@@ -49,7 +49,7 @@ async def get_oauth_token_status(
         
         # Build status response
         platform_status = {}
-        for platform in ['gsc', 'bing', 'wordpress', 'wix']:
+        for platform in ['gsc', 'bing', 'wordpress', 'wix', 'linkedin']:
             task = next((t for t in tasks if t.platform == platform), None)
             is_connected = platform in connected_platforms
             
@@ -109,7 +109,7 @@ async def manual_refresh_token(
     
     Args:
         user_id: User ID
-        platform: Platform identifier ('gsc', 'bing', 'wordpress', 'wix')
+        platform: Platform identifier ('gsc', 'bing', 'wordpress', 'wix', 'linkedin')
     """
     try:
         # Verify user can only access their own data
@@ -117,7 +117,7 @@ async def manual_refresh_token(
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Validate platform
-        valid_platforms = ['gsc', 'bing', 'wordpress', 'wix']
+        valid_platforms = ['gsc', 'bing', 'wordpress', 'wix', 'linkedin']
         if platform not in valid_platforms:
             raise HTTPException(
                 status_code=400,

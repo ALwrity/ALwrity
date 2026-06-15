@@ -17,7 +17,7 @@ try:
     REDIS_AVAILABLE = True
 except ImportError:
     REDIS_AVAILABLE = False
-    logger.warning("Redis not available, using in-memory caching")
+    logger.info("Redis not available, using in-memory caching")
 
 class CachingService:
     """Service for intelligent caching of content strategy data."""
@@ -69,7 +69,7 @@ class CachingService:
                 self.redis_available = True
                 logger.info("Redis connection established successfully")
             except Exception as e:
-                logger.warning(f"Redis connection failed: {str(e)}. Using in-memory cache.")
+                logger.info(f"Redis connection failed: {str(e)}. Using in-memory cache.")
                 self.redis_available = False
                 self.memory_cache = {}
         else:

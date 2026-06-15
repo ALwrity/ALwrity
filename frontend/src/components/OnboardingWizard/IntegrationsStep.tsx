@@ -192,10 +192,10 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
       description: 'Connect your LinkedIn profile for professional content publishing',
       icon: <LinkedInIcon />,
       category: 'social',
-      status: 'coming_soon',
+      status: 'available',
       features: ['Professional posting', 'Network insights', 'Content optimization'],
       benefits: ['LinkedIn article publishing', 'Professional network analytics', 'B2B content insights'],
-      isEnabled: false
+      isEnabled: true
     },
     {
       id: 'instagram',

@@ -242,6 +242,7 @@ const OAuthTokenStatus: React.FC<OAuthTokenStatusProps> = ({ compact = true }) =
       bing: 'Bing',
       wordpress: 'WP',
       wix: 'Wix',
+      linkedin: 'LinkedIn',
     };
     return names[platform] || platform.toUpperCase();
   };
@@ -293,7 +294,7 @@ const OAuthTokenStatus: React.FC<OAuthTokenStatusProps> = ({ compact = true }) =
     return null;
   }
   
-  const platforms = ['gsc', 'bing', 'wordpress', 'wix'];
+  const platforms = ['gsc', 'bing', 'wordpress', 'wix', 'linkedin'];
   
   return (
     <TerminalPaper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>

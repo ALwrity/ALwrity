@@ -23,7 +23,7 @@ class OAuthTokenMonitoringTask(Base):
     
     # User and Platform Identification
     user_id = Column(String(255), nullable=False, index=True)  # Clerk user ID (string)
-    platform = Column(String(50), nullable=False)  # 'gsc', 'bing', 'wordpress', 'wix'
+    platform = Column(String(50), nullable=False)  # 'gsc', 'bing', 'wordpress', 'wix', 'linkedin'
     
     # Task Status
     status = Column(String(50), default='active')  # 'active', 'failed', 'paused', 'needs_intervention'

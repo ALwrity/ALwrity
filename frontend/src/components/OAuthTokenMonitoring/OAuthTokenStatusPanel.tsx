@@ -156,6 +156,7 @@ const OAuthTokenStatusPanel: React.FC<OAuthTokenStatusPanelProps> = ({
       bing: 'Bing Webmaster Tools',
       wordpress: 'WordPress',
       wix: 'Wix',
+      linkedin: 'LinkedIn',
     };
     return names[platform] || platform.toUpperCase();
   };
@@ -183,7 +184,7 @@ const OAuthTokenStatusPanel: React.FC<OAuthTokenStatusPanelProps> = ({
     return null;
   }
   
-  const platforms = ['gsc', 'bing', 'wordpress', 'wix'];
+  const platforms = ['gsc', 'bing', 'wordpress', 'wix', 'linkedin'];
   
   return (
     <Card sx={{ mb: 2 }}>

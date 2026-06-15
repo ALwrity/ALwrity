@@ -22,8 +22,9 @@ from models.platform_insights_monitoring_models import PlatformInsightsTask, Pla
 from models.website_analysis_monitoring_models import (
     WebsiteAnalysisTask, WebsiteAnalysisExecutionLog, DeepWebsiteCrawlTask,
     OnboardingFullWebsiteAnalysisTask, DeepCompetitorAnalysisTask,
-    SIFIndexingTask, MarketTrendsTask, AdvertoolsTask,
+    SIFIndexingTask, MarketTrendsTask,
 )
+from models.advertools_monitoring_models import AdvertoolsTask
 
 router = APIRouter(prefix="/api/scheduler", tags=["scheduler-dashboard"])
 

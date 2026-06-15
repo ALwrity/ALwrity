@@ -20,6 +20,7 @@ from utils.logger_utils import get_service_logger
 from services.gsc_service import GSCService
 from services.integrations.bing_oauth import BingOAuthService
 from services.integrations.wordpress_oauth import WordPressOAuthService
+from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.wix_service import WixService
 from services.database import get_user_db_path
 
@@ -232,6 +233,7 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
         - Bing: bing_oauth_tokens table (via BingOAuthService)
         - WordPress: wordpress_oauth_tokens table (via WordPressOAuthService)
         - Wix: wix_oauth_tokens table (via WixOAuthService)
+        - LinkedIn: linkedin_oauth_tokens table (via LinkedInOAuthService)
         
         Args:
             task: OAuthTokenMonitoringTask instance
@@ -255,6 +257,8 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 return await self._check_wordpress_token(user_id)
             elif platform == 'wix':
                 return await self._check_wix_token(user_id)
+            elif platform == 'linkedin':
+                return await self._check_linkedin_token(user_id)
             else:
                 return TaskExecutionResult(
                     success=False,
@@ -645,6 +649,94 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 retryable=False
             )
     
+    async def _check_linkedin_token(self, user_id: str) -> TaskExecutionResult:
+        """Check and refresh LinkedIn Growth Engine credentials (Zernio or native OAuth)."""
+        try:
+            linkedin_service = LinkedInOAuthService()
+            token_status = linkedin_service.get_user_token_status(user_id)
+            provider_mode = token_status.get("provider_mode")
+
+            if not token_status.get("has_tokens"):
+                return TaskExecutionResult(
+                    success=False,
+                    error_message="No LinkedIn tokens found for user",
+                    result_data={
+                        'platform': 'linkedin',
+                        'user_id': user_id,
+                        'status': 'not_found',
+                        'check_time': datetime.utcnow().isoformat(),
+                    },
+                    retryable=False,
+                )
+
+            can_attempt = token_status.get("has_active_tokens") or (
+                token_status.get("has_expired_tokens")
+                and token_status.get("has_refreshable_tokens")
+            )
+
+            if can_attempt:
+                try:
+                    linkedin_service.get_valid_credentials(user_id, monitoring=True)
+                    status_label = (
+                        'refreshed'
+                        if token_status.get("has_expired_tokens")
+                        and not token_status.get("has_active_tokens")
+                        else 'valid'
+                    )
+                    return TaskExecutionResult(
+                        success=True,
+                        result_data={
+                            'platform': 'linkedin',
+                            'user_id': user_id,
+                            'status': status_label,
+                            'provider_mode': provider_mode,
+                            'check_time': datetime.utcnow().isoformat(),
+                            'message': f'LinkedIn credentials are {status_label}',
+                        },
+                    )
+                except Exception as e:
+                    return TaskExecutionResult(
+                        success=False,
+                        error_message=f"LinkedIn credential validation failed: {e}",
+                        result_data={
+                            'platform': 'linkedin',
+                            'user_id': user_id,
+                            'status': 'refresh_failed',
+                            'provider_mode': provider_mode,
+                            'check_time': datetime.utcnow().isoformat(),
+                        },
+                        retryable=False,
+                    )
+
+            return TaskExecutionResult(
+                success=False,
+                error_message="LinkedIn credentials expired and could not be refreshed",
+                result_data={
+                    'platform': 'linkedin',
+                    'user_id': user_id,
+                    'status': 'expired',
+                    'provider_mode': provider_mode,
+                    'check_time': datetime.utcnow().isoformat(),
+                    'message': 'LinkedIn credentials expired. User needs to reconnect.',
+                },
+                retryable=False,
+            )
+
+        except Exception as e:
+            self.logger.error(
+                f"Error checking LinkedIn token for user {user_id}: {e}", exc_info=True
+            )
+            return TaskExecutionResult(
+                success=False,
+                error_message=f"LinkedIn token check failed: {str(e)}",
+                result_data={
+                    'platform': 'linkedin',
+                    'user_id': user_id,
+                    'error': str(e),
+                },
+                retryable=False,
+            )
+
     def _create_failure_alert(
         self,
         user_id: str,
@@ -658,7 +750,7 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
         
         Args:
             user_id: User ID
-            platform: Platform identifier (gsc, bing, wordpress, wix)
+            platform: Platform identifier (gsc, bing, wordpress, wix, linkedin)
             error_message: Error message from token check
             result_data: Optional result data from token check
             db: Database session
@@ -682,7 +774,8 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 'gsc': 'Google Search Console',
                 'bing': 'Bing Webmaster Tools',
                 'wordpress': 'WordPress',
-                'wix': 'Wix'
+                'wix': 'Wix',
+                'linkedin': 'LinkedIn',
             }
             platform_display = platform_names.get(platform, platform.upper())
             

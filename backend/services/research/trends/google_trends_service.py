@@ -378,7 +378,7 @@ class GoogleTrendsService:
         timeframe: str,
         geo: str,
         gprop: str = "",
-    ) -> _TrendReq:
+    ) -> "_TrendReq":
         """Create TrendReq with optional gprop (e.g., 'youtube' for video trends)."""
         start = time.monotonic()
         ua = random.choice(self.USER_AGENTS)
@@ -401,7 +401,7 @@ class GoogleTrendsService:
     # Data fetchers — each catches all exceptions and returns defaults
     # -----------------------------------------------------------------------
 
-    def _fetch_interest_over_time(self, pytrends: _TrendReq, keywords: List[str] = None) -> List[Dict[str, Any]]:
+    def _fetch_interest_over_time(self, pytrends: "_TrendReq", keywords: List[str] = None) -> List[Dict[str, Any]]:
         """Fetch interest over time data."""
         start = time.monotonic()
         try:
@@ -426,7 +426,7 @@ class GoogleTrendsService:
             logger.error(f"[Trends] interest_over_time failed in {elapsed}ms: {e}")
             return []
 
-    def _fetch_interest_by_region(self, pytrends: _TrendReq, keywords: List[str] = None) -> List[Dict[str, Any]]:
+    def _fetch_interest_by_region(self, pytrends: "_TrendReq", keywords: List[str] = None) -> List[Dict[str, Any]]:
         """Fetch interest by region data."""
         start = time.monotonic()
         try:
@@ -449,7 +449,7 @@ class GoogleTrendsService:
             logger.error(f"[Trends] interest_by_region failed in {elapsed}ms: {e}")
             return []
 
-    def _fetch_related_topics(self, pytrends: _TrendReq) -> Dict[str, List[Dict[str, Any]]]:
+    def _fetch_related_topics(self, pytrends: "_TrendReq") -> Dict[str, List[Dict[str, Any]]]:
         """Fetch related topics. Patches catch IndexError from pytrends bug."""
         start = time.monotonic()
         result = {"top": [], "rising": []}
@@ -501,7 +501,7 @@ class GoogleTrendsService:
             logger.error(f"[Trends] related_topics failed in {elapsed}ms: {e}")
             return result
 
-    def _fetch_related_queries(self, pytrends: _TrendReq) -> Dict[str, List[Dict[str, Any]]]:
+    def _fetch_related_queries(self, pytrends: "_TrendReq") -> Dict[str, List[Dict[str, Any]]]:
         """Fetch related queries. Patches catch IndexError from pytrends bug."""
         start = time.monotonic()
         result = {"top": [], "rising": []}

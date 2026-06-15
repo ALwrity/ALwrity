@@ -16,6 +16,7 @@ from models.oauth_token_monitoring_models import OAuthTokenMonitoringTask
 from services.gsc_service import GSCService
 from services.integrations.bing_oauth import BingOAuthService
 from services.integrations.wordpress_oauth import WordPressOAuthService
+from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.integrations.wix_oauth import WixOAuthService
 from services.database import get_user_db_path
 
@@ -35,7 +36,7 @@ def get_connected_platforms(user_id: str) -> List[str]:
         user_id: User ID (Clerk string)
         
     Returns:
-        List of connected platform identifiers: ['gsc', 'bing', 'wordpress', 'wix', 'youtube']
+        List of connected platform identifiers: ['gsc', 'bing', 'wordpress', 'wix', 'youtube', 'linkedin']
     """
     connected = []
     
@@ -144,6 +145,21 @@ def get_connected_platforms(user_id: str) -> List[str]:
     except Exception as e:
         logger.warning(f"[OAuth Monitoring] ⚠️ YouTube check failed for user {user_id}: {e}", exc_info=True)
     
+    try:
+        db_path = get_user_db_path(user_id)
+        linkedin_service = LinkedInOAuthService(db_path=db_path)
+        token_status = linkedin_service.get_user_token_status(user_id)
+        has_active = token_status.get("has_active_tokens", False)
+        has_refreshable = token_status.get("has_refreshable_tokens", False)
+        has_expired = token_status.get("has_expired_tokens", False)
+        if has_active or (has_expired and has_refreshable):
+            connected.append("linkedin")
+            logger.debug(f"[OAuth Monitoring] ✅ LinkedIn connected for user {user_id}")
+        else:
+            logger.debug(f"[OAuth Monitoring] ❌ LinkedIn not connected for user {user_id}")
+    except Exception as e:
+        logger.warning(f"[OAuth Monitoring] ⚠️ LinkedIn check failed for user {user_id}: {e}", exc_info=True)
+    
     # Don't log here - let the caller log a formatted summary if needed
     # This function is called frequently and should be silent
     return connected
@@ -165,7 +181,7 @@ def create_oauth_monitoring_tasks(
         db: Database session
         platforms: Optional list of platforms to create tasks for.
                    If None, auto-detects connected platforms.
-                   Valid values: 'gsc', 'bing', 'wordpress', 'wix'
+                   Valid values: 'gsc', 'bing', 'wordpress', 'wix', 'linkedin'
         
     Returns:
         List of created OAuthTokenMonitoringTask instances
