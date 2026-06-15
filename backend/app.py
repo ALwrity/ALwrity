@@ -89,10 +89,8 @@ _log_memory_usage()
 logger.info("app.py: Early memory checkpoint after env load")
 
 
-# Import modular utilities (skip OnboardingManager import in feature-only modes)
+# Import modular utilities
 from alwrity_utils import HealthChecker, RateLimiter, FrontendServing, RouterManager
-if _is_full_mode():
-    from alwrity_utils import OnboardingManager
 
 # Skip monitoring middleware in feature-only modes to save memory
 if _is_full_mode():
@@ -108,10 +106,14 @@ setup_clean_logging()
 # Import middleware
 from middleware.auth_middleware import get_current_user
 
-# Import component logic endpoints (skip in feature-only modes - uses seo_analyzer)
+# Import component logic endpoints. These include onboarding style-detection routes
+# that the frontend calls during onboarding, even in feature-limited mode.
 component_logic_router = None
-if _is_full_mode():
+try:
     from api.component_logic import router as component_logic_router
+except Exception as e:
+    logger.warning(f"Failed to import component_logic router: {e}")
+    component_logic_router = None
 
 # Import subscription API endpoints
 from api.subscription import router as subscription_router
@@ -316,10 +318,22 @@ router_manager = RouterManager(app)
 router_group_status: Dict[str, Dict[str, Any]] = {}
 
 onboarding_manager = None
-# Only create OnboardingManager in full mode
-if _is_full_mode():
-    from alwrity_utils import OnboardingManager
+# Keep onboarding endpoints mounted in every feature profile; the frontend
+# relies on them for initialization and manual business-info saves.
+try:
+    from alwrity_utils.onboarding_manager import OnboardingManager
     onboarding_manager = OnboardingManager(app)
+    router_group_status["onboarding_manager"] = {
+        "mounted": True,
+        "reason": "Required by frontend onboarding flow",
+    }
+except Exception as e:
+    logger.error(f"Failed to mount onboarding manager: {e}")
+    onboarding_manager = None
+    router_group_status["onboarding_manager"] = {
+        "mounted": False,
+        "reason": str(e),
+    }
 
 # Middleware Order (FastAPI executes in REVERSE order of registration - LIFO):
 # Registration order:  1. Monitoring  2. Rate Limit  3. API Key Injection
@@ -411,12 +425,12 @@ async def feature_profile_status():
 @app.get("/api/onboarding/status")
 async def onboarding_status():
     """Get onboarding manager status (or demo-mode disabled state)."""
-    if not _is_full_mode():
+    if onboarding_manager is None:
         return {
             "enabled": False,
             "status": "disabled",
-            "message": f"Onboarding is disabled in feature-only mode. Enabled features: {list(get_enabled_features())}",
-            "feature_mode": "single",
+            "message": "Onboarding manager failed to mount",
+            "feature_mode": "single" if not _is_full_mode() else "full",
         }
     return onboarding_manager.get_onboarding_status()
 
@@ -494,6 +508,14 @@ else:
         "mounted": True,
         "reason": f"Feature-only mode: {enabled_features}",
     }
+
+    # The frontend onboarding wizard calls style-detection routes under
+    # /api/onboarding/style-detection/... even outside full mode.
+    if component_logic_router:
+        router_group_status["component_logic_onboarding"] = {
+            "mounted": router_manager.include_router_safely(component_logic_router, "component_logic_onboarding"),
+            "reason": "Required by frontend onboarding style-detection flow",
+        }
 
 # Safety net: explicitly include hallucination detector (import may fail gracefully)
 if hallucination_detector_router:

@@ -86,19 +86,30 @@ get_db = get_db_dependency
 async def log_api_request(request: Request, db: Session, duration: float, status_code: int):
     """Log API request to database for monitoring."""
     try:
-        await monitor.add_request(
-            db=db,
+        request_size = 0
+        try:
+            if request.method == "POST":
+                request_size = len(await request.body())
+        except Exception as size_error:
+            logger.debug(f"Could not calculate LinkedIn API request size: {size_error}")
+
+        api_request = APIRequest(
             path=str(request.url.path),
             method=request.method,
             status_code=status_code,
             duration=duration,
             user_id=request.headers.get("X-User-ID"),
-            request_size=len(await request.body()) if request.method == "POST" else 0,
+            request_size=request_size,
             user_agent=request.headers.get("User-Agent"),
             ip_address=request.client.host if request.client else None
         )
+        db.add(api_request)
         db.commit()
     except Exception as e:
+        try:
+            db.rollback()
+        except Exception:
+            pass
         logger.error(f"Failed to log API request: {str(e)}")
 
 
@@ -286,6 +297,12 @@ async def generate_article(
         
         if not response.success:
             raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Article generation failed"))
+
+        # Log successful request
+        duration = time.time() - start_time
+        background_tasks.add_task(
+            log_api_request, http_request, db, duration, 200
+        )
         
         # Save and track text content (non-blocking)
         if user_id and response.data:

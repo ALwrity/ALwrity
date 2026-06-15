@@ -16,6 +16,43 @@ class VideoScriptGenerator:
     def __init__(self, citation_manager=None, quality_analyzer=None):
         self.citation_manager = citation_manager
         self.quality_analyzer = quality_analyzer
+
+    def _extract_response_citations(self, content: str, research_sources: List) -> List[Dict[str, Any]]:
+        """Extract citations and adapt them to the public LinkedIn Citation schema."""
+        if not self.citation_manager:
+            return []
+
+        raw_citations = self.citation_manager.extract_citations(content)
+        source_count = len(research_sources or [])
+        citations: List[Dict[str, Any]] = []
+        skipped = 0
+
+        for raw in raw_citations:
+            try:
+                source_index = int(raw.get("number"))
+            except (TypeError, ValueError):
+                skipped += 1
+                continue
+
+            if source_count and not 1 <= source_index <= source_count:
+                skipped += 1
+                continue
+
+            citations.append({
+                "type": "inline",
+                "reference": f"Source {source_index}",
+                "position": raw.get("position"),
+                "source_index": source_index
+            })
+
+        if skipped:
+            logger.debug(
+                "Skipped {} video citation candidates that did not map to {} research sources",
+                skipped,
+                source_count
+            )
+
+        return citations
     
     async def generate_video_script(
         self,
@@ -34,7 +71,7 @@ class VideoScriptGenerator:
             source_list = None
             if request.include_citations and research_sources and self.citation_manager:
                 all_content = f"{content_result['hook']} {' '.join([scene['content'] for scene in content_result['main_content']])} {content_result['conclusion']}"
-                citations = self.citation_manager.extract_citations(all_content)
+                citations = self._extract_response_citations(all_content, research_sources)
                 source_list = self.citation_manager.generate_source_list(research_sources)
             
             # Step 4: Analyze content quality

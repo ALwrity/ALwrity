@@ -123,6 +123,45 @@ class ContentGenerator:
         
         context_parts.append("\nInstructions: Use the research above to include specific data points, statistics, and factual claims in your content. Cite sources where appropriate.")
         return "\n".join(context_parts)
+
+    def _extract_response_citations(self, content: str, research_sources: List) -> List[Dict[str, Any]]:
+        """Extract citations and adapt them to the public LinkedIn Citation schema."""
+        if not self.citation_manager:
+            return []
+
+        raw_citations = self.citation_manager.extract_citations(content)
+        source_count = len(research_sources or [])
+        citations: List[Dict[str, Any]] = []
+        skipped = 0
+
+        for raw in raw_citations:
+            citation_number = raw.get("number")
+            try:
+                source_index = int(citation_number)
+            except (TypeError, ValueError):
+                skipped += 1
+                continue
+
+            # Avoid treating years like "(2024)" as source citations.
+            if source_count and not 1 <= source_index <= source_count:
+                skipped += 1
+                continue
+
+            citations.append({
+                "type": "inline",
+                "reference": f"Source {source_index}",
+                "position": raw.get("position"),
+                "source_index": source_index
+            })
+
+        if skipped:
+            logger.debug(
+                "Skipped {} extracted citation candidates that did not map to {} research sources",
+                skipped,
+                source_count
+            )
+
+        return citations
     
     async def generate_post(
         self,
@@ -165,7 +204,7 @@ class ContentGenerator:
             if request.include_citations and research_sources and self.citation_manager:
                 try:
                     logger.info(f"Processing citations for content length: {len(content_result['content'])}")
-                    citations = self.citation_manager.extract_citations(content_result['content'])
+                    citations = self._extract_response_citations(content_result['content'], research_sources)
                     logger.info(f"Extracted {len(citations)} citations from content")
                     source_list = self.citation_manager.generate_source_list(research_sources)
                     logger.info(f"Generated source list: {source_list[:200] if source_list else 'None'}")
@@ -251,7 +290,8 @@ class ContentGenerator:
             
             if request.include_citations and research_sources and self.citation_manager:
                 try:
-                    citations = self.citation_manager.extract_citations(content_result['content'])
+                    citations = self._extract_response_citations(content_result['content'], research_sources)
+                    logger.info(f"Extracted {len(citations)} article citations from content")
                     source_list = self.citation_manager.generate_source_list(research_sources)
                 except Exception as e:
                     logger.warning(f"Citation processing failed: {e}")
