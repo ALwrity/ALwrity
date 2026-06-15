@@ -58,7 +58,7 @@ OPTIONAL_ROUTER_REGISTRY = [
     {"name": "image_studio", "module": "routers.image_studio", "attr": "router", "features": {"all", "image_studio"}},
     {"name": "product_marketing", "module": "routers.product_marketing", "attr": "router", "features": {"all", "product_marketing"}},
     {"name": "campaign_creator", "module": "routers.campaign_creator", "attr": "router", "features": {"all"}},
-    {"name": "content_assets", "module": "api.content_assets.router", "attr": "router", "features": {"all"}},
+    {"name": "content_assets", "module": "api.content_assets.router", "attr": "router", "features":  {"all", "linkedin", "podcast", "blog_writer"}},
     {"name": "podcast", "module": "api.podcast.router", "attr": "router", "features": {"all", "podcast"}},
     {"name": "youtube", "module": "api.youtube.router", "attr": "router", "features": {"all", "youtube"}, "include_kwargs": {"prefix": "/api"}},
     {"name": "research_config", "module": "api.research_config", "attr": "router", "features": {"all", "research"}, "include_kwargs": {"prefix": "/api/research", "tags": ["research"]}},

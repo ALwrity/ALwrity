@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Button, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
 import { CopilotSidebar } from '@copilotkit/react-ui';
@@ -14,8 +14,6 @@ import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
 import { saveLinkedInToAssetLibrary } from '../../services/linkedInWriterApi';
-import { useContentPlanningStore } from '../../stores/contentPlanningStore';
-import { useWorkflowStore } from '../../stores/workflowStore';
 import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
 // Optional debug flag: set to true to enable verbose logs locally
@@ -130,8 +128,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
-  const navigate = useNavigate();
-  const { completeTask } = useWorkflowStore();
   const locationState = location.state as { 
     calendarTopic?: string; 
     calendarDescription?: string;
@@ -152,11 +148,10 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Save to Asset Library + Mark Calendar Event Complete ──────
+  // ── Save to Asset Library (podcast-maker pattern: save only, stay on page) ──
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
-  const { updateEvent } = useContentPlanningStore();
-
+  
   const handleSaveToAssetLibrary = async () => {
     if (!draft) return;
     setSaveStatus('saving');
@@ -167,7 +162,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
         : undefined;
       const title = draft.split('\n')[0].substring(0, 100) || 'LinkedIn Post';
 
-      await saveLinkedInToAssetLibrary({
+      const result = await saveLinkedInToAssetLibrary({
         title,
         content: draft,
         topic,
@@ -178,28 +173,10 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
         },
       });
 
-      // Mark the originating calendar event as published
-      if (locationState?.calendarEventId) {
-        try {
-          await updateEvent(locationState.calendarEventId, { status: 'published' });
-        } catch (err) {
-          console.warn('[LinkedInWriter] Failed to update calendar event status:', err);
-        }
-      }
-
-      // Mark the workflow task as completed (for calendar-sourced tasks)
-      if (locationState?.workflowTaskId) {
-        try {
-          await completeTask(locationState.workflowTaskId);
-        } catch (err) {
-          console.warn('[LinkedInWriter] Failed to complete workflow task:', err);
-        }
-      }
+      console.log('[LinkedInWriter] Saved to Asset Library, assetId:', result.assetId);
 
       setSaveStatus('saved');
 
-      // Navigate back to dashboard after a brief delay so the user sees "saved"
-      setTimeout(() => navigate('/dashboard'), 1500);
     } catch (err: any) {
       const message = err?.response?.data?.detail || err?.message || 'Please try again.';
       console.error('[LinkedInWriter] Save failed:', err);
@@ -496,6 +473,7 @@ Always use the most appropriate tool for the user's request.`.trim();
           {draft && !isGenerating && (
             <div style={{ padding: '8px 24px', display: 'flex', justifyContent: 'flex-end' }}>
               <Button
+                type='button'
                 variant="contained"
                 color="success"
                 startIcon={saveStatus === 'saving' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}

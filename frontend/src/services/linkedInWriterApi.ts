@@ -348,5 +348,7 @@ export const saveLinkedInToAssetLibrary = async (
     },
   });
 
+  console.log('[linkedInWriterApi] LinkedIn post saved to Asset Library:', response.data.id);
+  
   return { assetId: response.data.id };
 };
