@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { isFeatureEnabled } from '../../utils/demoMode';
+import { isFeatureEnabled, shouldSkipOnboarding } from '../../utils/demoMode';
 
 interface FeatureRouteProps {
   feature: string;
@@ -25,7 +25,9 @@ const FeatureRoute: React.FC<FeatureRouteProps> = ({
   children, 
   redirectTo = '/dashboard' 
 }) => {
-  if (!isFeatureEnabled(feature)) {
+  const isAssetLibraryInFeatureMode = feature === 'asset-library' && shouldSkipOnboarding();
+
+  if (!isFeatureEnabled(feature) && !isAssetLibraryInFeatureMode) {
     return <Navigate to={redirectTo} replace />;
   }
   return <>{children}</>;

@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useOnboarding } from '../../contexts/OnboardingContext';
-import { shouldSkipOnboarding, getDefaultLandingRoute } from '../../utils/demoMode';
+import { shouldSkipOnboarding, isFeatureOnlyAllowedPath } from '../../utils/demoMode';
 import { useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
@@ -37,14 +37,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     try { return localStorage.getItem('onboarding_complete') === 'true'; } catch { return false; }
   })();
   const isFeatureLimited = shouldSkipOnboarding();
-  const defaultRoute = getDefaultLandingRoute();
-  const isOnDefaultRoute = typeof location?.pathname === 'string' && location.pathname.startsWith(defaultRoute);
+  const pathname = typeof location?.pathname === 'string' ? location.pathname : '';
+  const isOnFeatureOnlyRoute = isFeatureOnlyAllowedPath(pathname);
 
   // Allow access to utility pages regardless of onboarding status
   const bypassRoutes = ['/billing', '/pricing', '/onboarding'];
-  const isBypassRoute = typeof location?.pathname === 'string' && bypassRoutes.some(route => location.pathname.startsWith(route));
+  const isBypassRoute = pathname !== '' && bypassRoutes.some(route => pathname.startsWith(route));
 
-  const allowAccess = isOnboardingComplete || localComplete || (isFeatureLimited && isOnDefaultRoute) || isBypassRoute;
+  const allowAccess = isOnboardingComplete || localComplete || (isFeatureLimited && isOnFeatureOnlyRoute) || isBypassRoute;
 
   // Wait for Clerk to load before any redirect decisions
   if (!isLoaded) {

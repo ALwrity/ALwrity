@@ -160,3 +160,30 @@ export function shouldSkipOnboarding(): boolean {
   const enabled = getEnabledFeatures();
   return !enabled.has('all');
 }
+
+/** Shared routes allowed in feature-only mode without completing onboarding. */
+const FEATURE_ONLY_SHARED_ROUTES = ['/asset-library'];
+
+/**
+ * Whether a pathname is reachable in feature-only mode without onboarding.
+ * Includes the default landing route, shared utility routes, and any enabled feature route.
+ */
+export function isFeatureOnlyAllowedPath(pathname: string): boolean {
+  if (!pathname || !shouldSkipOnboarding()) {
+    return false;
+  }
+
+  const defaultRoute = getDefaultLandingRoute();
+  if (pathname.startsWith(defaultRoute)) {
+    return true;
+  }
+
+  if (FEATURE_ONLY_SHARED_ROUTES.some((route) => pathname.startsWith(route))) {
+    return true;
+  }
+
+  const enabled = getEnabledFeatures();
+  return FEATURE_ROUTE_PRIORITY.some(
+    ([feature, route]) => enabled.has(feature) && pathname.startsWith(route)
+  );
+}
