@@ -42,6 +42,8 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
         self.exception_handler = SchedulerExceptionHandler()
         # Expiration warning window (7 days before expiration)
         self.expiration_warning_days = 7
+        self.max_refresh_retries = 3
+        self.base_retry_backoff_minutes = 15
     
     async def execute_task(self, task: OAuthTokenMonitoringTask, db: Session) -> TaskExecutionResult:
         """
@@ -93,6 +95,10 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 task.last_success = datetime.utcnow()
                 task.status = 'active'
                 task.failure_reason = None
+                task.terminal_failure_reason = None
+                task.channel_status = 'connected'
+                task.refresh_attempts = 0
+                task.next_retry_at = None
                 # Reset failure tracking on success
                 task.consecutive_failures = 0
                 task.failure_pattern = None
@@ -112,6 +118,7 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 
                 task.last_failure = datetime.utcnow()
                 task.failure_reason = result.error_message
+                task.refresh_attempts = (task.refresh_attempts or 0) + 1
                 
                 if pattern and pattern.should_cool_off:
                     # Mark task for human intervention
@@ -126,6 +133,9 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                     }
                     # Clear next_check - task won't run automatically
                     task.next_check = None
+                    task.next_retry_at = None
+                    task.channel_status = "disconnected"
+                    task.terminal_failure_reason = result.error_message
                     
                     self.logger.warning(
                         f"Task {task.id} marked for human intervention: "
@@ -133,10 +143,17 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                         f"reason: {pattern.failure_reason.value}"
                     )
                 else:
-                    # Normal failure handling
-                    task.status = 'failed'
                     task.consecutive_failures = (task.consecutive_failures or 0) + 1
-                    # Do NOT update next_check - wait for manual trigger
+                    if task.refresh_attempts >= self.max_refresh_retries:
+                        task.status = 'failed'
+                        task.channel_status = 'disconnected'
+                        task.terminal_failure_reason = result.error_message
+                        task.next_retry_at = None
+                    else:
+                        task.status = 'degraded'
+                        task.channel_status = 'degraded'
+                        delay_minutes = self.base_retry_backoff_minutes * (2 ** (task.refresh_attempts - 1))
+                        task.next_retry_at = datetime.utcnow() + timedelta(minutes=delay_minutes)
                 
                 self.logger.warning(
                     f"OAuth token refresh failed for user {user_id}, platform {platform}. "
@@ -144,7 +161,7 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 )
                 
                 # Create UsageAlert notification for the user
-                self._create_failure_alert(user_id, platform, result.error_message, result.result_data, db)
+                self._create_failure_alert(user_id, platform, result.error_message, result.result_data, db, task)
             
             task.updated_at = datetime.utcnow()
             db.commit()
@@ -193,12 +210,14 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 task.last_failure = datetime.utcnow()
                 task.failure_reason = str(e)
                 task.status = 'failed'
+                task.channel_status = 'disconnected'
+                task.terminal_failure_reason = str(e)
                 task.last_check = datetime.utcnow()
                 task.updated_at = datetime.utcnow()
-                # Do NOT update next_check - wait for manual trigger
+                task.next_retry_at = None
                 
                 # Create UsageAlert notification for the user
-                self._create_failure_alert(user_id, task.platform, str(e), None, db)
+                self._create_failure_alert(user_id, task.platform, str(e), None, db, task)
                 
                 db.commit()
             except Exception as commit_error:
@@ -651,7 +670,8 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
         platform: str,
         error_message: str,
         result_data: Optional[Dict[str, Any]],
-        db: Session
+        db: Session,
+        task: Optional[OAuthTokenMonitoringTask] = None
     ):
         """
         Create a UsageAlert notification when OAuth token refresh fails.
@@ -723,6 +743,20 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
             # Get current billing period (YYYY-MM format)
             from datetime import datetime
             billing_period = datetime.utcnow().strftime("%Y-%m")
+
+            alert_payload = {
+                "requires_user_action": True,
+                "platform": platform,
+                "channel_status": getattr(task, "channel_status", "disconnected"),
+                "terminal_failure_reason": getattr(task, "terminal_failure_reason", error_message),
+                "next_retry_at": (
+                    task.next_retry_at.isoformat() if task and task.next_retry_at else None
+                ),
+                "refresh_attempts": getattr(task, "refresh_attempts", 0),
+                "max_refresh_retries": self.max_refresh_retries,
+            }
+
+            message = f"{message} [ALERT_PAYLOAD] {alert_payload}"
             
             # Create UsageAlert
             alert = UsageAlert(
@@ -786,4 +820,3 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 f"Defaulting to Weekly (7 days)."
             )
             return last_execution + timedelta(days=7)
-

@@ -40,6 +40,10 @@ class OAuthTokenMonitoringTask(Base):
     
     # Scheduling
     next_check = Column(DateTime, nullable=True, index=True)  # Next scheduled check time
+    next_retry_at = Column(DateTime, nullable=True, index=True)  # Backoff retry schedule for refresh failures
+    refresh_attempts = Column(Integer, default=0)  # Current retry attempt count for refresh workflow
+    terminal_failure_reason = Column(Text, nullable=True)  # Permanent failure reason requiring user action
+    channel_status = Column(String(32), default='connected')  # connected, degraded, disconnected
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -97,4 +101,3 @@ class OAuthTokenExecutionLog(Base):
     
     def __repr__(self):
         return f"<OAuthTokenExecutionLog(id={self.id}, task_id={self.task_id}, status={self.status}, execution_date={self.execution_date})>"
-

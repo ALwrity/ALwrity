@@ -26,7 +26,10 @@ from .executors.advertools_executor import AdvertoolsExecutor
 from .executors.sif_indexing_executor import SIFIndexingExecutor
 from .executors.market_trends_executor import MarketTrendsExecutor
 from .utils.task_loader import load_due_monitoring_tasks
-from .utils.oauth_token_task_loader import load_due_oauth_token_monitoring_tasks
+from .utils.oauth_token_task_loader import (
+    load_due_oauth_token_monitoring_tasks,
+    load_near_expiry_oauth_token_tasks
+)
 from .utils.website_analysis_task_loader import load_due_website_analysis_tasks
 from .utils.onboarding_full_website_analysis_task_loader import load_due_onboarding_full_website_analysis_tasks
 from .utils.deep_competitor_analysis_task_loader import load_due_deep_competitor_analysis_tasks
@@ -69,6 +72,11 @@ def get_scheduler() -> TaskScheduler:
             'oauth_token_monitoring',
             oauth_token_executor,
             load_due_oauth_token_monitoring_tasks
+        )
+        _scheduler_instance.register_executor(
+            'oauth_token_refresh',
+            oauth_token_executor,
+            load_near_expiry_oauth_token_tasks
         )
         
         # Register website analysis executor
