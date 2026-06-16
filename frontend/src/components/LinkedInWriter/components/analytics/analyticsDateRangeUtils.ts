@@ -1,7 +1,7 @@
 import type {
   LinkedInAnalyticsPresetDays,
   LinkedInPersonalAnalyticsRequest,
-} from '../../../api/linkedinSocial';
+} from '../../../../api/linkedinSocial';
 
 export const PRESET_OPTIONS: Array<{ value: LinkedInAnalyticsPresetDays; label: string }> = [
   { value: 7, label: '7 days' },
