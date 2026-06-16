@@ -79,3 +79,9 @@ class LinkedInLandingAnalyticsResponse(BaseModel):
     organization: Optional[LinkedInLandingOrgAnalyticsResponse] = None
     dataDelayNote: Optional[str] = None
     provider: str
+
+
+class LinkedInPersonalAnalyticsResponse(BaseModel):
+    dateRange: LinkedInAnalyticsDateRangeResponse
+    personal: LinkedInLandingPersonalAnalyticsResponse
+    provider: str

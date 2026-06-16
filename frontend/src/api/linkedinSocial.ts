@@ -91,6 +91,27 @@ export interface LinkedInLandingAnalyticsResponse {
 
 export type LinkedInAnalyticsTab = 'personal' | 'organization';
 
+export type LinkedInAnalyticsPresetDays = 7 | 14 | 28 | 90 | 365;
+
+export type LinkedInPersonalAnalyticsPresetRequest = {
+  presetDays: LinkedInAnalyticsPresetDays;
+};
+
+export type LinkedInPersonalAnalyticsCustomRequest = {
+  startDate: string;
+  endDate: string;
+};
+
+export type LinkedInPersonalAnalyticsRequest =
+  | LinkedInPersonalAnalyticsPresetRequest
+  | LinkedInPersonalAnalyticsCustomRequest;
+
+export interface LinkedInPersonalAnalyticsResponse {
+  dateRange: LinkedInAnalyticsDateRange;
+  personal: LinkedInLandingPersonalAnalytics;
+  provider: string;
+}
+
 const BASE = '/api/linkedin-social';
 
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
@@ -187,5 +208,18 @@ export async function listLinkedInOrganizations(
 /** Rolling last-7-day personal + org analytics for the Writer landing page. */
 export async function getLinkedInLandingAnalytics(): Promise<LinkedInLandingAnalyticsResponse> {
   const response = await apiClient.get(`${BASE}/analytics/landing`);
+  return response.data;
+}
+
+/** Personal profile aggregate analytics for a selected date range. */
+export async function getLinkedInPersonalAnalytics(
+  request: LinkedInPersonalAnalyticsRequest
+): Promise<LinkedInPersonalAnalyticsResponse> {
+  const params =
+    'presetDays' in request
+      ? { presetDays: request.presetDays }
+      : { startDate: request.startDate, endDate: request.endDate };
+
+  const response = await apiClient.get(`${BASE}/analytics/personal`, { params });
   return response.data;
 }

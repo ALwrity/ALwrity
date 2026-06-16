@@ -7,6 +7,7 @@ import {
 } from '../../../../hooks/useLinkedInAnalyticsDashboard';
 import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
 import { AnalyticsDateRangeLabel } from './AnalyticsDateRangeLabel';
+import { AnalyticsDateRangePicker } from './AnalyticsDateRangePicker';
 import { AnalyticsEmptyState } from './AnalyticsEmptyState';
 import { AnalyticsMetricGrid } from './AnalyticsMetricGrid';
 import { AvatarTabSwitcher, orgTabInitials } from './AvatarTabSwitcher';
@@ -26,12 +27,14 @@ export const LinkedInAnalyticsDashboard: React.FC<LinkedInAnalyticsDashboardProp
   const {
     isLoading,
     error,
-    dateRange,
+    personalDateRange,
+    orgDateRange,
     personal,
     organization,
     activeTab,
     setActiveTab,
     refresh,
+    applyPersonalDateRange,
   } = useLinkedInAnalyticsDashboard();
 
   const showOrgTab = organization != null;
@@ -100,17 +103,26 @@ export const LinkedInAnalyticsDashboard: React.FC<LinkedInAnalyticsDashboardProp
               gap: 8,
             }}
           >
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#475569',
-                textTransform: 'uppercase',
-                letterSpacing: '0.04em',
-              }}
-            >
-              Last 7 days
-            </span>
+            {activeTab === 'personal' ? (
+              <AnalyticsDateRangePicker
+                dateRange={personalDateRange}
+                onApply={applyPersonalDateRange}
+                disabled={!personal}
+                isLoading={isLoading}
+              />
+            ) : (
+              <span
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#475569',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                Last 7 days
+              </span>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <Tooltip title="Refresh analytics">
                 <span>
@@ -172,7 +184,9 @@ export const LinkedInAnalyticsDashboard: React.FC<LinkedInAnalyticsDashboardProp
             onTabChange={setActiveTab}
           />
 
-          <AnalyticsDateRangeLabel dateRange={dateRange} />
+          {activeTab === 'organization' && (
+            <AnalyticsDateRangeLabel dateRange={orgDateRange} />
+          )}
 
           {showGlobalError && (
             <p

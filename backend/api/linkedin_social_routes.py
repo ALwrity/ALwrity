@@ -7,6 +7,7 @@ Separate from routers/linkedin.py (content generation / LinkedIn Writer).
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -24,9 +25,15 @@ from models.linkedin_social_models import (
     LinkedInLandingAnalyticsResponse,
     LinkedInOrganizationResponse,
     LinkedInOrganizationsListResponse,
+    LinkedInPersonalAnalyticsResponse,
+)
+from services.integrations.linkedin.analytics_dates import (
+    InvalidAnalyticsDateRange,
+    parse_range_request,
 )
 from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
+from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
 from services.integrations.linkedin_oauth import LinkedInOAuthService
@@ -389,6 +396,73 @@ async def get_landing_analytics(
     except Exception as e:
         logger.exception(f"[LinkedInAnalytics] landing failed user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to load LinkedIn analytics") from e
+
+
+@router.get("/analytics/personal", response_model=LinkedInPersonalAnalyticsResponse)
+async def get_personal_analytics(
+    preset_days: Optional[int] = Query(
+        None,
+        alias="presetDays",
+        description="Preset window: 7, 14, 28, 90, or 365 days",
+    ),
+    start_date: Optional[str] = Query(
+        None,
+        alias="startDate",
+        description="Custom range start (YYYY-MM-DD, inclusive)",
+    ),
+    end_date: Optional[str] = Query(
+        None,
+        alias="endDate",
+        description="Custom range end (YYYY-MM-DD, inclusive in UI)",
+    ),
+    current_user: dict = Depends(get_current_user),
+) -> LinkedInPersonalAnalyticsResponse:
+    """Normalized personal profile aggregate analytics for a date range."""
+    user_id = _user_id(current_user)
+    provider = get_linkedin_provider()
+    try:
+        if preset_days is not None and preset_days not in (7, 14, 28, 90, 365):
+            raise InvalidAnalyticsDateRange(
+                "presetDays must be one of 7, 14, 28, 90, or 365."
+            )
+        date_range = parse_range_request(
+            today=date.today(),
+            preset_days=preset_days,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if preset_days is not None:
+            logger.warning(
+                f"[LinkedInAnalytics] personal range user_id={user_id} preset={preset_days}"
+            )
+        elif start_date and end_date:
+            logger.warning(
+                f"[LinkedInAnalytics] personal range user_id={user_id} "
+                f"custom start={start_date} end={end_date}"
+            )
+        payload = await build_personal_analytics_payload(
+            user_id, provider, _oauth_service, date_range
+        )
+        return LinkedInPersonalAnalyticsResponse(**payload)
+    except InvalidAnalyticsDateRange as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except LinkedInNotConnectedError as e:
+        raise HTTPException(status_code=401, detail=str(e)) from e
+    except ZernioAPIError as e:
+        status = e.status_code or 502
+        if status in (402, 403, 412):
+            raise HTTPException(status_code=status, detail=str(e)) from e
+        logger.warning(
+            f"[LinkedInAnalytics] personal Zernio error user_id={user_id}: {e}"
+        )
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        logger.exception(
+            f"[LinkedInAnalytics] personal failed user_id={user_id}: {e}"
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to load personal LinkedIn analytics"
+        ) from e
 
 
 @router.get("/analytics/profile", response_model=LinkedInAnalyticsResponse)
