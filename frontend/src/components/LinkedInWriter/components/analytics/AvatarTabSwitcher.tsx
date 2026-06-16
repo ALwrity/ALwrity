@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Business as BusinessIcon } from '@mui/icons-material';
 import type { LinkedInAnalyticsTab } from '../../../../hooks/useLinkedInAnalyticsDashboard';
 
 const AVATAR_SIZE = 48;
@@ -9,7 +8,7 @@ interface AvatarTab {
   id: LinkedInAnalyticsTab;
   avatarUrl?: string | null;
   fallbackInitials: string;
-  isOrg?: boolean;
+  ariaLabel: string;
 }
 
 interface AvatarTabSwitcherProps {
@@ -47,9 +46,7 @@ const AvatarTabButton: React.FC<{
       type="button"
       role="tab"
       aria-selected={isActive}
-      aria-label={
-        tab.isOrg ? 'Organization page analytics' : 'Personal profile analytics'
-      }
+      aria-label={tab.ariaLabel}
       onClick={onSelect}
       style={avatarButtonStyle(isActive)}
     >
@@ -64,8 +61,6 @@ const AvatarTabButton: React.FC<{
           }}
           onError={() => setImageFailed(true)}
         />
-      ) : tab.isOrg ? (
-        <BusinessIcon sx={{ color: '#64748b', fontSize: 24 }} aria-hidden />
       ) : (
         <span
           style={{
@@ -110,3 +105,12 @@ export const AvatarTabSwitcher: React.FC<AvatarTabSwitcherProps> = ({
     </div>
   );
 };
+
+/** First letter of org name for avatar tab fallback, or "CO" when unknown. */
+export function orgTabInitials(orgName?: string | null): string {
+  const trimmed = orgName?.trim();
+  if (trimmed) {
+    return trimmed.charAt(0).toUpperCase();
+  }
+  return 'CO';
+}

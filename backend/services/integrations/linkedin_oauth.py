@@ -9,12 +9,13 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import secrets
 import sqlite3
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Mapping, Optional, Tuple
-from urllib.parse import quote, urlencode
+from urllib.parse import quote, unquote, urlencode
 
 import requests
 from cryptography.fernet import Fernet, InvalidToken
@@ -30,11 +31,16 @@ from services.integrations.linkedin.zernio_client import (
     account_name_from_item,
     account_type_from_item,
     create_profile_sync,
-    delete_account_sync,
     get_connect_url_sync,
-    list_accounts_sync,
+    parse_select_linkedin_account_response,
+    select_linkedin_organization_sync,
     zernio_base_url,
     _parse_account_items,
+)
+from services.integrations.linkedin.account_resolution import (
+    fetch_linkedin_account_items,
+    partition_zernio_account_items,
+    summarize_zernio_account_items,
 )
 
 
@@ -374,6 +380,7 @@ class LinkedInOAuthService:
             is_active,
             created_at,
             _updated_at,
+            zernio_profile_id,
         ) = row
         not_expired, expires_dt = self._parse_expires_at(expires_at)
         has_refresh = bool(linkedin_refresh_token)
@@ -382,6 +389,7 @@ class LinkedInOAuthService:
             "provider_mode": provider_mode,
             "zernio_account_id": zernio_account_id,
             "zernio_org_account_id": zernio_org_account_id,
+            "zernio_profile_id": zernio_profile_id,
             "expires_at": expires_at,
             "account_name": account_name,
             "profile_urn": profile_urn,
@@ -665,56 +673,18 @@ class LinkedInOAuthService:
             return False
 
     def disconnect_user(self, user_id: str) -> Dict[str, Any]:
-        """Revoke per-user tokens and best-effort Zernio account removal."""
+        """Unlink LinkedIn from ALwrity (local tokens only; Zernio accounts are preserved)."""
         logger.info(f"[LinkedInConnect] disconnect_user start user_id={user_id}")
-        row = self._get_active_token_row(user_id)
-        zernio_deleted = False
-        deleted_ids: set[str] = set()
-        if row:
-            creds = self._row_to_credentials(row)
-            if creds.provider_mode == "zernio" and creds.zernio_api_key:
-                account_ids_to_delete: List[str] = []
-                if creds.zernio_profile_id:
-                    try:
-                        raw = list_accounts_sync(
-                            creds.zernio_api_key,
-                            creds.zernio_api_url,
-                            creds.zernio_profile_id,
-                            platform="linkedin",
-                        )
-                        for item in _parse_account_items(raw):
-                            aid = account_id_from_item(item)
-                            if aid:
-                                account_ids_to_delete.append(aid)
-                    except Exception as e:
-                        logger.warning(
-                            f"[LinkedInConnect] could not list Zernio accounts for disconnect "
-                            f"user_id={user_id}: {e}"
-                        )
-                if not account_ids_to_delete:
-                    for aid in (creds.zernio_account_id, creds.zernio_org_account_id):
-                        if aid:
-                            account_ids_to_delete.append(aid)
-                for aid in account_ids_to_delete:
-                    if aid in deleted_ids:
-                        continue
-                    if delete_account_sync(
-                        creds.zernio_api_key,
-                        creds.zernio_api_url,
-                        aid,
-                    ):
-                        zernio_deleted = True
-                        deleted_ids.add(aid)
         revoked = self.revoke_token(user_id)
         status = self.get_connection_status(user_id)
-        logger.info(
+        logger.warning(
             f"[LinkedInConnect] disconnect_user done user_id={user_id} "
-            f"revoked={revoked} zernio_deleted={zernio_deleted}"
+            f"revoked={revoked} zernio_accounts_preserved=true"
         )
         return {
-            "success": revoked or zernio_deleted,
+            "success": revoked,
             "revoked": revoked,
-            "zernio_account_deleted": zernio_deleted,
+            "zernio_account_deleted": False,
             "connected": status.get("connected", False),
             "has_env_fallback": False,
         }
@@ -796,26 +766,42 @@ class LinkedInOAuthService:
         if not profile_id:
             raise ValueError("No Zernio profile found for user; run ensure_zernio_profile first")
 
-        raw = list_accounts_sync(
-            api_key,
-            zernio_base_url(),
-            profile_id,
-            platform="linkedin",
+        items, list_source = fetch_linkedin_account_items(
+            api_key, zernio_base_url(), profile_id
         )
-        items = _parse_account_items(raw)
         if not items:
             raise ValueError("No LinkedIn accounts found for this Zernio profile")
 
-        personal_item = None
-        org_item = None
-        for item in items:
-            account_type = (account_type_from_item(item) or "").lower()
-            if account_type == "personal" and personal_item is None:
-                personal_item = item
-            elif account_type in ("organization", "org") and org_item is None:
-                org_item = item
+        logger.warning(
+            f"[LinkedInConnect] sync start user_id={user_id} profile_id={profile_id} "
+            f"list_source={list_source} raw_count={len(items)} "
+            f"items={summarize_zernio_account_items(items)}"
+        )
 
-        primary_item = personal_item or items[0]
+        personal_item, org_item = partition_zernio_account_items(items)
+        partition_method = "partition"
+        if org_item is None and len(items) >= 2:
+            logger.warning(
+                f"[LinkedInConnect] sync partition missing org user_id={user_id} "
+                f"account_types={[account_type_from_item(i) for i in items]}"
+            )
+
+        primary_item = personal_item
+        if primary_item is None:
+            primary_item = items[0]
+            partition_method = "fallback_first_item"
+        elif org_item is primary_item and len(items) > 1:
+            primary_item = next((i for i in items if i is not org_item), primary_item)
+            partition_method = "fallback_non_org_primary"
+
+        logger.warning(
+            f"[LinkedInConnect] sync partition user_id={user_id} method={partition_method} "
+            f"personal_id={account_id_from_item(personal_item) if personal_item else None} "
+            f"org_id={account_id_from_item(org_item) if org_item else None}"
+        )
+
+        if not primary_item:
+            primary_item = items[0]
         primary_id = account_id_from_item(primary_item)
         if not primary_id:
             raise ValueError("Zernio account list missing account id")
@@ -836,6 +822,11 @@ class LinkedInOAuthService:
         if not stored:
             raise RuntimeError("Failed to store synced Zernio credentials")
 
+        logger.warning(
+            f"[LinkedInConnect] sync stored user_id={user_id} profile_id={profile_id} "
+            f"personal_id={primary_id} org_id={org_id}"
+        )
+
         synced: List[Dict[str, Any]] = []
         for item in items:
             aid = account_id_from_item(item)
@@ -849,6 +840,17 @@ class LinkedInOAuthService:
                 }
             )
         return synced
+
+    def try_sync_zernio_accounts(self, user_id: str) -> bool:
+        """Best-effort sync from Zernio; returns True when sync succeeded."""
+        try:
+            self.sync_zernio_accounts(user_id)
+            return True
+        except Exception as e:
+            logger.warning(
+                f"[LinkedInConnect] Zernio account sync skipped user_id={user_id}: {e}"
+            )
+            return False
 
     def _get_redirect_uri(self) -> str:
         configured = os.getenv("LINKEDIN_SOCIAL_REDIRECT_URI")
@@ -868,7 +870,9 @@ class LinkedInOAuthService:
             return None
         return state.split(":", 1)[0]
 
-    def generate_authorization_url(self, user_id: str, state: Optional[str] = None) -> Dict[str, str]:
+    def generate_authorization_url(
+        self, user_id: str, state: Optional[str] = None
+    ) -> Dict[str, str]:
         """Return OAuth authorization URL for Zernio or native LinkedIn based on LINKEDIN_PROVIDER."""
         provider = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
         oauth_state = self._build_oauth_state(user_id, state)
@@ -881,7 +885,8 @@ class LinkedInOAuthService:
 
             profile_id = self.ensure_zernio_profile(user_id)
             logger.info(
-                f"[LinkedInConnect] generating Zernio auth URL user_id={user_id} profile_id={profile_id}"
+                f"[LinkedInConnect] generating Zernio auth URL user_id={user_id} "
+                f"profile_id={profile_id}"
             )
 
             redirect_uri = self._get_redirect_uri()
@@ -940,6 +945,124 @@ class LinkedInOAuthService:
             "state": oauth_state,
             "provider": "native",
         }
+
+    def _log_zernio_callback_params(
+        self, user_id: str, query_params: Mapping[str, str]
+    ) -> None:
+        """Log callback query keys/values once (secrets redacted) for OAuth debugging."""
+        redacted_keys = {"temptoken", "temp_token", "code", "access_token"}
+        safe: Dict[str, str] = {}
+        for key, value in query_params.items():
+            if key.lower() in redacted_keys:
+                safe[key] = "<redacted>" if value else value
+            else:
+                safe[key] = value
+        logger.info(
+            f"[LinkedInConnect] Zernio callback query params user_id={user_id} params={safe}"
+        )
+
+    @staticmethod
+    def _parse_headless_user_profile(query_params: Mapping[str, str]) -> dict[str, Any]:
+        raw = query_params.get("userProfile") or query_params.get("user_profile") or ""
+        if not raw:
+            logger.warning("[LinkedInConnect] headless callback missing userProfile")
+            return {}
+        try:
+            return json.loads(unquote(raw))
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning(f"[LinkedInConnect] headless userProfile parse failed: {exc}")
+            return {}
+
+    def _validate_zernio_callback_state(
+        self, user_id: str, query_params: Mapping[str, str]
+    ) -> bool:
+        alwrity_state = query_params.get("alwrity_state")
+        if not alwrity_state:
+            return True
+        state_user = self._extract_user_id_from_state(alwrity_state)
+        if state_user and state_user != user_id:
+            logger.error(
+                f"[LinkedInConnect] OAuth state user mismatch user_id={user_id} "
+                f"state_user={state_user}"
+            )
+            return False
+        if not self._oauth_state_is_valid(user_id, alwrity_state):
+            logger.error(f"[LinkedInConnect] invalid or expired OAuth state user_id={user_id}")
+            return False
+        self.consume_oauth_state(user_id, alwrity_state)
+        return True
+
+    def finalize_headless_personal_connect(
+        self, user_id: str, query_params: Mapping[str, str]
+    ) -> bool:
+        """Complete headless LinkedIn OAuth by selecting personal account server-side."""
+        self._log_zernio_callback_params(user_id, query_params)
+
+        if not self._validate_zernio_callback_state(user_id, query_params):
+            return False
+
+        temp_token = query_params.get("tempToken") or query_params.get("temp_token")
+        if not temp_token:
+            logger.error(f"[LinkedInConnect] headless callback missing tempToken user_id={user_id}")
+            return False
+
+        api_key = os.getenv("ZERNIO_API_KEY")
+        if not api_key:
+            logger.error(f"[LinkedInConnect] ZERNIO_API_KEY missing during callback user_id={user_id}")
+            return False
+
+        profile_id = (
+            query_params.get("profileId")
+            or query_params.get("profile_id")
+            or self._get_stored_zernio_profile_id(user_id)
+        )
+        if not profile_id:
+            logger.error(f"[LinkedInConnect] headless callback missing profileId user_id={user_id}")
+            return False
+
+        user_profile = self._parse_headless_user_profile(query_params)
+        try:
+            result = select_linkedin_organization_sync(
+                api_key,
+                zernio_base_url(),
+                profile_id,
+                temp_token,
+                user_profile,
+                account_type="personal",
+            )
+        except Exception as exc:
+            logger.error(
+                f"[LinkedInConnect] headless select-organization failed user_id={user_id}: {exc}"
+            )
+            return False
+
+        parsed = parse_select_linkedin_account_response(result)
+        account_id = parsed.get("account_id")
+        if not account_id:
+            logger.error(
+                f"[LinkedInConnect] headless select-organization missing accountId "
+                f"user_id={user_id}"
+            )
+            return False
+
+        account_name = parsed.get("display_name")
+        stored = self.store_zernio_credentials(
+            user_id=user_id,
+            zernio_api_key=api_key,
+            zernio_account_id=account_id,
+            zernio_org_account_id=None,
+            account_name=account_name,
+            zernio_profile_id=profile_id,
+        )
+        if not stored:
+            logger.error(f"[LinkedInConnect] headless credential store failed user_id={user_id}")
+            return False
+
+        logger.warning(
+            f"[LinkedInConnect] headless personal connected user_id={user_id} "
+            f"account_id={account_id} account_type={parsed.get('account_type')}"
+        )
+        return True
 
     def _oauth_state_is_valid(self, user_id: str, state: str) -> bool:
         try:
@@ -1029,7 +1152,13 @@ class LinkedInOAuthService:
     def handle_zernio_connect_callback(
         self, user_id: str, query_params: Mapping[str, str]
     ) -> bool:
-        """Persist Zernio credentials after standard connect redirect."""
+        """Persist Zernio credentials after connect redirect (headless or standard)."""
+        temp_token = query_params.get("tempToken") or query_params.get("temp_token")
+        if temp_token:
+            return self.finalize_headless_personal_connect(user_id, query_params)
+
+        self._log_zernio_callback_params(user_id, query_params)
+
         connected = query_params.get("connected")
         account_id = query_params.get("accountId") or query_params.get("account_id")
         if not account_id and connected != "linkedin":
@@ -1040,18 +1169,8 @@ class LinkedInOAuthService:
             logger.error(f"[LinkedInConnect] ZERNIO_API_KEY missing during callback user_id={user_id}")
             return False
 
-        alwrity_state = query_params.get("alwrity_state")
-        if alwrity_state:
-            state_user = self._extract_user_id_from_state(alwrity_state)
-            if state_user and state_user != user_id:
-                logger.error(
-                    f"[LinkedInConnect] OAuth state user mismatch user_id={user_id} state_user={state_user}"
-                )
-                return False
-            if not self._oauth_state_is_valid(user_id, alwrity_state):
-                logger.error(f"[LinkedInConnect] invalid or expired OAuth state user_id={user_id}")
-                return False
-            self.consume_oauth_state(user_id, alwrity_state)
+        if not self._validate_zernio_callback_state(user_id, query_params):
+            return False
 
         try:
             self.sync_zernio_accounts(user_id)

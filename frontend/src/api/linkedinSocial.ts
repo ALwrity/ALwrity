@@ -49,6 +49,7 @@ export interface LinkedInAuthUrlResponse {
   authorization_url: string;
   state: string;
   provider: string;
+  purpose?: string;
 }
 
 export interface LinkedInDisconnectResponse {
@@ -72,8 +73,9 @@ export interface LinkedInLandingPersonalAnalytics {
 }
 
 export interface LinkedInLandingOrgAnalytics {
-  accountId: string;
+  accountId?: string | null;
   orgId?: string | null;
+  orgName?: string | null;
   avatarUrl?: string | null;
   analytics: Record<string, number | string | null>;
   error?: string | null;
@@ -100,6 +102,14 @@ export async function getLinkedInAuthUrl(state?: string): Promise<LinkedInAuthUr
   const response = await apiClient.get(`${BASE}/auth/url`, {
     params: state ? { state } : undefined,
   });
+  return response.data;
+}
+
+export async function syncLinkedInAccounts(): Promise<{
+  success: boolean;
+  accounts: LinkedInAccount[];
+}> {
+  const response = await apiClient.post(`${BASE}/sync`);
   return response.data;
 }
 
@@ -134,6 +144,17 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
     if (typeof detail === 'string' && detail.trim()) {
       if (detail.includes('ZERNIO_API_KEY')) {
         return 'LinkedIn is not configured on this server. Contact your administrator.';
+      }
+      const lowerDetail = detail.toLowerCase();
+      if (
+        lowerDetail.includes('personal_account_not_supported') ||
+        (lowerDetail.includes('organization account') &&
+          lowerDetail.includes('personal'))
+      ) {
+        return (
+          'Company page analytics requires a LinkedIn organization connection. ' +
+          'Connect your company page, or disconnect and reconnect selecting your organization.'
+        );
       }
       return detail;
     }

@@ -65,8 +65,9 @@ class LinkedInLandingPersonalAnalyticsResponse(BaseModel):
 
 
 class LinkedInLandingOrgAnalyticsResponse(BaseModel):
-    accountId: str
+    accountId: Optional[str] = None
     orgId: Optional[str] = None
+    orgName: Optional[str] = None
     avatarUrl: Optional[str] = None
     analytics: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = None

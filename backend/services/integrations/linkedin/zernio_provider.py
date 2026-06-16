@@ -30,6 +30,12 @@ from services.integrations.linkedin.zernio_client import (
     ZernioAPIError,
     ZernioClient,
     avatar_url_from_item,
+    _parse_account_items,
+)
+from services.integrations.linkedin.account_resolution import (
+    LOG_PREFIX as ACCOUNTS_LOG_PREFIX,
+    summarize_zernio_account_items,
+    zernio_items_to_accounts,
 )
 
 _PHASE2_MSG = "LinkedIn publishing is not implemented in Phase 1 (deferred to Phase 2)."
@@ -60,7 +66,15 @@ class ZernioProvider:
         if account_id:
             return account_id
         creds = self._oauth.resolve_credentials(user_id)
-        resolved = creds.org_account_id if prefer_org else creds.primary_account_id
+        if prefer_org:
+            resolved = creds.zernio_org_account_id
+            if not resolved:
+                raise ValueError(
+                    "No LinkedIn organization account is connected; "
+                    "connect a company page before requesting org analytics"
+                )
+        else:
+            resolved = creds.primary_account_id
         if not resolved:
             raise ValueError("account_id is required and no default is configured")
         return resolved
@@ -69,47 +83,69 @@ class ZernioProvider:
         creds = self._oauth.resolve_credentials(user_id)
         accounts: list[LinkedInAccount] = []
 
-        try:
+        async def _load_items(
+            scope: str, *, global_scope: bool = False, profile_id: Optional[str] = None
+        ) -> list[dict]:
             client = ZernioClient(creds)
-            raw = await client.list_accounts(profile_id=creds.zernio_profile_id)
-            items = raw if isinstance(raw, list) else raw.get("accounts", raw.get("data", []))
-            if isinstance(items, list):
-                for item in items:
-                    if not isinstance(item, dict):
-                        continue
-                    aid = str(item.get("id") or item.get("accountId") or item.get("_id") or "")
-                    if not aid:
-                        continue
-                    accounts.append(
-                        LinkedInAccount(
-                            account_id=aid,
-                            account_type=item.get("accountType") or item.get("type"),
-                            username=item.get("username") or item.get("name"),
-                            avatar_url=avatar_url_from_item(item),
-                            platform="linkedin",
-                        )
-                    )
-        except ZernioAPIError as e:
-            logger.warning(f"Zernio list_accounts failed, synthesizing from credentials: {e}")
+            raw = await client.list_accounts(
+                profile_id=profile_id, global_scope=global_scope
+            )
+            items = _parse_account_items(raw)
+            logger.warning(
+                f"{ACCOUNTS_LOG_PREFIX} list_accounts user_id={user_id} "
+                f"scope={scope} profile_id={profile_id or 'none'} count={len(items)} "
+                f"items={summarize_zernio_account_items(items)}"
+            )
+            return items
 
-        if not accounts and creds.zernio_account_id:
-            accounts.append(
-                LinkedInAccount(
-                    account_id=creds.zernio_account_id,
-                    account_type="personal",
-                    username=creds.account_name,
-                    platform="linkedin",
+        try:
+            items = await _load_items("profile", profile_id=creds.zernio_profile_id)
+            if len(items) < 2:
+                global_items = await _load_items("global", global_scope=True)
+                if len(global_items) > len(items):
+                    logger.warning(
+                        f"{ACCOUNTS_LOG_PREFIX} list_accounts retry user_id={user_id} "
+                        f"reason=profile_count_lt_2 global_count={len(global_items)}"
+                    )
+                    items = global_items
+            accounts = zernio_items_to_accounts(items)
+            for account in accounts:
+                logger.debug(
+                    f"{ACCOUNTS_LOG_PREFIX} list_accounts item user_id={user_id} "
+                    f"id={account.account_id} resolved_type={account.account_type}"
                 )
+        except ZernioAPIError as e:
+            logger.warning(
+                f"{ACCOUNTS_LOG_PREFIX} list_accounts failed user_id={user_id} "
+                f"fallback=synthesized_from_creds error={e}"
             )
-        if creds.zernio_org_account_id and creds.zernio_org_account_id != creds.zernio_account_id:
-            accounts.append(
-                LinkedInAccount(
-                    account_id=creds.zernio_org_account_id,
-                    account_type="organization",
-                    username=creds.account_name,
-                    platform="linkedin",
+
+        if not accounts:
+            if creds.zernio_account_id:
+                accounts.append(
+                    LinkedInAccount(
+                        account_id=creds.zernio_account_id,
+                        account_type="personal",
+                        username=creds.account_name,
+                        platform="linkedin",
+                    )
                 )
-            )
+            if creds.zernio_org_account_id and creds.zernio_org_account_id != (
+                creds.zernio_account_id or ""
+            ):
+                accounts.append(
+                    LinkedInAccount(
+                        account_id=creds.zernio_org_account_id,
+                        account_type="organization",
+                        username=creds.account_name,
+                        platform="linkedin",
+                    )
+                )
+            if accounts:
+                logger.info(
+                    f"{ACCOUNTS_LOG_PREFIX} list_accounts synthesized user_id={user_id} "
+                    f"count={len(accounts)}"
+                )
         return accounts
 
     async def list_organizations(
@@ -134,6 +170,7 @@ class ZernioProvider:
                     organization_id=org_id,
                     name=item.get("name") or item.get("localizedName"),
                     urn=urn,
+                    logo_url=avatar_url_from_item(item),
                 )
             )
         return orgs

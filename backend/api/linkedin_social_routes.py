@@ -93,6 +93,9 @@ async def get_connection_status(
     """Return LinkedIn connection state for the authenticated user."""
     user_id = _user_id(current_user)
     status = _oauth_service.get_connection_status(user_id)
+    if status.get("connected"):
+        _oauth_service.try_sync_zernio_accounts(user_id)
+        status = _oauth_service.get_connection_status(user_id)
 
     organizations: List[Dict[str, Any]] = []
     if status.get("connected") and status.get("accounts"):
@@ -139,9 +142,31 @@ async def get_authorization_url(
         if "ZERNIO_API_KEY" in str(e):
             logger.error(f"[LinkedInConnect] missing ZERNIO_API_KEY user_id={user_id}")
         raise HTTPException(status_code=400, detail=str(e)) from e
+    except ZernioAPIError as e:
+        status = e.status_code or 502
+        logger.warning(f"[LinkedInConnect] auth URL Zernio error user_id={user_id}: {e}")
+        raise HTTPException(status_code=status, detail=str(e)) from e
     except Exception as e:
         logger.exception(f"[LinkedInConnect] auth URL failed user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/sync")
+async def sync_linkedin_accounts(
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Refresh personal + organization account IDs from Zernio (no new OAuth)."""
+    user_id = _user_id(current_user)
+    try:
+        accounts = _oauth_service.sync_zernio_accounts(user_id)
+        return {"success": True, "accounts": accounts}
+    except LinkedInNotConnectedError as e:
+        raise HTTPException(status_code=401, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        logger.exception(f"[LinkedInConnect] manual sync failed user_id={user_id}: {e}")
+        raise HTTPException(status_code=502, detail=str(e)) from e
 
 
 @router.get("/callback")
@@ -159,12 +184,20 @@ async def handle_oauth_callback_get(
     """HTML OAuth callback that stores credentials and notifies opener via postMessage."""
     try:
         resolved_account_id = accountId or account_id
-        is_zernio_redirect = connected == "linkedin" or bool(resolved_account_id)
+        temp_token = request.query_params.get("tempToken") or request.query_params.get(
+            "temp_token"
+        )
+        is_zernio_redirect = (
+            connected == "linkedin"
+            or bool(resolved_account_id)
+            or bool(temp_token)
+        )
 
         if is_zernio_redirect:
             logger.info(
                 f"[LinkedInConnect] Zernio callback user_id={user_id} "
-                f"account_id_present={bool(resolved_account_id)}"
+                f"account_id_present={bool(resolved_account_id)} "
+                f"headless={bool(temp_token)}"
             )
             query_params = dict(request.query_params)
             ok = _oauth_service.handle_zernio_connect_callback(user_id, query_params)
@@ -408,11 +441,14 @@ async def get_org_analytics(
     metric_list = [m.strip().lower() for m in metrics.split(",")] if metrics else None
     try:
         creds = _oauth_service.resolve_credentials(user_id)
-        resolved_account = account_id or creds.zernio_org_account_id or creds.zernio_account_id
+        resolved_account = account_id or creds.zernio_org_account_id
         if not resolved_account:
             raise HTTPException(
                 status_code=400,
-                detail="account_id query param is required when no org account is connected",
+                detail=(
+                    "No LinkedIn organization account is connected. "
+                    "Connect a company page before requesting org analytics."
+                ),
             )
     except LinkedInNotConnectedError as e:
         raise HTTPException(status_code=401, detail=str(e)) from e

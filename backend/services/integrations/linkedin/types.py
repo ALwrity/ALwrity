@@ -80,6 +80,7 @@ class LinkedInOrganization:
     organization_id: str
     name: Optional[str] = None
     urn: Optional[str] = None
+    logo_url: Optional[str] = None
 
 
 @dataclass

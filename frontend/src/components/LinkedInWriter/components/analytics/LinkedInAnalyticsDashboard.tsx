@@ -9,7 +9,7 @@ import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
 import { AnalyticsDateRangeLabel } from './AnalyticsDateRangeLabel';
 import { AnalyticsEmptyState } from './AnalyticsEmptyState';
 import { AnalyticsMetricGrid } from './AnalyticsMetricGrid';
-import { AvatarTabSwitcher } from './AvatarTabSwitcher';
+import { AvatarTabSwitcher, orgTabInitials } from './AvatarTabSwitcher';
 import { metricsForTab } from './analyticsMetricConfig';
 
 interface LinkedInAnalyticsDashboardProps {
@@ -41,25 +41,26 @@ export const LinkedInAnalyticsDashboard: React.FC<LinkedInAnalyticsDashboardProp
       id: LinkedInAnalyticsTab;
       avatarUrl?: string | null;
       fallbackInitials: string;
-      isOrg: boolean;
+      ariaLabel: string;
     }> = [
       {
         id: 'personal',
         avatarUrl: personal?.avatarUrl,
         fallbackInitials: 'ME',
-        isOrg: false,
+        ariaLabel: 'Personal profile analytics',
       },
     ];
     if (showOrgTab) {
+      const orgLabel = organization?.orgName?.trim() || 'Organization page';
       tabs.push({
         id: 'organization',
         avatarUrl: organization?.avatarUrl,
-        fallbackInitials: 'CO',
-        isOrg: true,
+        fallbackInitials: orgTabInitials(organization?.orgName),
+        ariaLabel: `${orgLabel} analytics`,
       });
     }
     return tabs;
-  }, [personal?.avatarUrl, organization?.avatarUrl, showOrgTab]);
+  }, [personal?.avatarUrl, organization?.avatarUrl, organization?.orgName, showOrgTab]);
 
   const activeMetrics = metricsForTab(activeTab);
   const activeAnalytics =

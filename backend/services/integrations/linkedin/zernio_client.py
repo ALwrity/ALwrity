@@ -8,6 +8,7 @@ import os
 from typing import Any, Optional
 
 import httpx
+from loguru import logger
 
 from services.integrations.linkedin.types import DEFAULT_ZERNIO_API_URL, LinkedInCredentials
 
@@ -94,13 +95,20 @@ class ZernioClient:
         self._timeout = timeout
 
     async def list_accounts(
-        self, *, profile_id: Optional[str] = None, platform: str = "linkedin"
+        self,
+        *,
+        profile_id: Optional[str] = None,
+        platform: str = "linkedin",
+        global_scope: bool = False,
     ) -> dict[str, Any]:
         url = f"{self._base_url}/accounts"
         params: dict[str, str] = {"platform": platform}
-        resolved_profile = profile_id or self._profile_id
-        if resolved_profile:
-            params["profileId"] = resolved_profile
+        if not global_scope:
+            resolved_profile = (
+                profile_id if profile_id is not None else self._profile_id
+            )
+            if resolved_profile:
+                params["profileId"] = resolved_profile
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.get(
                 url,
@@ -234,18 +242,22 @@ def create_profile_sync(
 def list_accounts_sync(
     api_key: str,
     base_url: str,
-    profile_id: str,
+    profile_id: Optional[str] = None,
     *,
     platform: str = "linkedin",
+    global_scope: bool = False,
     timeout: float = 30.0,
 ) -> dict[str, Any]:
-    """List connected accounts for a profile (Quickstart Step 3)."""
+    """List connected accounts for a profile, or all LinkedIn accounts when global_scope=True."""
     import requests
 
     url = f"{base_url.rstrip('/')}/accounts"
+    params: dict[str, str] = {"platform": platform}
+    if not global_scope and profile_id:
+        params["profileId"] = profile_id
     response = requests.get(
         url,
-        params={"profileId": profile_id, "platform": platform},
+        params=params,
         headers=_auth_headers(api_key),
         timeout=timeout,
     )
@@ -262,27 +274,95 @@ def get_connect_url_sync(
     profile_id: str,
     redirect_url: str,
     *,
+    headless: bool = True,
     timeout: float = 30.0,
 ) -> dict[str, Any]:
     """Sync helper for OAuth connect URL (used by LinkedInOAuthService)."""
     import requests
 
     url = f"{base_url.rstrip('/')}/connect/linkedin"
+    params: dict[str, str] = {
+        "profileId": profile_id,
+        "redirect_url": redirect_url,
+    }
+    if headless:
+        params["headless"] = "true"
+    logger.warning(
+        f"[LinkedInConnect] connect url headless={headless} profile_id={profile_id}"
+    )
     response = requests.get(
         url,
-        params={"profileId": profile_id, "redirect_url": redirect_url},
+        params=params,
         headers=_auth_headers(api_key),
         timeout=timeout,
     )
     if response.status_code >= 400:
         raise ZernioAPIError(
-            f"Zernio connect URL returned HTTP {response.status_code}: {response.text}"
+            f"Zernio connect URL returned HTTP {response.status_code}: {response.text}",
+            status_code=response.status_code,
         )
     data = response.json()
     auth_url = data.get("authUrl") or data.get("auth_url")
     if not auth_url:
         raise ZernioAPIError("Zernio connect response missing authUrl")
     return {"authUrl": auth_url, "state": data.get("state")}
+
+
+def parse_select_linkedin_account_response(data: dict[str, Any]) -> dict[str, Any]:
+    """Extract connected account fields from select-organization response."""
+    account = data.get("account") if isinstance(data.get("account"), dict) else {}
+    account_id = (
+        account.get("accountId")
+        or account.get("account_id")
+        or account.get("_id")
+        or account.get("id")
+    )
+    return {
+        "account_id": str(account_id) if account_id else None,
+        "display_name": account.get("displayName") or account.get("username"),
+        "account_type": account.get("accountType") or account.get("account_type"),
+        "account": account,
+    }
+
+
+def select_linkedin_organization_sync(
+    api_key: str,
+    base_url: str,
+    profile_id: str,
+    temp_token: str,
+    user_profile: dict[str, Any],
+    *,
+    account_type: str = "personal",
+    selected_organization: Optional[dict[str, Any]] = None,
+    redirect_url: Optional[str] = None,
+    timeout: float = 30.0,
+) -> dict[str, Any]:
+    """Finalize LinkedIn connect after headless OAuth (personal or organization)."""
+    import requests
+
+    url = f"{base_url.rstrip('/')}/connect/linkedin/select-organization"
+    body: dict[str, Any] = {
+        "profileId": profile_id,
+        "tempToken": temp_token,
+        "userProfile": user_profile,
+        "accountType": account_type,
+    }
+    if selected_organization:
+        body["selectedOrganization"] = selected_organization
+    if redirect_url:
+        body["redirect_url"] = redirect_url
+
+    response = requests.post(
+        url,
+        json=body,
+        headers=_auth_headers(api_key),
+        timeout=timeout,
+    )
+    if response.status_code >= 400:
+        raise ZernioAPIError(
+            f"Zernio select-organization returned HTTP {response.status_code}: {response.text}"
+        )
+    return response.json()
 
 
 def delete_account_sync(

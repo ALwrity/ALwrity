@@ -49,6 +49,8 @@ export function useLinkedInAnalyticsDashboard() {
       setDataDelayNote(data.dataDelayNote ?? null);
       setProvider(data.provider);
 
+      console.info('[LinkedInAnalytics] hasOrgTab:', Boolean(data.organization));
+
       if (data.personal.error) {
         console.warn('[LinkedInAnalytics] personal partial error:', data.personal.error);
       } else if (data.organization?.error) {
