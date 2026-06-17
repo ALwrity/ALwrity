@@ -239,6 +239,50 @@ export interface LinkedInCommentResponseResult {
   error?: string;
 }
 
+export interface LinkedInAudioNarrationRequest {
+  text?: string;
+  video_script?: {
+    hook: string;
+    main_content: Array<Record<string, string>>;
+    conclusion: string;
+    captions?: string[];
+    thumbnail_suggestions: string[];
+    video_description: string;
+  };
+  target_duration_seconds?: number;
+  voice_id?: string;
+  custom_voice_id?: string;
+  speed?: number;
+  volume?: number;
+  pitch?: number;
+  emotion?: string;
+  tone?: LinkedInTone;
+  topic?: string;
+  industry?: string;
+}
+
+export interface LinkedInAudioMetadata {
+  provider: string;
+  model: string;
+  voice_id: string;
+  text_length: number;
+  file_size: number;
+  estimated_duration_seconds: number;
+  target_duration_seconds: number;
+  generation_time: number;
+  format: string;
+  topic?: string;
+  industry?: string;
+}
+
+export interface LinkedInAudioNarrationResponse {
+  success: boolean;
+  audio_id?: string;
+  download_path?: string;
+  metadata?: LinkedInAudioMetadata;
+  error?: string;
+}
+
 export interface LinkedInEditContentRequest {
   content: string;
   edit_type: 'professionalize' | 'optimize_engagement' | 'add_hashtags' | 'adjust_tone' | 'expand' | 'condense' | 'add_cta';
@@ -282,6 +326,25 @@ export const linkedInWriterApi = {
   async generateVideoScript(request: LinkedInVideoScriptRequest): Promise<LinkedInVideoScriptResponse> {
     const { data } = await aiApiClient.post('/api/linkedin/generate-video-script', request);
     return data;
+  },
+
+  async generateAudioNarration(request: LinkedInAudioNarrationRequest): Promise<LinkedInAudioNarrationResponse> {
+    const { data } = await aiApiClient.post('/api/linkedin/generate-audio-narration', request);
+    return data;
+  },
+
+  async generateAudioFromScript(request: LinkedInVideoScriptRequest): Promise<LinkedInAudioNarrationResponse> {
+    const { data } = await aiApiClient.post('/api/linkedin/generate-audio-from-script', request);
+    return data;
+  },
+
+  async getAudioStatus(audioId: string): Promise<any> {
+    const { data } = await apiClient.get(`/api/linkedin/audio-status/${audioId}`);
+    return data;
+  },
+
+  getAudioDownloadUrl(audioId: string): string {
+    return `/api/linkedin/audio/${audioId}`;
   },
 
   async generateCommentResponse(request: LinkedInCommentResponseRequest): Promise<LinkedInCommentResponseResult> {

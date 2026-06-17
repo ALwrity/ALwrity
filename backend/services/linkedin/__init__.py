@@ -24,6 +24,7 @@ from .image_generation import (
 )
 from .image_prompts import LinkedInPromptGenerator
 from .carousel import LinkedInCarouselPDFRenderer
+from .audio import LinkedInAudioService, LinkedInAudioStorage
 
 __all__ = [
     # Content Generation
@@ -46,6 +47,9 @@ __all__ = [
     'LinkedInPromptGenerator',
     # Carousel Rendering
     'LinkedInCarouselPDFRenderer',
+    # Audio Narration
+    'LinkedInAudioService',
+    'LinkedInAudioStorage',
 ]
 
 # Version information
