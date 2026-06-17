@@ -203,6 +203,74 @@ export const PODCAST_RECOMMENDATIONS: CustomRecommendations = {
 // Brand Avatar-specific Recommendations
 // ============================================
 
+// ============================================
+// LinkedIn Writer Presets
+// ============================================
+
+export const LINKEDIN_PRESETS: ImagePreset[] = [
+  {
+    key: 'professionalSquare',
+    title: 'Professional Square',
+    subtitle: 'Clean 1:1 feed image for LinkedIn posts',
+    prompt: 'Professional LinkedIn post image, corporate aesthetic, clean composition, mobile-friendly, high contrast text-safe areas, modern business visual, neutral background with subtle brand accents',
+    style: 'Realistic',
+    renderingSpeed: 'Quality',
+    aspectRatio: '1:1',
+  },
+  {
+    key: 'landscapeFeed',
+    title: 'Landscape Feed',
+    subtitle: 'Wide format optimized for LinkedIn feed',
+    prompt: 'LinkedIn landscape feed image, professional business context, cinematic wide composition, clear focal point, polished corporate look, optimized for 1.91:1 feed viewing',
+    style: 'Realistic',
+    renderingSpeed: 'Quality',
+    aspectRatio: '16:9',
+  },
+  {
+    key: 'thoughtLeadership',
+    title: 'Thought Leadership',
+    subtitle: 'Authoritative visual for executive posts',
+    prompt: 'Thought leadership LinkedIn visual, executive presence, minimalist design, data-inspired abstract elements, trustworthy professional tone, editorial quality',
+    style: 'Realistic',
+    renderingSpeed: 'Quality',
+    aspectRatio: '1:1',
+  },
+  {
+    key: 'industryVisual',
+    title: 'Industry Visual',
+    subtitle: 'Industry-specific professional imagery',
+    prompt: 'Industry-specific LinkedIn professional image, relevant business metaphors, modern workplace aesthetic, engaging but credible, suitable for B2B audience',
+    style: 'Auto',
+    renderingSpeed: 'Quality',
+    aspectRatio: '1:1',
+  },
+];
+
+export const LINKEDIN_THEME: ImageModalTheme = {
+  dialogBackground: 'rgba(10, 30, 60, 0.96)',
+  primaryAccent: '#0A66C2',
+  secondaryAccent: '#057642',
+  warningAccent: '#f59e0b',
+};
+
+export const LINKEDIN_RECOMMENDATIONS: CustomRecommendations = {
+  style: <>
+    <strong>Realistic:</strong> Best for professional LinkedIn posts and corporate content<br />
+    <strong>Auto:</strong> Balanced look for general business topics<br />
+    <strong>Fiction:</strong> Use sparingly for creative or illustrative posts
+  </>,
+  speed: <>
+    <strong>Quality:</strong> Recommended for final LinkedIn post images<br />
+    <strong>Default:</strong> Good balance for iterations<br />
+    <strong>Turbo:</strong> Quick previews while refining your prompt
+  </>,
+  aspectRatio: <>
+    <strong>1:1 (Square):</strong> Standard LinkedIn feed post image (recommended)<br />
+    <strong>16:9:</strong> Wide landscape — mapped to LinkedIn 1.91:1 feed format<br />
+    <strong>3:4:</strong> Portrait orientation for mobile-first posts
+  </>,
+};
+
 export const BRAND_AVATAR_RECOMMENDATIONS: CustomRecommendations = {
   style: <>
     <strong>Realistic:</strong> Best for professional personal brands and executive headshots.<br />

@@ -7,6 +7,9 @@ import {
   ContentPreviewHeaderWithModals,
   ContentDisplayArea
 } from '../../TextEditor';
+import { readPrefs } from '../utils/linkedInWriterUtils';
+import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
+import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
@@ -66,8 +69,17 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   const hasTriggeredOnceRef = useRef<boolean>(false);
   const ctaDebounceRef = useRef<NodeJS.Timeout | null>(null); // Debounce CTA appearance
 
+  const prefs = readPrefs();
+  const selectionImage = useLinkedInSelectionImage({
+    topic,
+    industry: prefs.industry,
+  });
+
   // Initialize text selection handler
-  const textSelectionHandler = useTextSelectionHandler(contentRef);
+  const textSelectionHandler = useTextSelectionHandler(contentRef, {
+    onGenerateImage: selectionImage.openForSelection,
+    isGeneratingImage: selectionImage.isGenerating,
+  });
 
   // Handle selected text replacement for quick edits
   useEffect(() => {
@@ -416,6 +428,16 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
       {/* Citation Hover Handler */}
       <CitationHoverHandler researchSources={researchSources || []} />
+
+      <LinkedInSelectionImageModal
+        open={selectionImage.modalOpen}
+        onClose={selectionImage.closeModal}
+        onGenerate={selectionImage.handleGenerate}
+        initialPrompt={selectionImage.initialPrompt}
+        isGenerating={selectionImage.isGenerating}
+        generatedPreview={selectionImage.generatedPreview}
+        onClosePreview={selectionImage.closePreview}
+      />
     </div>
   );
 };
