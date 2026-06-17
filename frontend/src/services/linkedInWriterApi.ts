@@ -1,4 +1,13 @@
 import { apiClient, aiApiClient } from '../api/client';
+import {
+  generateLinkedInImage as generateLinkedInImageService,
+  buildPromptFromSelection as buildLinkedInImagePrompt,
+  resolveLinkedInImageUrl,
+  fetchLinkedInImageBlobUrl,
+  mapAspectRatioToLinkedIn,
+  type LinkedInImageGenerationParams,
+  type LinkedInImageGenerationResult,
+} from './linkedInImageService';
 
 // LinkedIn-specific enums
 export enum LinkedInPostType {
@@ -292,7 +301,16 @@ export const linkedInWriterApi = {
   async editContent(request: LinkedInEditContentRequest): Promise<LinkedInEditContentResponse> {
     const { data } = await aiApiClient.post('/api/linkedin/edit-content', request);
     return data;
-  }
+  },
+
+  async generateImage(params: LinkedInImageGenerationParams): Promise<LinkedInImageGenerationResult> {
+    return generateLinkedInImageService(params);
+  },
+
+  buildImagePromptFromSelection: buildLinkedInImagePrompt,
+  resolveImageUrl: resolveLinkedInImageUrl,
+  fetchImageBlobUrl: fetchLinkedInImageBlobUrl,
+  mapImageAspectRatio: mapAspectRatioToLinkedIn,
 };
 
 // ── Asset Library Save ────────────────────────────────────────────────

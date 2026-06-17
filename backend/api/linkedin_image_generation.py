@@ -114,7 +114,7 @@ async def generate_linkedin_image(
         
         if image_result and image_result.get('success'):
             # Store the generated image
-            image_id = await image_storage.store_image(
+            store_result = await image_storage.store_image(
                 image_data=image_result['image_data'],
                 metadata={
                     'prompt': request.prompt,
@@ -124,8 +124,19 @@ async def generate_linkedin_image(
                     'topic': request.content_context.get('topic'),
                     'industry': request.content_context.get('industry')
                 },
+                content_type=request.content_context.get('content_type') or 'post',
                 user_id=user_id
             )
+
+            if not store_result.get('success'):
+                error_msg = store_result.get('error', 'Failed to store generated image')
+                logger.error(f"Image storage failed: {error_msg}")
+                return ImageGenerationResponse(
+                    success=False,
+                    error=error_msg
+                )
+
+            image_id = store_result['image_id']
             
             logger.info(f"Image generated and stored successfully with ID: {image_id}")
             
