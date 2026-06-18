@@ -614,6 +614,7 @@ Format as structured JSON with detailed assessment and optimization guidance.
         try:
             # Format prompt
             prompt = self.prompts['content_gap_analysis'].format(
+                analysis_data=json.dumps(analysis_data, indent=2),
                 target_url=analysis_data.get('target_url', 'N/A'),
                 industry=analysis_data.get('industry', 'N/A'),
                 serp_opportunities=analysis_data.get('serp_opportunities', 0),

@@ -206,7 +206,19 @@ class TxtaiIntelligenceService:
                 raise ae
 
             self._mark_ann_incompatible()
-            return self.embeddings.search(query, limit=limit, graph=graph, index=False)
+            try:
+                return self.embeddings.search(query, limit=limit, graph=graph, index=False)
+            except AttributeError as ae2:
+                # Some FAISS/txtai combinations still raise nprobe errors even with
+                # `index=False` (the underlying index is the same IndexIDMap). In that
+                # case return an empty result rather than letting the exception
+                # bubble up — the caller treats [] as "no matches" and continues.
+                if self._is_nprobe_incompatibility(ae2):
+                    logger.warning(
+                        f"txtai scan search also raised nprobe incompatibility for user {self.user_id}; returning empty results"
+                    )
+                    return []
+                raise
 
     @staticmethod
     def _cosine_similarity_from_vectors(v1, v2) -> float:

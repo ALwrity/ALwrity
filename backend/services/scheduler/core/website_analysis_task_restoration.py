@@ -9,6 +9,7 @@ from utils.logger_utils import get_service_logger
 
 from services.database import get_all_user_ids, get_session_for_user
 from models.website_analysis_monitoring_models import WebsiteAnalysisTask
+from models.onboarding import OnboardingSession
 from services.website_analysis_monitoring_service import generate_website_analysis_tasks_task
 
 # Use service logger for consistent logging (WARNING level visible in production)

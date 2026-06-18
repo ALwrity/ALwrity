@@ -1306,7 +1306,7 @@ class SIFIntegrationService:
             
             # Content quality assessment (lazy initialization to avoid circular imports)
             if not self.guardian_agent:
-                from .sif_agents import ContentGuardianAgent
+                from services.intelligence.agents.specialized import ContentGuardianAgent
                 self.guardian_agent = ContentGuardianAgent(self.intelligence_service, user_id=self.user_id, sif_service=self)
             quality_score = await self.guardian_agent.assess_content_quality(website_data)
             insights["content_quality"] = quality_score

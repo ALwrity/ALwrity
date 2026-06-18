@@ -540,16 +540,18 @@ def wavespeed_structured_json_response(
                     return parsed_json
             except json.JSONDecodeError as json_err:
                 logger.error(f"❌ JSON parsing failed: {json_err}")
-                # Retry once with increased max_tokens — likely a truncation issue
-                if max_tokens < 16384:
-                    logger.warning(f"Retrying with increased max_tokens ({max_tokens} → {max_tokens * 2}) due to JSON parse failure")
+                # Retry once with increased max_tokens — likely a truncation issue.
+                # Coerce None to a sane default so we never crash on a None comparison.
+                safe_max_tokens = int(max_tokens) if max_tokens else 8192
+                if safe_max_tokens < 16384:
+                    logger.warning(f"Retrying with increased max_tokens ({safe_max_tokens} → {safe_max_tokens * 2}) due to JSON parse failure")
                     response_text = _retry_with_increased_tokens(
                         client=client,
                         messages=messages,
                         model=model,
                         fallback_models=fallback_models,
                         temperature=temperature,
-                        max_tokens=max_tokens * 2,
+                        max_tokens=safe_max_tokens * 2,
                     )
                     if response_text:
                         try:

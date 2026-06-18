@@ -638,7 +638,8 @@ class AdvertoolsService:
             param_count = 0
             url_col = 'url' if 'url' in crawl_df.columns else 'response_url' if 'response_url' in crawl_df.columns else None
             if url_col:
-                param_count = int(crawl_df[url_col].astype(str).str.contains('?').sum())
+                # Literal `?` (not a regex repetition operator).
+                param_count = int(crawl_df[url_col].astype(str).str.contains('?', regex=False).sum())
 
             optimization_score = max(0, round(100 - (waste_ratio * 100) - (budget_usage_ratio * 20), 1))
 
