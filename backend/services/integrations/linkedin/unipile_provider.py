@@ -430,6 +430,50 @@ class UnipileProvider:
             )
             return []
 
+    async def fetch_own_linkedin_profile(
+        self,
+        user_id: str,
+        *,
+        linkedin_sections: str = "*",
+    ) -> dict[str, Any]:
+        """
+        Fetch the connected user's full LinkedIn UserProfile from Unipile.
+
+        Resolves ``unipile_account_id`` from stored credentials and calls
+        ``GET /api/v1/users/me`` with the requested LinkedIn sections.
+
+        Args:
+            user_id: Internal ALwrity user ID (Clerk)
+            linkedin_sections: Unipile sections query (default ``*`` for full profile)
+
+        Returns:
+            Raw Unipile UserProfile dictionary
+
+        Raises:
+            LinkedInNotConnectedError: If user has no Unipile account connected
+            UnipileAPIError: If the Unipile API request fails
+        """
+        logger.info(
+            f"[UnipileProvider] fetch_own_linkedin_profile user={user_id} "
+            f"linkedin_sections={linkedin_sections!r}"
+        )
+
+        creds = self._oauth.resolve_credentials(user_id)
+        account_id = creds.unipile_account_id
+        if not account_id:
+            raise LinkedInNotConnectedError(
+                "No Unipile LinkedIn account connected. "
+                "Connect via hosted OAuth before fetching profile."
+            )
+
+        logger.info(
+            f"[UnipileProvider] Fetching UserProfile account_id={account_id} user={user_id}"
+        )
+        return await self._client.get_own_profile(
+            account_id,
+            linkedin_sections=linkedin_sections,
+        )
+
     async def list_organizations(
         self, user_id: str, account_id: str
     ) -> list[LinkedInOrganization]:

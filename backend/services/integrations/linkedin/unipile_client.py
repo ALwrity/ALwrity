@@ -247,7 +247,12 @@ class UnipileClient:
             _raise_for_error(response)
             return response.json()
 
-    async def get_own_profile(self, account_id: str) -> dict[str, Any]:
+    async def get_own_profile(
+        self,
+        account_id: str,
+        *,
+        linkedin_sections: Optional[str] = None,
+    ) -> dict[str, Any]:
         """
         Fetch the connected account owner's LinkedIn user profile.
 
@@ -256,6 +261,9 @@ class UnipileClient:
 
         Args:
             account_id: Unipile account ID for the connected LinkedIn account
+            linkedin_sections: Optional LinkedIn sections to include (e.g. ``*`` for
+                full profile with experience, skills, education). When omitted, Unipile
+                returns a lighter default payload — used for avatar lookups.
 
         Returns:
             UserProfile dictionary from Unipile
@@ -268,9 +276,14 @@ class UnipileClient:
             raise ValueError("Unipile API key is required")
 
         url = self._get_full_url("/api/v1/users/me")
-        params = {"account_id": account_id}
+        params: dict[str, str] = {"account_id": account_id}
+        if linkedin_sections is not None:
+            params["linkedin_sections"] = linkedin_sections
 
-        logger.debug(f"[UnipileClient] Fetching own profile account_id={account_id}")
+        logger.debug(
+            f"[UnipileClient] Fetching own profile account_id={account_id} "
+            f"linkedin_sections={linkedin_sections!r}"
+        )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
             response = await client.get(
@@ -282,6 +295,8 @@ class UnipileClient:
         if isinstance(data, dict):
             logger.info(
                 f"[UnipileClient] Own profile fetched account_id={account_id} "
+                f"linkedin_sections={linkedin_sections!r} "
+                f"object={data.get('object')!r} is_self={data.get('is_self')!r} "
                 f"keys={list(data.keys())}"
             )
         return data
