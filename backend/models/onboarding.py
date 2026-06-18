@@ -13,11 +13,13 @@ class OnboardingSession(Base):
     progress = Column(Float, default=0.0)
     started_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    payload = Column(JSON, nullable=True)  # Task scheduling manifest
     api_keys = relationship('APIKey', back_populates='session', cascade="all, delete-orphan")
     website_analyses = relationship('WebsiteAnalysis', back_populates='session', cascade="all, delete-orphan")
     research_preferences = relationship('ResearchPreferences', back_populates='session', cascade="all, delete-orphan", uselist=False)
     persona_data = relationship('PersonaData', back_populates='session', cascade="all, delete-orphan", uselist=False)
     competitor_analyses = relationship('CompetitorAnalysis', back_populates='session', cascade="all, delete-orphan")
+    platform_integrations = relationship('PlatformIntegration', back_populates='session', cascade="all, delete-orphan", uselist=False)
 
     def __repr__(self):
         return f"<OnboardingSession(id={self.id}, user_id={self.user_id}, step={self.current_step}, progress={self.progress})>"
@@ -280,6 +282,43 @@ class CompetitorAnalysis(Base):
             'status': self.status,
             'error_message': self.error_message,
             'warning_message': self.warning_message,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class PlatformIntegration(Base):
+    """Stores Step 5 integration/platform connection data for onboarding."""
+    __tablename__ = 'platform_integrations'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey('onboarding_sessions.id', ondelete='CASCADE'), nullable=False)
+
+    # Integration data
+    primary_website = Column(String(512), nullable=True)
+    website_platforms = Column(JSON)   # { wix: {...}, wordpress: {...} }
+    analytics_platforms = Column(JSON) # { gsc: {...}, bing: {...} }
+    social_platforms = Column(JSON)    # { facebook: true, twitter: true, ... }
+    connected_platforms = Column(JSON) # ["wix", "gsc", ...]
+
+    # Metadata
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # Relationships
+    session = relationship('OnboardingSession', back_populates='platform_integrations')
+
+    def __repr__(self):
+        return f"<PlatformIntegration(id={self.id}, session_id={self.session_id}, platforms={len(self.connected_platforms or [])})>"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'primary_website': self.primary_website,
+            'website_platforms': self.website_platforms,
+            'analytics_platforms': self.analytics_platforms,
+            'social_platforms': self.social_platforms,
+            'connected_platforms': self.connected_platforms,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

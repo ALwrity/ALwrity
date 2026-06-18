@@ -46,22 +46,24 @@ class ProductMarketingPromptBuilder(AIPromptOptimizer):
             # Use Canonical Profile (SSOT)
             db = SessionLocal()
             try:
-                onboarding_data = self.onboarding_integration_service._build_canonical_from_db(user_id, db)
+                integrated_data = self.onboarding_integration_service.get_integrated_data_sync(user_id, db)
+                canonical_profile = integrated_data.get('canonical_profile', {})
             except Exception as e:
                 self.logger.error(f"Error fetching onboarding data: {e}")
-                onboarding_data = {}
+                canonical_profile = {}
             finally:
                 db.close()
-
-            canonical_profile = onboarding_data or {}
             
             enhanced_prompt = base_prompt
             
             # 1. Brand Voice & Tone (Canonical)
-            tone = canonical_profile.get('writing_tone', 'professional')
-            voice = canonical_profile.get('writing_voice', 'authoritative')
-            brand_enhancement = f", {tone} tone, {voice} voice"
-            enhanced_prompt += brand_enhancement
+            tone = canonical_profile.get('writing_tone')
+            voice = canonical_profile.get('writing_voice')
+            if tone or voice:
+                parts = []
+                if tone: parts.append(f"{tone} tone")
+                if voice: parts.append(f"{voice} voice")
+                enhanced_prompt += f", {', '.join(parts)}"
             
             # 2. Target Audience (Canonical)
             target_audience = canonical_profile.get('target_audience')
@@ -162,23 +164,27 @@ class ProductMarketingPromptBuilder(AIPromptOptimizer):
             # Use Canonical Profile (SSOT)
             db = SessionLocal()
             try:
-                onboarding_data = self.onboarding_integration_service._build_canonical_from_db(user_id, db)
+                integrated_data = self.onboarding_integration_service.get_integrated_data_sync(user_id, db)
+                canonical_profile = integrated_data.get('canonical_profile', {})
             except Exception as e:
                 self.logger.error(f"Error fetching onboarding data: {e}")
-                onboarding_data = {}
+                canonical_profile = {}
             finally:
                 db.close()
-
-            canonical_profile = onboarding_data or {}
             
             enhanced_prompt = base_request
             
             # 1. Brand Voice & Tone (Canonical)
-            tone = canonical_profile.get('writing_tone', 'professional')
-            voice = canonical_profile.get('writing_voice', 'authoritative')
-            complexity = canonical_profile.get('writing_complexity', 'intermediate')
+            tone = canonical_profile.get('writing_tone')
+            voice = canonical_profile.get('writing_voice')
+            complexity = canonical_profile.get('writing_complexity')
             
-            enhanced_prompt += f"\n\nBrand Voice & Tone:\n- Tone: {tone}\n- Voice: {voice}\n- Complexity: {complexity}"
+            if tone or voice or complexity:
+                lines = []
+                if tone: lines.append(f"- Tone: {tone}")
+                if voice: lines.append(f"- Voice: {voice}")
+                if complexity: lines.append(f"- Complexity: {complexity}")
+                enhanced_prompt += "\n\nBrand Voice & Tone:\n" + "\n".join(lines)
             
             # 2. Target Audience (Canonical)
             target_audience = canonical_profile.get('target_audience')

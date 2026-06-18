@@ -6,6 +6,7 @@ import hallucinationDetectorService from '../../../services/hallucinationDetecto
 import WixConnectModal from './WixConnectModal';
 import { useWixPublish } from '../../../hooks/useWixPublish';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
+import PublishProgressModal from '../PublishProgressModal';
 
 const saveCompleteBlogAsset = async (
   title: string,
@@ -72,6 +73,7 @@ export const PublishContent: React.FC<PublishContentProps> = ({
   const [checkingWP, setCheckingWP] = useState(false);
   const [publishing, setPublishing] = useState<string | null>(null);
   const [publishResult, setPublishResult] = useState<{ platform: string; success: boolean; message: string; url?: string } | null>(null);
+  const [publishProgress, setPublishProgress] = useState<{ platform: string; currentStage: number; done: boolean; error: string | null } | null>(null);
   const [copyDone, setCopyDone] = useState(false);
   const [wixContentWarning, setWixContentWarning] = useState<string | null>(null);
   const [flowRunning, setFlowRunning] = useState(false);
@@ -133,23 +135,47 @@ export const PublishContent: React.FC<PublishContentProps> = ({
     }
   };
 
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  const finishPublishProgress = (success: boolean, platform: string, message: string, url?: string) => {
+    setPublishResult({ platform, success, message, url });
+    if (success) {
+      setPublishProgress(prev => prev ? { ...prev, currentStage: 3, done: true } : null);
+      setTimeout(() => setPublishProgress(null), 2000);
+    } else {
+      setPublishProgress(prev => prev ? { ...prev, error: message } : null);
+    }
+    setPublishing(null);
+  };
+
   const publishToWordPress = async () => {
     const md = buildFullMarkdown();
     const html = convertMarkdownToHTML(md);
     setPublishing('wordpress');
     setPublishResult(null);
+    setPublishProgress({ platform: 'wordpress', currentStage: 0, done: false, error: null });
+    await delay(400);
 
     try {
+      // Stage 0: Validating
       if (!seoMetadata) {
-        setPublishResult({ platform: 'wordpress', success: false, message: 'Generate SEO metadata first before publishing.' });
+        finishPublishProgress(false, 'wordpress', 'Generate SEO metadata first before publishing.');
         return;
       }
+
+      // Stage 1: Connecting
+      setPublishProgress(prev => prev ? { ...prev, currentStage: 1 } : null);
+      await delay(400);
 
       const activeSite = wordpressSites.find(s => s.is_active) || wordpressSites[0];
       if (!activeSite) {
-        setPublishResult({ platform: 'wordpress', success: false, message: 'No WordPress sites connected. Go to Settings > Integrations to add one.' });
+        finishPublishProgress(false, 'wordpress', 'No WordPress sites connected. Go to Settings > Integrations to add one.');
         return;
       }
+
+      // Stage 2: Publishing
+      setPublishProgress(prev => prev ? { ...prev, currentStage: 2 } : null);
+      await delay(400);
 
       const title = seoMetadata.seo_title || md.match(/^#\s+(.+)$/m)?.[1] || 'Blog Post';
       const request: WordPressPublishRequest = {
@@ -165,16 +191,15 @@ export const PublishContent: React.FC<PublishContentProps> = ({
 
       const result = await wordpressAPI.publishContent(request);
       if (result.success) {
-        setPublishResult({ platform: 'wordpress', success: true, message: `Published to "${activeSite.site_name}"!`, url: result.post_url });
+        finishPublishProgress(true, 'wordpress', `Published to "${activeSite.site_name}"!`, result.post_url);
         saveCompleteBlogAsset(blogTitle || seoMetadata?.seo_title || 'Blog Post', md, seoMetadata, 'wordpress', result.post_url, String(result.post_id ?? ''));
         try { localStorage.setItem('blog_publish_completed', 'true'); } catch {}
       } else {
-        setPublishResult({ platform: 'wordpress', success: false, message: result.error || 'Publish failed' });
+        finishPublishProgress(false, 'wordpress', result.error || 'Publish failed');
       }
     } catch (err: any) {
-      setPublishResult({ platform: 'wordpress', success: false, message: err?.response?.data?.detail || err.message || 'Publish failed' });
-    } finally {
-      setPublishing(null);
+      const msg = err?.response?.data?.detail || err.message || 'Publish failed';
+      finishPublishProgress(false, 'wordpress', msg);
     }
   };
 
@@ -210,22 +235,40 @@ export const PublishContent: React.FC<PublishContentProps> = ({
     const enrichedMd = enrichMarkdownWithImages(md);
     setPublishResult(null);
     setWixContentWarning(null);
+    setPublishProgress({ platform: 'wix', currentStage: 0, done: false, error: null });
+    await delay(400);
+
+    // Stage 0: Validating
     const validation = validateWixContent(enrichedMd);
     if (!validation.valid) {
+      setPublishProgress(prev => prev ? { ...prev, error: validation.warning || 'Content validation failed.' } : null);
       setPublishResult({ platform: 'wix', success: false, message: validation.warning || 'Content validation failed.' });
       return;
     }
     if (validation.warning) {
       setWixContentWarning(validation.warning);
     }
+
+    // Stage 1: Connecting
+    setPublishProgress(prev => prev ? { ...prev, currentStage: 1 } : null);
+    await delay(400);
+
+    // Stage 2: Publishing
+    setPublishProgress(prev => prev ? { ...prev, currentStage: 2 } : null);
+    await delay(400);
+
     const result = await publishToWix(enrichedMd, seoMetadata, blogTitle);
+    if (result.success) {
+      setPublishProgress(prev => prev ? { ...prev, currentStage: 3, done: true } : null);
+      setTimeout(() => setPublishProgress(null), 2000);
+      saveCompleteBlogAsset(blogTitle || seoMetadata?.seo_title || 'Blog Post', md, seoMetadata, 'wix', result.url, result.post_id);
+      try { localStorage.setItem('blog_publish_completed', 'true'); } catch {}
+    } else {
+      setPublishProgress(prev => prev ? { ...prev, error: result.message } : null);
+    }
     setPublishResult({ platform: 'wix', success: result.success, message: result.message, url: result.url });
     if (result.warning && result.success) {
       setWixContentWarning(result.warning);
-    }
-    if (result.success) {
-      saveCompleteBlogAsset(blogTitle || seoMetadata?.seo_title || 'Blog Post', md, seoMetadata, 'wix', result.url, result.post_id);
-      try { localStorage.setItem('blog_publish_completed', 'true'); } catch {}
     }
   };
 
@@ -599,6 +642,15 @@ export const PublishContent: React.FC<PublishContentProps> = ({
         isOpen={showWixConnectModal}
         onClose={closeWixConnectModal}
         onConnectionSuccess={handleWixConnectionSuccess}
+      />
+
+      <PublishProgressModal
+        open={publishProgress !== null}
+        platform={publishProgress?.platform || ''}
+        currentStage={publishProgress?.currentStage ?? 0}
+        done={publishProgress?.done ?? false}
+        error={publishProgress?.error}
+        onClose={() => setPublishProgress(null)}
       />
 
       {/* Publish History modal */}

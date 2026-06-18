@@ -1,14 +1,14 @@
 """
 Core Persona Service
 
-Handles the core persona generation logic using Gemini AI.
+Handles the core persona generation logic using the provider-agnostic llm_text_gen gateway.
 """
 
 from typing import Dict, Any, List
 from loguru import logger
 from datetime import datetime
 
-from services.llm_providers.gemini_provider import gemini_structured_json_response
+from services.llm_providers.main_text_generation import llm_text_gen
 from .data_collector import OnboardingDataCollector
 from .prompt_builder import PersonaPromptBuilder
 from services.persona.linkedin.linkedin_persona_service import LinkedInPersonaService
@@ -16,7 +16,7 @@ from services.persona.facebook.facebook_persona_service import FacebookPersonaSe
 
 
 class CorePersonaService:
-    """Core service for generating writing personas using Gemini AI."""
+    """Core service for generating writing personas using the provider-agnostic LLM gateway."""
     
     _instance = None
     _initialized = False
@@ -38,7 +38,7 @@ class CorePersonaService:
             self._initialized = True
     
     def generate_core_persona(self, onboarding_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate core writing persona using Gemini structured response."""
+        """Generate core writing persona using the provider-agnostic LLM gateway."""
         
         # Build analysis prompt
         prompt = self.prompt_builder.build_persona_analysis_prompt(onboarding_data)
@@ -50,18 +50,20 @@ class CorePersonaService:
         user_id = onboarding_data.get("session_info", {}).get("user_id")
         
         try:
-            # Generate structured response using Gemini
-            response = gemini_structured_json_response(
+            # Generate structured response using the provider-agnostic gateway
+            # (handles GPT_PROVIDER routing, subscription/usage checks, fallbacks)
+            response = llm_text_gen(
                 prompt=prompt,
-                schema=persona_schema,
+                json_struct=persona_schema,
                 temperature=0.2,  # Low temperature for consistent analysis
                 max_tokens=8192,
                 system_prompt="You are an expert writing style analyst and persona developer. Analyze the provided data to create a precise, actionable writing persona.",
-                user_id=user_id
+                user_id=user_id,
+                flow_type="core_persona_generation"
             )
             
             if "error" in response:
-                logger.error(f"Gemini API error: {response['error']}")
+                logger.error(f"LLM gateway error: {response['error']}")
                 return {"error": f"AI analysis failed: {response['error']}"}
             
             logger.info("✅ Core persona generated successfully")
@@ -111,13 +113,14 @@ class CorePersonaService:
         user_id = onboarding_data.get("session_info", {}).get("user_id")
         
         try:
-            response = gemini_structured_json_response(
+            response = llm_text_gen(
                 prompt=prompt,
-                schema=platform_schema,
+                json_struct=platform_schema,
                 temperature=0.2,
                 max_tokens=4096,
                 system_prompt=f"You are an expert in {platform} content strategy and platform-specific writing optimization.",
-                user_id=user_id
+                user_id=user_id,
+                flow_type=f"{platform}_persona_generation"
             )
             
             return response

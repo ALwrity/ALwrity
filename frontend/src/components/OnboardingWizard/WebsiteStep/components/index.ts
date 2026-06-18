@@ -22,4 +22,5 @@ export { default as CombinedStrategySection } from './CombinedStrategySection';
 export { default as StyleAnalysisSection } from './StyleAnalysisSection';
 export { default as ContentTypeAnalysisSection } from './ContentTypeAnalysisSection';
 export { default as BrandAnalysisSection } from './BrandAnalysisSection';
+export { default as CrawlResultSections } from './CrawlResultSections';
 export type { Competitor } from './CompetitorsGrid';

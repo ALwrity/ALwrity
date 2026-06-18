@@ -623,12 +623,12 @@ Generate the complete JSON with all 30 fields personalized for {website_url}:
                 personalized_metadata = self._add_personalization_metadata(key, norm_value, context_summary)
                 fields[key] = { 
                     'value': norm_value, 
-                    'source': 'ai_refresh', 
+                    'source': 'ai_generated', 
                     'confidence': 0.8,
                     'personalized': True,
                     'personalization_data': personalized_metadata
                 }
-                sources[key] = 'ai_refresh'
+                sources[key] = 'ai_generated'
                 non_null_keys.append(key)
             else:
                 missing_fields.append(key)

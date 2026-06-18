@@ -4,7 +4,7 @@ Database models for tracking website analysis tasks and execution logs.
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, Index, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from datetime import datetime
 
 # Import the same Base from enhanced_strategy_models
@@ -28,9 +28,11 @@ class WebsiteAnalysisTask(Base):
     competitor_id = Column(String(255), nullable=True)  # For competitor tasks (domain or identifier)
     
     # Task Status
-    status = Column(String(50), default='active')  # 'active', 'failed', 'paused', 'needs_intervention'
+    status = Column(String(50), default='active')  # 'active', 'failed', 'paused', 'needs_intervention', 'running'
     
     # Execution Tracking
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat = Column(DateTime, nullable=True)
     last_check = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)
@@ -42,6 +44,7 @@ class WebsiteAnalysisTask(Base):
     
     # Scheduling
     next_check = Column(DateTime, nullable=True, index=True)  # Next scheduled check time
+    next_execution = synonym('next_check')
     frequency_days = Column(Integer, default=10)  # Recurring frequency in days
     
     # Metadata
@@ -118,6 +121,8 @@ class OnboardingFullWebsiteAnalysisTask(Base):
 
     status = Column(String(50), default='active', index=True)
 
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat = Column(DateTime, nullable=True)
     last_executed = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)
@@ -186,6 +191,8 @@ class DeepCompetitorAnalysisTask(Base):
 
     status = Column(String(50), default='active', index=True)
 
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat = Column(DateTime, nullable=True)
     last_executed = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)
@@ -254,6 +261,8 @@ class DeepWebsiteCrawlTask(Base):
 
     status = Column(String(50), default='active', index=True)
 
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat = Column(DateTime, nullable=True)
     last_executed = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)
@@ -263,6 +272,8 @@ class DeepWebsiteCrawlTask(Base):
     failure_pattern = Column(JSON, nullable=True)
 
     next_execution = Column(DateTime, nullable=True, index=True)
+
+    frequency_days = Column(Integer, default=7)  # Recurring frequency in days
 
     payload = Column(JSON, nullable=True)
 
@@ -322,6 +333,8 @@ class SIFIndexingTask(Base):
 
     status = Column(String(50), default='active', index=True)
 
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat = Column(DateTime, nullable=True)
     last_executed = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)
@@ -392,6 +405,8 @@ class MarketTrendsTask(Base):
 
     status = Column(String(50), default="active", index=True)
 
+    started_at = Column(DateTime, nullable=True)
+    last_heartbeat = Column(DateTime, nullable=True)
     last_executed = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)

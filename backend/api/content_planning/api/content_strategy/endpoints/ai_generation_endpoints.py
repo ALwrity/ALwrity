@@ -107,8 +107,8 @@ async def generate_comprehensive_strategy(
 
 @router.post("/generate-strategy-component")
 async def generate_strategy_component(
-    current_user: Dict[str, Any] = Depends(get_current_user),
     component_type: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
     base_strategy: Optional[Dict[str, Any]] = None,
     context: Optional[Dict[str, Any]] = None,
     db: Session = Depends(get_db)

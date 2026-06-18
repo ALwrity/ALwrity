@@ -17,9 +17,15 @@ class EnhancedLinguisticAnalyzer:
     """Advanced linguistic analysis for persona creation and improvement."""
     
     def __init__(self):
-        """Initialize the linguistic analyzer with required spaCy dependency."""
+        """Initialize the linguistic analyzer — minimal setup, spaCy loaded on first use."""
         self.nlp = None
         self.spacy_available = False
+        self._initialized = False
+    
+    def _ensure_initialized(self):
+        """Lazily load spaCy model and NLTK data on first method call."""
+        if self._initialized:
+            return
         
         # spaCy is REQUIRED for high-quality persona generation
         try:
@@ -36,14 +42,27 @@ class EnhancedLinguisticAnalyzer:
         
         # Download required NLTK data
         try:
-            nltk.data.find('tokenizers/punkt_tab')  # Updated for newer NLTK versions
+            nltk.data.find('tokenizers/punkt_tab')
             nltk.data.find('corpora/stopwords')
             nltk.data.find('taggers/averaged_perceptron_tagger')
         except LookupError:
             logger.warning("NLTK data not found. Downloading required data...")
-            nltk.download('punkt_tab', quiet=True)  # Updated for newer NLTK versions
+            nltk.download('punkt_tab', quiet=True)
             nltk.download('stopwords', quiet=True)
             nltk.download('averaged_perceptron_tagger', quiet=True)
+        
+        self._initialized = True
+
+
+# ── Singleton factory (avoids duplicate spaCy instances across modules) ──────────
+_analyzer_instance = None
+
+def get_linguistic_analyzer() -> EnhancedLinguisticAnalyzer:
+    """Return the shared singleton instance."""
+    global _analyzer_instance
+    if _analyzer_instance is None:
+        _analyzer_instance = EnhancedLinguisticAnalyzer()
+    return _analyzer_instance
     
     def analyze_writing_style(self, text_samples: List[str]) -> Dict[str, Any]:
         """
@@ -55,6 +74,7 @@ class EnhancedLinguisticAnalyzer:
         Returns:
             Detailed linguistic analysis
         """
+        self._ensure_initialized()
         try:
             logger.info(f"Analyzing writing style from {len(text_samples)} text samples")
             

@@ -24,7 +24,7 @@ import {
 } from '../../api/componentLogic';
 import { getLatestBrandAvatar, getLatestVoiceClone } from '../../api/brandAssets';
 import { usePersonaPolling } from '../../hooks/usePersonaPolling';
-import { apiClient } from '../../api/client';
+import { aiApiClient } from '../../api/client';
 import { type GenerationStep } from './PersonaStep/PersonaGenerationProgress';
 import { usePersonaInitialization } from './PersonaStep/personaInitialization';
 import { usePersonaGeneration } from './PersonaStep/personaGeneration';
@@ -280,7 +280,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
 
   const loadServerCachedPersonaData = useCallback(async () => {
     try {
-      const resp = await apiClient.get('/api/onboarding/step4/persona-latest');
+      const resp = await aiApiClient.get('/api/onboarding/step4/persona-latest');
       if (resp.data && resp.data.success && resp.data.persona) {
         const p = resp.data.persona;
         setCorePersona(p.core_persona);

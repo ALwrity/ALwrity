@@ -34,7 +34,7 @@ export const useAutoPopulation = ({
         isAutoPopulating
       });
     }
-  }, [autoPopulateAttempted, isAutoPopulating]); // Removed autoPopulateFromOnboarding from dependencies
+  }, [autoPopulateAttempted, isAutoPopulating, autoPopulateFromOnboarding]);
 
   return {
     autoPopulateAttempted,

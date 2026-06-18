@@ -26,6 +26,14 @@ export interface PlatformInsightsStatusResponse {
   gsc_tasks: PlatformInsightsTask[];
   bing_tasks: PlatformInsightsTask[];
   total_tasks: number;
+  // C2: present when the GET handler computed missing platforms without
+  // auto-creating them. Empty array means the user has tasks for every
+  // connected platform. The frontend can call
+  // `ensurePlatformInsightsTasks` when this is non-empty.
+  missing_platforms?: ('gsc' | 'bing')[];
+  // C2: present on the POST response, listing what was created vs failed.
+  created_platforms?: ('gsc' | 'bing')[];
+  failed_platforms?: Array<{ platform: 'gsc' | 'bing'; error: string }>;
 }
 
 export interface PlatformInsightsExecutionLog {
@@ -81,6 +89,25 @@ export const getPlatformInsightsLogs = async (
   } catch (error: any) {
     console.error('Error fetching platform insights logs:', error);
     throw new Error(error.response?.data?.detail || 'Failed to fetch platform insights logs');
+  }
+};
+
+/**
+ * C2: explicitly create any missing platform insights tasks. Replaces
+ * the old auto-create side effect of GET /platform-insights/status.
+ * Idempotent — existing tasks are not duplicated.
+ */
+export const ensurePlatformInsightsTasks = async (
+  userId: string
+): Promise<PlatformInsightsStatusResponse> => {
+  try {
+    const response = await apiClient.post(
+      `/api/scheduler/platform-insights/${userId}/ensure-tasks`
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error('Error ensuring platform insights tasks:', error);
+    throw new Error(error.response?.data?.detail || 'Failed to ensure platform insights tasks');
   }
 };
 

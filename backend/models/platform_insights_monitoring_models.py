@@ -4,7 +4,7 @@ Database models for tracking platform insights (GSC/Bing) fetch tasks.
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Index, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from datetime import datetime
 
 # Import the same Base from enhanced_strategy_models
@@ -41,6 +41,7 @@ class PlatformInsightsTask(Base):
     
     # Scheduling
     next_check = Column(DateTime, nullable=True, index=True)  # Next scheduled check time
+    next_execution = synonym('next_check')
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)

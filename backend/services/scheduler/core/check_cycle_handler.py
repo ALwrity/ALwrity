@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from services.database import get_all_user_ids, get_session_for_user
 from utils.logger_utils import get_service_logger
+from .stale_task_recovery import recover_stale_tasks
 
 if TYPE_CHECKING:
     from .scheduler import TaskScheduler
@@ -76,7 +77,7 @@ async def check_and_execute_due_tasks(scheduler: 'TaskScheduler'):
     scheduler.stats['total_checks'] += 1
     check_start_time = datetime.utcnow()
     scheduler.stats['last_check'] = check_start_time.isoformat()
-    
+
     # Track execution summary for this check cycle
     cycle_summary = {
         'tasks_found_by_type': {},
@@ -101,6 +102,17 @@ async def check_and_execute_due_tasks(scheduler: 'TaskScheduler'):
             continue
             
         try:
+            # Phase 0: Recover stale tasks stuck in 'running' status from prior crashes
+            try:
+                recovered = recover_stale_tasks(db)
+                if recovered:
+                    logger.warning(
+                        f"[Scheduler Check] Recovered {recovered} stale task(s) "
+                        f"for user {user_id} from previous crashes"
+                    )
+            except Exception as e:
+                logger.error(f"[Scheduler Check] Stale task recovery failed for user {user_id}: {e}")
+
             # Check onboarding status first
             # Skip users who haven't completed onboarding to prevent premature agent initialization
             from services.onboarding.progress_service import OnboardingProgressService

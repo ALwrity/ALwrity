@@ -52,9 +52,7 @@ const KeyInsightCard: React.FC<KeyInsightProps> = ({
   color = 'primary' 
 }) => {
   const theme = useTheme();
-  const isDark = theme.palette.mode === 'dark';
   
-  // Helper function to safely get palette colors
   const getPaletteColor = (colorKey: string) => {
     const palette = theme.palette as any;
     return palette[colorKey] || palette.primary;
@@ -69,41 +67,25 @@ const KeyInsightCard: React.FC<KeyInsightProps> = ({
         p: 2.5, 
         mb: 0, 
         borderRadius: 2.5,
-        // Force high-contrast base color so nested text never inherits a light color
-        color: isDark ? '#ffffff !important' : '#1a202c !important',
-        // High-contrast background for readability (avoid pastel-on-white look)
-        // Hard override to white in light mode; prevents faint text from theme gradients
-        background: isDark
-          ? `linear-gradient(135deg, ${alpha(paletteColor.main, 0.14)} 0%, ${alpha(paletteColor.main, 0.10)} 100%)`
-          : '#ffffff !important',
+        color: '#1a202c !important',
+        background: '#ffffff !important',
         backgroundImage: 'none !important',
-        backgroundColor: isDark ? undefined : '#ffffff !important',
+        backgroundColor: '#ffffff !important',
         opacity: '1 !important',
         border: `2px solid`,
-        borderColor: isDark
-          ? alpha(paletteColor.main, 0.35)
-          : alpha(paletteColor.main, 0.35),
+        borderColor: alpha(paletteColor.main, 0.35),
         borderLeftWidth: '5px',
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        // Prevent any blend that could wash out text colors on light surfaces
         mixBlendMode: 'normal',
-        // Ensure all child elements inherit proper text color
-        '& *': {
-          color: 'inherit !important'
-        },
         '& .MuiTypography-root': {
-          color: isDark ? '#ffffff !important' : '#111827 !important',
-          WebkitTextFillColor: isDark ? '#ffffff' : '#111827',
+          color: '#111827 !important',
+          WebkitTextFillColor: '#111827',
         },
         '&:hover': {
-          background: isDark
-            ? `linear-gradient(135deg, ${alpha(paletteColor.main, 0.18)} 0%, ${alpha(paletteColor.main, 0.12)} 100%)`
-            : '#ffffff !important',
+          background: '#ffffff !important',
           borderColor: alpha(paletteColor.main, 0.55),
           transform: 'translateY(-4px)',
-          boxShadow: isDark
-            ? `0 12px 40px ${alpha(paletteColor.main, 0.2)}`
-            : `0 12px 40px ${alpha(paletteColor.main, 0.15)}`
+          boxShadow: `0 12px 40px ${alpha(paletteColor.main, 0.15)}`
         }
       }}
     >
@@ -118,10 +100,7 @@ const KeyInsightCard: React.FC<KeyInsightProps> = ({
             width: 48,
             height: 48,
             borderRadius: 2,
-            // Stronger icon container contrast
-            background: isDark
-              ? alpha(paletteColor.main, 0.22)
-              : alpha(paletteColor.main, 0.14),
+            background: alpha(paletteColor.main, 0.14),
           }}
         >
           {icon}
@@ -134,12 +113,11 @@ const KeyInsightCard: React.FC<KeyInsightProps> = ({
               fontSize: '0.78rem',
               letterSpacing: '0.6px',
               textTransform: 'uppercase',
-              color: isDark ? '#ffffff !important' : '#1f2937 !important',
-              textShadow: isDark ? 'none' : '0 1px 0 rgba(255,255,255,0.6)',
+              color: '#1f2937 !important',
+              textShadow: '0 1px 0 rgba(255,255,255,0.6)',
               mb: 0.5,
               display: 'block',
-              // Force high contrast for readability
-              WebkitTextFillColor: isDark ? '#ffffff' : '#1f2937',
+              WebkitTextFillColor: '#1f2937',
               WebkitTextStroke: '0px transparent'
             }}
           >
@@ -150,10 +128,9 @@ const KeyInsightCard: React.FC<KeyInsightProps> = ({
             sx={{ 
               fontWeight: 700,
               fontSize: '1.1rem',
-              color: isDark ? '#ffffff !important' : '#111827 !important',
+              color: '#111827 !important',
               lineHeight: 1.35,
-              // Force high contrast for readability
-              WebkitTextFillColor: isDark ? '#ffffff' : '#111827',
+              WebkitTextFillColor: '#111827',
               WebkitTextStroke: '0px transparent'
             }}
           >

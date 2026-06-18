@@ -9,7 +9,7 @@
  * - Integration with backend metadata generation
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -114,6 +114,69 @@ export const SEOMetadataModal: React.FC<SEOMetadataModalProps> = ({
   const [copiedItems, setCopiedItems] = useState<Set<string>>(new Set());
   const [editableMetadata, setEditableMetadata] = useState<SEOMetadataResult | null>(null);
   const [contentHash, setContentHash] = useState<string>('');
+  const [genProgress, setGenProgress] = useState(0);
+
+  const metadataStageDefinitions = [
+    { id: 'analyzing', label: 'Analyzing', icon: '🔍' },
+    { id: 'title', label: 'SEO Title', icon: '📝' },
+    { id: 'description', label: 'Description', icon: '📋' },
+    { id: 'social', label: 'Social Tags', icon: '📱' },
+    { id: 'compiling', label: 'Compiling', icon: '⚡' },
+  ];
+
+  // Progress simulation while generating (preserves last stage position on error)
+  useEffect(() => {
+    if (!isGenerating) return;
+    setGenProgress(0);
+    const interval = setInterval(() => {
+      setGenProgress(prev => {
+        if (prev >= 100) { clearInterval(interval); return 100; }
+        return prev + 1;
+      });
+    }, 120);
+    return () => clearInterval(interval);
+  }, [isGenerating]);
+
+  const latestStageIndex = useMemo(() => {
+    if (genProgress === 0) return -1;
+    const index = Math.floor((genProgress / 100) * metadataStageDefinitions.length);
+    return Math.min(index, metadataStageDefinitions.length - 1);
+  }, [genProgress]);
+
+  const stagesWithState = useMemo(() => {
+    return metadataStageDefinitions.map((stage, i) => {
+      let state: 'upcoming' | 'active' | 'done' | 'error' = 'upcoming';
+      if (error) {
+        state = i === latestStageIndex ? 'error' : i < latestStageIndex ? 'done' : 'upcoming';
+      } else if (!isGenerating && metadataResult) {
+        state = 'done';
+      } else if (latestStageIndex === -1) {
+        state = i === 0 ? 'active' : 'upcoming';
+      } else if (i < latestStageIndex) {
+        state = 'done';
+      } else if (i === latestStageIndex) {
+        state = 'active';
+      }
+      return { ...stage, state };
+    });
+  }, [metadataStageDefinitions, latestStageIndex, isGenerating, genProgress, error, metadataResult]);
+
+  const progressPct = useMemo(() => {
+    if (error) return 0;
+    if (!isGenerating && metadataResult) return 100;
+    const done = stagesWithState.filter(s => s.state === 'done').length;
+    const active = stagesWithState.filter(s => s.state === 'active').length;
+    if (done === 0 && active === 0) return 0;
+    return Math.round(((done + active * 0.5) / metadataStageDefinitions.length) * 100);
+  }, [stagesWithState, error, isGenerating, metadataResult]);
+
+  const stageStateStyle: Record<string, { background: string; border: string; color: string }> = {
+    upcoming: { background: '#f1f5f9', border: '#e2e8f0', color: '#94a3b8' },
+    active: { background: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' },
+    done: { background: '#ecfdf5', border: '#bbf7d0', color: '#047857' },
+    error: { background: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
+  };
+
   // Subscribe to image generation bus to auto-fill OG/Twitter image fields
   useEffect(() => {
     const unsub = subscribeImage(({ base64 }: { base64: string }) => {
@@ -508,6 +571,12 @@ export const SEOMetadataModal: React.FC<SEOMetadataModalProps> = ({
         }
       }}
     >
+      <style>{`
+        @keyframes seoMetaPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.15); }
+          50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+        }
+      `}</style>
       <DialogTitle sx={{ 
         display: 'flex', 
         alignItems: 'center', 
@@ -550,14 +619,33 @@ export const SEOMetadataModal: React.FC<SEOMetadataModalProps> = ({
 
       <DialogContent sx={{ p: 0 }}>
         {isGenerating && (
-          <Box sx={{ p: 4, textAlign: 'center' }}>
-            <CircularProgress size={60} sx={{ mb: 2 }} />
-            <Typography variant="h6" sx={{ mb: 1 }}>
-              Generating SEO Metadata...
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              Creating optimized titles, descriptions, and social media tags
-            </Typography>
+          <Box sx={{ p: 4 }}>
+            {/* Progress bar */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
+              <Box sx={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
+                <Box sx={{ width: `${progressPct}%`, height: '100%', borderRadius: 2, background: 'linear-gradient(90deg, #3b82f6, #2563eb)', transition: 'width 0.5s ease' }} />
+              </Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', fontSize: '0.65rem' }}>
+                {stagesWithState.filter(s => s.state === 'done').length}/{metadataStageDefinitions.length}
+              </Typography>
+            </Box>
+
+            {/* Stage chips */}
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {stagesWithState.map(stage => {
+                const copy = stageStateStyle[stage.state];
+                return (
+                  <Box key={stage.id} sx={{ flex: 1, py: 1, px: 0.5, borderRadius: 1.5, backgroundColor: copy.background, border: `1px solid ${copy.border}`, textAlign: 'center', animation: stage.state === 'active' ? 'seoMetaPulse 2s ease-in-out infinite' : undefined, transition: 'all 0.3s ease' }}>
+                    <Box sx={{ fontSize: 18, lineHeight: 1, mb: 0.25 }}>
+                      {stage.state === 'active' ? <CircularProgress size={16} thickness={5} sx={{ color: '#1d4ed8' }} /> : stage.icon}
+                    </Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: copy.color, display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
+                      {stage.state === 'active' ? 'Working…' : stage.state === 'done' ? 'Done' : stage.state === 'error' ? 'Error' : stage.label}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
           </Box>
         )}
 

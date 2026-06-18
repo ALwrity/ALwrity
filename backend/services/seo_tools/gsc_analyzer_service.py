@@ -344,9 +344,9 @@ class GSCAnalyzerService:
                 {'keyword': 'SEO tools', 'position': 4, 'strength': 'Strong'}
             ],
             'vulnerabilities': [
-                'Broader 'content optimization' keywords at position 5-8',
-                'Competitors ranking higher for 'AI writing' variants',
-                'Low ranking for 'keyword research tool' (position 8)'
+                "Broader 'content optimization' keywords at position 5-8",
+                "Competitors ranking higher for 'AI writing' variants",
+                "Low ranking for 'keyword research tool' (position 8)"
             ],
             'recommendations': [
                 'Strengthen ranking for broader content keywords',

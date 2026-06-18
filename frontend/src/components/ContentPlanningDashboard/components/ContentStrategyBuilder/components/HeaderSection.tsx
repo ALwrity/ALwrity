@@ -23,8 +23,6 @@ import {
   TrendingUp as TrendingUpIcon,
   Security as SecurityIcon,
   AutoAwesome as AutoAwesomeIcon,
-  Storage as StorageIcon,
-  SmartToy as SmartToyIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import AutofillDataTransparency from './AutofillDataTransparency';
@@ -37,9 +35,8 @@ interface HeaderSectionProps {
   confidenceScores: any;
   loading: boolean;
   error: string | null;
-  onRefreshAutofill: () => void;
-  onDatabaseAutofill: () => void;
-  onSmartAutofill: () => void;
+  onAutofill: () => void;
+  onRegenerateAI?: () => void;
   onContinueWithPresent: () => void;
   onScrollToReview: () => void;
   hasAutofillData: boolean;
@@ -55,9 +52,8 @@ const HeaderSection: React.FC<HeaderSectionProps> = ({
   confidenceScores,
   loading,
   error,
-  onRefreshAutofill,
-  onDatabaseAutofill,
-  onSmartAutofill,
+  onAutofill,
+  onRegenerateAI,
   onContinueWithPresent,
   onScrollToReview,
   hasAutofillData,
@@ -530,17 +526,17 @@ const HeaderSection: React.FC<HeaderSectionProps> = ({
               </Alert>
             </Collapse>
 
-            {/* Action Buttons - Smart, Database, and AI Autofill */}
+            {/* Action Buttons - Single Autofill */}
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
               <Tooltip 
-                title="Smart Autofill combines the speed of database autofill with AI personalization. It uses your onboarding data for 18-19 fields and AI analysis for 11-12 additional fields, providing the best of both worlds. Recommended for most users."
+                title="Autofill combines your onboarding data with AI to fill all 30+ strategy fields."
                 arrow
                 placement="top"
               >
                 <Button
                   variant="contained"
                   startIcon={<AutoAwesomeIcon />}
-                  onClick={onSmartAutofill}
+                  onClick={onAutofill}
                   disabled={loading}
                   sx={{
                     backgroundColor: 'rgba(102, 126, 234, 0.95)',
@@ -564,86 +560,45 @@ const HeaderSection: React.FC<HeaderSectionProps> = ({
                     }
                   }}
                 >
-                  {loading ? 'Processing...' : 'Smart Autofill (Recommended)'}
+                  {loading ? 'Processing...' : 'Autofill Strategy Fields'}
                 </Button>
               </Tooltip>
-              
-              <Tooltip 
-                title="Database Autofill quickly populates 18-19 fields directly from your onboarding data (website analysis, research preferences, API integrations). Fast and free - no AI processing required. Best for users who want quick results from existing data."
-                arrow
-                placement="top"
-              >
-                <Button
-                  variant="outlined"
-                  startIcon={<StorageIcon />}
-                  onClick={onDatabaseAutofill}
-                  disabled={loading}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.4)',
-                    borderWidth: 2,
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    px: 3,
-                    py: 1.2,
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.6)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(255, 255, 255, 0.2)'
-                    },
-                    '&:disabled': {
-                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                      color: 'rgba(255, 255, 255, 0.5)'
-                    }
-                  }}
+
+              {hasAutofillData && onRegenerateAI && (
+                <Tooltip
+                  title="Re-run AI generation to refresh AI-sourced fields. Your onboarding data and manual edits to DB-grounded fields are preserved."
+                  arrow
+                  placement="top"
                 >
-                  {loading ? 'Loading...' : 'Database Autofill'}
-                </Button>
-              </Tooltip>
-              
-              <Tooltip 
-                title="AI Autofill uses advanced AI analysis to generate personalized strategy fields based on your onboarding data. This provides deeper insights and recommendations but takes longer and uses AI credits. Best for users who want AI-powered strategic insights."
-                arrow
-                placement="top"
-              >
-                <Button
-                  variant="outlined"
-                  startIcon={<SmartToyIcon />}
-                  onClick={onRefreshAutofill}
-                  disabled={loading}
-                  sx={{
-                    color: 'white',
-                    borderColor: 'rgba(255, 255, 255, 0.4)',
-                    borderWidth: 2,
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    px: 3,
-                    py: 1.2,
-                    borderRadius: 2,
-                    textTransform: 'none',
-                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    transition: 'all 0.3s ease',
-                    '&:hover': {
-                      borderColor: 'rgba(255, 255, 255, 0.6)',
-                      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                      transform: 'translateY(-2px)',
-                      boxShadow: '0 4px 12px rgba(255, 255, 255, 0.2)'
-                    },
-                    '&:disabled': {
-                      borderColor: 'rgba(255, 255, 255, 0.2)',
-                      color: 'rgba(255, 255, 255, 0.5)'
-                    }
-                  }}
-                >
-                  {loading ? 'Processing...' : 'AI Autofill'}
-                </Button>
-              </Tooltip>
-              
+                  <Button
+                    variant="outlined"
+                    startIcon={<AutoAwesomeIcon />}
+                    onClick={onRegenerateAI}
+                    disabled={loading}
+                    sx={{
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                      fontWeight: 500,
+                      fontSize: '0.8rem',
+                      px: 2,
+                      py: 1.2,
+                      borderRadius: 2,
+                      textTransform: 'none',
+                      '&:hover': {
+                        borderColor: 'rgba(255, 255, 255, 0.6)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                      },
+                      '&:disabled': {
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        color: 'rgba(255, 255, 255, 0.4)',
+                      }
+                    }}
+                  >
+                    Regenerate AI
+                  </Button>
+                </Tooltip>
+              )}
+
               {cacheStatus === 'cached' && (
                 <Tooltip 
                   title="Continue editing your strategy with the current autofilled values. You can review and modify any field before creating your strategy."

@@ -123,7 +123,24 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
   const [showPersonalization, setShowPersonalization] = useState(false);
 
   const getAccent = (theme: any) => (theme?.palette?.[accentColorKey] ?? theme?.palette?.primary);
-  
+
+  const sourceMeta = autoPopulated && dataSource
+    ? {
+        website_analysis: { label: 'Website', color: 'primary' as const },
+        ai_generated: { label: 'AI', color: 'secondary' as const },
+        onboarding_session: { label: 'Onboarding', color: 'success' as const },
+        competitor_analysis: { label: 'Competitor', color: 'warning' as const },
+        analytics_data: { label: 'Analytics', color: 'info' as const },
+        research_preferences: { label: 'Research', color: 'info' as const },
+        persona_data: { label: 'Persona', color: 'error' as const },
+        api_keys_data: { label: 'API Keys', color: 'default' as const },
+        deep_competitor_analysis: { label: 'Deep Comp.', color: 'warning' as const },
+        gsc_analytics: { label: 'GSC', color: 'info' as const },
+        bing_analytics: { label: 'Bing', color: 'info' as const },
+        unified: { label: 'Unified', color: 'primary' as const },
+      }[dataSource]
+    : null;
+
   // Get field configuration from store with proper null checking
   const tooltipData = getTooltipData(fieldId);
   
@@ -765,6 +782,22 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
             </Box>
           )}
 
+          {/* Source badge */}
+          {sourceMeta && (
+            <Chip
+              label={sourceMeta.label}
+              size="small"
+              variant="filled"
+              color={sourceMeta.color}
+              sx={{
+                fontSize: '0.6rem',
+                height: 20,
+                fontWeight: 600,
+                '& .MuiChip-label': { px: 1 }
+              }}
+            />
+          )}
+
           {/* Data Quality indicator */}
           {dataQuality && (
             <Chip
@@ -822,22 +855,9 @@ const StrategicInputField: React.FC<StrategicInputFieldProps> = ({
           </Box>
         )} */}
 
-        {/* Enhanced Data Source Information */}
-        {autoPopulated && dataSource && (
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: 0.5,
-            mt: 0.5,
-            p: 0.5,
-            bgcolor: (theme) => `${getAccent(theme).main}0D`,
-            borderRadius: 1,
-            border: (theme) => `1px solid ${getAccent(theme).main}33`
-          }}>
-            <InfoIcon sx={{ fontSize: 12, color: (theme) => getAccent(theme).main }} />
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem' }}>
-              Data from: {dataSource.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            </Typography>
+        {/* Confidence + View details row */}
+        {(confidenceLevel || onViewDataSource) && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
             {confidenceLevel && (
               <Chip
                 label={`${Math.round(confidenceLevel * 100)}% confidence`}

@@ -122,8 +122,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
       setValidationStatus(validation);
     } catch (error) {
       console.error('Error loading onboarding data:', error);
-      
-      // Error handling is managed by global API client interceptors
+      setError('Could not load all onboarding data. Some features may be limited.');
       
       // Fallback to just API keys if other endpoints fail
       try {
@@ -200,16 +199,9 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
     const missingSteps: string[] = [];
     
     try {
-      // Check API Keys (Step 1) - Since the user is on step 5 (FinalStep), 
-      // they must have completed step 1 (API Keys) to get here
-      // The backend has EXA_API_KEY and GEMINI_API_KEY in .env and user completed step 1
-      const hasApiKeys = true; // User is on final step, so step 1 must be completed
-      
-      console.log('FinalStep: API Keys check:', {
-        hasApiKeys, 
-        reason: 'User is on final step, so step 1 (API Keys) must be completed',
-        note: 'Backend has EXA_API_KEY and GEMINI_API_KEY in .env'
-      });
+      const apiKeyEntries = Object.entries(data.apiKeys || {}).filter(([, v]) => v && String(v).length > 0);
+      const hasApiKeys = apiKeyEntries.length > 0;
+
       if (!hasApiKeys) {
         missingSteps.push('API Keys');
       }

@@ -68,7 +68,7 @@ class OnboardingProgressService:
                 if not session:
                     return {
                         "is_completed": False,
-                        "current_step": 1,
+                        "current_step": 0,
                         "completion_percentage": 0.0,
                         "started_at": None,
                         "last_updated": None,
@@ -95,7 +95,7 @@ class OnboardingProgressService:
             logger.error(f"Error getting onboarding status: {e}")
             return {
                 "is_completed": False,
-                "current_step": 1,
+                "current_step": 0,
                 "completion_percentage": 0.0,
                 "started_at": None,
                 "last_updated": None,
@@ -169,29 +169,87 @@ class OnboardingProgressService:
             logger.error(f"Error completing onboarding: {e}")
             return False
     
-    def reset_onboarding(self, user_id: str) -> bool:
-        """Reset onboarding progress and cancel/pause all scheduled tasks for the user."""
+    def reset_onboarding(self, user_id: str, hard: bool = False) -> bool:
+        """Reset onboarding progress and cancel/pause all scheduled tasks for the user.
+
+        Args:
+            user_id: The user to reset.
+            hard: If True, delete all session & task records for a clean slate.
+                  If False (default), just reset step to 1 and pause tasks.
+        """
         try:
-            db = get_session_for_user(user_id)
-            try:
-                # Reset the onboarding session
-                session = db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).first()
-                if session:
-                    session.current_step = 1
-                    session.progress = 0.0
-                    session.updated_at = datetime.utcnow()
-                db.commit()
-            finally:
-                db.close()
+            if hard:
+                self._hard_reset(user_id)
+            else:
+                db = get_session_for_user(user_id)
+                try:
+                    session = db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).first()
+                    if session:
+                        session.current_step = 0
+                        session.progress = 0.0
+                        session.updated_at = datetime.utcnow()
+                    db.commit()
+                finally:
+                    db.close()
+                self._cancel_scheduled_tasks(user_id)
 
-            # Cancel/pause all scheduled tasks for this user
-            self._cancel_scheduled_tasks(user_id)
-
-            logger.info(f"Reset onboarding for user {user_id}")
+            logger.info(f"{'Hard' if hard else 'Soft'} reset onboarding for user {user_id}")
             return True
         except Exception as e:
             logger.error(f"Error resetting onboarding for user {user_id}: {e}")
             return False
+
+    def _hard_reset(self, user_id: str):
+        """Delete all onboarding data and task records for a clean slate."""
+        db = get_session_for_user(user_id)
+        try:
+            # 1. Delete onboarding session (cascades to website_analyses,
+            #    api_keys, research_preferences, persona_data,
+            #    competitor_analyses, platform_integrations)
+            db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).delete()
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            logger.warning(f"Could not delete onboarding session for user {user_id}: {e}")
+        finally:
+            db.close()
+
+        # 2. Delete scheduled monitoring task records
+        task_table_groups = [
+            # (task_model, execution_log_model) — logs cascade via relationship
+            ("models.website_analysis_monitoring_models", [
+                "OnboardingFullWebsiteAnalysisTask",
+                "DeepCompetitorAnalysisTask",
+                "SIFIndexingTask",
+                "MarketTrendsTask",
+                "WebsiteAnalysisTask",
+                "DeepWebsiteCrawlTask",
+            ]),
+            ("models.advertools_monitoring_models", ["AdvertoolsTask"]),
+            ("models.oauth_token_monitoring_models", ["OAuthTokenMonitoringTask"]),
+        ]
+
+        for mod_path, class_names in task_table_groups:
+            try:
+                mod = __import__(mod_path, fromlist=class_names)
+                for cls_name in class_names:
+                    cls = getattr(mod, cls_name, None)
+                    if cls is None:
+                        continue
+                    try:
+                        inner_db = get_session_for_user(user_id)
+                        try:
+                            inner_db.query(cls).filter(cls.user_id == user_id).delete()
+                            inner_db.commit()
+                        except Exception as e:
+                            inner_db.rollback()
+                            logger.warning(f"Could not delete {cls_name} for user {user_id}: {e}")
+                        finally:
+                            inner_db.close()
+                    except Exception as e:
+                        logger.warning(f"Could not delete {cls_name} for user {user_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Could not import {mod_path} for hard reset: {e}")
     
     def _cancel_scheduled_tasks(self, user_id: str):
         """Pause all DB-backed scheduled tasks for a user after onboarding reset."""

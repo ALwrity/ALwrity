@@ -3,7 +3,7 @@
  * Extracted utility functions for website analysis and URL handling
  */
 
-import { apiClient } from '../../../../api/client';
+import { apiClient, longRunningApiClient } from '../../../../api/client';
 
 /**
  * Fixes URL format by adding protocol if missing and ensuring proper format
@@ -176,7 +176,7 @@ export const loadExistingAnalysis = async (analysisId: number, website: string):
  */
 export const performAnalysis = async (
   fixedUrl: string, 
-  updateProgress: (step: number, message: string) => void
+  updateProgress: (step: number, message: string, subMessage?: string) => void
 ): Promise<{
   success: boolean;
   analysis?: any;
@@ -186,24 +186,34 @@ export const performAnalysis = async (
   error?: string;
 }> => {
   try {
-    // Simulate progress updates
-    updateProgress(1, 'Website URL validated');
-    
+    updateProgress(1, 'URL validated — connection established', 'Your website is reachable. Starting analysis pipeline...');
+
     const requestData = {
       url: fixedUrl,
       include_patterns: true,
       include_guidelines: true
     };
 
-    updateProgress(2, 'Starting content crawl...');
-    
-    const response = await apiClient.post('/api/onboarding/style-detection/complete', requestData);
+    updateProgress(2, 'Crawling your website pages', 'Scanning public pages to understand your content architecture and navigation');
 
-    updateProgress(3, 'Content extracted successfully');
-    updateProgress(4, 'Style analysis in progress...');
-    updateProgress(5, 'Content characteristics analyzed');
-    updateProgress(6, 'Target audience identified');
-    updateProgress(7, 'Recommendations generated');
+    // Show progressive updates while backend processes the analysis
+    const progressTimers = [
+      setTimeout(() => updateProgress(3, 'Extracting content & SEO metadata', 'Analyzing page titles, headings, body text, and meta descriptions'), 8000),
+      setTimeout(() => updateProgress(4, 'Analyzing brand voice & tone', 'Identifying your unique writing patterns, vocabulary, and emotional resonance'), 25000),
+      setTimeout(() => updateProgress(5, 'Evaluating content characteristics', 'Measuring readability, sentence structure, and content variety'), 55000),
+      setTimeout(() => updateProgress(6, 'Identifying target audience signals', 'Detecting audience expertise level, pain points, and content preferences'), 100000),
+    ];
+
+    const response = await longRunningApiClient.post('/api/onboarding/style-detection/complete', requestData);
+
+    // Cancel pending timers — real results are here
+    progressTimers.forEach(clearTimeout);
+
+    updateProgress(3, 'Content extracted successfully', 'Page titles, headings, body text, and metadata have been collected');
+    updateProgress(4, 'Brand voice & tone analyzed', 'Detected tone patterns, vocabulary richness, and emotional resonance across your content');
+    updateProgress(5, 'Content characteristics evaluated', 'Readability, sentence complexity, and content format variety assessed');
+    updateProgress(6, 'Target audience identified', 'Audience expertise level, interests, and content preferences mapped from your material');
+    updateProgress(7, 'AI brand playbook generated', 'Custom guidelines packaged for your AI content generation');
 
     const result = response.data;
 

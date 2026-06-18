@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import ProtectedRoute from './components/shared/ProtectedRoute';
@@ -28,6 +28,11 @@ const PodcastDashboard = React.lazy(() => import('./components/PodcastMaker/Podc
 const PricingPage = React.lazy(() => import('./components/Pricing/PricingPage'));
 const WixTestPage = React.lazy(() => import('./components/WixTestPage/WixTestPage'));
 const WixCallbackPage = React.lazy(() => import('./components/WixCallbackPage/WixCallbackPage'));
+
+const WizardWithNavigate = () => {
+  const navigate = useNavigate();
+  return <Wizard onComplete={() => navigate('/dashboard')} />;
+};
 const WordPressCallbackPage = React.lazy(() => import('./components/WordPressCallbackPage/WordPressCallbackPage'));
 const BingCallbackPage = React.lazy(() => import('./components/BingCallbackPage/BingCallbackPage'));
 const BingAnalyticsStorage = React.lazy(() => import('./components/BingAnalyticsStorage/BingAnalyticsStorage'));
@@ -182,7 +187,7 @@ const App: React.FC = () => {
                       path="/onboarding" 
                       element={
                         <ErrorBoundary context="Onboarding Wizard" showDetails>
-                          <Wizard />
+                          <WizardWithNavigate />
                         </ErrorBoundary>
                       } 
                     />

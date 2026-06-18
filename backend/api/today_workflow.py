@@ -255,13 +255,22 @@ async def generate_workflow(
     user_id = str(current_user.get("id"))
     plan, created = await get_or_create_daily_workflow_plan(db, user_id, date=date, creation_source="manual")
 
+    # H5: threadpool helpers must not share the request's `db` Session.
+    # Open a fresh Session per worker and close it deterministically.
     def _fetch_tasks():
-        return (
-            db.query(DailyWorkflowTask)
-            .filter(DailyWorkflowTask.plan_id == plan.id, DailyWorkflowTask.user_id == user_id)
-            .order_by(DailyWorkflowTask.created_at.asc())
-            .all()
-        )
+        from services.database import get_session_for_user
+        thread_db = get_session_for_user(user_id)
+        if thread_db is None:
+            return []
+        try:
+            return (
+                thread_db.query(DailyWorkflowTask)
+                .filter(DailyWorkflowTask.plan_id == plan.id, DailyWorkflowTask.user_id == user_id)
+                .order_by(DailyWorkflowTask.created_at.asc())
+                .all()
+            )
+        finally:
+            thread_db.close()
 
     tasks = await run_in_threadpool(_fetch_tasks)
 
@@ -284,20 +293,27 @@ async def generate_workflow(
             y_str = (parsed_plan_date - timedelta(days=1)).isoformat()
 
             def _fetch_yesterday():
-                y_plan = (
-                    db.query(DailyWorkflowPlan)
-                    .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == y_str)
-                    .first()
-                )
-                if y_plan:
-                    y_tasks = (
-                        db.query(DailyWorkflowTask)
-                        .filter(DailyWorkflowTask.plan_id == y_plan.id, DailyWorkflowTask.user_id == user_id)
-                        .order_by(DailyWorkflowTask.created_at.asc())
-                        .all()
+                from services.database import get_session_for_user
+                thread_db = get_session_for_user(user_id)
+                if thread_db is None:
+                    return []
+                try:
+                    y_plan = (
+                        thread_db.query(DailyWorkflowPlan)
+                        .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == y_str)
+                        .first()
                     )
-                    return y_tasks
-                return []
+                    if y_plan:
+                        y_tasks = (
+                            thread_db.query(DailyWorkflowTask)
+                            .filter(DailyWorkflowTask.plan_id == y_plan.id, DailyWorkflowTask.user_id == user_id)
+                            .order_by(DailyWorkflowTask.created_at.asc())
+                            .all()
+                        )
+                        return y_tasks
+                    return []
+                finally:
+                    thread_db.close()
 
             try:
                 y_tasks = await run_in_threadpool(_fetch_yesterday)

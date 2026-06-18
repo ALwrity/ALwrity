@@ -3,121 +3,16 @@ Utility Endpoints
 Handles utility endpoints for enhanced content strategies.
 """
 
-from typing import Dict, Any, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
+from typing import Dict, Any
+from fastapi import APIRouter, Depends
 from loguru import logger
 
-# Import database
-from services.database import get_db_session
-
-# Import services
-from ....services.enhanced_strategy_service import EnhancedStrategyService
-from ....services.enhanced_strategy_db_service import EnhancedStrategyDBService
-
-# Import authentication
 from middleware.auth_middleware import get_current_user
-
-# Import utilities
 from ....utils.error_handlers import ContentPlanningErrorHandler
 from ....utils.response_builders import ResponseBuilder
-from ....utils.constants import ERROR_MESSAGES, SUCCESS_MESSAGES
 
 router = APIRouter(tags=["Strategy Utilities"])
 
-# Helper function to get database session
-def get_db():
-    db = get_db_session()
-    try:
-        yield db
-    finally:
-        db.close()
-
-@router.get("/onboarding-data")
-async def get_onboarding_data(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get onboarding data for enhanced strategy auto-population."""
-    try:
-        logger.warning(f"🔍 get_onboarding_data called with current_user: {current_user}")
-        
-        # Extract authenticated user_id from Clerk
-        clerk_user_id = str(current_user.get('id', ''))
-        if not clerk_user_id:
-            logger.error(f"❌ Invalid user ID in authentication token. current_user: {current_user}")
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid user ID in authentication token"
-            )
-        
-        # Clerk user IDs are strings (e.g., 'user_xxx' or numeric strings)
-        # OnboardingSession uses Clerk user_id as String(255), so we can use it directly
-        authenticated_user_id = clerk_user_id
-        
-        logger.warning(f"🚀 Getting onboarding data for authenticated user: {authenticated_user_id}")
-        
-        db_service = EnhancedStrategyDBService(db)
-        enhanced_service = EnhancedStrategyService(db_service)
-        
-        onboarding_data = await enhanced_service._get_onboarding_data(authenticated_user_id)
-        
-        logger.warning(f"✅ Onboarding data retrieved successfully for user: {authenticated_user_id}")
-        
-        return ResponseBuilder.create_success_response(
-            message="Onboarding data retrieved successfully",
-            data=onboarding_data
-        )
-        
-    except HTTPException as he:
-        logger.error(f"❌ HTTPException in get_onboarding_data: status={he.status_code}, detail={he.detail}")
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error getting onboarding data: {str(e)}")
-        logger.error(f"❌ Exception type: {type(e).__name__}")
-        import traceback
-        logger.error(f"❌ Traceback: {traceback.format_exc()}")
-        raise ContentPlanningErrorHandler.handle_general_error(e, "get_onboarding_data")
-
-@router.post("/smart-autofill")
-async def smart_autofill(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get smart autofill combining database fields (18-19) + AI fields (11-12)."""
-    try:
-        # Extract authenticated user_id from Clerk
-        clerk_user_id = str(current_user.get('id', ''))
-        if not clerk_user_id:
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid user ID in authentication token"
-            )
-        
-        # Clerk user IDs are strings (e.g., 'user_xxx' or numeric strings)
-        # OnboardingSession uses Clerk user_id as String(255), so we can use it directly
-        authenticated_user_id = clerk_user_id
-        
-        logger.info(f"🚀 Starting smart autofill for authenticated user: {authenticated_user_id}")
-        
-        # Import unified service
-        from ....services.content_strategy.autofill.unified_autofill_service import UnifiedAutoFillService
-        
-        unified_service = UnifiedAutoFillService(db)
-        autofill_data = await unified_service.get_autofill(authenticated_user_id)
-        
-        logger.info(f"✅ Smart autofill completed successfully for user: {authenticated_user_id}")
-        
-        return ResponseBuilder.create_success_response(
-            message="Smart autofill completed successfully",
-            data=autofill_data
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error in smart autofill: {str(e)}")
-        raise ContentPlanningErrorHandler.handle_general_error(e, "smart_autofill")
 
 @router.get("/tooltips")
 async def get_enhanced_strategy_tooltips(

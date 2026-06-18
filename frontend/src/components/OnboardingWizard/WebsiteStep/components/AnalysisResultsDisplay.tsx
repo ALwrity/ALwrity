@@ -9,17 +9,11 @@ import {
   Typography,
   Card,
   CardContent,
-  Grid,
   Divider,
   Checkbox,
   FormControlLabel,
   Alert,
   Paper,
-  // List,
-  // ListItem,
-  // ListItemText,
-  // Link,
-  Collapse,
   Switch,
   Button
 } from '@mui/material';
@@ -27,37 +21,20 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   Verified as VerifiedIcon,
   Analytics as AnalyticsIcon,
-  TrendingUp as TrendingUpIcon,
-  Business as BusinessIcon,
   Info as InfoIcon,
   Link as LinkIcon,
-  // Edit as EditIcon,
-  Save as SaveIcon,
-  ExpandLess as ExpandLessIcon,
-  ExpandMore as ExpandMoreIcon,
-  Lightbulb as LightbulbIcon
+  Save as SaveIcon
 } from '@mui/icons-material';
-
-// Import rendering utilities
-import {
-  // renderProUpgradeAlert,
-  renderBestPracticesSection,
-  renderAvoidElementsSection,
-  renderBrandAnalysisSection
-} from '../utils/renderUtils';
 
 // Import extracted components
 import { 
   EnhancedGuidelinesSection, 
   KeyInsightsGrid,
-  ContentStrategyInsightsSection,
-  StrategicInsightsSection,
   SEOAuditSection,
   SitemapAnalysisSection,
   CombinedAnalysisSection,
   CombinedStrategySection,
-  TargetAudienceAnalysisSection,
-  ContentCharacteristicsSection
+  CrawlResultSections
 } from './index';
 import SectionHeader from './SectionHeader';
 import { useOnboardingStyles } from '../../common/useOnboardingStyles';
@@ -158,7 +135,6 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
   onSave
 }) => {
   const styles = useOnboardingStyles();
-  const [isCrawlExpanded, setIsCrawlExpanded] = useState(false);
   const [isEditable, setIsEditable] = useState(false);
 
   const warningParts = warning ? warning.split('|').map(part => part.trim()).filter(Boolean) : [];
@@ -362,43 +338,7 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
             content_type={analysis.content_type}
           />
 
-          {/* Strategic Insights Section */}
-          <Box sx={{ mt: 4 }}>
-            <SectionHeader 
-              title="Strategic Insights" 
-              icon={<LightbulbIcon />} 
-            />
-            <StrategicInsightsSection 
-              contentStrategy={analysis.strategic_insights?.content_strategy}
-              competitiveAdvantages={analysis.strategic_insights?.competitive_advantages}
-              contentCalendarSuggestions={analysis.strategic_insights?.content_calendar_suggestions}
-              aiGenerationTips={analysis.strategic_insights?.ai_generation_tips}
-              isEditable={isEditable}
-              onUpdate={(field, value) => handleSectionUpdate('strategic_insights', field, value)}
-            />
-          </Box>
-
-          {/* Content Strategy Insights */}
-          <Box sx={{ mt: 4 }}>
-             <SectionHeader 
-              title="Content Strategy" 
-              icon={<TrendingUpIcon />} 
-            />
-             <ContentStrategyInsightsSection 
-               insights={analysis.content_strategy_insights}
-               isEditable={isEditable}
-               onUpdate={(field, value) => handleSectionUpdate('content_strategy_insights', field, value)}
-             />
-          </Box>
-          
-          {/* Brand Analysis Section */}
-          <Box sx={{ mt: 4 }}>
-            <SectionHeader 
-              title="Brand Identity" 
-              icon={<BusinessIcon />} 
-            />
-            {renderBrandAnalysisSection(analysis)}
-          </Box>
+          {/* Brand Analysis Section — shown via CombinedAnalysisSection tab */}
 
           {(analysis.guidelines || guidelineWarning) && (
             <Box sx={{ mt: 4 }}>
@@ -476,46 +416,9 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
              />
           </Box>
           
-          <Grid container spacing={3} sx={{ mt: 2 }}>
-            {/* Target Audience */}
-            <Grid item xs={12} md={6}>
-              <TargetAudienceAnalysisSection targetAudience={analysis.target_audience} />
-            </Grid>
-            
-            {/* Content Characteristics */}
-            <Grid item xs={12} md={6}>
-              <ContentCharacteristicsSection contentCharacteristics={analysis.content_characteristics} />
-            </Grid>
-          </Grid>
-
-          <Grid container spacing={3} sx={{ mt: 2 }}>
-            <Grid item xs={12} md={6}>
-              {analysis.best_practices && renderBestPracticesSection(analysis.best_practices)}
-            </Grid>
-            <Grid item xs={12} md={6}>
-              {analysis.avoid_elements && renderAvoidElementsSection(analysis.avoid_elements)}
-            </Grid>
-          </Grid>
-          
-          {/* Raw Crawl Data (Collapsible) */}
+          {/* Crawl Result Sections */}
           {crawlResult && (
-            <Box sx={{ mt: 4 }}>
-              <Button
-                onClick={() => setIsCrawlExpanded(!isCrawlExpanded)}
-                endIcon={isCrawlExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-                sx={{ mb: 2 }}
-              >
-                {isCrawlExpanded ? 'Hide Raw Crawl Data' : 'Show Raw Crawl Data'}
-              </Button>
-              <Collapse in={isCrawlExpanded}>
-                <Paper sx={{ p: 2, bgcolor: '#f8fafc', maxHeight: '400px', overflow: 'auto' }}>
-                  <Typography variant="h6" gutterBottom>Raw Crawl Result</Typography>
-                  <pre style={{ fontSize: '0.75rem', whiteSpace: 'pre-wrap' }}>
-                    {JSON.stringify(crawlResult, null, 2)}
-                  </pre>
-                </Paper>
-              </Collapse>
-            </Box>
+            <CrawlResultSections crawlResult={crawlResult} />
           )}
 
         </CardContent>

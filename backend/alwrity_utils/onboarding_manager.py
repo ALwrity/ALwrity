@@ -3,12 +3,13 @@ Onboarding Manager Module
 Handles all onboarding-related endpoints and functionality.
 """
 
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Query
 from fastapi.responses import FileResponse
 from typing import Dict, Any, Optional
 from loguru import logger
 
 # Import onboarding functions
+from api.onboarding_utils.endpoints_tasks import get_tasks_status
 from api.onboarding import (
     health_check,
     initialize_onboarding,
@@ -250,12 +251,23 @@ class OnboardingManager:
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.post("/api/onboarding/reset")
-        async def onboarding_reset(current_user: dict = Depends(get_current_user)):
+        async def onboarding_reset(current_user: dict = Depends(get_current_user),
+                                    hard: bool = Query(False, description="Hard reset — delete all records for a clean slate")):
             """Reset the onboarding progress."""
             try:
-                return await reset_onboarding(current_user)
+                return await reset_onboarding(current_user, hard=hard)
             except Exception as e:
                 logger.error(f"Error in onboarding_reset: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        # Scheduled tasks status endpoint
+        @self.app.get("/api/onboarding/tasks/status")
+        async def onboarding_tasks_status(current_user: dict = Depends(get_current_user)):
+            """Get status of all scheduled background tasks for the current user."""
+            try:
+                return await get_tasks_status(current_user)
+            except Exception as e:
+                logger.error(f"Error in onboarding_tasks_status: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
         # Resume functionality

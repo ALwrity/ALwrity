@@ -20,6 +20,7 @@ import DashboardHeader from '../shared/DashboardHeader';
 import LoadingSkeleton from '../shared/LoadingSkeleton';
 import ErrorDisplay from '../shared/ErrorDisplay';
 import ContentLifecyclePillars from './ContentLifecyclePillars';
+import DashboardOnboardingStatus from './DashboardOnboardingStatus';
 import AnalyticsInsights from './components/AnalyticsInsights';
 import ToolsModal from './components/ToolsModal';
 import EnhancedBillingDashboard from '../billing/EnhancedBillingDashboard';
@@ -134,6 +135,33 @@ const MainDashboard: React.FC = () => {
     };
     fetchSifHealth();
     const interval = setInterval(fetchSifHealth, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Onboarding background tasks status
+  const [onboardingTasks, setOnboardingTasks] = React.useState<{
+    tasks: Record<string, { status: string; started_at: string | null; progress_pct: number }>;
+    total: number;
+    completed_count: number;
+    failed_count: number;
+    all_done: boolean;
+  } | null>(null);
+  const [showOnboardingStatus, setShowOnboardingStatus] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchOnboardingTasks = async () => {
+      try {
+        const res = await apiClient.get('/api/onboarding/tasks/status');
+        if (res.data.tasks) {
+          setOnboardingTasks(res.data);
+          if (res.data.all_done) return;
+        }
+      } catch {
+        setOnboardingTasks(null);
+      }
+    };
+    fetchOnboardingTasks();
+    const interval = setInterval(fetchOnboardingTasks, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -393,6 +421,14 @@ const MainDashboard: React.FC = () => {
               }}
             />
 
+
+            {/* Onboarding status card — outside SubscriptionGuard so all users see scheduling progress */}
+            {showOnboardingStatus && onboardingTasks && !onboardingTasks.all_done && (
+              <DashboardOnboardingStatus
+                {...onboardingTasks}
+                onDismiss={() => setShowOnboardingStatus(false)}
+              />
+            )}
 
             {/* Subscription Guard - Protect main dashboard content */}
             <SubscriptionGuard

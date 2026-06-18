@@ -90,6 +90,162 @@ def _ensure_daily_workflow_schema(engine, user_id: str) -> None:
     except Exception as e:
         logger.error(f"Failed daily_workflow_plans schema compatibility check for user {user_id}: {e}")
 
+
+def _ensure_task_history_unique_index(engine, user_id: str) -> None:
+    """Enforce unique index on task_history(user_id, task_hash).
+
+    For SQLite, indexes cannot be altered in place; we drop and recreate
+    the index. If duplicate rows exist, the new unique index will fail —
+    in that case, log a warning and skip. Pre-existing duplicates should
+    be rare (only from buggy code paths) and won't block functionality.
+    """
+    index_name = "ix_task_history_user_hash"
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='task_history'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_idx = conn.exec_driver_sql(
+                "PRAGMA index_list('task_history')"
+            ).fetchall()
+            target_idx = next((row for row in existing_idx if row[1] == index_name), None)
+
+            if target_idx and target_idx[2] == 1:
+                return
+
+            if target_idx:
+                conn.exec_driver_sql(f"DROP INDEX {index_name}")
+
+            conn.exec_driver_sql(
+                f"CREATE UNIQUE INDEX {index_name} ON task_history (user_id, task_hash)"
+            )
+            logger.warning(
+                f"Auto-migrated task_history unique index '{index_name}' for user {user_id}"
+            )
+    except Exception as e:
+        logger.error(f"Failed task_history unique index migration for user {user_id}: {e}")
+
+
+def _ensure_scheduler_task_columns(engine, user_id: str) -> None:
+    """Backfill started_at and last_heartbeat columns for all scheduler task tables."""
+    task_tables = {
+        "advertools_tasks": ["started_at", "last_heartbeat"],
+        "onboarding_full_website_analysis_tasks": ["started_at", "last_heartbeat"],
+        "deep_competitor_analysis_tasks": ["started_at", "last_heartbeat"],
+        "deep_website_crawl_tasks": ["started_at", "last_heartbeat"],
+        "sif_indexing_tasks": ["started_at", "last_heartbeat"],
+        "market_trends_tasks": ["started_at", "last_heartbeat"],
+        "website_analysis_tasks": ["started_at", "last_heartbeat"],
+    }
+
+    try:
+        with engine.begin() as conn:
+            for table_name, columns in task_tables.items():
+                table_check = conn.exec_driver_sql(
+                    f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'"
+                ).fetchone()
+                if not table_check:
+                    continue
+
+                existing_cols = {
+                    row[1] for row in conn.exec_driver_sql(
+                        f"PRAGMA table_info({table_name})"
+                    ).fetchall()
+                }
+
+                for col_name in columns:
+                    if col_name not in existing_cols:
+                        conn.exec_driver_sql(
+                            f"ALTER TABLE {table_name} ADD COLUMN {col_name} DATETIME NULL"
+                        )
+                        logger.warning(
+                            f"Auto-migrated {table_name} column '{col_name}' for user {user_id}"
+                        )
+    except Exception as e:
+        logger.error(f"Failed scheduler task schema migration for user {user_id}: {e}")
+
+    # Backfill frequency_days for deep_website_crawl_tasks (Integer, not DateTime)
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='deep_website_crawl_tasks'"
+            ).fetchone()
+            if table_check:
+                existing_cols = {
+                    row[1] for row in conn.exec_driver_sql(
+                        "PRAGMA table_info(deep_website_crawl_tasks)"
+                    ).fetchall()
+                }
+                if "frequency_days" not in existing_cols:
+                    conn.exec_driver_sql(
+                        "ALTER TABLE deep_website_crawl_tasks ADD COLUMN frequency_days INTEGER DEFAULT 7"
+                    )
+                    logger.warning(
+                        f"Auto-migrated deep_website_crawl_tasks column 'frequency_days' for user {user_id}"
+                    )
+    except Exception as e:
+        logger.error(f"Failed frequency_days schema migration for user {user_id}: {e}")
+
+
+def _ensure_onboarding_data_integration_columns(engine, user_id: str) -> None:
+    """Backfill required onboarding_data_integrations columns for legacy tenant DBs."""
+    required_columns = {
+        "canonical_profile": "JSON NULL",
+    }
+
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='onboarding_data_integrations'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_cols = {
+                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(onboarding_data_integrations)").fetchall()
+            }
+
+            for col_name, col_def in required_columns.items():
+                if col_name not in existing_cols:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE onboarding_data_integrations ADD COLUMN {col_name} {col_def}"
+                    )
+                    logger.warning(
+                        f"Auto-migrated onboarding_data_integrations column '{col_name}' for user {user_id}"
+                    )
+    except Exception as e:
+        logger.error(f"Failed onboarding_data_integrations schema compatibility check for user {user_id}: {e}")
+
+def _ensure_onboarding_session_payload_column(engine, user_id: str) -> None:
+    """Backfill payload column for onboarding_sessions table."""
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='onboarding_sessions'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_cols = {
+                row[1] for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(onboarding_sessions)"
+                ).fetchall()
+            }
+
+            if "payload" not in existing_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE onboarding_sessions ADD COLUMN payload JSON NULL"
+                )
+                logger.warning(
+                    f"Auto-migrated onboarding_sessions column 'payload' for user {user_id}"
+                )
+    except Exception as e:
+        logger.error(f"Failed onboarding_sessions payload schema migration for user {user_id}: {e}")
+
+
 def _sanitize_user_id(user_id: str) -> str:
     """Sanitize user_id to be safe for filesystem."""
     return "".join(c for c in user_id if c.isalnum() or c in ('-', '_'))
@@ -308,6 +464,9 @@ def init_user_database(user_id: str):
         SEOAnalysisBase.metadata.create_all(bind=engine)
         ContentPlanningBase.metadata.create_all(bind=engine)
         EnhancedStrategyBase.metadata.create_all(bind=engine)
+        _ensure_scheduler_task_columns(engine, user_id)
+        _ensure_onboarding_data_integration_columns(engine, user_id)
+        _ensure_onboarding_session_payload_column(engine, user_id)
         MonitoringBase.metadata.create_all(bind=engine)
         APIMonitoringBase.metadata.create_all(bind=engine)
         PersonaBase.metadata.create_all(bind=engine)
@@ -316,6 +475,7 @@ def init_user_database(user_id: str):
         ContentAssetBase.metadata.create_all(bind=engine)
         BingAnalyticsBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)
+        _ensure_task_history_unique_index(engine, user_id)
         
         # Initialize default data for new databases
         try:
@@ -326,6 +486,9 @@ def init_user_database(user_id: str):
             SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
             db = SessionLocal()
             try:
+                # Ensure all subscription table columns exist before querying
+                from services.subscription.schema_utils import ensure_subscription_plan_columns
+                ensure_subscription_plan_columns(db)
                 pricing_service = PricingService(db)
                 pricing_service.initialize_default_pricing()
                 pricing_service.initialize_default_plans()

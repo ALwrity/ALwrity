@@ -20,7 +20,8 @@ from models.onboarding import (
     APIKey,
     PersonaData,
     CompetitorAnalysis,
-    SEOPageAudit
+    SEOPageAudit,
+    PlatformIntegration,
 )
 from models.website_analysis_monitoring_models import (
     DeepCompetitorAnalysisTask,
@@ -55,14 +56,25 @@ class OnboardingDataIntegrationService:
             gsc_analytics = {}
             bing_analytics = {}
 
-            canonical_profile = self._build_canonical_profile(
-                website_analysis,
-                research_preferences,
-                persona_data,
-                onboarding_session,
-                competitor_analysis,
-                deep_competitor_analysis
-            )
+            # Use stored canonical profile when available (avoids redundant recomputation)
+            existing_record = db.query(OnboardingDataIntegration).filter(
+                OnboardingDataIntegration.user_id == user_id
+            ).first()
+            if existing_record and existing_record.canonical_profile:
+                canonical_profile = existing_record.canonical_profile
+            else:
+                canonical_profile = self._build_canonical_profile(
+                    website_analysis,
+                    research_preferences,
+                    persona_data,
+                    onboarding_session,
+                    competitor_analysis,
+                    deep_competitor_analysis
+                )
+
+            platform_integrations = self._get_platform_integrations(user_id, db)
+
+            data_quality = self._assess_data_quality(website_analysis, research_preferences, api_keys_data, persona_data, competitor_analysis, gsc_analytics, bing_analytics)
 
             integrated_data = {
                 'website_analysis': website_analysis,
@@ -72,15 +84,41 @@ class OnboardingDataIntegrationService:
                 'persona_data': persona_data,
                 'competitor_analysis': competitor_analysis,
                 'deep_competitor_analysis': deep_competitor_analysis,
+                'platform_integrations': platform_integrations,
                 'gsc_analytics': gsc_analytics,
                 'bing_analytics': bing_analytics,
                 'canonical_profile': canonical_profile,
-                'data_quality': self._assess_data_quality(website_analysis, research_preferences, api_keys_data, persona_data, competitor_analysis, gsc_analytics, bing_analytics),
+                'data_quality': data_quality,
                 'processing_timestamp': datetime.utcnow().isoformat()
             }
-            
+
+            # ── Structured data integration summary ──
+            step1_keys = api_keys_data.get('total_keys', 0) if api_keys_data else 0
+            step1_providers = api_keys_data.get('providers', []) if api_keys_data else []
+            step2_url = website_analysis.get('website_url', '') if website_analysis else ''
+            step3_depth = research_preferences.get('research_depth', '') if research_preferences else ''
+            step3_ct = research_preferences.get('content_types', []) if research_preferences else []
+            comp_count = len(competitor_analysis) if competitor_analysis else 0
+            deep_comp_status = deep_competitor_analysis.get('status', 'not_scheduled') if deep_competitor_analysis else 'unknown'
+            persona_core = bool(persona_data.get('core_persona')) if persona_data else False
+            platforms = platform_integrations.get('connected_platforms', []) if platform_integrations else []
+            dq = data_quality or {}
+
+            lines = [
+                f"[DataIntegration] ✅ Data status for user {user_id}:",
+                f"   ├─ Step 1 (API Keys):    {'✓' if step1_keys else '—'} {step1_keys} provider(s) {step1_providers if step1_providers else ''}".rstrip(),
+                f"   ├─ Step 2 (Website):     {'✓' if step2_url else '—'} {step2_url or 'no data'}".rstrip(),
+                f"   ├─ Step 3 (Research):    {'✓' if step3_depth else '—'} depth={step3_depth or 'none'}, types={len(step3_ct) if step3_ct else 0}".rstrip(),
+                f"   ├─ Step 3 (Competitors): {'✓' if comp_count else '—'} {comp_count} competitor(s), deep={deep_comp_status}".rstrip(),
+                f"   ├─ Step 4 (Persona):     {'✓' if persona_core else '—'}{' core_persona present' if persona_core else ' no persona data'}".rstrip(),
+                f"   ├─ Step 5 (Integrations):{'✓' if platforms else '—'} {platforms if platforms else 'no platforms'}".rstrip(),
+                f"   ├─ Canonical Profile:    {'✓' if canonical_profile.get('industry') else '—'} industry={canonical_profile.get('industry', 'none')}".rstrip(),
+                f"   └─ Data Quality:         completeness={dq.get('completeness', 0):.2f}, freshness={dq.get('freshness', 0):.2f}, overall={dq.get('overall_score', 0):.2f}".rstrip(),
+            ]
+            logger.info('\n'.join(lines))
+
             return integrated_data
-            
+
         except Exception as e:
             logger.error(f"Error processing onboarding data (sync) for user {user_id}: {str(e)}")
             return self._get_fallback_data()
@@ -662,10 +700,10 @@ class OnboardingDataIntegrationService:
             return {
                 'industry': industry,
                 'target_audience': target_audience,
-                'writing_tone': writing_tone or 'professional',
-                'writing_voice': writing_voice or 'authoritative',
-                'writing_complexity': writing_complexity or 'intermediate',
-                'writing_engagement': writing_engagement or 'moderate',
+                'writing_tone': writing_tone,
+                'writing_voice': writing_voice,
+                'writing_complexity': writing_complexity,
+                'writing_engagement': writing_engagement,
                 'content_types': content_types,
                 'brand_colors': brand_colors,
                 'brand_values': brand_values,
@@ -876,28 +914,24 @@ class OnboardingDataIntegrationService:
                 OnboardingDataIntegration.user_id == user_id
             ).first()
 
+            cp = integrated_data.get('canonical_profile')
+
             if existing_record:
-                # Use legacy columns that are known to exist
-                if hasattr(existing_record, 'website_analysis_data'):
-                    existing_record.website_analysis_data = integrated_data.get('website_analysis', {})
-                if hasattr(existing_record, 'research_preferences_data'):
-                    existing_record.research_preferences_data = integrated_data.get('research_preferences', {})
-                if hasattr(existing_record, 'api_keys_data'):
-                    existing_record.api_keys_data = integrated_data.get('api_keys_data', {})
+                existing_record.website_analysis_data = integrated_data.get('website_analysis', {})
+                existing_record.research_preferences_data = integrated_data.get('research_preferences', {})
+                existing_record.api_keys_data = integrated_data.get('api_keys_data', {})
+                existing_record.canonical_profile = cp
                 existing_record.updated_at = datetime.utcnow()
             else:
                 new_kwargs = {
                     'user_id': user_id,
+                    'website_analysis_data': integrated_data.get('website_analysis', {}),
+                    'research_preferences_data': integrated_data.get('research_preferences', {}),
+                    'api_keys_data': integrated_data.get('api_keys_data', {}),
+                    'canonical_profile': cp,
                     'created_at': datetime.utcnow(),
                     'updated_at': datetime.utcnow()
                 }
-                if 'website_analysis' in integrated_data:
-                    new_kwargs['website_analysis_data'] = integrated_data.get('website_analysis', {})
-                if 'research_preferences' in integrated_data:
-                    new_kwargs['research_preferences_data'] = integrated_data.get('research_preferences', {})
-                if 'api_keys_data' in integrated_data:
-                    new_kwargs['api_keys_data'] = integrated_data.get('api_keys_data', {})
-
                 new_record = OnboardingDataIntegration(**new_kwargs)
                 db.add(new_record)
 
@@ -919,7 +953,6 @@ class OnboardingDataIntegrationService:
             ).order_by(OnboardingSession.updated_at.desc()).first()
             
             if not session:
-                logger.warning(f"No onboarding session found for user {user_id}")
                 return {}
             
             # Get persona data for this session
@@ -1033,6 +1066,29 @@ class OnboardingDataIntegrationService:
             }
         except Exception as e:
             logger.error(f"Error getting deep competitor analysis for user {user_id}: {str(e)}")
+            return {}
+
+    def _get_platform_integrations(self, user_id: str, db: Session) -> Dict[str, Any]:
+        """Get platform integrations (Step 5) data for the user."""
+        try:
+            session = db.query(OnboardingSession).filter(
+                OnboardingSession.user_id == user_id
+            ).order_by(OnboardingSession.updated_at.desc()).first()
+
+            if not session or not session.platform_integrations:
+                return {}
+
+            pi = session.platform_integrations
+            return {
+                "primary_website": pi.primary_website,
+                "website_platforms": pi.website_platforms or {},
+                "analytics_platforms": pi.analytics_platforms or {},
+                "social_platforms": pi.social_platforms or {},
+                "connected_platforms": pi.connected_platforms or [],
+                "updated_at": pi.updated_at.isoformat() if pi.updated_at else None,
+            }
+        except Exception as e:
+            logger.error(f"Error getting platform integrations for user {user_id}: {str(e)}")
             return {}
 
     async def _get_gsc_analytics(self, user_id: str) -> Dict[str, Any]:
@@ -1172,6 +1228,7 @@ class OnboardingDataIntegrationService:
                     'research_preferences': record.research_preferences_data or {},
                     'api_keys_data': record.api_keys_data or {},
                     'onboarding_session': {},
+                    'canonical_profile': record.canonical_profile or {},
                     'data_quality': self._assess_data_quality(
                         record.website_analysis_data or {},
                         record.research_preferences_data or {},

@@ -113,6 +113,10 @@ class MarketTrendsExecutor(TaskExecutor):
             db.rollback()
             logger.warning(f"Market trends task failed for user {user_id}: {e}")
 
+            # Re-merge objects after rollback to avoid DetachedInstanceError
+            task = db.merge(task)
+            task_log = db.merge(task_log)
+
             failure_detection = FailureDetectionService(db)
             pattern = failure_detection.analyze_task_failures(task.id, "market_trends", user_id)
 
@@ -172,8 +176,8 @@ class MarketTrendsExecutor(TaskExecutor):
                     keywords.extend(self._extract_strings(strategy.market_gaps))
                 if strategy.competitor_content_strategies:
                     keywords.extend(self._extract_strings(strategy.competitor_content_strategies))
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to extract keywords from EnhancedContentStrategy for user {user_id}: {e}")
 
         if not keywords:
             try:
@@ -191,8 +195,8 @@ class MarketTrendsExecutor(TaskExecutor):
                     ai_strategy = wa.content_strategy_insights.get("ai_strategy", {})
                     topic_clusters = ai_strategy.get("topic_clusters") or []
                     keywords.extend(self._extract_strings(topic_clusters))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to extract keywords from WebsiteAnalysis for user {user_id}: {e}")
 
         deduped = []
         seen = set()

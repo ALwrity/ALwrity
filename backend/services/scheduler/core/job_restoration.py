@@ -81,19 +81,22 @@ async def restore_persona_jobs(scheduler: 'TaskScheduler'):
                                         if j.id == job_id]
                         
                         if not existing_jobs:
-                            # Check SchedulerEventLog for original scheduled time
-                            original_scheduled_event = db.query(SchedulerEventLog).filter(
-                                SchedulerEventLog.event_type == 'job_scheduled',
-                                SchedulerEventLog.job_id == job_id,
-                                SchedulerEventLog.user_id == user_id
-                            ).order_by(SchedulerEventLog.event_date.desc()).first()
-                            
-                            # Check if job was already completed or failed
-                            completed_event = db.query(SchedulerEventLog).filter(
-                                SchedulerEventLog.event_type.in_(['job_completed', 'job_failed']),
-                                SchedulerEventLog.job_id == job_id,
-                                SchedulerEventLog.user_id == user_id
-                            ).order_by(SchedulerEventLog.event_date.desc()).first()
+                            try:
+                                original_scheduled_event = db.query(SchedulerEventLog).filter(
+                                    SchedulerEventLog.event_type == 'job_scheduled',
+                                    SchedulerEventLog.job_id == job_id,
+                                    SchedulerEventLog.user_id == user_id
+                                ).order_by(SchedulerEventLog.event_date.desc()).first()
+                                
+                                completed_event = db.query(SchedulerEventLog).filter(
+                                    SchedulerEventLog.event_type.in_(['job_completed', 'job_failed']),
+                                    SchedulerEventLog.job_id == job_id,
+                                    SchedulerEventLog.user_id == user_id
+                                ).order_by(SchedulerEventLog.event_date.desc()).first()
+                            except Exception:
+                                original_scheduled_event = None
+                                completed_event = None
+                                logger.warning(f"SchedulerEventLog query failed for {job_id}, scheduling new job")
                             
                             if completed_event:
                                 # Job was already completed/failed, skip
@@ -181,19 +184,22 @@ async def restore_persona_jobs(scheduler: 'TaskScheduler'):
                                         if j.id == job_id]
                         
                         if not existing_jobs:
-                            # Check SchedulerEventLog for original scheduled time
-                            original_scheduled_event = db.query(SchedulerEventLog).filter(
-                                SchedulerEventLog.event_type == 'job_scheduled',
-                                SchedulerEventLog.job_id == job_id,
-                                SchedulerEventLog.user_id == user_id
-                            ).order_by(SchedulerEventLog.event_date.desc()).first()
-                            
-                            # Check if job was already completed or failed
-                            completed_event = db.query(SchedulerEventLog).filter(
-                                SchedulerEventLog.event_type.in_(['job_completed', 'job_failed']),
-                                SchedulerEventLog.job_id == job_id,
-                                SchedulerEventLog.user_id == user_id
-                            ).order_by(SchedulerEventLog.event_date.desc()).first()
+                            try:
+                                original_scheduled_event = db.query(SchedulerEventLog).filter(
+                                    SchedulerEventLog.event_type == 'job_scheduled',
+                                    SchedulerEventLog.job_id == job_id,
+                                    SchedulerEventLog.user_id == user_id
+                                ).order_by(SchedulerEventLog.event_date.desc()).first()
+                                
+                                completed_event = db.query(SchedulerEventLog).filter(
+                                    SchedulerEventLog.event_type.in_(['job_completed', 'job_failed']),
+                                    SchedulerEventLog.job_id == job_id,
+                                    SchedulerEventLog.user_id == user_id
+                                ).order_by(SchedulerEventLog.event_date.desc()).first()
+                            except Exception:
+                                original_scheduled_event = None
+                                completed_event = None
+                                logger.warning(f"SchedulerEventLog query failed for {job_id}, scheduling new job")
                             
                             if completed_event:
                                 skipped_count += 1

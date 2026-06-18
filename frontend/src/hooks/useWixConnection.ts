@@ -43,24 +43,30 @@ export const useWixConnection = () => {
         }
       } catch {}
 
-      const connectedFlag = sessionStorage.getItem('wix_connected') === 'true'
+      const hasLocalFlag = sessionStorage.getItem('wix_connected') === 'true'
         || localStorage.getItem('wix_connected') === 'true';
 
-      if (connectedFlag) {
-        const siteInfoRaw = sessionStorage.getItem('wix_site_info');
-        let siteInfo: any = {};
-        try { if (siteInfoRaw) siteInfo = JSON.parse(siteInfoRaw); } catch {}
-        const sites: WixSite[] = [{
-          id: siteInfo.siteId || siteInfo.site_id || 'wix-site-1',
-          blog_url: siteInfo.url || siteInfo.viewUrl || 'Connected Wix Site',
-          blog_id: 'wix-blog',
-          created_at: siteInfo.createdAt || new Date().toISOString(),
-          scope: 'BLOG.CREATE-DRAFT,BLOG.PUBLISH,MEDIA.MANAGE'
-        }];
-        setStatus({ connected: true, sites, total_sites: 1 });
-      } else {
-        setStatus({ connected: false, sites: [], total_sites: 0 });
+      if (hasLocalFlag) {
+        // Retry backend once — the callback POST may still be in-flight
+        try {
+          await new Promise(r => setTimeout(r, 1500));
+          const retry = await apiClient.get('/api/wix/connection/status');
+          if (retry.data?.connected) {
+            const siteInfo = retry.data.site_info;
+            const sites: WixSite[] = siteInfo ? [{
+              id: siteInfo.siteId || siteInfo.site_id || 'wix-site-1',
+              blog_url: siteInfo.url || siteInfo.viewUrl || 'Connected Wix Site',
+              blog_id: 'wix-blog',
+              created_at: siteInfo.createdAt || new Date().toISOString(),
+              scope: 'BLOG.CREATE-DRAFT,BLOG.PUBLISH,MEDIA.MANAGE'
+            }] : [];
+            setStatus({ connected: true, sites, total_sites: sites.length });
+            return;
+          }
+        } catch {}
       }
+
+      setStatus({ connected: false, sites: [], total_sites: 0 });
     } catch {
       setStatus({ connected: false, sites: [], total_sites: 0, error: 'Error checking connection status' });
     } finally {

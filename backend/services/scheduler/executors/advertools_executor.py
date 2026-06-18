@@ -1,6 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 from loguru import logger
 from sqlalchemy.orm import Session
@@ -11,8 +11,9 @@ from services.seo.advertools_service import AdvertoolsService
 from services.seo_tools.sitemap_service import SitemapService
 from models.advertools_monitoring_models import AdvertoolsTask, AdvertoolsExecutionLog
 from models.onboarding import WebsiteAnalysis, OnboardingSession
+from services.scheduler.core.executor_interface import TaskExecutor, TaskExecutionResult
 
-class AdvertoolsExecutor:
+class AdvertoolsExecutor(TaskExecutor):
     """
     Executor for Advertools-based SEO intelligence tasks.
     Handles 'content_audit' and 'site_health' task types.
@@ -23,26 +24,17 @@ class AdvertoolsExecutor:
         self.sitemap_service = SitemapService()
         self.logger = logger.bind(service="AdvertoolsExecutor")
 
-    async def execute_task(self, task_stub: Any, db: Session, **kwargs) -> Dict[str, Any]:
-        """
-        Execute an Advertools intelligence task.
-        
-        Args:
-            task_stub: Tuple or object containing (id, user_id, payload)
-            db: Database session
-            
-        Returns:
-            Execution result dictionary
-        """
+    async def execute_task(self, task: Any, db: Session) -> TaskExecutionResult:
+        """Execute an Advertools intelligence task."""
         start_time = datetime.utcnow()
-        task_id = getattr(task_stub, 'id', None)
-        user_id = getattr(task_stub, 'user_id', None)
-        payload = getattr(task_stub, 'payload', {}) or {}
+        task_id = getattr(task, 'id', None)
+        user_id = getattr(task, 'user_id', None)
+        payload = getattr(task, 'payload', {}) or {}
         
         task_type = payload.get('type')
         website_url = payload.get('website_url')
         
-        self.logger.info(f"🚀 Starting Advertools task {task_id} ({task_type}) for {website_url}")
+        self.logger.info(f"Starting Advertools task {task_id} ({task_type}) for {website_url}")
         
         # Find the actual task record to update state
         task_record = None
@@ -172,15 +164,21 @@ class AdvertoolsExecutor:
             db.commit()
             
             if success:
-                self.logger.info(f"✅ Advertools task {task_id} completed successfully")
+                self.logger.info(f"Advertools task {task_id} completed successfully")
             else:
-                self.logger.warning(f"⚠️ Advertools task {task_id} failed: {result.get('error')}")
+                self.logger.warning(f"Advertools task {task_id} failed: {result.get('error')}")
                 
-            return result
+            return TaskExecutionResult(
+                success=success,
+                result_data=result,
+                execution_time_ms=execution_time_ms,
+                retryable=not success,
+                retry_delay=300
+            )
 
         except Exception as e:
             db.rollback()
-            self.logger.error(f"❌ Advertools task execution failed: {e}")
+            self.logger.error(f"Advertools task execution failed: {e}")
             
             # Try to update task record with failure even if main logic failed
             if task_record:
@@ -193,7 +191,19 @@ class AdvertoolsExecutor:
                 except:
                     db.rollback()
             
-            return {"success": False, "error": str(e)}
+            execution_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            return TaskExecutionResult(
+                success=False,
+                error_message=str(e),
+                execution_time_ms=execution_time_ms,
+                retryable=True,
+                retry_delay=300
+            )
+
+    def calculate_next_execution(self, task: Any, frequency: str, last_execution: Optional[datetime] = None) -> datetime:
+        base = last_execution or datetime.utcnow()
+        freq_days = getattr(task, 'frequency_days', 7) or 7
+        return base + timedelta(days=freq_days)
 
     async def _update_persona_augmentation(self, user_id: str, website_url: str, audit_result: Dict[str, Any], db: Session):
         """

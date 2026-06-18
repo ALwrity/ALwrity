@@ -21,6 +21,10 @@ from ..llm_providers.main_text_generation import llm_text_gen
 from middleware.logging_middleware import seo_logger
 
 
+# Global concurrency throttle for sitemap HTTP fetches.
+# Prevents FD exhaustion and rate-limiting from runaway parallel fetches.
+_sitemap_fetch_semaphore = asyncio.Semaphore(15)
+
 class SitemapService:
     """Service for analyzing website sitemaps with AI insights"""
     
@@ -175,9 +179,10 @@ class SitemapService:
             MAX_SITEMAP_SIZE = 10 * 1024 * 1024 
             
             try:
-                async with session.get(sitemap_url) as response:
-                    if response.status != 200:
-                        raise Exception(f"Failed to fetch sitemap: HTTP {response.status}")
+                async with _sitemap_fetch_semaphore:
+                    async with session.get(sitemap_url) as response:
+                        if response.status != 200:
+                            raise Exception(f"Failed to fetch sitemap: HTTP {response.status}")
                     
                     # Check Content-Type header
                     content_type = response.headers.get("Content-Type", "").lower()
@@ -1150,6 +1155,11 @@ Format your response as structured insights that can be easily parsed and displa
                                 return sitemap_url
                             else:
                                 logger.warning(f"robots.txt points to inaccessible sitemap: {sitemap_url}")
+                                # Fallback: try common sitemap paths directly
+                                # Instead of returning None (which makes the caller retry the same
+                                # rate-limited domain), try known paths on the same domain immediately.
+                                logger.info(f"Falling back to common sitemap paths for {base_url}")
+                                return await self._find_sitemap_by_common_paths(base_url)
                         
                         logger.debug("No sitemap directive found in robots.txt")
                     else:

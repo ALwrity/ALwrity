@@ -72,4 +72,4 @@ class TaskHistory(Base):
     vector_id = Column(String(36), nullable=True) 
 
 Index("ix_daily_workflow_plans_user_date", DailyWorkflowPlan.user_id, DailyWorkflowPlan.date, unique=True)
-Index("ix_task_history_user_hash", TaskHistory.user_id, TaskHistory.task_hash)
+Index("ix_task_history_user_hash", TaskHistory.user_id, TaskHistory.task_hash, unique=True)

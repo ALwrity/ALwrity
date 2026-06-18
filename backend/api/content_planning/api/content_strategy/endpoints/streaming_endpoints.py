@@ -24,7 +24,7 @@ from ....services.enhanced_strategy_service import EnhancedStrategyService
 from ....services.enhanced_strategy_db_service import EnhancedStrategyDBService
 
 # Use bounded shared cache instead of process-local unbounded dict
-from ...services.content_strategy.performance.caching import CachingService
+from ....services.content_strategy.performance.caching import CachingService
 
 router = APIRouter(tags=["Strategy Streaming"])
 

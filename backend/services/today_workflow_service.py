@@ -2,6 +2,8 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func as sql_func
 from sqlalchemy.orm import Session
 
 from models.daily_workflow_models import DailyWorkflowPlan, DailyWorkflowTask
@@ -9,9 +11,7 @@ from models.agent_activity_models import AgentAlert
 from models.content_planning import CalendarEvent, ContentStrategy
 from services.agent_activity_service import AgentActivityService, build_agent_event_payload
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.database import get_all_user_ids, get_session_for_user
-from services.onboarding.progress_service import OnboardingProgressService
-from services.active_strategy_service import ActiveStrategyService
+from services.database import get_session_for_user
 from loguru import logger
 
 PILLAR_IDS = ["plan", "generate", "publish", "analyze", "engage", "remarket"]
@@ -43,16 +43,24 @@ _CONTENT_ESTIMATED_TIME = {
     "twitter_post": 10, "instagram_post": 15, "seo_page": 30, "video": 60,
 }
 
+# Generic fallback URL for any calendar event whose content_type / platform
+# does not match a known writer. Prevents the event from being silently
+# dropped from the daily plan.
+_GENERIC_FALLBACK_ACTION_URL = "/content-planning"
 
-def _resolve_calendar_action_url(content_type: str, platform: str) -> Optional[str]:
+
+def _resolve_calendar_action_url(content_type: str, platform: str) -> str:
     platform_lower = (platform or "").strip().lower()
     if platform_lower in _PLATFORM_ACTION_URL:
         return _PLATFORM_ACTION_URL[platform_lower]
     ct_lower = (content_type or "").strip().lower()
     if ct_lower in _CONTENT_ACTION_URL:
         return _CONTENT_ACTION_URL[ct_lower]
-    logger.warning("No action_url mapping for calendar event content_type={!r} platform={!r}", content_type, platform)
-    return None
+    logger.warning(
+        "No action_url mapping for calendar event content_type={!r} platform={!r} — falling back to {}",
+        content_type, platform, _GENERIC_FALLBACK_ACTION_URL,
+    )
+    return _GENERIC_FALLBACK_ACTION_URL
 
 
 def _resolve_calendar_estimated_time(content_type: str) -> int:
@@ -69,8 +77,6 @@ def _generate_calendar_event_plan(date: str, grounding: Dict[str, Any]) -> Dict[
         action_url = _resolve_calendar_action_url(
             event.get("content_type", ""), event.get("platform", "")
         )
-        if action_url is None:
-            continue
 
         task = {
             "pillarId": CALENDAR_CONTENT_PILLAR,
@@ -371,18 +377,17 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
     # 3. Fetch calendar events for today
     calendar_events_today = []
     try:
-        from datetime import datetime as dt_func, timedelta
-
-        today_start = dt_func.strptime(date, "%Y-%m-%d").replace(hour=0, minute=0, second=0)
-        today_end = today_start + timedelta(days=1)
-
+        # Compare on the date portion via SQL func.date() to sidestep the
+        # naive-vs-aware TypeError risk. CalendarEvent.scheduled_date may be
+        # either depending on how it was written (datetime.utcnow() vs
+        # datetime.now(timezone.utc)), and SQL-level date comparison is
+        # unambiguous regardless of the stored timezone.
         calendar_events_today = (
             db.query(CalendarEvent)
             .join(ContentStrategy, CalendarEvent.strategy_id == ContentStrategy.id)
             .filter(
                 ContentStrategy.user_id == user_id,
-                CalendarEvent.scheduled_date >= today_start,
-                CalendarEvent.scheduled_date < today_end,
+                sql_func.date(CalendarEvent.scheduled_date) == date,
                 CalendarEvent.status.in_(["draft", "scheduled"]),
             )
             .all()
@@ -422,8 +427,20 @@ import asyncio
 from services.intelligence.agents.agent_orchestrator import AgentOrchestrationService
 from services.task_memory_service import TaskMemoryService
 
-# Initialize orchestration service (singleton)
-orchestration_service = AgentOrchestrationService()
+# Initialize orchestration service (singleton) with resilient fallback.
+# If the constructor fails (e.g., missing AI provider config, import error in
+# a transitive dependency), we leave the module usable by setting the singleton
+# to None. The agent committee will be skipped, and only the LLM fallback path
+# will produce tasks. This prevents a transient init failure from taking down
+# the entire scheduler import chain.
+try:
+    orchestration_service = AgentOrchestrationService()
+except Exception as _orch_init_err:
+    logger.error(
+        f"AgentOrchestrationService init failed at module load; "
+        f"agent committee will be disabled: {_orch_init_err}"
+    )
+    orchestration_service = None
 
 async def generate_agent_enhanced_plan(
     db: Session,
@@ -437,6 +454,12 @@ async def generate_agent_enhanced_plan(
     memory_service = TaskMemoryService(user_id, db)
 
     # 1. Get Orchestrator
+    if orchestration_service is None:
+        logger.warning(
+            f"OrchestrationService unavailable for user {user_id}; "
+            f"agent committee disabled, falling back to LLM path"
+        )
+        return {"date": date, "tasks": []}
     try:
         orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
     except Exception as e:
@@ -679,6 +702,7 @@ async def generate_agent_enhanced_plan(
         },
     }
 
+    calendar_events = grounding.get("calendar_events_today", [])
     prompt = (
         "Generate a personalized Today workflow plan for ALwrity with exactly 6 lifecycle pillars: "
         "plan, generate, publish, analyze, engage, remarket.\n\n"
@@ -694,7 +718,9 @@ async def generate_agent_enhanced_plan(
         "- Use these common actionUrl routes when relevant: "
         "/content-planning-dashboard, /blog-writer, /linkedin-writer, /facebook-writer, /seo-dashboard, /scheduler-dashboard.\n"
         "- Keep descriptions concise.\n\n"
-        f"Grounding context (Alerts):\n{json.dumps(grounding.get('recent_agent_alerts', []), indent=2)}\n"
+        f"Grounding context (Alerts):\n{json.dumps(grounding.get('recent_agent_alerts', []), indent=2)}\n\n"
+        f"Calendar events scheduled for today (must inform the 'generate' pillar):\n"
+        f"{json.dumps(calendar_events, indent=2)}\n"
     )
 
     if strict_contextuality:
@@ -763,16 +789,27 @@ async def get_or_create_daily_workflow_plan(
     creation_source: str = "manual",
 ) -> tuple[DailyWorkflowPlan, bool]:
     from starlette.concurrency import run_in_threadpool
-    
+
     date_str = date or _today_date_str()
-    
+
+    # H5: SQLAlchemy Sessions are not thread-safe. The threadpool helpers
+    # below would otherwise mutate the caller's `db` Session from a different
+    # thread. We give them their own Session bound to the same per-user
+    # engine and ensure it is closed on every exit path.
     def _get_existing():
-        return (
-            db.query(DailyWorkflowPlan)
-            .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
-            .first()
-        )
-    
+        from services.database import get_session_for_user
+        thread_db = get_session_for_user(user_id)
+        if thread_db is None:
+            return None
+        try:
+            return (
+                thread_db.query(DailyWorkflowPlan)
+                .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+                .first()
+            )
+        finally:
+            thread_db.close()
+
     existing = await run_in_threadpool(_get_existing)
     
     if existing:
@@ -789,11 +826,25 @@ async def get_or_create_daily_workflow_plan(
 
     # Filter agent proposals: keep only non-generate pillars, dedup by title
     committee_pillars = {"plan", "analyze", "engage", "publish", "remarket"}
-    filtered_agent_tasks = [
-        t for t in agent_plan_data.get("tasks", [])
-        if t.get("pillarId") in committee_pillars
-        and t.get("title") not in calendar_task_titles
-    ]
+    filtered_agent_tasks = []
+    for t in agent_plan_data.get("tasks", []):
+        pillar_id = t.get("pillarId")
+        if pillar_id not in committee_pillars:
+            # 'generate' is owned by calendar events; anything outside PILLAR_IDS
+            # is invalid and we log a warning so the agent is debuggable.
+            if pillar_id not in PILLAR_IDS:
+                agent = None
+                metadata = t.get("metadata")
+                if isinstance(metadata, dict):
+                    agent = metadata.get("source_agent")
+                logger.warning(
+                    f"Dropping agent task with invalid pillar_id={pillar_id!r} "
+                    f"from agent {agent or 'unknown'}: title={t.get('title', '')!r}"
+                )
+            continue
+        if t.get("title") in calendar_task_titles:
+            continue
+        filtered_agent_tasks.append(t)
 
     # Step 3: Merge — calendar wins for generate, agents fill other pillars
     all_tasks = calendar_plan.get("tasks", []) + filtered_agent_tasks
@@ -815,55 +866,81 @@ async def get_or_create_daily_workflow_plan(
     tasks = plan_data.get("tasks", [])
 
     def _create_plan():
-        plan = DailyWorkflowPlan(
-            user_id=user_id,
-            date=date_str,
-            source=creation_source,
-            generation_mode="calendar_driven" if calendar_source else _derive_generation_mode(plan_data),
-            committee_agent_count=_count_committee_agents(tasks),
-            fallback_used=False,
-            plan_json=plan_data,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
-        )
-        db.add(plan)
-        db.commit()
-        db.refresh(plan)
-
-        for t in tasks:
-            pillar_id = str(t.get("pillarId") or "").lower().strip()
-            if pillar_id not in PILLAR_IDS:
-                agent = None
-                metadata = t.get("metadata")
-                if isinstance(metadata, dict):
-                    agent = metadata.get("source_agent")
-                logger.warning(f"Skipping task persistence for invalid pillar_id={pillar_id!r} "
-                               f"from agent {agent or 'unknown'}: title={t.get('title', '')}")
-                continue
-            task = DailyWorkflowTask(
-                plan_id=plan.id,
+        # H5: own Session for the threadpool worker (callers' `db` is async-thread only).
+        from services.database import get_session_for_user
+        thread_db = get_session_for_user(user_id)
+        if thread_db is None:
+            raise RuntimeError(f"Failed to open DB session for user {user_id}")
+        try:
+            plan = DailyWorkflowPlan(
                 user_id=user_id,
-                pillar_id=pillar_id,
-                title=str(t.get("title") or "Task").strip()[:255],
-                description=str(t.get("description") or "").strip(),
-                status=_coerce_status(t.get("status")),
-                priority=_coerce_priority(t.get("priority")),
-                estimated_time=int(t.get("estimatedTime") or 15),
-                action_type=str(t.get("actionType") or "navigate").strip()[:20],
-                action_url=str(t.get("actionUrl") or "").strip(),
-                dependencies=json.dumps(t.get("dependencies") or []),
-                metadata_json=t.get("metadata") or {},
-                enabled=bool(t.get("enabled", True)),
+                date=date_str,
+                source=creation_source,
+                generation_mode="calendar_driven" if calendar_source else _derive_generation_mode(plan_data),
+                committee_agent_count=_count_committee_agents(tasks),
+                fallback_used=False,
+                plan_json=plan_data,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
-            db.add(task)
-        
-        db.commit()
-        return plan
+            thread_db.add(plan)
+            try:
+                thread_db.commit()
+            except IntegrityError:
+                # Race condition: another concurrent call created the same (user_id, date) plan.
+                # Roll back and re-fetch the existing plan so the caller sees a coherent state.
+                thread_db.rollback()
+                existing = (
+                    thread_db.query(DailyWorkflowPlan)
+                    .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+                    .first()
+                )
+                if existing is None:
+                    # Extremely unlikely: the other transaction also rolled back.
+                    raise
+                logger.info(
+                    "DailyWorkflowPlan race resolved: re-fetched existing plan for user_id={} date={}",
+                    user_id, date_str,
+                )
+                return existing, False
+            thread_db.refresh(plan)
 
-    plan = await run_in_threadpool(_create_plan)
-    return plan, True
+            for t in tasks:
+                pillar_id = str(t.get("pillarId") or "").lower().strip()
+                if pillar_id not in PILLAR_IDS:
+                    agent = None
+                    metadata = t.get("metadata")
+                    if isinstance(metadata, dict):
+                        agent = metadata.get("source_agent")
+                    logger.warning(f"Skipping task persistence for invalid pillar_id={pillar_id!r} "
+                                   f"from agent {agent or 'unknown'}: title={t.get('title', '')}")
+                    continue
+                task = DailyWorkflowTask(
+                    plan_id=plan.id,
+                    user_id=user_id,
+                    pillar_id=pillar_id,
+                    title=str(t.get("title") or "Task").strip()[:255],
+                    description=str(t.get("description") or "").strip(),
+                    status=_coerce_status(t.get("status")),
+                    priority=_coerce_priority(t.get("priority")),
+                    estimated_time=int(t.get("estimatedTime") or 15),
+                    action_type=str(t.get("actionType") or "navigate").strip()[:20],
+                    action_url=str(t.get("actionUrl") or "").strip(),
+                    dependencies=json.dumps(t.get("dependencies") or []),
+                    metadata_json=t.get("metadata") or {},
+                    enabled=bool(t.get("enabled", True)),
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+                thread_db.add(task)
+
+            thread_db.commit()
+            return plan, True
+        finally:
+            thread_db.close()
+
+    plan, created = await run_in_threadpool(_create_plan)
+    return plan, created
 
 
 def _derive_generation_mode(plan_data: Dict[str, Any]) -> str:
@@ -911,57 +988,71 @@ def _plan_uses_fallback(tasks: List[Dict[str, Any]]) -> bool:
     return False
 
 
-async def generate_scheduled_daily_workflows() -> Dict[str, int]:
-    user_ids = get_all_user_ids()
-    stats = {"users_seen": 0, "created": 0, "existing": 0, "skipped_no_onboarding": 0, "skipped_no_strategy": 0, "failed": 0}
+def sync_workflow_tasks_from_calendar_event(
+    db: Session,
+    user_id: str,
+    calendar_event: CalendarEvent,
+) -> int:
+    """Reverse-sync a CalendarEvent change to any DailyWorkflowTask that references it.
 
-    for user_id in user_ids:
-        stats["users_seen"] += 1
-        db = None
-        try:
-            # Gate 1: Onboarding must be completed
-            onboarding_service = OnboardingProgressService()
-            status = onboarding_service.get_onboarding_status(user_id)
-            if not status.get("is_completed", False):
-                stats["skipped_no_onboarding"] += 1
-                logger.info("Skipping daily workflow for user {} — onboarding not completed", user_id)
-                continue
+    Called by the calendar CRUD endpoints after a create/update/delete. Maps
+    calendar status transitions to workflow task status transitions so the
+    today-workflow view reflects calendar changes in (near) real time.
 
-            db = get_session_for_user(user_id)
-            if not db:
-                stats["failed"] += 1
-                continue
+    Status mapping:
+      - calendar "published" → task "completed" (only for tasks not yet decided)
+      - calendar "cancelled" → task "dismissed" (only for tasks not yet decided)
+      - calendar "scheduled"/"draft" → no change (workflow already reflects this)
 
-            # Gate 2: User must have an active content strategy
-            active_strategy_service = ActiveStrategyService(db_session=db)
-            has_active_strategy = active_strategy_service.has_active_strategies_with_tasks()
-            if not has_active_strategy:
-                stats["skipped_no_strategy"] += 1
-                logger.info("Skipping daily workflow for user {} — no active strategy", user_id)
-                db.close()
-                db = None
-                continue
+    Returns the number of workflow tasks updated.
+    """
+    target_task_status = None
+    if calendar_event.status == "published":
+        target_task_status = "completed"
+    elif calendar_event.status == "cancelled":
+        target_task_status = "dismissed"
+    else:
+        return 0
 
-            plan, created = await get_or_create_daily_workflow_plan(
-                db,
-                user_id,
-                creation_source="scheduled",
+    try:
+        # Find non-decided workflow tasks sourced from this calendar event.
+        # task.metadata_json -> {"source": "calendar_event", "source_event_id": <id>}
+        tasks = (
+            db.query(DailyWorkflowTask)
+            .filter(
+                DailyWorkflowTask.user_id == user_id,
+                DailyWorkflowTask.status.in_(["pending", "in_progress"]),
             )
-            if created:
-                stats["created"] += 1
-                logger.info("Scheduled daily workflow created for user {} date {}", user_id, plan.date)
-            else:
-                stats["existing"] += 1
-                logger.info("Scheduled daily workflow already exists for user {} date {}", user_id, plan.date)
-        except Exception as e:
-            stats["failed"] += 1
-            logger.error("Scheduled daily workflow generation failed for user {}: {}", user_id, e)
-        finally:
-            if db:
-                db.close()
-
-    logger.info("Scheduled daily workflow run complete: {}", stats)
-    return stats
+            .all()
+        )
+        updated = 0
+        for task in tasks:
+            metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
+            if (
+                metadata.get("source") == "calendar_event"
+                and metadata.get("source_event_id") == calendar_event.id
+            ):
+                task.status = target_task_status
+                task.decided_at = datetime.utcnow()
+                task.completion_notes = (
+                    f"Auto-updated from calendar event status={calendar_event.status}"
+                )
+                db.add(task)
+                updated += 1
+        if updated:
+            db.commit()
+            logger.info(
+                f"Reverse-synced {updated} workflow task(s) for user {user_id} "
+                f"from calendar_event id={calendar_event.id} status={calendar_event.status}"
+            )
+        return updated
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Failed to reverse-sync workflow tasks for user {user_id} "
+            f"from calendar_event id={calendar_event.id}: {e}"
+        )
+        return 0
 
 
 def update_task_status(

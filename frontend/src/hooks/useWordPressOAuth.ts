@@ -99,50 +99,46 @@ export const useWordPressOAuth = (): UseWordPressOAuthReturn => {
         }
         
         // Listen for popup completion and messages
+        let resolved = false;
+        let checkClosed: ReturnType<typeof setInterval>;
+
+        const cleanup = () => {
+          if (resolved) return;
+          resolved = true;
+          clearInterval(checkClosed);
+          window.removeEventListener('message', messageHandler);
+          if (popup && !popup.closed) popup.close();
+        };
+
         const messageHandler = (event: MessageEvent) => {
-          
-          // Accept messages only from the popup we opened and from trusted origins
           const ngrokOrigin = process.env.REACT_APP_NGROK_ORIGIN || '';
           const productionOrigin = 'https://alwrity-ai.vercel.app';
           const trustedOrigins = [window.location.origin];
           if (ngrokOrigin) trustedOrigins.push(ngrokOrigin);
           trustedOrigins.push(productionOrigin);
-          
+
           if (event.source !== popup) return;
-          if (!trustedOrigins.includes(event.origin)) {
-            return;
-          }
+          if (!trustedOrigins.includes(event.origin)) return;
 
-
-          if (event.data.type === 'WPCOM_OAUTH_SUCCESS') {
-            popup.close();
-            clearInterval(checkClosed);
-            // Refresh status after OAuth completion
-            setTimeout(() => {
-              checkStatus();
-            }, 1000);
-          } else if (event.data.type === 'WPCOM_OAUTH_ERROR') {
-            popup.close();
-            clearInterval(checkClosed);
-            // Refresh status to show disconnected state
-            setTimeout(() => {
-              checkStatus();
-            }, 1000);
+          if (event.data.type === 'WPCOM_OAUTH_SUCCESS' || event.data.type === 'WPCOM_OAUTH_ERROR') {
+            cleanup();
+            setTimeout(() => { checkStatus(); }, 1000);
           }
         };
 
         window.addEventListener('message', messageHandler);
-        
-        const checkClosed = setInterval(() => {
+
+        checkClosed = setInterval(() => {
           if (popup.closed) {
-            clearInterval(checkClosed);
-            window.removeEventListener('message', messageHandler);
-            // Refresh status after OAuth completion
-            setTimeout(() => {
-              checkStatus();
-            }, 1000);
+            cleanup();
+            setTimeout(() => { checkStatus(); }, 1000);
           }
         }, 1000);
+
+        // Safety timeout: clean up after 2 minutes regardless
+        setTimeout(() => {
+          if (!resolved) cleanup();
+        }, 2 * 60 * 1000);
         
       } else {
         throw new Error('Failed to get WordPress OAuth URL');

@@ -11,7 +11,7 @@ from services.database import get_db_session
 from services.persona_data_service import PersonaDataService
 from services.persona.facebook.facebook_persona_service import FacebookPersonaService
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
-from models.scheduler_models import SchedulerEventLog
+
 
 
 async def generate_facebook_persona_task(user_id: str):
@@ -79,112 +79,17 @@ async def generate_facebook_persona_task(user_id: str):
                 # Save to database
                 success = persona_data_service.save_platform_persona(user_id, 'facebook', generated_persona)
                 if success:
-                    logger.info(f"✅ Scheduled Facebook persona generation completed for user {user_id}")
-                    
-                    # Log success to scheduler event log for dashboard
-                    try:
-                        event_log = SchedulerEventLog(
-                            event_type='job_completed',
-                            event_date=start_time,
-                            job_id=f"facebook_persona_{user_id}",
-                            job_type='one_time',
-                            user_id=user_id,
-                            event_data={
-                                'job_function': 'generate_facebook_persona_task',
-                                'execution_time_seconds': execution_time,
-                                'status': 'success'
-                            }
-                        )
-                        db.add(event_log)
-                        db.commit()
-                    except Exception as log_error:
-                        logger.warning(f"Failed to log Facebook persona generation success to scheduler event log: {log_error}")
-                        if db:
-                            db.rollback()
+                    logger.info(f"Scheduled Facebook persona generation completed for user {user_id}")
                 else:
                     error_msg = f"Failed to save Facebook persona for user {user_id}"
-                    logger.warning(f"⚠️ {error_msg}")
-                    
-                    # Log failure to scheduler event log
-                    try:
-                        event_log = SchedulerEventLog(
-                            event_type='job_failed',
-                            event_date=start_time,
-                            job_id=f"facebook_persona_{user_id}",
-                            job_type='one_time',
-                            user_id=user_id,
-                            error_message=error_msg,
-                            event_data={
-                                'job_function': 'generate_facebook_persona_task',
-                                'execution_time_seconds': execution_time,
-                                'status': 'failed',
-                                'failure_reason': 'save_failed',
-                                'expensive_api_call': True
-                            }
-                        )
-                        db.add(event_log)
-                        db.commit()
-                    except Exception as log_error:
-                        logger.warning(f"Failed to log Facebook persona save failure to scheduler event log: {log_error}")
-                        if db:
-                            db.rollback()
+                    logger.warning(f"Failed to save Facebook persona for user {user_id}")
             else:
                 error_msg = f"Scheduled Facebook persona generation failed for user {user_id}: {generated_persona}"
-                logger.error(f"❌ {error_msg}")
-                
-                # Log failure to scheduler event log for dashboard visibility
-                try:
-                    event_log = SchedulerEventLog(
-                        event_type='job_failed',
-                        event_date=start_time,
-                        job_id=f"facebook_persona_{user_id}",  # Match scheduled job ID format
-                        job_type='one_time',
-                        user_id=user_id,
-                        error_message=error_msg,
-                        event_data={
-                            'job_function': 'generate_facebook_persona_task',
-                            'execution_time_seconds': execution_time,
-                            'status': 'failed',
-                            'failure_reason': 'generation_returned_error',
-                            'expensive_api_call': True
-                        }
-                    )
-                    db.add(event_log)
-                    db.commit()
-                except Exception as log_error:
-                    logger.warning(f"Failed to log Facebook persona generation failure to scheduler event log: {log_error}")
-                    if db:
-                        db.rollback()
+                logger.error(f"Scheduled Facebook persona generation failed for user {user_id}: {generated_persona}")
         except Exception as gen_error:
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             error_msg = f"Exception during scheduled Facebook persona generation for user {user_id}: {str(gen_error)}. Expensive API call may have been made."
-            logger.error(f"❌ {error_msg}")
-            
-            # Log exception to scheduler event log for dashboard visibility
-            try:
-                event_log = SchedulerEventLog(
-                    event_type='job_failed',
-                    event_date=start_time,
-                    job_id=f"facebook_persona_{user_id}",  # Match scheduled job ID format
-                    job_type='one_time',
-                    user_id=user_id,
-                    error_message=error_msg,
-                    event_data={
-                        'job_function': 'generate_facebook_persona_task',
-                        'execution_time_seconds': execution_time,
-                        'status': 'failed',
-                        'failure_reason': 'exception',
-                        'exception_type': type(gen_error).__name__,
-                        'exception_message': str(gen_error),
-                        'expensive_api_call': True
-                    }
-                )
-                db.add(event_log)
-                db.commit()
-            except Exception as log_error:
-                logger.warning(f"Failed to log Facebook persona generation exception to scheduler event log: {log_error}")
-                if db:
-                    db.rollback()
+            logger.error(f"Exception during scheduled Facebook persona generation for user {user_id}: {str(gen_error)}. Expensive API call may have been made.")
             
     except Exception as e:
         logger.error(f"Error in scheduled Facebook persona generation for user {user_id}: {e}")

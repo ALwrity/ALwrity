@@ -16,26 +16,75 @@ RATE_LIMIT_DELAY_SECONDS = 2.0  # Delay between API calls to prevent quota exhau
 # Task management for long-running persona generation
 import uuid
 from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
 
 from services.persona.core_persona.core_persona_service import CorePersonaService
-from services.persona.enhanced_linguistic_analyzer import EnhancedLinguisticAnalyzer
+from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
 from services.persona.persona_quality_improver import PersonaQualityImprover
 from middleware.auth_middleware import get_current_user
 from services.user_api_key_context import user_api_keys
+from services.database import get_session_for_user
+from services.intelligence.agent_flat_context import AgentFlatContextStore
+from models.onboarding import OnboardingSession, PersonaData
 
-# In-memory task storage (in production, use Redis or database)
+# In-memory task storage (transient — running tasks can't survive restart)
 persona_tasks: Dict[str, Dict[str, Any]] = {}
 
-# In-memory latest persona cache per user (24h TTL)
-persona_latest_cache: Dict[str, Dict[str, Any]] = {}
 PERSONA_CACHE_TTL_HOURS = 24
+
+
+def _get_session_or_404(db: Session, user_id: str) -> OnboardingSession:
+    """Get the onboarding session for a user, or raise 404."""
+    session = db.query(OnboardingSession).filter(
+        OnboardingSession.user_id == user_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Onboarding session not found")
+    return session
+
+
+def _load_persona_data(db: Session, user_id: str) -> Optional[Dict[str, Any]]:
+    """Load cached persona from DB. Returns None if missing or stale."""
+    session = db.query(OnboardingSession).filter(
+        OnboardingSession.user_id == user_id
+    ).first()
+    if not session or not session.persona_data:
+        return None
+    pd = session.persona_data
+    if pd.updated_at and (datetime.now() - pd.updated_at) > timedelta(hours=PERSONA_CACHE_TTL_HOURS):
+        db.delete(pd)
+        db.commit()
+        return None
+    return {
+        "success": True,
+        "core_persona": pd.core_persona,
+        "platform_personas": pd.platform_personas,
+        "quality_metrics": pd.quality_metrics,
+        "selected_platforms": pd.selected_platforms,
+        "timestamp": pd.updated_at.isoformat() if pd.updated_at else None,
+    }
+
+
+def _save_persona_data(db: Session, user_id: str, data: Dict[str, Any]) -> None:
+    """Upsert persona data for a user."""
+    session = _get_session_or_404(db, user_id)
+    if session.persona_data:
+        pd = session.persona_data
+    else:
+        pd = PersonaData(session_id=session.id)
+        db.add(pd)
+    pd.core_persona = data.get("core_persona")
+    pd.platform_personas = data.get("platform_personas", {})
+    pd.quality_metrics = data.get("quality_metrics", {})
+    pd.selected_platforms = data.get("selected_platforms", [])
+    db.commit()
 
 router = APIRouter()
 
 # Initialize services
 core_persona_service = CorePersonaService()
-linguistic_analyzer = EnhancedLinguisticAnalyzer()
-quality_improver = PersonaQualityImprover()
+linguistic_analyzer = get_linguistic_analyzer()
+quality_improver = PersonaQualityImprover(linguistic_analyzer)
 
 
 def _extract_user_id(user: Dict[str, Any]) -> str:
@@ -99,6 +148,10 @@ async def generate_writing_personas_async(
     """
     Start persona generation as an async task and return task ID for polling.
     """
+    user_id = _extract_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if not db:
+        raise HTTPException(status_code=503, detail="Could not connect to database")
     try:
         # Handle both PersonaGenerationRequest and dict inputs
         if isinstance(request, dict):
@@ -107,33 +160,30 @@ async def generate_writing_personas_async(
             persona_request = request
             
         # If fresh cache exists for this user, short-circuit and return a completed task
-        user_id = _extract_user_id(current_user)
-        cached = persona_latest_cache.get(user_id)
+        cached = _load_persona_data(db, user_id)
         if cached:
-            ts = datetime.fromisoformat(cached.get("timestamp", datetime.now().isoformat())) if isinstance(cached.get("timestamp"), str) else None
-            if ts and (datetime.now() - ts) <= timedelta(hours=PERSONA_CACHE_TTL_HOURS):
-                task_id = str(uuid.uuid4())
-                persona_tasks[task_id] = {
-                    "task_id": task_id,
-                    "status": "completed",
-                    "progress": 100,
-                    "current_step": "Persona loaded from cache",
-                    "progress_messages": [
-                        {"timestamp": datetime.now().isoformat(), "message": "Loaded cached persona", "progress": 100}
-                    ],
-                    "result": {
-                        "success": True,
-                        "core_persona": cached.get("core_persona"),
-                        "platform_personas": cached.get("platform_personas", {}),
-                        "quality_metrics": cached.get("quality_metrics", {}),
-                    },
-                    "error": None,
-                    "created_at": datetime.now().isoformat(),
-                    "updated_at": datetime.now().isoformat(),
-                    "user_id": user_id,
-                    "request_data": (PersonaGenerationRequest(**(request if isinstance(request, dict) else request.dict())).dict()) if request else {}
-                }
-                logger.info(f"Cache hit for user {user_id} - returning completed task without regeneration: {task_id}")
+            task_id = str(uuid.uuid4())
+            persona_tasks[task_id] = {
+                "task_id": task_id,
+                "status": "completed",
+                "progress": 100,
+                "current_step": "Persona loaded from cache",
+                "progress_messages": [
+                    {"timestamp": datetime.now().isoformat(), "message": "Loaded cached persona", "progress": 100}
+                ],
+                "result": {
+                    "success": True,
+                    "core_persona": cached.get("core_persona"),
+                    "platform_personas": cached.get("platform_personas", {}),
+                    "quality_metrics": cached.get("quality_metrics", {}),
+                },
+                "error": None,
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "user_id": user_id,
+                "request_data": (PersonaGenerationRequest(**(request if isinstance(request, dict) else request.dict())).dict()) if request else {}
+            }
+            logger.info(f"Cache hit for user {user_id} - returning completed task without regeneration: {task_id}")
             return {
                 "task_id": task_id,
                 "status": "completed",
@@ -185,68 +235,70 @@ async def generate_writing_personas_async(
     except Exception as e:
         logger.error(f"Failed to start persona generation task: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to start task: {str(e)}")
+    finally:
+        db.close()
 
 @router.get("/step4/persona-latest", response_model=Dict[str, Any])
-async def get_latest_persona(current_user: Dict[str, Any] = Depends(get_current_user)):
+async def get_latest_persona(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
     """Return latest cached persona for the current user if available and fresh."""
+    user_id = _extract_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if not db:
+        return {"success": False, "persona": None, "message": "Could not connect to database", "status_code": 503}
     try:
-        user_id = _extract_user_id(current_user)
-        cached = persona_latest_cache.get(user_id)
+        cached = _load_persona_data(db, user_id)
         if not cached:
-            raise HTTPException(status_code=404, detail="No cached persona found")
-
-        ts = datetime.fromisoformat(cached["timestamp"]) if isinstance(cached.get("timestamp"), str) else None
-        if not ts or (datetime.now() - ts) > timedelta(hours=PERSONA_CACHE_TTL_HOURS):
-            # Expired
-            persona_latest_cache.pop(user_id, None)
-            raise HTTPException(status_code=404, detail="Cached persona expired")
-
+            return {"success": False, "persona": None, "message": "No cached persona found", "status_code": 404}
         return {"success": True, "persona": cached}
-    except HTTPException as he:
-        # Return 200 even for HTTP exceptions (like 404) to prevent frontend connection errors
-        # if the endpoint is called during an auto-initialization phase.
-        logger.warning(f"Persona retrieval notice (returning success=False): {he.detail}")
-        return {
-            "success": False, 
-            "persona": None, 
-            "message": he.detail,
-            "status_code": he.status_code
-        }
     except Exception as e:
         logger.error(f"Error getting latest persona: {e}", exc_info=True)
-        return {
-            "success": False, 
-            "persona": None, 
-            "message": f"Internal error retrieving persona: {str(e)}",
-            "status_code": 500
-        }
+        return {"success": False, "persona": None, "message": f"Internal error retrieving persona: {str(e)}", "status_code": 500}
+    finally:
+        db.close()
 
 @router.post("/step4/persona-save", response_model=Dict[str, Any])
 async def save_persona_update(
     request: Dict[str, Any],
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Save/overwrite latest persona cache for current user (from edited UI)."""
+    """Save/overwrite latest persona data for current user (from edited UI)."""
+    user_id = _extract_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if not db:
+        return {"success": False, "message": "Could not connect to database", "status_code": 503}
     try:
-        user_id = _extract_user_id(current_user)
         payload = {
-            "success": True,
             "core_persona": request.get("core_persona"),
             "platform_personas": request.get("platform_personas", {}),
             "quality_metrics": request.get("quality_metrics", {}),
             "selected_platforms": request.get("selected_platforms", []),
-            "timestamp": datetime.now().isoformat()
         }
-        persona_latest_cache[user_id] = payload
-        logger.info(f"Saved latest persona to cache for user {user_id}")
+        _save_persona_data(db, user_id, payload)
+        
+        # Persist to flat-file context for agent access
+        try:
+            flat_store = AgentFlatContextStore(user_id)
+            canonical_payload = {
+                "core_persona": payload.get("core_persona") or {},
+                "platform_personas": payload.get("platform_personas") or {},
+                "quality_metrics": payload.get("quality_metrics") or {},
+                "selected_platforms": payload.get("selected_platforms", []),
+                "saved_at": datetime.now().isoformat(),
+                "source_payload": request,
+            }
+            flat_store.save_step4_persona_data(canonical_payload, source="onboarding_step4")
+        except Exception as flat_err:
+            logger.warning(f"Failed to persist step 4 flat context for user {user_id}: {flat_err}")
+        
+        logger.info(f"Saved latest persona data for user {user_id}")
         return {"success": True}
     except Exception as e:
-        logger.error(f"Error saving latest persona: {e}", exc_info=True)
-        return {
-            "success": False, 
-            "message": f"Failed to save persona: {str(e)}",
-            "status_code": 500
-        }
+        logger.error(f"Error saving persona: {e}", exc_info=True)
+        return {"success": False, "message": f"Failed to save persona: {str(e)}", "status_code": 500}
+    finally:
+        db.close()
 
 @router.get("/step4/persona-task/{task_id}", response_model=PersonaTaskStatus)
 async def get_persona_task_status(task_id: str):
@@ -268,67 +320,57 @@ async def get_persona_task_status(task_id: str):
 @router.post("/step4/generate-personas", response_model=PersonaGenerationResponse)
 async def generate_writing_personas(
     request: Union[PersonaGenerationRequest, Dict[str, Any]],
-    current_user: Dict[str, Any] = Depends(get_current_user)
+    current_user: Dict[str, Any] = Depends(get_current_user),
 ):
     """
     Generate AI writing personas using the sophisticated persona system with optimized parallel execution.
-    
-    OPTIMIZED APPROACH:
-    1. Generate core persona (1 API call)
-    2. Parallel platform adaptations (1 API call per platform)
-    3. Parallel quality assessment (no additional API calls - uses existing data)
-    
-    Total API calls: 1 + N platforms (vs previous: 1 + N + 1 = N + 2)
     """
+    user_id = _extract_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if not db:
+        return PersonaGenerationResponse(success=False, error="Could not connect to database")
     try:
         logger.info(f"Starting OPTIMIZED persona generation for user: {current_user.get('user_id', 'unknown')}")
         
-        # Handle both PersonaGenerationRequest and dict inputs
         if isinstance(request, dict):
-            # Convert dict to PersonaGenerationRequest
             persona_request = PersonaGenerationRequest(**request)
         else:
             persona_request = request
+        
+        # Ensure session_info.user_id is set so the LLM gateway can do subscription/usage checks
+        if user_id:
+            persona_request.onboarding_data.setdefault("session_info", {})
+            if not persona_request.onboarding_data["session_info"].get("user_id"):
+                persona_request.onboarding_data["session_info"]["user_id"] = user_id
             
         logger.info(f"Selected platforms: {persona_request.selected_platforms}")
         
         # Step 1: Generate core persona (1 API call)
         logger.info("Step 1: Generating core persona...")
         core_persona = await asyncio.get_event_loop().run_in_executor(
-            None, 
-            core_persona_service.generate_core_persona, 
-            persona_request.onboarding_data
+            None, core_persona_service.generate_core_persona, persona_request.onboarding_data
         )
         
-        # Add small delay after core persona generation
         await asyncio.sleep(1.0)
         
         if "error" in core_persona:
             logger.error(f"Core persona generation failed: {core_persona['error']}")
-            return PersonaGenerationResponse(
-                success=False,
-                error=f"Core persona generation failed: {core_persona['error']}"
-            )
+            return PersonaGenerationResponse(success=False, error=f"Core persona generation failed: {core_persona['error']}")
         
-        # Step 2: Generate platform adaptations with rate limiting (N API calls with delays)
+        # Step 2: Generate platform adaptations with rate limiting
         logger.info(f"Step 2: Generating platform adaptations with rate limiting for: {persona_request.selected_platforms}")
         platform_personas = {}
         
-        # Process platforms sequentially with small delays to avoid rate limits
         for i, platform in enumerate(persona_request.selected_platforms):
             try:
                 logger.info(f"Generating {platform} persona ({i+1}/{len(persona_request.selected_platforms)})")
                 
-                # Add delay between API calls to prevent rate limiting
-                if i > 0:  # Skip delay for first platform
+                if i > 0:
                     logger.info(f"Rate limiting: Waiting {RATE_LIMIT_DELAY_SECONDS}s before next API call...")
                     await asyncio.sleep(RATE_LIMIT_DELAY_SECONDS)
                 
-                # Generate platform persona
                 result = await generate_single_platform_persona_async(
-                    core_persona, 
-                    platform, 
-                    persona_request.onboarding_data
+                    core_persona, platform, persona_request.onboarding_data
                 )
                 
                 if isinstance(result, Exception):
@@ -340,33 +382,39 @@ async def generate_writing_personas(
                     logger.error(f"Platform {platform} generation failed: {error_msg}")
                     platform_personas[platform] = result
                     
-                    # Check for rate limit errors and suggest retry
                     if "429" in error_msg or "quota" in error_msg.lower() or "rate limit" in error_msg.lower():
-                        logger.warning(f"⚠️ Rate limit detected for {platform}. Consider increasing RATE_LIMIT_DELAY_SECONDS")
+                        logger.warning(f"Rate limit detected for {platform}. Consider increasing RATE_LIMIT_DELAY_SECONDS")
                 else:
                     platform_personas[platform] = result
-                    logger.info(f"✅ {platform} persona generated successfully")
+                    logger.info(f"Platform {platform} persona generated successfully")
                     
             except Exception as e:
                 logger.error(f"Platform {platform} generation error: {str(e)}")
                 platform_personas[platform] = {"error": str(e)}
         
-        
-        # Step 3: Assess quality (no additional API calls - uses existing data)
+        # Step 3: Assess quality
         logger.info("Step 3: Assessing persona quality...")
         quality_metrics = await assess_persona_quality_internal(
-            core_persona, 
-            platform_personas,
-            persona_request.user_preferences
+            core_persona, platform_personas, persona_request.user_preferences
         )
         
-        # Log performance metrics
         total_platforms = len(persona_request.selected_platforms)
         successful_platforms = len([p for p in platform_personas.values() if "error" not in p])
-        logger.info(f"✅ Persona generation completed: {successful_platforms}/{total_platforms} platforms successful")
-        logger.info(f"📊 API calls made: 1 (core) + {total_platforms} (platforms) = {1 + total_platforms} total")
-        logger.info(f"⏱️ Rate limiting: Sequential processing with 2s delays to prevent quota exhaustion")
+        logger.info(f"Persona generation completed: {successful_platforms}/{total_platforms} platforms successful")
+        logger.info(f"API calls made: 1 (core) + {total_platforms} (platforms) = {1 + total_platforms} total")
         
+        # Persist generated persona data to DB
+        try:
+            _save_persona_data(db, user_id, {
+                "core_persona": core_persona,
+                "platform_personas": platform_personas,
+                "quality_metrics": quality_metrics,
+                "selected_platforms": persona_request.selected_platforms,
+            })
+            logger.info(f"Persisted sync-generated persona data for user {user_id}")
+        except Exception as persist_err:
+            logger.warning(f"Could not persist sync-generated persona: {persist_err}")
+
         return PersonaGenerationResponse(
             success=True,
             core_persona=core_persona,
@@ -376,10 +424,9 @@ async def generate_writing_personas(
         
     except Exception as e:
         logger.error(f"Persona generation error: {str(e)}")
-        return PersonaGenerationResponse(
-            success=False,
-            error=f"Persona generation failed: {str(e)}"
-        )
+        return PersonaGenerationResponse(success=False, error=f"Persona generation failed: {str(e)}")
+    finally:
+        db.close()
 
 @router.post("/step4/assess-quality", response_model=PersonaQualityResponse)
 async def assess_persona_quality(
@@ -511,11 +558,18 @@ async def execute_persona_generation_task(task_id: str, persona_request: Persona
         logger.info(f"Task {task_id}: Onboarding data summary: {onboarding_data_summary}")
         
         # Update task status to running
-        update_task_status(task_id, "running", 10, "Starting persona generation...")
+        update_task_status(task_id, "running", 5, "Preparing persona workspace...")
         logger.info(f"Task {task_id}: Status updated to running")
         
         # Inject user-specific API keys into environment for the duration of this background task
         user_id = _extract_user_id(current_user)
+        
+        # Ensure session_info.user_id is set on onboarding_data so the LLM gateway
+        # (llm_text_gen) can do subscription/usage checks for this user.
+        if user_id:
+            persona_request.onboarding_data.setdefault("session_info", {})
+            if not persona_request.onboarding_data["session_info"].get("user_id"):
+                persona_request.onboarding_data["session_info"]["user_id"] = user_id
         env_mapping = {
             'gemini': 'GEMINI_API_KEY',
             'exa': 'EXA_API_KEY',
@@ -537,8 +591,14 @@ async def execute_persona_generation_task(task_id: str, persona_request: Persona
                         os.environ[env_var] = value
                         logger.debug(f"[BG TASK] Injected {env_var} for user {user_id}")
 
+                update_task_status(task_id, "running", 10, "Loading your brand context...")
+                await asyncio.sleep(0.3)
+
+                update_task_status(task_id, "running", 15, "Building AI prompt for your brand voice...")
+                await asyncio.sleep(0.3)
+
                 # Step 1: Generate core persona (1 API call)
-                update_task_status(task_id, "running", 20, "Generating core persona...")
+                update_task_status(task_id, "running", 20, "Calling AI to analyze your brand voice (this may take up to 30s)...")
                 logger.info(f"Task {task_id}: Step 1 - Generating core persona...")
                 
                 core_persona = await asyncio.get_event_loop().run_in_executor(
@@ -557,27 +617,29 @@ async def execute_persona_generation_task(task_id: str, persona_request: Persona
                         update_task_status(task_id, "failed", 0, f"Core persona generation failed: {error_msg}", error=str(error_msg))
                     return
                 
-                update_task_status(task_id, "running", 40, "Core persona generated successfully")
+                update_task_status(task_id, "running", 40, "✅ Core brand voice generated")
+                logger.info(f"Task {task_id}: Core persona generated successfully")
                 
                 # Add small delay after core persona generation
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(0.5)
                 
                 # Step 2: Generate platform adaptations with rate limiting (N API calls with delays)
-                update_task_status(task_id, "running", 50, f"Generating platform adaptations for: {persona_request.selected_platforms}")
                 platform_personas = {}
-                
                 total_platforms = len(persona_request.selected_platforms)
+                
+                update_task_status(task_id, "running", 45, f"Adapting brand voice to {total_platforms} platform(s)...")
                 
                 # Process platforms sequentially with small delays to avoid rate limits
                 for i, platform in enumerate(persona_request.selected_platforms):
                     try:
                         progress = 50 + (i * 40 // total_platforms)
-                        update_task_status(task_id, "running", progress, f"Generating {platform} persona ({i+1}/{total_platforms})")
+                        update_task_status(task_id, "running", progress, f"✨ Tailoring voice for {platform} ({i+1}/{total_platforms})...")
                         
                         # Add delay between API calls to prevent rate limiting
                         if i > 0:  # Skip delay for first platform
-                            update_task_status(task_id, "running", progress, f"Rate limiting: Waiting {RATE_LIMIT_DELAY_SECONDS}s before next API call...")
+                            update_task_status(task_id, "running", progress, f"⏳ Rate-limit pause before {platform}...")
                             await asyncio.sleep(RATE_LIMIT_DELAY_SECONDS)
+                            update_task_status(task_id, "running", progress, f"✨ Tailoring voice for {platform} ({i+1}/{total_platforms})...")
                         
                         # Generate platform persona
                         result = await generate_single_platform_persona_async(
@@ -601,18 +663,22 @@ async def execute_persona_generation_task(task_id: str, persona_request: Persona
                         else:
                             platform_personas[platform] = result
                             logger.info(f"✅ {platform} persona generated successfully")
+                            update_task_status(task_id, "running", min(progress + 1, 90), f"✅ {platform} voice ready")
                             
                     except Exception as e:
                         logger.error(f"Platform {platform} generation error: {str(e)}")
                         platform_personas[platform] = {"error": str(e)}
                 
                 # Step 3: Assess quality (no additional API calls - uses existing data)
-                update_task_status(task_id, "running", 90, "Assessing persona quality...")
+                update_task_status(task_id, "running", 92, "🧪 Assessing quality and consistency...")
                 quality_metrics = await assess_persona_quality_internal(
                     core_persona, 
                     platform_personas,
                     persona_request.user_preferences
                 )
+                
+                update_task_status(task_id, "running", 97, "💾 Saving your brand voice...")
+                await asyncio.sleep(0.2)
             finally:
                 # Restore environment
                 for env_var, original_value in original_env.items():
@@ -637,19 +703,23 @@ async def execute_persona_generation_task(task_id: str, persona_request: Persona
         }
         
         # Update task status to completed
-        update_task_status(task_id, "completed", 100, "Persona generation completed successfully", final_result)
+        update_task_status(task_id, "completed", 100, "🎉 Your brand voice is ready!", final_result)
 
-        # Populate server-side cache for quick reloads
+        # Persist persona data to DB for quick reloads
         try:
             user_id = _extract_user_id(current_user)
-            persona_latest_cache[user_id] = {
-                **final_result,
-                "selected_platforms": persona_request.selected_platforms,
-                "timestamp": datetime.now().isoformat()
-            }
-            logger.info(f"Latest persona cached for user {user_id}")
+            bg_db = get_session_for_user(user_id)
+            if bg_db:
+                try:
+                    _save_persona_data(bg_db, user_id, {
+                        **final_result,
+                        "selected_platforms": persona_request.selected_platforms,
+                    })
+                    logger.info(f"Persona data persisted for user {user_id}")
+                finally:
+                    bg_db.close()
         except Exception as e:
-            logger.warning(f"Could not cache latest persona: {e}")
+            logger.warning(f"Could not persist persona data: {e}")
         
     except Exception as e:
         logger.error(f"Persona generation task {task_id} failed: {str(e)}")
@@ -707,9 +777,10 @@ async def assess_persona_quality_internal(
     """
     try:
         from services.persona.persona_quality_improver import PersonaQualityImprover
+        from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
         
         # Initialize quality improver
-        quality_improver = PersonaQualityImprover()
+        quality_improver = PersonaQualityImprover(get_linguistic_analyzer())
         
         # Use mock linguistic analysis if not available
         linguistic_analysis = {

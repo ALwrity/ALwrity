@@ -2,7 +2,10 @@
 Self-Learning Task Memory Service (Phase 3)
 Uses txtai and TaskHistory DB model to filter and improve daily task suggestions.
 """
+import asyncio
 import hashlib
+import os
+import time
 import uuid
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
@@ -17,6 +20,16 @@ EXACT_DUPLICATE_LOOKBACK_DAYS = 7
 SEMANTIC_SUPPRESSION_SCORE_THRESHOLD = 0.85
 SUPPRESSED_STATUSES = {"dismissed", "rejected", "skipped"}
 
+# M4: txtai save debounce. Previously the index was saved synchronously on
+# every task outcome, which is O(N) disk I/O for N outcomes. Now we coalesce
+# upserts and save at most once per (batch_size upserts) or once per
+# (debounce_sec elapsed), whichever comes first. The DB TaskHistory is the
+# source of truth; the txtai index is a derived cache that can be rebuilt
+# from the DB if the in-memory copy is lost.
+TASK_MEMORY_SAVE_BATCH_SIZE = int(os.getenv("TASK_MEMORY_SAVE_BATCH_SIZE", "10"))
+TASK_MEMORY_SAVE_DEBOUNCE_SEC = float(os.getenv("TASK_MEMORY_SAVE_DEBOUNCE_SEC", "5.0"))
+
+
 class TaskMemoryService:
     """
     Manages the long-term memory of user tasks.
@@ -25,12 +38,18 @@ class TaskMemoryService:
     2. Check if a proposed task is redundant or previously rejected.
     3. Retrieve relevant past tasks for context.
     """
-    
+
     def __init__(self, user_id: str, db: Session):
         self.user_id = user_id
         self.db = db
         self.intelligence = TxtaiIntelligenceService(user_id)
         self._metrics_counters: Dict[str, int] = {}
+        # M4: debounced-save state. _pending_save_count tracks upserts not
+        # yet flushed; _flush_handle is the active asyncio.TimerHandle (or
+        # None). All access is serialised via _save_lock.
+        self._pending_save_count: int = 0
+        self._save_lock: Optional[asyncio.Lock] = None  # lazy in flush()
+        self._flush_handle: Optional[asyncio.TimerHandle] = None
 
     def _increment_metric(self, metric_name: str, increment: int = 1) -> None:
         """Increment lightweight in-memory counters for observability hooks."""
@@ -41,11 +60,95 @@ class TaskMemoryService:
             metric_name,
             self._metrics_counters[metric_name],
         )
-        
+
     def _compute_hash(self, title: str, description: str) -> str:
         """Compute a consistent hash for task deduplication."""
         text = f"{title.strip().lower()}|{description.strip().lower()}"
         return hashlib.sha256(text.encode()).hexdigest()
+
+    def _save_index_sync(self) -> int:
+        """Synchronously save the txtai index. Returns the number of pending
+        upserts that were flushed, or 0 if nothing was pending.
+
+        Caller must hold `_save_lock` (or be the only writer, e.g. in
+        tests) to avoid concurrent saves.
+        """
+        if self._pending_save_count == 0:
+            return 0
+        flushed = self._pending_save_count
+        index_path = getattr(self.intelligence, "index_path", None)
+        if not index_path:
+            logger.warning("Could not save embeddings: index_path not found on service")
+            # Reset the counter anyway to avoid unbounded growth
+            self._pending_save_count = 0
+            return flushed
+        try:
+            self.intelligence.embeddings.save(index_path)
+            logger.info(
+                f"Saved txtai index for user {self.user_id}: flushed {flushed} pending upsert(s)"
+            )
+        except Exception as save_err:
+            logger.error(
+                f"Failed to save txtai index for user {self.user_id}: {save_err}"
+            )
+            # Don't reset counter on failure so the next flush retries
+            return 0
+        self._pending_save_count = 0
+        return flushed
+
+    def _ensure_lock(self) -> asyncio.Lock:
+        """Lazily create the asyncio.Lock. Must be called from inside a loop."""
+        if self._save_lock is None:
+            self._save_lock = asyncio.Lock()
+        return self._save_lock
+
+    def _schedule_debounced_flush(self) -> None:
+        """Schedule (or reschedule) a debounced flush.
+
+        Called after every upsert. Replaces any pending timer so a burst
+        of upserts results in a single save once the burst ends.
+        """
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # No running loop (e.g., called from a sync context in tests).
+            # Fall back to immediate save so we don't lose data.
+            self._save_index_sync()
+            return
+
+        if self._flush_handle is not None:
+            self._flush_handle.cancel()
+            self._flush_handle = None
+        if TASK_MEMORY_SAVE_DEBOUNCE_SEC <= 0:
+            # Debounce disabled — fire immediately.
+            loop.create_task(self._flush())
+        else:
+            self._flush_handle = loop.call_later(
+                TASK_MEMORY_SAVE_DEBOUNCE_SEC,
+                lambda: loop.create_task(self._flush()),
+            )
+
+    async def _flush(self) -> int:
+        """Coalesced save: write the txtai index if anything is pending.
+
+        Idempotent: safe to call multiple times concurrently. The lock
+        ensures only one save runs at a time; subsequent calls see
+        `_pending_save_count == 0` and return 0.
+        """
+        lock = self._ensure_lock()
+        async with lock:
+            return self._save_index_sync()
+
+    async def flush(self) -> int:
+        """Public flush entry point. Force a save of any pending upserts.
+
+        Useful for tests, graceful shutdown, or any time the caller wants
+        to ensure the index is on disk before continuing.
+        """
+        if self._flush_handle is not None:
+            self._flush_handle.cancel()
+            self._flush_handle = None
+        return await self._flush()
 
     async def record_task_outcome(self, task: DailyWorkflowTask, feedback_score: int = 0, feedback_text: str = None):
         """
@@ -53,7 +156,7 @@ class TaskMemoryService:
         """
         try:
             task_hash = self._compute_hash(task.title, task.description)
-            
+
             # 1. Update/Create DB Record
             history = TaskHistory(
                 user_id=self.user_id,
@@ -70,11 +173,13 @@ class TaskMemoryService:
             )
             self.db.add(history)
             self.db.commit()
-            
-            # 2. Index into txtai (if status is meaningful)
+
+            # 2. Index into txtai (if status is meaningful).
+            # M4: we always upsert immediately (it's in-memory and fast),
+            # but defer the disk save. The save is coalesced: at most one
+            # save per (TASK_MEMORY_SAVE_BATCH_SIZE upserts) or one per
+            # (TASK_MEMORY_SAVE_DEBOUNCE_SEC elapsed), whichever fires first.
             if task.status in ["completed", "dismissed", "rejected", "skipped"]:
-                # We index the task text with metadata about its outcome
-                # This allows us to search: "Has the user rejected similar tasks?"
                 doc = {
                     "id": history.vector_id,
                     "text": f"{task.title}. {task.description}",
@@ -82,22 +187,26 @@ class TaskMemoryService:
                     "status": task.status,
                     "timestamp": datetime.utcnow().isoformat()
                 }
-                
-                # Use Txtai service to upsert
-                # Note: TxtaiService usually handles batching, but for single updates we can use add
+
                 if hasattr(self.intelligence.embeddings, "upsert"):
-                     self.intelligence.embeddings.upsert([doc])
-                     # save() requires a path argument in some txtai versions, but TxtaiService manages paths
-                     # If we are using the service wrapper, we should rely on its internal management
-                     # However, self.intelligence.embeddings is the raw txtai object.
-                     # We should check if we need to call save with the index path.
-                     
-                     index_path = getattr(self.intelligence, "index_path", None)
-                     if index_path:
-                        self.intelligence.embeddings.save(index_path)
-                        logger.info(f"Indexed task outcome: {task.title} -> {task.status}")
-                     else:
-                        logger.warning("Could not save embeddings: index_path not found on service")
+                    self.intelligence.embeddings.upsert([doc])
+                    self._pending_save_count += 1
+
+                    if self._pending_save_count >= TASK_MEMORY_SAVE_BATCH_SIZE:
+                        # Hit the batch size — flush now.
+                        await self._flush()
+                    else:
+                        # Below threshold — schedule a debounced flush.
+                        self._schedule_debounced_flush()
+                else:
+                    logger.debug(
+                        f"txtai embeddings object has no upsert() for user {self.user_id}; "
+                        f"task outcome recorded in DB only"
+                    )
+            else:
+                # Status is not semantically meaningful (e.g. "pending").
+                # No upsert, no save.
+                pass
 
         except Exception as e:
             logger.error(f"Failed to record task outcome for user {self.user_id}: {e}")

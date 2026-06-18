@@ -211,7 +211,8 @@ class SchedulerExceptionHandler:
         self,
         error: Union[Exception, SchedulerException],
         context: Dict[str, Any] = None,
-        log_level: str = "error"
+        log_level: str = "error",
+        db: Session = None
     ) -> Dict[str, Any]:
         """Handle and log scheduler exceptions."""
         
@@ -244,7 +245,7 @@ class SchedulerExceptionHandler:
         
         # Store critical errors in database for alerting
         if error.severity in [SchedulerErrorSeverity.HIGH, SchedulerErrorSeverity.CRITICAL]:
-            self._store_error_alert(error)
+            self._store_error_alert(error, db=db)
         
         # Return formatted error response
         return self._format_error_response(error)
@@ -313,10 +314,11 @@ class SchedulerExceptionHandler:
         # Default to low
         return SchedulerErrorSeverity.LOW
     
-    def _store_error_alert(self, error: SchedulerException):
+    def _store_error_alert(self, error: SchedulerException, db: Session = None):
         """Store critical errors in database for alerting."""
         
-        if not self.db:
+        session = db or self.db
+        if not session:
             return
         
         try:
@@ -340,17 +342,17 @@ class SchedulerExceptionHandler:
                             "task_type": error.task_type
                         }
                     )
-                    self.db.add(execution_log)
-                    self.db.commit()
+                    session.add(execution_log)
+                    session.commit()
                     self.logger.info(f"Stored error alert in execution log for task {error.task_id}")
                 except Exception as e:
-                    self.logger.error(f"Failed to store error in execution log: {e}")
-                    self.db.rollback()
+                    self.logger.error(f"Failed to store error in execution log: {e}", exc_info=True)
+                    session.rollback()
             # Note: For errors without task_id, we rely on structured logging only
             # Future: Could create a separate scheduler_error_logs table for system-level errors
         
         except Exception as e:
-            self.logger.error(f"Failed to store error alert: {e}")
+            self.logger.error(f"Failed to store error alert: {e}", exc_info=True)
     
     def _format_error_response(self, error: SchedulerException) -> Dict[str, Any]:
         """Format error for API response or logging."""

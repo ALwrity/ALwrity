@@ -80,32 +80,80 @@ class CalendarService:
         """Update a calendar event."""
         try:
             logger.info(f"Updating calendar event: {event_id}")
-            
+
             db_service = ContentPlanningDBService(db)
             updated_event = await db_service.update_calendar_event(event_id, update_data)
-            
+
             if updated_event:
+                # M1: reverse-sync calendar status change to any workflow tasks
+                # that sourced from this event. Errors here must not break the
+                # calendar update — workflow sync is a side effect.
+                try:
+                    from services.today_workflow_service import sync_workflow_tasks_from_calendar_event
+                    from models.content_planning import ContentStrategy
+                    strategy = (
+                        db.query(ContentStrategy)
+                        .filter(ContentStrategy.id == updated_event.strategy_id)
+                        .first()
+                    )
+                    if strategy is not None:
+                        sync_workflow_tasks_from_calendar_event(
+                            db, str(strategy.user_id), updated_event,
+                        )
+                except Exception as sync_err:
+                    logger.warning(
+                        f"Reverse-sync from calendar event {event_id} to workflow "
+                        f"tasks failed (non-blocking): {sync_err}"
+                    )
                 return updated_event.to_dict()
             else:
                 raise ContentPlanningErrorHandler.handle_not_found_error("Calendar event", event_id)
-            
+
         except Exception as e:
             logger.error(f"Error updating calendar event: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "update_calendar_event")
-    
+
     async def delete_calendar_event(self, event_id: int, db: Session) -> bool:
         """Delete a calendar event."""
         try:
             logger.info(f"Deleting calendar event: {event_id}")
-            
+
+            # Capture user_id + status BEFORE delete for the reverse-sync
+            from models.content_planning import ContentStrategy, CalendarEvent as _CalEv
+            pre_event = (
+                db.query(_CalEv)
+                .join(ContentStrategy, _CalEv.strategy_id == ContentStrategy.id)
+                .filter(_CalEv.id == event_id)
+                .first()
+            )
+            pre_strategy = pre_event.strategy if pre_event else None
+
             db_service = ContentPlanningDBService(db)
             deleted = await db_service.delete_calendar_event(event_id)
-            
+
             if deleted:
+                # M1: treat deletion as cancellation for any workflow tasks
+                # sourced from this event, so the today-workflow view stays
+                # coherent. Errors here are non-blocking.
+                if pre_event is not None and pre_strategy is not None:
+                    try:
+                        from services.today_workflow_service import sync_workflow_tasks_from_calendar_event
+                        # Synthesize a transient event-like object with status="cancelled"
+                        class _CancelledSentinel:
+                            id = pre_event.id
+                            status = "cancelled"
+                        sync_workflow_tasks_from_calendar_event(
+                            db, str(pre_strategy.user_id), _CancelledSentinel(),
+                        )
+                    except Exception as sync_err:
+                        logger.warning(
+                            f"Reverse-sync from calendar event {event_id} deletion "
+                            f"to workflow tasks failed (non-blocking): {sync_err}"
+                        )
                 return True
             else:
                 raise ContentPlanningErrorHandler.handle_not_found_error("Calendar event", event_id)
-            
+
         except Exception as e:
             logger.error(f"Error deleting calendar event: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "delete_calendar_event")

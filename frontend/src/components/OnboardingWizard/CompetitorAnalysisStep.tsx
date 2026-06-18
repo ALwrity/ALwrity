@@ -17,20 +17,17 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Divider,
   Chip,
   Tooltip,
-  // IconButton,
+  IconButton,
   Collapse
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
   Refresh as RefreshIcon,
-  ExpandMore as ExpandMoreIcon,
   Info as InfoIcon,
   Lightbulb as LightbulbIcon,
   TrendingUp as TrendingUpIcon,
-  Warning as WarningIcon,
   Search as SearchIcon,
   AutoAwesome as AutoFixHighIcon,
   ExpandLess as ExpandLessIcon
@@ -39,7 +36,7 @@ import { aiApiClient, longRunningApiClient } from '../../api/client';  // Use ai
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';
 import type { Competitor } from './WebsiteStep/components';
-import { ComingSoonSection } from './CompetitorAnalysisStep/ComingSoonSection';
+
 
 // Light theme constants matching requirements
 const lightTheme = {
@@ -101,9 +98,25 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [showHeaderInfo, setShowHeaderInfo] = useState(false);
   // const [showWhyImportant, setShowWhyImportant] = useState(false);
   const [missingData, setMissingData] = useState(false);
+  const [showBenchmarksModal, setShowBenchmarksModal] = useState(false);
+  const [showStrategyModal, setShowStrategyModal] = useState(false);
+  const [showPublishingModal, setShowPublishingModal] = useState(false);
+  const [showStructureModal, setShowStructureModal] = useState(false);
 
   // Ref to track if initialization has already started to prevent duplicate calls
   const initializationStarted = React.useRef(false);
+  const crawlSocialMediaRef = React.useRef<Record<string, string>>({});
+
+  const mergeCrawlSocialMedia = React.useCallback((exaData: Record<string, any>) => {
+    const merged = { ...exaData };
+    for (const [platform, url] of Object.entries(crawlSocialMediaRef.current)) {
+      const existing = merged[platform];
+      if (!existing || String(existing).trim() === '' || String(existing).trim() === '1' || String(existing).toLowerCase() === 'true') {
+        merged[platform] = url;
+      }
+    }
+    return merged;
+  }, []);
 
   // Check for missing data
   useEffect(() => {
@@ -168,14 +181,25 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
             competitors: parsedData.competitors?.length || 0
           });
           
-          setCompetitors(parsedData.competitors || []);
-          setSocialMediaAccounts(parsedData.social_media_accounts || {});
-          setSocialMediaCitations(parsedData.social_media_citations || []);
-          setResearchSummary(parsedData.research_summary || null);
-          setSitemapAnalysis(parsedData.sitemap_analysis || null);
-          setUsingCachedData(true);
-          
-          return true; // Successfully loaded from cache
+          const hasCompetitors = (parsedData.competitors || []).length > 0;
+          const hasResearch = !!parsedData.research_summary;
+
+          // Only consider cache valid if it has actual data (avoid stale empty-competitor cache)
+          if (hasCompetitors || hasResearch) {
+            setCompetitors(parsedData.competitors || []);
+            setSocialMediaAccounts(parsedData.social_media_accounts || {});
+            setSocialMediaCitations(parsedData.social_media_citations || []);
+            setResearchSummary(parsedData.research_summary || null);
+            setSitemapAnalysis(parsedData.sitemap_analysis || null);
+            setUsingCachedData(true);
+            
+            return true; // Successfully loaded from cache
+          } else {
+            console.log('CompetitorAnalysisStep: Cache has no competitor data, treating as miss');
+            localStorage.removeItem('competitor_analysis_data');
+            localStorage.removeItem('competitor_analysis_url');
+            localStorage.removeItem('competitor_analysis_timestamp');
+          }
         } else {
           console.log('CompetitorAnalysisStep: Cache expired, will run fresh analysis');
         }
@@ -319,13 +343,14 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         };
 
         setCompetitors(analysisData.competitors);
-        setSocialMediaAccounts(analysisData.social_media_accounts);
+        const mergedAccounts = mergeCrawlSocialMedia(analysisData.social_media_accounts);
+        setSocialMediaAccounts(mergedAccounts);
         setSocialMediaCitations(analysisData.social_media_citations);
         setResearchSummary(analysisData.research_summary);
         
-        // Cache the analysis results
+        // Cache the analysis results with merged data
         try {
-          localStorage.setItem('competitor_analysis_data', JSON.stringify(analysisData));
+          localStorage.setItem('competitor_analysis_data', JSON.stringify({ ...analysisData, social_media_accounts: mergedAccounts }));
           localStorage.setItem('competitor_analysis_url', finalUserUrl);
           localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
           console.log('CompetitorAnalysisStep: Cached competitor analysis for future use');
@@ -363,12 +388,11 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       
       if (result.success) {
         console.log('Social media discovery completed:', result.social_media_accounts);
-        const newAccounts = result.social_media_accounts || {};
+        const newAccounts = mergeCrawlSocialMedia(result.social_media_accounts || {});
         
         // Check if we found any valid accounts
-        // We cast to any because values might be empty strings
-        const hasNewAccounts = Object.values(newAccounts).some((val: any) => val && val.length > 0);
-        const hasExistingAccounts = Object.values(socialMediaAccounts).some((val: any) => val && val.length > 0);
+        const hasNewAccounts = Object.values(newAccounts).some((val: any) => val && String(val).trim() !== '' && String(val) !== '1');
+        const hasExistingAccounts = Object.values(socialMediaAccounts).some((val: any) => val && String(val).trim() !== '' && String(val) !== '1');
 
         // Only update if we found something, or if we had nothing to begin with.
         // This prevents "vanishing" profiles if a re-discovery returns a false negative/empty result.
@@ -455,11 +479,23 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       }
       initializationStarted.current = true;
 
-      // 1. Check for backend data (SSOT)
-      if (initialData && (initialData.competitors?.length > 0 || initialData.social_media_accounts)) {
-        console.log('CompetitorAnalysisStep: Initializing from backend data');
-        if (initialData.competitors) setCompetitors(initialData.competitors);
-        if (initialData.social_media_accounts) setSocialMediaAccounts(initialData.social_media_accounts);
+      // Extract crawl social media from step 2 for fallback
+      const crawlData = initialData?.crawl_social_media || initialData?.crawlResult?.content?.social_media || {};
+      if (Object.keys(crawlData).length > 0) {
+        console.log('CompetitorAnalysisStep: Loaded crawl social media for fallback:', crawlData);
+        crawlSocialMediaRef.current = crawlData;
+      }
+
+      // Apply crawl-merged social media accounts from backend (always available since init endpoint fix)
+      if (initialData?.social_media_accounts) {
+        console.log('CompetitorAnalysisStep: Applying backend social media accounts');
+        setSocialMediaAccounts(mergeCrawlSocialMedia(initialData.social_media_accounts));
+      }
+
+      // 1. Check for backend competitors data (SSOT)
+      if (initialData?.competitors?.length > 0) {
+        console.log('CompetitorAnalysisStep: Initializing competitors from backend data');
+        setCompetitors(initialData.competitors);
         if (initialData.social_media_citations) setSocialMediaCitations(initialData.social_media_citations);
         if (initialData.researchSummary) setResearchSummary(initialData.researchSummary);
         if (initialData.sitemapAnalysis) setSitemapAnalysis(initialData.sitemapAnalysis);
@@ -634,81 +670,95 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
 
   return (
     <Box sx={classes.container}>
-      {/* Educational Header */}
-      <Box sx={{ mb: 4, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
+      {/* Compact Header: Title, subtitle, info, and Run Fresh Analysis on one line */}
+      <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 4 }}>
         <Typography variant="h4" sx={{ 
-          fontWeight: 700, 
-          mb: 2,
+          fontWeight: 700,
           background: 'linear-gradient(45deg, #2563EB 30%, #7C3AED 90%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
+          whiteSpace: 'nowrap'
         }}>
           Competitive Intelligence
         </Typography>
-        
-        <Typography variant="body1" color="text.secondary" sx={{ 
-          mb: 2, 
-          maxWidth: 600, 
-          mx: 'auto',
-          fontSize: '1.1rem'
+        <Typography variant="body2" color="text.secondary" sx={{
+          flex: 1,
+          minWidth: 200,
+          fontSize: '0.9rem'
         }}>
-          Uncover the strategies that are working for your competitors to build your own advantage.
+          — Uncover the strategies that are working for your competitors to build your own advantage.
         </Typography>
-
-        <Button 
-          size="small" 
-          onClick={() => setShowHeaderInfo(!showHeaderInfo)}
-          endIcon={showHeaderInfo ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          sx={{ textTransform: 'none', borderRadius: 2 }}
+        <Tooltip title="About this step">
+          <IconButton 
+            size="small" 
+            onClick={() => setShowHeaderInfo(!showHeaderInfo)}
+            sx={{ color: '#64748b' }}
+          >
+            {showHeaderInfo ? <ExpandLessIcon /> : <InfoIcon />}
+          </IconButton>
+        </Tooltip>
+        <Button
+          size="small"
+          variant="outlined"
+          startIcon={<RefreshIcon />}
+          onClick={() => startCompetitorDiscovery(true)}
+          disabled={isAnalyzing}
+          sx={{
+            borderColor: '#667eea',
+            color: '#667eea',
+            textTransform: 'none',
+            whiteSpace: 'nowrap',
+            '&:hover': { borderColor: '#5a6fd8', bgcolor: 'rgba(102,126,234,0.04)' }
+          }}
         >
-          {showHeaderInfo ? 'Hide details' : 'About this Step'}
+          {isAnalyzing ? 'Analyzing...' : 'Run Fresh Analysis'}
         </Button>
-
-        <Collapse in={showHeaderInfo}>
-          <Box sx={{ 
-            mt: 2, 
-            p: 3, 
-            bgcolor: lightTheme.surface,
-            color: lightTheme.text,
-            borderRadius: 3,
-            border: `1px solid ${lightTheme.border}`,
-            boxShadow: lightTheme.shadowSm,
-            maxWidth: 800,
-            mx: 'auto',
-            textAlign: 'left'
-          }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#DBEAFE', borderRadius: '50%', mb: 1.5, color: '#2563EB' }}>
-                    <SearchIcon />
-                  </Box>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>What</Typography>
-                  <Typography variant="caption" color="text.secondary">We analyze top competitors in your niche.</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#F3E8FF', borderRadius: '50%', mb: 1.5, color: '#7C3AED' }}>
-                    <TrendingUpIcon />
-                  </Box>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Why</Typography>
-                  <Typography variant="caption" color="text.secondary">To identify content gaps and market positioning.</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#DCFCE7', borderRadius: '50%', mb: 1.5, color: '#16A34A' }}>
-                    <AutoFixHighIcon />
-                  </Box>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>How</Typography>
-                  <Typography variant="caption" color="text.secondary">Using AI to scan their public content and social footprint.</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Box>
-        </Collapse>
       </Box>
+
+      {/* Collapsible info modal */}
+      <Collapse in={showHeaderInfo}>
+        <Box sx={{ 
+          mb: 3, 
+          p: 3, 
+          bgcolor: lightTheme.surface,
+          color: lightTheme.text,
+          borderRadius: 3,
+          border: `1px solid ${lightTheme.border}`,
+          boxShadow: lightTheme.shadowSm,
+          maxWidth: 800,
+          textAlign: 'left'
+        }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={4}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <Box sx={{ p: 1.5, bgcolor: '#DBEAFE', borderRadius: '50%', mb: 1.5, color: '#2563EB' }}>
+                  <SearchIcon />
+                </Box>
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>What</Typography>
+                <Typography variant="caption" color="text.secondary">We analyze top competitors in your niche.</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <Box sx={{ p: 1.5, bgcolor: '#F3E8FF', borderRadius: '50%', mb: 1.5, color: '#7C3AED' }}>
+                  <TrendingUpIcon />
+                </Box>
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>Why</Typography>
+                <Typography variant="caption" color="text.secondary">To identify content gaps and market positioning.</Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <Box sx={{ p: 1.5, bgcolor: '#DCFCE7', borderRadius: '50%', mb: 1.5, color: '#16A34A' }}>
+                  <AutoFixHighIcon />
+                </Box>
+                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>How</Typography>
+                <Typography variant="caption" color="text.secondary">Using AI to scan their public content and social footprint.</Typography>
+              </Box>
+            </Grid>
+          </Grid>
+        </Box>
+      </Collapse>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }}>
@@ -723,276 +773,372 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         </Alert>
       )}
 
-      {!isAnalyzing && !error && (competitors.length > 0 || researchSummary) && (
-        <Box>
-          {researchSummary && (
-            <Paper sx={{ 
-              p: 3, 
-              mb: 4, 
-              background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)', // Warm sky-blue gradient
-              border: '1px solid #81d4fa',
-              borderRadius: 2,
-              boxShadow: '0 4px 12px rgba(3, 169, 244, 0.15)'
-            }}>
-              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                <Tooltip title="This section provides a high-level overview of the competitive landscape, including the total number of competitors found and key market insights derived from AI analysis.">
-                    <Typography variant="h6" fontWeight={600} color="primary" sx={{ display: 'flex', alignItems: 'center', cursor: 'help' }}>
-                        <AssessmentIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-                        Research Summary
-                    </Typography>
-                </Tooltip>
-              </Box>
+      {/* Social Media Accounts Section (always visible) */}
+      <SocialMediaPresenceSection 
+        socialMediaAccounts={socialMediaAccounts} 
+        onUpdateAccounts={handleUpdateSocialAccounts}
+        onRefresh={discoverSocialMedia}
+        isRefreshing={isDiscoveringSocial}
+      />
 
-              {usingCachedData && (
-                <Alert 
-                  severity="info" 
-                  sx={{ 
-                    mb: 3,
-                    bgcolor: 'rgba(255, 255, 255, 0.6)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid #81d4fa',
-                    color: '#01579b',
-                    '& .MuiAlert-icon': {
-                      color: '#0277bd'
-                    }
-                  }}
-                >
-                  Loaded previously analyzed competitor data. 
-                  <Button 
-                    startIcon={<RefreshIcon />} 
-                    onClick={() => startCompetitorDiscovery(true)}
-                    sx={{ 
-                        ml: 2,
-                        background: 'linear-gradient(45deg, #2563EB 30%, #7C3AED 90%)',
-                        color: 'white',
-                        fontWeight: 600,
-                        boxShadow: '0 3px 5px 2px rgba(37, 99, 235, .3)',
-                        '&:hover': {
-                            background: 'linear-gradient(45deg, #1d4ed8 30%, #6d28d9 90%)',
-                        }
-                    }}
-                    size="small"
-                  >
-                    Run Fresh Analysis
-                  </Button>
-                </Alert>
+      {/* Competitors Grid Section (always visible) */}
+      <CompetitorsGrid 
+        competitors={competitors}
+        onShowHighlights={handleShowHighlights}
+        onRemoveCompetitor={handleRemoveCompetitor}
+        onAddCompetitor={handleAddCompetitor}
+      />
+
+      {/* Strategic Content Opportunities Section */}
+      {(sitemapAnalysis || isAnalyzingSitemap) && (
+        <Box mt={6} mb={4}>
+          {/* Header */}
+          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Tooltip title="Based on competitor analysis, these are specific recommendations to improve your SEO and content strategy.">
+              <Typography variant="h5" fontWeight={600} sx={{ color: '#1a202c !important', display: 'flex', alignItems: 'center', cursor: 'help' }}>
+                <LightbulbIcon sx={{ mr: 1, color: '#f59e0b' }} />
+                Strategic Content Opportunities
+                <InfoIcon sx={{ ml: 1, fontSize: 20, color: 'text.disabled' }} />
+              </Typography>
+            </Tooltip>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={isAnalyzingSitemap ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
+              onClick={() => startSitemapAnalysis(true)}
+              disabled={isAnalyzingSitemap}
+              sx={{ borderColor: '#667eea', color: '#667eea', textTransform: 'none', '&:hover': { borderColor: '#5a6fd8', bgcolor: 'rgba(102,126,234,0.04)' } }}
+            >
+              {isAnalyzingSitemap ? 'Refreshing...' : 'Refresh Strategy'}
+            </Button>
+          </Box>
+
+          {isAnalyzingSitemap ? (
+            <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f8fafc', borderStyle: 'dashed', borderColor: '#cbd5e0' }}>
+              <CircularProgress size={24} sx={{ mb: 2 }} />
+              <Typography color="text.secondary">Analyzing competitive landscape for opportunities...</Typography>
+            </Paper>
+          ) : (
+            <Box>
+              {/* 1. Your Competitive Position */}
+              {sitemapAnalysis?.analysis_data?.onboarding_insights?.competitive_positioning && (
+                <Paper sx={{ p: 3, mb: 3, bgcolor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                    <Box sx={{ p: 1, bgcolor: 'white', borderRadius: '50%', color: '#0284c7', flexShrink: 0 }}>
+                      <AssessmentIcon />
+                    </Box>
+                    <Box>
+                      <Typography variant="subtitle1" fontWeight={600} color="#0c4a6e" gutterBottom>
+                        Your Competitive Position
+                      </Typography>
+                      <Typography variant="body2" color="#0c4a6e">
+                        {sitemapAnalysis.analysis_data.onboarding_insights.competitive_positioning}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Paper>
               )}
-              
-              <Grid container spacing={3} mt={1}>
-                <Grid item xs={12} sm={6} md={3}>
-                  <Typography variant="h4" color="primary" fontWeight={700}>
-                    {researchSummary.total_competitors}
-                  </Typography>
-                  <Typography 
-                    variant="body2" 
-                    sx={{ color: '#4a5568 !important' }} // Force dark text for readability
-                  >
-                    Competitors Found
-                  </Typography>
+
+              <Grid container spacing={3}>
+                {/* 2. Topics to Create */}
+                <Grid item xs={12} md={6}>
+                  <Card sx={{ height: '100%', bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ color: '#92400e', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <AutoFixHighIcon fontSize="small" sx={{ color: '#f59e0b' }} /> Topics to Create
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 2, color: '#78716c' }}>
+                        Subjects your competitors cover that you don't yet — create content on these to capture new audience segments.
+                      </Typography>
+                      {sitemapAnalysis?.analysis_data?.onboarding_insights?.content_gaps?.length > 0 ? (
+                        <Box display="flex" flexWrap="wrap" gap={1}>
+                          {sitemapAnalysis.analysis_data.onboarding_insights.content_gaps.map((gap: string, i: number) => (
+                            <Chip key={i} label={gap} size="small" sx={{ bgcolor: 'white', border: '1px solid #fde68a', fontWeight: 500 }} />
+                          ))}
+                        </Box>
+                      ) : (
+                        <Typography variant="caption" fontStyle="italic" color="#78716c">No gaps detected yet.</Typography>
+                      )}
+                    </CardContent>
+                  </Card>
                 </Grid>
-                <Grid item xs={12} sm={6} md={9}>
-                  <Typography variant="subtitle1" fontWeight={700} color="text.primary" gutterBottom>
-                    Market Insights
-                  </Typography>
-                  <Typography 
-                    variant="body1" 
-                    sx={{ color: '#2d3748 !important' }} // Force dark text for readability
-                  >
-                    {researchSummary.market_insights || "Analysis complete. Review the competitors below to see detailed insights."}
-                  </Typography>
+
+                {/* 3. Growth Moves */}
+                <Grid item xs={12} md={6}>
+                  <Card sx={{ height: '100%', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                    <CardContent>
+                      <Typography variant="h6" sx={{ color: '#166534', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <TrendingUpIcon fontSize="small" sx={{ color: '#22c55e' }} /> Growth Moves
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 2, color: '#6b7280' }}>
+                        Prioritized actions to improve your content strategy and organic reach.
+                      </Typography>
+                      {(() => {
+                        const ACTION_VERBS = ['Target', 'Expand', 'Create', 'Build', 'Optimize', 'Capture', 'Scale', 'Launch'];
+                        const growthMoves = [
+                          ...(sitemapAnalysis?.analysis_data?.onboarding_insights?.growth_opportunities || []),
+                          ...(sitemapAnalysis?.analysis_data?.onboarding_insights?.strategic_recommendations || []).slice(0, 2)
+                        ];
+                        return growthMoves.length > 0 ? (
+                          <List dense disablePadding>
+                            {growthMoves.map((move: string, i: number) => (
+                              <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
+                                <ListItemIcon sx={{ minWidth: 28 }}>
+                                  <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#22c55e', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
+                                    {i + 1}
+                                  </Box>
+                                </ListItemIcon>
+                                <ListItemText primary={`${ACTION_VERBS[i % ACTION_VERBS.length]} ${move}`} primaryTypographyProps={{ variant: 'body2', color: '#166534' }} />
+                              </ListItem>
+                            ))}
+                          </List>
+                        ) : (
+                          <Typography variant="caption" fontStyle="italic" color="#6b7280">Generating recommendations...</Typography>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
                 </Grid>
               </Grid>
-            </Paper>
-          )}
 
-          {/* Social Media Accounts Section */}
-          <SocialMediaPresenceSection 
-            socialMediaAccounts={socialMediaAccounts} 
-            onUpdateAccounts={handleUpdateSocialAccounts}
-            onRefresh={discoverSocialMedia}
-            isRefreshing={isDiscoveringSocial}
-          />
-
-          {/* Competitors Grid Section */}
-          <CompetitorsGrid 
-            competitors={competitors}
-            onShowHighlights={handleShowHighlights}
-            onRemoveCompetitor={handleRemoveCompetitor}
-            onAddCompetitor={handleAddCompetitor}
-          />
-
-          {/* Strategic Opportunities Section (Replaces Sitemap Analysis) */}
-          {(sitemapAnalysis || isAnalyzingSitemap) && (
-            <Box mt={6} mb={4}>
-               <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-                <Tooltip title="Actionable Insights: Based on competitor analysis, these are specific recommendations to improve your SEO. Use 'Content Gaps' to find topics to write about, and 'Growth Areas' to identify low-competition keywords.">
-                  <Typography 
-                    variant="h5" 
-                    fontWeight={600}
-                    sx={{ color: '#1a202c !important', display: 'flex', alignItems: 'center', cursor: 'help' }}
-                  >
-                    Strategic Content Opportunities
-                    <InfoIcon sx={{ ml: 1, fontSize: 20, color: 'text.disabled' }} />
-                  </Typography>
-                </Tooltip>
-                <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={isAnalyzingSitemap ? <CircularProgress size={16} color="inherit" /> : null}
-                    onClick={() => startSitemapAnalysis(true)}
-                    disabled={isAnalyzingSitemap}
-                    sx={{ 
-                      borderColor: '#667eea',
-                      color: '#667eea',
-                      '&:hover': {
-                        borderColor: '#5a6fd8',
-                        backgroundColor: 'rgba(102, 126, 234, 0.04)'
-                      }
-                    }}
-                  >
-                    {isAnalyzingSitemap ? 'Refreshing...' : 'Refresh Strategy'}
-                  </Button>
-              </Box>
-
-              {isAnalyzingSitemap ? (
-                 <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f8fafc', borderStyle: 'dashed', borderColor: '#cbd5e0' }}>
-                    <CircularProgress size={24} sx={{ mb: 2 }} />
-                    <Typography color="text.secondary">Analyzing competitive landscape for opportunities...</Typography>
-                 </Paper>
-              ) : (
-                <Box>
-                    {/* Market Positioning & Benchmarks */}
-                    {sitemapAnalysis?.analysis_data?.onboarding_insights && (
-                        <Grid container spacing={3} mb={3}>
-                            <Grid item xs={12}>
-                                <Paper sx={{ p: 2, bgcolor: '#f0f9ff', border: '1px solid #bae6fd', display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                                    <Box sx={{ p: 1, bgcolor: 'white', borderRadius: '50%', color: '#0284c7' }}>
-                                        <AssessmentIcon />
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="subtitle1" fontWeight={600} color="#0c4a6e" gutterBottom>
-                                            Market Positioning
-                                        </Typography>
-                                        <Typography variant="body2" color="#0c4a6e">
-                                            {sitemapAnalysis.analysis_data.onboarding_insights.competitive_positioning}
-                                        </Typography>
-                                    </Box>
-                                </Paper>
-                            </Grid>
-                        </Grid>
-                    )}
-
-                    <Grid container spacing={3}>
-                        {/* Content Gaps */}
-                    <Grid item xs={12} md={4}>
-                        <Card sx={{ height: '100%', bgcolor: '#fff5f5', border: '1px solid #fed7d7' }}>
-                            <CardContent>
-                                <Typography variant="h6" color="error.main" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <WarningIcon fontSize="small" /> Content Gaps
-                                </Typography>
-                                <Divider sx={{ mb: 2, borderColor: '#feb2b2' }} />
-                                <Typography variant="body2" sx={{ mb: 2, color: '#2d3748' }}>
-                                    Topics your competitors are covering that you are missing:
-                                </Typography>
-                                {sitemapAnalysis?.analysis_data?.onboarding_insights?.content_gaps?.length > 0 ? (
-                                    <Box display="flex" flexWrap="wrap" gap={1}>
-                                        {sitemapAnalysis.analysis_data.onboarding_insights.content_gaps.map((gap: string, i: number) => (
-                                            <Chip key={i} label={gap} size="small" color="error" variant="outlined" sx={{ bgcolor: 'white' }} />
-                                        ))}
-                                    </Box>
-                                ) : (
-                                    <Typography variant="caption" fontStyle="italic">No specific gaps detected yet.</Typography>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    {/* Growth Opportunities */}
-                    <Grid item xs={12} md={4}>
-                        <Card sx={{ height: '100%', bgcolor: '#f0fff4', border: '1px solid #c6f6d5' }}>
-                            <CardContent>
-                                <Typography variant="h6" color="success.main" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <TrendingUpIcon fontSize="small" /> Growth Areas
-                                </Typography>
-                                <Divider sx={{ mb: 2, borderColor: '#9ae6b4' }} />
-                                <Typography variant="body2" sx={{ mb: 2, color: '#2d3748' }}>
-                                    High-potential areas for organic traffic growth:
-                                </Typography>
-                                <List dense disablePadding>
-                                    {sitemapAnalysis?.analysis_data?.onboarding_insights?.growth_opportunities?.length > 0 ? (
-                                        sitemapAnalysis.analysis_data.onboarding_insights.growth_opportunities.slice(0, 4).map((opp: string, i: number) => (
-                                            <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
-                                                <ListItemIcon sx={{ minWidth: 28 }}>
-                                                    <TrendingUpIcon fontSize="small" color="success" sx={{ fontSize: 16 }} />
-                                                </ListItemIcon>
-                                                <ListItemText primary={opp} primaryTypographyProps={{ variant: 'body2', color: '#2d3748' }} />
-                                            </ListItem>
-                                        ))
-                                    ) : (
-                                        <Typography variant="caption" fontStyle="italic">Analysis in progress.</Typography>
-                                    )}
-                                </List>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                     {/* Strategic Recommendations */}
-                     <Grid item xs={12} md={4}>
-                        <Card sx={{ height: '100%', bgcolor: '#ebf8ff', border: '1px solid #bee3f8' }}>
-                            <CardContent>
-                                <Typography variant="h6" color="primary.main" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <LightbulbIcon fontSize="small" /> Strategy
-                                </Typography>
-                                <Divider sx={{ mb: 2, borderColor: '#90cdf4' }} />
-                                <Typography variant="body2" sx={{ mb: 2, color: '#2d3748' }}>
-                                    Recommended next steps for your content strategy:
-                                </Typography>
-                                <List dense disablePadding>
-                                    {sitemapAnalysis?.analysis_data?.onboarding_insights?.strategic_recommendations?.length > 0 ? (
-                                        sitemapAnalysis.analysis_data.onboarding_insights.strategic_recommendations.slice(0, 4).map((rec: string, i: number) => (
-                                            <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
-                                                <ListItemIcon sx={{ minWidth: 28 }}>
-                                                    <InfoIcon fontSize="small" color="primary" sx={{ fontSize: 16 }} />
-                                                </ListItemIcon>
-                                                <ListItemText primary={rec} primaryTypographyProps={{ variant: 'body2', color: '#2d3748' }} />
-                                            </ListItem>
-                                        ))
-                                    ) : (
-                                        <Typography variant="caption" fontStyle="italic">Generating recommendations...</Typography>
-                                    )}
-                                </List>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                </Grid>
-
-                {/* Industry Benchmarks */}
-                {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.length > 0 && (
-                    <Box mt={3}>
-                        <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <TrendingUpIcon fontSize="small" /> Industry Benchmarks
-                        </Typography>
-                        <Grid container spacing={2}>
-                            {sitemapAnalysis.analysis_data.onboarding_insights.industry_benchmarks.map((benchmark: string, i: number) => (
-                                <Grid item xs={12} sm={6} key={i}>
-                                    <Paper variant="outlined" sx={{ p: 1.5, bgcolor: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                        <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#94a3b8' }} />
-                                        <Typography variant="body2" color="#334155">
-                                            {benchmark}
-                                        </Typography>
-                                    </Paper>
-                                </Grid>
-                            ))}
-                        </Grid>
-                    </Box>
-                )}
+              {/* 4. Deeper Insights — secondary buttons */}
+              <Box mt={3}>
+                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', mb: 1, fontSize: '0.7rem', letterSpacing: 1 }}>
+                  DEEPER INSIGHTS
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
+                  {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.length > 0 && (
+                    <Button size="small" variant="outlined" onClick={() => setShowBenchmarksModal(true)} startIcon={<AssessmentIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
+                      Industry Benchmarks
+                    </Button>
+                  )}
+                  {sitemapAnalysis?.analysis_data?.ai_insights?.content_strategy?.length > 0 && (
+                    <Button size="small" variant="outlined" onClick={() => setShowStrategyModal(true)} startIcon={<LightbulbIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
+                      Content Strategy & SEO
+                    </Button>
+                  )}
+                  {sitemapAnalysis?.analysis_data?.content_trends?.trends?.length > 0 && (
+                    <Button size="small" variant="outlined" onClick={() => setShowPublishingModal(true)} startIcon={<TrendingUpIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
+                      Publishing Patterns
+                    </Button>
+                  )}
+                  {sitemapAnalysis?.analysis_data?.structure_analysis?.keyword_clusters && Object.keys(sitemapAnalysis.analysis_data.structure_analysis.keyword_clusters).length > 0 && (
+                    <Button size="small" variant="outlined" onClick={() => setShowStructureModal(true)} startIcon={<SearchIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
+                      Topics Your Site Covers
+                    </Button>
+                  )}
                 </Box>
-              )}
+              </Box>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      {/* Industry Benchmarks Modal */}
+      <Dialog
+        open={showBenchmarksModal}
+        onClose={() => setShowBenchmarksModal(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ pb: 2 }}>
+          <Typography variant="h6" fontWeight={600}>Industry Benchmarks</Typography>
+        </DialogTitle>
+        <DialogContent>
+          {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.map((benchmark: string, i: number) => (
+            <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#94a3b8', flexShrink: 0 }} />
+              <Typography variant="body2" color="#334155">{benchmark}</Typography>
+            </Paper>
+          ))}
+        </DialogContent>
+      </Dialog>
+
+      {/* Content Strategy & SEO Modal */}
+      <Dialog open={showStrategyModal} onClose={() => setShowStrategyModal(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ pb: 2 }}>
+          <Typography variant="h6" fontWeight={600}>Content Strategy & SEO Insights</Typography>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.85rem' }}>
+            Actionable recommendations from AI analysis of your site structure and competitor landscape.
+          </Typography>
+          {sitemapAnalysis?.analysis_data?.ai_insights?.content_strategy?.length > 0 && (
+            <Box mb={2}>
+              <Typography variant="subtitle2" fontWeight={600} color="#0c4a6e" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <LightbulbIcon sx={{ fontSize: 16, color: '#f59e0b' }} /> Content Strategy
+              </Typography>
+              <List dense disablePadding>
+                {sitemapAnalysis.analysis_data.ai_insights.content_strategy.map((item: string, i: number) => (
+                  <ListItem key={i} disableGutters sx={{ py: 0.25 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#94a3b8' }} /></ListItemIcon>
+                    <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+          {sitemapAnalysis?.analysis_data?.ai_insights?.seo_opportunities?.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight={600} color="#0c4a6e" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <SearchIcon sx={{ fontSize: 16, color: '#0284c7' }} /> SEO Opportunities
+              </Typography>
+              <List dense disablePadding>
+                {sitemapAnalysis.analysis_data.ai_insights.seo_opportunities.map((item: string, i: number) => (
+                  <ListItem key={i} disableGutters sx={{ py: 0.25 }}>
+                    <ListItemIcon sx={{ minWidth: 24 }}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#94a3b8' }} /></ListItemIcon>
+                    <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Publishing Patterns Modal */}
+      <Dialog open={showPublishingModal} onClose={() => setShowPublishingModal(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}>
+        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <Typography variant="h6" fontWeight={700} sx={{ color: '#0f172a' }}>Publishing Patterns &amp; Trends</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
+          <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>
+            How often you publish, when content was created, and optimization opportunities found in your sitemap.
+          </Typography>
+
+          {/* Velocity + Date range side by side */}
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
+            {sitemapAnalysis?.analysis_data?.content_trends?.publishing_velocity != null && (
+              <Paper variant="outlined" sx={{ flex: 1, minWidth: 140, p: 2, textAlign: 'center', bgcolor: '#f0f9ff', borderColor: '#bae6fd' }}>
+                <Typography variant="h4" sx={{ color: '#0369a1', fontWeight: 700 }}>
+                  {typeof sitemapAnalysis.analysis_data.content_trends.publishing_velocity === 'number'
+                    ? sitemapAnalysis.analysis_data.content_trends.publishing_velocity.toFixed(2)
+                    : sitemapAnalysis.analysis_data.content_trends.publishing_velocity}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#475569' }}>Posts per day</Typography>
+              </Paper>
+            )}
+            {sitemapAnalysis?.analysis_data?.content_trends?.date_range?.span_days != null && (
+              <Paper variant="outlined" sx={{ flex: 1, minWidth: 140, p: 2, textAlign: 'center', bgcolor: '#fef2f2', borderColor: '#fecaca' }}>
+                <Typography variant="h4" sx={{ color: '#b91c1c', fontWeight: 700 }}>
+                  {sitemapAnalysis.analysis_data.content_trends.date_range.span_days}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#475569' }}>Days of content history</Typography>
+              </Paper>
+            )}
+            {sitemapAnalysis?.analysis_data?.structure_analysis?.total_urls != null && (
+              <Paper variant="outlined" sx={{ flex: 1, minWidth: 140, p: 2, textAlign: 'center', bgcolor: '#f0fdf4', borderColor: '#bbf7d0' }}>
+                <Typography variant="h4" sx={{ color: '#15803d', fontWeight: 700 }}>
+                  {sitemapAnalysis.analysis_data.structure_analysis.total_urls}
+                </Typography>
+                <Typography variant="caption" sx={{ color: '#475569' }}>Total URLs in sitemap</Typography>
+              </Paper>
+            )}
+          </Box>
+
+          {/* Trends */}
+          {sitemapAnalysis?.analysis_data?.content_trends?.trends?.length > 0 && (
+            <Box mb={2.5}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Trends</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                {sitemapAnalysis.analysis_data.content_trends.trends.map((item: string, i: number) => (
+                  <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: '#ffffff', borderColor: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#3b82f6', flexShrink: 0 }} />
+                    <Typography variant="body2" sx={{ color: '#1e293b' }}>{item}</Typography>
+                  </Paper>
+                ))}
+              </Box>
             </Box>
           )}
 
-        </Box>
-      )}
+          {/* Optimization Opportunities */}
+          {sitemapAnalysis?.analysis_data?.publishing_patterns?.optimization_opportunities?.length > 0 && (
+            <Box mb={2.5}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Sitemap Optimization Tips</Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                {sitemapAnalysis.analysis_data.publishing_patterns.optimization_opportunities.map((item: string, i: number) => (
+                  <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: '#fffbeb', borderColor: '#fde68a', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#d97706', flexShrink: 0 }} />
+                    <Typography variant="body2" sx={{ color: '#92400e' }}>{item}</Typography>
+                  </Paper>
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Competitors Analyzed */}
+          {sitemapAnalysis?.analysis_data?.competitors_analyzed?.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Competitors Compared</Typography>
+              <Box display="flex" flexWrap="wrap" gap={0.75}>
+                {sitemapAnalysis.analysis_data.competitors_analyzed.map((domain: string, i: number) => (
+                  <Chip key={i} label={domain} size="small" sx={{ bgcolor: '#f1f5f9', color: '#334155', fontWeight: 500 }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Site Structure Modal */}
+      <Dialog open={showStructureModal} onClose={() => setShowStructureModal(false)} maxWidth="md" fullWidth
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
+        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+          <Typography variant="h6" fontWeight={700} sx={{ color: '#0f172a' }}>Topics Your Site Covers</Typography>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
+          <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>
+            A high-contrast snapshot of the main topics, content pillars, and structure quality found across your website.
+          </Typography>
+
+          {/* Top Topics — light high-contrast chips */}
+          {sitemapAnalysis?.analysis_data?.structure_analysis?.keyword_clusters && (
+            <Box mb={2.5}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Top Topics</Typography>
+              <Box display="flex" flexWrap="wrap" gap={0.75}>
+                {Object.entries(sitemapAnalysis.analysis_data.structure_analysis.keyword_clusters).map(([topic, count]: [string, any], i: number) => (
+                  <Chip key={i} label={`${topic} (${count})`} size="small" sx={{ bgcolor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', fontWeight: 600 }} />
+                ))}
+              </Box>
+            </Box>
+          )}
+
+          {/* Content Mix — high contrast progress bars */}
+          {sitemapAnalysis?.analysis_data?.structure_analysis?.strategic_pillars && (
+            <Box mb={2.5}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1.5 }}>Content Mix</Typography>
+              {(() => {
+                const entries = Object.entries(sitemapAnalysis.analysis_data.structure_analysis.strategic_pillars);
+                const maxCount = Math.max(...entries.map(([, c]) => c as number), 1);
+                return (
+                  <Box display="flex" flexDirection="column" gap={1.25}>
+                    {entries.map(([pillar, count]: [string, any], i: number) => (
+                      <Box key={i}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
+                          <Typography variant="body2" fontWeight={600} sx={{ color: '#1e293b' }}>{pillar}</Typography>
+                          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>{count} URLs</Typography>
+                        </Box>
+                        <Box sx={{ width: '100%', height: 10, bgcolor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
+                          <Box sx={{ width: `${((count as number) / maxCount) * 100}%`, height: '100%', bgcolor: '#6366f1', borderRadius: 5 }} />
+                        </Box>
+                      </Box>
+                    ))}
+                  </Box>
+                );
+              })()}
+            </Box>
+          )}
+
+          {/* Structure Quality — high contrast green */}
+          {sitemapAnalysis?.analysis_data?.structure_analysis?.structure_quality && (
+            <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f0fdf4', border: '1px solid #86efac', borderRadius: 2 }}>
+              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#166534', mb: 0.5 }}>Structure Quality</Typography>
+              <Typography variant="body2" sx={{ color: '#15803d' }}>{sitemapAnalysis.analysis_data.structure_analysis.structure_quality}</Typography>
+            </Paper>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={showProgressModal}
@@ -1082,8 +1228,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Coming Soon Section */}
-      <ComingSoonSection missingData={missingData} />
     </Box>
   );
 };

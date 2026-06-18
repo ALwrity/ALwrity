@@ -14,14 +14,11 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText,
-  Alert
+  ListItemText
 } from '@mui/material';
 import {
   Psychology as PsychologyIcon,
-  CheckCircle as CheckIcon,
-  DataUsage as DataIcon,
-  SmartToy as SmartToyIcon
+  CheckCircle as CheckIcon
 } from '@mui/icons-material';
 
 interface ComingSoonSectionProps {
@@ -50,36 +47,6 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
         'Directly apply Brand Voice to any Alwrity tool',
         'AI-powered feedback on brand voice consistency'
       ]
-    },
-    {
-      id: 'deep-crawl',
-      title: 'Deep Website Analysis',
-      description: 'Crawl 10+ pages for comprehensive persona generation',
-      icon: <DataIcon />,
-      status: 'In Development',
-      color: '#10b981',
-      details: [
-        'Analyze multiple blog posts and pages',
-        'Extract comprehensive writing patterns',
-        'Understand content themes and topics',
-        'Generate more accurate personas',
-        'Better brand voice detection'
-      ]
-    },
-    {
-      id: 'fine-tuning',
-      title: 'Personal AI Fine-Tuning',
-      description: 'Train a custom AI model specifically for your brand',
-      icon: <SmartToyIcon />,
-      status: 'Planned',
-      color: '#8b5cf6',
-      details: [
-        'Fine-tune Google Gemma model with your data',
-        'Create your personal AI marketing team',
-        'Learn from your website, social media, and analytics',
-        'Generate content that sounds authentically like you',
-        'Private model - your data stays secure'
-      ]
     }
   ];
 
@@ -106,11 +73,11 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
             gap: 1
           }}
         >
-          🚀 Advanced Features & Roadmap
+          Try it out
         </Typography>
         <Grid container spacing={3}>
           {features.map((feature) => (
-            <Grid item xs={12} md={4} key={feature.id}>
+            <Grid item xs={12} md={6} key={feature.id}>
               <Card
                 sx={{
                   height: '100%',
@@ -205,25 +172,6 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
             </Grid>
           ))}
         </Grid>
-
-        <Alert 
-          severity="info" 
-          sx={{ 
-            mt: 4, 
-            backgroundColor: '#f0f9ff',
-            border: '2px solid #0ea5e9',
-            borderRadius: 3,
-            '& .MuiAlert-icon': {
-              color: '#0ea5e9',
-              fontSize: '1.5rem'
-            }
-          }}
-        >
-          <Typography variant="body1" sx={{ color: '#0c4a6e', fontWeight: 500 }}>
-            <strong>What's Next:</strong> These features will be available in upcoming releases. 
-            Your current persona is already powerful and ready to use!
-          </Typography>
-        </Alert>
       </Box>
 
       {/* Feature Details Modal */}
@@ -308,18 +256,6 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
                     Select a topic from your content calendar, then generate content using different personas 
                     to see how your AI adapts its writing style. Compare the results and provide feedback 
                     to continuously improve your persona.
-                  </Typography>
-                </Box>
-              )}
-
-              {selectedFeatureData.id === 'fine-tuning' && (
-                <Box sx={{ mt: 3, p: 2, backgroundColor: '#f0f9ff', borderRadius: 2 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#1e293b' }}>
-                    Privacy & Security:
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Your data is used exclusively to train your private AI model. It's never shared 
-                    or used for any other purpose. You own your AI, and it works only for you.
                   </Typography>
                 </Box>
               )}

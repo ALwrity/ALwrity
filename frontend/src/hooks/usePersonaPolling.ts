@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { apiClient } from '../api/client';
+import { aiApiClient } from '../api/client';
 
 export interface PersonaTaskStatus {
   task_id: string;
@@ -136,7 +136,7 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
       }
 
       try {
-        const response = await apiClient.get(`/api/onboarding/step4/persona-task/${currentTaskIdRef.current}`);
+        const response = await aiApiClient.get(`/api/onboarding/step4/persona-task/${currentTaskIdRef.current}`);
         const status: PersonaTaskStatus = response.data;
         
         console.log('Persona polling status update:', status);

@@ -5,13 +5,12 @@
  * Integrates with CopilotKit for real-time progress updates and user interactions.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
   Button,
   Chip,
-  LinearProgress,
   Card,
   CardContent,
   CardHeader,
@@ -478,6 +477,54 @@ export const SEOAnalysisModal: React.FC<SEOAnalysisModalProps> = ({
     return tooltips[category as keyof typeof tooltips] || tooltips.structure;
   };
 
+  const seoStageDefinitions = [
+    { id: 'keywords', label: 'Keywords', icon: '🔑' },
+    { id: 'structure', label: 'Structure', icon: '📐' },
+    { id: 'headings', label: 'Headings', icon: '📊' },
+    { id: 'optimization', label: 'Optimization', icon: '🎯' },
+    { id: 'insights', label: 'AI Insights', icon: '🤖' },
+    { id: 'compiling', label: 'Compiling', icon: '📋' },
+  ];
+
+  const stageStateCopy: Record<string, { background: string; border: string; color: string }> = {
+    upcoming: { background: '#f1f5f9', border: '#e2e8f0', color: '#94a3b8' },
+    active: { background: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' },
+    done: { background: '#ecfdf5', border: '#bbf7d0', color: '#047857' },
+    error: { background: '#fef2f2', border: '#fecaca', color: '#b91c1c' }
+  };
+
+  const latestStageIndex = useMemo(() => {
+    if (progress === 0) return -1;
+    const index = Math.floor((progress / 100) * seoStageDefinitions.length);
+    return Math.min(index, seoStageDefinitions.length - 1);
+  }, [progress]);
+
+  const stagesWithState = useMemo(() => {
+    return seoStageDefinitions.map((stage, i) => {
+      let state: 'upcoming' | 'active' | 'done' | 'error' = 'upcoming';
+      if (!isAnalyzing && error) {
+        state = i === seoStageDefinitions.length - 1 ? 'error' : 'done';
+      } else if (!isAnalyzing || progress >= 100) {
+        state = 'done';
+      } else if (latestStageIndex === -1) {
+        state = i === 0 ? 'active' : 'upcoming';
+      } else if (i < latestStageIndex) {
+        state = 'done';
+      } else if (i === latestStageIndex) {
+        state = 'active';
+      }
+      return { ...stage, state };
+    });
+  }, [seoStageDefinitions, latestStageIndex, isAnalyzing, error, progress]);
+
+  const progressPct = useMemo(() => {
+    if (progress >= 100) return 100;
+    const done = stagesWithState.filter(s => s.state === 'done').length;
+    const active = stagesWithState.filter(s => s.state === 'active').length;
+    if (done === 0 && active === 0) return 0;
+    return Math.round(((done + active * 0.5) / seoStageDefinitions.length) * 100);
+  }, [stagesWithState, progress]);
+
   return (
     <Dialog 
       open={isOpen} 
@@ -495,6 +542,12 @@ export const SEOAnalysisModal: React.FC<SEOAnalysisModalProps> = ({
         }
       }}
     >
+      <style>{`
+        @keyframes seoStagePulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.15); }
+          50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+        }
+      `}</style>
       <DialogContent sx={{ p: 0, color: '#0f172a' }}>
         <Box sx={{ p: 3, borderBottom: '1px solid rgba(0,0,0,0.1)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -536,32 +589,73 @@ export const SEOAnalysisModal: React.FC<SEOAnalysisModalProps> = ({
 
         {isAnalyzing && (
           <Box sx={{ p: 3 }}>
-            <Box sx={{ textAlign: 'center', mb: 3 }}>
-              <Refresh sx={{ 
-                fontSize: 32, 
-                animation: 'spin 1s linear infinite',
-                '@keyframes spin': {
-                  '0%': { transform: 'rotate(0deg)' },
-                  '100%': { transform: 'rotate(360deg)' }
-                }
-              }} />
-              <Typography variant="body2" sx={{ color: 'text.secondary', mt: 1 }}>
-                {progressMessage}
+            {/* Thin progress bar */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Box sx={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
+                <Box
+                  sx={{
+                    width: `${progressPct}%`,
+                    height: '100%',
+                    borderRadius: 2,
+                    background: 'linear-gradient(90deg, #3b82f6, #2563eb)',
+                    transition: 'width 0.5s ease'
+                  }}
+                />
+              </Box>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', fontSize: '0.65rem' }}>
+                {stagesWithState.filter(s => s.state === 'done').length}/{seoStageDefinitions.length}
               </Typography>
             </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={progress} 
-              sx={{ 
-                height: 8, 
-                borderRadius: 4,
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                '& .MuiLinearProgress-bar': {
-                  borderRadius: 4,
-                  background: 'linear-gradient(90deg, #4caf50, #8bc34a)'
-                }
-              }} 
-            />
+
+            {/* Compact stage indicators */}
+            <Box sx={{ display: 'flex', gap: 0.75, mb: 2 }}>
+              {stagesWithState.map(stage => {
+                const copy = stageStateCopy[stage.state];
+                return (
+                  <Box
+                    key={stage.id}
+                    sx={{
+                      flex: 1,
+                      py: 0.75,
+                      px: 0.5,
+                      borderRadius: 1.5,
+                      backgroundColor: copy.background,
+                      border: `1px solid ${copy.border}`,
+                      textAlign: 'center',
+                      animation: stage.state === 'active' ? 'seoStagePulse 2s ease-in-out infinite' : undefined,
+                      transition: 'all 0.3s ease'
+                    }}
+                  >
+                    <Box sx={{ fontSize: 16, lineHeight: 1 }}>{stage.icon}</Box>
+                    <Typography variant="caption" sx={{ fontWeight: 600, color: copy.color, mt: 0.25, display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
+                      {stage.state === 'active' ? 'Working…' : stage.state === 'done' ? 'Done' : stage.state === 'error' ? 'Error' : stage.label}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+
+            {/* Latest message card */}
+            {progressMessage && (
+              <Box
+                sx={{
+                  borderRadius: '10px',
+                  py: 1.25,
+                  px: 1.5,
+                  border: '1px solid',
+                  borderColor: '#bfdbfe',
+                  backgroundColor: '#eff6ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25
+                }}
+              >
+                <CircularProgress size={14} thickness={5} sx={{ color: '#1d4ed8', flexShrink: 0 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', fontSize: '0.85rem' }}>
+                  {progressMessage}
+                </Typography>
+              </Box>
+            )}
           </Box>
         )}
 
