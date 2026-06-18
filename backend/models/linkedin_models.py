@@ -479,3 +479,96 @@ class LinkedInEditContentResponse(BaseModel):
     provider: Optional[str] = None
     model: Optional[str] = None
     error: Optional[str] = None
+
+
+class LinkedInAudioNarrationRequest(BaseModel):
+    """Request model for LinkedIn narration audio generation."""
+
+    text: Optional[str] = Field(
+        None,
+        description="Raw narration text (alternative to video_script)",
+        min_length=10,
+        max_length=10000,
+    )
+    video_script: Optional[VideoScript] = Field(
+        None,
+        description="LinkedIn video script to convert into narration",
+    )
+    target_duration_seconds: int = Field(
+        default=75,
+        description="Target spoken duration in seconds (LinkedIn clips: 30–90s)",
+        ge=30,
+        le=90,
+    )
+    voice_id: str = Field(default="Wise_Woman", description="TTS voice ID")
+    custom_voice_id: Optional[str] = Field(None, description="Custom cloned voice ID")
+    speed: float = Field(default=1.0, ge=0.5, le=2.0, description="Speech speed multiplier")
+    volume: float = Field(default=1.0, ge=0.1, le=10.0, description="Speech volume")
+    pitch: float = Field(default=0.0, ge=-12.0, le=12.0, description="Speech pitch")
+    emotion: Optional[str] = Field(
+        None,
+        description="TTS emotion override (defaults from tone when omitted)",
+    )
+    tone: Optional[LinkedInTone] = Field(
+        default=LinkedInTone.PROFESSIONAL,
+        description="LinkedIn tone used to pick a professional TTS emotion",
+    )
+    topic: Optional[str] = Field(None, description="Topic label for metadata", max_length=200)
+    industry: Optional[str] = Field(None, description="Industry label for metadata", max_length=100)
+
+    @validator("video_script", always=True)
+    def require_text_or_video_script(cls, video_script, values):
+        text = values.get("text")
+        if not text and not video_script:
+            raise ValueError("Either text or video_script must be provided")
+        return video_script
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "video_script": {
+                    "hook": "Did you know 70% of B2B buyers research on LinkedIn before reaching out?",
+                    "main_content": [
+                        {
+                            "scene_number": "1",
+                            "content": "Start by optimizing your profile headline for your ideal client.",
+                            "duration": "20",
+                            "visual_notes": "Profile screenshot",
+                        }
+                    ],
+                    "conclusion": "Follow for more LinkedIn growth tips.",
+                    "thumbnail_suggestions": ["Profile optimization checklist"],
+                    "video_description": "LinkedIn profile tips for B2B sellers",
+                },
+                "target_duration_seconds": 75,
+                "tone": "professional",
+                "topic": "LinkedIn profile optimization",
+                "industry": "Marketing",
+            }
+        }
+
+
+class LinkedInAudioMetadata(BaseModel):
+    """Metadata returned after LinkedIn narration generation."""
+
+    provider: str
+    model: str
+    voice_id: str
+    text_length: int
+    file_size: int
+    estimated_duration_seconds: float
+    target_duration_seconds: int
+    generation_time: float
+    format: str = "mp3"
+    topic: Optional[str] = None
+    industry: Optional[str] = None
+
+
+class LinkedInAudioNarrationResponse(BaseModel):
+    """Response model for LinkedIn narration audio generation."""
+
+    success: bool = True
+    audio_id: Optional[str] = None
+    download_path: Optional[str] = None
+    metadata: Optional[LinkedInAudioMetadata] = None
+    error: Optional[str] = None
