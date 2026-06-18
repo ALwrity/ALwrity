@@ -560,6 +560,7 @@ class LinkedInAudioMetadata(BaseModel):
     target_duration_seconds: int
     generation_time: float
     format: str = "mp3"
+    emotion: str = Field(..., description="TTS emotion applied (explicit or tone-derived)")
     topic: Optional[str] = None
     industry: Optional[str] = None
 

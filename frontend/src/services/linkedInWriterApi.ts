@@ -271,6 +271,7 @@ export interface LinkedInAudioMetadata {
   target_duration_seconds: number;
   generation_time: number;
   format: string;
+  emotion: string;
   topic?: string;
   industry?: string;
 }
