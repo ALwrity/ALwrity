@@ -48,6 +48,8 @@ import models.website_analysis_monitoring_models
 import models.platform_insights_monitoring_models
 import models.agent_activity_models
 import models.daily_workflow_models
+# Phase 3.4: SIF indexing watermark table (per-user, per-source content-hash ledger)
+import models.sif_indexing_watermark  # noqa: F401
 
 from services.workspace_paths import get_workspace_root, get_user_workspace_dir
 
@@ -188,6 +190,52 @@ def _ensure_scheduler_task_columns(engine, user_id: str) -> None:
                     )
     except Exception as e:
         logger.error(f"Failed frequency_days schema migration for user {user_id}: {e}")
+
+
+def _ensure_sif_indexing_watermark_table(engine, user_id: str) -> None:
+    """Phase 3.4: backfill the per-user sif_indexing_watermarks table.
+
+    The model is registered with EnhancedStrategyBase.metadata so
+    ``create_all`` will create the table on fresh databases. For
+    legacy tenant DBs that pre-date the model, we explicitly CREATE
+    TABLE IF NOT EXISTS with the same shape. We also add the unique
+    constraint on (user_id, source_id) and the secondary index on
+    (user_id, indexed_at) for time-range queries.
+    """
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS sif_indexing_watermarks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id VARCHAR(255) NOT NULL,
+                    source_id VARCHAR(512) NOT NULL,
+                    source_hash VARCHAR(128) NOT NULL DEFAULT '',
+                    embedding_count INTEGER NOT NULL DEFAULT 0,
+                    indexed_at DATETIME NOT NULL,
+                    notes TEXT NULL
+                )
+                """
+            )
+            # Unique constraint (idempotent via IF NOT EXISTS).
+            conn.exec_driver_sql(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_sif_watermark_user_source
+                ON sif_indexing_watermarks (user_id, source_id)
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE INDEX IF NOT EXISTS ix_sif_watermark_user_indexed
+                ON sif_indexing_watermarks (user_id, indexed_at)
+                """
+            )
+    except Exception as e:
+        # Don't block tenant DB init on watermark table failure; the
+        # model will still be queryable and ``create_all`` is idempotent.
+        logger.error(
+            f"Failed sif_indexing_watermarks schema migration for user {user_id}: {e}"
+        )
 
 
 def _ensure_onboarding_data_integration_columns(engine, user_id: str) -> None:
@@ -476,6 +524,8 @@ def init_user_database(user_id: str):
         BingAnalyticsBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)
         _ensure_task_history_unique_index(engine, user_id)
+        # Phase 3.4: ensure the SIF indexing watermark table exists.
+        _ensure_sif_indexing_watermark_table(engine, user_id)
         
         # Initialize default data for new databases
         try:

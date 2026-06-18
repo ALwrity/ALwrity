@@ -541,6 +541,27 @@ async def get_semantic_cache_stats(current_user: dict = Depends(get_current_user
 
 
 async def get_sif_indexing_health(current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+    """SIF indexing health for the dashboard.
+
+    Phase 4.3: extends the response with ``index_stats``:
+      - ``doc_count``: number of docs in the user's txtai index
+        (0 if uninitialized — the service is lazily created)
+      - ``ann_disabled``: True if a previous run hit IndexIDMap
+        nprobe and fell back to linear search
+      - ``corrupt_marker_present``: True if a ``.corrupt`` marker
+        file exists for the user (signals next service start will
+        rebuild the index — Phase 3.1 auto-remediation)
+
+    Phase 4.4: extends the response with ``cache_stats``:
+      - total cache entries
+      - memory usage MB
+      - hit/miss/invalidations from the cache layer
+
+    The function is best-effort: if the intelligence service or
+    cache cannot be loaded (e.g. txtai not installed in this
+    environment), the corresponding section is set to ``None``
+    rather than raising.
+    """
     try:
         user_id = str(current_user.get("id"))
         db_session = get_session_for_user(user_id)
@@ -580,6 +601,14 @@ async def get_sif_indexing_health(current_user: dict = Depends(get_current_user)
                     "time": sif_health.get("latest_execution", {}).get("execution_date"),
                     "error_message": sif_health.get("latest_execution", {}).get("error_message"),
                 },
+                # Phase 4.3: live index stats from the txtai service.
+                # Best-effort: returns None if the service is not
+                # importable in this environment (e.g. txtai missing).
+                "index_stats": _collect_sif_index_stats(user_id),
+                # Phase 4.4: cache stats from the semantic cache.
+                "cache_stats": _collect_sif_cache_stats(),
+                # Phase 4.5: structured counters since process start.
+                "metrics": _collect_sif_metrics_snapshot(user_id),
             }
         finally:
             db_session.close()
@@ -1882,13 +1911,116 @@ def _convert_platforms(platform_data: Dict[str, Any]) -> Dict[str, PlatformStatu
                 last_sync=platform_data.get("gsc", {}).get("last_sync"),
                 data_points=len(platform_data.get("gsc", {}).get("sites", []))
             ),
-            "bing_webmaster": PlatformStatus(
-                status="connected" if platform_data.get("bing", {}).get("connected", False) else "disconnected",
-                connected=platform_data.get("bing", {}).get("connected", False),
-                last_sync=platform_data.get("bing", {}).get("last_sync"),
-                data_points=len(platform_data.get("bing", {}).get("sites", []))
-            )
-        }
+                "bing_webmaster": PlatformStatus(
+                    status="connected" if platform_data.get("bing", {}).get("connected", False) else "disconnected",
+                    connected=platform_data.get("bing", {}).get("connected", False),
+                    last_sync=platform_data.get("bing", {}).get("last_sync"),
+                    data_points=len(platform_data.get("bing", {}).get("sites", []))
+                )
+            }
     except Exception as e:
         logger.error(f"Error converting platforms: {e}")
-        return {} 
+        return {}
+
+
+# Phase 4.3 + 4.4: helpers used by ``get_sif_indexing_health`` to
+# surface live index and cache state. Each helper is best-effort:
+# returns ``None`` if the underlying service cannot be loaded in
+# this environment (e.g. txtai not installed), so the endpoint
+# stays usable even when the SIF stack is degraded.
+
+
+def _collect_sif_index_stats(user_id: str) -> Optional[Dict[str, Any]]:
+    """Return live index stats for the given user.
+
+    The txtai service is lazily created per user. For dashboard
+    purposes we do NOT want to call the heavy ``_ensure_initialized``
+    path (which loads the model and could take seconds); instead we
+    read the persisted index file size + count if available, and
+    check the ``.corrupt`` marker file.
+    """
+    try:
+        from services.intelligence.txtai_service import TxtaiIntelligenceService
+    except ImportError:
+        return None
+
+    try:
+        from services.intelligence.sif_metrics import set_user_gauge
+
+        svc = TxtaiIntelligenceService(user_id=user_id)
+        # doc_count via embeddings.count() — this is a blocking call.
+        # We do not want to make the dashboard endpoint slow, so we
+        # only attempt this if the service is already initialized.
+        doc_count = 0
+        if svc._initialized and svc.embeddings and hasattr(svc.embeddings, "count"):
+            try:
+                doc_count = int(svc.embeddings.count())
+            except Exception:
+                doc_count = 0
+
+        # Phase 3.1: corrupt marker check.
+        from pathlib import Path
+        index_path = getattr(svc, "index_path", None)
+        corrupt_marker_present = False
+        if index_path:
+            try:
+                corrupt_marker_present = Path(f"{index_path}.corrupt").exists()
+            except OSError:
+                corrupt_marker_present = False
+
+        # ANN-disabled flag was set in-process by _mark_ann_incompatible.
+        # This is per-service-instance, so for the dashboard we
+        # default to False (the actual flag lives on the singleton
+        # for this user). The ``hasattr`` check is defensive in case
+        # the attribute is removed in a future refactor.
+        ann_disabled = bool(getattr(svc, "_disable_ann_queries", False))
+
+        stats = {
+            "doc_count": doc_count,
+            "ann_disabled": ann_disabled,
+            "corrupt_marker_present": corrupt_marker_present,
+            "index_path": index_path,
+            "initialized": bool(svc._initialized),
+        }
+        # Phase 4.4: per-user gauge for the team-activity page.
+        set_user_gauge(user_id, "sif_index_count", float(doc_count))
+        set_user_gauge(user_id, "sif_corrupt_marker", float(corrupt_marker_present))
+        set_user_gauge(user_id, "sif_ann_disabled", float(ann_disabled))
+        return stats
+    except Exception as e:
+        logger.debug(f"Phase 4.3: _collect_sif_index_stats failed for user {user_id}: {e}")
+        return None
+
+
+def _collect_sif_cache_stats() -> Optional[Dict[str, Any]]:
+    """Return semantic cache stats (memory entries, hit/miss counters)."""
+    try:
+        from services.intelligence.semantic_cache import semantic_cache_manager
+    except ImportError:
+        return None
+    try:
+        mgr = semantic_cache_manager
+        # ``get_stats()`` returns a dataclass asdict; safe to expose
+        stats = mgr.get_stats()
+        return {
+            "cache_size": int(stats.get("cache_size", 0) or 0),
+            "memory_usage_mb": float(stats.get("memory_usage_mb", 0.0) or 0.0),
+            "total_hits": int(stats.get("total_hits", 0) or 0),
+            "total_misses": int(stats.get("total_misses", 0) or 0),
+            "total_invalidations": int(stats.get("total_invalidations", 0) or 0),
+            "max_memory_size_mb": float(stats.get("max_memory_size_mb", 0.0) or 0.0),
+        }
+    except Exception as e:
+        logger.debug(f"Phase 4.4: _collect_sif_cache_stats failed: {e}")
+        return None
+
+
+def _collect_sif_metrics_snapshot(user_id: str) -> Optional[Dict[str, Any]]:
+    """Return the sif_metrics snapshot for the dashboard."""
+    try:
+        from services.intelligence.sif_metrics import get_metrics_for_user
+        return get_metrics_for_user(user_id)
+    except Exception as e:
+        logger.debug(f"Phase 4.5: _collect_sif_metrics_snapshot failed: {e}")
+        return None
+

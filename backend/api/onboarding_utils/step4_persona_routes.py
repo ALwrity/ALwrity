@@ -26,6 +26,9 @@ from services.user_api_key_context import user_api_keys
 from services.database import get_session_for_user
 from services.intelligence.agent_flat_context import AgentFlatContextStore
 from models.onboarding import OnboardingSession, PersonaData
+from models.content_asset_models import ContentAsset, AssetType, AssetSource
+from sqlalchemy import desc
+from services.llm_providers.main_audio_generation import generate_audio
 
 # In-memory task storage (transient — running tasks can't survive restart)
 persona_tasks: Dict[str, Dict[str, Any]] = {}
@@ -833,3 +836,152 @@ async def _log_persona_generation_result(
         logger.info(f"Quality metrics: {quality_metrics.get('overall_score', 'N/A')}% overall score")
     except Exception as e:
         logger.error(f"Error logging persona generation result: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# Test Drive endpoints (Phase 4.1)
+# Allows users to test their brand voice/avatar/voice-clone with new prompts
+# in the "Test with your data" modal. Reuses existing providers.
+# ---------------------------------------------------------------------------
+
+class TestTextRequest(BaseModel):
+    """Request body for /step4/test-text — side-by-side text generation."""
+    prompt: str
+    persona: Dict[str, Any] = {}
+    platform: Optional[str] = "blog"
+
+
+class TestVoiceRequest(BaseModel):
+    """Request body for /step4/test-voice — synthesize new text with stored voice clone."""
+    text: str
+
+
+class TestImageRequest(BaseModel):
+    """Request body for /step4/test-image — platform-tuned avatar variation."""
+    platform: str
+    prompt_override: Optional[str] = None
+
+
+@router.post("/step4/test-voice", response_model=Dict[str, Any])
+async def test_voice_with_clone(
+    request: TestVoiceRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Synthesize user-provided text using their stored voice clone.
+
+    Looks up the user's most recent voice_clone asset and reuses its
+    `custom_voice_id` + `engine` to call the existing `generate_audio`
+    provider. Returns the synthesized audio as a URL the browser can
+    play (or as base64 if the provider returned inline data).
+    """
+    try:
+        user_id = _extract_user_id(current_user)
+        text = (request.text or "").strip()
+
+        if not text:
+            return {"success": False, "message": "Please type some text to read.", "error": "empty_text"}
+        if len(text) > 500:
+            return {
+                "success": False,
+                "message": "Text is too long. Please keep it under 500 characters for the test drive.",
+                "error": "text_too_long",
+            }
+
+        # Look up the user's latest voice clone asset
+        db = get_session_for_user(user_id)
+        if not db:
+            return {"success": False, "message": "Could not connect to database.", "error": "db_unavailable"}
+
+        try:
+            asset = (
+                db.query(ContentAsset)
+                .filter(
+                    ContentAsset.user_id == user_id,
+                    ContentAsset.asset_type == AssetType.AUDIO,
+                    ContentAsset.source_module == AssetSource.VOICE_CLONER,
+                )
+                .order_by(desc(ContentAsset.created_at))
+                .first()
+            )
+
+            if not asset:
+                return {
+                    "success": False,
+                    "message": "No voice clone found. Generate a voice clone first.",
+                    "error": "no_voice_clone",
+                }
+
+            meta = asset.asset_metadata or {}
+            custom_voice_id = meta.get("custom_voice_id")
+            engine = meta.get("engine") or "qwen3"
+
+            if not custom_voice_id:
+                return {
+                    "success": False,
+                    "message": "Your voice clone is missing a reusable voice ID. Please re-create the voice clone.",
+                    "error": "missing_voice_id",
+                }
+        finally:
+            db.close()
+
+        # Synthesize new audio with the stored voice id + new text.
+        # generate_audio handles subscription/usage checks internally.
+        logger.info(
+            f"[test-voice] Synthesizing with voice_id={custom_voice_id} engine={engine} text_len={len(text)} user={user_id}"
+        )
+        result = generate_audio(
+            text=text,
+            custom_voice_id=custom_voice_id,
+            model="speech-02-hd" if engine == "minimax" else "alwrity-ai/qwen3-tts",
+            user_id=user_id,
+        )
+
+        # The provider returns either a URL or raw bytes depending on the engine.
+        audio_url: Optional[str] = None
+        audio_base64: Optional[str] = None
+        audio_format: Optional[str] = None
+
+        if isinstance(result, dict):
+            audio_url = (
+                result.get("audio_url")
+                or result.get("url")
+                or result.get("preview_audio_url")
+            )
+            audio_base64 = result.get("audio_base64")
+            audio_format = result.get("format")
+        elif isinstance(result, (bytes, bytearray)):
+            import base64
+            audio_base64 = base64.b64encode(bytes(result)).decode("ascii")
+            audio_format = "audio/mpeg"
+
+        if not audio_url and not audio_base64:
+            return {
+                "success": False,
+                "message": "Voice synthesis completed but no audio was returned. Please try again.",
+                "error": "empty_audio",
+            }
+
+        return {
+            "success": True,
+            "audio_url": audio_url,
+            "audio_base64": audio_base64,
+            "format": audio_format,
+            "engine": engine,
+            "voice_id": custom_voice_id,
+        }
+
+    except HTTPException:
+        raise
+    except RuntimeError as re:
+        # Subscription limit or similar surfaced as 429 by the provider
+        msg = str(re)
+        logger.warning(f"[test-voice] runtime error: {msg}")
+        return {"success": False, "message": msg, "error": "runtime_error"}
+    except Exception as e:
+        logger.error(f"[test-voice] Error: {e}", exc_info=True)
+        return {
+            "success": False,
+            "message": "We hit a snag while synthesizing the audio. Please try again.",
+            "error": "internal_error",
+        }

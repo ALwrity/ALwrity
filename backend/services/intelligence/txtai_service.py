@@ -242,6 +242,8 @@ class TxtaiIntelligenceService:
         Returns:
             Number of items actually upserted.
         """
+        # Phase 5 / Issue #8: explicit guard for missing txtai.
+        self._require_txtai_available()
         self._ensure_initialized()
         if not self._initialized:
             await self._ensure_initialized_async()
@@ -292,6 +294,8 @@ class TxtaiIntelligenceService:
         Returns:
             Number of documents deleted.
         """
+        # Phase 5 / Issue #8: explicit guard for missing txtai.
+        self._require_txtai_available()
         await self._ensure_initialized_async()
         if not self._initialized or not self.embeddings:
             return 0
@@ -315,6 +319,8 @@ class TxtaiIntelligenceService:
         Returns:
             Number of items indexed.
         """
+        # Phase 5 / Issue #8: explicit guard for missing txtai.
+        self._require_txtai_available()
         await self._ensure_initialized_async()
         if not self._initialized or not self.embeddings:
             return 0

@@ -373,6 +373,45 @@ async def sif_indexing_health_endpoint(current_user: dict = Depends(get_current_
     return await get_sif_indexing_health(current_user)
 
 
+@app.get("/api/sif/metrics")
+async def sif_metrics_endpoint(current_user: dict = Depends(get_current_user)):
+    """Phase 4.6: SIF metrics for the team-activity page (or any
+    dashboard widget that wants to surface live SIF activity).
+
+    Returns a JSON dict with:
+      - ``user_id``: the requesting user
+      - ``counters``: global counters (search, index, delete, cluster, cache, sync)
+      - ``gauges``: process-wide gauges (uptime, corrupt markers, etc.)
+      - ``user_gauges``: per-user gauges (sif_index_count, sif_corrupt_marker, sif_ann_disabled)
+
+    The endpoint is cheap: it reads from the in-process
+    ``sif_metrics`` module, which holds the data in a thread-safe
+    dict. No DB queries, no model loads.
+    """
+    try:
+        from services.intelligence.sif_metrics import get_metrics_for_user
+        user_id = str(current_user.get("id"))
+        return get_metrics_for_user(user_id)
+    except ImportError as e:
+        logger.warning(f"/api/sif/metrics: sif_metrics not available: {e}")
+        return {
+            "user_id": str(current_user.get("id", "")),
+            "counters": {},
+            "gauges": {},
+            "user_gauges": {},
+            "error": "sif_metrics_unavailable",
+        }
+    except Exception as e:
+        logger.error(f"/api/sif/metrics failed: {e}")
+        return {
+            "user_id": str(current_user.get("id", "")),
+            "counters": {},
+            "gauges": {},
+            "user_gauges": {},
+            "error": str(e),
+        }
+
+
 @app.get("/api/seo-dashboard/guardian-audit")
 async def guardian_audit_endpoint(current_user: dict = Depends(get_current_user)):
     """
