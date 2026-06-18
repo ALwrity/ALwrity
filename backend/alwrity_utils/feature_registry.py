@@ -67,6 +67,7 @@ FEATURE_GROUPS: Dict[str, FeatureGroup] = {
         routers=(
             "routers.linkedin:router",
             "api.linkedin_image_generation:router",
+            "api.linkedin_audio_generation:router",
         ),
     ),
     "facebook": FeatureGroup(

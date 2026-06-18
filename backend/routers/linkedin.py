@@ -14,59 +14,31 @@ import json
 from loguru import logger
 from pathlib import Path
 
+from api.linkedin_router_utils import (
+    ERROR_CODES,
+    check_rate_limit,
+    error_response,
+    get_db,
+    log_api_request,
+)
 from models.linkedin_models import (
     LinkedInPostRequest, LinkedInArticleRequest, LinkedInCarouselRequest,
     LinkedInVideoScriptRequest, LinkedInCommentResponseRequest,
     LinkedInPostResponse, LinkedInArticleResponse, LinkedInCarouselResponse,
     LinkedInVideoScriptResponse, LinkedInCommentResponseResult,
     LinkedInEditContentRequest, LinkedInEditContentResponse,
-    LinkedInAudioNarrationRequest, LinkedInAudioNarrationResponse, LinkedInAudioMetadata,
 )
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.linkedin_service import LinkedInService
 from services.linkedin.carousel import LinkedInCarouselPDFRenderer
-from services.linkedin.audio import LinkedInAudioService, LinkedInAudioStorage
 from middleware.auth_middleware import get_current_user
 from utils.text_asset_tracker import save_and_track_text_content
 from models.api_monitoring import APIRequest
 from sqlalchemy import func
-from collections import defaultdict
+from sqlalchemy.orm import Session
 
 # Initialize the LinkedIn service instance
 linkedin_service = LinkedInService()
-linkedin_audio_service = LinkedInAudioService()
-linkedin_audio_storage = LinkedInAudioStorage()
-from services.subscription.monitoring_middleware import DatabaseAPIMonitor
-from services.database import get_db as get_db_dependency
-from sqlalchemy.orm import Session
-
-# Simple in-memory rate limiter: {user_id: [timestamp, ...]}
-_rate_limit_store: Dict[str, list] = defaultdict(list)
-RATE_LIMIT_MAX_REQUESTS = 30
-RATE_LIMIT_WINDOW = 60  # seconds
-
-def check_rate_limit(user_id: str) -> Optional[int]:
-    """Returns retry-after seconds if rate limited, None otherwise."""
-    now = time.time()
-    window_start = now - RATE_LIMIT_WINDOW
-    timestamps = _rate_limit_store[user_id]
-    # Prune old entries
-    _rate_limit_store[user_id] = [t for t in timestamps if t > window_start]
-    if len(_rate_limit_store[user_id]) >= RATE_LIMIT_MAX_REQUESTS:
-        return int(_rate_limit_store[user_id][0] + RATE_LIMIT_WINDOW - now)
-    _rate_limit_store[user_id].append(now)
-    return None
-
-ERROR_CODES = {
-    'VALIDATION': 'LINKEDIN_ERR_001',
-    'GENERATION_FAILED': 'LINKEDIN_ERR_002',
-    'RATE_LIMITED': 'LINKEDIN_ERR_003',
-    'SAVE_FAILED': 'LINKEDIN_ERR_004',
-    'NOT_FOUND': 'LINKEDIN_ERR_404',
-}
-
-def error_response(code: str, message: str) -> dict:
-    return {"code": code, "message": message}
 
 # Initialize router
 router = APIRouter(
@@ -78,33 +50,6 @@ router = APIRouter(
         500: {"description": "Internal server error"}
     }
 )
-
-# Initialize monitoring
-monitor = DatabaseAPIMonitor()
-
-
-# Use the proper database dependency from services.database
-get_db = get_db_dependency
-
-
-async def log_api_request(request: Request, db: Session, duration: float, status_code: int):
-    """Log API request to database for monitoring."""
-    try:
-        await monitor.add_request(
-            db=db,
-            path=str(request.url.path),
-            method=request.method,
-            status_code=status_code,
-            duration=duration,
-            user_id=request.headers.get("X-User-ID"),
-            request_size=len(await request.body()) if request.method == "POST" else 0,
-            user_agent=request.headers.get("User-Agent"),
-            ip_address=request.client.host if request.client else None
-        )
-        db.commit()
-    except Exception as e:
-        logger.error(f"Failed to log API request: {str(e)}")
-
 
 @router.get("/health", summary="Health Check", description="Check LinkedIn service health")
 async def health_check():
@@ -661,237 +606,6 @@ async def generate_video_script(
             status_code=500,
             detail=error_response(ERROR_CODES['GENERATION_FAILED'], f"Failed to generate LinkedIn video script: {str(e)}")
         )
-
-
-@router.post(
-    "/generate-audio-narration",
-    response_model=LinkedInAudioNarrationResponse,
-    summary="Generate LinkedIn Audio Narration",
-    description="""
-    Generate professional narration audio for LinkedIn video content.
-
-    Accepts either raw narration text or a LinkedIn video script (hook, scenes,
-    conclusion). Output is optimized for LinkedIn voiceover clips (30–90 seconds)
-    using WaveSpeed Minimax Speech 02 HD.
-    """
-)
-async def generate_audio_narration(
-    request: LinkedInAudioNarrationRequest,
-    background_tasks: BackgroundTasks,
-    http_request: Request,
-    db: Session = Depends(get_db),
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
-):
-    """Generate LinkedIn narration audio from text or a video script."""
-    start_time = time.time()
-
-    try:
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
-        if not user_id:
-            raise HTTPException(status_code=401, detail=error_response(ERROR_CODES['VALIDATION'], "Authentication required"))
-
-        retry_after = check_rate_limit(user_id)
-        if retry_after:
-            raise HTTPException(
-                status_code=429,
-                detail=error_response(ERROR_CODES['RATE_LIMITED'], f"Rate limit exceeded. Retry after {retry_after} seconds."),
-                headers={"Retry-After": str(retry_after)},
-            )
-
-        tone_value = request.tone.value if hasattr(request.tone, 'value') else str(request.tone or 'professional')
-
-        result = await linkedin_audio_service.generate_narration(
-            user_id=user_id,
-            text=request.text,
-            video_script=request.video_script,
-            target_duration_seconds=request.target_duration_seconds,
-            voice_id=request.voice_id,
-            custom_voice_id=request.custom_voice_id,
-            speed=request.speed,
-            volume=request.volume,
-            pitch=request.pitch,
-            emotion=request.emotion,
-            tone=tone_value,
-            topic=request.topic,
-            industry=request.industry,
-        )
-
-        if not result.get('success'):
-            raise HTTPException(
-                status_code=500,
-                detail=error_response(ERROR_CODES['GENERATION_FAILED'], result.get('error', 'Audio generation failed')),
-            )
-
-        duration = time.time() - start_time
-        background_tasks.add_task(log_api_request, http_request, db, duration, 200)
-
-        meta = result.get('metadata') or {}
-        return LinkedInAudioNarrationResponse(
-            success=True,
-            audio_id=result.get('audio_id'),
-            download_path=result.get('download_path'),
-            metadata=LinkedInAudioMetadata(**meta),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.error(f"Error generating LinkedIn audio narration: {str(e)}")
-        background_tasks.add_task(log_api_request, http_request, db, duration, 500)
-        raise HTTPException(
-            status_code=500,
-            detail=error_response(ERROR_CODES['GENERATION_FAILED'], f"Failed to generate LinkedIn audio narration: {str(e)}"),
-        )
-
-
-@router.post(
-    "/generate-audio-from-script",
-    response_model=LinkedInAudioNarrationResponse,
-    summary="Generate Audio from LinkedIn Video Script Request",
-    description="""
-    Convenience endpoint: generate a LinkedIn video script from a topic, then
-    synthesize narration audio from that script in one call.
-    """
-)
-async def generate_audio_from_script_request(
-    request: LinkedInVideoScriptRequest,
-    background_tasks: BackgroundTasks,
-    http_request: Request,
-    db: Session = Depends(get_db),
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
-):
-    """Generate video script content, then produce narration audio."""
-    start_time = time.time()
-
-    try:
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
-        if not user_id:
-            raise HTTPException(status_code=401, detail=error_response(ERROR_CODES['VALIDATION'], "Authentication required"))
-
-        script_response = await linkedin_service.generate_linkedin_video_script(request)
-        if not script_response.success or not script_response.data:
-            raise HTTPException(
-                status_code=500,
-                detail=error_response(ERROR_CODES['GENERATION_FAILED'], script_response.error or "Video script generation failed"),
-            )
-
-        target_duration = min(max(getattr(request, 'video_duration', 60), 30), 90)
-        tone_value = request.tone.value if hasattr(request.tone, 'value') else str(request.tone)
-
-        result = await linkedin_audio_service.generate_narration(
-            user_id=user_id,
-            video_script=script_response.data,
-            target_duration_seconds=target_duration,
-            tone=tone_value,
-            topic=request.topic,
-            industry=request.industry,
-        )
-
-        if not result.get('success'):
-            raise HTTPException(
-                status_code=500,
-                detail=error_response(ERROR_CODES['GENERATION_FAILED'], result.get('error', 'Audio generation failed')),
-            )
-
-        duration = time.time() - start_time
-        background_tasks.add_task(log_api_request, http_request, db, duration, 200)
-
-        meta = result.get('metadata') or {}
-        return LinkedInAudioNarrationResponse(
-            success=True,
-            audio_id=result.get('audio_id'),
-            download_path=result.get('download_path'),
-            metadata=LinkedInAudioMetadata(**meta),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        duration = time.time() - start_time
-        logger.error(f"Error generating LinkedIn audio from script: {str(e)}")
-        background_tasks.add_task(log_api_request, http_request, db, duration, 500)
-        raise HTTPException(
-            status_code=500,
-            detail=error_response(ERROR_CODES['GENERATION_FAILED'], f"Failed to generate LinkedIn audio from script: {str(e)}"),
-        )
-
-
-@router.get(
-    "/audio/{audio_id}",
-    summary="Download LinkedIn Narration Audio",
-    description="Retrieve a generated LinkedIn narration audio file by ID.",
-)
-async def get_linkedin_audio(
-    audio_id: str,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
-):
-    user_id = None
-    if current_user:
-        user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    result = await linkedin_audio_storage.retrieve_audio(audio_id, user_id)
-    if not result.get('success') or not result.get('audio_path'):
-        raise HTTPException(status_code=404, detail="Audio not found")
-
-    return FileResponse(
-        path=result['audio_path'],
-        media_type="audio/mpeg",
-        filename=f"{audio_id}.mp3",
-    )
-
-
-@router.get(
-    "/audio-status/{audio_id}",
-    summary="Get LinkedIn Audio Status",
-    description="Check metadata for a generated LinkedIn narration audio file.",
-)
-async def get_linkedin_audio_status(
-    audio_id: str,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
-):
-    user_id = None
-    if current_user:
-        user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    metadata = await linkedin_audio_storage.get_metadata(audio_id, user_id)
-    if not metadata:
-        return {"success": False, "status": "not_found", "error": "Audio not found"}
-
-    return {"success": True, "status": "completed", "metadata": metadata}
-
-
-@router.delete(
-    "/audio/{audio_id}",
-    summary="Delete LinkedIn Narration Audio",
-    description="Delete a generated LinkedIn narration audio file by ID.",
-)
-async def delete_linkedin_audio(
-    audio_id: str,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
-):
-    user_id = None
-    if current_user:
-        user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    result = await linkedin_audio_storage.delete_audio(audio_id, user_id)
-    if not result.get('success'):
-        raise HTTPException(status_code=404, detail=result.get('error', 'Audio not found'))
-    return result
 
 
 @router.post(
