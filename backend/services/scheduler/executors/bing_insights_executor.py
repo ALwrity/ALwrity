@@ -144,9 +144,6 @@ class BingInsightsExecutor(TaskExecutor):
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
             
-            # Set database session for exception handler
-            self.exception_handler.db = db
-            
             error_result = self.exception_handler.handle_task_execution_error(
                 task=task,
                 error=e,

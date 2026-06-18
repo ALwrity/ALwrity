@@ -183,6 +183,10 @@ class SIFIndexingExecutor(TaskExecutor):
             db.rollback()
             logger.warning(f"SIF indexing task failed for user {user_id}: {e}")
 
+            # Re-merge objects after rollback to avoid DetachedInstanceError
+            task = db.merge(task)
+            task_log = db.merge(task_log)
+
             failure_detection = FailureDetectionService(db)
             pattern = failure_detection.analyze_task_failures(task.id, "sif_indexing", user_id)
 

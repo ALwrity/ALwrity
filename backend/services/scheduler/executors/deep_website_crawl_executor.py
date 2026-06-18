@@ -45,50 +45,10 @@ class DeepWebsiteCrawlExecutor(TaskExecutor):
             logger.info(f"Executing deep website crawl for user {user_id}, url {website_url}")
             
             result = await self.crawl_service.execute_deep_crawl(
-                user_id=user_id, 
-                website_url=website_url,
-                task_id=task.id # Pass task_id so service can update logs/task if needed, but we handle some here too.
-                # Actually, the service updates logs and task status.
-                # So we should coordinate.
-                # In DeepCrawlService I wrote logic to update logs/task if task_id provided.
-                # But here we also create a log "running".
-                # The service creates a "success" or "failed" log.
-                # This might result in duplicate logs or "running" log stuck.
-                # Let's see DeepCrawlService again.
+                user_id=user_id,
+                website_url=website_url
             )
-            
-            # The service creates a new log entry for success/failure.
-            # So the "running" log created here will stay as "running" unless updated.
-            # I should probably update the "running" log instead of letting service create new one.
-            # OR, I should remove task_id from service call and handle logging here.
-            # Handling logging here is better for separation of concerns, BUT the service has the detailed stats.
-            # The service returns the stats.
-            # I will remove task_id from service call in future refactor, but for now let's just update the local log here too if needed.
-            # Wait, if service creates a log, I have 2 logs.
-            # I'll modify this executor to NOT pass task_id to service, but rely on return value.
-            # But `DeepCrawlService.execute_deep_crawl` takes task_id as Optional.
-            # If I don't pass it, it returns the result dict.
-            # I'll do that.
-            
-            # Re-calling service without task_id
-            # Wait, `execute_deep_crawl` signature: `async def execute_deep_crawl(self, user_id: str, website_url: str, task_id: Optional[int] = None)`
-            
-            # If I don't pass task_id, the service won't touch the DB for logs/tasks (except for saving content).
-            # This is cleaner.
-            
-            # result = await self.crawl_service.execute_deep_crawl(user_id, website_url)
-            # But wait, in the service I implemented:
-            # `if task_id: log = ... db.add(log) ...`
-            # So if I don't pass task_id, it just returns data. Perfect.
-            
-            # Correction: I need to update the file `backend/services/research/deep_crawl_service.py` ?
-            # No, it handles optional task_id.
-            
-            # So here I call it without task_id.
-            
-            # However, `DeepCrawlService` updates task status (last_executed, etc) if task_id is present.
-            # If I don't pass task_id, I must update task status here.
-            
+
             task.last_executed = datetime.utcnow()
             task.last_success = datetime.utcnow()
             task.status = "active" # Keep active for recurring? Or paused?
@@ -118,6 +78,10 @@ class DeepWebsiteCrawlExecutor(TaskExecutor):
         except Exception as e:
             db.rollback()
             logger.warning(f"Deep website crawl task failed for user {user_id}: {e}")
+
+            # Re-merge objects after rollback to avoid DetachedInstanceError
+            task = db.merge(task)
+            task_log = db.merge(task_log)
 
             failure_detection = FailureDetectionService(db)
             pattern = failure_detection.analyze_task_failures(task.id, "deep_website_crawl", user_id)

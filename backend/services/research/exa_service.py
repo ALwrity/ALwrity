@@ -38,15 +38,24 @@ class ExaService:
     websites and analyze their content for competitive intelligence.
     """
     
-    def __init__(self):
+    def __init__(self, timeout_seconds: int = 30):
         """Initialize the Exa Service with API credentials."""
         self.api_key = os.getenv("EXA_API_KEY")
         self.exa = None
         self.enabled = False
+        self.timeout_seconds = timeout_seconds
 
         # Don't assume key is available at import time in production.
         # Keys may be injected per-request via middleware, so defer init.
         self._try_initialize()
+
+    async def _run_sync_with_timeout(self, func, *args, **kwargs):
+        """Run a synchronous SDK call in a thread pool with a timeout."""
+        loop = asyncio.get_event_loop()
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: func(*args, **kwargs)),
+            timeout=self.timeout_seconds
+        )
 
     def _try_initialize(self) -> None:
         """Attempt to (re)initialize the Exa SDK from current environment."""
@@ -134,7 +143,8 @@ class ExaService:
                 logger.info(f"Enhanced targeting with analysis data: {include_text_queries}")
             
             # Use the Exa SDK to find similar links with content and context
-            search_result = self.exa.find_similar_and_contents(
+            search_result = await self._run_sync_with_timeout(
+                self.exa.find_similar_and_contents,
                 url=user_url,
                 num_results=min(num_results, 10),  # Exa API limit
                 include_domains=include_domains,
@@ -478,7 +488,8 @@ class ExaService:
             domain = urlparse(user_url).netloc.replace('www.', '')
             
             # Use Exa's answer API to find social media accounts
-            result = self.exa.answer(
+            result = await self._run_sync_with_timeout(
+                self.exa.answer,
                 f"Find all social media accounts of the url: {domain}. Return a JSON object with facebook, twitter, instagram, linkedin, youtube, and tiktok fields containing the URLs or empty strings if not found.",
                 model="exa-pro",
                 text=True
@@ -545,6 +556,8 @@ class ExaService:
                 if clean_text.startswith('{'):
                     # Direct JSON format
                     answer_data = json.loads(clean_text)
+                    # Normalize all values to strings — Exa may return 1/true for platforms without URLs
+                    answer_data = {k: str(v).strip() if v else '' for k, v in answer_data.items()}
                 else:
                     # Parse markdown format with URLs
                     answer_data = {

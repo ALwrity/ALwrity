@@ -1,25 +1,27 @@
-/**
- * Content Characteristics Section Component
- * Displays content characteristics analysis in a reusable format
- */
-
 import React from 'react';
 import {
   Box,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   Typography,
-  Grid,
-  Tooltip
+  Tooltip,
+  Chip,
+  TextField
 } from '@mui/material';
 import {
   Analytics as AnalyticsIcon,
   Language as LanguageIcon,
   Speed as SpeedIcon,
   Palette as PaletteIcon,
-  TrendingUp as TrendingUpIcon
+  TrendingUp as TrendingUpIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
-
-import { renderKeyInsight } from '../utils/renderUtils';
-import { useOnboardingStyles } from '../../common/useOnboardingStyles';
+import SectionHeader from './SectionHeader';
 
 interface ContentCharacteristics {
   sentence_structure?: string;
@@ -40,141 +42,188 @@ interface ContentCharacteristicsSectionProps {
 
 const ContentCharacteristicsSection: React.FC<ContentCharacteristicsSectionProps> = ({
   contentCharacteristics,
-  isEditable,
+  isEditable = false,
   onUpdate,
-  hideHeader
+  hideHeader = false
 }) => {
-  const styles = useOnboardingStyles();
+  const safeValue = (val: any): string | undefined => {
+    if (val === null || val === undefined) return undefined;
+    if (typeof val === 'string') return val;
+    if (typeof val === 'number') return String(val);
+    if (Array.isArray(val)) return val.join(', ');
+    if (typeof val === 'object') {
+      if (val.value) return String(val.value);
+      return undefined;
+    }
+    return String(val);
+  };
 
   if (!contentCharacteristics) {
     return null;
   }
 
+  const createData = (
+    category: string,
+    label: string,
+    value: any,
+    tooltip: string,
+    icon: React.ReactNode,
+    field: string
+  ) => {
+    return { category, label, value: safeValue(value), tooltip, icon, field };
+  };
+
+  const rows = [
+    createData(
+      'Readability',
+      'Vocabulary Level',
+      contentCharacteristics.vocabulary_level,
+      'The complexity and sophistication of words used in the content',
+      <LanguageIcon />,
+      'vocabulary_level'
+    ),
+    createData(
+      'Readability',
+      'Readability Score',
+      contentCharacteristics.readability_score,
+      'How easy it is for readers to understand the content',
+      <SpeedIcon />,
+      'readability_score'
+    ),
+    createData(
+      'Readability',
+      'Content Density',
+      contentCharacteristics.content_density,
+      'How much information is packed into each section',
+      <PaletteIcon />,
+      'content_density'
+    ),
+    createData(
+      'Structure',
+      'Sentence Structure',
+      contentCharacteristics.sentence_structure,
+      'The variety and complexity of sentence patterns used',
+      <AnalyticsIcon />,
+      'sentence_structure'
+    ),
+    createData(
+      'Structure',
+      'Paragraph Organization',
+      contentCharacteristics.paragraph_organization,
+      'How paragraphs are structured and organized',
+      <AnalyticsIcon />,
+      'paragraph_organization'
+    ),
+    createData(
+      'Structure',
+      'Content Flow',
+      contentCharacteristics.content_flow,
+      'How smoothly the content moves from one idea to the next',
+      <TrendingUpIcon />,
+      'content_flow'
+    ),
+    createData(
+      'Presentation',
+      'Visual Elements Usage',
+      contentCharacteristics.visual_elements_usage,
+      'How often images, charts, and other visual elements support the text',
+      <PaletteIcon />,
+      'visual_elements_usage'
+    ),
+  ].filter(row => isEditable || (row.value && row.value.trim() !== ''));
+
+  const groupedRows = rows.reduce((acc, row) => {
+    if (!acc[row.category]) {
+      acc[row.category] = [];
+    }
+    acc[row.category].push(row);
+    return acc;
+  }, {} as Record<string, typeof rows>);
+
+  if (rows.length === 0) {
+    return null;
+  }
+
   return (
-    <Box sx={{ 
-      ...styles.analysisSection, 
-      mt: 4,
-      '& .MuiTypography-root': { color: '#111827 !important', WebkitTextFillColor: '#111827' },
-      '& .MuiPaper-root': { backgroundColor: '#ffffff !important', backgroundImage: 'none !important' }
-    }}>
-      <Typography 
-        variant="h5" 
-        sx={{
-          ...styles.analysisSectionHeader,
-          color: '#1a202c !important', // Force dark text
-          fontWeight: '700 !important'
-        }}
-      >
-        <AnalyticsIcon sx={{ color: '#667eea !important' }} />
-        Content Characteristics
-      </Typography>
-      
-      <Grid container spacing={2}>
-        {contentCharacteristics.vocabulary_level && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="The complexity and sophistication of words used in the content. Higher levels use more advanced vocabulary while accessible levels use simpler, everyday words." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Vocabulary Level',
-                  contentCharacteristics.vocabulary_level,
-                  <LanguageIcon />,
-                  'info'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-        
-        {contentCharacteristics.readability_score && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="How easy it is for readers to understand the content. Higher scores mean the content is easier to read and comprehend." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Readability Score',
-                  contentCharacteristics.readability_score,
-                  <SpeedIcon />,
-                  'success'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-        
-        {contentCharacteristics.content_density && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="How much information is packed into each section. Moderate density balances information with readability." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Content Density',
-                  contentCharacteristics.content_density,
-                  <PaletteIcon />,
-                  'warning'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-        
-        {contentCharacteristics.sentence_structure && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="The variety and complexity of sentence patterns used. Varied structures keep readers engaged." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Sentence Structure',
-                  contentCharacteristics.sentence_structure,
-                  <AnalyticsIcon />,
-                  'secondary'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-        
-        {contentCharacteristics.paragraph_organization && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="How paragraphs are structured and organized. Clear organization helps readers follow the content easily." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Paragraph Organization',
-                  contentCharacteristics.paragraph_organization,
-                  <AnalyticsIcon />,
-                  'primary'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-        
-        {contentCharacteristics.content_flow && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="How smoothly the content moves from one idea to the next. Good flow keeps readers engaged throughout." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Content Flow',
-                  contentCharacteristics.content_flow,
-                  <TrendingUpIcon />,
-                  'success'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-        
-        {contentCharacteristics.visual_elements_usage && (
-          <Grid item xs={12} sm={6} md={4} lg={3} xl={2}>
-            <Tooltip title="How often images, charts, and other visual elements are used to support the text content." arrow>
-              <Box>
-                {renderKeyInsight(
-                  'Visual Elements Usage',
-                  contentCharacteristics.visual_elements_usage,
-                  <PaletteIcon />,
-                  'warning'
-                )}
-              </Box>
-            </Tooltip>
-          </Grid>
-        )}
-      </Grid>
+    <Box sx={{ mt: hideHeader ? 0 : 4 }}>
+      {!hideHeader && (
+        <SectionHeader 
+          title="Content Characteristics" 
+          icon={<AnalyticsIcon sx={{ color: '#667eea' }} />}
+          tooltip="Readability, structure, and presentation patterns in your content."
+        />
+      )}
+
+      <TableContainer component={Paper} elevation={0} sx={{ border: '1px solid #e0e0e0', borderRadius: 2 }}>
+        <Table sx={{ minWidth: 650 }} aria-label="content characteristics table">
+          <TableHead>
+            <TableRow sx={{ backgroundColor: '#f8fafc' }}>
+              <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '30%' }}>Metric</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '40%' }}>Analysis Result</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: '#1a202c', width: '30%' }}>Description</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {Object.entries(groupedRows).map(([category, categoryRows]) => (
+              <React.Fragment key={category}>
+                <TableRow sx={{ backgroundColor: '#f1f5f9' }}>
+                  <TableCell colSpan={3} sx={{ fontWeight: 700, color: '#475569', py: 1 }}>
+                    {category}
+                  </TableCell>
+                </TableRow>
+                {categoryRows.map((row) => (
+                  <TableRow
+                    key={row.label}
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 }, '&:hover': { backgroundColor: '#f9f9f9' } }}
+                  >
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ color: '#667eea', display: 'flex' }}>{row.icon}</Box>
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: '#2d3748' }}>
+                          {row.label}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell>
+                      {isEditable ? (
+                        <TextField
+                          value={row.value || ''}
+                          onChange={(e) => onUpdate && onUpdate(row.field, e.target.value)}
+                          variant="outlined"
+                          size="small"
+                          fullWidth
+                          sx={{ 
+                            '& .MuiInputBase-input': { color: '#1f2937', fontWeight: 500 },
+                            '& .MuiOutlinedInput-root': { bgcolor: 'white', color: '#1f2937' }
+                          }}
+                        />
+                      ) : (
+                        <Chip 
+                          label={row.value} 
+                          size="small" 
+                          color="primary" 
+                          variant="outlined" 
+                          sx={{ fontWeight: 600 }}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Tooltip title={row.tooltip} arrow placement="top">
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
+                          <InfoIcon fontSize="small" color="action" />
+                          <Typography variant="caption" color="text.secondary">
+                            What is this?
+                          </Typography>
+                        </Box>
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </React.Fragment>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </Box>
   );
 };

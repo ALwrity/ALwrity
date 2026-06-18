@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from loguru import logger
 
 from services.persona.core_persona.core_persona_service import CorePersonaService
-from services.persona.enhanced_linguistic_analyzer import EnhancedLinguisticAnalyzer
+from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
 from services.persona.persona_quality_improver import PersonaQualityImprover
 from middleware.auth_middleware import get_current_user
 from services.llm_providers.gemini_provider import gemini_structured_json_response
@@ -19,8 +19,8 @@ router = APIRouter()
 
 # Initialize services
 core_persona_service = CorePersonaService()
-linguistic_analyzer = EnhancedLinguisticAnalyzer()
-quality_improver = PersonaQualityImprover()
+linguistic_analyzer = get_linguistic_analyzer()
+quality_improver = PersonaQualityImprover(linguistic_analyzer)
 
 class OptimizedPersonaGenerationRequest(BaseModel):
     """Optimized request model for persona generation."""

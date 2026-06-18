@@ -1,11 +1,14 @@
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from models.website_analysis_monitoring_models import DeepWebsiteCrawlTask
+from utils.logger_utils import get_service_logger
 
-def load_due_deep_website_crawl_tasks(db: Session, user_id: str = None) -> List[DeepWebsiteCrawlTask]:
+logger = get_service_logger("deep_website_crawl_task_loader")
+
+def load_due_deep_website_crawl_tasks(db: Session, user_id: Optional[str] = None) -> List[DeepWebsiteCrawlTask]:
     """
     Load due deep website crawl tasks.
     
@@ -16,18 +19,22 @@ def load_due_deep_website_crawl_tasks(db: Session, user_id: str = None) -> List[
     Returns:
         List of due tasks
     """
-    query = db.query(DeepWebsiteCrawlTask).filter(
-        or_(
-            DeepWebsiteCrawlTask.status == 'active',
-            DeepWebsiteCrawlTask.status == 'retry'
-        ),
-        or_(
-            DeepWebsiteCrawlTask.next_execution <= datetime.utcnow(),
-            DeepWebsiteCrawlTask.next_execution == None
+    try:
+        query = db.query(DeepWebsiteCrawlTask).filter(
+            or_(
+                DeepWebsiteCrawlTask.status == 'active',
+                DeepWebsiteCrawlTask.status == 'retry'
+            ),
+            or_(
+                DeepWebsiteCrawlTask.next_execution <= datetime.utcnow(),
+                DeepWebsiteCrawlTask.next_execution == None
+            )
         )
-    )
-    
-    if user_id:
-        query = query.filter(DeepWebsiteCrawlTask.user_id == user_id)
         
-    return query.all()
+        if user_id:
+            query = query.filter(DeepWebsiteCrawlTask.user_id == user_id)
+            
+        return query.all()
+    except Exception as e:
+        logger.error(f"Error loading deep website crawl tasks: {e}")
+        return []

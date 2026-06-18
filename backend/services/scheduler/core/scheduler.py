@@ -142,8 +142,8 @@ class TaskScheduler:
         """
         Get the appropriate trigger for the given interval.
         
-        For intervals >= 60 minutes, use IntervalTrigger.
-        For intervals < 60 minutes, use CronTrigger.
+        Uses CronTrigger only when interval_minutes divides 60 evenly (wall-clock alignment).
+        Falls back to IntervalTrigger for non-divisors to avoid hour-boundary skew.
         
         Args:
             interval_minutes: Interval in minutes
@@ -151,12 +151,10 @@ class TaskScheduler:
         Returns:
             Appropriate APScheduler trigger
         """
-        if interval_minutes >= 60:
-            # Use IntervalTrigger for intervals >= 60 minutes
-            return IntervalTrigger(minutes=interval_minutes)
-        else:
-            # Use CronTrigger for intervals < 60 minutes (valid range: 0-59)
+        if interval_minutes < 60 and 60 % interval_minutes == 0:
             return CronTrigger(minute=f'*/{interval_minutes}')
+        else:
+            return IntervalTrigger(minutes=interval_minutes)
     
     def register_executor(
         self,
@@ -371,44 +369,6 @@ class TaskScheduler:
             registered_types = self.registry.get_registered_types()
             active_strategies = self.stats.get('active_strategies_count', 0)
             
-            # Count tasks per user (Multi-tenant SQLite)
-            oauth_tasks_count = 0
-            website_analysis_tasks_count = 0
-            platform_insights_tasks_count = 0
-            advertools_tasks_count = 0
-            
-            user_ids = get_all_user_ids()
-            for user_id in user_ids:
-                try:
-                    db = get_session_for_user(user_id)
-                    if not db:
-                        continue
-                        
-                    try:
-                        from models.oauth_token_monitoring_models import OAuthTokenMonitoringTask
-                        oauth_tasks_count += db.query(OAuthTokenMonitoringTask).filter(
-                            OAuthTokenMonitoringTask.status == 'active'
-                        ).count()
-                        
-                        from models.website_analysis_monitoring_models import WebsiteAnalysisTask
-                        website_analysis_tasks_count += db.query(WebsiteAnalysisTask).filter(
-                            WebsiteAnalysisTask.status == 'active'
-                        ).count()
-                        
-                        from models.platform_insights_monitoring_models import PlatformInsightsTask
-                        platform_insights_tasks_count += db.query(PlatformInsightsTask).filter(
-                            PlatformInsightsTask.status == 'active'
-                        ).count()
-
-                        from models.advertools_monitoring_models import AdvertoolsTask
-                        advertools_tasks_count += db.query(AdvertoolsTask).filter(
-                            AdvertoolsTask.status == 'active'
-                        ).count()
-                    finally:
-                        db.close()
-                except Exception as e:
-                    logger.debug(f"Error counting tasks for user {user_id}: {e}")
-
             # Calculate job counts
             apscheduler_recurring = 1  # check_due_tasks
             apscheduler_one_time = len(all_jobs) - 1
@@ -427,7 +387,7 @@ class TaskScheduler:
                 recurring_breakdown += f", Advertools: {advertools_tasks_count}"
             
             startup_lines = [
-                f"[Scheduler] ✅ Task Scheduler Started",
+                f"[Scheduler] TaskScheduler Started",
                 f"   ├─ Check Interval: {initial_interval} minutes",
                 f"   ├─ Registered Task Types: {len(registered_types)} ({', '.join(registered_types) if registered_types else 'none'})",
                 f"   ├─ Active Strategies: {active_strategies}",
@@ -686,7 +646,7 @@ class TaskScheduler:
                 context={"task_type": task_type},
                 original_error=e
             )
-            self.exception_handler.handle_exception(error)
+            self.exception_handler.handle_exception(error, db=db)
             self.stats["tasks_failed"] += 1
             return summary
 
@@ -751,7 +711,7 @@ class TaskScheduler:
                 context={"task_type": task_type},
                 original_error=e
             )
-            self.exception_handler.handle_exception(error)
+            self.exception_handler.handle_exception(error, db=db)
             self.stats["tasks_failed"] += 1
             return summary
 
@@ -772,6 +732,62 @@ class TaskScheduler:
         else:
             user_stats["tasks_failed"] += 1
         user_stats["last_update"] = datetime.utcnow().isoformat()
+
+    def get_stats(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return a composite stats dict for the dashboard.
+
+        C1: this method was missing — the dashboard endpoint called
+        `scheduler.get_stats()` and crashed with `AttributeError`. We now
+        return `self.stats` (counters) plus live runtime attributes
+        (running state, active execution count, current/min/max check
+        interval, registered task types).
+
+        The returned dict is a deep copy of `self.stats` (callers cannot
+        mutate scheduler state through it) plus live runtime attributes
+        (running state, active execution count, current/min/max check
+        interval, registered task types).
+
+        If `user_id` is provided, per-user counters are returned under
+        the top-level keys (so the dashboard can show a user-scoped
+        view). Global counters are still included.
+        """
+        import copy
+
+        # Shallow copy the top-level stats dict, then deep copy the
+        # nested per_user_stats (and each per-user sub-dict) so callers
+        # can read but not mutate scheduler state.
+
+        out: Dict[str, Any] = dict(self.stats)
+        nested = self.stats.get("per_user_stats")
+        if isinstance(nested, dict):
+            out["per_user_stats"] = {
+                uid: copy.deepcopy(user_stats)
+                for uid, user_stats in nested.items()
+            }
+
+        # Live runtime attributes that the dashboard reads.
+        out["active_executions"] = len(self.active_executions)
+        out["running"] = self._running
+        out["check_interval_minutes"] = self.current_check_interval_minutes
+        out["min_check_interval_minutes"] = self.min_check_interval_minutes
+        out["max_check_interval_minutes"] = self.max_check_interval_minutes
+        # Adaptive interval logic exists (min < max) so flag it on.
+        out["intelligent_scheduling"] = (
+            self.min_check_interval_minutes < self.max_check_interval_minutes
+        )
+        try:
+            out["registered_types"] = list(self.registry.get_registered_types())
+        except Exception:
+            out["registered_types"] = []
+
+        # User-scoped view: overlay per-user counters at the top level.
+        if user_id is not None:
+            user_stats = out.get("per_user_stats", {}).get(user_id) or {}
+            out["tasks_executed"] = user_stats.get("tasks_executed", 0)
+            out["tasks_failed"] = user_stats.get("tasks_failed", 0)
+            out["last_update"] = user_stats.get("last_update") or out.get("last_update")
+
+        return out
 
     async def _schedule_retry(self, task: Any, retry_delay: int):
         try:

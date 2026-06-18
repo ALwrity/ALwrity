@@ -581,23 +581,6 @@ class ContentPlanningAPI {
     return response.data?.data || response.data;
   }
 
-  // Non-streaming autofill refresh method
-  async refreshAutofill(userId?: number, useAI: boolean = true, aiOnly: boolean = false): Promise<any> {
-    const params: any = { 
-      use_ai: useAI, 
-      ai_only: aiOnly,
-      _t: Date.now() // 🚨 CRITICAL: Cache-busting timestamp to ensure fresh AI generation
-    };
-    if (userId) params.user_id = userId;
-    const response = await apiClient.post(`${this.baseURL}/enhanced-strategies/strategies/autofill/refresh`, null, { params });
-    
-    // The backend returns ResponseBuilder format: { status, message, data, status_code, timestamp }
-    // We need to return the actual payload from response.data.data
-    const result = response.data?.data || response.data;
-    
-    return result;
-  }
-
   // Enhanced Strategy CRUD Operations
   async updateEnhancedStrategy(id: string, updates: any): Promise<any> {
     return this.handleRequest(async () => {
@@ -613,21 +596,18 @@ class ContentPlanningAPI {
     });
   }
 
-  // Onboarding Data Methods
-  // Note: Endpoint gets user_id from authentication, query params are ignored
-  async getOnboardingData(userId?: number): Promise<any> {
+  // Unified autofill (DB + AI merged)
+  async autofill(): Promise<any> {
     return this.handleRequest(async () => {
-      // Don't pass user_id as query param - endpoint gets it from authentication
-      const response = await apiClient.get(`${this.baseURL}/enhanced-strategies/onboarding-data`);
+      const response = await apiClient.post(`${this.baseURL}/enhanced-strategies/strategies/autofill/generate`);
       return response.data?.data || response.data;
     });
   }
 
-  async smartAutofill(userId?: number): Promise<any> {
+  // Regenerate only AI-generated fields, preserving DB-grounded onboarding data
+  async regenerateAIFields(): Promise<any> {
     return this.handleRequest(async () => {
-      const response = await apiClient.post(`${this.baseURL}/enhanced-strategies/smart-autofill`, null, {
-        params: userId ? { user_id: userId } : {}
-      });
+      const response = await apiClient.post(`${this.baseURL}/enhanced-strategies/strategies/autofill/regenerate-ai`);
       return response.data?.data || response.data;
     });
   }

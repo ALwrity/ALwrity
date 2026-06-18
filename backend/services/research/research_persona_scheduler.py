@@ -9,7 +9,7 @@ from loguru import logger
 
 from services.database import get_db_session
 from services.research.research_persona_service import ResearchPersonaService
-from models.scheduler_models import SchedulerEventLog
+
 
 
 async def generate_research_persona_task(user_id: str):
@@ -46,59 +46,16 @@ async def generate_research_persona_task(user_id: str):
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             
             if research_persona:
-                logger.info(f"✅ Scheduled research persona generation completed for user {user_id}")
-                
-                # Log success to scheduler event log for dashboard
-                try:
-                    event_log = SchedulerEventLog(
-                        event_type='job_completed',
-                        event_date=start_time,
-                        job_id=f"research_persona_{user_id}",
-                        job_type='one_time',
-                        user_id=user_id,
-                        event_data={
-                            'job_function': 'generate_research_persona_task',
-                            'execution_time_seconds': execution_time,
-                            'status': 'success'
-                        }
-                    )
-                    db.add(event_log)
-                    db.commit()
-                except Exception as log_error:
-                    logger.warning(f"Failed to log persona generation success to scheduler event log: {log_error}")
-                    if db:
-                        db.rollback()
+                logger.info(f"Scheduled research persona generation completed for user {user_id}")
             else:
                 error_msg = (
                     f"Scheduled research persona generation FAILED for user {user_id}. "
                     f"Expensive API call was made but generation failed. "
                     f"Will NOT automatically retry to prevent wasteful API calls."
                 )
-                logger.error(f"❌ {error_msg}")
-                
-                # Log failure to scheduler event log for dashboard visibility
-                try:
-                    event_log = SchedulerEventLog(
-                        event_type='job_failed',
-                        event_date=start_time,
-                        job_id=f"research_persona_{user_id}",
-                        job_type='one_time',
-                        user_id=user_id,
-                        error_message=error_msg,
-                        event_data={
-                            'job_function': 'generate_research_persona_task',
-                            'execution_time_seconds': execution_time,
-                            'status': 'failed',
-                            'failure_reason': 'generation_returned_none',
-                            'expensive_api_call': True
-                        }
-                    )
-                    db.add(event_log)
-                    db.commit()
-                except Exception as log_error:
-                    logger.warning(f"Failed to log persona generation failure to scheduler event log: {log_error}")
-                    if db:
-                        db.rollback()
+                logger.error(f"Scheduled research persona generation FAILED for user {user_id}")
+                # DO NOT reschedule - this prevents infinite retry loops
+                # User can manually trigger generation from frontend if needed
                 
                 # DO NOT reschedule - this prevents infinite retry loops
                 # User can manually trigger generation from frontend if needed
@@ -108,34 +65,7 @@ async def generate_research_persona_task(user_id: str):
                 f"Exception during scheduled research persona generation for user {user_id}: {str(gen_error)}. "
                 f"Expensive API call may have been made. Will NOT automatically retry."
             )
-            logger.error(f"❌ {error_msg}")
-            
-            # Log exception to scheduler event log for dashboard visibility
-            try:
-                event_log = SchedulerEventLog(
-                    event_type='job_failed',
-                    event_date=start_time,
-                    job_id=f"research_persona_{user_id}",  # Match scheduled job ID format
-                    job_type='one_time',
-                    user_id=user_id,
-                    error_message=error_msg,
-                    event_data={
-                        'job_function': 'generate_research_persona_task',
-                        'execution_time_seconds': execution_time,
-                        'status': 'failed',
-                        'failure_reason': 'exception',
-                        'exception_type': type(gen_error).__name__,
-                        'exception_message': str(gen_error),
-                        'expensive_api_call': True
-                    }
-                )
-                db.add(event_log)
-                db.commit()
-            except Exception as log_error:
-                logger.warning(f"Failed to log persona generation exception to scheduler event log: {log_error}")
-                if db:
-                    db.rollback()
-            
+            logger.error(f"Exception during scheduled research persona generation for user {user_id}: {str(gen_error)}")
             # DO NOT reschedule - prevent infinite retry loops
             
     except Exception as e:

@@ -26,9 +26,9 @@ import EnterpriseDatapointsModal from './EnterpriseDatapointsModal';
 // Import extracted hooks
 import { useCategoryReview } from './ContentStrategyBuilder/hooks/useCategoryReview';
 import { useProgressTracking } from './ContentStrategyBuilder/hooks/useProgressTracking';
-// import { useAutoPopulation } from './ContentStrategyBuilder/hooks/useAutoPopulation'; // Removed - now handled by consent modal
+import { useAutoPopulation } from './ContentStrategyBuilder/hooks/useAutoPopulation';
 import { useModalManagement } from './ContentStrategyBuilder/hooks/useModalManagement';
-import { useAIRefresh } from './ContentStrategyBuilder/hooks/useAIRefresh';
+// Removed: useAIRefresh (autofill unified into store's autofillStrategyFields)
 import { useEventHandlers } from './ContentStrategyBuilder/hooks/useEventHandlers';
 import { useStrategyCreation } from './ContentStrategyBuilder/hooks/useStrategyCreation';
 
@@ -74,8 +74,8 @@ const ContentStrategyBuilder: React.FC = () => {
     updateFormField,
     validateFormField,
     validateAllFields,
-    autoPopulateFromOnboarding,
-    smartAutofill,
+    autofillStrategyFields,
+    regenerateAIFields,
     createStrategy: createEnhancedStrategy,
     calculateCompletionPercentage,
     getCompletionStats,
@@ -236,7 +236,7 @@ const ContentStrategyBuilder: React.FC = () => {
       - validateStrategyField: Check if a field is valid
       - reviewStrategy: Get overall strategy review
       - generateSuggestions: Get suggestions for a field
-      - autoPopulateFromOnboarding: Auto-fill using onboarding data
+      - autofillStrategyFields: Auto-fill using onboarding + AI data
       
       SUGGESTIONS CONTEXT:
       - Users can click on suggestion buttons to quickly start common tasks
@@ -318,23 +318,6 @@ const ContentStrategyBuilder: React.FC = () => {
     setShowEnterpriseModal
   });
 
-  const {
-    refreshMessage,
-    refreshProgress,
-    isRefreshing,
-    refreshError,
-    handleAIRefresh
-  } = useAIRefresh({
-    setTransparencyModalOpen,
-    setIsGenerating,
-    setStoreGenerationProgress,
-    setCurrentPhase,
-    clearTransparencyMessages,
-    addTransparencyMessage,
-    setAIGenerating,
-    setError
-  });
-
   // getCompletionStats depends on formData, so we include it to recalculate when data changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const completionStats = useMemo(() => getCompletionStats(), [formData]);
@@ -356,11 +339,11 @@ const ContentStrategyBuilder: React.FC = () => {
     isNextInSequence
   } = useProgressTracking({ completionStats, reviewedCategories });
 
-  // Remove automatic auto-population hook - now handled by consent modal
-  // const { autoPopulateAttempted, setAutoPopulateAttempted } = useAutoPopulation({
-  //   autoPopulateFromOnboarding,
-  //   completionStats
-  // });
+  // Pre-fill strategy fields from onboarding data on first mount
+  const { autoPopulateAttempted, setAutoPopulateAttempted } = useAutoPopulation({
+    autoPopulateFromOnboarding: autofillStrategyFields,
+    completionStats
+  });
   
   // Removed: Auto-population consent state (replaced with buttons in HeaderSection)
 
@@ -599,20 +582,19 @@ const ContentStrategyBuilder: React.FC = () => {
               confidenceScores={confidenceScores}
               loading={loading}
               error={error}
-              onRefreshAutofill={handleAIRefresh}
-              onDatabaseAutofill={autoPopulateFromOnboarding}
-              onSmartAutofill={smartAutofill}
-              onContinueWithPresent={handleContinueWithPresent}
-              onScrollToReview={handleScrollToReview}
-              hasAutofillData={hasAutofillData}
-              lastAutofillTime={lastAutofillTime}
-              dataSource={dataSource}
-            />
+                onAutofill={() => autofillStrategyFields()}
+               onRegenerateAI={() => regenerateAIFields()}
+               onContinueWithPresent={handleContinueWithPresent}
+               onScrollToReview={handleScrollToReview}
+               hasAutofillData={hasAutofillData}
+               lastAutofillTime={lastAutofillTime}
+               dataSource={dataSource}
+             />
 
       {/* Error Alert */}
       <ErrorAlert
         error={error}
-        onRetry={() => autoPopulateFromOnboarding(true)}
+        onRetry={() => autofillStrategyFields()}
         onShowDataSourceTransparency={() => setShowDataSourceTransparency(true)}
       />
 
@@ -637,12 +619,8 @@ const ContentStrategyBuilder: React.FC = () => {
               aiGenerating={aiGenerating}
               onShowAIRecommendations={() => setShowAIRecommendations(true)}
               onShowDataSourceTransparency={() => setShowDataSourceTransparency(true)}
-              onRefreshData={() => autoPopulateFromOnboarding()}
-              onRefreshAI={handleAIRefresh}
-              refreshMessage={refreshMessage}
-              refreshProgress={refreshProgress}
-              isRefreshing={isRefreshing}
-              refreshError={refreshError}
+               onRefreshData={() => autofillStrategyFields()}
+               onRefreshAI={() => autofillStrategyFields()}
             />
 
             {/* Category Progress - Compact with Futuristic Styling */}

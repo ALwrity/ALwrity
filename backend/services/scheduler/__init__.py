@@ -35,7 +35,7 @@ from .utils.platform_insights_task_loader import load_due_platform_insights_task
 from .utils.advertools_task_loader import load_due_advertools_tasks
 from .utils.sif_indexing_task_loader import load_due_sif_indexing_tasks
 from .utils.market_trends_task_loader import load_due_market_trends_tasks
-from services.today_workflow_service import generate_scheduled_daily_workflows
+from services.daily_workflow_batch import generate_scheduled_daily_workflows
 
 # Global scheduler instance (initialized on first access)
 _scheduler_instance: TaskScheduler = None

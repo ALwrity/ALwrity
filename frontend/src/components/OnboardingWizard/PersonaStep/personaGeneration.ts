@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { apiClient } from '../../../api/client';
+import { aiApiClient } from '../../../api/client';
 import { 
   generateWritingPersonas, 
   assessPersonaQuality, 
@@ -56,7 +56,7 @@ export const usePersonaGeneration = ({
       };
 
       console.log('Starting async persona generation...');
-      const response = await apiClient.post('/api/onboarding/step4/generate-personas-async', request);
+      const response = await aiApiClient.post('/api/onboarding/step4/generate-personas-async', request);
       
       if (response.data.task_id) {
         console.log('Persona generation task response:', response.data);
@@ -65,7 +65,7 @@ export const usePersonaGeneration = ({
         if (response.data.status === 'completed') {
           console.log('Task already completed (cache hit), fetching result immediately');
           // Fetch the completed task result
-          const taskResponse = await apiClient.get(`/api/onboarding/step4/persona-task/${response.data.task_id}`);
+          const taskResponse = await aiApiClient.get(`/api/onboarding/step4/persona-task/${response.data.task_id}`);
           if (taskResponse.data && taskResponse.data.result) {
             const result = taskResponse.data.result;
             setCorePersona(result.core_persona);

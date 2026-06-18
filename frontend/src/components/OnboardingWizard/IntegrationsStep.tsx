@@ -79,6 +79,7 @@ interface IntegrationPlatform {
 const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataChange }) => {
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
+  const [oauthError, setOauthError] = useState<string | null>(null);
   
   // Use custom hooks
   const { gscSites, connectedPlatforms, setConnectedPlatforms, handleGSCConnect } = useGSCConnection();
@@ -271,6 +272,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
         await refreshBingStatus();
       } catch (e) {
         console.error('Failed to refresh Bing status:', e);
+        setOauthError('Could not verify Bing connection status.');
       }
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -303,9 +305,8 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
       // Remove query parameters from URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error) {
-      // WordPress OAuth failed
       console.error('WordPress OAuth error:', error);
-      // Remove query parameters from URL
+      setOauthError('WordPress connection failed. Please try again.');
       window.history.replaceState({}, document.title, window.location.pathname);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -328,11 +329,11 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     if (platformId === 'gsc') {
       await handleGSCConnect();
     } else if (platformId === 'bing') {
-      // Use the Bing OAuth hook for connection
       try {
         await connectBing();
       } catch (error) {
         console.error('Bing connection failed:', error);
+        setOauthError('Bing connection failed. Please try again.');
       }
     } else {
       await handleConnect(platformId);
@@ -485,6 +486,15 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     <Box sx={{ width: '100%', maxWidth: '100%', p: { xs: 1, sm: 2, md: 3 } }}>
       {/* Email Address Section */}
       <EmailSection email={email} onEmailChange={setEmail} />
+
+      {/* OAuth Error Alert */}
+      {oauthError && (
+        <Fade in timeout={500}>
+          <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }} onClose={() => setOauthError(null)}>
+            {oauthError}
+          </Alert>
+        </Fade>
+      )}
 
       {/* Website Platforms */}
       <Fade in timeout={800}>

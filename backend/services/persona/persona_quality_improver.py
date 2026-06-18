@@ -16,14 +16,14 @@ from models.enhanced_persona_models import (
     PersonaLearningData
 )
 from services.database import get_db_session
-from services.persona.enhanced_linguistic_analyzer import EnhancedLinguisticAnalyzer
+from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
 
 class PersonaQualityImprover:
     """Service for continuously improving persona quality and accuracy."""
     
-    def __init__(self):
+    def __init__(self, linguistic_analyzer=None):
         """Initialize the quality improver."""
-        self.linguistic_analyzer = EnhancedLinguisticAnalyzer()
+        self.linguistic_analyzer = linguistic_analyzer or get_linguistic_analyzer()
         logger.debug("PersonaQualityImprover initialized")
     
     def assess_persona_quality_comprehensive(

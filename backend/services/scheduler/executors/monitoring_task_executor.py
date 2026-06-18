@@ -108,8 +108,6 @@ class MonitoringTaskExecutor(TaskExecutor):
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
 
-            self.exception_handler.db = db
-
             error = TaskExecutionError(
                 message=f"Error executing monitoring task {task.id}: {str(e)}",
                 user_id=user_id,
@@ -124,7 +122,7 @@ class MonitoringTaskExecutor(TaskExecutor):
                 original_error=e
             )
 
-            self.exception_handler.handle_exception(error)
+            self.exception_handler.handle_exception(error, db=db)
 
             try:
                 execution_log = TaskExecutionLog(
@@ -153,7 +151,7 @@ class MonitoringTaskExecutor(TaskExecutor):
                     task_id=task.id,
                     original_error=commit_error
                 )
-                self.exception_handler.handle_exception(db_error)
+                self.exception_handler.handle_exception(db_error, db=db)
                 db.rollback()
 
             return TaskExecutionResult(

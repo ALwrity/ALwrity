@@ -18,6 +18,11 @@ from middleware.logging_middleware import seo_logger
 
 from .sitemap_service import SitemapService
 
+# Per-domain concurrency lock for sitemap benchmarking.
+# Prevents N concurrent calls to the same domain from flooding it with requests.
+_sitemap_benchmarking_locks: Dict[str, asyncio.Lock] = {}
+_sitemap_benchmarking_lock_cleanup_interval = 300  # seconds
+
 class ContentStrategyService:
     """Service for AI-powered content strategy analysis"""
     
@@ -155,139 +160,146 @@ class ContentStrategyService:
         # Using WARNING level to ensure visibility in production logs as requested by user
         logger.warning(f"🚀 [START] Competitive sitemap benchmarking for {website_url} with {len(competitors)} competitors")
 
-        competitors = [c for c in (competitors or []) if isinstance(c, str) and c.strip()]
-        if max_competitors:
-            competitors = competitors[: max(0, int(max_competitors))]
-        
-        if not competitors:
-            logger.warning(f"No competitors provided for benchmarking {website_url}")
+        # Per-domain dedup lock: only one benchmarking run per domain at a time
+        domain = self._normalize_domain(website_url)
+        lock = _sitemap_benchmarking_locks.setdefault(domain, asyncio.Lock())
+        lock_key = id(lock)
+        logger.warning(f"🔒 [DEDUP] Waiting for domain lock {lock_key} on {domain} (concurrent calls held until prior run finishes)")
+        async with lock:
+            logger.warning(f"🔓 [DEDUP] Acquired domain lock {lock_key} on {domain}")
 
-        sitemap_service = SitemapService()
+            competitors = [c for c in (competitors or []) if isinstance(c, str) and c.strip()]
+            if max_competitors:
+                competitors = competitors[: max(0, int(max_competitors))]
+            
+            if not competitors:
+                logger.warning(f"No competitors provided for benchmarking {website_url}")
 
-        logger.warning(f"🔍 [PROGRESS] Discovering user sitemap for {website_url}")
-        discovered_user_sitemap = await sitemap_service.discover_sitemap_url(website_url)
-        user_sitemap_result = None
-        user_error = None
-        if discovered_user_sitemap:
-            try:
-                logger.warning(f"⚡ [PROGRESS] Analyzing user sitemap: {discovered_user_sitemap}")
-                user_sitemap_result = await sitemap_service.analyze_sitemap(
-                    sitemap_url=discovered_user_sitemap,
-                    analyze_content_trends=True,
-                    analyze_publishing_patterns=True,
-                    include_ai_insights=False,
-                    user_id=user_id
-                )
-            except Exception as e:
-                user_error = str(e)
-                logger.error(f"Error analyzing user sitemap {discovered_user_sitemap}: {e}")
-        else:
-            user_error = "No sitemap discovered for your website. Please ensure your site has a valid sitemap.xml."
-            logger.warning(f"⚠️ No sitemap found for user website {website_url}")
+            sitemap_service = SitemapService()
 
-        competitor_sitemaps: Dict[str, Optional[str]] = {}
-        competitor_results: Dict[str, Dict[str, Any]] = {}
-        competitor_errors: Dict[str, str] = {}
-
-        logger.warning(f"🔍 [PROGRESS] Discovering sitemaps for {len(competitors)} competitors")
-        discovery_tasks = [sitemap_service.discover_sitemap_url(u) for u in competitors]
-        discovery_results = await asyncio.gather(*discovery_tasks, return_exceptions=True)
-        for i, url in enumerate(competitors):
-            res = discovery_results[i]
-            if isinstance(res, Exception):
-                competitor_sitemaps[url] = None
-                competitor_errors[url] = str(res)
-                logger.warning(f"Error discovering sitemap for competitor {url}: {res}")
-            else:
-                competitor_sitemaps[url] = res
-                if not res:
-                    competitor_errors[url] = "No sitemap found"
-                    logger.info(f"ℹ️ No sitemap found for competitor {url}")
-                else:
-                    logger.info(f"✅ Found sitemap for competitor {url}: {res}")
-
-        to_analyze = [(url, competitor_sitemaps.get(url)) for url in competitors if competitor_sitemaps.get(url)]
-        logger.warning(f"⚡ [PROGRESS] Analyzing {len(to_analyze)} competitor sitemaps")
-        
-        # Helper for safe analysis with timeout
-        async def analyze_with_timeout(url, sm):
-            try:
-                logger.warning(f"🕒 [START] Analyzing {url} with 300s timeout")
-                # 5 minute timeout per competitor to prevent total blocking
-                result = await asyncio.wait_for(
-                    sitemap_service.analyze_sitemap(
-                        sitemap_url=sm,
+            logger.warning(f"🔍 [PROGRESS] Discovering user sitemap for {website_url}")
+            discovered_user_sitemap = await sitemap_service.discover_sitemap_url(website_url)
+            user_sitemap_result = None
+            user_error = None
+            if discovered_user_sitemap:
+                try:
+                    logger.warning(f"⚡ [PROGRESS] Analyzing user sitemap: {discovered_user_sitemap}")
+                    user_sitemap_result = await sitemap_service.analyze_sitemap(
+                        sitemap_url=discovered_user_sitemap,
                         analyze_content_trends=True,
                         analyze_publishing_patterns=True,
                         include_ai_insights=False,
                         user_id=user_id
-                    ),
-                    timeout=300.0
-                )
-                logger.warning(f"✅ [DONE] Analysis finished for {url}")
-                return result
-            except asyncio.TimeoutError:
-                logger.error(f"⏱️ Analysis timed out for competitor {url} (limit: 300s)")
-                return TimeoutError(f"Analysis timed out after 300s")
-            except Exception as e:
-                msg = str(e)
-                if "URL returned a webpage" in msg or "Failed to parse sitemap XML" in msg or "no element found" in msg:
-                     logger.warning(f"⚠️ Analysis skipped for {url}: Invalid sitemap ({msg})")
-                else:
-                     logger.error(f"❌ Analysis failed for {url}: {e}")
-                return e
-
-        analysis_tasks = [
-            analyze_with_timeout(url, sm)
-            for (url, sm) in to_analyze
-        ]
-        analysis_results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
-        for i, (url, _) in enumerate(to_analyze):
-            res = analysis_results[i]
-            if isinstance(res, Exception):
-                competitor_errors[url] = str(res)
-                if "URL returned a webpage" not in str(res) and "Failed to parse sitemap XML" not in str(res) and "no element found" not in str(res):
-                    logger.error(f"Error analyzing sitemap for competitor {url}: {res}")
+                    )
+                except Exception as e:
+                    user_error = str(e)
+                    logger.error(f"Error analyzing user sitemap {discovered_user_sitemap}: {e}")
             else:
-                competitor_results[url] = res
+                user_error = "No sitemap discovered for your website. Please ensure your site has a valid sitemap.xml."
+                logger.warning(f"⚠️ No sitemap found for user website {website_url}")
 
-        user_summary = self._summarize_sitemap(user_sitemap_result)
-        competitor_summaries: Dict[str, Dict[str, Any]] = {}
-        for competitor_url, result in competitor_results.items():
-            if result and isinstance(result, dict) and "error" not in result:
-                competitor_summaries[competitor_url] = self._summarize_sitemap(result)
+            competitor_sitemaps: Dict[str, Optional[str]] = {}
+            competitor_results: Dict[str, Dict[str, Any]] = {}
+            competitor_errors: Dict[str, str] = {}
 
-        benchmark = self._build_competitive_sitemap_benchmark(
-            website_url=website_url,
-            user_summary=user_summary,
-            competitor_summaries=competitor_summaries
-        )
+            logger.warning(f"🔍 [PROGRESS] Discovering sitemaps for {len(competitors)} competitors")
+            discovery_tasks = [sitemap_service.discover_sitemap_url(u) for u in competitors]
+            discovery_results = await asyncio.gather(*discovery_tasks, return_exceptions=True)
+            for i, url in enumerate(competitors):
+                res = discovery_results[i]
+                if isinstance(res, Exception):
+                    competitor_sitemaps[url] = None
+                    competitor_errors[url] = str(res)
+                    logger.warning(f"Error discovering sitemap for competitor {url}: {res}")
+                else:
+                    competitor_sitemaps[url] = res
+                    if not res:
+                        competitor_errors[url] = "No sitemap found"
+                        logger.info(f"ℹ️ No sitemap found for competitor {url}")
+                    else:
+                        logger.info(f"✅ Found sitemap for competitor {url}: {res}")
 
-        execution_time = (datetime.utcnow() - start_time).total_seconds()
+            to_analyze = [(url, competitor_sitemaps.get(url)) for url in competitors if competitor_sitemaps.get(url)]
+            logger.warning(f"⚡ [PROGRESS] Analyzing {len(to_analyze)} competitor sitemaps")
+            
+            # Helper for safe analysis with timeout
+            async def analyze_with_timeout(url, sm):
+                try:
+                    logger.warning(f"🕒 [START] Analyzing {url} with 300s timeout")
+                    result = await asyncio.wait_for(
+                        sitemap_service.analyze_sitemap(
+                            sitemap_url=sm,
+                            analyze_content_trends=True,
+                            analyze_publishing_patterns=True,
+                            include_ai_insights=False,
+                            user_id=user_id
+                        ),
+                        timeout=300.0
+                    )
+                    logger.warning(f"✅ [DONE] Analysis finished for {url}")
+                    return result
+                except asyncio.TimeoutError:
+                    logger.error(f"⏱️ Analysis timed out for competitor {url} (limit: 300s)")
+                    return TimeoutError(f"Analysis timed out after 300s")
+                except Exception as e:
+                    msg = str(e)
+                    if "URL returned a webpage" in msg or "Failed to parse sitemap XML" in msg or "no element found" in msg:
+                        logger.warning(f"⚠️ Analysis skipped for {url}: Invalid sitemap ({msg})")
+                    else:
+                        logger.error(f"❌ Analysis failed for {url}: {e}")
+                    return e
 
-        return {
-            "analysis_type": "competitive_sitemap_benchmarking",
-            "timestamp": datetime.utcnow().isoformat(),
-            "execution_time": execution_time,
-            "inputs": {
-                "website_url": website_url,
-                "competitors": competitors,
-                "max_competitors": max_competitors
-            },
-            "data_sources": {
-                "user_sitemap_url": discovered_user_sitemap,
-                "competitor_sitemaps": competitor_sitemaps
-            },
-            "user": {
-                "summary": user_summary,
-                "error": user_error
-            },
-            "competitors": {
-                "summaries": competitor_summaries,
-                "errors": competitor_errors
-            },
-            "benchmark": benchmark
-        }
+            analysis_tasks = [
+                analyze_with_timeout(url, sm)
+                for (url, sm) in to_analyze
+            ]
+            analysis_results = await asyncio.gather(*analysis_tasks, return_exceptions=True)
+            for i, (url, _) in enumerate(to_analyze):
+                res = analysis_results[i]
+                if isinstance(res, Exception):
+                    competitor_errors[url] = str(res)
+                    if "URL returned a webpage" not in str(res) and "Failed to parse sitemap XML" not in str(res) and "no element found" not in str(res):
+                        logger.error(f"Error analyzing sitemap for competitor {url}: {res}")
+                else:
+                    competitor_results[url] = res
+
+            user_summary = self._summarize_sitemap(user_sitemap_result)
+            competitor_summaries: Dict[str, Dict[str, Any]] = {}
+            for competitor_url, result in competitor_results.items():
+                if result and isinstance(result, dict) and "error" not in result:
+                    competitor_summaries[competitor_url] = self._summarize_sitemap(result)
+
+            benchmark = self._build_competitive_sitemap_benchmark(
+                website_url=website_url,
+                user_summary=user_summary,
+                competitor_summaries=competitor_summaries
+            )
+
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+
+            return {
+                "analysis_type": "competitive_sitemap_benchmarking",
+                "timestamp": datetime.utcnow().isoformat(),
+                "execution_time": execution_time,
+                "inputs": {
+                    "website_url": website_url,
+                    "competitors": competitors,
+                    "max_competitors": max_competitors
+                },
+                "data_sources": {
+                    "user_sitemap_url": discovered_user_sitemap,
+                    "competitor_sitemaps": competitor_sitemaps
+                },
+                "user": {
+                    "summary": user_summary,
+                    "error": user_error
+                },
+                "competitors": {
+                    "summaries": competitor_summaries,
+                    "errors": competitor_errors
+                },
+                "benchmark": benchmark
+            }
 
     def _safe_ratio(self, numerator: Any, denominator: Any) -> Optional[float]:
         try:
@@ -315,6 +327,14 @@ class ContentStrategyService:
             return float(statistics.median(cleaned))
         except Exception:
             return None
+
+    @staticmethod
+    def _normalize_domain(website_url: str) -> str:
+        """Extract and normalize the domain from a URL for lock keying."""
+        from urllib.parse import urlparse
+        parsed = urlparse(website_url)
+        domain = (parsed.netloc or parsed.path or website_url).lower()
+        return domain.rstrip("/")
 
     def _build_competitive_sitemap_benchmark(
         self,

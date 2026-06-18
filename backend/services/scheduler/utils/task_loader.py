@@ -4,17 +4,20 @@ Functions to load due tasks from database.
 """
 
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import List, Optional
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 
 from models.monitoring_models import MonitoringTask
 from models.enhanced_strategy_models import EnhancedContentStrategy
+from utils.logger_utils import get_service_logger
+
+logger = get_service_logger("monitoring_task_loader")
 
 
 def load_due_monitoring_tasks(
     db: Session,
-    user_id: Optional[Union[str, int]] = None
+    user_id: Optional[str] = None
 ) -> List[MonitoringTask]:
     """
     Load all monitoring tasks that are due for execution.
@@ -37,27 +40,31 @@ def load_due_monitoring_tasks(
     Returns:
         List of due MonitoringTask instances with strategy relationship loaded
     """
-    now = datetime.utcnow()
-    
-    # Join with strategy to ensure relationship is loaded and support user filtering
-    query = db.query(MonitoringTask).join(
-        EnhancedContentStrategy,
-        MonitoringTask.strategy_id == EnhancedContentStrategy.id
-    ).options(
-        joinedload(MonitoringTask.strategy)  # Eagerly load strategy relationship
-    ).filter(
-        and_(
-            MonitoringTask.status == 'active',
-            or_(
-                MonitoringTask.next_execution <= now,
-                MonitoringTask.next_execution.is_(None)
+    try:
+        now = datetime.utcnow()
+        
+        # Join with strategy to ensure relationship is loaded and support user filtering
+        query = db.query(MonitoringTask).join(
+            EnhancedContentStrategy,
+            MonitoringTask.strategy_id == EnhancedContentStrategy.id
+        ).options(
+            joinedload(MonitoringTask.strategy)  # Eagerly load strategy relationship
+        ).filter(
+            and_(
+                MonitoringTask.status == 'active',
+                or_(
+                    MonitoringTask.next_execution <= now,
+                    MonitoringTask.next_execution.is_(None)
+                )
             )
         )
-    )
-    
-    # Apply user filter if provided
-    if user_id is not None:
-        query = query.filter(EnhancedContentStrategy.user_id == user_id)
-    
-    return query.all()
+        
+        # Apply user filter if provided
+        if user_id is not None:
+            query = query.filter(EnhancedContentStrategy.user_id == user_id)
+        
+        return query.all()
+    except Exception as e:
+        logger.error(f"Error loading monitoring tasks: {e}")
+        return []
 

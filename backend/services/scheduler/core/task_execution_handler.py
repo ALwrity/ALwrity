@@ -4,6 +4,7 @@ Handles asynchronous execution of individual tasks with proper session isolation
 """
 
 from typing import TYPE_CHECKING, Any, Dict, Optional
+from datetime import datetime
 from sqlalchemy.orm import object_session
 
 from services.database import get_db_session
@@ -74,13 +75,10 @@ async def execute_task_async(
                 task_id=getattr(task, 'id', None),
                 task_type=task_type
             )
-            scheduler.exception_handler.handle_exception(error, log_level="error")
+            scheduler.exception_handler.handle_exception(error, log_level="error", db=db)
             scheduler.stats['tasks_failed'] += 1
             scheduler._update_user_stats(user_id, success=False)
             return
-        
-        # Set database session for exception handler
-        scheduler.exception_handler.db = db
         
         # Merge the detached task object into this session
         # The task object was loaded in a different session and is now detached
@@ -138,11 +136,23 @@ async def execute_task_async(
                 },
                 original_error=e
             )
-            scheduler.exception_handler.handle_exception(error)
+            scheduler.exception_handler.handle_exception(error, db=db)
             scheduler.stats['tasks_failed'] += 1
             scheduler._update_user_stats(user_id, success=False)
             return
         
+        # Mark task as running before execution (for stale detection if process crashes)
+        if hasattr(task, 'status'):
+            task.status = 'running'
+        if hasattr(task, 'started_at'):
+            task.started_at = datetime.utcnow()
+        if hasattr(task, 'last_heartbeat'):
+            task.last_heartbeat = datetime.utcnow()
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
         # Execute task with its own session (with error handling)
         try:
             result = await executor.execute_task(task, db)
@@ -169,7 +179,7 @@ async def execute_task_async(
                     execution_time_ms=result.execution_time_ms,
                     context={"result_data": result.result_data}
                 )
-                scheduler.exception_handler.handle_exception(error, log_level="warning")
+                scheduler.exception_handler.handle_exception(error, log_level="warning", db=db)
                 
                 logger.warning(f"[Scheduler] ❌ Task {task_id} failed | user_id: {user_id} | error: {result.error_message}")
                 
@@ -189,13 +199,13 @@ async def execute_task_async(
                 task_type=task_type,
                 original_error=e
             )
-            scheduler.exception_handler.handle_exception(error)
+            scheduler.exception_handler.handle_exception(error, db=db)
             scheduler.stats['tasks_failed'] += 1
             scheduler._update_user_stats(user_id, success=False)
         
     except SchedulerException as e:
         # Handle scheduler exceptions
-        scheduler.exception_handler.handle_exception(e)
+        scheduler.exception_handler.handle_exception(e, db=db)
         scheduler.stats['tasks_failed'] += 1
         scheduler._update_user_stats(user_id, success=False)
     except Exception as e:
@@ -207,10 +217,13 @@ async def execute_task_async(
             task_type=task_type,
             original_error=e
         )
-        scheduler.exception_handler.handle_exception(error)
+        scheduler.exception_handler.handle_exception(error, db=db)
         scheduler.stats['tasks_failed'] += 1
         scheduler._update_user_stats(user_id, success=False)
     finally:
+        # Release task lease to allow re-dispatch on restart
+        scheduler._release_task_lease(task_id)
+        
         # Clean up database session
         if db:
             try:

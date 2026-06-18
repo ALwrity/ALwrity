@@ -57,6 +57,59 @@ export const GSCBrainstormModal: React.FC<GSCBrainstormModalProps> = ({
 
   React.useEffect(() => setTopicInput(initialKeywords), [initialKeywords]);
 
+  const brainstormStageDefs = [
+    { id: 'fetching', label: 'Fetching', icon: '📡' },
+    { id: 'analyzing', label: 'Analyzing', icon: '🔍' },
+    { id: 'generating', label: 'Generating', icon: '🤖' },
+    { id: 'compiling', label: 'Compiling', icon: '⚡' },
+  ];
+
+  const brainstormStageKeywords = [
+    { id: 'fetching', keywords: ['fetch', 'gsc', 'search console' ] },
+    { id: 'analyzing', keywords: ['analyz', 'keyword', 'opportunit', 'scan' ] },
+    { id: 'generating', keywords: ['generat', 'topic', 'suggest', 'craft' ] },
+    { id: 'compiling', keywords: ['compil', 'finaliz', 'packag' ] },
+  ];
+
+  const brainstormStages = React.useMemo(() => {
+    let currentIdx = -1;
+    if (progressMessage) {
+      const msg = progressMessage.toLowerCase();
+      for (let i = 0; i < brainstormStageKeywords.length; i++) {
+        if (brainstormStageKeywords[i].keywords.some(kw => msg.includes(kw))) {
+          currentIdx = i;
+          break;
+        }
+      }
+    }
+    return brainstormStageDefs.map((stage, i) => {
+      let state: 'upcoming' | 'active' | 'done' = 'upcoming';
+      if (currentIdx === -1) {
+        state = i === 0 ? 'active' : 'upcoming';
+      } else if (i < currentIdx) {
+        state = 'done';
+      } else if (i === currentIdx) {
+        state = 'active';
+      } else {
+        state = 'upcoming';
+      }
+      return { ...stage, state };
+    });
+  }, [progressMessage]);
+
+  const brainstormProgressPct = React.useMemo(() => {
+    const doneCount = brainstormStages.filter(s => s.state === 'done').length;
+    const activeCount = brainstormStages.filter(s => s.state === 'active').length;
+    if (doneCount === 0 && activeCount === 0) return 0;
+    return Math.round(((doneCount + activeCount * 0.5) / brainstormStageDefs.length) * 100);
+  }, [brainstormStages]);
+
+  const brainstormStageStyle: Record<string, { bg: string; border: string; color: string }> = {
+    upcoming: { bg: '#f1f5f9', border: '#e2e8f0', color: '#94a3b8' },
+    active: { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' },
+    done: { bg: '#ecfdf5', border: '#bbf7d0', color: '#047857' },
+  };
+
   if (!open) return null;
 
   const hasData =
@@ -91,6 +144,15 @@ export const GSCBrainstormModal: React.FC<GSCBrainstormModalProps> = ({
       }}
       onClick={onClose}
     >
+      <style>{`
+        @keyframes brainPulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.15); }
+          50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+        }
+        @keyframes brainSpin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
       <div
         style={{
           backgroundColor: '#fff',
@@ -180,53 +242,56 @@ export const GSCBrainstormModal: React.FC<GSCBrainstormModalProps> = ({
           >✕</button>
         </div>
 
-        {/* Loading with educational progress */}
+        {/* Loading with compact stage progress */}
         {isBrainstorming && (
           <div style={{
             flex: 1, display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            padding: '48px', gap: '24px',
+            padding: '32px', gap: '20px',
           }}>
-            <div style={{ position: 'relative', width: '72px', height: '72px' }}>
-              <div style={{
-                position: 'absolute', inset: 0,
-                borderRadius: '50%', border: '4px solid #e8e8e8',
-              }} />
-              <div style={{
-                position: 'absolute', inset: 0,
-                borderRadius: '50%', border: '4px solid transparent',
-                borderTopColor: '#1976d2', borderRightColor: '#4caf50',
-                animation: 'progressSpin 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite',
-              }} />
-              <style>{`@keyframes progressSpin { to { transform: rotate(360deg); } }`}</style>
+            {/* Progress bar */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 480 }}>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
+                <div style={{ width: `${brainstormProgressPct}%`, height: '100%', borderRadius: 2, background: 'linear-gradient(90deg, #3b82f6, #2563eb)', transition: 'width 0.5s ease' }} />
+              </div>
+              <span style={{ fontWeight: 600, fontSize: '0.65rem', color: '#64748b' }}>
+                {brainstormStages.filter(s => s.state === 'done').length}/{brainstormStageDefs.length}
+              </span>
             </div>
+
+            {/* Stage chips */}
+            <div style={{ display: 'flex', gap: 8, width: '100%', maxWidth: 480 }}>
+              {brainstormStages.map(stage => {
+                const ss = brainstormStageStyle[stage.state];
+                return (
+                  <div key={stage.id} style={{ flex: 1, padding: '8px 4px', borderRadius: 10, backgroundColor: ss.bg, border: `1px solid ${ss.border}`, textAlign: 'center', animation: stage.state === 'active' ? 'brainPulse 2s ease-in-out infinite' : undefined, transition: 'all 0.3s ease' }}>
+                    <div style={{ fontSize: 18, lineHeight: 1, marginBottom: 2 }}>
+                      {stage.state === 'active' ? (
+                        <span style={{ display: 'inline-block', width: 16, height: 16, border: '2px solid #bfdbfe', borderTopColor: '#1d4ed8', borderRadius: '50%', animation: 'brainSpin 0.8s linear infinite' }} />
+                      ) : stage.icon}
+                    </div>
+                    <div style={{ fontWeight: 600, fontSize: '0.6rem', color: ss.color, lineHeight: 1.2 }}>
+                      {stage.state === 'active' ? 'Working…' : stage.state === 'done' ? 'Done' : stage.label}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
             <div style={{ textAlign: 'center', maxWidth: '520px' }}>
               {progressMessage ? (
-                <>
-                  <p style={{
-                    margin: '0 0 12px', fontSize: '15px', color: '#333',
-                    fontWeight: 500, lineHeight: 1.5,
-                  }}>
-                    {progressMessage}
-                  </p>
-                  <div style={{
-                    width: '240px', height: '3px', backgroundColor: '#e8e8e8',
-                    borderRadius: '2px', margin: '0 auto', overflow: 'hidden',
-                  }}>
-                    <div style={{
-                      width: '40%', height: '100%', backgroundColor: '#4caf50',
-                      borderRadius: '2px',
-                      animation: 'progressBar 2s ease-in-out infinite',
-                    }} />
-                    <style>{`@keyframes progressBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(350%); } }`}</style>
-                  </div>
-                </>
+                <p style={{
+                  margin: 0, fontSize: '15px', color: '#333',
+                  fontWeight: 500, lineHeight: 1.5,
+                }}>
+                  {progressMessage}
+                </p>
               ) : (
                 <p style={{ margin: 0, fontSize: '15px', color: '#666', lineHeight: 1.5 }}>
                   Analyzing your GSC data and generating topic suggestions...
                 </p>
               )}
-              <p style={{ margin: '16px 0 0', fontSize: '13px', color: '#999' }}>
+              <p style={{ margin: '12px 0 0', fontSize: '13px', color: '#999' }}>
                 This usually takes 5-15 seconds
               </p>
             </div>

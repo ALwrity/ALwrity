@@ -251,6 +251,7 @@ class OnboardingDataIntegration(Base):
     website_analysis_data = Column(JSON, nullable=True)  # Data from website analysis
     research_preferences_data = Column(JSON, nullable=True)  # Data from research preferences
     api_keys_data = Column(JSON, nullable=True)  # API configuration data
+    canonical_profile = Column(JSON, nullable=True)  # Merged canonical profile (SSOT)
     
     # Integration mapping and user edits
     field_mappings = Column(JSON, nullable=True)  # Mapping of onboarding fields to strategy fields
@@ -275,7 +276,7 @@ class OnboardingDataIntegration(Base):
             'website_analysis_data': self.website_analysis_data,
             'research_preferences_data': self.research_preferences_data,
             'api_keys_data': self.api_keys_data,
-            'canonical_profile': getattr(self, 'canonical_profile', None),
+            'canonical_profile': self.canonical_profile,
             'field_mappings': self.field_mappings,
             'auto_populated_fields': self.auto_populated_fields,
             'user_overrides': self.user_overrides,

@@ -1,6 +1,6 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from loguru import logger
-from fastapi import HTTPException, Depends
+from fastapi import HTTPException, Depends, Query
 from middleware.auth_middleware import get_current_user
 
 
@@ -58,11 +58,12 @@ async def complete_onboarding(current_user: Dict[str, Any]):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-async def reset_onboarding(current_user: dict = Depends(get_current_user)):
+async def reset_onboarding(current_user: dict = Depends(get_current_user),
+                            hard: Optional[bool] = Query(False, description="If true, delete all records for a clean slate")):
     try:
         from api.onboarding_utils.onboarding_control_service import OnboardingControlService
         control_service = OnboardingControlService()
-        return await control_service.reset_onboarding(current_user)
+        return await control_service.reset_onboarding(current_user, hard=hard)
     except Exception as e:
         logger.error(f"Error resetting onboarding: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

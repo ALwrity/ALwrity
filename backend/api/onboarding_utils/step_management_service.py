@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 from services.database import get_db
-from models.onboarding import OnboardingSession, APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
+from models.onboarding import OnboardingSession, APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis, PlatformIntegration
 from services.intelligence.agent_flat_context import AgentFlatContextStore
 
 class StepManagementService:
@@ -261,7 +261,7 @@ class StepManagementService:
         try:
             session = self._get_or_create_session(user_id, db)
             
-            logger.info(f"🔍 COMPETITOR SAVE: Starting to save {len(competitors)} competitors for session {session.id}")
+            logger.info(f" COMPETITOR SAVE: Starting to save {len(competitors)} competitors for session {session.id}")
             
             saved_count = 0
             failed_count = 0
@@ -269,7 +269,7 @@ class StepManagementService:
             for idx, competitor in enumerate(competitors):
                 try:
                     if not competitor or not isinstance(competitor, dict):
-                        logger.warning(f"  ⚠️ Skipping invalid competitor entry at index {idx}: {competitor}")
+                        logger.warning(f"   Skipping invalid competitor entry at index {idx}: {competitor}")
                         continue
 
                     # Use full URL (Text column supports it) and clean it
@@ -321,10 +321,10 @@ class StepManagementService:
                     
                 except Exception as e:
                     failed_count += 1
-                    logger.error(f"  ❌ Failed to save competitor {idx + 1}: {str(e)}")
+                    logger.error(f"   Failed to save competitor {idx + 1}: {str(e)}")
             
             db.commit()
-            logger.info(f"✅ Saved {saved_count} competitors ({failed_count} failed)")
+            logger.info(f" Saved {saved_count} competitors ({failed_count} failed)")
 
             # Refresh Step 3 flat context with competitor details saved by this flow
             try:
@@ -349,12 +349,13 @@ class StepManagementService:
 
 
 
-    def _save_step5_integrations_context(self, user_id: str, step5_data: Dict[str, Any]) -> bool:
-        """Persist Step 5 integrations context to flat-file store."""
+    def _save_step5_integrations_context(self, user_id: str, step5_data: Dict[str, Any], db: Session) -> bool:
+        """Persist Step 5 integrations data to DB and flat-file store."""
         try:
+            integrations = step5_data.get("integrations") if isinstance(step5_data.get("integrations"), dict) else step5_data
             flat_store = AgentFlatContextStore(user_id)
             canonical_payload = {
-                "integrations": step5_data.get("integrations") if isinstance(step5_data.get("integrations"), dict) else {},
+                "integrations": integrations,
                 "providers": step5_data.get("providers") if isinstance(step5_data.get("providers"), list) else [],
                 "connected_accounts": step5_data.get("connectedAccounts") if isinstance(step5_data.get("connectedAccounts"), list) else [],
                 "integration_status": step5_data.get("status") or step5_data.get("integrationStatus"),
@@ -362,9 +363,27 @@ class StepManagementService:
                 "saved_at": datetime.utcnow().isoformat(),
                 "source_payload": step5_data,
             }
-            return flat_store.save_step5_integrations(canonical_payload, source="onboarding_step5")
+
+            # Persist to DB
+            session = self._get_or_create_session(user_id, db)
+            if session.platform_integrations:
+                pi = session.platform_integrations
+            else:
+                pi = PlatformIntegration(session_id=session.id)
+                db.add(pi)
+            pi.primary_website = integrations.get("primaryWebsite")
+            pi.website_platforms = integrations.get("websitePlatforms", {})
+            pi.analytics_platforms = integrations.get("analyticsPlatforms", {})
+            pi.social_platforms = integrations.get("socialPlatforms", {})
+            pi.connected_platforms = integrations.get("connectedPlatforms", [])
+            db.commit()
+
+            # Also persist to flat file for backward compatibility
+            flat_store.save_step5_integrations(canonical_payload, source="onboarding_step5")
+            logger.info(f"Step 5 integrations persisted to DB and flat file for user {user_id}")
+            return True
         except Exception as e:
-            logger.warning(f"Failed to save Step 5 integrations context for user {user_id}: {e}")
+            logger.warning(f"Failed to save Step 5 integrations for user {user_id}: {e}")
             return False
 
     def _save_persona_data(self, user_id: str, persona_data: Dict[str, Any], db: Session) -> bool:
@@ -485,7 +504,7 @@ class StepManagementService:
                     "step_number": 4,
                     "title": "Personalization",
                     "description": "Customize your experience",
-                    "status": completed(bool(persona.get('corePersona') or persona.get('platformPersonas'))),
+                    "status": completed(bool(persona.get('corePersona') or persona.get('core_persona') or persona.get('platformPersonas') or persona.get('platform_personas'))),
                     "completed_at": None,
                     "data": persona or None,
                     "validation_errors": []
@@ -547,12 +566,37 @@ class StepManagementService:
                 research = integrated_data.get('research_preferences', {})
                 competitors = integrated_data.get('competitor_analysis', [])
                 website = integrated_data.get('website_analysis', {})
-                social_media = website.get('social_media_presence') or website.get('social_media_accounts', {})
+                social_media = dict(website.get('social_media_presence') or website.get('social_media_accounts', {}) or {})
+                
+                # Extract crawl_result social_media for use as fallback
+                crawl_result = website.get('crawl_result', {}) or {}
+                crawl_social_media = {}
+                if isinstance(crawl_result, dict):
+                    crawl_content = crawl_result.get('content', {}) or {}
+                    crawl_social_media = crawl_content.get('social_media', {}) or {}
+                    if not isinstance(crawl_social_media, dict):
+                        crawl_social_media = {}
+                    def _norm_url(u: str) -> str:
+                        if not isinstance(u, str):
+                            return ''
+                        u = u.strip()
+                        if not u:
+                            return ''
+                        if u.startswith('//'):
+                            return 'https:' + u
+                        if not u.startswith('http://') and not u.startswith('https://'):
+                            return 'https://' + u if '.' in u else ''
+                        return u
+                    for platform, url in list(crawl_social_media.items()):
+                        existing = social_media.get(platform)
+                        if not existing or str(existing).strip().lower() in ('', '1', 'true', 'none'):
+                            social_media[platform] = _norm_url(url)
                 
                 # Merge competitors into the data
                 step_data = research.copy() if research else {}
                 step_data['competitors'] = competitors
                 step_data['social_media_accounts'] = social_media
+                step_data['crawl_social_media'] = crawl_social_media
                 
                 return {
                     "step_number": 3,
@@ -569,9 +613,20 @@ class StepManagementService:
                     "step_number": 4,
                     "title": "Personalization",
                     "description": "Customize your experience",
-                    "status": 'completed' if (persona.get('corePersona') or persona.get('platformPersonas')) else 'pending',
+                    "status": 'completed' if (persona.get('corePersona') or persona.get('core_persona') or persona.get('platformPersonas') or persona.get('platform_personas')) else 'pending',
                     "completed_at": None,
                     "data": persona,
+                    "validation_errors": []
+                }
+            if step_number == 5:
+                integrations = integrated_data.get('platform_integrations', {})
+                return {
+                    "step_number": 5,
+                    "title": "Integrations",
+                    "description": "Connect additional services",
+                    "status": 'completed' if integrations.get('connected_platforms') else 'pending',
+                    "completed_at": None,
+                    "data": integrations,
                     "validation_errors": []
                 }
 
@@ -579,7 +634,6 @@ class StepManagementService:
             status = OnboardingProgressService().get_onboarding_status(user_id)
             mapping = {
                 1: ('API Keys', 'Connect your AI services', status['current_step'] >= 1),
-                5: ('Integrations', 'Connect additional services', status['current_step'] >= 5),
                 6: ('Finish', 'Complete setup', status['is_completed'])
             }
             title, description, done = mapping.get(step_number, (f'Step {step_number}', 'Onboarding step', False))
@@ -623,19 +677,19 @@ class StepManagementService:
             if step_number == 1 and request_data:
                 # Step 1: Save API keys
                 step_data = request_data.get('data') or request_data
-                logger.info(f"🔍 Step 1: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f"🔍 Step 1: Extracted step_data keys: {list(step_data.keys()) if step_data else 'None'}")
+                logger.info(f" Step 1: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
+                logger.info(f" Step 1: Extracted step_data keys: {list(step_data.keys()) if step_data else 'None'}")
                 api_keys = step_data.get('api_keys', {})
-                logger.info(f"🔍 Step 1: API keys found: {list(api_keys.keys()) if api_keys else 'None'}")
+                logger.info(f" Step 1: API keys found: {list(api_keys.keys()) if api_keys else 'None'}")
                 if api_keys:
                     for provider, key in api_keys.items():
                         if key:
                             try:
                                 saved = self._save_api_key(user_id, provider, key, db)
                                 if saved:
-                                    logger.info(f"✅ Saved API key for provider {provider}")
+                                    logger.info(f" Saved API key for provider {provider}")
                             except Exception as e:
-                                logger.error(f"❌ BLOCKING ERROR: Failed to save API key for provider {provider}: {str(e)}")
+                                logger.error(f" BLOCKING ERROR: Failed to save API key for provider {provider}: {str(e)}")
                                 raise HTTPException(
                                     status_code=500,
                                     detail=f"Failed to save API key for {provider}. Onboarding cannot proceed until this is resolved."
@@ -644,40 +698,21 @@ class StepManagementService:
             # Step 2: Save website analysis data
             elif step_number == 2 and request_data:
                 website_data = request_data.get('data') or request_data
-                logger.info(f"🔍 Step 2: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f"🔍 Step 2: Extracted website_data keys: {list(website_data.keys()) if website_data else 'None'}")
+                logger.info(f" Step 2: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
+                logger.info(f" Step 2: Extracted website_data keys: {list(website_data.keys()) if website_data else 'None'}")
                 if website_data:
                     try:
                         saved = self._save_website_analysis(user_id, website_data, db)
                         if saved:
-                            logger.info(f"✅ Saved website analysis for user {user_id}")
+                            logger.info(f" Saved website analysis for user {user_id}")
                             
-                            # Trigger Advertools persona augmentation (Phase 1)
-                            try:
-                                from services.scheduler import get_scheduler
-                                
-                                website_url = website_data.get('website') or website_data.get('website_url')
-                                if website_url:
-                                    scheduler = get_scheduler()
-                                    # Schedule content audit for persona augmentation
-                                    scheduler.schedule_one_time_task(
-                                        func=scheduler.execute_task_by_type,
-                                        run_date=datetime.utcnow() + timedelta(seconds=10), # Start in 10s
-                                        job_id=f"advertools_persona_augmentation_{user_id}",
-                                        kwargs={
-                                            "task_type": "advertools_intelligence",
-                                            "user_id": user_id,
-                                            "payload": {
-                                                "type": "content_audit",
-                                                "website_url": website_url
-                                            }
-                                        }
-                                    )
-                                    logger.info(f"🚀 Triggered Advertools persona augmentation for {website_url}")
-                            except Exception as sched_err:
-                                logger.error(f"Failed to trigger Advertools augmentation: {sched_err}")
+                            # Schedule background tasks for Step 2 (non-blocking)
+                            website_url = website_data.get('website') or website_data.get('website_url')
+                            if website_url:
+                                from api.onboarding_utils.onboarding_task_scheduler import schedule_step2_tasks
+                                schedule_step2_tasks(user_id, db, website_url)
                     except Exception as e:
-                        logger.error(f"❌ BLOCKING ERROR: Failed to save website analysis: {str(e)}")
+                        logger.error(f" BLOCKING ERROR: Failed to save website analysis: {str(e)}")
                         raise HTTPException(
                             status_code=500,
                             detail="Failed to save website analysis data. Onboarding cannot proceed until this is resolved."
@@ -686,25 +721,40 @@ class StepManagementService:
             # Step 3: Save research preferences data
             elif step_number == 3 and request_data:
                 research_data = request_data.get('data') or request_data
-                logger.info(f"🔍 Step 3: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f"🔍 Step 3: Extracted research_data keys: {list(research_data.keys()) if research_data else 'None'}")
+                logger.info(f" Step 3: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
+                logger.info(f" Step 3: Extracted research_data keys: {list(research_data.keys()) if research_data else 'None'}")
                 if research_data:
                     try:
                         saved = self._save_research_preferences(user_id, research_data, db)
                         if saved:
-                            logger.info(f"✅ Saved research preferences for user {user_id}")
+                            logger.info(f" Saved research preferences for user {user_id}")
                             
                         # Also save competitors if present
                         competitors = research_data.get('competitors')
                         if competitors:
                             industry_context = research_data.get('industryContext') or research_data.get('industry_context')
-                            logger.info(f"🔍 Step 3: Found {len(competitors)} competitors to save")
+                            logger.info(f" Step 3: Found {len(competitors)} competitors to save")
                             self._save_competitor_analysis(user_id, competitors, industry_context, db)
+
+                            # Schedule deep competitor analysis (non-blocking)
+                            website_url = None
+                            try:
+                                session = self._get_or_create_session(user_id, db)
+                                existing_analysis = db.query(WebsiteAnalysis).filter(
+                                    WebsiteAnalysis.session_id == session.id
+                                ).first()
+                                if existing_analysis and existing_analysis.website_url:
+                                    website_url = existing_analysis.website_url
+                            except Exception:
+                                pass
+                            if website_url:
+                                from api.onboarding_utils.onboarding_task_scheduler import schedule_step3_tasks
+                                schedule_step3_tasks(user_id, db, website_url, competitors)
                             
                         # Save social media presence if available (Update WebsiteAnalysis)
                         social_media = research_data.get('social_media_accounts')
                         if social_media:
-                            logger.info(f"🔍 Step 3: Found social media accounts to save")
+                            logger.info(f" Step 3: Found social media accounts to save")
                             try:
                                 session = self._get_or_create_session(user_id, db)
                                 existing_analysis = db.query(WebsiteAnalysis).filter(
@@ -714,15 +764,15 @@ class StepManagementService:
                                     existing_analysis.social_media_presence = social_media
                                     existing_analysis.updated_at = datetime.utcnow()
                                     db.commit()
-                                    logger.info(f"✅ Updated social media presence for user {user_id}")
+                                    logger.info(f" Updated social media presence for user {user_id}")
                                 else:
-                                    logger.warning(f"⚠️ Could not save social media: WebsiteAnalysis not found for user {user_id}")
+                                    logger.warning(f" Could not save social media: WebsiteAnalysis not found for user {user_id}")
                             except Exception as e:
-                                logger.error(f"❌ Failed to save social media presence: {str(e)}")
+                                logger.error(f" Failed to save social media presence: {str(e)}")
                                 # Don't block completion for this, as it's secondary data
                     
                     except Exception as e:
-                        logger.error(f"❌ BLOCKING ERROR: Failed to save research preferences: {str(e)}")
+                        logger.error(f" BLOCKING ERROR: Failed to save research preferences: {str(e)}")
                         raise HTTPException(
                             status_code=500,
                             detail="Failed to save research preferences. Onboarding cannot proceed until this is resolved."
@@ -731,15 +781,18 @@ class StepManagementService:
             # Step 4: Save persona data
             elif step_number == 4 and request_data:
                 persona_data = request_data.get('data') or request_data
-                logger.info(f"🔍 Step 4: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f"🔍 Step 4: Extracted persona_data keys: {list(persona_data.keys()) if persona_data else 'None'}")
+                logger.info(f" Step 4: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
+                logger.info(f" Step 4: Extracted persona_data keys: {list(persona_data.keys()) if persona_data else 'None'}")
                 if persona_data:
                     try:
                         saved = self._save_persona_data(user_id, persona_data, db)
                         if saved:
-                            logger.info(f"✅ Saved persona data for user {user_id}")
+                            logger.info(f" Saved persona data for user {user_id}")
+                            # Schedule persona generation tasks (non-blocking)
+                            from api.onboarding_utils.onboarding_task_scheduler import schedule_step4_tasks
+                            schedule_step4_tasks(user_id, db)
                     except Exception as e:
-                        logger.error(f"❌ BLOCKING ERROR: Failed to save persona data: {str(e)}")
+                        logger.error(f" BLOCKING ERROR: Failed to save persona data: {str(e)}")
                         raise HTTPException(
                             status_code=500,
                             detail="Failed to save persona data. Onboarding cannot proceed until this is resolved."
@@ -749,14 +802,17 @@ class StepManagementService:
             # Step 5: Save integrations data to flat context
             elif step_number == 5 and request_data:
                 step5_data = request_data.get('data') or request_data
-                logger.info(f"🔍 Step 5: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f"🔍 Step 5: Extracted step5_data keys: {list(step5_data.keys()) if step5_data else 'None'}")
+                logger.info(f" Step 5: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
+                logger.info(f" Step 5: Extracted step5_data keys: {list(step5_data.keys()) if step5_data else 'None'}")
                 if step5_data:
-                    saved = self._save_step5_integrations_context(user_id, step5_data)
+                    saved = self._save_step5_integrations_context(user_id, step5_data, db)
                     if saved:
-                        logger.info(f"✅ Saved Step 5 integrations context for user {user_id}")
+                        logger.info(f" Saved Step 5 integrations context for user {user_id}")
+                        # Schedule Step 5 background tasks (non-blocking)
+                        from api.onboarding_utils.onboarding_task_scheduler import schedule_step5_tasks
+                        schedule_step5_tasks(user_id, db)
                     else:
-                        logger.warning(f"⚠️ Step 5 integrations context not persisted for user {user_id}")
+                        logger.warning(f" Step 5 integrations context not persisted for user {user_id}")
 
             # Persist current step and progress in DB
             from services.onboarding.progress_service import OnboardingProgressService
@@ -770,7 +826,7 @@ class StepManagementService:
 
             # Log save errors but don't block step completion (non-blocking)
             if save_errors:
-                logger.warning(f"⚠️ Step {step_number} completed but some data save operations failed: {save_errors}")
+                logger.warning(f" Step {step_number} completed but some data save operations failed: {save_errors}")
             
             # Refresh SSOT (Canonical Profile) - non-blocking try/except inside method
             if not save_errors:

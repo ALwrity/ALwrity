@@ -4,11 +4,6 @@ from sqlalchemy import text
 from loguru import logger
 
 
-_checked_subscription_plan_columns: bool = False
-_checked_usage_summaries_columns: bool = False
-_checked_api_usage_logs_columns: bool = False
-
-
 def ensure_subscription_plan_columns(db: Session) -> None:
     """Ensure required columns exist on subscription_plans for runtime safety.
 
@@ -16,18 +11,12 @@ def ensure_subscription_plan_columns(db: Session) -> None:
     been applied. If columns are missing (e.g., exa_calls_limit), we add them
     with a safe default so ORM queries do not fail.
     """
-    global _checked_subscription_plan_columns
-    if _checked_subscription_plan_columns:
-        return
-
     try:
-        # Discover existing columns using PRAGMA
         result = db.execute(text("PRAGMA table_info(subscription_plans)"))
         cols: Set[str] = {row[1] for row in result}
         
         logger.debug(f"Schema check: Found {len(cols)} columns in subscription_plans table")
 
-        # Columns we may reference in models but might be missing in older DBs
         required_columns = {
             "ai_text_generation_calls_limit": "INTEGER DEFAULT 0",
             "exa_calls_limit": "INTEGER DEFAULT 0",
@@ -47,18 +36,13 @@ def ensure_subscription_plan_columns(db: Session) -> None:
                 except Exception as alter_err:
                     logger.error(f"Failed to add column {col_name}: {alter_err}")
                     db.rollback()
-                    # Don't set flag on error - allow retry
                     raise
             else:
                 logger.debug(f"Column {col_name} already exists")
-        
-        # Only set flag if we successfully completed the check
-        _checked_subscription_plan_columns = True
+
     except Exception as e:
         logger.error(f"Error ensuring subscription_plan columns: {e}", exc_info=True)
         db.rollback()
-        # Don't set the flag if there was an error, so we retry next time
-        _checked_subscription_plan_columns = False
         raise
 
 
@@ -69,18 +53,12 @@ def ensure_usage_summaries_columns(db: Session) -> None:
     been applied. If columns are missing (e.g., exa_calls, exa_cost), we add them
     with a safe default so ORM queries do not fail.
     """
-    global _checked_usage_summaries_columns
-    if _checked_usage_summaries_columns:
-        return
-
     try:
-        # Discover existing columns using PRAGMA
         result = db.execute(text("PRAGMA table_info(usage_summaries)"))
         cols: Set[str] = {row[1] for row in result}
         
         logger.debug(f"Schema check: Found {len(cols)} columns in usage_summaries table")
 
-        # Columns we may reference in models but might be missing in older DBs
         required_columns = {
             "exa_calls": "INTEGER DEFAULT 0",
             "exa_cost": "REAL DEFAULT 0.0",
@@ -105,18 +83,13 @@ def ensure_usage_summaries_columns(db: Session) -> None:
                 except Exception as alter_err:
                     logger.error(f"Failed to add column {col_name}: {alter_err}")
                     db.rollback()
-                    # Don't set flag on error - allow retry
                     raise
             else:
                 logger.debug(f"Column {col_name} already exists")
-        
-        # Only set flag if we successfully completed the check
-        _checked_usage_summaries_columns = True
+
     except Exception as e:
         logger.error(f"Error ensuring usage_summaries columns: {e}", exc_info=True)
         db.rollback()
-        # Don't set the flag if there was an error, so we retry next time
-        _checked_usage_summaries_columns = False
         raise
 
 
@@ -127,18 +100,12 @@ def ensure_api_usage_logs_columns(db: Session) -> None:
     been applied. If columns are missing (e.g., actual_provider_name), we add them
     with a safe default so ORM queries do not fail.
     """
-    global _checked_api_usage_logs_columns
-    if _checked_api_usage_logs_columns:
-        return
-    
     try:
-        # Discover existing columns using PRAGMA
         result = db.execute(text("PRAGMA table_info(api_usage_logs)"))
         cols: Set[str] = {row[1] for row in result}
         
         logger.debug(f"Schema check: Found {len(cols)} columns in api_usage_logs table")
         
-        # Columns we may reference in models but might be missing in older DBs
         required_columns = {
             "actual_provider_name": "VARCHAR(50) NULL",
         }
@@ -153,18 +120,13 @@ def ensure_api_usage_logs_columns(db: Session) -> None:
                 except Exception as alter_err:
                     logger.error(f"Failed to add column {col_name}: {alter_err}")
                     db.rollback()
-                    # Don't set flag on error - allow retry
                     raise
             else:
                 logger.debug(f"Column {col_name} already exists")
-        
-        # Only set flag if we successfully completed the check
-        _checked_api_usage_logs_columns = True
+
     except Exception as e:
         logger.error(f"Error ensuring api_usage_logs columns: {e}", exc_info=True)
         db.rollback()
-        # Don't set the flag if there was an error, so we retry next time
-        _checked_api_usage_logs_columns = False
         raise
 
 
@@ -173,5 +135,3 @@ def ensure_all_schema_columns(db: Session) -> None:
     ensure_subscription_plan_columns(db)
     ensure_usage_summaries_columns(db)
     ensure_api_usage_logs_columns(db)
-
-

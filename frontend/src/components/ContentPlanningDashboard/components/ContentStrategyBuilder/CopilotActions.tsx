@@ -291,139 +291,53 @@ export const useCopilotActions = () => {
     }
   }, [formData, calculateCompletionPercentage, setError]);
 
-  // Action 7: Auto-populate from onboarding
-  const autoPopulateFromOnboarding = useCallback(async () => {
+  // Action 7: Auto-fill strategy fields (unified DB + AI)
+  const autofillStrategyFields = useCallback(async () => {
     try {
-      console.log("🔄 Auto-populating from onboarding data");
-      
-      // Start transparency flow (same as Refresh & Autofill button)
-      const { transparencyInterval } = await triggerTransparencyFlow('autofill', 'Auto-population from onboarding data');
-      
-      // Get empty fields that need to be filled
-      const emptyFields = Object.keys(formData).filter(key => {
-        const value = formData[key];
-        return !value || typeof value !== 'string' || value.trim() === '';
-      });
-      
-      // Call the same backend API as the Refresh & Autofill button
-      const response = await contentPlanningApi.refreshAutofill(1, true, true);
-      
-      // Clear the transparency interval since we got the response
-      clearInterval(transparencyInterval);
-      
-      // Process the response (same logic as handleAIRefresh)
-      if (response) {
-        const payload = response;
-        const fields = payload.fields || {};
-        const sources = payload.sources || {};
-        const inputDataPoints = payload.input_data_points || {};
-        const meta = payload.meta || {};
-        
-        console.log('🎯 CopilotKit Auto-population - Generated fields:', Object.keys(fields).length);
-        
-        // Check if AI generation failed
-        if (meta.error || !meta.ai_used) {
-          console.error('❌ AI generation failed:', meta.error || 'AI not used');
-          setError(`AI generation failed: ${meta.error || 'AI was not used for generation. Please try again.'}`);
-          setTransparencyModalOpen(false);
-          setAIGenerating(false);
-          setTransparencyGenerating(false);
-          return { success: false, message: 'AI generation failed. Please try again.' };
-        }
-        
-        // Check if we have any fields generated
-        const fieldsCount = Object.keys(fields).length;
-        if (fieldsCount === 0) {
-          console.error('❌ No fields generated');
-          setError('No fields were generated. Please try again.');
-          setTransparencyModalOpen(false);
-          setAIGenerating(false);
-          setTransparencyGenerating(false);
-          return { success: false, message: 'No fields generated. Please try again.' };
-        }
-        
-        console.log(`✅ AI generation successful - ${fieldsCount} fields generated`);
-        
-        // Validate data source
-        if (meta.data_source === 'ai_generation_failed' || meta.data_source === 'ai_generation_error') {
-          console.error('❌ AI generation failed:', meta.data_source);
-          setError(`AI generation failed: ${meta.error || 'Invalid data source. Please try again.'}`);
-          setTransparencyModalOpen(false);
-          setAIGenerating(false);
-          setTransparencyGenerating(false);
-          return { success: false, message: 'AI generation failed. Please try again.' };
-        }
-        
-        const fieldValues: Record<string, any> = {};
-        const confidenceScores: Record<string, number> = {};
-        
-        Object.keys(fields).forEach((fieldId) => {
-          const fieldData = fields[fieldId];
-          
-          if (fieldData && typeof fieldData === 'object' && 'value' in fieldData) {
-            fieldValues[fieldId] = fieldData.value;
-            
-            // Extract confidence score if available
-            if (fieldData.confidence) {
-              confidenceScores[fieldId] = fieldData.confidence;
-            }
-          } else {
-            console.warn(`⚠️ Field ${fieldId} has invalid structure`);
-          }
-        });
-        
-        // Update the store with the new data - COMPLETELY REPLACE old data
-        useStrategyBuilderStore.setState((state) => {
-          const newState = {
-            autoPopulatedFields: fieldValues,
-            dataSources: sources,
-            inputDataPoints: inputDataPoints,
-            confidenceScores: confidenceScores,
-            formData: { ...state.formData, ...fieldValues } // Keep existing manual edits
-          };
-          console.log('✅ Store updated with fresh AI data:', Object.keys(fieldValues).length, 'fields');
-          return newState;
-        });
-        
-        // Add final completion message
-        addTransparencyMessage(`✅ AI generation completed successfully! Generated ${Object.keys(fieldValues).length} real AI values.`);
-        setTransparencyGenerationProgress(100);
-        setCurrentPhase('Complete');
-        
-        // Update session storage with fresh autofill timestamp
-        sessionStorage.setItem('lastAutofillTime', new Date().toISOString());
-        
-        // Reset generation state
-        setAIGenerating(false);
-        setTransparencyGenerating(false);
-        
-        return { 
-          success: true, 
-          message: `Auto-population completed successfully! Generated ${Object.keys(fieldValues).length} fields using your onboarding data.`,
-          populatedFields: Object.keys(fieldValues),
-          emptyFieldsRemaining: emptyFields.filter(field => !Object.keys(fieldValues).includes(field)),
-          timestamp: new Date().toISOString(),
-          formStatus: {
-            completionPercentage: calculateCompletionPercentage(),
-            filledFields: Object.keys(formData).filter(key => {
-              const value = formData[key];
-              return value && typeof value === 'string' && value.trim() !== '';
-            }),
-            totalFields: 30
-          }
-        };
-      } else {
-        throw new Error('Invalid response from AI refresh endpoint');
+      console.log("🔄 Auto-filling strategy fields");
+      const response = await contentPlanningApi.autofill();
+
+      if (!response) {
+        throw new Error('Invalid response from autofill endpoint');
       }
+
+      const fields = response.fields || {};
+      const sources = response.sources || {};
+      const inputDataPoints = response.input_data_points || {};
+
+      if (Object.keys(fields).length === 0) {
+        setError('Autofill failed to produce strategy fields. Please try again.');
+        return { success: false, message: 'No fields generated.' };
+      }
+
+      const fieldValues: Record<string, any> = {};
+      const confidenceScores: Record<string, number> = {};
+
+      Object.keys(fields).forEach((fieldId) => {
+        const fieldData = fields[fieldId];
+        if (fieldData && typeof fieldData === 'object' && 'value' in fieldData) {
+          fieldValues[fieldId] = fieldData.value;
+          if (fieldData.confidence) {
+            confidenceScores[fieldId] = fieldData.confidence;
+          }
+        }
+      });
+
+      useStrategyBuilderStore.setState((state) => ({
+        autoPopulatedFields: fieldValues,
+        dataSources: sources,
+        inputDataPoints: inputDataPoints,
+        confidenceScores: confidenceScores,
+        formData: { ...state.formData, ...fieldValues },
+      }));
+
+      return { success: true, message: `Auto-populated ${Object.keys(fieldValues).length} fields` };
     } catch (error: any) {
       console.error("❌ Failed to auto-populate:", error);
-      setError(`Failed to auto-populate: ${error.message}`);
-      setTransparencyModalOpen(false);
-      setAIGenerating(false);
-      setTransparencyGenerating(false);
+      setError(`Autofill failed: ${error.message}`);
       return { success: false, message: error.message || 'Unknown error' };
     }
-  }, [formData, calculateCompletionPercentage, setError, setTransparencyModalOpen, setTransparencyGenerating, setTransparencyGenerationProgress, setCurrentPhase, addTransparencyMessage, setAIGenerating, triggerTransparencyFlow]);
+  }, [formData, setError]);
 
   // Call useCopilotAction hooks unconditionally - they will handle context availability internally
   // This is the only way to comply with React hooks rules
@@ -479,9 +393,9 @@ export const useCopilotActions = () => {
   });
 
   (useCopilotAction as unknown as (config: any) => void)({
-    name: "autoPopulateFromOnboarding",
-    description: "Auto-populate strategy fields using onboarding data. Use this to automatically fill fields based on your onboarding information, website analysis, and research preferences.",
-    handler: autoPopulateFromOnboarding
+    name: "autofillStrategyFields",
+    description: "Auto-fill strategy fields using onboarding data + AI. Use this to automatically fill all strategy fields.",
+    handler: autofillStrategyFields
   });
 
   // Return action handlers for direct use if needed
@@ -492,6 +406,6 @@ export const useCopilotActions = () => {
     validateStrategyField,
     reviewStrategy,
     generateSuggestions,
-    autoPopulateFromOnboarding
+    autofillStrategyFields
   };
 };

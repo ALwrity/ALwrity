@@ -11,7 +11,7 @@ import hashlib
 
 from models.website_analysis_monitoring_models import WebsiteAnalysisTask
 from models.onboarding import OnboardingSession
-from models.scheduler_models import SchedulerEventLog
+
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 from services.database import get_db_session
 from utils.logger_utils import get_service_logger
@@ -27,49 +27,9 @@ async def generate_website_analysis_tasks_task(user_id: str):
             raise RuntimeError(f"Failed to get database session for user {user_id}")
 
         result = create_website_analysis_tasks(user_id=user_id, db=db)
-        success = bool(result.get("success"))
-
-        try:
-            event_log = SchedulerEventLog(
-                event_type="job_completed" if success else "job_failed",
-                event_date=start_time,
-                job_id=f"website_analysis_tasks_{user_id}",
-                job_type="one_time",
-                user_id=user_id,
-                error_message=None if success else str(result.get("error") or "website analysis task creation failed"),
-                event_data={
-                    "job_function": "generate_website_analysis_tasks_task",
-                    "status": "success" if success else "failed",
-                    "tasks_created": int(result.get("tasks_created") or 0),
-                },
-            )
-            db.add(event_log)
-            db.commit()
-        except Exception as log_error:
-            logger.warning(f"Failed to log website analysis task creation event for user {user_id}: {log_error}")
-            db.rollback()
 
     except Exception as e:
         logger.error(f"Scheduled website analysis task creation failed for user {user_id}: {e}", exc_info=True)
-        if db:
-            try:
-                event_log = SchedulerEventLog(
-                    event_type="job_failed",
-                    event_date=start_time,
-                    job_id=f"website_analysis_tasks_{user_id}",
-                    job_type="one_time",
-                    user_id=user_id,
-                    error_message=str(e),
-                    event_data={
-                        "job_function": "generate_website_analysis_tasks_task",
-                        "status": "failed",
-                        "exception_type": type(e).__name__,
-                    },
-                )
-                db.add(event_log)
-                db.commit()
-            except Exception:
-                db.rollback()
     finally:
         if db:
             db.close()

@@ -7,6 +7,8 @@ Built on txtai's native agent framework
 import asyncio
 import json
 import logging
+import os
+from collections import OrderedDict
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
@@ -469,21 +471,69 @@ class ALwrityAgentOrchestrator:
 # Service class for agent orchestration
 class AgentOrchestrationService:
     """Service class for managing agent orchestration"""
-    
+
     def __init__(self):
-        self.orchestrators: Dict[str, ALwrityAgentOrchestrator] = {}
+        # C2: LRU-bounded cache. An OrderedDict gives us O(1) LRU eviction:
+        # - reading an entry via `move_to_end` marks it as recently used
+        # - inserting beyond the cap evicts the least-recently-used entry
+        # Default cap is conservative; override via env for high-tenant nodes.
+        cache_size = int(os.getenv("AGENT_ORCHESTRATOR_CACHE_SIZE", "200"))
+        self._max_orchestrators: int = max(1, cache_size)
+        self.orchestrators: "OrderedDict[str, ALwrityAgentOrchestrator]" = OrderedDict()
         self.execution_history: List[Dict[str, Any]] = []
-        
-        logger.info("Initialized AgentOrchestrationService")
-    
+
+        logger.info(
+            f"Initialized AgentOrchestrationService with LRU cache cap={self._max_orchestrators}"
+        )
+
+    def _evict_orchestrator_lru(self) -> None:
+        """Evict the least-recently-used orchestrator if at capacity.
+
+        We evict until the cache is at most `cap` entries. The check is
+        `len > cap` (not `>=`) so that exactly `cap` entries remain after
+        eviction completes.
+        """
+        while len(self.orchestrators) > self._max_orchestrators:
+            evicted_user_id, evicted = self.orchestrators.popitem(last=False)
+            logger.info(
+                f"Evicted LRU orchestrator for user {evicted_user_id} "
+                f"(cache cap={self._max_orchestrators})"
+            )
+            # Best-effort cleanup of any resources the orchestrator holds.
+            try:
+                if hasattr(evicted, "cleanup"):
+                    evicted.cleanup()
+            except Exception as cleanup_err:
+                logger.warning(
+                    f"Orchestrator cleanup for user {evicted_user_id} failed (non-fatal): {cleanup_err}"
+                )
+
+    def _cache_orchestrator(self, user_id: str, orchestrator: ALwrityAgentOrchestrator) -> None:
+        """Insert into the LRU cache, evicting older entries if needed."""
+        # If the user already had an entry, remove the old one first so we
+        # don't temporarily exceed the cap and so the new entry is treated
+        # as fresh.
+        if user_id in self.orchestrators:
+            del self.orchestrators[user_id]
+        self.orchestrators[user_id] = orchestrator
+        self._evict_orchestrator_lru()
+
     async def get_or_create_orchestrator(self, user_id: str) -> ALwrityAgentOrchestrator:
-        """Get or create an orchestrator for a user"""
+        """Get or create an orchestrator for a user.
+
+        LRU semantics: every call marks the user's orchestrator as
+        recently used. If the cache is at capacity and the user is new,
+        the least-recently-used orchestrator is evicted.
+        """
         onboarding_gated_initialization = False
         if user_id not in self.orchestrators:
             config = AgentTeamConfiguration(user_id=user_id)
-            self.orchestrators[user_id] = ALwrityAgentOrchestrator(config)
+            self._cache_orchestrator(user_id, ALwrityAgentOrchestrator(config))
             logger.info(f"Created new orchestrator for user: {user_id}")
-        
+        else:
+            # Mark as recently used (move to the end of the OrderedDict).
+            self.orchestrators.move_to_end(user_id)
+
         # Ensure initialization happened, if not try again (e.g. if onboarding was just completed)
         orchestrator = self.orchestrators[user_id]
         if not orchestrator.agents and not orchestrator.execution_history:

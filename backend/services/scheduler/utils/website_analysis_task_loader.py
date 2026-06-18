@@ -4,16 +4,19 @@ Functions to load due website analysis tasks from database.
 """
 
 from datetime import datetime
-from typing import List, Optional, Union
+from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
 from models.website_analysis_monitoring_models import WebsiteAnalysisTask
+from utils.logger_utils import get_service_logger
+
+logger = get_service_logger("website_analysis_task_loader")
 
 
 def load_due_website_analysis_tasks(
     db: Session,
-    user_id: Optional[Union[str, int]] = None
+    user_id: Optional[str] = None
 ) -> List[WebsiteAnalysisTask]:
     """
     Load all website analysis tasks that are due for execution.
@@ -33,22 +36,26 @@ def load_due_website_analysis_tasks(
     Returns:
         List of due WebsiteAnalysisTask instances
     """
-    now = datetime.utcnow()
-    
-    # Build query for due tasks
-    query = db.query(WebsiteAnalysisTask).filter(
-        and_(
-            WebsiteAnalysisTask.status == 'active',
-            or_(
-                WebsiteAnalysisTask.next_check <= now,
-                WebsiteAnalysisTask.next_check.is_(None)
+    try:
+        now = datetime.utcnow()
+        
+        # Build query for due tasks
+        query = db.query(WebsiteAnalysisTask).filter(
+            and_(
+                WebsiteAnalysisTask.status == 'active',
+                or_(
+                    WebsiteAnalysisTask.next_check <= now,
+                    WebsiteAnalysisTask.next_check.is_(None)
+                )
             )
         )
-    )
-    
-    # Apply user filter if provided (for user isolation)
-    if user_id is not None:
-        query = query.filter(WebsiteAnalysisTask.user_id == str(user_id))
-    
-    return query.all()
+        
+        # Apply user filter if provided (for user isolation)
+        if user_id is not None:
+            query = query.filter(WebsiteAnalysisTask.user_id == user_id)
+        
+        return query.all()
+    except Exception as e:
+        logger.error(f"Error loading website analysis tasks: {e}")
+        return []
 

@@ -154,10 +154,6 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
         except Exception as e:
             execution_time_ms = int((time.time() - start_time) * 1000)
             
-            # Set database session for exception handler
-            self.exception_handler.db = db
-            
-            # Create structured error
             error = TaskExecutionError(
                 message=f"Error executing OAuth token monitoring task {task.id}: {str(e)}",
                 user_id=user_id,
@@ -172,7 +168,7 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
             )
             
             # Handle exception with structured logging
-            self.exception_handler.handle_exception(error)
+            self.exception_handler.handle_exception(error, db=db)
             
             # Update execution log with error
             try:
@@ -208,7 +204,7 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                     task_id=task.id,
                     original_error=commit_error
                 )
-                self.exception_handler.handle_exception(db_error)
+                self.exception_handler.handle_exception(db_error, db=db)
                 db.rollback()
             
             return TaskExecutionResult(

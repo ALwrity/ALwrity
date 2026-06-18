@@ -589,16 +589,25 @@ async def get_lightweight_stats(user_id: str) -> Dict[str, Any]:
         # This is much faster as it only scans the table once
         # Use run_in_threadpool to avoid blocking the event loop with sync DB query
         from starlette.concurrency import run_in_threadpool
-        
+
+        # H5: threadpool workers must not share the async-loop `db` Session
+        # (SQLAlchemy Sessions are not thread-safe). Open a fresh Session
+        # bound to the same per-user engine and close it in the worker.
         def _fetch_stats():
-            return db.query(
-                func.count(APIRequest.id).label('total_requests'),
-                func.sum(
-                    case((APIRequest.status_code >= 400, 1), else_=0)
-                ).label('total_errors')
-            ).filter(
-                APIRequest.timestamp >= five_minutes_ago
-            ).first()
+            thread_db = get_session_for_user(user_id)
+            if thread_db is None:
+                return None
+            try:
+                return thread_db.query(
+                    func.count(APIRequest.id).label('total_requests'),
+                    func.sum(
+                        case((APIRequest.status_code >= 400, 1), else_=0)
+                    ).label('total_errors')
+                ).filter(
+                    APIRequest.timestamp >= five_minutes_ago
+                ).first()
+            finally:
+                thread_db.close()
 
         stats = await run_in_threadpool(_fetch_stats)
         

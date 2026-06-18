@@ -22,6 +22,7 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
     """
     logger.info("Restoring Advertools intelligence tasks...")
     total_created = 0
+    total_existing = 0
     
     user_ids = get_all_user_ids()
     for user_id in user_ids:
@@ -45,6 +46,8 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                     AdvertoolsTask.user_id == user_id,
                     func.json_extract(AdvertoolsTask.payload, '$.type') == 'content_audit'
                 ).first()
+                if existing_audit:
+                    total_existing += 1
                 
                 if not existing_audit:
                     # Create weekly content audit task
@@ -60,6 +63,7 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                         }
                     )
                     db.add(new_audit)
+                    db.commit()
                     total_created += 1
                     logger.info(f"Created weekly content audit task for user {user_id}")
                 
@@ -67,6 +71,8 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                     AdvertoolsTask.user_id == user_id,
                     func.json_extract(AdvertoolsTask.payload, '$.type') == 'site_health'
                 ).first()
+                if existing_health:
+                    total_existing += 1
                 
                 if not existing_health:
                     # Create weekly site health task
@@ -82,13 +88,13 @@ async def restore_advertools_tasks(scheduler: Any) -> int:
                         }
                     )
                     db.add(new_health)
+                    db.commit()
                     total_created += 1
                     logger.info(f"Created weekly site health task for user {user_id}")
                 
-                db.commit()
             finally:
                 db.close()
         except Exception as e:
             logger.error(f"Error restoring Advertools tasks for user {user_id}: {e}")
             
-    return total_created
+    return total_existing + total_created

@@ -14,7 +14,7 @@ from .facebook_persona_schemas import (
     FacebookPersonaOptimization
 )
 from .facebook_persona_prompts import FacebookPersonaPrompts
-from services.llm_providers.gemini_provider import gemini_structured_json_response
+from services.llm_providers.main_text_generation import llm_text_gen
 
 
 class FacebookPersonaService:
@@ -66,14 +66,16 @@ class FacebookPersonaService:
             # Extract user_id for tracking
             user_id = onboarding_data.get("session_info", {}).get("user_id")
 
-            # Generate structured response using Gemini with optimized prompts
-            response = gemini_structured_json_response(
+            # Generate structured response using the provider-agnostic gateway
+            # (handles GPT_PROVIDER routing, subscription/usage checks, fallbacks)
+            response = llm_text_gen(
                 prompt=prompt,
-                schema=schema,
+                json_struct=schema,
                 temperature=0.2,
                 max_tokens=4096,
                 system_prompt=system_prompt,
-                user_id=user_id
+                user_id=user_id,
+                flow_type="facebook_persona_generation"
             )
 
             if not response or "error" in response:

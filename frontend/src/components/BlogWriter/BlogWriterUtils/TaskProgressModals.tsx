@@ -14,6 +14,8 @@ interface TaskProgressModalsProps {
   showModal: boolean;
   rewritePolling: PollingState;
   mediumPolling: PollingState;
+  onCloseOutlineModal?: () => void;
+  onCloseContentModal?: () => void;
 }
 
 const TaskProgressModals: React.FC<TaskProgressModalsProps> = ({
@@ -22,6 +24,8 @@ const TaskProgressModals: React.FC<TaskProgressModalsProps> = ({
   showModal,
   rewritePolling,
   mediumPolling,
+  onCloseOutlineModal,
+  onCloseContentModal,
 }) => {
   return (
     <>
@@ -31,6 +35,7 @@ const TaskProgressModals: React.FC<TaskProgressModalsProps> = ({
         progressMessages={outlinePolling.progressMessages.map(m => m.message)}
         latestMessage={outlinePolling.progressMessages.length > 0 ? outlinePolling.progressMessages[outlinePolling.progressMessages.length - 1].message : ''}
         error={outlinePolling.error ?? null}
+        onClose={onCloseOutlineModal}
       />
 
       <OutlineProgressModal
@@ -44,6 +49,7 @@ const TaskProgressModals: React.FC<TaskProgressModalsProps> = ({
         )}
         error={(rewritePolling.isPolling ? rewritePolling.error : mediumPolling.error) ?? null}
         titleOverride={rewritePolling.isPolling ? '🔄 Rewriting Your Blog' : '📝 Generating Your Blog Content'}
+        onClose={onCloseContentModal}
       />
     </>
   );

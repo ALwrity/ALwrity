@@ -7,24 +7,17 @@ import {
   Typography,
   Alert,
   CircularProgress,
-  Card,
-  Grid,
+  Paper,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  DialogContentText,
-  Collapse
+  DialogContentText
 } from '@mui/material';
 import {
   Analytics as AnalyticsIcon,
   History as HistoryIcon,
-  Business as BusinessIcon,
-  ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon,
-  Search as SearchIcon,
-  Psychology as PsychologyIcon,
-  AutoAwesome as AutoFixHighIcon
+  Business as BusinessIcon
 } from '@mui/icons-material';
 
 // Extracted components
@@ -48,11 +41,13 @@ interface WebsiteStepProps {
   onContinue: (stepData?: any) => void;
   updateHeaderContent: (content: { title: string; description: string }) => void;
   onValidationChange?: (isValid: boolean) => void;
+  onDataReady?: (getData: () => any) => void;
 }
 
 interface AnalysisProgress {
   step: number;
   message: string;
+  subMessage?: string;
   completed: boolean;
 }
 
@@ -72,23 +67,7 @@ interface ExistingAnalysis {
 // MAIN COMPONENT
 // =============================================================================
 
-// Light theme constants matching requirements
-const lightTheme = {
-  surface: '#FFFFFF',
-  text: '#0B1220',
-  textSecondary: '#4B5563',
-  border: '#E5E7EB',
-  inputBg: '#FFFFFF',
-  inputText: '#0B1220',
-  placeholder: '#6B7280',
-  primary: '#6C5CE7',
-  primaryContrast: '#FFFFFF',
-  shadowSm: '0 1px 2px rgba(16,24,40,0.06)',
-  shadowMd: '0 4px 10px rgba(16,24,40,0.08)',
-  radiusLg: '20px'
-};
-
-const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderContent, onValidationChange }) => {
+const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataReady }) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -104,14 +83,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [showBusinessForm, setShowBusinessForm] = useState(false);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
-    { step: 1, message: 'Validating URL...', completed: false },
-    { step: 2, message: 'Crawling website & Analyzing SEO...', completed: false },
-    { step: 3, message: 'Processing content structure...', completed: false },
-    { step: 4, message: 'Analyzing brand voice & tone...', completed: false },
-    { step: 5, message: 'Generating strategic insights...', completed: false },
-    { step: 6, message: 'Finalizing recommendations...', completed: false }
+    { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
+    { step: 2, message: 'Crawling website pages & structure', subMessage: 'Scanning public pages to map your content architecture', completed: false },
+    { step: 3, message: 'Extracting content & SEO metadata', subMessage: 'Analyzing page titles, headings, body text, and meta descriptions', completed: false },
+    { step: 4, message: 'Analyzing brand voice & tone', subMessage: 'Identifying your unique writing patterns, vocabulary, and emotional resonance', completed: false },
+    { step: 5, message: 'Evaluating content characteristics', subMessage: 'Measuring readability, sentence structure, and content variety', completed: false },
+    { step: 6, message: 'Identifying target audience signals', subMessage: 'Detecting audience expertise level, pain points, and content preferences', completed: false },
+    { step: 7, message: 'Generating custom AI guidelines', subMessage: 'Building your brand playbook to guide future AI-generated content', completed: false }
   ]);
-  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     // Update header content when component mounts
@@ -260,10 +239,16 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
     }
   };
 
-  const updateProgress = (step: number, message: string) => {
-    setProgress(prev => prev.map(p => 
-      p.step === step ? { ...p, message, completed: true } : p
-    ));
+  const updateProgress = (step: number, message: string, subMessage?: string) => {
+    setProgress(prev => {
+      const existing = prev.find(p => p.step === step);
+      if (existing) {
+        return prev.map(p => 
+          p.step === step ? { ...p, message, subMessage: subMessage || p.subMessage, completed: true } : p
+        );
+      }
+      return [...prev, { step, message, subMessage, completed: true }];
+    });
   };
 
   const handleLoadExistingConfirm = async () => {
@@ -304,25 +289,44 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const handleNewAnalysis = async () => {
     setShowConfirmationDialog(false);
     setExistingAnalysis(null);
+    setError(null);
+    setSuccess(null);
+    setAnalysisWarning(null);
+    setAnalysis(null);
+    setCrawlResult(null);
+    setProgress(prev => prev.map(p => ({ ...p, completed: false })));
+
     if (website) {
       const fixedUrl = fixUrlFormat(website);
       if (fixedUrl) {
+        setIsProgressModalOpen(true);
         setLoading(true);
-        const analysisResult = await performAnalysis(fixedUrl, updateProgress);
-        if (analysisResult.success) {
-          setDomainName(analysisResult.domainName || '');
-          setAnalysis(analysisResult.analysis);
-          setAnalysisWarning(analysisResult.warning || null);
-          
-          if (analysisResult.warning) {
-            setSuccess(`Website style analysis completed successfully! Note: ${analysisResult.warning}`);
+        try {
+          const analysisResult = await performAnalysis(fixedUrl, updateProgress);
+          if (analysisResult.success) {
+            setDomainName(analysisResult.domainName || '');
+            setAnalysis(analysisResult.analysis);
+            setCrawlResult(analysisResult.crawlResult);
+            setAnalysisWarning(analysisResult.warning || null);
+
+            localStorage.setItem('website_url', fixedUrl);
+            localStorage.setItem('website_analysis_data', JSON.stringify(analysisResult.analysis));
+
+            if (analysisResult.warning) {
+              setSuccess(`Website style analysis completed successfully! Note: ${analysisResult.warning}`);
+            } else {
+              setSuccess('Website style analysis completed successfully!');
+            }
           } else {
-            setSuccess('Website style analysis completed successfully!');
+            setError(analysisResult.error || 'Analysis failed');
           }
-        } else {
-          setError(analysisResult.error || 'Analysis failed');
+        } catch (err) {
+          console.error('Analysis error:', err);
+          setError('Failed to analyze website. Please check your internet connection and try again.');
+        } finally {
+          setLoading(false);
+          setTimeout(() => setIsProgressModalOpen(false), 1000);
         }
-        setLoading(false);
       }
     }
   };
@@ -348,55 +352,21 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
     setAnalysis(updatedAnalysis);
   };
 
-  /*
-  const handleContinue = async () => {
-    setError(null);
-    const fixedUrl = fixUrlFormat(website);
-    if (!fixedUrl) {
-      setError('Please enter a valid website URL (starting with http:// or https://)');
-      return;
+  // Register data collector so the Wizard footer button is the single gate to step 3
+  useEffect(() => {
+    if (onDataReady) {
+      onDataReady(() => {
+        const fixedUrl = fixUrlFormat(website);
+        return {
+          website: fixedUrl || website,
+          domainName,
+          analysis,
+          crawlResult,
+          useAnalysisForGenAI,
+        };
+      });
     }
-    
-    // Save current analysis state to backend before continuing
-    if (analysis && analysis.id) {
-      setLoading(true);
-      await saveAnalysis(analysis);
-      setLoading(false);
-    }
-    
-    // Prepare step data for the next step
-    const stepData = {
-      website: fixedUrl,
-      domainName: domainName,
-      analysis: analysis,
-      useAnalysisForGenAI: useAnalysisForGenAI
-    };
-
-    const cachedIntake = onboardingCache.getStepData(2) as WebsiteIntakeCache | undefined;
-    onboardingCache.saveStepData(2, {
-      ...cachedIntake,
-      website: fixedUrl,
-      analysis: analysis,
-      hasWebsite: true
-    });
-
-    // Store in localStorage for Step 3 (Competitor Analysis)
-    localStorage.setItem('website_url', fixedUrl);
-    localStorage.setItem('website_analysis_data', JSON.stringify(analysis));
-    
-    onContinue(stepData);
-  };
-  */
-  /*
-  const handleContinue = async () => {
-    // This function is now triggered by the user via the AnalysisResultsDisplay component
-    // or manually via a button if we were to add one here.
-    // Since AnalysisResultsDisplay has its own flow, we might not use this directly 
-    // in the main render unless we want a global "Continue" button.
-    // For now, silencing the unused var warning by logging or commenting out.
-    console.log('Main handleContinue ready');
-  };
-  */
+  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI]);
 
   // Conditional rendering for business description form - now handled inline via toggle
   /*
@@ -444,162 +414,92 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
         '100%': { opacity: 1, transform: 'translateY(0)' }
       }
     }}>
-      {/* Educational Header */}
-      <Box sx={{ mb: 4, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
-        <Typography variant="h4" sx={{ 
-          fontWeight: 700, 
-          mb: 2,
+      {/* Header */}
+      <Box sx={{ mb: 3, textAlign: 'center', animation: 'fadeIn 0.6s ease-out' }}>
+        <Typography variant="h4" sx={{
+          fontWeight: 700,
+          mb: 1,
           background: 'linear-gradient(45deg, #2563EB 30%, #7C3AED 90%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
           Let AI Learn Your Brand Voice
         </Typography>
-        
-        <Typography variant="body1" color="text.secondary" sx={{ 
-          mb: 2, 
-          maxWidth: 600, 
-          mx: 'auto',
-          fontSize: '1.1rem'
-        }}>
-          Enter your website URL to automatically extract your unique writing style, tone, and audience preferences.
-        </Typography>
-
-        <Button 
-          size="small" 
-          onClick={() => setShowInfo(!showInfo)}
-          endIcon={showInfo ? <ExpandLessIcon /> : <ExpandMoreIcon />}
-          sx={{ textTransform: 'none', borderRadius: 2 }}
-        >
-          {showInfo ? 'Hide details' : 'How does this work?'}
-        </Button>
-
-        <Collapse in={showInfo}>
-          <Box sx={{ 
-            mt: 2, 
-            p: 3, 
-            bgcolor: lightTheme.surface,
-            color: lightTheme.text,
-            borderRadius: 3,
-            border: `1px solid ${lightTheme.border}`,
-            boxShadow: lightTheme.shadowSm,
-            maxWidth: 800,
-            mx: 'auto',
-            textAlign: 'left'
-          }}>
-            <Grid container spacing={3}>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#DBEAFE', borderRadius: '50%', mb: 1.5, color: '#2563EB' }}>
-                    <SearchIcon />
-                  </Box>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>1. Scan & Crawl</Typography>
-                  <Typography variant="caption" color="text.secondary">We securely analyze your public pages to gather content samples.</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#F3E8FF', borderRadius: '50%', mb: 1.5, color: '#7C3AED' }}>
-                    <PsychologyIcon />
-                  </Box>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>2. AI Analysis</Typography>
-                  <Typography variant="caption" color="text.secondary">Our AI identifies your tone, vocabulary, and sentence structure.</Typography>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={4}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                  <Box sx={{ p: 1.5, bgcolor: '#DCFCE7', borderRadius: '50%', mb: 1.5, color: '#16A34A' }}>
-                    <AutoFixHighIcon />
-                  </Box>
-                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>3. Personalization</Typography>
-                  <Typography variant="caption" color="text.secondary">Future content is generated to match your brand's unique voice perfectly.</Typography>
-                </Box>
-              </Grid>
-            </Grid>
-          </Box>
-        </Collapse>
       </Box>
 
-      {/* Input Section */}
-      <Card sx={{ 
-        mb: 3, 
-        p: 4, 
-        bgcolor: lightTheme.surface,
-        color: lightTheme.text,
-        borderRadius: lightTheme.radiusLg,
-        boxShadow: lightTheme.shadowSm,
-        border: `1px solid ${lightTheme.border}`,
-        position: 'relative',
-        overflow: 'visible'
+      {/* Input Card */}
+      <Paper elevation={0} sx={{
+        mb: 2,
+        p: 2.5,
+        borderRadius: 3,
+        border: '1px solid #E5E7EB',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
       }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={8}>
-            <TextField
-              label="Website URL"
-              value={website}
-              onChange={e => setWebsite(e.target.value)}
-              fullWidth
-              placeholder="https://yourwebsite.com"
-              disabled={loading}
-              helperText="We'll only read public pages. No login required."
-              InputProps={{
-                sx: { 
-                  borderRadius: 2,
-                  bgcolor: lightTheme.inputBg,
-                  color: lightTheme.inputText,
-                }
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  bgcolor: lightTheme.inputBg,
-                  color: lightTheme.inputText,
-                  '& fieldset': { borderColor: lightTheme.border },
-                  '&:hover fieldset': { borderColor: lightTheme.primary },
-                  '&.Mui-focused fieldset': { borderColor: lightTheme.primary }
-                },
-                '& .MuiInputLabel-root': { color: lightTheme.textSecondary },
-                '& .MuiInputLabel-root.Mui-focused': { color: lightTheme.primary },
-                '& .MuiFormHelperText-root': { color: lightTheme.textSecondary }
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <Button
-              variant="contained"
-              onClick={handleAnalyze}
-              disabled={!website || loading}
-              fullWidth
-              size="large"
-              startIcon={loading ? <CircularProgress size={20} color="inherit" /> : <AnalyticsIcon />}
-              sx={{ 
-                borderRadius: '16px',
-                py: 1.5,
-                bgcolor: lightTheme.primary,
-                color: lightTheme.primaryContrast,
-                boxShadow: lightTheme.shadowMd,
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  bgcolor: lightTheme.primary,
-                  filter: 'brightness(1.06)',
-                  transform: 'translateY(-1px)',
-                  boxShadow: '0 8px 25px 0 rgba(37, 99, 235, 0.4)',
-                },
-                '&:active': {
-                  transform: 'translateY(1px)'
-                }
-              }}
-            >
-              {loading ? 'Analyzing...' : 'Website Analysis'}
-            </Button>
-          </Grid>
-        </Grid>
-      </Card>
+        <Box sx={{ position: 'relative' }}>
+          <TextField
+            label="Your website URL (e.g., www.example.com)"
+            value={website}
+            onChange={e => setWebsite(e.target.value)}
+            fullWidth
+            placeholder="Enter your URL to instantly capture your brand voice."
+            disabled={loading}
+            InputLabelProps={{ shrink: true }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: 2,
+                bgcolor: '#F9FAFB',
+                pr: '136px',
+                '& fieldset': { borderColor: '#E5E7EB' },
+                '&:hover fieldset': { borderColor: '#7C3AED' },
+                '&.Mui-focused fieldset': { borderColor: '#7C3AED', borderWidth: 2 },
+              },
+              '& .MuiInputLabel-root': {
+                color: '#6B7280',
+                fontWeight: 500,
+                '&.Mui-focused': { color: '#7C3AED' },
+              },
+            }}
+          />
+          <Button
+            variant="contained"
+            onClick={handleAnalyze}
+            disabled={!website || loading}
+            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AnalyticsIcon />}
+            sx={{
+              position: 'absolute',
+              right: 6,
+              top: 6,
+              bottom: 6,
+              borderRadius: '10px',
+              textTransform: 'none',
+              px: 2.5,
+              py: 0,
+              bgcolor: '#7C3AED',
+              color: '#FFFFFF',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+              boxShadow: 'none',
+              zIndex: 1,
+              '&:hover': {
+                bgcolor: '#6D28D9',
+                boxShadow: 'none',
+              },
+              '&.Mui-disabled': {
+                bgcolor: '#A78BFA',
+                color: 'rgba(255,255,255,0.85)',
+              },
+            }}
+          >
+            {loading ? 'Analyzing...' : 'Analyze'}
+          </Button>
+        </Box>
+      </Paper>
 
       {/* No Website Option */}
-      <Box sx={{ mt: 2, textAlign: 'center', mb: 3 }}>
+      <Box sx={{ textAlign: 'center', mb: 3 }}>
         {!showBusinessForm ? (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontSize: '0.85rem' }}>
               Don't have a live website yet?
             </Typography>
             <Button
@@ -608,19 +508,20 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                 setShowBusinessForm(true);
               }}
               startIcon={<BusinessIcon />}
-              sx={{ 
-                textTransform: 'none', 
-                color: 'text.secondary',
-                '&:hover': { color: 'primary.main', bgcolor: 'transparent' }
+              sx={{
+                textTransform: 'none',
+                fontWeight: 500,
+                color: '#7C3AED',
+                fontSize: '0.9rem',
+                '&:hover': { bgcolor: 'transparent', color: '#6D28D9' },
               }}
             >
               Describe your business manually instead
             </Button>
           </>
         ) : (
-          <Box sx={{ 
-            mt: 2, 
-            textAlign: 'left', 
+          <Box sx={{
+            textAlign: 'left',
             animation: 'fadeIn 0.5s ease-out'
           }}>
              <BusinessDescriptionStep
@@ -630,7 +531,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                 }}
                 onContinue={(businessData: any) => {
                   console.log('➡️ Business info completed, proceeding to next step...');
-                  
+
                   // Prepare step data combining website and business data
                   const stepData = {
                     website: fixUrlFormat(website),
@@ -639,7 +540,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                     useAnalysisForGenAI: useAnalysisForGenAI,
                     businessData: businessData
                   };
-                  
+
                   const cachedIntake = onboardingCache.getStepData(2) as WebsiteIntakeCache | undefined;
                   onboardingCache.saveStepData(2, {
                     ...cachedIntake,
@@ -655,7 +556,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                     localStorage.setItem('website_url', fixedUrl);
                     localStorage.setItem('website_analysis_data', JSON.stringify(analysis));
                   }
-                  
+
                   onContinue(stepData);
                 }}
               />
@@ -704,12 +605,15 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
         maxWidth="sm"
         fullWidth
         disableEscapeKeyDown
+        PaperProps={{
+          sx: {
+            borderRadius: 3,
+            boxShadow: '0 20px 60px rgba(16,24,40,0.12)',
+            bgcolor: '#F9FAFB',
+          }
+        }}
       >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <CircularProgress size={24} />
-          Analyzing Your Website...
-        </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ p: 0 }}>
           <AnalysisProgressDisplay loading={true} progress={progress} />
         </DialogContent>
       </Dialog>

@@ -431,6 +431,7 @@ const BlogWriter: React.FC = () => {
   // Modal visibility management - extracted to useModalVisibility
   const {
     showModal,
+    setShowModal,
     showOutlineModal,
     setShowOutlineModal,
     setIsMediumGenerationStarting,
@@ -879,6 +880,8 @@ const BlogWriter: React.FC = () => {
         showModal={showModal}
         rewritePolling={rewritePolling}
         mediumPolling={mediumPolling}
+        onCloseOutlineModal={() => setShowOutlineModal(false)}
+        onCloseContentModal={() => setShowModal(false)}
       />
 
       {/* SEO Analysis Modal */}

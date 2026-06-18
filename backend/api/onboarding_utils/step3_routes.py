@@ -12,7 +12,7 @@ Last Updated: January 2025
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Body
 from pydantic import BaseModel, HttpUrl, Field
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import traceback
 from loguru import logger
 
@@ -496,8 +496,8 @@ async def start_deep_crawl(
 ):
     """
     Start a deep website crawl task.
-    If schedule is True, it sets up the recurring task.
-    If schedule is False, it runs immediately (fire and forget/poll).
+    If schedule is True, creates a recurring task with proper frequency.
+    If schedule is False, runs immediately (fire-and-forget, no DB record).
     """
     user_id = str(current_user.get("id"))
     db = get_session_for_user(user_id)
@@ -505,62 +505,70 @@ async def start_deep_crawl(
         raise HTTPException(status_code=500, detail="Database connection failed")
 
     try:
-        # Check/Create Task
         task = db.query(DeepWebsiteCrawlTask).filter(
             DeepWebsiteCrawlTask.user_id == user_id,
             DeepWebsiteCrawlTask.website_url == request.user_url
         ).first()
 
         if not task:
-            task = DeepWebsiteCrawlTask(
-                user_id=user_id,
-                website_url=request.user_url,
-                status="active" if request.schedule else "running",
-                next_execution=datetime.utcnow() if request.schedule else None
-            )
-            db.add(task)
-            db.commit()
-            db.refresh(task)
+            if request.schedule:
+                # Create recurring task with proper frequency
+                task = DeepWebsiteCrawlTask(
+                    user_id=user_id,
+                    website_url=request.user_url,
+                    status="active",
+                    next_execution=datetime.now(timezone.utc) + timedelta(minutes=5),
+                    frequency_days=7,
+                    payload={"created_from": "deep-crawl-endpoint", "schedule": True},
+                )
+                db.add(task)
+                db.commit()
+                db.refresh(task)
+                message = "Deep crawl scheduled for first run in 5 minutes."
+            else:
+                # Fire-and-forget: no DB record, run immediately
+                service = DeepCrawlService()
+                background_tasks.add_task(
+                    service.execute_deep_crawl,
+                    user_id=user_id,
+                    website_url=request.user_url,
+                    task_id=None,
+                )
+                return {
+                    "success": True,
+                    "message": "Deep crawl started immediately.",
+                    "task_id": None,
+                    "status": "running",
+                }
         else:
-            task.website_url = request.user_url # Update URL if changed?
+            # Existing task
             if request.schedule:
                 task.status = "active"
-                # If scheduling, don't run immediately unless requested?
-                # User said "fire ... OR let it be scheduled".
-                # If this endpoint is called, we assume intent to start OR schedule.
-                # If schedule=True, we might just set it active.
-                # If schedule=False, we run it now.
-                # But typically user might want "Run now AND schedule".
-                # Let's assume this endpoint is "Start Now". Scheduling is separate?
-                # "option to fire and check ... or let it be scheduled"
-                # If "fire", run now.
-                pass
+                task.next_execution = datetime.now(timezone.utc) + timedelta(minutes=5)
+                task.frequency_days = 7
+                db.commit()
+                message = "Deep crawl re-scheduled."
             else:
-                task.status = "running"
-            db.commit()
-
-        if not request.schedule:
-            # Run immediately in background
-            service = DeepCrawlService()
-            background_tasks.add_task(
-                service.execute_deep_crawl,
-                user_id=user_id,
-                website_url=request.user_url,
-                task_id=task.id
-            )
-            message = "Deep crawl started immediately."
-        else:
-            # Scheduled
-            task.status = "active"
-            task.next_execution = datetime.utcnow() # Scheduler will pick it up
-            db.commit()
-            message = "Deep crawl scheduled."
+                # Fire-and-forget: run immediately, don't alter task schedule
+                service = DeepCrawlService()
+                background_tasks.add_task(
+                    service.execute_deep_crawl,
+                    user_id=user_id,
+                    website_url=request.user_url,
+                    task_id=task.id,
+                )
+                return {
+                    "success": True,
+                    "message": "Deep crawl started immediately.",
+                    "task_id": task.id,
+                    "status": "running",
+                }
 
         return {
             "success": True,
             "message": message,
             "task_id": task.id,
-            "status": task.status
+            "status": task.status,
         }
     except Exception as e:
         logger.error(f"Error starting deep crawl: {e}")

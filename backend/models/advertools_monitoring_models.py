@@ -28,6 +28,8 @@ class AdvertoolsTask(Base):
     status = Column(String(50), default='active', index=True)  # 'active', 'failed', 'paused'
     
     # Execution Tracking
+    started_at = Column(DateTime, nullable=True)     # When current execution started (for stale detection)
+    last_heartbeat = Column(DateTime, nullable=True)  # Updated during long-running executions
     last_executed = Column(DateTime, nullable=True)
     last_success = Column(DateTime, nullable=True)
     last_failure = Column(DateTime, nullable=True)

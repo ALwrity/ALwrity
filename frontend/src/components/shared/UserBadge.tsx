@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Avatar, Box, Menu, MenuItem, Typography, Tooltip, Chip, Divider, IconButton, CircularProgress } from '@mui/material';
+import {
+  Avatar, Box, Menu, MenuItem, Typography, Tooltip, Chip, Divider, IconButton, CircularProgress,
+  Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Checkbox, FormControlLabel,
+} from '@mui/material';
+import { DeleteForever as DeleteForeverIcon } from '@mui/icons-material';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import SystemStatusIndicator from '../ContentPlanningDashboard/components/SystemStatusIndicator';
@@ -11,6 +15,7 @@ import {
   logBackendCooldownSkipOnce,
 } from '../../api/client';
 import { saveNavigationState } from '../../utils/navigationState';
+import { onboardingCache } from '../../services/onboardingCache';
 import { Refresh as RefreshIcon } from '@mui/icons-material';
 
 interface UserBadgeProps {
@@ -24,6 +29,9 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [systemStatus, setSystemStatus] = useState<'healthy' | 'warning' | 'critical' | 'unknown'>('unknown');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [signOutAfterReset, setSignOutAfterReset] = useState(true);
   const open = Boolean(anchorEl);
 
   const initials = React.useMemo(() => {
@@ -122,6 +130,28 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
     } finally {
       window.location.assign('/');
     }
+  };
+
+  const handleResetOnboarding = async () => {
+    setResetDialogOpen(false);
+    setIsResetting(true);
+    try {
+      await apiClient.post('/api/onboarding/reset?hard=true');
+    } catch (err) {
+      console.error('Failed to reset onboarding:', err);
+    }
+    // Clear all cached/restored onboarding state before redirect
+    try {
+      onboardingCache.clearCache();
+    } catch (_) {}
+    const lsKeys = ['onboarding_step_data', 'onboarding_active_step', 'onboarding_data', 'onboarding_intro_completed', 'website_url'];
+    lsKeys.forEach(k => localStorage.removeItem(k));
+    sessionStorage.removeItem('onboarding_init');
+    if (signOutAfterReset) {
+      try { await signOut(); } catch (_) {}
+    }
+    setIsResetting(false);
+    window.location.assign(signOutAfterReset ? '/' : '/onboarding');
   };
 
   return (
@@ -304,7 +334,67 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
         <MenuItem onClick={handleSignOut} sx={{ mx: 1, borderRadius: 1, color: '#6b7280', '&:hover': { bgcolor: '#fef2f2', color: '#ef4444' } }}>
           Sign out
         </MenuItem>
+
+        <Divider sx={{ mx: 2 }} />
+
+        <MenuItem
+          onClick={() => setResetDialogOpen(true)}
+          disabled={isResetting}
+          sx={{ mx: 1, borderRadius: 1, color: '#dc2626', '&:hover': { bgcolor: '#fef2f2' } }}
+        >
+          <DeleteForeverIcon sx={{ fontSize: 18, mr: 1 }} />
+          {isResetting ? 'Resetting...' : 'Reset Onboarding'}
+        </MenuItem>
       </Menu>
+
+      {/* Reset Onboarding Confirmation Dialog */}
+      <Dialog open={resetDialogOpen} onClose={() => setResetDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ color: '#dc2626', fontWeight: 700 }}>
+          Reset Onboarding — This cannot be undone
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText component="div" sx={{ color: '#374151' }}>
+            <Typography sx={{ mb: 1.5, fontWeight: 600 }}>
+              This will permanently delete all of your onboarding data:
+            </Typography>
+            <Box component="ul" sx={{ pl: 2, mb: 2 }}>
+              <Typography component="li" sx={{ mb: 0.5 }}>Your website analysis and SEO audit</Typography>
+              <Typography component="li" sx={{ mb: 0.5 }}>Competitor research data</Typography>
+              <Typography component="li" sx={{ mb: 0.5 }}>Persona configurations</Typography>
+              <Typography component="li" sx={{ mb: 0.5 }}>Platform integrations and OAuth tokens</Typography>
+              <Typography component="li" sx={{ mb: 0.5 }}>All background tasks and scheduled jobs</Typography>
+              <Typography component="li">Your onboarding progress</Typography>
+            </Box>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={signOutAfterReset}
+                  onChange={(e) => setSignOutAfterReset(e.target.checked)}
+                  sx={{ '&.Mui-checked': { color: '#dc2626' } }}
+                />
+              }
+              label="Sign me out after reset"
+            />
+            <Typography sx={{ color: '#6b7280', fontStyle: 'italic', fontSize: '0.875rem', mt: 1 }}>
+              {signOutAfterReset
+                ? 'You will be signed out and redirected to the landing page.'
+                : 'You will be redirected to start the onboarding wizard from scratch.'}
+            </Typography>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setResetDialogOpen(false)} sx={{ color: '#6b7280' }}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleResetOnboarding}
+            variant="contained"
+            sx={{ bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' } }}
+          >
+            Yes, reset everything
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

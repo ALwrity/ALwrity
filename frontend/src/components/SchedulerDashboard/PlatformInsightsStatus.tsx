@@ -35,6 +35,7 @@ import { useAuth } from '@clerk/clerk-react';
 import {
   getPlatformInsightsStatus,
   getPlatformInsightsLogs,
+  ensurePlatformInsightsTasks,
   PlatformInsightsStatusResponse,
   PlatformInsightsTask,
   PlatformInsightsExecutionLog,
@@ -76,12 +77,28 @@ const PlatformInsightsStatus: React.FC<PlatformInsightsStatusProps> = ({ compact
   
   const fetchStatus = async () => {
     if (!userId) return;
-    
+
     try {
       setLoading(true);
       setError(null);
       const response = await getPlatformInsightsStatus(userId);
-      setStatus(response);
+      // C2: GET is now strictly read-only. If the server reports missing
+      // platforms (user has connected integrations but no tracking tasks
+      // yet), POST to the dedicated ensure-tasks endpoint to create them.
+      // We re-fetch afterwards so the UI shows the freshly created tasks.
+      if (response.missing_platforms && response.missing_platforms.length > 0) {
+        try {
+          const ensured = await ensurePlatformInsightsTasks(userId);
+          setStatus(ensured);
+        } catch (ensureErr: any) {
+          console.error('Failed to ensure platform insights tasks:', ensureErr);
+          // Fall back to the read-only response; the missing platforms
+          // are still surfaced so the user knows what's pending.
+          setStatus(response);
+        }
+      } else {
+        setStatus(response);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to fetch platform insights status');
       console.error('Error fetching platform insights status:', err);

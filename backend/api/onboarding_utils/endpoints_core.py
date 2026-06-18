@@ -43,10 +43,40 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 research = completion_data.get('research_preferences') or {}
                 step_completed = bool(research.get('research_depth') or research.get('content_types'))
                 if step_completed:
-                    step_data = research
+                    step_data = dict(research)
+                    # Merge crawl social media into social_media_accounts (same logic as get_step_data(3))
+                    website = completion_data.get('website_analysis') or {}
+                    social_media = dict(website.get('social_media_presence') or website.get('social_media_accounts', {}) or {})
+                    crawl_result = website.get('crawl_result', {}) or {}
+                    crawl_social_media = {}
+                    if isinstance(crawl_result, dict):
+                        crawl_content = crawl_result.get('content', {}) or {}
+                        crawl_social_media = crawl_content.get('social_media', {}) or {}
+                        if not isinstance(crawl_social_media, dict):
+                            crawl_social_media = {}
+                        def _norm_url(u: str) -> str:
+                            if not isinstance(u, str):
+                                return ''
+                            u = u.strip()
+                            if not u:
+                                return ''
+                            if u.startswith('//'):
+                                return 'https:' + u
+                            if not u.startswith('http://') and not u.startswith('https://'):
+                                return 'https://' + u if '.' in u else ''
+                            return u
+                        for platform, url in list(crawl_social_media.items()):
+                            existing = social_media.get(platform)
+                            if not existing or str(existing).strip().lower() in ('', '1', 'true', 'none'):
+                                social_media[platform] = _norm_url(url)
+                    step_data['social_media_accounts'] = social_media
+                    step_data['crawl_social_media'] = crawl_social_media
             elif step_num == 4:  # Persona Generation
                 persona = completion_data.get('persona_data') or {}
-                step_completed = bool(persona.get('corePersona') or persona.get('platformPersonas'))
+                step_completed = bool(
+                    persona.get('corePersona') or persona.get('core_persona') or
+                    persona.get('platformPersonas') or persona.get('platform_personas')
+                )
                 if step_completed:
                     step_data = persona
             elif step_num == 5:  # Integrations (always completed if we reach this point)
@@ -71,7 +101,7 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                     any(v for v in (completion_data.get('api_keys') or {}).values() if v) and
                     bool((completion_data.get('website_analysis') or {}).get('website_url') or (completion_data.get('website_analysis') or {}).get('writing_style')) and
                     bool((completion_data.get('research_preferences') or {}).get('research_depth') or (completion_data.get('research_preferences') or {}).get('content_types')) and
-                    bool((completion_data.get('persona_data') or {}).get('corePersona') or (completion_data.get('persona_data') or {}).get('platformPersonas'))
+                    bool((completion_data.get('persona_data') or {}).get('corePersona') or (completion_data.get('persona_data') or {}).get('core_persona') or (completion_data.get('persona_data') or {}).get('platformPersonas') or (completion_data.get('persona_data') or {}).get('platform_personas'))
                 )
                 if all_have:
                     svc = progress_service
