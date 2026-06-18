@@ -26,6 +26,7 @@ export interface LinkedInAccount {
   account_id: string;
   account_type?: string | null;
   username?: string | null;
+  avatar_url?: string | null;
   platform: string;
 }
 

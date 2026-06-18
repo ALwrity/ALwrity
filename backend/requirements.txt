@@ -12,7 +12,7 @@ tenacity>=8.2.3
 pydantic>=2.5.2,<3.0.0
 typing-extensions>=4.8.0
 
-reportlab-4.5.1
+reportlab==4.5.1
 
 # Auth
 PyJWT>=2.8.0

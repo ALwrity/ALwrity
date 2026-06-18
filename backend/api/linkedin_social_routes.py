@@ -35,6 +35,7 @@ from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
 from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
 from services.integrations.linkedin.types import LinkedInNotConnectedError
+from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.integrations.oauth_callback_utils import (
@@ -63,19 +64,30 @@ async def _resolve_linkedin_callback_user(
     request: Request,
     alwrity_state: Optional[str] = None,
     state: Optional[str] = None,
+    name: Optional[str] = None,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> str:
-    """Resolve callback user from Clerk session or validated OAuth state."""
+    """Resolve callback user from Clerk session, Unipile name, or validated OAuth state."""
     if credentials and credentials.credentials:
         user = await clerk_auth.verify_token(credentials.credentials)
         if user and user.get("id"):
             return str(user["id"])
 
+    unipile_user_id = (name or request.query_params.get("name") or "").strip()
+    if unipile_user_id:
+        logger.info(
+            f"[LinkedInConnect] Resolved callback user from Unipile name={unipile_user_id}"
+        )
+        return unipile_user_id
+
     oauth_state = alwrity_state or state or request.query_params.get("alwrity_state")
     if oauth_state:
-        user_id = _oauth_service.peek_oauth_state_user(oauth_state)
-        if user_id:
-            return user_id
+        if ":" in oauth_state:
+            user_id = _oauth_service.peek_oauth_state_user(oauth_state)
+            if user_id:
+                return user_id
+        if oauth_state.startswith("user_"):
+            return oauth_state
 
     raise HTTPException(status_code=401, detail="Authentication required for LinkedIn callback")
 
@@ -101,8 +113,12 @@ async def get_connection_status(
     user_id = _user_id(current_user)
     status = _oauth_service.get_connection_status(user_id)
     if status.get("connected"):
-        _oauth_service.try_sync_zernio_accounts(user_id)
-        status = _oauth_service.get_connection_status(user_id)
+        if status.get("provider") == "zernio":
+            _oauth_service.try_sync_zernio_accounts(user_id)
+            status = _oauth_service.get_connection_status(user_id)
+    elif status.get("provider") == "unipile":
+        if await _oauth_service.try_sync_unipile_accounts(user_id):
+            status = _oauth_service.get_connection_status(user_id)
 
     organizations: List[Dict[str, Any]] = []
     if status.get("connected") and status.get("accounts"):
@@ -131,12 +147,12 @@ async def get_authorization_url(
     state: Optional[str] = None,
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, str]:
-    """Return OAuth authorization URL for Zernio or native LinkedIn connect."""
+    """Return OAuth authorization URL for Zernio, Unipile, or native LinkedIn connect."""
     user_id = _user_id(current_user)
     logger.info(f"[LinkedInConnect] auth URL requested user_id={user_id}")
     try:
         oauth_state = state or str(uuid.uuid4())
-        payload = _oauth_service.generate_authorization_url(user_id, oauth_state)
+        payload = await _oauth_service.generate_authorization_url(user_id, oauth_state)
         logger.info(
             f"[LinkedInConnect] auth URL generated user_id={user_id} provider={payload.get('provider')}"
         )
@@ -146,12 +162,21 @@ async def get_authorization_url(
             "provider": payload["provider"],
         }
     except ValueError as e:
-        if "ZERNIO_API_KEY" in str(e):
+        error_str = str(e).lower()
+        if "zernio_api_key is not configured" in error_str:
             logger.error(f"[LinkedInConnect] missing ZERNIO_API_KEY user_id={user_id}")
+        elif "unipile_api_key is not configured" in error_str:
+            logger.error(f"[LinkedInConnect] missing UNIPILE_API_KEY user_id={user_id}")
+        else:
+            logger.warning(f"[LinkedInConnect] configuration error user_id={user_id}: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
     except ZernioAPIError as e:
         status = e.status_code or 502
         logger.warning(f"[LinkedInConnect] auth URL Zernio error user_id={user_id}: {e}")
+        raise HTTPException(status_code=status, detail=str(e)) from e
+    except UnipileAPIError as e:
+        status = e.status_code or 502
+        logger.warning(f"[LinkedInConnect] auth URL Unipile error user_id={user_id}: {e}")
         raise HTTPException(status_code=status, detail=str(e)) from e
     except Exception as e:
         logger.exception(f"[LinkedInConnect] auth URL failed user_id={user_id}: {e}")
@@ -186,17 +211,86 @@ async def handle_oauth_callback_get(
     account_id: Optional[str] = None,
     username: Optional[str] = None,
     alwrity_state: Optional[str] = None,
+    provider: Optional[str] = Query(None, description="OAuth provider (unipile, zernio, native)"),
+    status: Optional[str] = Query(None, description="Connection status (success, error)"),
+    message: Optional[str] = Query(None, description="Error message if status is error"),
+    name: Optional[str] = Query(None, description="User ID passed to Unipile as 'name' param"),
     user_id: str = Depends(_resolve_linkedin_callback_user),
 ) -> HTMLResponse:
-    """HTML OAuth callback that stores credentials and notifies opener via postMessage."""
+    """HTML OAuth callback that stores credentials and notifies opener via postMessage.
+
+    Handles callbacks from:
+    - Zernio (legacy): connected, accountId, tempToken params
+    - Unipile (Phase 2): provider=unipile, status=success|error, account_id, name
+    - Native LinkedIn: code, state params
+    """
     try:
         resolved_account_id = accountId or account_id
         temp_token = request.query_params.get("tempToken") or request.query_params.get(
             "temp_token"
         )
+
+        # Detect Unipile callback (Phase 2)
+        is_unipile_redirect = provider == "unipile"
+        if is_unipile_redirect:
+            logger.info(
+                f"[LinkedInConnect] Unipile callback user_id={user_id} "
+                f"status={status} account_id_present={bool(resolved_account_id)}"
+            )
+
+            if status == "error":
+                error_msg = message or "Unipile authentication failed"
+                logger.error(f"[LinkedInConnect] Unipile callback error user_id={user_id}: {error_msg}")
+                html = build_oauth_callback_html(
+                    payload={
+                        "type": "LINKEDIN_OAUTH_ERROR",
+                        "success": False,
+                        "provider": "unipile",
+                        "error": error_msg,
+                    },
+                    title="LinkedIn Connection Failed",
+                    heading="Connection Failed",
+                    message=f"LinkedIn connection failed: {error_msg}. You can close this window and try again.",
+                )
+                return HTMLResponse(content=html)
+
+            # Success case - store credentials
+            if not resolved_account_id:
+                logger.error(f"[LinkedInConnect] Unipile callback missing account_id user_id={user_id}")
+                raise HTTPException(status_code=400, detail="Missing account_id from Unipile callback")
+
+            ok = await _oauth_service.handle_unipile_callback(
+                user_id=user_id,
+                account_id=resolved_account_id,
+                status="success",
+            )
+            if not ok:
+                raise HTTPException(status_code=400, detail="Failed to store Unipile credentials")
+
+            logger.info(f"[LinkedInConnect] Unipile callback succeeded user_id={user_id}")
+            payload = {
+                "type": "LINKEDIN_OAUTH_SUCCESS",
+                "success": True,
+                "provider": "unipile",
+            }
+            html = build_oauth_callback_html(
+                payload=payload,
+                title="LinkedIn Connected",
+                heading="Connection Successful",
+                message="Your LinkedIn account was connected via Unipile. You can close this window.",
+            )
+            return HTMLResponse(
+                content=html,
+                headers={
+                    "Cross-Origin-Opener-Policy": "unsafe-none",
+                    "Cross-Origin-Embedder-Policy": "unsafe-none",
+                },
+            )
+
+        # Detect Zernio callback (legacy)
         is_zernio_redirect = (
             connected == "linkedin"
-            or bool(resolved_account_id)
+            or bool(resolved_account_id and not provider)
             or bool(temp_token)
         )
 
@@ -230,6 +324,7 @@ async def handle_oauth_callback_get(
                 },
             )
 
+        # Native LinkedIn OAuth
         if not code or not state:
             raise HTTPException(status_code=400, detail="Missing OAuth code or state")
 
@@ -298,7 +393,7 @@ async def disconnect_linkedin(
     user_id = _user_id(current_user)
     logger.info(f"[LinkedInConnect] disconnect requested user_id={user_id}")
     try:
-        result = _oauth_service.disconnect_user(user_id)
+        result = await _oauth_service.disconnect_user(user_id)
         logger.info(
             f"[LinkedInConnect] disconnect completed user_id={user_id} "
             f"revoked={result.get('revoked')} zernio_account_deleted={result.get('zernio_account_deleted')}"

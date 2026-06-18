@@ -64,6 +64,12 @@ function formatProviderLabel(provider: string): string {
 
 
 
+function isInternalUserId(value: string | null | undefined): boolean {
+  return Boolean(value?.trim().startsWith('user_'));
+}
+
+
+
 function findPersonalAccount(accounts: LinkedInAccount[]): LinkedInAccount | undefined {
 
   return (
@@ -106,12 +112,12 @@ export function buildLinkedInProfileSummary(params: {
 
 
 
+  const statusAccountName = status?.account_name?.trim();
   const displayName =
-
     personalAccount?.username?.trim() ||
-
-    status?.account_name?.trim() ||
-
+    (statusAccountName && !isInternalUserId(statusAccountName)
+      ? statusAccountName
+      : undefined) ||
     'LinkedIn account';
 
 

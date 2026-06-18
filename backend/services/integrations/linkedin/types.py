@@ -9,9 +9,10 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
 DEFAULT_ZERNIO_API_URL = "https://zernio.com/api/v1"
+DEFAULT_UNIPILE_DSN = "api1.unipile.com:13211"
 
 
-ProviderMode = Literal["zernio", "native"]
+ProviderMode = Literal["zernio", "native", "unipile"]
 ProfileAggregation = Literal["TOTAL", "DAILY"]
 OrgMetricType = Literal["total_value", "time_series"]
 
@@ -22,14 +23,30 @@ class LinkedInNotConnectedError(Exception):
 
 @dataclass(frozen=True)
 class LinkedInCredentials:
+    """
+    LinkedIn credentials for all provider modes (Zernio, Unipile, Native).
+
+    Fields are provider-specific:
+    - Zernio: zernio_api_key, zernio_profile_id, zernio_account_id
+    - Unipile: unipile_account_id, unipile_org_account_id (no API key stored, uses env var)
+    - Native: linkedin_access_token, linkedin_refresh_token
+    """
+
     provider_mode: ProviderMode
+    # Zernio fields (legacy, maintained for backward compatibility)
     zernio_api_key: Optional[str] = None
     zernio_profile_id: Optional[str] = None
     zernio_account_id: Optional[str] = None
     zernio_org_account_id: Optional[str] = None
     zernio_api_url: str = DEFAULT_ZERNIO_API_URL
+    # Unipile fields (Phase 1)
+    unipile_account_id: Optional[str] = None
+    unipile_org_account_id: Optional[str] = None
+    unipile_dsn: str = DEFAULT_UNIPILE_DSN
+    # Native OAuth fields
     linkedin_access_token: Optional[str] = None
     linkedin_refresh_token: Optional[str] = None
+    # Common fields
     account_name: Optional[str] = None
     profile_urn: Optional[str] = None
     source: Literal["database", "environment"] = "database"
@@ -41,17 +58,32 @@ class LinkedInCredentials:
         *,
         decrypted: bool = True,
     ) -> LinkedInCredentials:
+        """
+        Create LinkedInCredentials from a database row dictionary.
+
+        Handles all provider modes (zernio, unipile, native) with appropriate
+        field mapping for each.
+        """
+        provider_mode = row.get("provider_mode", "zernio")
+
         return cls(
-            provider_mode=row.get("provider_mode", "zernio"),
+            provider_mode=provider_mode,
+            # Zernio fields
             zernio_api_key=row.get("zernio_api_key"),
             zernio_profile_id=row.get("zernio_profile_id"),
             zernio_account_id=row.get("zernio_account_id"),
             zernio_org_account_id=row.get("zernio_org_account_id"),
-            zernio_api_url=row.get("zernio_api_url") or os.getenv(
-                "ZERNIO_API_URL", DEFAULT_ZERNIO_API_URL
-            ),
+            zernio_api_url=row.get("zernio_api_url")
+            or os.getenv("ZERNIO_API_URL", DEFAULT_ZERNIO_API_URL),
+            # Unipile fields (Phase 1)
+            unipile_account_id=row.get("unipile_account_id"),
+            unipile_org_account_id=row.get("unipile_org_account_id"),
+            unipile_dsn=row.get("unipile_dsn")
+            or os.getenv("UNIPILE_DSN", DEFAULT_UNIPILE_DSN),
+            # Native fields
             linkedin_access_token=row.get("linkedin_access_token"),
             linkedin_refresh_token=row.get("linkedin_refresh_token"),
+            # Common fields
             account_name=row.get("account_name"),
             profile_urn=row.get("profile_urn"),
             source="database",
@@ -59,10 +91,28 @@ class LinkedInCredentials:
 
     @property
     def primary_account_id(self) -> Optional[str]:
+        """
+        Get the primary account ID for the current provider mode.
+
+        Returns:
+            Account ID for zernio, unipile, or native mode
+        """
+        if self.provider_mode == "unipile":
+            return self.unipile_account_id
+        # Default to Zernio for 'zernio' and legacy records
         return self.zernio_account_id
 
     @property
     def org_account_id(self) -> Optional[str]:
+        """
+        Get the organization account ID for the current provider mode.
+
+        Returns:
+            Organization account ID or primary account ID as fallback
+        """
+        if self.provider_mode == "unipile":
+            return self.unipile_org_account_id or self.unipile_account_id
+        # Default to Zernio for 'zernio' and legacy records
         return self.zernio_org_account_id or self.zernio_account_id
 
 

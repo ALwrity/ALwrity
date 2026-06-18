@@ -15,7 +15,7 @@ import secrets
 import sqlite3
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Mapping, Optional, Tuple
-from urllib.parse import quote, unquote, urlencode
+from urllib.parse import quote, unquote, urlencode, urlparse
 
 import requests
 from cryptography.fernet import Fernet, InvalidToken
@@ -43,15 +43,25 @@ from services.integrations.linkedin.account_resolution import (
     summarize_zernio_account_items,
 )
 
+_PLACEHOLDER_BACKEND_URL_TOKENS = ("your-backend-ngrok", "example.com", "placeholder")
+
+
+def _is_placeholder_backend_url(url: str) -> bool:
+    """Return True when a backend/ngrok URL is unset or a documentation placeholder."""
+    normalized = url.strip().lower()
+    if not normalized:
+        return True
+    return any(token in normalized for token in _PLACEHOLDER_BACKEND_URL_TOKENS)
+
 
 class LinkedInOAuthService:
-    """Manages LinkedIn Growth Engine credentials (Zernio or native OAuth)."""
+    """Manages LinkedIn Growth Engine credentials (Zernio, Unipile, or native OAuth)."""
 
     _TOKEN_SELECT_COLUMNS = """
         id, user_id, provider_mode, zernio_api_key, zernio_account_id,
         zernio_org_account_id, linkedin_access_token, linkedin_refresh_token,
         expires_at, account_name, profile_urn, is_active, created_at, updated_at,
-        zernio_profile_id
+        zernio_profile_id, unipile_account_id, unipile_org_account_id
     """
 
     def __init__(self, db_path: Optional[str] = None):
@@ -127,7 +137,9 @@ class LinkedInOAuthService:
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    zernio_profile_id TEXT
+                    zernio_profile_id TEXT,
+                    unipile_account_id TEXT,
+                    unipile_org_account_id TEXT
                 )
                 """
             )
@@ -136,6 +148,15 @@ class LinkedInOAuthService:
             if "zernio_profile_id" not in existing_cols:
                 cursor.execute(
                     "ALTER TABLE linkedin_oauth_tokens ADD COLUMN zernio_profile_id TEXT"
+                )
+            # Add Unipile columns (Phase 2 migration)
+            if "unipile_account_id" not in existing_cols:
+                cursor.execute(
+                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_account_id TEXT"
+                )
+            if "unipile_org_account_id" not in existing_cols:
+                cursor.execute(
+                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_org_account_id TEXT"
                 )
             cursor.execute(
                 """
@@ -217,7 +238,10 @@ class LinkedInOAuthService:
             _updated_at,
             *rest,
         ) = row
-        zernio_profile_id = rest[0] if rest else None
+        # Handle optional columns that may not exist in older rows
+        zernio_profile_id = rest[0] if len(rest) > 0 else None
+        unipile_account_id = rest[1] if len(rest) > 1 else None
+        unipile_org_account_id = rest[2] if len(rest) > 2 else None
 
         def _maybe_decrypt(value: Optional[str]) -> Optional[str]:
             if not value:
@@ -233,6 +257,8 @@ class LinkedInOAuthService:
                 "zernio_profile_id": zernio_profile_id,
                 "zernio_account_id": zernio_account_id,
                 "zernio_org_account_id": zernio_org_account_id,
+                "unipile_account_id": unipile_account_id,
+                "unipile_org_account_id": unipile_org_account_id,
                 "linkedin_access_token": _maybe_decrypt(linkedin_access_token),
                 "linkedin_refresh_token": _maybe_decrypt(linkedin_refresh_token),
                 "account_name": account_name,
@@ -347,6 +373,66 @@ class LinkedInOAuthService:
             return True
         except Exception as e:
             logger.error(f"Failed to store native LinkedIn tokens for user {user_id}: {e}")
+            return False
+
+    def store_unipile_credentials(
+        self,
+        user_id: str,
+        unipile_account_id: str,
+        unipile_org_account_id: Optional[str] = None,
+        account_name: Optional[str] = None,
+        profile_urn: Optional[str] = None,
+    ) -> bool:
+        """
+        Store Unipile account credentials after successful OAuth.
+
+        Unipile stores OAuth tokens server-side; we only need to store
+        the account_id reference for API calls.
+
+        Args:
+            user_id: Internal user ID
+            unipile_account_id: Unipile account ID from callback
+            unipile_org_account_id: Optional organization account ID
+            account_name: Display name for the account
+            profile_urn: LinkedIn profile URN
+
+        Returns:
+            True if credentials stored successfully
+        """
+        try:
+            self._init_db(user_id)
+            db_path = self._get_db_path(user_id)
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                # Deactivate existing tokens
+                cursor.execute(
+                    "UPDATE linkedin_oauth_tokens SET is_active = 0 WHERE user_id = ?",
+                    (user_id,),
+                )
+                # Insert new Unipile credentials
+                cursor.execute(
+                    """
+                    INSERT INTO linkedin_oauth_tokens (
+                        user_id, provider_mode, unipile_account_id,
+                        unipile_org_account_id, account_name, profile_urn, is_active
+                    ) VALUES (?, 'unipile', ?, ?, ?, ?, 1)
+                    """,
+                    (
+                        user_id,
+                        unipile_account_id,
+                        unipile_org_account_id,
+                        account_name,
+                        profile_urn,
+                    ),
+                )
+                conn.commit()
+            logger.info(
+                f"[LinkedInConnect] Stored Unipile credentials for user={user_id}, "
+                f"account_id={unipile_account_id}"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to store Unipile credentials for user {user_id}: {e}")
             return False
 
     def _parse_expires_at(self, expires_at_str: Optional[str]) -> Tuple[bool, Optional[datetime]]:
@@ -478,6 +564,8 @@ class LinkedInOAuthService:
             return creds
         if creds.provider_mode == "native" and creds.linkedin_access_token:
             return creds
+        if creds.provider_mode == "unipile" and creds.unipile_account_id:
+            return creds
         raise LinkedInNotConnectedError("LinkedIn credentials row is incomplete")
 
     def resolve_credentials(self, user_id: str) -> LinkedInCredentials:
@@ -488,6 +576,8 @@ class LinkedInOAuthService:
         if creds.provider_mode == "zernio" and creds.zernio_api_key:
             return creds
         if creds.provider_mode == "native" and creds.linkedin_access_token:
+            return creds
+        if creds.provider_mode == "unipile" and creds.unipile_account_id:
             return creds
         raise LinkedInNotConnectedError("LinkedIn credentials row is incomplete")
 
@@ -626,22 +716,47 @@ class LinkedInOAuthService:
             creds = None
 
         accounts: List[Dict[str, Any]] = []
-        if connected and creds and creds.zernio_account_id:
-            accounts.append(
-                {
-                    "account_id": creds.zernio_account_id,
-                    "account_type": "personal",
-                    "source": creds.source,
-                }
-            )
-        if connected and creds and creds.zernio_org_account_id:
-            accounts.append(
-                {
-                    "account_id": creds.zernio_org_account_id,
-                    "account_type": "organization",
-                    "source": creds.source,
-                }
-            )
+        if connected and creds:
+            # Handle Zernio accounts
+            if creds.provider_mode == "zernio":
+                if creds.zernio_account_id:
+                    accounts.append(
+                        {
+                            "account_id": creds.zernio_account_id,
+                            "account_type": "personal",
+                            "source": creds.source,
+                        }
+                    )
+                if creds.zernio_org_account_id:
+                    accounts.append(
+                        {
+                            "account_id": creds.zernio_org_account_id,
+                            "account_type": "organization",
+                            "source": creds.source,
+                        }
+                    )
+            # Handle Unipile accounts (Phase 2)
+            elif creds.provider_mode == "unipile":
+                if creds.unipile_account_id:
+                    accounts.append(
+                        {
+                            "account_id": creds.unipile_account_id,
+                            "account_type": "personal",
+                            "source": creds.source,
+                        }
+                    )
+                if creds.unipile_org_account_id:
+                    accounts.append(
+                        {
+                            "account_id": creds.unipile_org_account_id,
+                            "account_type": "organization",
+                            "source": creds.source,
+                        }
+                    )
+
+        account_name = creds.account_name if creds else None
+        if account_name and str(account_name).strip().startswith("user_"):
+            account_name = None
 
         return {
             "connected": connected,
@@ -649,7 +764,7 @@ class LinkedInOAuthService:
             "has_per_user_token": has_db_token,
             "has_env_fallback": False,
             "accounts": accounts,
-            "account_name": creds.account_name if creds else None,
+            "account_name": account_name,
         }
 
     def revoke_token(self, user_id: str) -> bool:
@@ -672,19 +787,49 @@ class LinkedInOAuthService:
             logger.error(f"Failed to revoke LinkedIn token for user {user_id}: {e}")
             return False
 
-    def disconnect_user(self, user_id: str) -> Dict[str, Any]:
-        """Unlink LinkedIn from ALwrity (local tokens only; Zernio accounts are preserved)."""
+    async def disconnect_user(self, user_id: str) -> Dict[str, Any]:
+        """Unlink LinkedIn from ALwrity (local tokens only; remote accounts may be deleted based on provider)."""
         logger.info(f"[LinkedInConnect] disconnect_user start user_id={user_id}")
+
+        # Check if Unipile and attempt to delete remote account
+        provider = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
+        unipile_account_deleted = False
+
+        if provider == "unipile":
+            try:
+                creds = self.resolve_credentials(user_id)
+                if creds.unipile_account_id:
+                    from services.integrations.linkedin.unipile_client import UnipileClient
+
+                    client = UnipileClient()
+                    unipile_account_deleted = await client.delete_account(creds.unipile_account_id)
+                    logger.info(
+                        f"[LinkedInConnect] Unipile account deletion attempted user_id={user_id} "
+                        f"account_id={creds.unipile_account_id} success={unipile_account_deleted}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"[LinkedInConnect] Failed to delete Unipile account for user_id={user_id}: {e}"
+                )
+
         revoked = self.revoke_token(user_id)
         status = self.get_connection_status(user_id)
-        logger.warning(
+
+        log_msg = (
             f"[LinkedInConnect] disconnect_user done user_id={user_id} "
-            f"revoked={revoked} zernio_accounts_preserved=true"
+            f"revoked={revoked} provider={provider}"
         )
+        if provider == "unipile":
+            log_msg += f" unipile_account_deleted={unipile_account_deleted}"
+        else:
+            log_msg += " zernio_accounts_preserved=true"
+        logger.warning(log_msg)
+
         return {
             "success": revoked,
             "revoked": revoked,
-            "zernio_account_deleted": False,
+            "provider": provider,
+            "unipile_account_deleted" if provider == "unipile" else "zernio_account_deleted": unipile_account_deleted if provider == "unipile" else False,
             "connected": status.get("connected", False),
             "has_env_fallback": False,
         }
@@ -852,11 +997,162 @@ class LinkedInOAuthService:
             )
             return False
 
+    def _resolve_public_backend_url(self) -> str:
+        """
+        Resolve the public backend base URL for Unipile OAuth redirects and webhooks.
+
+        Priority: LINKEDIN_SOCIAL_REDIRECT_URI origin → NGROK_URL → BACKEND_URL
+        (each skipped if placeholder) → localhost for local browser callbacks.
+        """
+        configured_redirect = os.getenv("LINKEDIN_SOCIAL_REDIRECT_URI", "").strip()
+        if configured_redirect:
+            parsed = urlparse(configured_redirect)
+            if parsed.scheme and parsed.netloc:
+                origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+                if not _is_placeholder_backend_url(origin):
+                    logger.info(
+                        f"[LinkedInConnect] Using public backend URL from "
+                        f"LINKEDIN_SOCIAL_REDIRECT_URI origin={origin}"
+                    )
+                    return origin
+                logger.warning(
+                    f"[LinkedInConnect] Ignoring placeholder LINKEDIN_SOCIAL_REDIRECT_URI "
+                    f"origin={origin}"
+                )
+
+        ngrok_url = os.getenv("NGROK_URL", "").strip().rstrip("/")
+        if ngrok_url:
+            if not _is_placeholder_backend_url(ngrok_url):
+                logger.info(f"[LinkedInConnect] Using public backend URL from NGROK_URL={ngrok_url}")
+                return ngrok_url
+            logger.warning(f"[LinkedInConnect] Ignoring placeholder NGROK_URL={ngrok_url}")
+
+        backend_url = os.getenv("BACKEND_URL", "").strip().rstrip("/")
+        if backend_url:
+            if not _is_placeholder_backend_url(backend_url):
+                logger.info(
+                    f"[LinkedInConnect] Using public backend URL from BACKEND_URL={backend_url}"
+                )
+                return backend_url
+            logger.warning(f"[LinkedInConnect] Ignoring placeholder BACKEND_URL={backend_url}")
+
+        logger.warning(
+            "[LinkedInConnect] No valid BACKEND_URL/NGROK_URL configured; "
+            "using http://localhost:8000 for Unipile browser callbacks. "
+            "Set NGROK_URL for notify_url webhooks from Unipile servers."
+        )
+        return "http://localhost:8000"
+
+    async def try_sync_unipile_accounts(self, user_id: str) -> bool:
+        """
+        Best-effort sync from Unipile when credentials exist remotely but not in ALwrity.
+
+        Matches accounts by hosted-auth ``name`` (ALwrity user id). If no match is found
+        but running LinkedIn accounts exist on Unipile, links the most recently created
+        account as a recovery path for failed callback redirects.
+        """
+        if os.getenv("LINKEDIN_PROVIDER", "zernio").lower() != "unipile":
+            return False
+
+        try:
+            self.resolve_credentials(user_id)
+            return True
+        except LinkedInNotConnectedError:
+            pass
+
+        from services.integrations.linkedin.unipile_client import UnipileClient
+
+        client = UnipileClient()
+        try:
+            items = await client.list_accounts(provider="LINKEDIN")
+        except Exception as exc:
+            logger.warning(
+                f"[LinkedInConnect] Unipile account sync skipped user_id={user_id}: {exc}"
+            )
+            return False
+
+        if not items:
+            logger.warning(
+                f"[LinkedInConnect] Unipile sync found 0 accounts for user_id={user_id} "
+                "despite successful list_accounts API call"
+            )
+            return False
+
+        def _account_id(item: Dict[str, Any]) -> Optional[str]:
+            raw = item.get("id") or item.get("account_id")
+            return str(raw) if raw else None
+
+        def _is_running(item: Dict[str, Any]) -> bool:
+            status = str(item.get("status") or item.get("state") or "").upper()
+            return status in ("OK", "RUNNING", "CONNECTED", "CREATION_SUCCESS", "SYNC_SUCCESS", "")
+
+        candidates = [item for item in items if _account_id(item) and _is_running(item)]
+        if not candidates:
+            candidates = [item for item in items if _account_id(item)]
+
+        for item in candidates:
+            account_id = _account_id(item)
+            if not account_id:
+                continue
+            hosted_name = item.get("name")
+            if hosted_name == user_id:
+                logger.info(
+                    f"[LinkedInConnect] Unipile sync matched account_id={account_id} "
+                    f"for user_id={user_id} via list name"
+                )
+                return await self.handle_unipile_callback(
+                    user_id=user_id,
+                    account_id=account_id,
+                    status="success",
+                )
+
+        for item in candidates:
+            account_id = _account_id(item)
+            if not account_id:
+                continue
+            try:
+                detail = await client.get_account(account_id)
+            except Exception as exc:
+                logger.debug(
+                    f"[LinkedInConnect] Unipile get_account failed account_id={account_id}: {exc}"
+                )
+                continue
+            for key in ("name", "client_name", "reference", "external_id"):
+                if detail.get(key) == user_id:
+                    logger.info(
+                        f"[LinkedInConnect] Unipile sync matched account_id={account_id} "
+                        f"for user_id={user_id} via detail.{key}"
+                    )
+                    return await self.handle_unipile_callback(
+                        user_id=user_id,
+                        account_id=account_id,
+                        status="success",
+                    )
+
+        candidates.sort(
+            key=lambda item: str(item.get("created_at") or item.get("created_on") or ""),
+            reverse=True,
+        )
+        latest_account_id = _account_id(candidates[0])
+        if not latest_account_id:
+            return False
+
+        logger.warning(
+            f"[LinkedInConnect] Unipile sync recovery linking latest account "
+            f"account_id={latest_account_id} to user_id={user_id} "
+            f"(remote_count={len(candidates)})"
+        )
+        return await self.handle_unipile_callback(
+            user_id=user_id,
+            account_id=latest_account_id,
+            status="success",
+        )
+
     def _get_redirect_uri(self) -> str:
         configured = os.getenv("LINKEDIN_SOCIAL_REDIRECT_URI")
-        if configured:
+        if configured and not _is_placeholder_backend_url(configured.strip()):
             return configured.strip()
-        backend_url = os.getenv("BACKEND_URL", "http://localhost:8000").rstrip("/")
+        backend_url = self._resolve_public_backend_url()
         return f"{backend_url}/api/linkedin-social/callback"
 
     def _build_oauth_state(self, user_id: str, state: Optional[str] = None) -> str:
@@ -870,10 +1166,25 @@ class LinkedInOAuthService:
             return None
         return state.split(":", 1)[0]
 
-    def generate_authorization_url(
+    def _get_unipile_redirect_urls(self, user_id: str) -> Dict[str, str]:
+        """Build Unipile redirect URLs for OAuth callback and webhook notification."""
+        backend_url = self._resolve_public_backend_url()
+        encoded_name = quote(user_id, safe="")
+        callback_base = f"{backend_url}/api/linkedin-social/callback"
+        return {
+            "success": (
+                f"{callback_base}?provider=unipile&status=success&name={encoded_name}"
+            ),
+            "failure": (
+                f"{callback_base}?provider=unipile&status=error&name={encoded_name}"
+            ),
+            "notify": f"{backend_url}/api/unipile/webhook",
+        }
+
+    async def generate_authorization_url(
         self, user_id: str, state: Optional[str] = None
     ) -> Dict[str, str]:
-        """Return OAuth authorization URL for Zernio or native LinkedIn based on LINKEDIN_PROVIDER."""
+        """Return OAuth authorization URL for Zernio, Unipile, or native LinkedIn based on LINKEDIN_PROVIDER."""
         provider = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
         oauth_state = self._build_oauth_state(user_id, state)
 
@@ -906,6 +1217,44 @@ class LinkedInOAuthService:
                 "auth_url": connect_data["authUrl"],
                 "state": oauth_state,
                 "provider": "zernio",
+            }
+
+        if provider == "unipile":
+            api_key = os.getenv("UNIPILE_API_KEY")
+            if not api_key:
+                logger.error(f"[LinkedInConnect] UNIPILE_API_KEY missing user_id={user_id}")
+                raise ValueError("UNIPILE_API_KEY is not configured")
+
+            logger.info(f"[LinkedInConnect] generating Unipile auth URL user_id={user_id}")
+
+            # Import Unipile client here to avoid circular imports
+            from services.integrations.linkedin.unipile_client import UnipileClient
+
+            client = UnipileClient()
+            redirect_urls = self._get_unipile_redirect_urls(user_id)
+            backend_url = self._resolve_public_backend_url()
+            logger.info(
+                f"[LinkedInConnect] Unipile redirect base_url={backend_url} user_id={user_id} "
+                f"success={redirect_urls['success']}"
+            )
+
+            try:
+                result = await client.create_hosted_auth_link(
+                    user_id=user_id,
+                    success_redirect_url=redirect_urls["success"],
+                    failure_redirect_url=redirect_urls["failure"],
+                    notify_url=redirect_urls["notify"],
+                    providers=["LINKEDIN"],
+                )
+            except Exception as e:
+                logger.error(f"[LinkedInConnect] Failed to create Unipile auth link: {e}")
+                raise ValueError(f"Failed to generate Unipile auth URL: {e}")
+
+            logger.info(f"[LinkedInConnect] Unipile auth URL generated for user={user_id}")
+            return {
+                "auth_url": result.auth_url,
+                "state": user_id,  # Unipile uses 'name' param for user matching
+                "provider": "unipile",
             }
 
         client_id = os.getenv("LINKEDIN_CLIENT_ID")
@@ -1254,6 +1603,84 @@ class LinkedInOAuthService:
         except Exception as e:
             logger.error(f"LinkedIn native OAuth callback error for user {user_id}: {e}")
             return None
+
+    async def handle_unipile_callback(
+        self,
+        user_id: str,
+        account_id: str,
+        status: str,
+        error_message: Optional[str] = None,
+    ) -> bool:
+        """
+        Handle Unipile OAuth callback and store credentials.
+
+        This method is called after the user completes authentication on
+        the Unipile hosted auth page. Unipile redirects to our callback
+        with the account_id and status.
+
+        Args:
+            user_id: Internal user ID (passed as 'name' param to Unipile)
+            account_id: Unipile account ID from successful auth
+            status: 'success' or 'error'
+            error_message: Error details if status is 'error'
+
+        Returns:
+            True if credentials stored successfully
+        """
+        if status != "success":
+            logger.error(
+                f"[LinkedInConnect] Unipile callback failed for user={user_id}: {error_message}"
+            )
+            return False
+
+        if not account_id:
+            logger.error(f"[LinkedInConnect] Unipile callback missing account_id for user={user_id}")
+            return False
+
+        # Fetch account details from Unipile to get account name
+        from services.integrations.linkedin.unipile_client import UnipileClient
+
+        client = UnipileClient()
+        account_name = None
+        profile_urn = None
+
+        try:
+            account_data = await client.get_account(account_id)
+            from services.integrations.linkedin.unipile_provider import (
+                unipile_display_name_from_item,
+            )
+
+            account_name = unipile_display_name_from_item(
+                account_data,
+                user_id=user_id,
+            )
+            profile_urn = account_data.get("profile_urn") or account_data.get("urn")
+            logger.info(
+                f"[LinkedInConnect] Fetched Unipile account details for user={user_id}, "
+                f"account_name={account_name}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"[LinkedInConnect] Could not fetch Unipile account details for user={user_id}: {e}. "
+                "Proceeding with account_id only."
+            )
+
+        # Store credentials
+        stored = self.store_unipile_credentials(
+            user_id=user_id,
+            unipile_account_id=account_id,
+            account_name=account_name,
+            profile_urn=profile_urn,
+        )
+
+        if stored:
+            logger.info(
+                f"[LinkedInConnect] Unipile callback succeeded for user={user_id}, account_id={account_id}"
+            )
+        else:
+            logger.error(f"[LinkedInConnect] Failed to store Unipile credentials for user={user_id}")
+
+        return stored
 
     def store_oauth_state(
         self,

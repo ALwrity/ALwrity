@@ -498,6 +498,26 @@ export const useLinkedInSocialConnection = () => {
 
 
 
+  const avatarUrl = useMemo(() => {
+    const personalAccount =
+      accounts.find((a) => a.account_type === 'personal') ||
+      accounts.find((a) => a.account_type !== 'organization') ||
+      accounts[0];
+    return personalAccount?.avatar_url ?? null;
+  }, [accounts]);
+
+
+
+  const displayName = useMemo(
+    () =>
+      primaryProfile?.displayName ??
+      status?.account_name ??
+      'LinkedIn account',
+    [primaryProfile, status?.account_name]
+  );
+
+
+
   return {
 
     connected,
@@ -507,6 +527,10 @@ export const useLinkedInSocialConnection = () => {
     hasPerUserToken,
 
     accountName: status?.account_name,
+
+    avatarUrl,
+
+    displayName,
 
     accounts,
 

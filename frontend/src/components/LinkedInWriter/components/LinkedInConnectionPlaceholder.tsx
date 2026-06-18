@@ -3,6 +3,7 @@ import { LinkedIn as LinkedInIcon } from '@mui/icons-material';
 import { CircularProgress } from '@mui/material';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { LinkedInAnalyticsDashboard } from './analytics/LinkedInAnalyticsDashboard';
+import { LinkedInConnectedProfileCard } from './LinkedInConnectedProfileCard';
 import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 
 const DisconnectedState: React.FC<{
@@ -156,12 +157,15 @@ const ConnectionLoadingState: React.FC = () => (
 export const LinkedInConnectionPlaceholder: React.FC = () => {
   const {
     connected,
+    provider,
     isLoading,
     isConnecting,
     connectError,
     disconnectError,
     error,
     hasPerUserToken,
+    displayName,
+    avatarUrl,
     connectWithOAuth,
     disconnect,
   } = useLinkedInSocialConnection();
@@ -191,6 +195,18 @@ export const LinkedInConnectionPlaceholder: React.FC = () => {
   }
 
   if (connected) {
+    if (provider === 'unipile') {
+      return (
+        <LinkedInConnectedProfileCard
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          onDisconnect={showDisconnect ? handleDisconnect : undefined}
+          isDisconnecting={isDisconnecting}
+          disconnectError={disconnectError}
+        />
+      );
+    }
+
     return (
       <LinkedInAnalyticsDashboard
         onDisconnect={showDisconnect ? handleDisconnect : undefined}
