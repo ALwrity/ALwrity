@@ -497,17 +497,23 @@ async def get_semantic_health(current_user: dict = Depends(get_current_user)) ->
     """
     try:
         user_id = str(current_user.get('id'))
-        
-        # Initialize semantic monitor for this user
-        semantic_monitor = RealTimeSemanticMonitor(user_id)
-        
+
+        # Use the cached SemanticDashboardAPI monitor for this user.
+        # Constructing a new RealTimeSemanticMonitor per request leaks
+        # SIFIntegrationService instances and skips the dashboard API's
+        # eviction logic.
+        from services.intelligence.monitoring.semantic_dashboard import (
+            semantic_dashboard_api,
+        )
+        semantic_monitor = semantic_dashboard_api.get_monitor(user_id)
+
         # Get current semantic health (will use cache if available)
         semantic_health: SemanticHealthMetric = await semantic_monitor.check_semantic_health(user_id)
-        
+
         logger.info(f"[Semantic Health API] Retrieved health data for user {user_id}: {semantic_health.status} (score: {semantic_health.value:.2f})")
-        
+
         return semantic_health
-        
+
     except Exception as e:
         logger.error(f"[Semantic Health API] Error retrieving semantic health for user: {e}")
         # Return a default healthy state with warning message
@@ -528,8 +534,12 @@ async def get_semantic_cache_stats(current_user: dict = Depends(get_current_user
     """
     try:
         user_id = str(current_user.get('id'))
-        # Initialize semantic monitor to access its cache manager
-        semantic_monitor = RealTimeSemanticMonitor(user_id)
+        # Use the cached dashboard-API monitor instead of constructing
+        # a new one per request.
+        from services.intelligence.monitoring.semantic_dashboard import (
+            semantic_dashboard_api,
+        )
+        semantic_monitor = semantic_dashboard_api.get_monitor(user_id)
         return await semantic_monitor.get_cache_stats()
     except Exception as e:
         logger.error(f"[Semantic Cache API] Error retrieving cache stats: {e}")

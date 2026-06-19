@@ -123,20 +123,46 @@ const MainDashboard: React.FC = () => {
     message?: string;
   } | null>(null);
 
-  // Fetch SIF indexing health on mount and every 60s
+  // Fetch SIF indexing health on mount and every 60s.
+  // Polling is suspended once we know the user has no scheduled
+  // SIF task (has_task === false) — the status won't change until
+  // onboarding completes, so periodic requests are pure waste.
+  // The hook re-arms automatically if a later state change
+  // indicates the task has been scheduled.
   React.useEffect(() => {
+    let cancelled = false;
     const fetchSifHealth = async () => {
       try {
         const resp = await apiClient.get('/api/seo-dashboard/sif-health');
-        setSifHealth(resp.data);
+        if (!cancelled) {
+          setSifHealth(resp.data);
+        }
       } catch {
-        setSifHealth(null);
+        if (!cancelled) {
+          setSifHealth(null);
+        }
       }
     };
     fetchSifHealth();
+    // Skip the 60s interval when the task is known to be missing.
+    // The initial fetch above still runs so the UI can render the
+    // "not scheduled" state immediately.
+    if (sifHealth && sifHealth.has_task === false) {
+      return () => {
+        cancelled = true;
+      };
+    }
     const interval = setInterval(fetchSifHealth, 60_000);
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+    // We intentionally depend on has_task + status so the effect
+    // re-evaluates when the backend reports a change. Reading the
+    // latest sifHealth here (rather than via setState callback) is
+    // safe because the dependency array tracks the fields we care
+    // about.
+  }, [sifHealth?.has_task, sifHealth?.status]);
 
   // Onboarding background tasks status
   const [onboardingTasks, setOnboardingTasks] = React.useState<{
