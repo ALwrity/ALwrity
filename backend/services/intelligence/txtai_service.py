@@ -28,16 +28,38 @@ except ImportError:
 
 class TxtaiIntelligenceService:
     _instances = {}
+    # Phase 2.2: per-class lock that protects the singleton fast path
+    # in ``__new__``. Created lazily as a ``threading.Lock`` (not
+    # RLock - ``__new__`` never re-enters for the same class) so it
+    # is safe under contention from multiple asyncio / thread-pool
+    # workers constructing the same user_id.
+    import threading as _threading
+    _singleton_lock = _threading.Lock()
     _init_locks = {}  # Locks for thread-safe initialization
     _init_tasks = {}  # Track ongoing initialization tasks
+    # Phase 5 / Issue #6: stable class attribute so that
+    # ``SemanticCacheManager._get_current_version`` (and any other
+    # caller) can derive a stable cache version from the model
+    # path without needing to instantiate the service. When the
+    # model changes, bump this constant and all SIF cache entries
+    # are invalidated automatically.
+    DEFAULT_MODEL_PATH = "sentence-transformers/all-MiniLM-L6-v2"
 
     def __new__(cls, user_id: str, *args, **kwargs):
-        if user_id not in cls._instances:
-            cls._instances[user_id] = super(TxtaiIntelligenceService, cls).__new__(cls)
-            # Create a lock for this user's initialization
-            if user_id not in cls._init_locks:
-                cls._init_locks[user_id] = asyncio.Lock()
-        return cls._instances[user_id]
+        # Phase 2.2: thread-safe singleton via double-checked locking.
+        # The actual pattern lives in ``sif_singleton.get_singleton``;
+        # we only set up the per-user init lock after the singleton
+        # is created.
+        from .sif_singleton import get_singleton
+        instance = get_singleton(
+            cls=cls,
+            user_id=user_id,
+            instances=cls._instances,
+            lock=cls._singleton_lock,
+        )
+        if user_id not in cls._init_locks:
+            cls._init_locks[user_id] = asyncio.Lock()
+        return instance
 
     def __init__(self, user_id: str, model_path: Optional[str] = None, enable_caching: bool = True):
         # Singleton: prevent re-initialization if already initialized
@@ -98,8 +120,85 @@ class TxtaiIntelligenceService:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self._initialize_embeddings)
 
+    # Phase 2.1: thin wrapper to keep the service file small. The
+    # actual implementation lives in ``sif_async_helpers.py``.
+    @staticmethod
+    async def _run_blocking(func, *args, **kwargs):
+        from .sif_async_helpers import run_blocking
+        return await run_blocking(func, *args, **kwargs)
+
+    # Phase 4.2 / 4.5: thin observability helpers. The actual
+    # counter / structured-log implementation lives in
+    # ``sif_metrics``. We add these as static methods so every
+    # public method on the service emits a consistent ``[sif_event]``
+    # log line and a counter bump, without each call site having
+    # to import the metrics module directly.
+    @staticmethod
+    def _record_sif_event(operation: str, user_id: str, outcome: str, **extra):
+        from .sif_metrics import inc_counter, log_sif_event
+        inc_counter(f"sif_{operation}_total", outcome, value=extra.pop("value", 1))
+        log_sif_event(operation, user_id=user_id, outcome=outcome, extra=extra or None)
+        # Phase 5 / Issue #617 #10: stamp the instance as recently
+        # used so the singleton cleanup doesn't evict it. The
+        # cleanup itself runs only every Nth call to keep the
+        # critical path cheap.
+        # (lookup of ``self`` happens via the caller; the counter
+        # is bumped below in the per-method path.)
+
+    # Phase 5 / Issue #617 #10: rate-limited stale-instance cleanup.
+    # Every CLEANUP_EVERY_N public calls, we scan the singleton
+    # dict for user_ids whose last activity is older than
+    # ``_instance_max_age_seconds`` and evict them. The cleanup
+    # is best-effort: failures are logged but never raised.
+    _cleanup_call_counter = 0
+    _CLEANUP_EVERY_N = 100
+    _INSTANCE_MAX_AGE_SECONDS = 3600.0  # 1 hour
+
+    @classmethod
+    def _maybe_cleanup_singleton(cls, self_instance):
+        """Run ``sif_singleton_cleanup.cleanup_stale_instances`` if
+        enough calls have passed since the last run.
+
+        Args:
+            self_instance: the instance whose ``_last_used`` we
+                stamp before counting. We use a class-level
+                counter so the rate-limit is global, not per-user.
+        """
+        from .sif_singleton_cleanup import record_use, cleanup_stale_instances
+        record_use(self_instance)
+        cls._cleanup_call_counter += 1
+        if cls._cleanup_call_counter < cls._CLEANUP_EVERY_N:
+            return
+        cls._cleanup_call_counter = 0
+        try:
+            evicted = cleanup_stale_instances(
+                instances=cls._instances,
+                lock=cls._singleton_lock,
+                max_age_seconds=cls._INSTANCE_MAX_AGE_SECONDS,
+            )
+            if evicted:
+                from loguru import logger as _logger
+                _logger.info(
+                    f"[sif_singleton_cleanup] evicted {len(evicted)} stale "
+                    f"instances (user_ids={evicted[:5]}{'...' if len(evicted) > 5 else ''})"
+                )
+        except Exception as e:
+            from loguru import logger as _logger
+            _logger.warning(f"[sif_singleton_cleanup] cleanup pass failed: {e}")
+
     def _initialize_embeddings(self, load_existing_index: bool = True):
-        """Initialize txtai embeddings with local storage support and comprehensive error handling."""
+        """Initialize txtai embeddings with local storage support and comprehensive error handling.
+
+        Phase 3.1: if a previous run left a ``.corrupt`` marker
+        (written by ``_mark_ann_incompatible`` on nprobe), the
+        on-disk index is structurally broken. The actual cleanup
+        is delegated to ``sif_index_remediation.remediate_corrupt_index``
+        so this file stays small. See that module for the
+        best-effort cleanup contract.
+        """
+        if load_existing_index:
+            from .sif_index_remediation import remediate_corrupt_index
+            remediate_corrupt_index(self.index_path, user_id=self.user_id)
         if not TXTAI_AVAILABLE:
             logger.error("txtai is not available. Please install with: pip install txtai[pipeline,similarity]")
             return
@@ -253,6 +352,8 @@ class TxtaiIntelligenceService:
             if self.fail_fast:
                 raise RuntimeError(message)
             return 0
+        # Phase 5 / Issue #617 #10: stamp + maybe cleanup
+        self._maybe_cleanup_singleton(self)
 
         try:
             if not items:
@@ -266,14 +367,24 @@ class TxtaiIntelligenceService:
                 metadata_json = json.dumps(metadata) if metadata else "{}"
                 processed_items.append((id_val, text, metadata_json))
 
-            self.embeddings.upsert(processed_items)
-            self.embeddings.save(self.index_path)
+            # Phase 2.1: off-loop to keep the event loop free.
+            await self._run_blocking(self.embeddings.upsert, processed_items)
+            await self._run_blocking(self.embeddings.save, self.index_path)
             count = len(processed_items)
             logger.info(f"Upserted {count} items for user {self.user_id}")
+            # Phase 4.2 / 4.5: record success.
+            self._record_sif_event(
+                "index", user_id=self.user_id, outcome="success",
+                upserted=count, value=count,
+            )
             return count
 
         except Exception as e:
             logger.error(f"Error indexing content for user {self.user_id}: {e}")
+            # Phase 4.2: record error.
+            self._record_sif_event(
+                "index", user_id=self.user_id, outcome="error",
+            )
             message = str(e)
             is_windows_lock_error = isinstance(e, PermissionError) or "WinError 32" in message
             if is_windows_lock_error:
@@ -299,14 +410,26 @@ class TxtaiIntelligenceService:
         await self._ensure_initialized_async()
         if not self._initialized or not self.embeddings:
             return 0
+        # Phase 5 / Issue #617 #10: stamp + maybe cleanup
+        self._maybe_cleanup_singleton(self)
 
         try:
-            self.embeddings.delete(doc_ids)
-            self.embeddings.save(self.index_path)
+            # Phase 2.1: off-loop to keep the event loop free.
+            await self._run_blocking(self.embeddings.delete, doc_ids)
+            await self._run_blocking(self.embeddings.save, self.index_path)
             logger.info(f"Deleted {len(doc_ids)} documents for user {self.user_id}")
+            # Phase 4.2 / 4.5: record success.
+            self._record_sif_event(
+                "delete", user_id=self.user_id, outcome="success",
+                deleted=len(doc_ids), value=len(doc_ids),
+            )
             return len(doc_ids)
         except Exception as e:
             logger.error(f"Error deleting documents for user {self.user_id}: {e}")
+            # Phase 4.2: record error.
+            self._record_sif_event(
+                "delete", user_id=self.user_id, outcome="error",
+            )
             return 0
 
     async def reindex_all(self, items: List[Tuple[str, str, Dict[str, Any]]]) -> int:
@@ -324,6 +447,8 @@ class TxtaiIntelligenceService:
         await self._ensure_initialized_async()
         if not self._initialized or not self.embeddings:
             return 0
+        # Phase 5 / Issue #617 #10: stamp + maybe cleanup
+        self._maybe_cleanup_singleton(self)
 
         try:
             import json
@@ -333,14 +458,24 @@ class TxtaiIntelligenceService:
                 metadata_json = json.dumps(metadata) if metadata else "{}"
                 processed_items.append((id_val, text, metadata_json))
 
-            self.embeddings.index(processed_items, reindex=True)
-            self.embeddings.save(self.index_path)
+            # Phase 2.1: off-loop to keep the event loop free.
+            await self._run_blocking(self.embeddings.index, processed_items, reindex=True)
+            await self._run_blocking(self.embeddings.save, self.index_path)
             count = len(processed_items)
             logger.info(f"Reindexed all {count} items for user {self.user_id}")
+            # Phase 4.2 / 4.5: record success.
+            self._record_sif_event(
+                "reindex", user_id=self.user_id, outcome="success",
+                count=count, value=count,
+            )
             return count
 
         except Exception as e:
             logger.error(f"Error reindexing all for user {self.user_id}: {e}")
+            # Phase 4.2: record error.
+            self._record_sif_event(
+                "reindex", user_id=self.user_id, outcome="error",
+            )
             raise
 
     async def search(self, query: str, limit: int = 5) -> List[Dict[str, Any]]:
@@ -352,6 +487,8 @@ class TxtaiIntelligenceService:
             if self.fail_fast:
                 raise RuntimeError(message)
             return []
+        # Phase 5 / Issue #617 #10: stamp + maybe cleanup
+        self._maybe_cleanup_singleton(self)
 
         try:
             # Check cache first if enabled
@@ -363,13 +500,23 @@ class TxtaiIntelligenceService:
                 )
                 if cached_results:
                     logger.info(f"Cache hit for search query: '{query}'")
+                    # Phase 4.2 / 4.5: record cache hit.
+                    self._record_sif_event(
+                        "search", user_id=self.user_id,
+                        outcome="cache_hit", result_count=len(cached_results),
+                    )
                     # Return cached results up to the requested limit
                     return cached_results[:limit]
                 else:
                     logger.debug(f"Cache miss for search query: '{query}'")
+                    # Phase 4.2: record cache miss.
+                    self._record_sif_event(
+                        "search", user_id=self.user_id, outcome="miss",
+                    )
 
             logger.debug(f"Searching for query: '{query}' with limit: {limit}")
-            results = self._search_with_ann_fallback(query, limit=limit)
+            # Phase 2.1: off-loop to keep the event loop free.
+            results = await self._search_with_ann_fallback(query, limit=limit)
             
             # Cache the results if caching is enabled
             if self.enable_caching and self.cache_manager and results:
@@ -383,9 +530,18 @@ class TxtaiIntelligenceService:
             
             logger.info(f"Search completed successfully for user {self.user_id}. Found {len(results)} results")
             logger.debug(f"Top result score: {results[0]['score'] if results else 'N/A'}")
+            # Phase 4.2 / 4.5: record success.
+            self._record_sif_event(
+                "search", user_id=self.user_id, outcome="success",
+                result_count=len(results),
+            )
             return results
         except Exception as e:
             logger.error(f"Search failed for user {self.user_id}: {e}")
+            # Phase 4.2: record error.
+            self._record_sif_event(
+                "search", user_id=self.user_id, outcome="error",
+            )
             if self.fail_fast:
                 raise
             logger.error(f"Query: '{query}'")
@@ -398,6 +554,8 @@ class TxtaiIntelligenceService:
         if not self._initialized or not self.embeddings:
             logger.error(f"Cannot calculate similarity - service not initialized for user {self.user_id}")
             return 0.0
+        # Phase 5 / Issue #617 #10: stamp + maybe cleanup
+        self._maybe_cleanup_singleton(self)
 
         try:
             # Create cache key for similarity calculation
@@ -461,12 +619,24 @@ class TxtaiIntelligenceService:
             logger.error(f"Full traceback: {traceback.format_exc()}")
             return 0.0
 
-    async def cluster(self, min_score: float = 0.5) -> List[List[int]]:
-        """Cluster indexed content to find semantic pillars using graph-based clustering with caching."""
+    async def cluster(
+        self,
+        min_score: float = 0.5,
+        seed_terms: Optional[List[str]] = None,
+    ) -> List[List[int]]:
+        """Cluster indexed content to find semantic pillars using graph-based clustering with caching.
+
+        Phase 3.5: ``seed_terms`` lets callers (e.g.
+        ``sif_integration._get_step_clusters_context``) pass
+        per-user keywords derived from ``EnhancedContentStrategy``.
+        Falls back to the historical default list when None/empty.
+        """
         await self._ensure_initialized_async()
         if not self._initialized or not self.embeddings:
             logger.error(f"Cannot cluster content - service not initialized for user {self.user_id}")
             return []
+        # Phase 5 / Issue #617 #10: stamp + maybe cleanup
+        self._maybe_cleanup_singleton(self)
 
         try:
             # Check cache first if enabled
@@ -487,16 +657,25 @@ class TxtaiIntelligenceService:
             # Check if we have graph functionality available
             if not hasattr(self.embeddings, 'graph') or not self.embeddings.graph:
                 logger.warning(f"Graph clustering not available for user {self.user_id}. Using fallback clustering.")
-                return await self._fallback_clustering(min_score)
-            
+                # Phase 4.2: count fallback as a distinct outcome so
+                # operators can see graph-availability issues.
+                self._record_sif_event(
+                    "cluster", user_id=self.user_id, outcome="fallback",
+                )
+                return await self._fallback_clustering(min_score, seed_terms)
+
             # Use graph-based clustering if available
             # Perform a search to get graph structure
             sample_query = "content marketing digital strategy"
-            graph_results = self._search_with_ann_fallback(sample_query, limit=10, graph=True)
-            
+            # Phase 2.1: graph_results is a blocking call; off-loop.
+            graph_results = await self._search_with_ann_fallback(sample_query, limit=10, graph=True)
+
             if not graph_results:
                 logger.warning(f"No graph results for clustering user {self.user_id}")
-                return await self._fallback_clustering(min_score)
+                self._record_sif_event(
+                    "cluster", user_id=self.user_id, outcome="fallback",
+                )
+                return await self._fallback_clustering(min_score, seed_terms)
             
             # Extract clusters from graph results
             clusters = self._extract_clusters_from_graph(graph_results, min_score)
@@ -518,22 +697,43 @@ class TxtaiIntelligenceService:
             
             logger.info(f"Clustering completed successfully. Found {len(clusters)} clusters for user {self.user_id}")
             logger.debug(f"Cluster sizes: {[len(c) for c in clusters]}")
+            # Phase 4.2 / 4.5: record success.
+            self._record_sif_event(
+                "cluster", user_id=self.user_id, outcome="success",
+                cluster_count=len(clusters),
+            )
             return clusters
-            
+
         except Exception as e:
             logger.error(f"Clustering failed for user {self.user_id}: {e}")
             logger.error(f"Min score: {min_score}")
             logger.error(f"Full traceback: {traceback.format_exc()}")
-            return await self._fallback_clustering(min_score)
+            # Phase 4.2: record error and fall back.
+            self._record_sif_event(
+                "cluster", user_id=self.user_id, outcome="error",
+            )
+            return await self._fallback_clustering(min_score, seed_terms)
     
-    async def _fallback_clustering(self, min_score: float) -> List[List[int]]:
-        """Fallback clustering method when graph clustering is not available."""
+    async def _fallback_clustering(
+        self,
+        min_score: float,
+        seed_terms: Optional[List[str]] = None,
+    ) -> List[List[int]]:
+        """Fallback clustering method when graph clustering is not available.
+
+        Phase 3.5: ``seed_terms`` lets callers pass per-user keywords
+        derived from ``EnhancedContentStrategy``. The list is
+        resolved by ``sif_seed_terms.resolve_seed_terms`` (with the
+        historical marketing defaults as a tail fallback) so this
+        file stays small.
+        """
         logger.info(f"Using fallback clustering for user {self.user_id}")
-        
+
+        from .sif_seed_terms import resolve_seed_terms
+        sample_queries = resolve_seed_terms(seed_terms)
+
         # Simple clustering based on semantic similarity against sample queries
         try:
-            # Get a sample of indexed items to analyze
-            sample_queries = ["marketing", "SEO", "content", "social media", "email marketing"]
             all_clusters = []
             
             for query in sample_queries:
