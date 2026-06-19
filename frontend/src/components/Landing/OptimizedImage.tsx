@@ -9,6 +9,7 @@ interface OptimizedImageProps {
   sx?: object;
   priority?: boolean;
   placeholder?: 'blur' | 'empty';
+  fallback?: React.ReactNode;
 }
 
 const OptimizedImage: React.FC<OptimizedImageProps> = ({
@@ -18,7 +19,8 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
   height = 'auto',
   sx = {},
   priority = false,
-  placeholder = 'blur'
+  placeholder = 'blur',
+  fallback,
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -41,7 +43,7 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
         ...sx
       }}
     >
-      {!imageLoaded && !imageError && (
+      {!imageLoaded && !imageError && placeholder === 'blur' && (
         <Skeleton
           variant="rectangular"
           width="100%"
@@ -70,25 +72,24 @@ const OptimizedImage: React.FC<OptimizedImageProps> = ({
             objectFit: 'cover',
             opacity: imageLoaded ? 1 : 0,
             transition: 'opacity 0.3s ease',
-            ...sx
           }}
         />
       )}
       
       {imageError && (
-        <Box
-          sx={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: 'rgba(255,255,255,0.1)',
-            color: 'text.secondary'
-          }}
-        >
-          Image failed to load
-        </Box>
+        fallback ?? (
+          <Box
+            sx={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(255,255,255,0.1)',
+              color: 'text.secondary'
+            }}
+          />
+        )
       )}
     </Box>
   );

@@ -26,6 +26,10 @@ const StoryWriter = React.lazy(() => import('./components/StoryWriter/StoryWrite
 const YouTubeCreator = React.lazy(() => import('./components/YouTubeCreator/YouTubeCreator'));
 const PodcastDashboard = React.lazy(() => import('./components/PodcastMaker/PodcastDashboard'));
 const PricingPage = React.lazy(() => import('./components/Pricing/PricingPage'));
+const PrivacyPolicyPage = React.lazy(() => import('./components/Landing/PrivacyPolicyPage'));
+const TermsOfServicePage = React.lazy(() => import('./components/Landing/TermsOfServicePage'));
+const CodeOfConductPage = React.lazy(() => import('./components/Landing/CodeOfConductPage'));
+const ContactPage = React.lazy(() => import('./components/Landing/ContactPage'));
 const WixTestPage = React.lazy(() => import('./components/WixTestPage/WixTestPage'));
 const WixCallbackPage = React.lazy(() => import('./components/WixCallbackPage/WixCallbackPage'));
 
@@ -242,6 +246,10 @@ const App: React.FC = () => {
                     <Route path="/team-activity" element={<ProtectedRoute><TeamActivityPage /></ProtectedRoute>} />
                     <Route path="/stripe-disputes" element={<ProtectedRoute><StripeDisputesDashboard /></ProtectedRoute>} />
                     <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                    <Route path="/terms" element={<TermsOfServicePage />} />
+                    <Route path="/code-of-conduct" element={<CodeOfConductPage />} />
+                    <Route path="/contact" element={<ContactPage />} />
                     <Route path="/research-test" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
                     <Route path="/research-dashboard" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
                     <Route path="/alwrity-researcher" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />

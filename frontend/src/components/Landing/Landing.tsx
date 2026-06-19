@@ -1,19 +1,21 @@
 import React, { Suspense, lazy } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useClerk } from '@clerk/clerk-react';
 import usePerformanceMonitor from '../../hooks/usePerformanceMonitor';
-import { 
-  Box, 
-  Button, 
-  Container, 
-  Typography, 
-  Stack, 
-  Grid, 
-  Card, 
+import {
+  Box,
+  Button,
+  Container,
+  Typography,
+  Stack,
+  Grid,
+  Card,
   CardContent,
   Chip,
   Avatar,
   useTheme,
   alpha,
-  CircularProgress
+  Skeleton,
 } from '@mui/material';
 import { keyframes } from '@mui/system';
 import {
@@ -25,9 +27,73 @@ import {
   Refresh,
   OpenInNew
 } from '@mui/icons-material';
+import Check from '@mui/icons-material/Check';
 import { motion } from 'framer-motion';
 import HeroSection from './HeroSection';
+import LandingNav from './LandingNav';
+import LandingFooter from './LandingFooter';
 import { ScrambleText } from '../ScrambleText';
+import {
+  landingSectionTitleSx,
+  landingSectionSubtitleSx,
+  landingSectionHeaderGap,
+  landingCardHoverSx,
+} from './landingStyles';
+
+const PRICING_TEASER_PLANS = [
+  {
+    name: 'Free',
+    price: '$0',
+    period: '/mo',
+    highlight: false,
+    features: [
+      'Core AI copilot access',
+      'Content planning basics',
+      'Limited monthly AI credits',
+      'Single-platform publishing',
+      'Community support',
+    ],
+  },
+  {
+    name: 'Basic',
+    price: '$29',
+    period: '/mo',
+    highlight: true,
+    features: [
+      'Full content lifecycle tools',
+      'Multi-platform publishing',
+      'Web research & fact-checking',
+      'Brand voice memory',
+      'Priority email support',
+    ],
+  },
+  {
+    name: 'Pro',
+    price: '$79',
+    period: '/mo',
+    highlight: false,
+    features: [
+      'Advanced analytics dashboard',
+      'Higher AI usage limits',
+      'Team collaboration features',
+      'Scheduler & remarketing',
+      'BYOK for all providers',
+    ],
+  },
+  {
+    name: 'Enterprise',
+    price: 'Custom',
+    period: '',
+    highlight: false,
+    features: [
+      'Dedicated account manager',
+      'Custom integrations & SSO',
+      'Unlimited team seats',
+      'SLA & enterprise security',
+      'White-glove onboarding',
+    ],
+  },
+] as const;
 
 // Scrambling text component for multiple phrases
 const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?: number; delay?: number; style?: React.CSSProperties }> = ({ 
@@ -66,6 +132,8 @@ const IntroducingAlwrity = lazy(() => import('./IntroducingAlwrity'));
 
 const Landing: React.FC = () => {
   const theme = useTheme();
+  const navigate = useNavigate();
+  const { openSignIn } = useClerk();
   
   // Monitor performance
   usePerformanceMonitor('Landing');
@@ -82,27 +150,27 @@ const Landing: React.FC = () => {
   };
 
   const titleFlyIn = {
-    hidden: { opacity: 0, y: -80, scale: 0.8 },
+    hidden: { opacity: 0, y: -40, scale: 0.95 },
     visible: { 
       opacity: 1, 
       y: 0,
       scale: 1,
       transition: { 
-        delay: 1,
-        duration: 0.8, 
-        ease: [0.22, 1, 0.36, 1] as const // Custom easing
+        delay: 0.15,
+        duration: 0.6, 
+        ease: [0.22, 1, 0.36, 1] as const
       }
     }
   };
 
   const chipsFlyIn = {
-    hidden: { opacity: 0, y: 60 },
+    hidden: { opacity: 0, y: 30 },
     visible: { 
       opacity: 1, 
       y: 0,
       transition: { 
-        delay: 1.3,
-        duration: 0.7,
+        delay: 0.3,
+        duration: 0.5,
         ease: "easeOut" as const
       }
     }
@@ -113,8 +181,8 @@ const Landing: React.FC = () => {
     visible: { 
       opacity: 1,
       transition: { 
-        delay: 1.6,
-        duration: 0.6
+        delay: 0.45,
+        duration: 0.5
       }
     }
   };
@@ -157,8 +225,8 @@ const Landing: React.FC = () => {
     hidden: {},
     visible: {
       transition: {
-        delayChildren: 2,
-        staggerChildren: 0.15
+        delayChildren: 0.3,
+        staggerChildren: 0.1
       }
     }
   };
@@ -167,38 +235,44 @@ const Landing: React.FC = () => {
     {
       icon: <CalendarToday />,
       title: 'Content Planning',
-      description: 'ALwrity builds a living strategy and calendar from your goals, audience and market signals. Drag-and-drop calendar, briefs, topics and distribution plans generated automatically.',
-      badge: 'Strategy'
+      description: 'AI builds a living strategy and your content calendar from your goals, audience, and market signals. Drag, drop, and approve.',
+      badge: 'Strategy',
+      href: '/content-planning'
     },
     {
       icon: <Create />,
       title: 'Content Generation',
       description: 'Generate text, images, audio, video and channel-ready posts for LinkedIn, Facebook, Instagram and blogs. Templates, brand voice and Personas baked in.',
-      badge: 'Multi‑Format'
+      badge: 'Multi‑Format',
+      href: '/dashboard'
     },
     {
       icon: <Publish />,
       title: 'Content Publishing',
       description: 'Publish and schedule directly to connected social channels and your website. One-click cross‑posting while preserving native formats.',
-      badge: 'Automated'
+      badge: 'Automated',
+      href: '/scheduler-dashboard'
     },
     {
       icon: <Analytics />,
       title: 'Content Analytics',
       description: 'Pulls analytics from connected platforms, analyzes with AI and surfaces actionable insights. Signals flow back to strategy and calendar for adaptive learning.',
-      badge: 'AI Insights'
+      badge: 'AI Insights',
+      href: '/seo-dashboard'
     },
     {
       icon: <Chat />,
       title: 'Content Engagement',
       description: 'Monitor comments, DMs and reactions. Research communities and reply with AI assistance from within ALwrity to grow audience authentically.',
-      badge: 'Community'
+      badge: 'Community',
+      href: '/linkedin-writer'
     },
     {
       icon: <Refresh />,
       title: 'Content Remarketing',
       description: 'Analyzes historic performance, suggests edits, variants and redistribution. Measures KPI attainment and explains what worked—and what did not.',
-      badge: 'Optimization'
+      badge: 'Optimization',
+      href: '/dashboard'
     }
   ];
 
@@ -237,33 +311,67 @@ const Landing: React.FC = () => {
   `;
 
 
-  // Loading component for Suspense
-  const LoadingSpinner = () => (
-    <Box 
-      sx={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        py: 8,
-        minHeight: '200px'
-      }}
-    >
-      <CircularProgress size={40} />
+  const SectionSkeleton: React.FC<{ minHeight: number }> = ({ minHeight }) => (
+    <Box sx={{ py: 0, px: 0, bgcolor: '#0a0a0a' }}>
+      <Skeleton
+        variant="rectangular"
+        height={minHeight}
+        sx={{
+          borderRadius: 0,
+          bgcolor: '#0a0a0a',
+          maxWidth: '100%',
+          mx: 'auto',
+        }}
+      />
     </Box>
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', overflow: 'hidden', position: 'relative' }}>
-      {/* Hero Section - Extracted to separate component */}
+    <Box sx={{ minHeight: '100vh', overflowX: 'hidden', position: 'relative', bgcolor: '#000' }}>
+      <Box
+        component="a"
+        href="#main-content"
+        sx={{
+          position: 'absolute',
+          left: -9999,
+          zIndex: 9999,
+          px: 2,
+          py: 1,
+          background: theme.palette.primary.main,
+          color: '#fff',
+          textDecoration: 'none',
+          fontWeight: 600,
+          '&:focus': {
+            left: 16,
+            top: 16,
+          },
+        }}
+      >
+        Skip to main content
+      </Box>
+
+      <LandingNav />
+
+      <Box component="main" id="main-content">
+      {/* Hero Section */}
       <HeroSection />
+
+      {/* Welcome / Why ALwrity — moved up for better conversion flow */}
+      <Suspense fallback={<SectionSkeleton minHeight={520} />}>
+        <IntroducingAlwrity />
+      </Suspense>
 
       {/* Lifecycle Section with Background Image */}
       <Box
+        id="lifecycle"
         sx={{
           position: 'relative',
-          minHeight: '100vh',
-          py: 12,
-          overflow: 'hidden'
+          minHeight: { xs: 'auto', md: 'calc(100vh - 48px)' },
+          py: { xs: 3.5, md: 4 },
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
         }}
       >
         {/* Background Image Layer */}
@@ -314,36 +422,39 @@ const Landing: React.FC = () => {
             whileInView="visible"
             viewport={{ once: true, amount: 0.1 }}
           >
-            <Stack spacing={8} alignItems="center">
-              {/* Title */}
+            <Stack spacing={0} alignItems="center">
+              {/* Title + subtitle */}
               <motion.div variants={titleFlyIn} style={{ width: '100%' }}>
-                <Stack spacing={3} alignItems="center" textAlign="center">
+                <Stack spacing={1.5} alignItems="center" textAlign="center" sx={{ mb: landingSectionHeaderGap }}>
                   <Typography 
                     variant="h2" 
-                    fontWeight={700}
+                    component="h2"
                     sx={{
+                      ...landingSectionTitleSx,
                       color: 'white',
-                      textShadow: `0 0 30px ${alpha(theme.palette.primary.main, 0.5)}, 0 4px 20px rgba(0,0,0,0.8)`
+                      textShadow: `0 0 30px ${alpha(theme.palette.primary.main, 0.5)}, 0 4px 20px rgba(0,0,0,0.8)`,
                     }}
                   >
                     ALwrity Content Lifecycle
                   </Typography>
                   <Typography 
                     variant="h5" 
-                    fontWeight={600}
+                    component="p"
                     sx={{
+                      ...landingSectionSubtitleSx,
                       color: alpha('#fff', 0.9),
-                      textShadow: '0 2px 10px rgba(0,0,0,0.6)'
+                      fontWeight: 600,
+                      textShadow: '0 2px 10px rgba(0,0,0,0.6)',
                     }}
                   >
-                    End‑to‑End, HITL by Design
+                    End-to-End, with You in Control
                   </Typography>
                 </Stack>
               </motion.div>
 
-              {/* Phases chips with animated connector */}
+              {/* Phase chips strip */}
               <motion.div variants={chipsFlyIn} style={{ width: '100%' }}>
-                <Box sx={{ position: 'relative', width: '100%', maxWidth: 1100, px: { xs: 2, md: 4 }, py: 2 }}>
+                <Box sx={{ position: 'relative', width: '100%', maxWidth: 1100, px: { xs: 1, md: 2 }, pt: 0.5, pb: 0.5, mb: landingSectionHeaderGap }}>
                   {/* animated line */}
                   <Box
                     sx={{
@@ -375,8 +486,8 @@ const Landing: React.FC = () => {
                       }}
                     />
                   </Box>
-                  {/* chips */}
-                  <Grid container spacing={{ xs: 1, md: 2 }} justifyContent="space-between" alignItems="center">
+                  {/* chips — 2×3 on mobile, single row on desktop */}
+                  <Grid container spacing={{ xs: 1, md: 1.5 }} justifyContent="center" alignItems="center">
                     {[
                       { label: 'Plan', variations: ['Plan', 'Strategy', 'Research', 'Blueprint'] },
                       { label: 'Generate', variations: ['Generate', 'Create', 'Produce', 'Craft'] },
@@ -385,7 +496,7 @@ const Landing: React.FC = () => {
                       { label: 'Engage', variations: ['Engage', 'Interact', 'Connect', 'Respond'] },
                       { label: 'Remarket', variations: ['Remarket', 'Repurpose', 'Recycle', 'Amplify'] }
                     ].map((item, idx) => (
-                      <Grid item key={item.label} xs={2} sx={{ display: 'flex', justifyContent: idx === 0 ? 'flex-start' : idx === 5 ? 'flex-end' : 'center' }}>
+                      <Grid item key={item.label} xs={4} md={2} sx={{ display: 'flex', justifyContent: 'center' }}>
                         <Chip 
                           label={
                             <Stack direction="row" spacing={0.5} alignItems="center">
@@ -393,7 +504,7 @@ const Landing: React.FC = () => {
                                 variant="caption" 
                                 sx={{ 
                                   fontWeight: 800, 
-                                  fontSize: { xs: '0.65rem', md: '0.75rem' },
+                                  fontSize: { xs: '0.6rem', md: '0.7rem' },
                                   color: 'primary.main'
                                 }}
                               >
@@ -403,21 +514,23 @@ const Landing: React.FC = () => {
                                 phrases={item.variations}
                                 duration={400}
                                 delay={200}
-                                interval={3000}
+                                interval={4000}
                                 style={{
                                   fontWeight: 700,
-                                  fontSize: '0.7rem',
+                                  fontSize: '0.65rem',
                                   color: 'white'
                                 }}
                               />
                             </Stack>
                           }
-                          size="medium"
+                          size="small"
                           sx={{
-                            px: { xs: 1, md: 2 },
-                            py: { xs: 1.5, md: 2 },
+                            px: { xs: 0.75, md: 1.5 },
+                            py: { xs: 1, md: 1.25 },
                             fontWeight: 700,
                             letterSpacing: 0.5,
+                            width: '100%',
+                            maxWidth: { xs: 110, md: 140 },
                             background: `linear-gradient(135deg, 
                               ${alpha(theme.palette.primary.main, 0.3)}, 
                               ${alpha(theme.palette.secondary.main, 0.3)})`,
@@ -427,7 +540,7 @@ const Landing: React.FC = () => {
                             animationDelay: `${idx * 0.3}s`,
                             transition: 'all 0.3s ease',
                             '&:hover': {
-                              transform: 'scale(1.1) translateY(-2px)',
+                              transform: 'scale(1.05) translateY(-2px)',
                               background: `linear-gradient(135deg, 
                                 ${alpha(theme.palette.primary.main, 0.5)}, 
                                 ${alpha(theme.palette.secondary.main, 0.5)})`,
@@ -441,23 +554,26 @@ const Landing: React.FC = () => {
                 </Box>
               </motion.div>
 
-              {/* Description */}
-              <motion.div variants={descriptionFade}>
+              {/* Description — between chips and cards */}
+              <motion.div variants={descriptionFade} style={{ width: '100%' }}>
                 <Typography 
-                  variant="h6" 
+                  variant="body1" 
                   color={alpha('#fff', 0.9)}
-                  maxWidth="900px"
+                  maxWidth="720px"
                   textAlign="center"
+                  mx="auto"
                   sx={{
                     textShadow: '0 2px 10px rgba(0,0,0,0.6)',
-                    lineHeight: 1.8
+                    ...landingSectionSubtitleSx,
+                    fontSize: { xs: '0.9rem', md: '1rem' },
+                    mb: { xs: 2, md: 2.5 },
                   }}
                 >
-                  ALwrity automates each phase with AI while you review and approve as the human‑in‑the‑loop.
+                  AI-Powered Automation with Human-in-the-Loop Design, ensuring You have the Final Say
                 </Typography>
               </motion.div>
 
-              {/* Cards with zoom animations */}
+              {/* Cards — 3×2 grid on desktop */}
               <motion.div
                 variants={cardsStagger}
                 initial="hidden"
@@ -465,87 +581,109 @@ const Landing: React.FC = () => {
                 viewport={{ once: true, amount: 0.1 }}
                 style={{ width: '100%' }}
               >
-                <Grid container spacing={2.5}>
+                <Grid container spacing={{ xs: 1.5, md: 2 }} sx={{ px: { xs: 0.5, md: 1 } }}>
                   {features.map((feature, index) => (
-                    <Grid item xs={12} md={6} lg={4} key={index}>
-                      <motion.div
-                        variants={cardVariants[index]}
-                        transition={{
-                          duration: 0.6,
-                          ease: [0.25, 0.46, 0.45, 0.94]
+                    <Grid item xs={12} sm={6} md={4} key={feature.title}>
+                    <motion.div
+                      variants={cardVariants[index]}
+                      transition={{
+                        duration: 0.45,
+                        ease: [0.25, 0.46, 0.45, 0.94],
+                      }}
+                    >
+                      <Card 
+                        sx={{ 
+                          ...glassCardSx, 
+                          height: '100%',
+                          position: 'relative',
+                          background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, 0.08)} 0%, ${alpha(theme.palette.common.white, 0.03)} 100%)`,
+                          backdropFilter: 'blur(20px)',
+                          border: `1px solid ${alpha(theme.palette.common.white, 0.15)}`,
+                          ...landingCardHoverSx,
+                          '& .lifecycle-card-desc': {
+                            display: '-webkit-box',
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                          },
+                          '&:hover': { 
+                            ...landingCardHoverSx['&:hover'],
+                            boxShadow: `0 24px 48px ${alpha(theme.palette.primary.main, 0.45)}, 0 0 24px ${alpha(theme.palette.primary.main, 0.2)}`,
+                            borderColor: alpha(theme.palette.primary.main, 0.55),
+                            '& .lifecycle-card-desc': {
+                              WebkitLineClamp: 'unset',
+                              overflow: 'visible',
+                            },
+                          },
                         }}
                       >
-                        <Card 
-                          sx={{ 
-                            ...glassCardSx, 
-                            height: '100%', 
-                            background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, 0.08)} 0%, ${alpha(theme.palette.common.white, 0.03)} 100%)`,
-                            backdropFilter: 'blur(20px)',
-                            border: `1px solid ${alpha(theme.palette.common.white, 0.15)}`,
-                            transition: 'all 0.25s ease', 
-                            '&:hover': { 
-                              transform: 'translateY(-6px)', 
-                              boxShadow: `0 24px 48px ${alpha(theme.palette.primary.main, 0.25)}`, 
-                              borderColor: alpha(theme.palette.primary.main, 0.4) 
-                            } 
-                          }}
-                        >
-                          <CardContent sx={{ p: 3 }}>
-                            <Stack spacing={2}>
-                              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                <Avatar
-                                  sx={{
-                                    width: 44,
-                                    height: 44,
-                                    borderRadius: 2,
-                                    background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.25)}, ${alpha(theme.palette.secondary.main, 0.25)})`,
-                                    color: theme.palette.primary.main
-                                  }}
-                                >
-                                  {feature.icon}
-                                </Avatar>
-                                <Chip 
-                                  label={feature.badge} 
-                                  size="small" 
-                                  sx={{ 
-                                    background: alpha(theme.palette.primary.main, 0.2),
-                                    color: theme.palette.primary.main,
-                                    fontWeight: 600,
-                                    backdropFilter: 'blur(10px)'
-                                  }} 
-                                />
-                              </Stack>
-                              <Stack spacing={1.25}>
-                                <Typography variant="h6" fontWeight={700} sx={{ fontSize: '1.05rem', color: 'white' }}>
-                                  {feature.title}
-                                </Typography>
-                                <Typography variant="body2" color={alpha('#fff', 0.85)} lineHeight={1.6} sx={{ fontSize: '0.93rem' }}>
-                                  {feature.description}
-                                </Typography>
-                              </Stack>
-                              <Box sx={{ pt: 0.5 }}>
-                                <Button 
-                                  size="small" 
-                                  endIcon={<OpenInNew sx={{ fontSize: 16 }} />} 
-                                  sx={{
-                                    textTransform: 'none',
-                                    fontWeight: 600,
-                                    px: 0,
-                                    minWidth: 0,
-                                    color: theme.palette.primary.main,
-                                    '&:hover': {
-                                      color: theme.palette.primary.light
-                                    }
-                                  }}
-                                  href="#"
-                                >
-                                  Learn more
-                                </Button>
-                              </Box>
+                        <CardContent sx={{ p: 2 }}>
+                          <Stack spacing={1.25}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                              <Avatar
+                                sx={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: 2,
+                                  background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.25)}, ${alpha(theme.palette.secondary.main, 0.25)})`,
+                                  color: theme.palette.primary.main,
+                                  '& .MuiSvgIcon-root': { fontSize: 20 },
+                                }}
+                              >
+                                {feature.icon}
+                              </Avatar>
+                              <Chip 
+                                label={feature.badge} 
+                                size="small" 
+                                sx={{ 
+                                  background: alpha(theme.palette.primary.main, 0.2),
+                                  color: theme.palette.primary.main,
+                                  fontWeight: 600,
+                                  fontSize: '0.7rem',
+                                  height: 24,
+                                }} 
+                              />
                             </Stack>
-                          </CardContent>
-                        </Card>
-                      </motion.div>
+                            <Stack spacing={0.75}>
+                              <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: '0.95rem', color: 'white' }}>
+                                {feature.title}
+                              </Typography>
+                              <Typography
+                                className="lifecycle-card-desc"
+                                variant="body2"
+                                color={alpha('#fff', 0.85)}
+                                lineHeight={1.45}
+                                sx={{ fontSize: '0.8rem' }}
+                              >
+                                {feature.description}
+                              </Typography>
+                            </Stack>
+                            <Box>
+                              <Button
+                                onClick={() =>
+                                  openSignIn({ forceRedirectUrl: feature.href })
+                                }
+                                size="small"
+                                endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                                sx={{
+                                  textTransform: 'none',
+                                  fontWeight: 600,
+                                  px: 0,
+                                  minWidth: 0,
+                                  fontSize: '0.8rem',
+                                  color: theme.palette.primary.main,
+                                  '&:hover': {
+                                    color: theme.palette.primary.light,
+                                  },
+                                }}
+                              >
+                                Sign in to explore →
+                              </Button>
+                            </Box>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
                     </Grid>
                   ))}
                 </Grid>
@@ -556,12 +694,12 @@ const Landing: React.FC = () => {
       </Box>
 
       {/* Feature Showcase with Carousel - Lazy Loaded */}
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<SectionSkeleton minHeight={640} />}>
         <FeatureShowcase />
       </Suspense>
 
       {/* The Solopreneur's Dilemma Section - Lazy Loaded */}
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<SectionSkeleton minHeight={560} />}>
         <SolopreneurDilemma />
       </Suspense>
 
@@ -569,28 +707,83 @@ const Landing: React.FC = () => {
       <Box 
         id="pricing" 
         sx={{ 
-          py: 8, 
+          py: { xs: 4, md: 5 },
+          minHeight: { xs: 'auto', md: 'calc(100vh - 64px)' },
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
           background: `linear-gradient(180deg, ${alpha(theme.palette.background.default, 0.95)} 0%, ${alpha(theme.palette.background.paper, 0.98)} 100%)`,
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: 'center', mb: 6 }}>
-            <Typography variant="h3" component="h2" gutterBottom fontWeight={700}>
-              Choose Your Plan
-            </Typography>
-            <Typography variant="h6" color="text.secondary">
-              Start with a free plan or upgrade for advanced features
-            </Typography>
-          </Box>
-          <Box sx={{ textAlign: 'center' }}>
+          <Stack spacing={3} alignItems="center">
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="h3" component="h2" gutterBottom sx={{ ...landingSectionTitleSx, color: 'text.primary' }}>
+                Choose Your Plan
+              </Typography>
+              <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 640, mx: 'auto' }}>
+                Start Free to Test-Drive: Then Choose the Plan That Fits Your Workflow
+              </Typography>
+            </Box>
+
+            <Grid container spacing={2} sx={{ width: '100%' }}>
+              {PRICING_TEASER_PLANS.map((plan) => (
+                <Grid item xs={12} sm={6} md={3} key={plan.name}>
+                  <Card
+                    sx={{
+                      height: '100%',
+                      borderRadius: 3,
+                      border: plan.highlight
+                        ? `2px solid ${theme.palette.primary.main}`
+                        : `1px solid ${alpha(theme.palette.divider, 0.2)}`,
+                      boxShadow: plan.highlight
+                        ? `0 12px 32px ${alpha(theme.palette.primary.main, 0.2)}`
+                        : '0 4px 16px rgba(0,0,0,0.06)',
+                      ...landingCardHoverSx,
+                      '&:hover': {
+                        ...landingCardHoverSx['&:hover'],
+                        boxShadow: `0 20px 40px ${alpha(theme.palette.primary.main, 0.25)}`,
+                      },
+                    }}
+                  >
+                    <CardContent sx={{ p: 2.25 }}>
+                      <Typography variant="h6" fontWeight={700} gutterBottom>
+                        {plan.name}
+                      </Typography>
+                      <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ mb: 2 }}>
+                        <Typography variant="h4" fontWeight={800} color="primary.main">
+                          {plan.price}
+                        </Typography>
+                        {plan.period && (
+                          <Typography variant="body2" color="text.secondary">
+                            {plan.period}
+                          </Typography>
+                        )}
+                      </Stack>
+                      <Stack spacing={0.75}>
+                        {plan.features.map((feature) => (
+                          <Stack key={feature} direction="row" spacing={0.75} alignItems="flex-start">
+                            <Check sx={{ fontSize: 16, color: 'primary.main', mt: 0.25 }} />
+                            <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.82rem', lineHeight: 1.4 }}>
+                              {feature}
+                            </Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
+            </Grid>
+
             <Button
               variant="contained"
               size="large"
-              onClick={() => window.location.href = '/pricing'}
+              onClick={() => navigate('/pricing')}
               sx={{
-                px: 6,
-                py: 2,
-                fontSize: '1.1rem',
+                px: 5,
+                py: 1.75,
+                fontSize: '1.05rem',
                 fontWeight: 600,
                 background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                 '&:hover': {
@@ -600,21 +793,19 @@ const Landing: React.FC = () => {
                 }
               }}
             >
-              View All Plans & Features
+              View Plans & Features
             </Button>
-          </Box>
+          </Stack>
         </Container>
       </Box>
 
-      {/* Introducing ALwrity Section with Background - Lazy Loaded */}
-      <Suspense fallback={<LoadingSpinner />}>
-        <IntroducingAlwrity />
-      </Suspense>
-
       {/* Final CTA Section - Lazy Loaded */}
-      <Suspense fallback={<LoadingSpinner />}>
+      <Suspense fallback={<SectionSkeleton minHeight={480} />}>
         <EnterpriseCTA />
       </Suspense>
+      </Box>
+
+      <LandingFooter />
     </Box>
   );
 };

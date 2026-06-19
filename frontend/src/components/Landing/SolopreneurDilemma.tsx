@@ -17,7 +17,9 @@ import {
   ArrowForward
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+import { useClerk } from '@clerk/clerk-react';
 import { ScrambleText } from '../ScrambleText';
+import { landingSectionTitleSx } from './landingStyles';
 
 // Scrambling text component for multiple phrases
 const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?: number; delay?: number }> = ({ 
@@ -48,6 +50,7 @@ const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?
 
 const SolopreneurDilemma: React.FC = () => {
   const theme = useTheme();
+  const { openSignIn } = useClerk();
 
   const painPoints = [
     {
@@ -124,7 +127,7 @@ const SolopreneurDilemma: React.FC = () => {
           right: 0,
           bottom: 0,
           backgroundImage: 'url(/alwrity_landing_pg_bg.png)',
-          backgroundSize: 'contain',
+          backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
           zIndex: 0,
@@ -159,15 +162,14 @@ const SolopreneurDilemma: React.FC = () => {
               <motion.div variants={itemVariants}>
                 <Typography 
                   variant="h2" 
-                  fontWeight={800} 
+                  component="h2"
                   sx={{ 
-                    fontSize: { xs: '2.5rem', md: '3.5rem' },
+                    ...landingSectionTitleSx,
                     color: 'white',
                     textShadow: '0 2px 10px rgba(0, 0, 0, 0.8)',
-                    letterSpacing: '-0.02em'
                   }}
                 >
-                  The Content Struggle is Real
+                  Content Struggle Real: Scale Smart, Burn Out Less
                 </Typography>
               </motion.div>
             </Box>
@@ -273,7 +275,7 @@ const SolopreneurDilemma: React.FC = () => {
                                 phrases={point.titleVariations || [point.title]}
                                 duration={500}
                                 delay={500}
-                                interval={4000}
+                                interval={10000}
                               />
                             </Typography>
                             <Typography 
@@ -394,6 +396,7 @@ const SolopreneurDilemma: React.FC = () => {
                       variant="contained"
                       size="large"
                       endIcon={<ArrowForward />}
+                      onClick={() => openSignIn({ forceRedirectUrl: '/onboarding' })}
                       sx={{
                         mt: 3,
                         py: 2,
@@ -412,10 +415,9 @@ const SolopreneurDilemma: React.FC = () => {
                       }}
                     >
                       <ScramblingText
-                        phrases={['End the Struggle Today', 'Stop the Chaos', 'Solve Content Problems', 'Transform Your Workflow']}
+                        phrases={['End the Struggle Today', 'Stop the Chaos', 'Transform Your Workflow']}
+                        interval={6000}
                         duration={500}
-                        delay={300}
-                        interval={3500}
                       />
                     </Button>
                   </motion.div>

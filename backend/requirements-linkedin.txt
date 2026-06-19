@@ -50,6 +50,9 @@ pandas>=2.0.0
 # Image processing - needed for LinkedIn image generation/editing
 Pillow>=10.0.0
 
+# PDF carousel rendering for LinkedIn
+reportlab==4.5.1
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
