@@ -27,6 +27,7 @@ from models.linkedin_social_models import (
     LinkedInOrganizationsListResponse,
     LinkedInPersonalAnalyticsResponse,
     LinkedInProfileAcquireResponse,
+    LinkedInProfileContextMetaResponse,
     LinkedInProfileMetaResponse,
 )
 from services.integrations.linkedin.analytics_dates import (
@@ -36,6 +37,9 @@ from services.integrations.linkedin.analytics_dates import (
 from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
 from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
+from services.integrations.linkedin.profile_context_service import get_or_build_profile_context
+from services.integrations.linkedin.profile_context_types import ProfileContextBuildError
+from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.profile_service import get_or_fetch_profile
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
@@ -162,6 +166,41 @@ def _raise_profile_acquire_http_error(exc: Exception, *, user_id: str) -> None:
     ) from exc
 
 
+def _raise_profile_context_http_error(exc: Exception, *, user_id: str) -> None:
+    """Map profile context build failures to Phase 2 HTTP status codes."""
+    if isinstance(exc, ProfileContextBuildError):
+        logger.exception(
+            "[LinkedInProfileContext] GET /profile context build failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to build LinkedIn profile context.",
+        ) from exc
+
+    if isinstance(exc, ValueError):
+        logger.error(
+            "[LinkedInProfileContext] GET /profile context persistence error user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to build LinkedIn profile context.",
+        ) from exc
+
+    logger.exception(
+        "[LinkedInProfileContext] GET /profile unexpected context error user_id={}: {}",
+        user_id,
+        exc,
+    )
+    raise HTTPException(
+        status_code=500,
+        detail="Unable to build LinkedIn profile context.",
+    ) from exc
+
+
 @router.get("/profile", response_model=LinkedInProfileAcquireResponse)
 async def get_linkedin_profile(
     refresh: bool = Query(
@@ -171,10 +210,10 @@ async def get_linkedin_profile(
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInProfileAcquireResponse:
     """
-    Return the connected user's normalized LinkedIn profile (cache-first).
+    Return the connected user's normalized LinkedIn profile and profile context.
 
-    Serves from ``linkedin_analysis_context`` when cached; calls Unipile only on
-    cache miss or when ``refresh=true``.
+    Phase 1: cache-first normalized profile from ``linkedin_analysis_context``.
+    Phase 2: cache-first ``profile_context`` built from the normalized profile.
     """
     user_id = _user_id(current_user)
     logger.info("[LinkedInProfile] GET /profile user_id={} refresh={}", user_id, refresh)
@@ -189,10 +228,25 @@ async def get_linkedin_profile(
     except Exception as exc:
         _raise_profile_acquire_http_error(exc, user_id=user_id)
 
+    repository = ProfileRepository(oauth=_oauth_service)
+    try:
+        profile_context, context_meta = get_or_build_profile_context(
+            user_id,
+            profile,
+            profile_content_hash=meta.get("profile_content_hash"),
+            repository=repository,
+        )
+    except (ProfileContextBuildError, ValueError) as exc:
+        _raise_profile_context_http_error(exc, user_id=user_id)
+    except Exception as exc:
+        _raise_profile_context_http_error(exc, user_id=user_id)
+
     logger.info(
-        "[LinkedInProfile] GET /profile complete user_id={} source={}",
+        "[LinkedInProfile] GET /profile complete user_id={} profile_source={} "
+        "context_source={}",
         user_id,
         meta.get("source"),
+        context_meta.get("source"),
     )
     return LinkedInProfileAcquireResponse(
         profile=profile,
@@ -200,6 +254,11 @@ async def get_linkedin_profile(
             source=meta["source"],  # type: ignore[arg-type]
             fetched_at=meta.get("fetched_at"),
             profile_content_hash=meta.get("profile_content_hash"),
+        ),
+        profile_context=profile_context,
+        profile_context_meta=LinkedInProfileContextMetaResponse(
+            source=context_meta["source"],  # type: ignore[arg-type]
+            profile_context_updated_at=context_meta.get("profile_context_updated_at"),
         ),
     )
 

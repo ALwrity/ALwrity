@@ -144,6 +144,13 @@ class ProfileContextMetaResponse(TypedDict, total=False):
     profile_context_updated_at: Optional[str]
 
 
+class ProfileContextAcquireMeta(TypedDict):
+    """Metadata returned by ``get_or_build_profile_context`` (Step 2.4)."""
+
+    source: ProfileContextSource
+    profile_context_updated_at: Optional[str]
+
+
 # Top-level keys on LinkedInProfileContext (Step 2.1 gate).
 PROFILE_CONTEXT_KEYS: frozenset[str] = frozenset(
     {

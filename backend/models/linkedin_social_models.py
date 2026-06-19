@@ -95,8 +95,17 @@ class LinkedInProfileMetaResponse(BaseModel):
     profile_content_hash: Optional[str] = None
 
 
+class LinkedInProfileContextMetaResponse(BaseModel):
+    """Profile context build/cache metadata (Phase 2)."""
+
+    source: Literal["cache", "built"]
+    profile_context_updated_at: Optional[str] = None
+
+
 class LinkedInProfileAcquireResponse(BaseModel):
-    """Normalized own-profile snapshot (Phase 1 — no raw Unipile payload)."""
+    """Normalized own-profile snapshot with Phase 2 profile context."""
 
     profile: Dict[str, Any] = Field(default_factory=dict)
     meta: LinkedInProfileMetaResponse
+    profile_context: Dict[str, Any] = Field(default_factory=dict)
+    profile_context_meta: LinkedInProfileContextMetaResponse

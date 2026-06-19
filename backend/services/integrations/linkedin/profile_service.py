@@ -11,6 +11,14 @@ from typing import Any, Optional, TypedDict
 
 from loguru import logger
 
+from services.integrations.linkedin.field_coercion import (
+    clean_str as _clean_str,
+    coerce_bool as _coerce_bool,
+    coerce_int as _coerce_int,
+    coerce_list as _coerce_list,
+)
+# Backward compatibility: ``_clean_str`` / ``_coerce_*`` were historically defined in
+# this module. They remain importable here; new code should use ``field_coercion`` directly.
 from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import avatar_url_from_user_profile
@@ -239,52 +247,6 @@ FORBIDDEN_RAW_KEYS: frozenset[str] = frozenset(
         "open_profile",
     }
 )
-
-
-def _clean_str(value: Any) -> str:
-    """Coerce a value to a trimmed string; None and non-strings become ``""``."""
-    if value is None:
-        return ""
-    if not isinstance(value, str):
-        return str(value).strip()
-    return value.strip()
-
-
-def _coerce_bool(value: Any, *, default: bool = False) -> bool:
-    """Coerce Unipile boolean fields safely."""
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        lowered = value.strip().lower()
-        if lowered in {"true", "1", "yes"}:
-            return True
-        if lowered in {"false", "0", "no"}:
-            return False
-    return default
-
-
-def _coerce_int(value: Any, *, default: int = 0) -> int:
-    """Coerce count fields to int."""
-    if value is None:
-        return default
-    if isinstance(value, bool):
-        return int(value)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float):
-        return int(value)
-    if isinstance(value, str) and value.strip().isdigit():
-        return int(value.strip())
-    return default
-
-
-def _coerce_list(value: Any) -> list[Any]:
-    """Return a list or empty list when null / wrong type."""
-    if isinstance(value, list):
-        return value
-    return []
 
 
 def _normalize_primary_locale(raw: dict[str, Any]) -> dict[str, str]:

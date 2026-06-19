@@ -137,6 +137,155 @@ class ProfileRepository:
             return None
         return parsed
 
+    def get_profile_context(
+        self,
+        user_id: str,
+        *,
+        row: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Read cached profile context JSON for ``user_id``.
+
+        Args:
+            user_id: ALwrity user ID
+            row: Optional pre-loaded analysis row to avoid a second DB read
+
+        Returns:
+            Parsed ``LinkedInProfileContext`` dict, or ``None`` when not stored/invalid
+        """
+        logger.info(
+            "[LinkedInProfileContext] ProfileRepository.get_profile_context user_id={}",
+            user_id,
+        )
+        if row is None:
+            row = self.get_analysis_row(user_id)
+        if not row:
+            logger.info(
+                "[LinkedInProfileContext] ProfileRepository.get_profile_context "
+                "no row user_id={}",
+                user_id,
+            )
+            return None
+        raw_json = row.get("profile_context_json")
+        if not raw_json:
+            logger.info(
+                "[LinkedInProfileContext] ProfileRepository.get_profile_context "
+                "empty profile_context_json user_id={}",
+                user_id,
+            )
+            return None
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError:
+            logger.error(
+                "[LinkedInProfileContext] Invalid profile_context_json user_id={}",
+                user_id,
+            )
+            return None
+        if not isinstance(parsed, dict):
+            logger.error(
+                "[LinkedInProfileContext] profile_context_json is not an object "
+                "user_id={}",
+                user_id,
+            )
+            return None
+        logger.info(
+            "[LinkedInProfileContext] ProfileRepository.get_profile_context hit "
+            "user_id={}",
+            user_id,
+        )
+        return parsed
+
+    def save_profile_context(
+        self,
+        user_id: str,
+        context: dict[str, Any],
+        *,
+        content_hash: Optional[str] = None,
+    ) -> str:
+        """
+        Persist Phase 2 profile context JSON and ``profile_context_updated_at``.
+
+        Does not modify ``normalized_profile_json`` or other Phase 1 columns.
+        Requires an existing ``linkedin_analysis_context`` row (from Phase 1 acquire).
+
+        Args:
+            user_id: ALwrity user ID
+            context: Built ``LinkedInProfileContext`` dict
+            content_hash: Optional Phase 1 hash to stamp in ``meta`` before save
+
+        Returns:
+            ISO timestamp written to ``profile_context_updated_at``
+
+        Raises:
+            ValueError: When no analysis row exists for ``user_id``
+        """
+        logger.info(
+            "[LinkedInProfileContext] ProfileRepository.save_profile_context user_id={}",
+            user_id,
+        )
+        if not isinstance(context, dict):
+            raise ValueError("profile context must be a dict")
+
+        context_to_save = context
+        if content_hash is not None:
+            context_to_save = json.loads(
+                json.dumps(context, separators=(",", ":"), default=str)
+            )
+            meta = context_to_save.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+                context_to_save["meta"] = meta
+            meta["built_from_profile_content_hash"] = content_hash
+
+        context_json = json.dumps(context_to_save, separators=(",", ":"), default=str)
+        now = datetime.utcnow().isoformat()
+        db_path = self._ensure_db(user_id)
+
+        existing = self.get_analysis_row(user_id)
+        if not existing:
+            logger.error(
+                "[LinkedInProfileContext] save_profile_context no analysis row "
+                "user_id={}",
+                user_id,
+            )
+            raise ValueError(
+                f"No linkedin_analysis_context row for user_id={user_id!r}; "
+                "acquire normalized profile first"
+            )
+
+        normalized_before = existing.get("normalized_profile_json")
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE linkedin_analysis_context
+                SET profile_context_json = ?,
+                    profile_context_updated_at = ?,
+                    updated_at = ?
+                WHERE user_id = ?
+                """,
+                (context_json, now, now, user_id),
+            )
+            conn.commit()
+
+        row_after = self.get_analysis_row(user_id)
+        if row_after and row_after.get("normalized_profile_json") != normalized_before:
+            logger.warning(
+                "[LinkedInProfileContext] normalized_profile_json changed unexpectedly "
+                "during save_profile_context user_id={}",
+                user_id,
+            )
+
+        logger.info(
+            "[LinkedInProfileContext] ProfileRepository.save_profile_context complete "
+            "user_id={} profile_context_updated_at={}",
+            user_id,
+            now,
+        )
+        return now
+
     def has_fresh_profile(
         self,
         user_id: str,
