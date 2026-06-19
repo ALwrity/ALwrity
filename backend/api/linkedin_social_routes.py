@@ -29,6 +29,8 @@ from models.linkedin_social_models import (
     LinkedInProfileAcquireResponse,
     LinkedInProfileContextMetaResponse,
     LinkedInProfileMetaResponse,
+    LinkedInProfileValidationMetaResponse,
+    LinkedInProfileValidationResponse,
 )
 from services.integrations.linkedin.analytics_dates import (
     InvalidAnalyticsDateRange,
@@ -38,9 +40,15 @@ from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
 from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
 from services.integrations.linkedin.profile_context_service import get_or_build_profile_context
-from services.integrations.linkedin.profile_context_types import ProfileContextBuildError
+from services.integrations.linkedin.profile_context_types import (
+    ProfileContextBuildError,
+    ProfileValidationError,
+)
 from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.profile_service import get_or_fetch_profile
+from services.integrations.linkedin.profile_validation_service import (
+    get_or_validate_profile_context,
+)
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
@@ -201,6 +209,41 @@ def _raise_profile_context_http_error(exc: Exception, *, user_id: str) -> None:
     ) from exc
 
 
+def _raise_profile_validation_http_error(exc: Exception, *, user_id: str) -> None:
+    """Map profile validation failures to Phase 3 HTTP status codes."""
+    if isinstance(exc, ProfileValidationError):
+        logger.exception(
+            "[LinkedInProfileValidation] GET /profile validation failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to validate LinkedIn profile.",
+        ) from exc
+
+    if isinstance(exc, ValueError):
+        logger.error(
+            "[LinkedInProfileValidation] GET /profile validation persistence error user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to validate LinkedIn profile.",
+        ) from exc
+
+    logger.exception(
+        "[LinkedInProfileValidation] GET /profile unexpected validation error user_id={}: {}",
+        user_id,
+        exc,
+    )
+    raise HTTPException(
+        status_code=500,
+        detail="Unable to validate LinkedIn profile.",
+    ) from exc
+
+
 @router.get("/profile", response_model=LinkedInProfileAcquireResponse)
 async def get_linkedin_profile(
     refresh: bool = Query(
@@ -214,6 +257,7 @@ async def get_linkedin_profile(
 
     Phase 1: cache-first normalized profile from ``linkedin_analysis_context``.
     Phase 2: cache-first ``profile_context`` built from the normalized profile.
+    Phase 3: cache-first ``profile_validation`` from profile context completeness.
     """
     user_id = _user_id(current_user)
     logger.info("[LinkedInProfile] GET /profile user_id={} refresh={}", user_id, refresh)
@@ -241,12 +285,26 @@ async def get_linkedin_profile(
     except Exception as exc:
         _raise_profile_context_http_error(exc, user_id=user_id)
 
+    try:
+        profile_validation_raw, validation_meta = get_or_validate_profile_context(
+            user_id,
+            profile_context,
+            profile_content_hash=meta.get("profile_content_hash"),
+            repository=repository,
+            context_source=context_meta.get("source"),
+        )
+    except (ProfileValidationError, ValueError) as exc:
+        _raise_profile_validation_http_error(exc, user_id=user_id)
+    except Exception as exc:
+        _raise_profile_validation_http_error(exc, user_id=user_id)
+
     logger.info(
         "[LinkedInProfile] GET /profile complete user_id={} profile_source={} "
-        "context_source={}",
+        "context_source={} validation_source={}",
         user_id,
         meta.get("source"),
         context_meta.get("source"),
+        validation_meta.get("source"),
     )
     return LinkedInProfileAcquireResponse(
         profile=profile,
@@ -259,6 +317,13 @@ async def get_linkedin_profile(
         profile_context_meta=LinkedInProfileContextMetaResponse(
             source=context_meta["source"],  # type: ignore[arg-type]
             profile_context_updated_at=context_meta.get("profile_context_updated_at"),
+        ),
+        profile_validation=LinkedInProfileValidationResponse.from_validation_result(
+            profile_validation_raw
+        ),
+        profile_validation_meta=LinkedInProfileValidationMetaResponse(
+            source=validation_meta["source"],  # type: ignore[arg-type]
+            validated_at=validation_meta.get("validated_at"),
         ),
     )
 
