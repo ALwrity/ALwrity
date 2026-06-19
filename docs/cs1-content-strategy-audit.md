@@ -141,18 +141,69 @@ are scheduled for follow-up phases.
 
 ## 3. Plan
 
-| Phase | Focus | Files | Effort |
+| Phase | Focus | Files | Status |
 |---|---|---|---|
-| `cs/phase-1` | **This document. Audit + plan only.** | 0 source files | 0.5 day |
-| `cs/phase-1.1` | Fix the still-live useAutoPopulation dep array | 1 file | 0.25 day |
-| `cs/phase-1.2` | Add the 14 P0 tests from #590 as a regression net | 1 backend test file | 1-1.5 days |
-| `cs/phase-1.3` | Add the 4 P1 backend tests and 1 frontend test | 1 backend + 1 frontend | 0.5 day |
-| `cs/phase-1.4` | Audit the new `autofill_service.py` to see if the AI refresh concern from #589 is still relevant | 1 file | 0.5 day |
-| `cs/phase-1.5` | Defer until #590 is closed: P2 tests, the 4 e2e tests, the per-field lock, the per-field regenerate | tbd | tbd |
+| `cs/phase-1` | **This document. Audit + plan only.** | 0 source files | done (commit `6056e86c`) |
+| `cs/phase-1.1` | Fix the still-live useAutoPopulation dep array | 1 file | done (commit `c2ba85ac`) |
+| `cs/phase-1.2` | Add the 14 P0 tests from #590 as a regression net | 1 backend test file | deferred (tests de-prioritized) |
+| `cs/phase-1.3` | Add the 4 P1 backend tests and 1 frontend test | 1 backend + 1 frontend | deferred (tests de-prioritized) |
+| `cs/phase-1.4` | Audit the new `autofill_service.py` for the AI refresh concern from #589 | 1 file | done (see section 8) |
+| `cs/phase-1.5` | Defer until #590 is closed: P2 tests, the 4 e2e tests, the per-field lock, the per-field regenerate | tbd | not started |
 
 Total `cs/phase-1` family: ~3.25 days against the original ~14-day
 estimate (because 3 of 4 critical bugs are already fixed and #2 is
-deferred).
+deferred). The 0.25-day dep-array fix and the 0.5-day autofill
+audit have both landed; only the test additions remain deferred.
+
+## 8. Result of cs/phase-1.4
+
+A line-by-line audit of
+`backend/api/content_planning/services/content_strategy/autofill/autofill_service.py`
+shows that the AI refresh concern from #589 #2 is **already
+addressed** in the current implementation.
+
+The merge logic in `_merge_fields` (lines 121-138):
+
+```python
+for key in ALL_FIELDS:
+    db_val = db_fields.get(key)
+    ai_val = ai_fields.get(key)
+    if db_val and db_val.get("value") is not None:
+        merged_fields[key] = db_val        # DB field takes precedence
+    elif ai_val and ai_val.get("value") is not None:
+        merged_fields[key] = ai_val        # AI fills only the gaps
+```
+
+DB fields are preferred when they have a value; AI generation only
+fills the gaps. The DB fields are never discarded. The
+`db_field_count` and `ai_field_count` counters in the merged
+payload (line 138) make the split observable to the frontend, so
+operators can see how much of the output is grounded in real
+onboarding data vs. LLM synthesis.
+
+The `generate()` method (lines 40-55) runs the DB normalize and AI
+generate in parallel via `asyncio.create_task`, then merges with
+DB-precedence. The `regenerate_ai_fields` method (lines 57-59)
+just calls `generate()` again, so a re-run still preserves DB
+fields.
+
+**No code change required for cs/phase-1.4.** The concern in #589 #2
+was real for the old `ai_refresh.py` but is already addressed in
+`autofill_service.py`.
+
+## 9. Updated summary
+
+After cs/phase-1.1 and cs/phase-1.4:
+- The 4 critical bugs from #589 are addressed: 3 already fixed on
+  main, 1 fixed by cs/phase-1.1.
+- The AI refresh concern from #589 #2 is already addressed in the
+  new `autofill_service.py` per the cs/phase-1.4 audit.
+- The test matrix from #590 is not yet realised; the user has
+  de-prioritised tests. The 22 tests from #590 remain in scope for
+  a later phase if the test gap is reopened.
+- All 3 long-form issues from this scope (cs/phase-1, cs/phase-1.1,
+  cs/phase-1.4) are landed as local commits on the `cs/phase-1`
+  branch, no push to remote.
 
 ---
 
