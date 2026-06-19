@@ -107,7 +107,13 @@ def _today_date_str() -> str:
 
 def _coerce_priority(value: Any) -> str:
     v = str(value or "medium").lower().strip()
-    return v if v in {"high", "medium", "low"} else "medium"
+    if v in {"high", "medium", "low"}:
+        return v
+    logger.warning(
+        f"Coercing invalid priority value {value!r} -> 'medium' "
+        f"(SIF-3 Issue #623 #16: expected one of high|medium|low)"
+    )
+    return "medium"
 
 
 def _coerce_status(value: Any) -> str:

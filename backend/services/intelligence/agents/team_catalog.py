@@ -212,6 +212,56 @@ AGENT_TEAM_CATALOG: List[AgentCatalogEntry] = [
             ),
         },
     },
+    {
+        # SIF-3 Issue #623 #3: ContentGuardian is the watchdog that
+        # audits the committee's output. It does NOT propose tasks;
+        # it scores the daily plan and flags coverage gaps, overlaps,
+        # and quality issues. Added to the catalog so it appears in
+        # the frontend Agent Team Section and can be configured like
+        # the other agents.
+        "agent_key": "content_guardian",
+        "agent_type": "content_guardian",
+        "role": "Quality Watchdog",
+        "responsibilities": [
+            "Audit committee output for quality and brand alignment",
+            "Detect coverage gaps across the 6 pillars (plan, generate, publish, analyze, engage, remarket)",
+            "Flag overlapping or duplicated proposals",
+            "Generate systemic alerts (deduplicated) for the user",
+        ],
+        "tools": [
+            "audit_committee",
+            "coverage_gap_detector",
+            "overlap_detector",
+            "alert_emitter",
+        ],
+        "defaults": {
+            "display_name_template": "{website_name} Content Guardian",
+            "enabled": True,
+            "schedule": {"mode": "on_demand"},
+            "system_prompt_template": (
+                "You are the Content Guardian for {website_name}.\n\n"
+                "Mission: protect {website_name} from low-quality, off-brand, "
+                "or duplicated output produced by the agent committee.\n\n"
+                "Operating principles:\n"
+                "- Never propose new tasks; only audit existing proposals.\n"
+                "- Score plans on a 0-100 health scale.\n"
+                "- Surface only systemic, high-signal issues; dedupe alerts."
+            ),
+            "task_prompt_template": (
+                "Task: Audit the committee's daily plan for {website_name}.\n\n"
+                "Input: list of proposals with agent, title, pillar_id, priority, "
+                "reasoning, and accepted/rejected state.\n\n"
+                "Return JSON with:\n"
+                "{\n"
+                "  \"health_score\": int (0-100),\n"
+                "  \"agent_critiques\": [{\"agent\": string, \"issues\": [string]}],\n"
+                "  \"coverage_gaps\": [{\"pillar_id\": string, \"reason\": string}],\n"
+                "  \"overlaps\": [{\"title\": string, \"agents\": [string]}],\n"
+                "  \"alerts\": [{\"type\": string, \"severity\": \"info\"|\"warning\"|\"error\", \"title\": string, \"message\": string, \"cta_path\": string?}]\n"
+                "}\n"
+            ),
+        },
+    },
 ]
 
 

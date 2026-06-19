@@ -60,7 +60,7 @@ const AGENT_DESCRIPTIONS: Record<string, { short: string; long: string }> = {
 
 const SIF_DESCRIPTION = {
   short: 'Semantic Intelligence Framework — the orchestration layer',
-  long: 'The SIF (Semantic Intelligence Framework) is ALwrity\'s orchestration layer for autonomous marketing agents. It coordinates the 6-member committee (ContentStrategy, StrategyArchitect, SEO, Social, Competitor, ContentGapRadar), plus TrendSurfer for signal detection and ContentGuardian for quality auditing. The SIF handles prompt sequencing, context card assembly, and committee voting.',
+  long: 'The SIF (Semantic Intelligence Framework) is ALwrity\'s orchestration layer for autonomous marketing agents. It coordinates the 6-member committee (StrategyOrchestrator, ContentStrategist, CompetitorAnalyst, SEOSpecialist, SocialMediaManager, ContentGuardian). ContentGuardian is the quality watchdog that audits the committee\'s output rather than proposing tasks. The SIF handles prompt sequencing, context card assembly, and committee voting.',
 };
 
 const AgentHelpModal: React.FC = () => {
@@ -134,9 +134,11 @@ const AgentHelpModal: React.FC = () => {
           </Box>
 
           <Box sx={{ mb: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            <Chip label="6 Committee Agents" size="small" sx={{ bgcolor: 'rgba(79,70,229,0.15)', color: '#818cf8', fontWeight: 600 }} />
-            <Chip label="1 Trend Agent" size="small" sx={{ bgcolor: 'rgba(255,152,0,0.15)', color: '#ffb74d', fontWeight: 600 }} />
-            <Chip label="1 Watchdog Agent" size="small" sx={{ bgcolor: 'rgba(76,175,80,0.15)', color: '#81c784', fontWeight: 600 }} />
+            <Chip
+              label={`${agents.length} Committee Members`}
+              size="small"
+              sx={{ bgcolor: 'rgba(79,70,229,0.15)', color: '#818cf8', fontWeight: 600 }}
+            />
           </Box>
 
           {loading && (
