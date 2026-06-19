@@ -104,6 +104,11 @@ class RealTimeSemanticMonitor:
         self.monitored_competitors: Set[str] = set()
         self.alert_subscribers: List[str] = []
         self.monitoring_history: List[Dict[str, Any]] = []
+        # Reference to the asyncio task running the monitoring loop.
+        # Stored so stop_monitoring() can cancel and await it cleanly
+        # (previously the task was fire-and-forget and could outlive
+        # the caller's intent).
+        self._monitoring_task: Optional[asyncio.Task] = None
         
         logger.info(f"Real-time semantic monitor initialized for user {user_id}")
 
@@ -112,9 +117,26 @@ class RealTimeSemanticMonitor:
         Public wrapper for semantic health check.
         Aggregates metrics into a single health status object.
         """
+        # If SIF isn't enabled for this user (no onboarding session),
+        # surface a distinct 'not_available' status instead of warning.
+        # This lets the frontend render a clear 'not set up' state and
+        # avoid polling for users who will never get a different result.
+        if not self.sif_enabled:
+            return SemanticHealthMetric(
+                metric_name="semantic_health",
+                value=0.0,
+                threshold=0.0,
+                status="not_available",
+                timestamp=datetime.utcnow().isoformat(),
+                description="Semantic monitoring is not enabled for this user (no onboarding session).",
+                recommendations=[
+                    "Complete onboarding to enable semantic monitoring",
+                ],
+            )
+
         # Call internal method (ignoring user_id arg if passed, as we use self.user_id)
         metrics = await self._check_semantic_health()
-        
+
         if not metrics:
             # Return a canonical semantic health summary when no metrics are available.
             return SemanticHealthMetric(
@@ -172,29 +194,54 @@ class RealTimeSemanticMonitor:
     async def start_monitoring(self, competitors: List[str] = None) -> bool:
         """Start real-time semantic monitoring."""
         try:
+            # If a previous loop is still running, cancel it before
+            # starting a new one. Prevents accumulating stale loops
+            # when start_monitoring() is called repeatedly.
+            if self._monitoring_task is not None and not self._monitoring_task.done():
+                self._monitoring_task.cancel()
+                try:
+                    await self._monitoring_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                self._monitoring_task = None
+
             self.is_monitoring = True
             if competitors:
                 self.monitored_competitors = set(competitors)
-            
+
             logger.info(f"Started semantic monitoring for user {self.user_id}")
             logger.info(f"Monitoring {len(self.monitored_competitors)} competitors")
-            
-            # Start background monitoring task
-            asyncio.create_task(self._monitoring_loop())
-            
+
+            # Start background monitoring task and keep a reference so
+            # stop_monitoring() can cancel it cleanly. The previous
+            # implementation used a fire-and-forget asyncio.create_task()
+            # which made the loop uncancellable from outside.
+            self._monitoring_task = asyncio.create_task(self._monitoring_loop())
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to start semantic monitoring: {e}")
             return False
-    
+
     async def stop_monitoring(self) -> bool:
         """Stop real-time semantic monitoring."""
         try:
             self.is_monitoring = False
+
+            # Cancel and await the background loop. If the task already
+            # finished, this is a no-op.
+            if self._monitoring_task is not None and not self._monitoring_task.done():
+                self._monitoring_task.cancel()
+                try:
+                    await self._monitoring_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            self._monitoring_task = None
+
             logger.info(f"Stopped semantic monitoring for user {self.user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to stop semantic monitoring: {e}")
             return False
