@@ -19,7 +19,6 @@ import {
 import {
   School as SchoolIcon,
   Lightbulb as LightbulbIcon,
-  Psychology as PsychologyIcon,
   Timeline as TimelineIcon,
   CheckCircle as CheckCircleIcon,
   ExpandMore as ExpandMoreIcon
@@ -61,7 +60,7 @@ const EducationalInfoDialog: React.FC<EducationalInfoDialogProps> = ({
           Key Points:
         </Typography>
         <List>
-          {educationalContent?.points?.map((point: string, index: number) => (
+          {educationalContent?.details?.map((point: string, index: number) => (
             <ListItem key={index} sx={{ py: 0.5 }}>
               <ListItemIcon>
                 <LightbulbIcon color="primary" fontSize="small" />
@@ -70,20 +69,17 @@ const EducationalInfoDialog: React.FC<EducationalInfoDialogProps> = ({
             </ListItem>
           ))}
         </List>
-        
-        <Typography variant="h6" gutterBottom>
-          Pro Tips:
-        </Typography>
-        <List>
-          {educationalContent?.tips?.map((tip: string, index: number) => (
-            <ListItem key={index} sx={{ py: 0.5 }}>
-              <ListItemIcon>
-                <PsychologyIcon color="secondary" fontSize="small" />
-              </ListItemIcon>
-              <ListItemText primary={tip} />
-            </ListItem>
-          ))}
-        </List>
+
+        {educationalContent?.insight && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Pro Tip:
+            </Typography>
+            <Typography variant="body2" color="text.secondary" paragraph>
+              {educationalContent.insight}
+            </Typography>
+          </>
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>
