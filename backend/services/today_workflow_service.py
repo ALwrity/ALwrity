@@ -68,8 +68,66 @@ PILLAR_IDS = _load_pillar_ids()
 MIN_TASK_EVIDENCE_LINKS = 1
 PLAN_CONTEXT_THRESHOLD = _load_plan_context_threshold()
 
-# Calendar → Workflow mapping
-CALENDAR_CONTENT_PILLAR = "generate"
+# Calendar → Workflow mapping. Previously every calendar event was
+# bucketed under the "generate" pillar regardless of content type,
+# which made LinkedIn posts look like generic content generation
+# and SEO audits look like content drafts. Each entry maps a
+# content_type (or platform) to the lifecycle pillar the task
+# actually belongs to.
+#
+# Resolution order in _resolve_calendar_pillar():
+#   1. content_type (e.g. "blog_post", "linkedin_post")
+#   2. platform fallback (e.g. "linkedin" → "engage")
+#   3. default ("generate") so unmapped events still get a pillar
+_CALENDAR_CONTENT_PILLAR = {
+    # Content creation → generate
+    "blog_post": "generate",
+    "video": "generate",
+    "podcast": "generate",
+    # Distribution → engage / publish
+    "linkedin_post": "engage",
+    "facebook_post": "engage",
+    "twitter_post": "engage",
+    "instagram_post": "engage",
+    "tiktok_post": "engage",
+    # SEO → analyze
+    "seo_page": "analyze",
+    # Direct publishing → publish
+    "youtube": "publish",
+}
+
+_CALENDAR_PLATFORM_PILLAR = {
+    "linkedin": "engage",
+    "facebook": "engage",
+    "twitter": "engage",
+    "instagram": "engage",
+    "tiktok": "engage",
+    "youtube": "publish",
+}
+
+CALENDAR_DEFAULT_PILLAR = "generate"
+
+# Kept for backwards-compat callers that read this constant.
+# New code should use _resolve_calendar_pillar() instead.
+CALENDAR_CONTENT_PILLAR = CALENDAR_DEFAULT_PILLAR
+
+
+def _resolve_calendar_pillar(content_type: str, platform: str) -> str:
+    """Pick the right workflow pillar for a calendar event.
+
+    Resolution order:
+      1. ``_CALENDAR_CONTENT_PILLAR`` by content_type
+      2. ``_CALENDAR_PLATFORM_PILLAR`` by platform
+      3. ``CALENDAR_DEFAULT_PILLAR`` (generate) as a safe fallback
+    """
+    ct_lower = (content_type or "").strip().lower()
+    if ct_lower in _CALENDAR_CONTENT_PILLAR:
+        return _CALENDAR_CONTENT_PILLAR[ct_lower]
+    p_lower = (platform or "").strip().lower()
+    if p_lower in _CALENDAR_PLATFORM_PILLAR:
+        return _CALENDAR_PLATFORM_PILLAR[p_lower]
+    return CALENDAR_DEFAULT_PILLAR
+
 
 _PLATFORM_ACTION_URL = {
     "linkedin": "/linkedin-writer",
@@ -124,16 +182,17 @@ def _generate_calendar_event_plan(date: str, grounding: Dict[str, Any]) -> Dict[
 
     tasks = []
     for event in calendar_events:
-        action_url = _resolve_calendar_action_url(
-            event.get("content_type", ""), event.get("platform", "")
-        )
+        content_type = event.get("content_type", "")
+        platform = event.get("platform", "")
+        action_url = _resolve_calendar_action_url(content_type, platform)
+        pillar_id = _resolve_calendar_pillar(content_type, platform)
 
         task = {
-            "pillarId": CALENDAR_CONTENT_PILLAR,
+            "pillarId": pillar_id,
             "title": (event.get("title") or "Untitled").strip()[:255],
             "description": (event.get("description") or "").strip(),
             "priority": "high",
-            "estimatedTime": _resolve_calendar_estimated_time(event.get("content_type", "")),
+            "estimatedTime": _resolve_calendar_estimated_time(content_type),
             "actionType": "navigate",
             "actionUrl": action_url,
             "enabled": True,
@@ -331,6 +390,44 @@ def validate_plan_contextuality(plan: Dict[str, Any], grounding: Dict[str, Any])
     }
 
 
+def _resolve_backfill_provider(user_id: str) -> tuple:
+    """Resolve the (provider, model) the user's tenant config prefers.
+
+    The pillar backfill runs after the agent committee, so it should
+    use the same provider+model the rest of the workflow uses. This
+    is a thin wrapper around the same config the LLM committee
+    functions consult; if the config can't be resolved (e.g. tenant
+    provider not configured), returns ``(None, None)`` so the
+    underlying ``llm_text_gen`` falls back to its default selection.
+
+    Returning a tuple rather than an opaque dict keeps the call site
+    small and matches the ``llm_text_gen`` parameter shape.
+    """
+    try:
+        from services.llm_providers.tenant_provider_config import (
+            tenant_provider_config_resolver,
+        )
+        provider_cfg = tenant_provider_config_resolver.resolve(user_id)
+        provider = None
+        if provider_cfg.selected_providers:
+            first = provider_cfg.selected_providers[0]
+            if first in ("google", "gemini"):
+                provider = "google"
+            elif first in ("huggingface", "hf_response_api", "hf"):
+                provider = "huggingface"
+            elif first in ("wavespeed", "wave"):
+                provider = "wavespeed"
+            elif first in ("openai", "gpt"):
+                provider = "openai"
+        model = provider_cfg.model_policy.get("default_model") if provider_cfg.model_policy else None
+        return provider, model
+    except Exception as e:
+        logger.debug(
+            f"Could not resolve tenant provider config for user {user_id}: {e}"
+        )
+        return None, None
+
+
 def _build_single_task_for_missing_pillar(
     user_id: str,
     date: str,
@@ -363,8 +460,18 @@ def _build_single_task_for_missing_pillar(
         "- Use actionType='navigate' and a valid ALwrity route when possible.\n"
         f"User context: {json.dumps(grounding.get('onboarding_data', {}), indent=2)}\n"
     )
+    # Resolve the (provider, model) the tenant's LLM committee uses,
+    # so backfill tasks don't silently use a different (possibly
+    # inferior) model than the rest of the workflow.
+    preferred_provider, preferred_model = _resolve_backfill_provider(user_id)
     try:
-        raw = llm_text_gen(prompt=prompt, json_struct=schema, user_id=user_id)
+        raw = llm_text_gen(
+            prompt=prompt,
+            json_struct=schema,
+            user_id=user_id,
+            preferred_provider=preferred_provider,
+            model=preferred_model,
+        )
         candidate = raw if isinstance(raw, dict) else json.loads(raw)
     except Exception as e:
         logger.warning(f"Failed to generate pillar backfill task for {pillar_id}: {e}")
@@ -375,6 +482,11 @@ def _build_single_task_for_missing_pillar(
         candidate["pillarId"] = pillar_id
         metadata = candidate.get("metadata") if isinstance(candidate.get("metadata"), dict) else {}
         metadata["source"] = "llm_pillar_backfill"
+        # Mark the backfill as coming from the same provider the
+        # committee uses, for transparency in operator dashboards.
+        if preferred_provider or preferred_model:
+            metadata["backfill_provider"] = preferred_provider
+            metadata["backfill_model"] = preferred_model
         candidate["metadata"] = metadata
     return candidate
 
@@ -515,15 +627,29 @@ async def generate_agent_enhanced_plan(
             f"OrchestrationService unavailable for user {user_id}; "
             f"agent committee disabled, falling back to LLM path"
         )
-        return {"date": date, "tasks": []}
+        # Signal the fallback explicitly so the caller can mark
+        # ``fallback_used=True`` on the plan and the dashboard can
+        # render the "AI-Assisted" provenance label. Returning an
+        # empty tasks list with no flag would silently hide the
+        # committee outage from operators.
+        return {"date": date, "tasks": [], "fallback_used": True}
     try:
         orchestrator = await orchestration_service.get_or_create_orchestrator(user_id)
     except Exception as e:
         logger.error(f"Failed to get orchestrator: {e}")
-        return {"date": date, "tasks": []}
+        # Same fallback flag — the orchestrator raised. Downstream
+        # ``_ensure_pillar_coverage`` will LLM-backfill empty pillars
+        # so the user still gets a usable plan.
+        return {"date": date, "tasks": [], "fallback_used": True}
 
     # 2. Parallel "Committee" Proposal Gathering
     logger.info(f"Gathering daily task proposals from agent committee for user {user_id}")
+    # Track how many agents actually participated in the committee,
+    # regardless of how many of their proposals survived dedup. This
+    # is the right number to surface as ``committee_agent_count`` on
+    # the plan; counting only surviving tasks under-reports when
+    # most proposals are filtered.
+    agents_polled_count: int = 0
     
     agent_tasks = []
     try:
@@ -539,6 +665,7 @@ async def generate_agent_enhanced_plan(
         
         # Filter out None agents (disabled/failed init)
         active_agents = [a for a in agents_to_poll if a]
+        agents_polled_count = len(active_agents)
         
         # Execute propose_daily_tasks in parallel
         results = await asyncio.gather(
@@ -727,7 +854,10 @@ async def generate_agent_enhanced_plan(
         final_tasks = _ensure_pillar_coverage(final_tasks, user_id, date, grounding)
         return {
             "date": date,
-            "tasks": final_tasks
+            "tasks": final_tasks,
+            # The actual count of agents that participated, not the
+            # count of distinct source_agent values on surviving tasks.
+            "committee_agent_count": agents_polled_count,
         }
 
     # Fallback to original LLM generation if agents returned nothing
@@ -824,6 +954,10 @@ async def generate_agent_enhanced_plan(
     result = {
         "date": date,
         "tasks": _ensure_pillar_coverage(tasks, user_id, date, grounding),
+        # LLM-only fallback path: zero agents participated. The plan
+        # row will see this and render "AI Personalized Guide" instead
+        # of "Personalized by Agents".
+        "committee_agent_count": 0,
     }
 
     activity.log_event(
@@ -879,6 +1013,15 @@ async def get_or_create_daily_workflow_plan(
 
     # Step 2: Agent committee → proposals for plan + analyze + engage + publish + remarket
     agent_plan_data = await generate_agent_enhanced_plan(db, user_id, date_str, grounding=grounding, strict_contextuality=False)
+    # ``fallback_used`` is set by the committee function when the
+    # orchestrator raises or is uninitialised. Surface it here so
+    # the plan row reflects the degraded path even if a later step
+    # (e.g. pillar backfill) restores task count.
+    committee_fallback_used = bool(agent_plan_data.get("fallback_used", False))
+    # Polled-agent count: the committee function records how many
+    # agents actually participated (not how many of their
+    # proposals survived dedup). Pass it through to the plan row.
+    committee_polled_count = int(agent_plan_data.get("committee_agent_count", 0) or 0)
 
     # Filter agent proposals: keep only non-generate pillars, dedup by title
     committee_pillars = {"plan", "analyze", "engage", "publish", "remarket"}
@@ -911,6 +1054,11 @@ async def get_or_create_daily_workflow_plan(
 
     # Step 5: Validation
     plan_data = {**agent_plan_data, "tasks": all_tasks}
+    # Carry the polled-agent count through the plan_data dict so it
+    # ends up in plan_json for downstream consumers (and so the
+    # call to _count_committee_agents can see it on the merged
+    # data if it ever walks plan_data instead of tasks).
+    plan_data["committee_agent_count"] = committee_polled_count
     validation = validate_plan_contextuality(plan_data, grounding)
 
     plan_data["quality_status"] = (
@@ -919,6 +1067,11 @@ async def get_or_create_daily_workflow_plan(
         else "low_context"
     )
     plan_data["contextuality_validation"] = validation
+    # Roll up fallback_used from any source. The committee flag
+    # (orchestrator failure) is the primary signal; the per-task
+    # helper detects llm_pillar_backfill and controlled_fallback
+    # sources as secondary signals.
+    plan_data["fallback_used"] = committee_fallback_used or _plan_uses_fallback(all_tasks)
     tasks = plan_data.get("tasks", [])
 
     def _create_plan():
@@ -933,8 +1086,12 @@ async def get_or_create_daily_workflow_plan(
                 date=date_str,
                 source=creation_source,
                 generation_mode="calendar_driven" if calendar_source else _derive_generation_mode(plan_data),
-                committee_agent_count=_count_committee_agents(tasks),
-                fallback_used=False,
+                # Prefer the polled count from the committee call
+                # over the distinct-source-agent walk. Falls back to
+                # the walk only if the committee didn't run.
+                committee_agent_count=committee_polled_count
+                or _count_committee_agents(tasks),
+                fallback_used=bool(plan_data.get("fallback_used", False)),
                 plan_json=plan_data,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
@@ -1024,13 +1181,38 @@ def _derive_generation_mode(plan_data: Dict[str, Any]) -> str:
 
 
 def _count_committee_agents(tasks: List[Dict[str, Any]]) -> int:
+    """Count distinct agents that participated in the committee.
+
+    The plan row's ``committee_agent_count`` is the operator-visible
+    signal of "how many AI teammates worked on this plan". The
+    pre-fix implementation counted only distinct ``source_agent``
+    values on surviving tasks, which under-reports when most
+    proposals are filtered by dedup or self-learning memory. A
+    plan with 6 polled agents and 1 surviving task used to show
+    ``committee_agent_count=1``; with the fix it shows 6.
+
+    This function falls back to the source-walk only when the
+    committee call didn't run (no polled count captured), so the
+    behavior is monotonic across the old and new call sites.
+    """
     agents = set()
+    polled_count: Optional[int] = None
     for task in tasks:
+        # The first pass sets the polled count from any task that
+        # carries it via its metadata. New committee runs stamp the
+        # count on a synthetic metadata entry; older plans without
+        # that entry fall back to the distinct-source-agent walk.
         metadata = task.get("metadata") if isinstance(task, dict) else {}
         metadata = metadata if isinstance(metadata, dict) else {}
         source_agent = str(metadata.get("source_agent") or "").strip()
         if source_agent:
             agents.add(source_agent)
+        # New: explicit polled count from the committee call.
+        polled_raw = metadata.get("committee_polled_count")
+        if isinstance(polled_raw, int):
+            polled_count = polled_raw
+    if polled_count is not None:
+        return max(polled_count, len(agents))
     return len(agents)
 
 
