@@ -18,9 +18,14 @@ import { contentPlanningApi } from '../../../services/contentPlanningApi';
 import StrategyIntelligenceTab from '../components/StrategyIntelligence/StrategyIntelligenceTab';
 import StrategyOnboardingDialog from '../components/StrategyOnboardingDialog';
 import { StrategyData } from '../components/StrategyIntelligence/types/strategy.types';
+import { useUser } from '@clerk/clerk-react';
 
 const ContentStrategyTab: React.FC = () => {
   const location = useLocation();
+  // Resolve the active Clerk user so the read endpoints (getLatest,
+  // getEnhancedStrategies) target the right tenant. The previous
+  // `const userId = 1;` was a multi-tenant collision.
+  const { user } = useUser();
   const navigate = useNavigate();
   
   // Use selective store subscriptions to prevent unnecessary re-renders
@@ -142,7 +147,7 @@ const ContentStrategyTab: React.FC = () => {
       setStrategyDataLoading(true);
       setStrategyDataError(null);
       
-      const userId = 1; // Default user ID
+      const userId = user?.id ?? null;
       
       // PRIORITY 0: Check cache first for latest generated strategy
       console.log('🔍 PRIORITY 0: Checking cache for latest generated strategy...');
@@ -194,7 +199,7 @@ const ContentStrategyTab: React.FC = () => {
               await new Promise(resolve => setTimeout(resolve, delay));
             }
             
-            const latestStrategyResponse = await contentPlanningApi.getLatestGeneratedStrategyWithRetry(userId);
+            const latestStrategyResponse = await contentPlanningApi.getLatestGeneratedStrategyWithRetry(Number(userId));
             
             console.log(`🔍 Latest strategy response (attempt ${attempt}):`, latestStrategyResponse);
             
@@ -244,7 +249,7 @@ const ContentStrategyTab: React.FC = () => {
       
       // PRIORITY 2: Try to get the latest generated strategy from polling system
       try {
-        const latestStrategyResponse = await contentPlanningApi.getLatestGeneratedStrategy(userId);
+        const latestStrategyResponse = await contentPlanningApi.getLatestGeneratedStrategy(Number(userId));
         
         if (latestStrategyResponse && latestStrategyResponse.strategic_insights) {
           setStrategyData(latestStrategyResponse);
@@ -267,7 +272,7 @@ const ContentStrategyTab: React.FC = () => {
       // PRIORITY 3: If no strategy found in polling system, try to get from database
       console.log('🎯 PRIORITY 3: Checking database for strategies...');
       try {
-        const strategiesResponse = await contentPlanningApi.getEnhancedStrategies(userId);
+        const strategiesResponse = await contentPlanningApi.getEnhancedStrategies(Number(userId));
         
         const strategies = strategiesResponse?.data?.strategies || strategiesResponse?.strategies || [];
         
