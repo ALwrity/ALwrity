@@ -3,10 +3,8 @@ Check Cycle Handler
 Handles the main scheduler check cycle that finds and executes due tasks.
 """
 
-import json
-import os
-from typing import TYPE_CHECKING, Dict, Any
-from datetime import datetime
+from typing import TYPE_CHECKING, Dict, Any, Optional
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from services.database import get_all_user_ids, get_session_for_user
@@ -22,49 +20,63 @@ logger = get_service_logger("check_cycle_handler")
 # Uses the global SemanticDashboardAPI singleton which provides get-or-create caching.
 from services.intelligence.monitoring.semantic_dashboard import semantic_dashboard_api
 
-# Persisted last-check timestamps for semantic health monitoring (24-hour cadence).
-# Survives scheduler restarts via a JSON file in the app state directory.
-_SEMANTIC_STATE_DIR = os.path.join(
-    os.path.expanduser("~"), ".alwrity", "scheduler_state"
-)
-_SEMANTIC_STATE_FILE = os.path.join(_SEMANTIC_STATE_DIR, "semantic_last_checks.json")
+# Phase 5: in-memory cache of per-user last-check timestamps. Populated
+# lazily from the ``semantic_health_checks`` DB table on first access,
+# then kept in sync as the scheduler records new checks. The DB is the
+# source of truth — this cache is just an optimisation to avoid hitting
+# the DB on every check cycle. The previous implementation wrote
+# timestamps to a JSON file in the user's home directory, which broke
+# in multi-instance deployments because each instance had its own file
+# and re-ran the cadence check for every user.
+LAST_SEMANTIC_CHECKS: Dict[str, datetime] = {}
 
 
-def _load_semantic_check_timestamps() -> Dict[str, datetime]:
-    """Load persisted check timestamps from disk. Returns empty dict on any failure."""
+def _load_last_check_for_user(db: Session, user_id: str) -> Optional[datetime]:
+    """Read the last-check timestamp from the DB. Falls back to
+    ``None`` (caller treats this as "check now") on any error.
+    """
     try:
-        if not os.path.exists(_SEMANTIC_STATE_FILE):
-            return {}
-        with open(_SEMANTIC_STATE_FILE, "r") as f:
-            raw = json.load(f)
-        return {
-            uid: datetime.fromisoformat(ts)
-            for uid, ts in raw.items() if ts
-        }
+        from models.semantic_health_check import SemanticHealthCheck
+        return SemanticHealthCheck.get_last_check_at(db, user_id)
     except Exception as e:
-        logger.warning(f"Failed to load semantic check timestamps: {e}")
-        return {}
+        logger.warning(
+            f"Failed to read last semantic check for user {user_id}: {e}"
+        )
+        return None
 
 
-def _save_semantic_check_timestamps(checks: Dict[str, datetime]):
-    """Persist check timestamps to disk."""
+def _record_semantic_check(
+    db: Session,
+    user_id: str,
+    status: str,
+    value: float,
+    description: Optional[str] = None,
+    recommendations: Optional[list] = None,
+    snapshot: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Upsert the semantic health check ledger row. Best-effort:
+    failures are logged but never block the scheduler.
+    """
     try:
-        os.makedirs(_SEMANTIC_STATE_DIR, exist_ok=True)
-        serializable = {
-            uid: ts.isoformat() if isinstance(ts, datetime) else ts
-            for uid, ts in checks.items()
-        }
-        with open(_SEMANTIC_STATE_FILE, "w") as f:
-            json.dump(serializable, f)
+        from models.semantic_health_check import SemanticHealthCheck
+        SemanticHealthCheck.record_check(
+            db,
+            user_id=user_id,
+            status=status,
+            value=value,
+            description=description,
+            recommendations=recommendations,
+            snapshot=snapshot,
+        )
+        db.commit()
     except Exception as e:
-        logger.warning(f"Failed to save semantic check timestamps: {e}")
-
-
-# Load persisted timestamps on startup so the 24-hour cadence survives restarts.
-# If the file is missing (first start), all users will get an immediate check —
-# that is acceptable because monitor instances are now cached via SemanticDashboardAPI,
-# meaning heavy model initialisation happens at most once per user.
-LAST_SEMANTIC_CHECKS: Dict[str, datetime] = _load_semantic_check_timestamps()
+        logger.warning(
+            f"Failed to record semantic check for user {user_id}: {e}"
+        )
+        try:
+            db.rollback()
+        except Exception:
+            pass
 
 async def check_and_execute_due_tasks(scheduler: 'TaskScheduler'):
     """
@@ -137,7 +149,16 @@ async def check_and_execute_due_tasks(scheduler: 'TaskScheduler'):
             # Uses cached monitor instances via SemanticDashboardAPI singleton
             # to avoid re-initializing TxtaiIntelligenceService and SIFIntegrationService.
             now = datetime.utcnow()
+            # In-memory cache lookup first. If miss, fall through to
+            # the DB read so we don't re-run the 24-hour check just
+            # because the cache is cold (e.g. after a process restart
+            # or in a multi-instance deployment where this process
+            # hasn't seen this user yet).
             last_check = LAST_SEMANTIC_CHECKS.get(user_id)
+            if last_check is None:
+                last_check = _load_last_check_for_user(db, user_id)
+                if last_check is not None:
+                    LAST_SEMANTIC_CHECKS[user_id] = last_check
             should_run_semantic = not last_check or (now - last_check).total_seconds() > 86400  # 24h
 
             if should_run_semantic:
@@ -149,7 +170,17 @@ async def check_and_execute_due_tasks(scheduler: 'TaskScheduler'):
                         f"{semantic_health.status} (score: {semantic_health.value:.2f})"
                     )
                     LAST_SEMANTIC_CHECKS[user_id] = now
-                    _save_semantic_check_timestamps(LAST_SEMANTIC_CHECKS)
+                    # Phase 5: persist the cadence + snapshot to DB
+                    # so multi-instance deployments don't re-run the
+                    # check for every user on every instance.
+                    _record_semantic_check(
+                        db,
+                        user_id=user_id,
+                        status=semantic_health.status,
+                        value=semantic_health.value,
+                        description=semantic_health.description,
+                        recommendations=list(semantic_health.recommendations or []),
+                    )
                 except Exception as e:
                     logger.warning(f"[Semantic Monitor] Error checking semantic health for user {user_id}: {e}")
 

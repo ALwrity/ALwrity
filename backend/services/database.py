@@ -238,6 +238,94 @@ def _ensure_sif_indexing_watermark_table(engine, user_id: str) -> None:
         )
 
 
+def _ensure_semantic_health_checks_table(engine, user_id: str) -> None:
+    """Phase 5: backfill the per-user semantic_health_checks table.
+
+    Replaces the JSON-file state previously stored at
+    ``~/.alwrity/scheduler_state/semantic_last_checks.json`` so the
+    24-hour cadence and the latest health snapshot survive across
+    process restarts and stay consistent across multi-instance
+    deployments.
+
+    The shape mirrors ``models.semantic_health_check.SemanticHealthCheck``:
+    one row per user with the latest check timestamp, status,
+    value, and JSON-serialised recommendations + snapshot.
+    """
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS semantic_health_checks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id VARCHAR(255) NOT NULL,
+                    last_check_at DATETIME NOT NULL,
+                    status VARCHAR(32) NOT NULL DEFAULT 'unknown',
+                    value INTEGER NOT NULL DEFAULT 0,
+                    description TEXT NULL,
+                    recommendations_json TEXT NULL,
+                    snapshot_json TEXT NULL
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_semantic_health_check_user
+                ON semantic_health_checks (user_id)
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE INDEX IF NOT EXISTS ix_semantic_health_check_user
+                ON semantic_health_checks (user_id)
+                """
+            )
+    except Exception as e:
+        # Don't block tenant DB init on this table's failure. The
+        # scheduler will fall back to an in-memory cadence tracker
+        # and log a warning.
+        logger.error(
+            f"Failed semantic_health_checks schema migration for user {user_id}: {e}"
+        )
+
+
+def _ensure_semantic_monitoring_snapshots_table(engine, user_id: str) -> None:
+    """Phase 5: backfill the per-user semantic_monitoring_snapshots table.
+
+    Stores per-cycle monitoring snapshots so the dashboard can show
+    trend data across process restarts. Replaces the in-memory
+    ``RealTimeSemanticMonitor.monitoring_history`` list which is
+    bounded to one process.
+
+    Shape mirrors ``models.semantic_monitoring_snapshot.SemanticMonitoringSnapshot``:
+    one row per snapshot, indexed by (user_id, captured_at) for
+    time-range queries.
+    """
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql(
+                """
+                CREATE TABLE IF NOT EXISTS semantic_monitoring_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id VARCHAR(255) NOT NULL,
+                    captured_at DATETIME NOT NULL,
+                    snapshot_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.exec_driver_sql(
+                """
+                CREATE INDEX IF NOT EXISTS ix_semantic_snapshot_user_captured
+                ON semantic_monitoring_snapshots (user_id, captured_at)
+                """
+            )
+    except Exception as e:
+        # Don't block tenant DB init on this table's failure. The
+        # monitor will fall back to its in-memory history list.
+        logger.error(
+            f"Failed semantic_monitoring_snapshots schema migration for user {user_id}: {e}"
+        )
+
+
 def _ensure_onboarding_data_integration_columns(engine, user_id: str) -> None:
     """Backfill required onboarding_data_integrations columns for legacy tenant DBs."""
     required_columns = {
@@ -526,6 +614,12 @@ def init_user_database(user_id: str):
         _ensure_task_history_unique_index(engine, user_id)
         # Phase 3.4: ensure the SIF indexing watermark table exists.
         _ensure_sif_indexing_watermark_table(engine, user_id)
+        # Phase 5: ensure the semantic health checks table exists.
+        # Replaces the JSON-file cadence tracker in check_cycle_handler.
+        _ensure_semantic_health_checks_table(engine, user_id)
+        # Phase 5: ensure the per-cycle monitoring snapshot table exists.
+        # Provides durable history for the dashboard across restarts.
+        _ensure_semantic_monitoring_snapshots_table(engine, user_id)
         
         # Initialize default data for new databases
         try:

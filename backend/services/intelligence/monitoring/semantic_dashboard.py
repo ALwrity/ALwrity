@@ -267,13 +267,42 @@ class RealTimeSemanticMonitor:
                 }
                 
                 self.monitoring_history.append(snapshot)
-                
+
                 # Keep only last 24 hours of history
                 cutoff_time = datetime.now() - timedelta(hours=24)
                 self.monitoring_history = [
                     h for h in self.monitoring_history
                     if datetime.fromisoformat(h["timestamp"]) > cutoff_time
                 ]
+
+                # Phase 5: persist the snapshot to DB so the dashboard
+                # has durable history across process restarts and
+                # multi-instance deployments. Best-effort: failures
+                # are logged and the in-memory list is still kept.
+                try:
+                    from services.database import get_session_for_user
+                    from models.semantic_monitoring_snapshot import (
+                        SemanticMonitoringSnapshot,
+                    )
+                    db = get_session_for_user(self.user_id)
+                    if db is not None:
+                        try:
+                            SemanticMonitoringSnapshot.append_snapshot(
+                                db, self.user_id, snapshot
+                            )
+                            # Reclaim disk: prune anything older than 24h
+                            # in the same transaction.
+                            SemanticMonitoringSnapshot.prune_old_snapshots(
+                                db, max_age_hours=24
+                            )
+                            db.commit()
+                        finally:
+                            db.close()
+                except Exception as persist_exc:
+                    logger.warning(
+                        f"Failed to persist semantic monitoring snapshot "
+                        f"for user {self.user_id}: {persist_exc}"
+                    )
                 
                 # Check for alerts
                 await self._check_alerts(health_metrics, competitor_updates, content_insights)
@@ -688,12 +717,52 @@ class RealTimeSemanticMonitor:
             return {"error": str(e)}
     
     def get_monitoring_history(self, hours: int = 24) -> List[Dict[str, Any]]:
-        """Get monitoring history for the specified number of hours."""
+        """Get monitoring history for the specified number of hours.
+
+        Phase 5: prefer the durable DB-backed history when available
+        so the dashboard can show data across process restarts. Falls
+        back to the in-memory list if the DB is unreachable. The two
+        sources are merged (DB rows first, then in-memory snapshots
+        newer than what the DB returned) so the caller sees the most
+        complete view possible.
+        """
+        db_snapshots: List[Dict[str, Any]] = []
+        try:
+            from services.database import get_session_for_user
+            from models.semantic_monitoring_snapshot import (
+                SemanticMonitoringSnapshot,
+            )
+            db = get_session_for_user(self.user_id)
+            if db is not None:
+                try:
+                    db_snapshots = SemanticMonitoringSnapshot.get_recent_snapshots(
+                        db, self.user_id, hours=hours
+                    )
+                finally:
+                    db.close()
+        except Exception as db_exc:
+            logger.warning(
+                f"Failed to read semantic monitoring history from DB "
+                f"for user {self.user_id}: {db_exc}"
+            )
+
+        # In-memory list filtered to the same window. This is the
+        # in-flight view (newest snapshots) and may overlap with the
+        # DB rows, so we dedupe by timestamp.
         cutoff_time = datetime.now() - timedelta(hours=hours)
-        return [
+        in_memory = [
             h for h in self.monitoring_history
             if datetime.fromisoformat(h["timestamp"]) > cutoff_time
         ]
+        seen_timestamps = {h.get("timestamp") for h in db_snapshots}
+        merged = list(db_snapshots)
+        for snap in in_memory:
+            if snap.get("timestamp") not in seen_timestamps:
+                merged.append(snap)
+                seen_timestamps.add(snap.get("timestamp"))
+        # Sort by timestamp so callers get a stable ordering
+        merged.sort(key=lambda h: h.get("timestamp", ""))
+        return merged
 
 
 class SemanticDashboardAPI:
