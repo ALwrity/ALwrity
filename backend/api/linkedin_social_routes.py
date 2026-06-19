@@ -26,6 +26,8 @@ from models.linkedin_social_models import (
     LinkedInOrganizationResponse,
     LinkedInOrganizationsListResponse,
     LinkedInPersonalAnalyticsResponse,
+    LinkedInProfileAcquireResponse,
+    LinkedInProfileMetaResponse,
 )
 from services.integrations.linkedin.analytics_dates import (
     InvalidAnalyticsDateRange,
@@ -34,6 +36,7 @@ from services.integrations.linkedin.analytics_dates import (
 from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
 from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
+from services.integrations.linkedin.profile_service import get_or_fetch_profile
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
@@ -103,6 +106,102 @@ def _resolve_user_account_id(user_id: str, account_id: Optional[str]) -> str:
             detail="account_id query param is required when no default LinkedIn account is stored",
         )
     return resolved
+
+
+def _raise_profile_acquire_http_error(exc: Exception, *, user_id: str) -> None:
+    """Map profile acquire failures to Phase 1 HTTP status codes."""
+    if isinstance(exc, LinkedInNotConnectedError):
+        logger.warning(
+            "[LinkedInProfile] GET /profile not connected user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="LinkedIn account not connected",
+        ) from exc
+
+    if isinstance(exc, UnipileAPIError):
+        status = exc.status_code
+        message = str(exc).lower()
+        if status == 401 or "disconnected" in message or "reconnect" in message:
+            logger.warning(
+                "[LinkedInProfile] GET /profile Unipile disconnected user_id={}: {}",
+                user_id,
+                exc,
+            )
+            raise HTTPException(status_code=401, detail="Reconnect required") from exc
+        if status == 403:
+            logger.warning(
+                "[LinkedInProfile] GET /profile Unipile forbidden user_id={}: {}",
+                user_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=502,
+                detail="Unable to fetch LinkedIn profile",
+            ) from exc
+        logger.warning(
+            "[LinkedInProfile] GET /profile Unipile error user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Unable to fetch LinkedIn profile",
+        ) from exc
+
+    logger.exception(
+        "[LinkedInProfile] GET /profile unexpected error user_id={}: {}",
+        user_id,
+        exc,
+    )
+    raise HTTPException(
+        status_code=500,
+        detail="Unable to fetch LinkedIn profile",
+    ) from exc
+
+
+@router.get("/profile", response_model=LinkedInProfileAcquireResponse)
+async def get_linkedin_profile(
+    refresh: bool = Query(
+        False,
+        description="Force Unipile fetch, update DB, and invalidate downstream on hash change",
+    ),
+    current_user: dict = Depends(get_current_user),
+) -> LinkedInProfileAcquireResponse:
+    """
+    Return the connected user's normalized LinkedIn profile (cache-first).
+
+    Serves from ``linkedin_analysis_context`` when cached; calls Unipile only on
+    cache miss or when ``refresh=true``.
+    """
+    user_id = _user_id(current_user)
+    logger.info("[LinkedInProfile] GET /profile user_id={} refresh={}", user_id, refresh)
+    try:
+        profile, meta = await get_or_fetch_profile(
+            user_id,
+            refresh=refresh,
+            oauth=_oauth_service,
+        )
+    except (LinkedInNotConnectedError, UnipileAPIError) as exc:
+        _raise_profile_acquire_http_error(exc, user_id=user_id)
+    except Exception as exc:
+        _raise_profile_acquire_http_error(exc, user_id=user_id)
+
+    logger.info(
+        "[LinkedInProfile] GET /profile complete user_id={} source={}",
+        user_id,
+        meta.get("source"),
+    )
+    return LinkedInProfileAcquireResponse(
+        profile=profile,
+        meta=LinkedInProfileMetaResponse(
+            source=meta["source"],  # type: ignore[arg-type]
+            fetched_at=meta.get("fetched_at"),
+            profile_content_hash=meta.get("profile_content_hash"),
+        ),
+    )
 
 
 @router.get("/connection/status", response_model=LinkedInConnectionStatusResponse)

@@ -177,6 +177,36 @@ class LinkedInOAuthService:
                 ON linkedin_oauth_tokens (user_id, is_active)
                 """
             )
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS linkedin_analysis_context (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL UNIQUE,
+                    unipile_account_id TEXT NOT NULL,
+
+                    normalized_profile_json TEXT,
+                    raw_userprofile_json TEXT,
+                    profile_content_hash TEXT,
+                    fetched_at TIMESTAMP,
+
+                    profile_context_json TEXT,
+                    profile_validation_json TEXT,
+                    user_completion_json TEXT,
+                    ai_profile_intelligence_json TEXT,
+
+                    profile_context_updated_at TIMESTAMP,
+                    ai_intelligence_updated_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+            cursor.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_linkedin_analysis_user
+                ON linkedin_analysis_context (user_id)
+                """
+            )
             conn.commit()
 
     def _migrate_plaintext_tokens_if_needed(

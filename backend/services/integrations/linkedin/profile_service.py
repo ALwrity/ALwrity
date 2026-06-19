@@ -1,18 +1,177 @@
 """
-LinkedIn profile acquisition service — Phase 1 (fetch + normalize).
+LinkedIn profile acquisition service — Phase 1 (fetch + normalize + cache).
 
 Maps Unipile AccountOwnerProfile / UserProfile payloads to ALwrity's normalized
-profile shape for Phases 2–6. Does not persist or call Unipile directly.
+profile shape for Phases 2–6. Orchestrates cache-first acquire via ProfileRepository.
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
 
 from loguru import logger
 
+from services.integrations.linkedin.profile_repository import ProfileRepository
+from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import avatar_url_from_user_profile
-from services.integrations.linkedin.unipile_provider import unipile_display_name_from_item
+from services.integrations.linkedin.unipile_provider import (
+    UnipileProvider,
+    unipile_display_name_from_item,
+)
+from services.integrations.linkedin_oauth import LinkedInOAuthService
+
+
+class ProfileMeta(TypedDict):
+    """Metadata returned alongside a normalized profile."""
+
+    source: str
+    fetched_at: Optional[str]
+    profile_content_hash: Optional[str]
+
+
+async def fetch_linkedin_profile(
+    user_id: str,
+    *,
+    provider: Optional[UnipileProvider] = None,
+    linkedin_sections: str = "*",
+) -> dict[str, Any]:
+    """
+    Fetch raw Unipile UserProfile for the connected user (no cache, no normalize).
+
+    Args:
+        user_id: ALwrity user ID (Clerk)
+        provider: Optional UnipileProvider instance (for testing)
+        linkedin_sections: Unipile sections query for step 2
+
+    Returns:
+        Raw Unipile UserProfile dictionary
+    """
+    logger.info("[LinkedInProfile] fetch_linkedin_profile user_id={}", user_id)
+    unipile = provider or UnipileProvider()
+    raw = await unipile.fetch_own_linkedin_profile(
+        user_id,
+        linkedin_sections=linkedin_sections,
+    )
+    if not isinstance(raw, dict):
+        raise TypeError(f"Expected dict UserProfile, got {type(raw).__name__}")
+    logger.info(
+        "[LinkedInProfile] UserProfile fetched is_self={} "
+        "work_experience_total_count={} skills_total_count={}",
+        raw.get("is_self"),
+        raw.get("work_experience_total_count"),
+        raw.get("skills_total_count"),
+    )
+    return raw
+
+
+async def get_or_fetch_profile(
+    user_id: str,
+    *,
+    refresh: bool = False,
+    provider: Optional[UnipileProvider] = None,
+    repository: Optional[ProfileRepository] = None,
+    oauth: Optional[LinkedInOAuthService] = None,
+    linkedin_sections: str = "*",
+) -> tuple[dict[str, Any], ProfileMeta]:
+    """
+    Cache-first orchestrator: return normalized profile and acquisition metadata.
+
+    Cache hit (no Unipile HTTP) when a row exists, ``unipile_account_id`` matches,
+    and ``refresh`` is False. Otherwise fetches from Unipile, normalizes, and persists.
+
+    Args:
+        user_id: ALwrity user ID (Clerk)
+        refresh: Force Unipile fetch and DB update
+        provider: Optional UnipileProvider (for testing)
+        repository: Optional ProfileRepository (for testing)
+        oauth: Optional LinkedInOAuthService (for testing)
+        linkedin_sections: Unipile sections query for step 2
+
+    Returns:
+        Tuple of (normalized profile dict, meta dict with source/cache fields)
+
+    Raises:
+        LinkedInNotConnectedError: When user has no connected Unipile account
+    """
+    logger.info(
+        "[LinkedInProfile] get_or_fetch_profile user_id={} refresh={}",
+        user_id,
+        refresh,
+    )
+    oauth_service = oauth or LinkedInOAuthService()
+    repo = repository or ProfileRepository(oauth=oauth_service)
+    unipile = provider or UnipileProvider(oauth_service=oauth_service)
+
+    creds = oauth_service.resolve_credentials(user_id)
+    account_id = creds.unipile_account_id
+    if not account_id:
+        raise LinkedInNotConnectedError(
+            "No Unipile LinkedIn account connected. "
+            "Connect via hosted OAuth before fetching profile."
+        )
+
+    if not refresh:
+        row = repo.get_analysis_row(user_id)
+        cached = repo.get_normalized_profile(user_id, row=row) if row else None
+        if (
+            row
+            and cached
+            and row.get("unipile_account_id") == account_id
+            and row.get("normalized_profile_json")
+        ):
+            meta: ProfileMeta = {
+                "source": "cache",
+                "fetched_at": row.get("fetched_at"),
+                "profile_content_hash": row.get("profile_content_hash"),
+            }
+            logger.info(
+                "[LinkedInProfile] get_or_fetch_profile source=cache user_id={} "
+                "fetched_at={}",
+                user_id,
+                meta["fetched_at"],
+            )
+            return cached, meta
+
+        if row and row.get("unipile_account_id") != account_id:
+            logger.info(
+                "[LinkedInProfile] unipile_account_id changed — cache stale user_id={}",
+                user_id,
+            )
+
+    logger.info(
+        "[LinkedInProfile] Calling Unipile GET /users/me linkedin_sections={} "
+        "(step 2 only)",
+        linkedin_sections,
+    )
+    raw = await fetch_linkedin_profile(
+        user_id,
+        provider=unipile,
+        linkedin_sections=linkedin_sections,
+    )
+    normalized = normalize_unipile_profile(
+        raw,
+        stored_account_name=creds.account_name,
+    )
+    content_hash = repo.save_normalized_profile(
+        user_id,
+        account_id,
+        normalized,
+        raw=raw,
+    )
+    row = repo.get_analysis_row(user_id)
+    meta = {
+        "source": "unipile",
+        "fetched_at": row.get("fetched_at") if row else None,
+        "profile_content_hash": content_hash,
+    }
+    logger.info(
+        "[LinkedInProfile] get_or_fetch_profile source=unipile user_id={} "
+        "fetched_at={}",
+        user_id,
+        meta["fetched_at"],
+    )
+    return normalized, meta
+
 
 # Top-level keys on the Phase 1 normalized profile (API-safe output).
 NORMALIZED_PROFILE_KEYS: frozenset[str] = frozenset(

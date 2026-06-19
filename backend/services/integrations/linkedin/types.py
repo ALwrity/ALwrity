@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal, Optional
 
 DEFAULT_ZERNIO_API_URL = "https://zernio.com/api/v1"
-DEFAULT_UNIPILE_DSN = "api1.unipile.com:13211"
+DEFAULT_UNIPILE_DSN = "api30.unipile.com:16037"
 
 
 ProviderMode = Literal["zernio", "native", "unipile"]

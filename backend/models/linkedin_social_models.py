@@ -5,7 +5,7 @@ Separate from linkedin_models.py (Writer content generation).
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -85,3 +85,18 @@ class LinkedInPersonalAnalyticsResponse(BaseModel):
     dateRange: LinkedInAnalyticsDateRangeResponse
     personal: LinkedInLandingPersonalAnalyticsResponse
     provider: str
+
+
+class LinkedInProfileMetaResponse(BaseModel):
+    """Acquisition metadata for GET /api/linkedin-social/profile."""
+
+    source: Literal["cache", "unipile"]
+    fetched_at: Optional[str] = None
+    profile_content_hash: Optional[str] = None
+
+
+class LinkedInProfileAcquireResponse(BaseModel):
+    """Normalized own-profile snapshot (Phase 1 — no raw Unipile payload)."""
+
+    profile: Dict[str, Any] = Field(default_factory=dict)
+    meta: LinkedInProfileMetaResponse
