@@ -509,9 +509,12 @@ class UnipileProvider:
         Phase 2: Will implement organization listing.
         """
         logger.warning(
-            f"[UnipileProvider] list_organizations called but not implemented (Phase 1)"
+            "[UnipileProvider] list_organizations not implemented (Phase 1) user_id={} "
+            "account_id={} — returning empty list",
+            user_id,
+            account_id,
         )
-        raise NotImplementedError(_ORGANIZATIONS_NOT_IMPLEMENTED)
+        return []
 
     async def get_profile_aggregate_analytics(
         self,

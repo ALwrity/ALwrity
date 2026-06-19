@@ -260,36 +260,40 @@ export const useLinkedInSocialConnection = () => {
 
     if (defaultAccount) {
 
-      const orgsOk = await loadOrganizations(defaultAccount);
+      if (connectionStatus.provider !== 'unipile') {
+        const orgsOk = await loadOrganizations(defaultAccount);
 
-      if (!orgsOk) {
+        if (!orgsOk) {
 
-        const orgsFromStatus = connectionStatus.organizations || [];
+          const orgsFromStatus = connectionStatus.organizations || [];
 
-        if (orgsFromStatus.length > 0) {
+          if (orgsFromStatus.length > 0) {
 
-          setOrganizations(
+            setOrganizations(
 
-            orgsFromStatus.map((o) => ({
+              orgsFromStatus.map((o) => ({
 
-              organization_id: o.organization_id,
+                organization_id: o.organization_id,
 
-              name: o.name,
+                name: o.name,
 
-              urn: o.urn,
+                urn: o.urn,
 
-            }))
+              }))
 
-          );
+            );
+
+          }
+
+          profileWarning =
+
+            profileWarning ||
+
+            'Company pages could not be loaded. Personal profile is still connected.';
 
         }
-
-        profileWarning =
-
-          profileWarning ||
-
-          'Company pages could not be loaded. Personal profile is still connected.';
-
+      } else {
+        setOrganizations([]);
       }
 
     } else if (connectionStatus.organizations?.length) {

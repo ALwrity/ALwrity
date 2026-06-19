@@ -7,17 +7,14 @@ Modes:
   - --dry-run: fetch + normalize only (Steps 1.1–1.2 gate; no persistence)
   - --from-fixture: offline normalizer test from saved JSON
   - --print-context: build Phase 2 profile context (persist when --user-id acquire)
-  - --validate-context: run Phase 3 completeness validation (requires --print-context)
 
 Usage:
     python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID
     python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --refresh
     python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --print-json
     python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --print-context
-    python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --print-context --validate-context
     python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --dry-run
     python backend/scripts/linkedin_fetch_profile.py --from-fixture PATH --print-context
-    python backend/scripts/linkedin_fetch_profile.py --from-fixture PATH --print-context --validate-context
     python backend/scripts/linkedin_fetch_profile.py --from-fixture docs/linkedin/fixtures/sample_user_profile_raw.json --print-normalized
 """
 
@@ -43,7 +40,6 @@ from services.integrations.linkedin.profile_context_builder import build_profile
 from services.integrations.linkedin.profile_context_service import get_or_build_profile_context
 from services.integrations.linkedin.profile_context_types import (
     ProfileContextBuildError,
-    ProfileValidationError,
     validate_profile_context,
 )
 from services.integrations.linkedin.profile_repository import (
@@ -55,10 +51,6 @@ from services.integrations.linkedin.profile_service import (
     normalize_unipile_profile,
     validate_normalized_profile,
 )
-from services.integrations.linkedin.profile_validation_service import (
-    get_or_validate_profile_context,
-)
-from services.integrations.linkedin.profile_validator import validate_profile_completeness
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.unipile_provider import UnipileProvider
@@ -346,154 +338,6 @@ def _print_profile_context_summary(
     print("=" * 60 + "\n")
 
 
-def _validation_api_payload(validation: dict[str, Any]) -> dict[str, Any]:
-    """Return API-shaped ``profile_validation`` fields (excludes embedded ``meta``)."""
-    return {
-        "is_profile_complete": validation.get("is_profile_complete", False),
-        "completeness_score": validation.get("completeness_score", 0),
-        "missing_fields": list(validation.get("missing_fields") or []),
-        "optional_missing_fields": list(validation.get("optional_missing_fields") or []),
-        "supplemental_fields": list(validation.get("supplemental_fields") or []),
-    }
-
-
-def _print_profile_validation_summary(
-    validation: dict[str, Any],
-    validation_meta: dict[str, Any],
-    *,
-    user_id: str,
-) -> None:
-    """Print Phase 3 profile validation summary to stdout."""
-    payload = _validation_api_payload(validation)
-
-    print("\n" + "=" * 60)
-    print("LinkedIn Profile Validation — Phase 3 Summary")
-    print("=" * 60)
-    print(f"user_id:                 {user_id}")
-    print(f"validation_source:       {validation_meta.get('source')}")
-    print(
-        f"validated_at:            "
-        f"{validation_meta.get('validated_at') or '(not persisted)'}"
-    )
-    print(f"is_profile_complete:     {payload['is_profile_complete']}")
-    print(f"completeness_score:      {payload['completeness_score']}%")
-    print(
-        f"missing_fields:          "
-        f"{', '.join(payload['missing_fields']) or '(none)'}"
-    )
-    print(
-        f"optional_missing_fields: "
-        f"{', '.join(payload['optional_missing_fields']) or '(none)'}"
-    )
-    print(
-        f"supplemental_fields:     "
-        f"{', '.join(payload['supplemental_fields']) or '(none)'}"
-    )
-    print("=" * 60 + "\n")
-
-
-def _resolve_profile_validation(
-    context: dict[str, Any],
-    context_meta: dict[str, Any],
-    *,
-    user_id: str,
-    content_hash: str,
-    persist: bool,
-    oauth: LinkedInOAuthService | None = None,
-) -> tuple[dict[str, Any], dict[str, Any]]:
-    """
-    Validate profile context (mirrors GET /profile Phase 3 path when persisting).
-
-    Args:
-        context: Phase 2 ``LinkedInProfileContext`` dict
-        context_meta: Phase 2 acquire meta (``source`` cache|built)
-        user_id: ALwrity user ID when persisting to SQLite
-        content_hash: Phase 1 ``profile_content_hash`` for cache linkage
-        persist: When True, use cache-first ``get_or_validate_profile_context``
-        oauth: Optional OAuth service for repository
-
-    Returns:
-        Tuple of (validation result dict, validation meta dict)
-    """
-    if persist:
-        oauth_service = oauth or LinkedInOAuthService()
-        repository = ProfileRepository(oauth=oauth_service)
-        return get_or_validate_profile_context(
-            user_id,
-            context,
-            profile_content_hash=content_hash,
-            repository=repository,
-            context_source=context_meta.get("source"),
-        )
-
-    validation = validate_profile_completeness(context)
-    validated_at = None
-    meta = validation.get("meta")
-    if isinstance(meta, dict):
-        stored_at = meta.get("validated_at")
-        if isinstance(stored_at, str):
-            validated_at = stored_at
-    return validation, {
-        "source": "validated",
-        "validated_at": validated_at,
-    }
-
-
-def _emit_profile_validation(
-    context: dict[str, Any],
-    context_meta: dict[str, Any],
-    *,
-    user_id: str,
-    content_hash: str,
-    persist: bool,
-    print_validation_json: bool,
-    oauth: LinkedInOAuthService | None = None,
-) -> int:
-    """Validate profile context, print summary, optionally print JSON; return exit code."""
-    logger.info(
-        "[LinkedInProfileValidation] CLI validate context user_id={} persist={}",
-        user_id,
-        persist,
-    )
-    try:
-        validation, validation_meta = _resolve_profile_validation(
-            context,
-            context_meta,
-            user_id=user_id,
-            content_hash=content_hash,
-            persist=persist,
-            oauth=oauth,
-        )
-    except ProfileValidationError as exc:
-        logger.error("[LinkedInProfileValidation] Failed to validate profile context: {}", exc)
-        return 1
-    except ValueError as exc:
-        logger.error("[LinkedInProfileValidation] Profile validation error: {}", exc)
-        return 1
-    except Exception:
-        logger.exception(
-            "[LinkedInProfileValidation] Unexpected error validating profile context"
-        )
-        return 1
-
-    _print_profile_validation_summary(
-        validation,
-        validation_meta,
-        user_id=user_id,
-    )
-
-    if print_validation_json:
-        print(json.dumps(_validation_api_payload(validation), indent=2, default=str))
-
-    logger.info(
-        "[LinkedInProfileValidation] Validation complete source={} user_id={} score={}%",
-        validation_meta.get("source"),
-        user_id,
-        validation.get("completeness_score"),
-    )
-    return 0
-
-
 def _resolve_profile_context(
     normalized: dict[str, Any],
     meta: dict[str, Any],
@@ -543,15 +387,13 @@ def _emit_profile_context(
     user_id: str,
     persist: bool,
     print_context_json: bool,
-    validate_context: bool = False,
     oauth: LinkedInOAuthService | None = None,
 ) -> int:
-    """Build profile context, print summary, optionally validate; return exit code."""
+    """Build profile context, print summary, optionally print JSON; return exit code."""
     logger.info(
-        "[LinkedInProfileContext] CLI build context user_id={} persist={} validate={}",
+        "[LinkedInProfileContext] CLI build context user_id={} persist={}",
         user_id,
         persist,
-        validate_context,
     )
     try:
         context, context_meta = _resolve_profile_context(
@@ -582,22 +424,6 @@ def _emit_profile_context(
         for error in context_errors:
             logger.error("  - {}", error)
         return 1
-
-    if validate_context:
-        content_hash = meta.get("profile_content_hash") or compute_profile_content_hash(
-            normalized
-        )
-        validation_code = _emit_profile_validation(
-            context,
-            context_meta,
-            user_id=user_id,
-            content_hash=content_hash,
-            persist=persist,
-            print_validation_json=print_context_json,
-            oauth=oauth,
-        )
-        if validation_code != 0:
-            return validation_code
 
     logger.info(
         "[LinkedInProfileContext] Context complete source={} user_id={}",
@@ -667,7 +493,6 @@ async def _run_acquire(args: argparse.Namespace) -> int:
             user_id=user_id,
             persist=True,
             print_context_json=True,
-            validate_context=args.validate_context,
         )
         if context_code != 0:
             return context_code
@@ -784,7 +609,6 @@ def _run_fixture_mode(args: argparse.Namespace) -> int:
             user_id="(fixture)",
             persist=False,
             print_context_json=True,
-            validate_context=args.validate_context,
         )
 
     _print_dry_run_summary(profile, user_id="(fixture)", account_id="(fixture)")
@@ -842,8 +666,8 @@ def main() -> None:
 
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch, normalize, persist LinkedIn profile (Phase 1), "
-            "build profile context (Phase 2), and validate completeness (Phase 3)."
+            "Fetch, normalize, persist LinkedIn profile (Phase 1) "
+            "and build profile context (Phase 2)."
         )
     )
     parser.add_argument(
@@ -886,11 +710,6 @@ def main() -> None:
         help="Build Phase 2 profile context and print summary + JSON to stdout",
     )
     parser.add_argument(
-        "--validate-context",
-        action="store_true",
-        help="Run Phase 3 completeness validation (requires --print-context)",
-    )
-    parser.add_argument(
         "--print-raw-json",
         action="store_true",
         help="Print raw Unipile profile JSON to stdout (dry-run / fixture only)",
@@ -907,9 +726,6 @@ def main() -> None:
 
     if args.print_context and args.dry_run:
         parser.error("--print-context cannot be combined with --dry-run")
-
-    if args.validate_context and not args.print_context:
-        parser.error("--validate-context requires --print-context")
 
     exit_code = asyncio.run(_run_async_entry(args))
     raise SystemExit(exit_code)

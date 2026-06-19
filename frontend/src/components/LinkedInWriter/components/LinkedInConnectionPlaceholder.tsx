@@ -3,7 +3,7 @@ import { LinkedIn as LinkedInIcon } from '@mui/icons-material';
 import { CircularProgress } from '@mui/material';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { LinkedInAnalyticsDashboard } from './analytics/LinkedInAnalyticsDashboard';
-import { LinkedInConnectedProfileCard } from './LinkedInConnectedProfileCard';
+import { LinkedInProfileSetupPanel } from './ProfileCompletion/LinkedInProfileSetupPanel';
 import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 
 const DisconnectedState: React.FC<{
@@ -197,7 +197,7 @@ export const LinkedInConnectionPlaceholder: React.FC = () => {
   if (connected) {
     if (provider === 'unipile') {
       return (
-        <LinkedInConnectedProfileCard
+        <LinkedInProfileSetupPanel
           displayName={displayName}
           avatarUrl={avatarUrl}
           onDisconnect={showDisconnect ? handleDisconnect : undefined}

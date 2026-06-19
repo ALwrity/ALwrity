@@ -300,17 +300,17 @@ class ProfileRepository:
             row: Optional pre-loaded analysis row to avoid a second DB read
 
         Returns:
-            Parsed ``ProfileValidationResult`` dict, or ``None`` when not stored/invalid
+            Parsed Phase 3 validation result dict, or ``None`` when not stored/invalid
         """
         logger.info(
-            "[LinkedInProfileValidation] ProfileRepository.get_profile_validation user_id={}",
+            "[ProfileValidation] ProfileRepository.get_profile_validation user_id={}",
             user_id,
         )
         if row is None:
             row = self.get_analysis_row(user_id)
         if not row:
             logger.info(
-                "[LinkedInProfileValidation] ProfileRepository.get_profile_validation "
+                "[ProfileValidation] ProfileRepository.get_profile_validation "
                 "no row user_id={}",
                 user_id,
             )
@@ -318,7 +318,7 @@ class ProfileRepository:
         raw_json = row.get("profile_validation_json")
         if not raw_json:
             logger.info(
-                "[LinkedInProfileValidation] ProfileRepository.get_profile_validation "
+                "[ProfileValidation] ProfileRepository.get_profile_validation "
                 "empty profile_validation_json user_id={}",
                 user_id,
             )
@@ -327,19 +327,19 @@ class ProfileRepository:
             parsed = json.loads(raw_json)
         except json.JSONDecodeError:
             logger.error(
-                "[LinkedInProfileValidation] Invalid profile_validation_json user_id={}",
+                "[ProfileValidation] Invalid profile_validation_json user_id={}",
                 user_id,
             )
             return None
         if not isinstance(parsed, dict):
             logger.error(
-                "[LinkedInProfileValidation] profile_validation_json is not an object "
+                "[ProfileValidation] profile_validation_json is not an object "
                 "user_id={}",
                 user_id,
             )
             return None
         logger.info(
-            "[LinkedInProfileValidation] ProfileRepository.get_profile_validation hit "
+            "[ProfileValidation] ProfileRepository.get_profile_validation hit "
             "user_id={}",
             user_id,
         )
@@ -349,62 +349,38 @@ class ProfileRepository:
         self,
         user_id: str,
         validation: dict[str, Any],
-        *,
-        content_hash: Optional[str] = None,
     ) -> str:
         """
         Persist Phase 3 profile validation JSON.
 
-        Does not modify ``profile_context_json``, ``normalized_profile_json``,
-        or other Phase 1/2 columns. Requires an existing analysis row.
+        Does not modify ``profile_context_json`` or Phase 1 columns.
+        Requires an existing ``linkedin_analysis_context`` row.
 
         Args:
             user_id: ALwrity user ID
-            validation: ``ProfileValidationResult`` dict
-            content_hash: Optional Phase 1 hash to stamp in ``meta`` before save
+            validation: Phase 3 validation result dict
 
         Returns:
-            ISO timestamp written to ``meta.validated_at``
+            ISO timestamp written to ``updated_at``
 
         Raises:
             ValueError: When no analysis row exists or validation is not a dict
         """
         logger.info(
-            "[LinkedInProfileValidation] ProfileRepository.save_profile_validation user_id={}",
+            "[ProfileValidation] ProfileRepository.save_profile_validation user_id={}",
             user_id,
         )
         if not isinstance(validation, dict):
             raise ValueError("profile validation must be a dict")
 
-        validation_to_save = validation
-        if content_hash is not None:
-            validation_to_save = json.loads(
-                json.dumps(validation, separators=(",", ":"), default=str)
-            )
-            meta = validation_to_save.get("meta")
-            if not isinstance(meta, dict):
-                meta = {}
-                validation_to_save["meta"] = meta
-            meta["built_from_profile_content_hash"] = content_hash
-
-        meta = validation_to_save.get("meta")
-        if not isinstance(meta, dict):
-            raise ValueError("profile validation meta must be a dict")
-        validated_at = meta.get("validated_at")
-        if not isinstance(validated_at, str) or not validated_at:
-            validated_at = datetime.utcnow().isoformat()
-            meta["validated_at"] = validated_at
-
-        validation_json = json.dumps(
-            validation_to_save, separators=(",", ":"), default=str
-        )
+        validation_json = json.dumps(validation, separators=(",", ":"), default=str)
         now = datetime.utcnow().isoformat()
         db_path = self._ensure_db(user_id)
 
         existing = self.get_analysis_row(user_id)
         if not existing:
             logger.error(
-                "[LinkedInProfileValidation] save_profile_validation no analysis row "
+                "[ProfileValidation] save_profile_validation no analysis row "
                 "user_id={}",
                 user_id,
             )
@@ -412,9 +388,6 @@ class ProfileRepository:
                 f"No linkedin_analysis_context row for user_id={user_id!r}; "
                 "acquire normalized profile first"
             )
-
-        normalized_before = existing.get("normalized_profile_json")
-        context_before = existing.get("profile_context_json")
 
         with sqlite3.connect(db_path) as conn:
             cursor = conn.cursor()
@@ -429,28 +402,145 @@ class ProfileRepository:
             )
             conn.commit()
 
-        row_after = self.get_analysis_row(user_id)
-        if row_after:
-            if row_after.get("normalized_profile_json") != normalized_before:
-                logger.warning(
-                    "[LinkedInProfileValidation] normalized_profile_json changed "
-                    "unexpectedly during save_profile_validation user_id={}",
-                    user_id,
-                )
-            if row_after.get("profile_context_json") != context_before:
-                logger.warning(
-                    "[LinkedInProfileValidation] profile_context_json changed "
-                    "unexpectedly during save_profile_validation user_id={}",
-                    user_id,
-                )
+        logger.info(
+            "[ProfileValidation] ProfileRepository.save_profile_validation complete "
+            "user_id={} updated_at={}",
+            user_id,
+            now,
+        )
+        return now
+
+    def get_user_completion(
+        self,
+        user_id: str,
+        *,
+        row: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Read cached user completion answers for ``user_id``.
+
+        Args:
+            user_id: ALwrity user ID
+            row: Optional pre-loaded analysis row to avoid a second DB read
+
+        Returns:
+            Parsed user completion dict keyed by field, or ``None`` when absent/invalid
+        """
+        logger.info(
+            "[ProfileCompletion] ProfileRepository.get_user_completion user_id={}",
+            user_id,
+        )
+        if row is None:
+            row = self.get_analysis_row(user_id)
+        if not row:
+            logger.info(
+                "[ProfileCompletion] ProfileRepository.get_user_completion "
+                "no row user_id={}",
+                user_id,
+            )
+            return None
+        raw_json = row.get("user_completion_json")
+        if not raw_json:
+            logger.info(
+                "[ProfileCompletion] ProfileRepository.get_user_completion "
+                "empty user_completion_json user_id={}",
+                user_id,
+            )
+            return None
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError:
+            logger.error(
+                "[ProfileCompletion] Invalid user_completion_json user_id={}",
+                user_id,
+            )
+            return None
+        if not isinstance(parsed, dict):
+            logger.error(
+                "[ProfileCompletion] user_completion_json is not an object "
+                "user_id={}",
+                user_id,
+            )
+            return None
+        logger.info(
+            "[ProfileCompletion] ProfileRepository.get_user_completion hit "
+            "user_id={} field_count={}",
+            user_id,
+            len(parsed),
+        )
+        return parsed
+
+    def save_user_completion(
+        self,
+        user_id: str,
+        answers: dict[str, Any],
+    ) -> dict[str, Any]:
+        """
+        Merge user completion answers into ``user_completion_json``.
+
+        New keys are added; existing keys are overwritten by the latest submit.
+
+        Args:
+            user_id: ALwrity user ID
+            answers: Field-keyed answers from a completion submit
+
+        Returns:
+            Merged completion dict after persist
+
+        Raises:
+            ValueError: When no analysis row exists or answers is not a dict
+        """
+        logger.info(
+            "[ProfileCompletion] ProfileRepository.save_user_completion user_id={} "
+            "answer_keys={}",
+            user_id,
+            sorted(answers.keys()) if isinstance(answers, dict) else None,
+        )
+        if not isinstance(answers, dict):
+            raise ValueError("user completion answers must be a dict")
+
+        existing = self.get_analysis_row(user_id)
+        if not existing:
+            logger.error(
+                "[ProfileCompletion] save_user_completion no analysis row "
+                "user_id={}",
+                user_id,
+            )
+            raise ValueError(
+                f"No linkedin_analysis_context row for user_id={user_id!r}; "
+                "acquire normalized profile first"
+            )
+
+        merged: dict[str, Any] = {}
+        current = self.get_user_completion(user_id, row=existing)
+        if current:
+            merged.update(current)
+        merged.update(answers)
+
+        completion_json = json.dumps(merged, separators=(",", ":"), default=str)
+        now = datetime.utcnow().isoformat()
+        db_path = self._ensure_db(user_id)
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE linkedin_analysis_context
+                SET user_completion_json = ?,
+                    updated_at = ?
+                WHERE user_id = ?
+                """,
+                (completion_json, now, user_id),
+            )
+            conn.commit()
 
         logger.info(
-            "[LinkedInProfileValidation] ProfileRepository.save_profile_validation "
-            "complete user_id={} validated_at={}",
+            "[ProfileCompletion] ProfileRepository.save_user_completion complete "
+            "user_id={} field_count={}",
             user_id,
-            validated_at,
+            len(merged),
         )
-        return validated_at
+        return merged
 
     def has_fresh_profile(
         self,
@@ -498,7 +588,7 @@ class ProfileRepository:
 
     def invalidate_downstream(self, user_id: str) -> None:
         """
-        Clear Phase 2/3/5 derived columns when normalized profile hash changes.
+        Clear Phase 2/3/4/5 derived columns when normalized profile hash changes.
 
         Args:
             user_id: ALwrity user ID
@@ -516,6 +606,7 @@ class ProfileRepository:
                 UPDATE linkedin_analysis_context
                 SET profile_context_json = NULL,
                     profile_validation_json = NULL,
+                    user_completion_json = NULL,
                     ai_profile_intelligence_json = NULL,
                     profile_context_updated_at = NULL,
                     ai_intelligence_updated_at = NULL,

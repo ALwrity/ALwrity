@@ -3,7 +3,7 @@
  * Separate from linkedInWriterApi.ts (content generation).
  */
 
-import { apiClient, NetworkError } from './client';
+import { apiClient, ConnectionError, NetworkError } from './client';
 
 export interface LinkedInConnectionStatus {
   connected: boolean;
@@ -113,6 +113,48 @@ export interface LinkedInPersonalAnalyticsResponse {
   provider: string;
 }
 
+export interface LinkedInProfileValidation {
+  is_profile_complete: boolean;
+  completeness_score: number;
+  missing_fields: string[];
+  optional_missing_fields: string[];
+}
+
+export type LinkedInCompletionInputType = 'text' | 'textarea' | 'tags';
+
+export interface LinkedInCompletionQuestion {
+  field_key: string;
+  label: string;
+  input_type: LinkedInCompletionInputType;
+  required: boolean;
+}
+
+export interface LinkedInProfileCompletion {
+  questions: LinkedInCompletionQuestion[];
+}
+
+export interface LinkedInProfileAcquireResponse {
+  profile: Record<string, unknown>;
+  meta: {
+    source: 'cache' | 'unipile';
+    fetched_at?: string | null;
+    profile_content_hash?: string | null;
+  };
+  profile_context: Record<string, unknown>;
+  profile_context_meta: {
+    source: 'cache' | 'built';
+    profile_context_updated_at?: string | null;
+  };
+  profile_validation?: LinkedInProfileValidation | null;
+  profile_completion?: LinkedInProfileCompletion | null;
+}
+
+export interface LinkedInProfileCompleteResponse {
+  profile_context: Record<string, unknown>;
+  profile_validation: LinkedInProfileValidation;
+  profile_completion: LinkedInProfileCompletion;
+}
+
 const BASE = '/api/linkedin-social';
 
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
@@ -143,6 +185,17 @@ export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> 
 export function getLinkedInSocialErrorMessage(err: unknown): string {
   if (err instanceof NetworkError) {
     return 'Cannot reach the ALwrity server. Check that the backend is running and try again.';
+  }
+
+  if (err instanceof ConnectionError) {
+    return err.message || 'Backend server is experiencing issues. Please try again later.';
+  }
+
+  if (
+    err instanceof Error &&
+    err.message.includes('Backend is temporarily unavailable')
+  ) {
+    return 'The server is recovering from a prior request. Please try again in a few seconds.';
   }
 
   if (err && typeof err === 'object' && 'response' in err) {
@@ -222,5 +275,23 @@ export async function getLinkedInPersonalAnalytics(
       : { startDate: request.startDate, endDate: request.endDate };
 
   const response = await apiClient.get(`${BASE}/analytics/personal`, { params });
+  return response.data;
+}
+
+/** Normalized profile, context, validation, and completion questions (Phases 1–4). */
+export async function getLinkedInProfile(
+  refresh = false
+): Promise<LinkedInProfileAcquireResponse> {
+  const response = await apiClient.get(`${BASE}/profile`, {
+    params: refresh ? { refresh: true } : undefined,
+  });
+  return response.data;
+}
+
+/** Submit profile completion answers and receive updated validation state. */
+export async function completeLinkedInProfile(
+  answers: Record<string, string | string[]>
+): Promise<LinkedInProfileCompleteResponse> {
+  const response = await apiClient.post(`${BASE}/profile/complete`, { answers });
   return response.data;
 }

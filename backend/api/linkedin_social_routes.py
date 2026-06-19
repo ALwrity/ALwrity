@@ -27,10 +27,13 @@ from models.linkedin_social_models import (
     LinkedInOrganizationsListResponse,
     LinkedInPersonalAnalyticsResponse,
     LinkedInProfileAcquireResponse,
+    LinkedInProfileCompleteRequest,
+    LinkedInProfileCompleteResponse,
     LinkedInProfileContextMetaResponse,
     LinkedInProfileMetaResponse,
-    LinkedInProfileValidationMetaResponse,
-    LinkedInProfileValidationResponse,
+    CompletionQuestionResponse,
+    ProfileCompletionResponse,
+    ProfileValidationResponse,
 )
 from services.integrations.linkedin.analytics_dates import (
     InvalidAnalyticsDateRange,
@@ -40,15 +43,19 @@ from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
 from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
 from services.integrations.linkedin.profile_context_service import get_or_build_profile_context
-from services.integrations.linkedin.profile_context_types import (
-    ProfileContextBuildError,
-    ProfileValidationError,
+from services.integrations.linkedin.profile_context_types import ProfileContextBuildError
+from services.integrations.linkedin.profile_completion_questions import build_completion_questions
+from services.integrations.linkedin.profile_completion_service import (
+    ProfileAlreadyCompleteError,
+    ProfileCompletionError,
+    ProfileCompletionResult,
+    complete_profile,
 )
+from services.integrations.linkedin.profile_context_patcher import ProfileCompletionPatchError
 from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.profile_service import get_or_fetch_profile
-from services.integrations.linkedin.profile_validation_service import (
-    get_or_validate_profile_context,
-)
+from services.integrations.linkedin.profile_validation_service import get_or_validate_profile_context
+from services.integrations.linkedin.profile_validation_types import ProfileValidationResult
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
@@ -209,22 +216,65 @@ def _raise_profile_context_http_error(exc: Exception, *, user_id: str) -> None:
     ) from exc
 
 
-def _raise_profile_validation_http_error(exc: Exception, *, user_id: str) -> None:
-    """Map profile validation failures to Phase 3 HTTP status codes."""
-    if isinstance(exc, ProfileValidationError):
-        logger.exception(
-            "[LinkedInProfileValidation] GET /profile validation failed user_id={}: {}",
-            user_id,
-            exc,
-        )
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to validate LinkedIn profile.",
-        ) from exc
+def _validation_result_to_response(
+    validation: ProfileValidationResult,
+) -> ProfileValidationResponse:
+    """Map Phase 3 validation dict to API response model."""
+    return ProfileValidationResponse(
+        is_profile_complete=bool(validation.get("is_profile_complete")),
+        completeness_score=int(validation.get("completeness_score") or 0),
+        missing_fields=list(validation.get("missing_fields") or []),
+        optional_missing_fields=list(validation.get("optional_missing_fields") or []),
+    )
 
+
+def _completion_result_to_response(
+    result: ProfileCompletionResult,
+) -> LinkedInProfileCompleteResponse:
+    """Map completion service result to POST /profile/complete response."""
+    return LinkedInProfileCompleteResponse(
+        profile_context=result.profile_context,
+        profile_validation=_validation_result_to_response(result.profile_validation),
+        profile_completion=ProfileCompletionResponse(
+            questions=[
+                CompletionQuestionResponse(
+                    field_key=question["field_key"],
+                    label=question["label"],
+                    input_type=question["input_type"],
+                    required=question["required"],
+                )
+                for question in result.questions
+            ]
+        ),
+    )
+
+
+def _build_profile_completion_payload(
+    validation: ProfileValidationResult,
+) -> ProfileCompletionResponse:
+    """Build completion questions when profile is incomplete."""
+    if validation.get("is_profile_complete"):
+        return ProfileCompletionResponse(questions=[])
+
+    questions = build_completion_questions(list(validation.get("missing_fields") or []))
+    return ProfileCompletionResponse(
+        questions=[
+            CompletionQuestionResponse(
+                field_key=question["field_key"],
+                label=question["label"],
+                input_type=question["input_type"],
+                required=question["required"],
+            )
+            for question in questions
+        ]
+    )
+
+
+def _raise_profile_validation_http_error(exc: Exception, *, user_id: str) -> None:
+    """Map profile validation failures to HTTP status codes."""
     if isinstance(exc, ValueError):
         logger.error(
-            "[LinkedInProfileValidation] GET /profile validation persistence error user_id={}: {}",
+            "[ProfileValidation] GET /profile validation error user_id={}: {}",
             user_id,
             exc,
         )
@@ -234,13 +284,66 @@ def _raise_profile_validation_http_error(exc: Exception, *, user_id: str) -> Non
         ) from exc
 
     logger.exception(
-        "[LinkedInProfileValidation] GET /profile unexpected validation error user_id={}: {}",
+        "[ProfileValidation] GET /profile unexpected validation error user_id={}: {}",
         user_id,
         exc,
     )
     raise HTTPException(
         status_code=500,
         detail="Unable to validate LinkedIn profile.",
+    ) from exc
+
+
+def _raise_profile_completion_http_error(exc: Exception, *, user_id: str) -> None:
+    """Map profile completion failures to HTTP status codes."""
+    if isinstance(exc, ProfileAlreadyCompleteError):
+        logger.info(
+            "[ProfileCompletion] POST /profile/complete already complete user_id={}",
+            user_id,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="Profile is already complete.",
+        ) from exc
+
+    if isinstance(exc, ProfileCompletionError):
+        logger.warning(
+            "[ProfileCompletion] POST /profile/complete bad request user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if isinstance(exc, ProfileCompletionPatchError):
+        logger.exception(
+            "[ProfileCompletion] POST /profile/complete patch failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to complete LinkedIn profile.",
+        ) from exc
+
+    if isinstance(exc, ValueError):
+        logger.error(
+            "[ProfileCompletion] POST /profile/complete persistence error user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to complete LinkedIn profile.",
+        ) from exc
+
+    logger.exception(
+        "[ProfileCompletion] POST /profile/complete unexpected error user_id={}: {}",
+        user_id,
+        exc,
+    )
+    raise HTTPException(
+        status_code=500,
+        detail="Unable to complete LinkedIn profile.",
     ) from exc
 
 
@@ -257,7 +360,7 @@ async def get_linkedin_profile(
 
     Phase 1: cache-first normalized profile from ``linkedin_analysis_context``.
     Phase 2: cache-first ``profile_context`` built from the normalized profile.
-    Phase 3: cache-first ``profile_validation`` from profile context completeness.
+    Phase 3/4: ``profile_validation`` and completion questions when incomplete.
     """
     user_id = _user_id(current_user)
     logger.info("[LinkedInProfile] GET /profile user_id={} refresh={}", user_id, refresh)
@@ -286,25 +389,24 @@ async def get_linkedin_profile(
         _raise_profile_context_http_error(exc, user_id=user_id)
 
     try:
-        profile_validation_raw, validation_meta = get_or_validate_profile_context(
+        profile_validation, _validation_meta = get_or_validate_profile_context(
             user_id,
             profile_context,
-            profile_content_hash=meta.get("profile_content_hash"),
             repository=repository,
-            context_source=context_meta.get("source"),
         )
-    except (ProfileValidationError, ValueError) as exc:
+        profile_completion = _build_profile_completion_payload(profile_validation)
+    except ValueError as exc:
         _raise_profile_validation_http_error(exc, user_id=user_id)
     except Exception as exc:
         _raise_profile_validation_http_error(exc, user_id=user_id)
 
     logger.info(
         "[LinkedInProfile] GET /profile complete user_id={} profile_source={} "
-        "context_source={} validation_source={}",
+        "context_source={} is_profile_complete={}",
         user_id,
         meta.get("source"),
         context_meta.get("source"),
-        validation_meta.get("source"),
+        profile_validation.get("is_profile_complete"),
     )
     return LinkedInProfileAcquireResponse(
         profile=profile,
@@ -318,14 +420,56 @@ async def get_linkedin_profile(
             source=context_meta["source"],  # type: ignore[arg-type]
             profile_context_updated_at=context_meta.get("profile_context_updated_at"),
         ),
-        profile_validation=LinkedInProfileValidationResponse.from_validation_result(
-            profile_validation_raw
-        ),
-        profile_validation_meta=LinkedInProfileValidationMetaResponse(
-            source=validation_meta["source"],  # type: ignore[arg-type]
-            validated_at=validation_meta.get("validated_at"),
-        ),
+        profile_validation=_validation_result_to_response(profile_validation),
+        profile_completion=profile_completion,
     )
+
+
+@router.post("/profile/complete", response_model=LinkedInProfileCompleteResponse)
+async def complete_linkedin_profile(
+    body: LinkedInProfileCompleteRequest,
+    current_user: dict = Depends(get_current_user),
+) -> LinkedInProfileCompleteResponse:
+    """
+    Apply user completion answers, patch profile context, and re-validate.
+
+    Returns updated context, validation, and any remaining completion questions.
+    """
+    user_id = _user_id(current_user)
+    logger.info(
+        "[ProfileCompletion] POST /profile/complete user_id={} answer_keys={}",
+        user_id,
+        sorted(body.answers.keys()),
+    )
+
+    if not body.answers:
+        logger.warning(
+            "[ProfileCompletion] POST /profile/complete empty answers user_id={}",
+            user_id,
+        )
+        raise HTTPException(status_code=400, detail="No completion answers provided.")
+
+    repository = ProfileRepository(oauth=_oauth_service)
+    try:
+        result = complete_profile(
+            user_id,
+            body.answers,
+            repository=repository,
+        )
+    except (ProfileAlreadyCompleteError, ProfileCompletionError) as exc:
+        _raise_profile_completion_http_error(exc, user_id=user_id)
+    except (ProfileCompletionPatchError, ValueError) as exc:
+        _raise_profile_completion_http_error(exc, user_id=user_id)
+    except Exception as exc:
+        _raise_profile_completion_http_error(exc, user_id=user_id)
+
+    logger.info(
+        "[ProfileCompletion] POST /profile/complete success user_id={} "
+        "is_profile_complete={}",
+        user_id,
+        result.profile_validation.get("is_profile_complete"),
+    )
+    return _completion_result_to_response(result)
 
 
 @router.get("/connection/status", response_model=LinkedInConnectionStatusResponse)

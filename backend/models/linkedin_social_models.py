@@ -102,40 +102,50 @@ class LinkedInProfileContextMetaResponse(BaseModel):
     profile_context_updated_at: Optional[str] = None
 
 
-class LinkedInProfileValidationResponse(BaseModel):
-    """Semantic completeness result for GET /api/linkedin-social/profile (Phase 3)."""
+class ProfileValidationResponse(BaseModel):
+    """Phase 3 profile completeness validation result."""
 
     is_profile_complete: bool
     completeness_score: int
     missing_fields: List[str] = Field(default_factory=list)
     optional_missing_fields: List[str] = Field(default_factory=list)
-    supplemental_fields: List[str] = Field(default_factory=list)
-
-    @classmethod
-    def from_validation_result(cls, validation: Dict[str, Any]) -> LinkedInProfileValidationResponse:
-        """Build API payload from persisted validation dict (excludes embedded ``meta``)."""
-        return cls(
-            is_profile_complete=bool(validation.get("is_profile_complete")),
-            completeness_score=int(validation.get("completeness_score", 0)),
-            missing_fields=list(validation.get("missing_fields") or []),
-            optional_missing_fields=list(validation.get("optional_missing_fields") or []),
-            supplemental_fields=list(validation.get("supplemental_fields") or []),
-        )
 
 
-class LinkedInProfileValidationMetaResponse(BaseModel):
-    """Profile validation cache metadata (Phase 3)."""
+class CompletionQuestionResponse(BaseModel):
+    """Single profile completion question for the UI."""
 
-    source: Literal["cache", "validated"]
-    validated_at: Optional[str] = None
+    field_key: str
+    label: str
+    input_type: Literal["text", "textarea", "tags"]
+    required: bool = True
+
+
+class ProfileCompletionResponse(BaseModel):
+    """Profile completion questions derived from validation."""
+
+    questions: List[CompletionQuestionResponse] = Field(default_factory=list)
 
 
 class LinkedInProfileAcquireResponse(BaseModel):
-    """Normalized own-profile snapshot with Phase 2 context and Phase 3 validation."""
+    """Normalized own-profile snapshot with Phase 2–4 analysis context."""
 
     profile: Dict[str, Any] = Field(default_factory=dict)
     meta: LinkedInProfileMetaResponse
     profile_context: Dict[str, Any] = Field(default_factory=dict)
     profile_context_meta: LinkedInProfileContextMetaResponse
-    profile_validation: LinkedInProfileValidationResponse
-    profile_validation_meta: LinkedInProfileValidationMetaResponse
+    profile_validation: Optional[ProfileValidationResponse] = None
+    profile_completion: Optional[ProfileCompletionResponse] = None
+
+
+class LinkedInProfileCompleteRequest(BaseModel):
+    """Request body for POST /api/linkedin-social/profile/complete."""
+
+    answers: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LinkedInProfileCompleteResponse(BaseModel):
+    """Response for POST /api/linkedin-social/profile/complete."""
+
+    profile_context: Dict[str, Any] = Field(default_factory=dict)
+    profile_validation: ProfileValidationResponse
+    profile_completion: ProfileCompletionResponse
