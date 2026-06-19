@@ -30,6 +30,7 @@ from services.integrations.linkedin.unipile_client import (
     UnipileClient,
     UnipileAPIError,
     avatar_url_from_user_profile,
+    profile_identifier_from_owner,
 )
 from services.integrations.linkedin.zernio_client import avatar_url_from_item
 from services.integrations.linkedin_oauth import LinkedInOAuthService
@@ -439,8 +440,11 @@ class UnipileProvider:
         """
         Fetch the connected user's full LinkedIn UserProfile from Unipile.
 
-        Resolves ``unipile_account_id`` from stored credentials and calls
-        ``GET /api/v1/users/me`` with the requested LinkedIn sections.
+        Uses a two-step v1 flow:
+        1. ``GET /api/v1/users/me`` → ``AccountOwnerProfile`` (resolve identifier)
+        2. ``GET /api/v1/users/{identifier}?linkedin_sections=*`` → ``UserProfile``
+
+        The ``linkedin_sections`` parameter is only valid on step 2 per Unipile OpenAPI.
 
         Args:
             user_id: Internal ALwrity user ID (Clerk)
@@ -451,7 +455,7 @@ class UnipileProvider:
 
         Raises:
             LinkedInNotConnectedError: If user has no Unipile account connected
-            UnipileAPIError: If the Unipile API request fails
+            UnipileAPIError: If the Unipile API request fails or identifier is missing
         """
         logger.info(
             f"[UnipileProvider] fetch_own_linkedin_profile user={user_id} "
@@ -467,11 +471,32 @@ class UnipileProvider:
             )
 
         logger.info(
-            f"[UnipileProvider] Fetching UserProfile account_id={account_id} user={user_id}"
+            f"[UnipileProvider] Step 1/2 — AccountOwnerProfile via /users/me "
+            f"account_id={account_id} user={user_id}"
         )
-        return await self._client.get_own_profile(
+        owner = await self._client.get_own_profile(account_id)
+        if not isinstance(owner, dict):
+            raise UnipileAPIError(
+                f"Unexpected /users/me response type: {type(owner).__name__}"
+            )
+
+        identifier = profile_identifier_from_owner(owner)
+        if not identifier:
+            raise UnipileAPIError(
+                f"AccountOwnerProfile missing public_identifier and provider_id "
+                f"for account_id={account_id}"
+            )
+
+        logger.info(
+            f"[UnipileProvider] Step 2/2 — UserProfile via /users/{{identifier}} "
+            f"account_id={account_id} identifier={identifier!r} "
+            f"linkedin_sections={linkedin_sections!r}"
+        )
+        return await self._client.get_user_profile(
             account_id,
+            identifier,
             linkedin_sections=linkedin_sections,
+            notify=False,
         )
 
     async def list_organizations(

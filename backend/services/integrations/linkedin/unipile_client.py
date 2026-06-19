@@ -74,6 +74,28 @@ def _normalize_account_list(data: Any) -> list[dict[str, Any]]:
     return []
 
 
+def profile_identifier_from_owner(owner: dict[str, Any]) -> Optional[str]:
+    """
+    Extract a LinkedIn profile identifier from an AccountOwnerProfile payload.
+
+    Unipile accepts ``public_identifier`` or ``provider_id`` on
+    ``GET /api/v1/users/{identifier}``.
+
+    Args:
+        owner: Raw dict from ``GET /api/v1/users/me``
+
+    Returns:
+        Identifier string, or None when neither field is present
+    """
+    if not isinstance(owner, dict):
+        return None
+    for key in ("public_identifier", "provider_id"):
+        value = owner.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def avatar_url_from_user_profile(item: dict[str, Any]) -> Optional[str]:
     """
     Extract profile photo URL from a Unipile UserProfile payload.
@@ -247,26 +269,20 @@ class UnipileClient:
             _raise_for_error(response)
             return response.json()
 
-    async def get_own_profile(
-        self,
-        account_id: str,
-        *,
-        linkedin_sections: Optional[str] = None,
-    ) -> dict[str, Any]:
+    async def get_own_profile(self, account_id: str) -> dict[str, Any]:
         """
-        Fetch the connected account owner's LinkedIn user profile.
+        Fetch the connected account owner's lightweight LinkedIn profile.
 
         Uses Unipile Users API ``GET /api/v1/users/me`` scoped to the account.
-        Profile photos are typically available here but not on the Account object.
+        Returns ``AccountOwnerProfile`` (identity, photos, counts) — not the
+        section-rich ``UserProfile``. For full sections use ``get_user_profile``
+        with the owner's ``public_identifier`` or ``provider_id``.
 
         Args:
             account_id: Unipile account ID for the connected LinkedIn account
-            linkedin_sections: Optional LinkedIn sections to include (e.g. ``*`` for
-                full profile with experience, skills, education). When omitted, Unipile
-                returns a lighter default payload — used for avatar lookups.
 
         Returns:
-            UserProfile dictionary from Unipile
+            AccountOwnerProfile dictionary from Unipile
 
         Raises:
             UnipileAPIError: If the request fails
@@ -277,12 +293,9 @@ class UnipileClient:
 
         url = self._get_full_url("/api/v1/users/me")
         params: dict[str, str] = {"account_id": account_id}
-        if linkedin_sections is not None:
-            params["linkedin_sections"] = linkedin_sections
 
         logger.debug(
-            f"[UnipileClient] Fetching own profile account_id={account_id} "
-            f"linkedin_sections={linkedin_sections!r}"
+            f"[UnipileClient] Fetching own profile account_id={account_id}"
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -295,35 +308,54 @@ class UnipileClient:
         if isinstance(data, dict):
             logger.info(
                 f"[UnipileClient] Own profile fetched account_id={account_id} "
-                f"linkedin_sections={linkedin_sections!r} "
-                f"object={data.get('object')!r} is_self={data.get('is_self')!r} "
+                f"object={data.get('object')!r} "
+                f"public_identifier={data.get('public_identifier')!r} "
                 f"keys={list(data.keys())}"
             )
         return data
 
     async def get_user_profile(
-        self, account_id: str, identifier: str
+        self,
+        account_id: str,
+        identifier: str,
+        *,
+        linkedin_sections: Optional[str] = None,
+        notify: Optional[bool] = None,
     ) -> dict[str, Any]:
         """
         Fetch a LinkedIn user profile by public identifier or provider id.
 
+        Uses ``GET /api/v1/users/{identifier}`` which returns ``UserProfile``.
+        Pass ``linkedin_sections=*`` for experience, skills, education, about, etc.
+
         Args:
             account_id: Unipile account ID
             identifier: LinkedIn public identifier (e.g. ``johndoe``) or provider id
+            linkedin_sections: Optional sections query (e.g. ``*`` for full profile)
+            notify: When ``False``, avoids notifying the profile owner on visit
 
         Returns:
             UserProfile dictionary from Unipile
+
+        Raises:
+            UnipileAPIError: If the request fails
+            ValueError: If API key is not configured
         """
         if not self._api_key:
             raise ValueError("Unipile API key is required")
 
         encoded_identifier = quote(identifier, safe="")
         url = self._get_full_url(f"/api/v1/users/{encoded_identifier}")
-        params = {"account_id": account_id}
+        params: dict[str, Any] = {"account_id": account_id}
+        if linkedin_sections is not None:
+            params["linkedin_sections"] = linkedin_sections
+        if notify is not None:
+            params["notify"] = notify
 
         logger.debug(
             f"[UnipileClient] Fetching user profile account_id={account_id} "
-            f"identifier={identifier}"
+            f"identifier={identifier} linkedin_sections={linkedin_sections!r} "
+            f"notify={notify!r}"
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -331,7 +363,16 @@ class UnipileClient:
                 url, params=params, headers=_auth_headers(self._api_key)
             )
             _raise_for_error(response)
-            return response.json()
+            data = response.json()
+
+        if isinstance(data, dict):
+            logger.info(
+                f"[UnipileClient] User profile fetched account_id={account_id} "
+                f"identifier={identifier} linkedin_sections={linkedin_sections!r} "
+                f"object={data.get('object')!r} is_self={data.get('is_self')!r} "
+                f"keys={list(data.keys())}"
+            )
+        return data
 
     async def list_accounts(
         self, provider: Optional[str] = "LINKEDIN"

@@ -1,11 +1,16 @@
 """
-LinkedIn profile acquire CLI — Phase 1 Step 1.1 (fetch + dry-run gate test).
+LinkedIn profile acquire CLI — Phase 1 Steps 1.1–1.2 (fetch, normalize, dry-run).
 
-Fetches the connected user's profile from Unipile via GET /api/v1/users/me
-(AccountOwnerProfile) with linkedin_sections. Does not persist (Step 1.3+).
+Fetches the connected user's full profile via Unipile two-step v1 flow:
+  1. GET /api/v1/users/me → AccountOwnerProfile (resolve identifier)
+  2. GET /api/v1/users/{identifier}?linkedin_sections=* → UserProfile
+
+Normalizes via profile_service. Does not persist (Step 1.3+).
 
 Usage:
     python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --dry-run
+    python backend/scripts/linkedin_fetch_profile.py --user-id USER_ID --dry-run --print-normalized
+    python backend/scripts/linkedin_fetch_profile.py --from-fixture docs/linkedin/fixtures/sample_user_profile_raw.json --print-normalized
 """
 
 from __future__ import annotations
@@ -26,6 +31,10 @@ load_dotenv(backend_dir / ".env")
 
 from loguru import logger
 
+from services.integrations.linkedin.profile_service import (
+    normalize_unipile_profile,
+    validate_normalized_profile,
+)
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.unipile_provider import UnipileProvider
@@ -35,12 +44,11 @@ from services.integrations.linkedin_oauth import LinkedInOAuthService
 # See: https://developer.unipile.com/reference/userscontroller_getaccountownerprofile
 ACCOUNT_OWNER_PROFILE_OBJECT = "AccountOwnerProfile"
 
-# Returned by GET /api/v1/users/{identifier} for third-party profiles (not /users/me).
+# Returned by GET /api/v1/users/{identifier} with linkedin_sections (full acquire path).
 USER_PROFILE_OBJECT = "UserProfile"
 
-# Accept both: /users/me should return AccountOwnerProfile; UserProfile kept for
-# backward compatibility if Unipile ever aliases the own-profile route.
-ACCEPTED_OWN_PROFILE_OBJECTS: frozenset[str] = frozenset(
+# Fixture mode accepts both shapes for offline Step 1.2 testing.
+FIXTURE_ACCEPTED_OBJECTS: frozenset[str] = frozenset(
     {ACCOUNT_OWNER_PROFILE_OBJECT, USER_PROFILE_OBJECT}
 )
 
@@ -87,14 +95,19 @@ def _section_counts(profile: dict[str, Any]) -> dict[str, int]:
     return counts
 
 
-def _validate_gate(profile: dict[str, Any]) -> list[str]:
+def _validate_gate(
+    profile: dict[str, Any],
+    *,
+    require_user_profile: bool = False,
+) -> list[str]:
     """
-    Validate Step 1.1 gate criteria for GET /api/v1/users/me.
+    Validate Step 1.1 gate criteria.
 
-    Unipile v1 own-profile contract (OpenAPI ``UsersController_getAccountOwnerProfile``):
-    - ``object`` is ``AccountOwnerProfile`` (not ``UserProfile``).
-    - ``is_self`` is not part of the AccountOwnerProfile schema; it appears only on
-      ``UserProfile`` responses from GET /users/{identifier} (third-party profiles).
+    Live fetch (two-step acquire) must return ``UserProfile`` from
+    ``GET /users/{identifier}?linkedin_sections=*``.
+
+    Fixture mode accepts ``AccountOwnerProfile`` or ``UserProfile`` for offline
+    Step 1.2 normalizer testing.
 
     Returns:
         List of error messages (empty when gate passes).
@@ -102,9 +115,15 @@ def _validate_gate(profile: dict[str, Any]) -> list[str]:
     errors: list[str] = []
 
     object_type = profile.get("object")
-    if object_type not in ACCEPTED_OWN_PROFILE_OBJECTS:
+    if require_user_profile:
+        if object_type != USER_PROFILE_OBJECT:
+            errors.append(
+                f"object must be {USER_PROFILE_OBJECT!r} on full acquire path, "
+                f"got {object_type!r}"
+            )
+    elif object_type not in FIXTURE_ACCEPTED_OBJECTS:
         errors.append(
-            f"object must be one of {sorted(ACCEPTED_OWN_PROFILE_OBJECTS)!r}, "
+            f"object must be one of {sorted(FIXTURE_ACCEPTED_OBJECTS)!r}, "
             f"got {object_type!r}"
         )
 
@@ -125,11 +144,12 @@ def _validate_gate(profile: dict[str, Any]) -> list[str]:
             "(first_name, last_name, headline, provider_id, or public_identifier)"
         )
 
-    # is_self is informational only for /users/me — not a gate criterion.
-    if object_type == USER_PROFILE_OBJECT and profile.get("is_self") is False:
-        logger.warning(
-            "[LinkedInProfile] is_self=False on own-profile fetch — unexpected for /users/me"
-        )
+    if require_user_profile and object_type == USER_PROFILE_OBJECT:
+        is_self = profile.get("is_self")
+        if is_self is False:
+            logger.warning(
+                "[LinkedInProfile] is_self=False on own-profile UserProfile fetch — unexpected"
+            )
 
     return errors
 
@@ -169,16 +189,49 @@ def _print_summary(profile: dict[str, Any], *, user_id: str, account_id: str) ->
     print("=" * 60 + "\n")
 
 
+def _print_normalized_summary(normalized: dict[str, Any]) -> None:
+    """Print Step 1.2 normalization summary."""
+    print("\n" + "-" * 60)
+    print("Phase 1 Step 1.2 — Normalized Profile Summary")
+    print("-" * 60)
+    print(f"name:              {normalized.get('name') or '(empty)'}")
+    print(f"headline:          {normalized.get('headline') or '(empty)'}")
+    print(f"job_title:         {normalized.get('job_title') or '(empty)'}")
+    print(f"company:           {normalized.get('company') or '(empty)'}")
+    print(f"about length:      {len(normalized.get('about') or '')}")
+    print(f"experience count:  {len(normalized.get('experience') or [])}")
+    print(f"education count:   {len(normalized.get('education') or [])}")
+    print(f"skills count:      {len(normalized.get('skills') or [])}")
+    print(f"profile_url:       {normalized.get('profile_url') or '(empty)'}")
+    print(f"is_self:           {normalized.get('is_self')}")
+    print("-" * 60 + "\n")
+
+
+def _load_fixture(path: str) -> dict[str, Any]:
+    """Load raw Unipile JSON fixture from disk."""
+    fixture_path = Path(path)
+    if not fixture_path.is_file():
+        raise FileNotFoundError(f"Fixture not found: {fixture_path}")
+    with fixture_path.open(encoding="utf-8") as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise ValueError(f"Fixture must be a JSON object, got {type(data).__name__}")
+    return data
+
+
 async def _run(args: argparse.Namespace) -> int:
-    """Fetch profile and validate Step 1.1 gate."""
+    """Fetch profile, normalize, and validate gates."""
+    if args.from_fixture:
+        return _run_fixture_mode(args)
+
     if not args.dry_run:
         logger.error(
-            "Step 1.1 supports --dry-run only. Persistence is added in Step 1.3."
+            "Steps 1.1–1.2 require --dry-run for live fetch (persistence is Step 1.3)."
         )
         return 2
 
     if not args.user_id.strip():
-        logger.error("--user-id is required")
+        logger.error("--user-id is required unless --from-fixture is used")
         return 2
 
     provider = UnipileProvider()
@@ -197,11 +250,15 @@ async def _run(args: argparse.Namespace) -> int:
         )
         return 1
 
-    logger.info("=" * 52)
-    logger.info("[LinkedInProfile] Phase 1 Step 1.1 — dry-run fetch")
+    stored_account_name = creds.account_name
+
+    logger.info("[LinkedInProfile] Phase 1 Step 1.1 — dry-run fetch (two-step v1)")
     logger.info("[LinkedInProfile] user_id={}", args.user_id)
     logger.info("[LinkedInProfile] unipile_account_id={}", account_id)
-    logger.info("=" * 52)
+    logger.info(
+        "[LinkedInProfile] linkedin_sections={} (applied on /users/{{identifier}} only)",
+        args.linkedin_sections,
+    )
 
     try:
         profile = await provider.fetch_own_linkedin_profile(
@@ -222,8 +279,14 @@ async def _run(args: argparse.Namespace) -> int:
         logger.error(f"Expected dict profile payload, got {type(profile).__name__}")
         return 1
 
-    gate_errors = _validate_gate(profile)
+    gate_errors = _validate_gate(profile, require_user_profile=True)
     _print_summary(profile, user_id=args.user_id.strip(), account_id=account_id)
+
+    if args.save_raw_fixture:
+        save_path = Path(args.save_raw_fixture)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        save_path.write_text(json.dumps(profile, indent=2, default=str), encoding="utf-8")
+        logger.info("[LinkedInProfile] Raw profile saved to {}", save_path)
 
     if args.print_json:
         print(json.dumps(profile, indent=2, default=str))
@@ -235,37 +298,117 @@ async def _run(args: argparse.Namespace) -> int:
         return 1
 
     logger.info("[LinkedInProfile] Step 1.1 gate PASSED")
+
+    return _run_normalize_gate(
+        profile,
+        stored_account_name=stored_account_name,
+        print_normalized=args.print_normalized,
+    )
+
+
+def _run_fixture_mode(args: argparse.Namespace) -> int:
+    """Normalize from a saved raw JSON fixture (offline Step 1.2)."""
+    try:
+        profile = _load_fixture(args.from_fixture)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        logger.error("Failed to load fixture: {}", exc)
+        return 1
+
+    logger.info("[LinkedInProfile] Loaded fixture {}", args.from_fixture)
+    _print_summary(profile, user_id="(fixture)", account_id="(fixture)")
+
+    if args.print_json:
+        print(json.dumps(profile, indent=2, default=str))
+
+    return _run_normalize_gate(profile, print_normalized=args.print_normalized)
+
+
+def _run_normalize_gate(
+    raw_profile: dict[str, Any],
+    *,
+    stored_account_name: str | None = None,
+    print_normalized: bool,
+) -> int:
+    """Run Step 1.2 normalizer and validation gate."""
+    logger.info("[LinkedInProfile] Phase 1 Step 1.2 — normalize")
+    normalized = normalize_unipile_profile(
+        raw_profile,
+        stored_account_name=stored_account_name,
+    )
+    _print_normalized_summary(normalized)
+
+    norm_errors = validate_normalized_profile(normalized)
+    if print_normalized:
+        print(json.dumps(normalized, indent=2, default=str))
+
+    if norm_errors:
+        logger.error("[LinkedInProfile] Step 1.2 gate FAILED:")
+        for error in norm_errors:
+            logger.error("  - {}", error)
+        return 1
+
+    logger.info("[LinkedInProfile] Step 1.2 gate PASSED")
     logger.info("[LinkedInProfile] Dry-run complete — profile not persisted")
     return 0
 
 
+async def _run_async_entry(args: argparse.Namespace) -> int:
+    """Async wrapper — fixture mode is sync."""
+    if args.from_fixture:
+        return _run_fixture_mode(args)
+    return await _run(args)
+
+
 def main() -> None:
     """CLI entry point."""
+    repo_root = backend_dir.parent
+    default_fixture = (
+        repo_root / "docs" / "linkedin" / "fixtures" / "sample_user_profile_raw.json"
+    )
+
     parser = argparse.ArgumentParser(
-        description="Fetch LinkedIn UserProfile from Unipile (Phase 1 Step 1.1 dry-run)."
+        description="Fetch and normalize LinkedIn profile from Unipile (Phase 1 Steps 1.1–1.2)."
     )
     parser.add_argument(
         "--user-id",
-        required=True,
         help="ALwrity user ID (Clerk), must have unipile_account_id in linkedin_oauth_tokens",
     )
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Fetch and validate gate only; do not persist (required for Step 1.1)",
+        help="Fetch and validate gates only; do not persist (required for live fetch)",
+    )
+    parser.add_argument(
+        "--from-fixture",
+        metavar="PATH",
+        help=f"Skip API; normalize from raw JSON fixture (default sample: {default_fixture.name})",
     )
     parser.add_argument(
         "--linkedin-sections",
         default="*",
-        help='Unipile linkedin_sections query param (default: "*")',
+        help='Unipile linkedin_sections for step 2 (/users/{identifier}); default: "*"',
     )
     parser.add_argument(
         "--print-json",
         action="store_true",
-        help="Print full raw UserProfile JSON to stdout after summary",
+        help="Print raw Unipile profile JSON to stdout",
+    )
+    parser.add_argument(
+        "--print-normalized",
+        action="store_true",
+        help="Print normalized ALwrity profile JSON to stdout (Step 1.2 gate output)",
+    )
+    parser.add_argument(
+        "--save-raw-fixture",
+        metavar="PATH",
+        help="Save fetched raw Unipile JSON to file for offline normalizer testing",
     )
     args = parser.parse_args()
-    exit_code = asyncio.run(_run(args))
+
+    if args.from_fixture is None and not args.user_id:
+        parser.error("--user-id is required unless --from-fixture is provided")
+
+    exit_code = asyncio.run(_run_async_entry(args))
     raise SystemExit(exit_code)
 
 
