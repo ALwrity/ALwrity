@@ -133,6 +133,26 @@ export interface LinkedInProfileCompletion {
   questions: LinkedInCompletionQuestion[];
 }
 
+/** Phase 5 — AI profile understanding (LLM fields only; server meta is separate). */
+export interface LinkedInAIProfileIntelligence {
+  professional_identity: string;
+  primary_expertise: string[];
+  industry: string;
+  experience_level: string;
+  knowledge_domains: string[];
+  writing_opportunities: string[];
+  target_audience: string[];
+  communication_style: string;
+  brand_positioning: string;
+  summary: string;
+}
+
+/** Phase 5 — intelligence cache/generation metadata. */
+export interface LinkedInProfileIntelligenceMeta {
+  source: 'cache' | 'generated';
+  ai_intelligence_updated_at?: string | null;
+}
+
 export interface LinkedInProfileAcquireResponse {
   profile: Record<string, unknown>;
   meta: {
@@ -147,12 +167,17 @@ export interface LinkedInProfileAcquireResponse {
   };
   profile_validation?: LinkedInProfileValidation | null;
   profile_completion?: LinkedInProfileCompletion | null;
+  /** Present when profile is complete and Phase 5 intelligence was generated or cached. */
+  ai_profile_intelligence?: LinkedInAIProfileIntelligence | null;
+  ai_profile_intelligence_meta?: LinkedInProfileIntelligenceMeta | null;
 }
 
 export interface LinkedInProfileCompleteResponse {
   profile_context: Record<string, unknown>;
   profile_validation: LinkedInProfileValidation;
   profile_completion: LinkedInProfileCompletion;
+  ai_profile_intelligence?: LinkedInAIProfileIntelligence | null;
+  ai_profile_intelligence_meta?: LinkedInProfileIntelligenceMeta | null;
 }
 
 const BASE = '/api/linkedin-social';
@@ -214,6 +239,15 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
 
     if (status === 412 || status === 403) {
       return 'Reconnect LinkedIn to grant analytics permissions, then try again.';
+    }
+
+    if (status === 503) {
+      if (typeof detail === 'string' && detail.trim()) {
+        return detail;
+      }
+      return (
+        'AI profile analysis is temporarily unavailable. Please try again in a few minutes.'
+      );
     }
 
     if (typeof detail === 'string' && detail.trim()) {
@@ -278,12 +312,20 @@ export async function getLinkedInPersonalAnalytics(
   return response.data;
 }
 
-/** Normalized profile, context, validation, and completion questions (Phases 1–4). */
+/** Normalized profile, context, validation, completion, and AI intelligence (Phases 1–5). */
 export async function getLinkedInProfile(
-  refresh = false
+  refresh = false,
+  refreshIntelligence = false
 ): Promise<LinkedInProfileAcquireResponse> {
+  const params: Record<string, boolean> = {};
+  if (refresh) {
+    params.refresh = true;
+  }
+  if (refreshIntelligence) {
+    params.refresh_intelligence = true;
+  }
   const response = await apiClient.get(`${BASE}/profile`, {
-    params: refresh ? { refresh: true } : undefined,
+    params: Object.keys(params).length > 0 ? params : undefined,
   });
   return response.data;
 }

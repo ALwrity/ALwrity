@@ -4,7 +4,9 @@ import {
   completeLinkedInProfile,
   getLinkedInProfile,
   getLinkedInSocialErrorMessage,
+  type LinkedInAIProfileIntelligence,
   type LinkedInCompletionQuestion,
+  type LinkedInProfileIntelligenceMeta,
   type LinkedInProfileValidation,
 } from '../api/linkedinSocial';
 import {
@@ -32,6 +34,10 @@ export function useLinkedInProfileCompletion(enabled: boolean) {
   const [profileValidation, setProfileValidation] =
     useState<LinkedInProfileValidation | null>(null);
   const [questions, setQuestions] = useState<LinkedInCompletionQuestion[]>([]);
+  const [aiProfileIntelligence, setAiProfileIntelligence] =
+    useState<LinkedInAIProfileIntelligence | null>(null);
+  const [aiProfileIntelligenceMeta, setAiProfileIntelligenceMeta] =
+    useState<LinkedInProfileIntelligenceMeta | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const loadAttemptRef = useRef(0);
@@ -68,6 +74,8 @@ export function useLinkedInProfileCompletion(enabled: boolean) {
         }
         setProfileValidation(data.profile_validation ?? null);
         setQuestions(data.profile_completion?.questions ?? []);
+        setAiProfileIntelligence(data.ai_profile_intelligence ?? null);
+        setAiProfileIntelligenceMeta(data.ai_profile_intelligence_meta ?? null);
         setIsLoading(false);
         return;
       } catch (err) {
@@ -88,6 +96,8 @@ export function useLinkedInProfileCompletion(enabled: boolean) {
     setError(message);
     setProfileValidation(null);
     setQuestions([]);
+    setAiProfileIntelligence(null);
+    setAiProfileIntelligenceMeta(null);
     setIsLoading(false);
   }, [enabled]);
 
@@ -105,6 +115,8 @@ export function useLinkedInProfileCompletion(enabled: boolean) {
         const result = await completeLinkedInProfile(answers);
         setProfileValidation(result.profile_validation);
         setQuestions(result.profile_completion?.questions ?? []);
+        setAiProfileIntelligence(result.ai_profile_intelligence ?? null);
+        setAiProfileIntelligenceMeta(result.ai_profile_intelligence_meta ?? null);
       } catch (err) {
         const message = getLinkedInSocialErrorMessage(err);
         console.error('[LinkedInProfileCompletion] submit failed:', message, err);
@@ -124,6 +136,8 @@ export function useLinkedInProfileCompletion(enabled: boolean) {
     error,
     profileValidation,
     questions,
+    aiProfileIntelligence,
+    aiProfileIntelligenceMeta,
     isProfileComplete,
     isSubmitting,
     submitError,

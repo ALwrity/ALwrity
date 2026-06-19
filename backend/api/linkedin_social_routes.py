@@ -31,9 +31,20 @@ from models.linkedin_social_models import (
     LinkedInProfileCompleteResponse,
     LinkedInProfileContextMetaResponse,
     LinkedInProfileMetaResponse,
+    AIProfileIntelligenceResponse,
     CompletionQuestionResponse,
     ProfileCompletionResponse,
+    ProfileIntelligenceMetaResponse,
     ProfileValidationResponse,
+)
+from services.integrations.linkedin.profile_intelligence_llm import ProfileIntelligenceLLMError
+from services.integrations.linkedin.profile_intelligence_service import (
+    ProfileIntelligenceAcquireMeta,
+    ProfileIntelligenceError,
+    get_or_generate_profile_intelligence,
+)
+from services.integrations.linkedin.profile_intelligence_validator import (
+    ProfileIntelligenceValidationError,
 )
 from services.integrations.linkedin.analytics_dates import (
     InvalidAnalyticsDateRange,
@@ -230,6 +241,9 @@ def _validation_result_to_response(
 
 def _completion_result_to_response(
     result: ProfileCompletionResult,
+    *,
+    ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None,
+    ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None,
 ) -> LinkedInProfileCompleteResponse:
     """Map completion service result to POST /profile/complete response."""
     return LinkedInProfileCompleteResponse(
@@ -246,7 +260,135 @@ def _completion_result_to_response(
                 for question in result.questions
             ]
         ),
+        ai_profile_intelligence=ai_profile_intelligence,
+        ai_profile_intelligence_meta=ai_profile_intelligence_meta,
     )
+
+
+def _stored_intelligence_to_response(
+    stored: dict[str, Any],
+) -> AIProfileIntelligenceResponse:
+    """Map persisted intelligence dict to API response (exclude server ``meta``)."""
+    payload = {key: value for key, value in stored.items() if key != "meta"}
+    return AIProfileIntelligenceResponse.model_validate(payload)
+
+
+def _intelligence_meta_to_response(
+    meta: ProfileIntelligenceAcquireMeta,
+) -> Optional[ProfileIntelligenceMetaResponse]:
+    """Map orchestrator meta to API response when intelligence was acquired."""
+    source = meta.get("source")
+    if source not in ("cache", "generated"):
+        return None
+    return ProfileIntelligenceMetaResponse(
+        source=source,  # type: ignore[arg-type]
+        ai_intelligence_updated_at=meta.get("ai_intelligence_updated_at"),
+    )
+
+
+def _load_profile_intelligence_for_response(
+    user_id: str,
+    profile_context: dict[str, Any],
+    profile_validation: ProfileValidationResult,
+    repository: ProfileRepository,
+    *,
+    force_regenerate: bool = False,
+) -> tuple[Optional[AIProfileIntelligenceResponse], Optional[ProfileIntelligenceMetaResponse]]:
+    """
+    Generate or load AI profile intelligence for API responses.
+
+    Returns ``(None, None)`` when profile is incomplete without calling the LLM.
+    """
+    if not profile_validation.get("is_profile_complete"):
+        logger.info(
+            "[ProfileIntelligence] API skip — profile incomplete user_id={} "
+            "missing_fields={}",
+            user_id,
+            profile_validation.get("missing_fields"),
+        )
+        return None, None
+
+    logger.info(
+        "[ProfileIntelligence] API load start user_id={} force_regenerate={}",
+        user_id,
+        force_regenerate,
+    )
+    try:
+        stored, meta = get_or_generate_profile_intelligence(
+            user_id,
+            profile_context,
+            profile_validation=profile_validation,
+            repository=repository,
+            force_regenerate=force_regenerate,
+        )
+    except (ProfileIntelligenceLLMError, ProfileIntelligenceValidationError) as exc:
+        _raise_profile_intelligence_http_error(exc, user_id=user_id)
+    except (ProfileIntelligenceError, ValueError) as exc:
+        _raise_profile_intelligence_http_error(exc, user_id=user_id)
+    except Exception as exc:
+        _raise_profile_intelligence_http_error(exc, user_id=user_id)
+
+    if not stored:
+        logger.warning(
+            "[ProfileIntelligence] API load returned empty intelligence user_id={}",
+            user_id,
+        )
+        return None, None
+
+    logger.info(
+        "[ProfileIntelligence] API load complete user_id={} source={}",
+        user_id,
+        meta.get("source"),
+    )
+    return _stored_intelligence_to_response(stored), _intelligence_meta_to_response(meta)
+
+
+def _raise_profile_intelligence_http_error(exc: Exception, *, user_id: str) -> None:
+    """Map Phase 5 intelligence failures to HTTP status codes."""
+    if isinstance(exc, ProfileIntelligenceLLMError):
+        error_kind = getattr(exc, "error_kind", "unknown")
+        logger.exception(
+            "[ProfileIntelligence] LLM failure user_id={} kind={}: {}",
+            user_id,
+            error_kind,
+            exc,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to generate AI profile intelligence.",
+        ) from exc
+
+    if isinstance(exc, ProfileIntelligenceValidationError):
+        logger.exception(
+            "[ProfileIntelligence] validation failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail="Unable to generate AI profile intelligence.",
+        ) from exc
+
+    if isinstance(exc, (ProfileIntelligenceError, ValueError)):
+        logger.exception(
+            "[ProfileIntelligence] orchestration failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate AI profile intelligence.",
+        ) from exc
+
+    logger.exception(
+        "[ProfileIntelligence] unexpected failure user_id={}: {}",
+        user_id,
+        exc,
+    )
+    raise HTTPException(
+        status_code=500,
+        detail="Unable to generate AI profile intelligence.",
+    ) from exc
 
 
 def _build_profile_completion_payload(
@@ -353,6 +495,10 @@ async def get_linkedin_profile(
         False,
         description="Force Unipile fetch, update DB, and invalidate downstream on hash change",
     ),
+    refresh_intelligence: bool = Query(
+        False,
+        description="Force regeneration of AI profile intelligence (Phase 5)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInProfileAcquireResponse:
     """
@@ -361,9 +507,15 @@ async def get_linkedin_profile(
     Phase 1: cache-first normalized profile from ``linkedin_analysis_context``.
     Phase 2: cache-first ``profile_context`` built from the normalized profile.
     Phase 3/4: ``profile_validation`` and completion questions when incomplete.
+    Phase 5: ``ai_profile_intelligence`` when profile is complete.
     """
     user_id = _user_id(current_user)
-    logger.info("[LinkedInProfile] GET /profile user_id={} refresh={}", user_id, refresh)
+    logger.info(
+        "[LinkedInProfile] GET /profile user_id={} refresh={} refresh_intelligence={}",
+        user_id,
+        refresh,
+        refresh_intelligence,
+    )
     try:
         profile, meta = await get_or_fetch_profile(
             user_id,
@@ -400,13 +552,39 @@ async def get_linkedin_profile(
     except Exception as exc:
         _raise_profile_validation_http_error(exc, user_id=user_id)
 
+    ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
+    ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
+    if profile_validation.get("is_profile_complete"):
+        (
+            ai_profile_intelligence,
+            ai_profile_intelligence_meta,
+        ) = _load_profile_intelligence_for_response(
+            user_id,
+            profile_context,
+            profile_validation,
+            repository,
+            force_regenerate=refresh_intelligence,
+        )
+    else:
+        logger.info(
+            "[ProfileIntelligence] GET /profile skipping intelligence — incomplete "
+            "user_id={} missing_fields={}",
+            user_id,
+            profile_validation.get("missing_fields"),
+        )
+
     logger.info(
         "[LinkedInProfile] GET /profile complete user_id={} profile_source={} "
-        "context_source={} is_profile_complete={}",
+        "context_source={} is_profile_complete={} intelligence_source={}",
         user_id,
         meta.get("source"),
         context_meta.get("source"),
         profile_validation.get("is_profile_complete"),
+        (
+            ai_profile_intelligence_meta.source
+            if ai_profile_intelligence_meta
+            else None
+        ),
     )
     return LinkedInProfileAcquireResponse(
         profile=profile,
@@ -422,6 +600,8 @@ async def get_linkedin_profile(
         ),
         profile_validation=_validation_result_to_response(profile_validation),
         profile_completion=profile_completion,
+        ai_profile_intelligence=ai_profile_intelligence,
+        ai_profile_intelligence_meta=ai_profile_intelligence_meta,
     )
 
 
@@ -469,7 +649,25 @@ async def complete_linkedin_profile(
         user_id,
         result.profile_validation.get("is_profile_complete"),
     )
-    return _completion_result_to_response(result)
+
+    ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
+    ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
+    if result.profile_validation.get("is_profile_complete"):
+        (
+            ai_profile_intelligence,
+            ai_profile_intelligence_meta,
+        ) = _load_profile_intelligence_for_response(
+            user_id,
+            result.profile_context,
+            result.profile_validation,
+            repository,
+        )
+
+    return _completion_result_to_response(
+        result,
+        ai_profile_intelligence=ai_profile_intelligence,
+        ai_profile_intelligence_meta=ai_profile_intelligence_meta,
+    )
 
 
 @router.get("/connection/status", response_model=LinkedInConnectionStatusResponse)

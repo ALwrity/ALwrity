@@ -126,8 +126,30 @@ class ProfileCompletionResponse(BaseModel):
     questions: List[CompletionQuestionResponse] = Field(default_factory=list)
 
 
+class AIProfileIntelligenceResponse(BaseModel):
+    """Phase 5 AI profile understanding (LLM fields only — no server meta)."""
+
+    professional_identity: str
+    primary_expertise: List[str] = Field(default_factory=list)
+    industry: str
+    experience_level: str
+    knowledge_domains: List[str] = Field(default_factory=list)
+    writing_opportunities: List[str] = Field(default_factory=list)
+    target_audience: List[str] = Field(default_factory=list)
+    communication_style: str
+    brand_positioning: str
+    summary: str
+
+
+class ProfileIntelligenceMetaResponse(BaseModel):
+    """Phase 5 intelligence acquisition metadata."""
+
+    source: Literal["cache", "generated"]
+    ai_intelligence_updated_at: Optional[str] = None
+
+
 class LinkedInProfileAcquireResponse(BaseModel):
-    """Normalized own-profile snapshot with Phase 2–4 analysis context."""
+    """Normalized own-profile snapshot with Phase 2–5 analysis context."""
 
     profile: Dict[str, Any] = Field(default_factory=dict)
     meta: LinkedInProfileMetaResponse
@@ -135,6 +157,8 @@ class LinkedInProfileAcquireResponse(BaseModel):
     profile_context_meta: LinkedInProfileContextMetaResponse
     profile_validation: Optional[ProfileValidationResponse] = None
     profile_completion: Optional[ProfileCompletionResponse] = None
+    ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
+    ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
 
 
 class LinkedInProfileCompleteRequest(BaseModel):
@@ -149,3 +173,5 @@ class LinkedInProfileCompleteResponse(BaseModel):
     profile_context: Dict[str, Any] = Field(default_factory=dict)
     profile_validation: ProfileValidationResponse
     profile_completion: ProfileCompletionResponse
+    ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
+    ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None

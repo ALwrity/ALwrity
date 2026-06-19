@@ -24,6 +24,29 @@ def compute_profile_content_hash(profile: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+def compute_profile_context_hash(context: dict[str, Any]) -> str:
+    """
+    Return SHA-256 hex digest of canonical ``LinkedInProfileContext`` JSON.
+
+    Used by Phase 5 to detect when AI profile intelligence must be regenerated
+    (e.g. after Phase 4 patches context without changing Phase 1 hash).
+    """
+    if not isinstance(context, dict):
+        logger.error(
+            "[ProfileIntelligence] compute_profile_context_hash invalid type={}",
+            type(context).__name__,
+        )
+        raise TypeError("profile context must be a dict")
+    canonical = json.dumps(context, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    logger.debug(
+        "[ProfileIntelligence] compute_profile_context_hash hash={} bytes={}",
+        digest[:12],
+        len(canonical),
+    )
+    return digest
+
+
 class ProfileRepository:
     """Read/write ``linkedin_analysis_context`` rows for a single user."""
 
@@ -541,6 +564,165 @@ class ProfileRepository:
             len(merged),
         )
         return merged
+
+    def get_ai_profile_intelligence(
+        self,
+        user_id: str,
+        *,
+        row: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Read cached AI profile intelligence JSON for ``user_id``.
+
+        Args:
+            user_id: ALwrity user ID
+            row: Optional pre-loaded analysis row to avoid a second DB read
+
+        Returns:
+            Parsed Phase 5 intelligence dict, or ``None`` when not stored/invalid
+        """
+        logger.info(
+            "[ProfileIntelligence] ProfileRepository.get_ai_profile_intelligence "
+            "user_id={}",
+            user_id,
+        )
+        if row is None:
+            row = self.get_analysis_row(user_id)
+        if not row:
+            logger.info(
+                "[ProfileIntelligence] ProfileRepository.get_ai_profile_intelligence "
+                "no row user_id={}",
+                user_id,
+            )
+            return None
+        raw_json = row.get("ai_profile_intelligence_json")
+        if not raw_json:
+            logger.info(
+                "[ProfileIntelligence] ProfileRepository.get_ai_profile_intelligence "
+                "empty ai_profile_intelligence_json user_id={}",
+                user_id,
+            )
+            return None
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            logger.exception(
+                "[ProfileIntelligence] Invalid ai_profile_intelligence_json "
+                "user_id={}: {}",
+                user_id,
+                exc,
+            )
+            return None
+        if not isinstance(parsed, dict):
+            logger.error(
+                "[ProfileIntelligence] ai_profile_intelligence_json is not an object "
+                "user_id={}",
+                user_id,
+            )
+            return None
+        logger.info(
+            "[ProfileIntelligence] ProfileRepository.get_ai_profile_intelligence hit "
+            "user_id={}",
+            user_id,
+        )
+        return parsed
+
+    def save_ai_profile_intelligence(
+        self,
+        user_id: str,
+        intelligence: dict[str, Any],
+        *,
+        context_hash: Optional[str] = None,
+    ) -> str:
+        """
+        Persist Phase 5 AI profile intelligence JSON and ``ai_intelligence_updated_at``.
+
+        Does not modify ``profile_context_json`` or upstream columns.
+        Requires an existing ``linkedin_analysis_context`` row.
+
+        Args:
+            user_id: ALwrity user ID
+            intelligence: Validated AI profile intelligence dict
+            context_hash: Optional profile context hash to stamp in ``meta``
+
+        Returns:
+            ISO timestamp written to ``ai_intelligence_updated_at``
+
+        Raises:
+            ValueError: When no analysis row exists or intelligence is not a dict
+        """
+        logger.info(
+            "[ProfileIntelligence] ProfileRepository.save_ai_profile_intelligence "
+            "user_id={}",
+            user_id,
+        )
+        if not isinstance(intelligence, dict):
+            raise ValueError("AI profile intelligence must be a dict")
+
+        intelligence_to_save = intelligence
+        if context_hash is not None:
+            intelligence_to_save = json.loads(
+                json.dumps(intelligence, separators=(",", ":"), default=str)
+            )
+            meta = intelligence_to_save.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+                intelligence_to_save["meta"] = meta
+            meta["built_from_profile_context_hash"] = context_hash
+
+        intelligence_json = json.dumps(
+            intelligence_to_save,
+            separators=(",", ":"),
+            default=str,
+        )
+        now = datetime.utcnow().isoformat()
+        db_path = self._ensure_db(user_id)
+
+        existing = self.get_analysis_row(user_id)
+        if not existing:
+            logger.error(
+                "[ProfileIntelligence] save_ai_profile_intelligence no analysis row "
+                "user_id={}",
+                user_id,
+            )
+            raise ValueError(
+                f"No linkedin_analysis_context row for user_id={user_id!r}; "
+                "acquire normalized profile first"
+            )
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE linkedin_analysis_context
+                    SET ai_profile_intelligence_json = ?,
+                        ai_intelligence_updated_at = ?,
+                        updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (intelligence_json, now, now, user_id),
+                )
+                conn.commit()
+            except sqlite3.Error as exc:
+                logger.exception(
+                    "[ProfileIntelligence] save_ai_profile_intelligence db error "
+                    "user_id={}: {}",
+                    user_id,
+                    exc,
+                )
+                raise ValueError(
+                    "Failed to persist AI profile intelligence"
+                ) from exc
+
+        logger.info(
+            "[ProfileIntelligence] ProfileRepository.save_ai_profile_intelligence "
+            "complete user_id={} ai_intelligence_updated_at={} context_hash={}",
+            user_id,
+            now,
+            context_hash[:12] if context_hash else None,
+        )
+        return now
 
     def has_fresh_profile(
         self,
