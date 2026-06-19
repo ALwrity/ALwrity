@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import PersonaEditorModal from './PersonaEditorModal';
 import { getUserPersonas, getPlatformPersona, updatePersona, updatePlatformPersona } from '../../../api/persona';
 import { shouldSkipOnboarding } from '../../../utils/demoMode';
@@ -41,6 +42,10 @@ const PersonaChip: React.FC<PersonaChipProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Resolve the active Clerk user so the persona write carries the
+  // correct tenant id (the previous `user_id: 1` was a multi-tenant
+  // collision across concurrent users).
+  const { user } = useUser();
 
   // Fetch persona data
   const fetchPersonaData = async () => {
@@ -75,7 +80,7 @@ const PersonaChip: React.FC<PersonaChipProps> = ({
 
         setPersonaData({
           id: platformData?.id || 1,
-          user_id: 1,
+          user_id: user?.id ? Number(user.id) : undefined,
           persona_name: corePersona.persona_name || 'Untitled Persona',
           archetype: corePersona.archetype || 'General',
           core_belief: corePersona.core_belief || '',
