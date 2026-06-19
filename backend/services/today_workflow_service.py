@@ -1,4 +1,5 @@
 import json
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -14,9 +15,58 @@ from services.llm_providers.main_text_generation import llm_text_gen
 from services.database import get_session_for_user
 from loguru import logger
 
-PILLAR_IDS = ["plan", "generate", "publish", "analyze", "engage", "remarket"]
+
+_DEFAULT_PILLAR_IDS = ("plan", "generate", "publish", "analyze", "engage", "remarket")
+_DEFAULT_PLAN_CONTEXT_THRESHOLD = 0.65
+
+
+def _load_pillar_ids() -> List[str]:
+    """Load the configured pillar ids, falling back to the
+    built-in defaults. Override with the
+    ``ALWRITY_PILLAR_IDS`` environment variable as a
+    comma-separated list.
+    """
+    raw = os.getenv("ALWRITY_PILLAR_IDS", "").strip()
+    if not raw:
+        return list(_DEFAULT_PILLAR_IDS)
+    parsed = [p.strip().lower() for p in raw.split(",") if p.strip()]
+    if not parsed:
+        logger.warning(
+            "ALWRITY_PILLAR_IDS env var is set but parses to empty list; "
+            "falling back to defaults"
+        )
+        return list(_DEFAULT_PILLAR_IDS)
+    logger.info(f"Loaded {len(parsed)} pillar ids from ALWRITY_PILLAR_IDS env var")
+    return parsed
+
+
+def _load_plan_context_threshold() -> float:
+    """Load the configured plan contextuality threshold (0.0-1.0).
+    Override with the ``ALWRITY_PLAN_CONTEXT_THRESHOLD`` env var.
+    """
+    raw = os.getenv("ALWRITY_PLAN_CONTEXT_THRESHOLD", "").strip()
+    if not raw:
+        return _DEFAULT_PLAN_CONTEXT_THRESHOLD
+    try:
+        value = float(raw)
+    except ValueError:
+        logger.warning(
+            f"ALWRITY_PLAN_CONTEXT_THRESHOLD={raw!r} is not a valid float; "
+            f"falling back to default {_DEFAULT_PLAN_CONTEXT_THRESHOLD}"
+        )
+        return _DEFAULT_PLAN_CONTEXT_THRESHOLD
+    if not 0.0 <= value <= 1.0:
+        logger.warning(
+            f"ALWRITY_PLAN_CONTEXT_THRESHOLD={value} is outside [0.0, 1.0]; "
+            f"falling back to default {_DEFAULT_PLAN_CONTEXT_THRESHOLD}"
+        )
+        return _DEFAULT_PLAN_CONTEXT_THRESHOLD
+    return value
+
+
+PILLAR_IDS = _load_pillar_ids()
 MIN_TASK_EVIDENCE_LINKS = 1
-PLAN_CONTEXT_THRESHOLD = 0.65
+PLAN_CONTEXT_THRESHOLD = _load_plan_context_threshold()
 
 # Calendar → Workflow mapping
 CALENDAR_CONTENT_PILLAR = "generate"

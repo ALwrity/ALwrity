@@ -313,6 +313,12 @@ class ALwrityAgentOrchestrator:
     
     def _create_orchestrator_agent(self):
         """Create master orchestrator agent using txtai native framework"""
+        if not TXTAI_AVAILABLE:
+            raise RuntimeError(
+                "txtai is not available; the agent orchestrator cannot "
+                "create a master agent. Install txtai or disable agent "
+                "features for this user."
+            )
         try:
             self.orchestrator_agent = StrategyOrchestratorAgent(
                 user_id=self.user_id,
@@ -320,12 +326,12 @@ class ALwrityAgentOrchestrator:
                 performance_monitor=self.performance_monitor,
                 llm=self.llm
             )
-            
+
             # Set sub-agents
             self.orchestrator_agent.set_sub_agents(self.agents)
-            
+
             logger.info(f"Created StrategyOrchestratorAgent for user {self.user_id}")
-            
+
         except Exception as e:
             logger.error(f"Error creating orchestrator agent: {e}")
             # Fallback to simple agent if class instantiation fails
