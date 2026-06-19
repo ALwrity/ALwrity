@@ -50,13 +50,42 @@ class SIFOnboardingIntegration:
         # SIF components
         self.intelligence = TxtaiIntelligenceService(user_id)
         self.harvester = SemanticHarvesterService()
-        
-        # Initialize agents
-        self.strategy_agent = StrategyArchitectAgent(self.intelligence, user_id)
-        self.guardian_agent = ContentGuardianAgent(self.intelligence, user_id)
-        self.link_agent = LinkGraphAgent(self.intelligence, user_id)
-        
+
+        # Issue #620 #11: lazy agent initialization. Pre-#11
+        # all three agents were instantiated eagerly in
+        # ``__init__``, which meant loading the txtai model and
+        # building the embeddings index for every onboarding
+        # service, even ones that only needed (say) competitor
+        # discovery. Lazy creation defers that work to first
+        # access, reducing cold-start time and avoiding the cost
+        # of building an index for users who only call a subset
+        # of the methods.
+        self._strategy_agent: Optional[StrategyArchitectAgent] = None
+        self._guardian_agent: Optional[ContentGuardianAgent] = None
+        self._link_agent: Optional[LinkGraphAgent] = None
+
         logger.info(f"[SIFOnboarding] Initialized for user {user_id}")
+
+    def _get_strategy_agent(self) -> StrategyArchitectAgent:
+        if self._strategy_agent is None:
+            self._strategy_agent = StrategyArchitectAgent(
+                self.intelligence, self.user_id
+            )
+        return self._strategy_agent
+
+    def _get_guardian_agent(self) -> ContentGuardianAgent:
+        if self._guardian_agent is None:
+            self._guardian_agent = ContentGuardianAgent(
+                self.intelligence, self.user_id
+            )
+        return self._guardian_agent
+
+    def _get_link_agent(self) -> LinkGraphAgent:
+        if self._link_agent is None:
+            self._link_agent = LinkGraphAgent(
+                self.intelligence, self.user_id
+            )
+        return self._link_agent
     
     async def enhance_competitor_discovery(self, website_url: str, business_info: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -150,16 +179,16 @@ class SIFOnboardingIntegration:
         
         try:
             # Discover content pillars from user content
-            content_pillars = await self.strategy_agent.discover_pillars()
+            content_pillars = await self._get_strategy_agent().discover_pillars()
             
             # Find semantic gaps (what competitors cover that user doesn't)
-            indexed_documents = await self.strategy_agent._fetch_index_documents()
+            indexed_documents = await self._get_strategy_agent()._fetch_index_documents()
             competitor_doc_ids = [
                 str(doc.get("id", ""))
                 for doc in indexed_documents
-                if self.strategy_agent._infer_document_role(doc.get("metadata", {})) == "competitor"
+                if self._get_strategy_agent()._infer_document_role(doc.get("metadata", {})) == "competitor"
             ]
-            semantic_gaps = await self.strategy_agent.find_semantic_gaps(competitor_indices=competitor_doc_ids)
+            semantic_gaps = await self._get_strategy_agent().find_semantic_gaps(competitor_indices=competitor_doc_ids)
 
             # Analyze content themes and topics
             themes_analysis = await self._analyze_content_themes(indexed_documents)
@@ -201,17 +230,17 @@ class SIFOnboardingIntegration:
 
             user_docs = [
                 doc for doc in indexed_documents
-                if self.strategy_agent._infer_document_role(doc.get("metadata", {})) == "user"
+                if self._get_strategy_agent()._infer_document_role(doc.get("metadata", {})) == "user"
             ]
             competitor_docs = [
                 doc for doc in indexed_documents
-                if self.strategy_agent._infer_document_role(doc.get("metadata", {})) == "competitor"
+                if self._get_strategy_agent()._infer_document_role(doc.get("metadata", {})) == "competitor"
             ]
             if not user_docs and not competitor_docs:
                 return None
 
-            user_theme_density = self.strategy_agent._extract_topic_density(user_docs)
-            competitor_theme_density = self.strategy_agent._extract_topic_density(competitor_docs)
+            user_theme_density = self._get_strategy_agent()._extract_topic_density(user_docs)
+            competitor_theme_density = self._get_strategy_agent()._extract_topic_density(competitor_docs)
             all_topics = set(user_theme_density) | set(competitor_theme_density)
 
             ranked_themes = []
@@ -232,8 +261,8 @@ class SIFOnboardingIntegration:
                         else "shared"
                     ),
                     "evidence": {
-                        "user_sample_titles": self.strategy_agent._sample_titles_for_topic(user_docs, topic),
-                        "competitor_sample_titles": self.strategy_agent._sample_titles_for_topic(competitor_docs, topic)
+                        "user_sample_titles": self._get_strategy_agent()._sample_titles_for_topic(user_docs, topic),
+                        "competitor_sample_titles": self._get_strategy_agent()._sample_titles_for_topic(competitor_docs, topic)
                     }
                 })
 

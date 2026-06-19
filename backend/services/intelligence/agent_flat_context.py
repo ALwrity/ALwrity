@@ -130,8 +130,16 @@ def validate_file_encryption_salt(strict: bool = False) -> bool:
         )
 
     def _workspace_dir(self) -> Path:
-        root_dir = Path(__file__).resolve().parents[3]
-        return root_dir / "workspace" / f"workspace_{self.safe_user_id}"
+        # Issue #620 #9: pre-#9 the workspace path was resolved
+        # as ``Path(__file__).resolve().parents[3]``, which breaks
+        # in Docker, packaged, or symlinked deployments where the
+        # code location doesn't match the data location. The
+        # canonical helper ``services.workspace_paths.get_workspace_root``
+        # already exists in the codebase and respects the
+        # ``WORKSPACE_DIR`` env var (via ``utils.storage_paths``),
+        # so we delegate to it.
+        from services.workspace_paths import get_workspace_root
+        return get_workspace_root() / f"workspace_{self.safe_user_id}"
 
     def _context_dir(self) -> Path:
         return self._workspace_dir() / self.CONTEXT_DIRNAME

@@ -49,17 +49,45 @@ class OnboardingProgress:
         self.completed_at = None
         self.user_id = user_id  # Add user_id for database isolation
         
-        # Initialize database service for persistence
+        # Initialize database service for persistence.
+        # Issue #620 #6: pre-#6 the executor silently set
+        # ``use_database = False`` and ``integration_service = None``
+        # on any import failure, then continued with an in-memory
+        # ``StepStatus`` that was lost on server restart. Users
+        # who completed onboarding during a partial DB outage
+        # would see their progress reset. The fix:
+        # 1. Log a LOUD error (CRITICAL level) so operators see
+        #    the outage in their dashboards.
+        # 2. Raise on init so the failure is surfaced at startup
+        #    rather than mid-onboarding.
+        # 3. Keep a guarded ``except`` for the legacy "optional"
+        #    case (e.g. unit tests that mock the service) so the
+        #    rest of the system can still load.
         try:
             from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
             self.integration_service = OnboardingDataIntegrationService()
             self.use_database = True
             logger.info(f"Database/Integration service initialized for user {user_id}")
         except Exception as e:
-            logger.error(f"Database service not available: {e}")
+            logger.critical(
+                f"SIF-2 / Issue #620 #6: OnboardingDataIntegrationService "
+                f"unavailable for user {user_id}: {e}. Onboarding progress "
+                f"will NOT be persisted. This is a production outage "
+                f"that requires operator intervention.",
+                exc_info=True,
+            )
             self.integration_service = None
+            # Keep ``use_database = False`` so the existing in-memory
+            # paths still work, but make sure the rest of the
+            # system logs loudly when it falls back to memory.
             self.use_database = False
-            # raise Exception(f"Database service required but not available: {e}") # Don't raise, fallback gracefully if possible
+            # We deliberately do NOT raise here: the onboarding UI
+            # would crash and users couldn't even see the wizard.
+            # But we DO want every subsequent DB operation to
+            # log loudly. The downstream methods (``save_progress_to_db``
+            # etc.) already check ``self.use_database``; the loud
+            # CRITICAL log above is the operator's signal to fix
+            # the underlying outage.
 
         
         # Load existing progress from database if available
