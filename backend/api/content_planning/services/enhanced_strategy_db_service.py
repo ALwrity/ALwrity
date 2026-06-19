@@ -83,17 +83,36 @@ class EnhancedStrategyDBService:
             self.db.rollback()
             return None
     
-    async def update_enhanced_strategy(self, strategy_id: int, update_data: Dict[str, Any]) -> Optional[EnhancedContentStrategy]:
-        """Update an enhanced strategy."""
+    async def update_enhanced_strategy(
+        self,
+        strategy_id: int,
+        update_data: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> Optional[EnhancedContentStrategy]:
+        """Update an enhanced strategy.
+
+        The ``user_id`` argument enforces tenant ownership. When
+        provided, the strategy is loaded through
+        ``get_enhanced_strategy(strategy_id, user_id)`` which
+        returns ``None`` if the record does not exist OR does not
+        belong to the user. Either case surfaces as a 404 at the
+        route, which is the right behaviour -- the caller cannot
+        distinguish "not yours" from "not real" because doing so
+        would leak the existence of other users' strategy IDs.
+
+        Pass ``user_id=None`` to skip the ownership check (admin
+        / internal flows only). Production routes must always
+        pass a real user id.
+        """
         try:
-            strategy = await self.get_enhanced_strategy(strategy_id)
+            strategy = await self.get_enhanced_strategy(strategy_id, user_id=user_id)
             if not strategy:
                 return None
-            
+
             for key, value in update_data.items():
                 if hasattr(strategy, key):
                     setattr(strategy, key, value)
-            
+
             strategy.updated_at = datetime.utcnow()
             self.db.commit()
             self.db.refresh(strategy)
@@ -102,14 +121,21 @@ class EnhancedStrategyDBService:
             logger.error(f"Error updating enhanced strategy {strategy_id}: {str(e)}")
             self.db.rollback()
             return None
-    
-    async def delete_enhanced_strategy(self, strategy_id: int) -> bool:
-        """Delete an enhanced strategy."""
+
+    async def delete_enhanced_strategy(
+        self,
+        strategy_id: int,
+        user_id: Optional[str] = None,
+    ) -> bool:
+        """Delete an enhanced strategy.
+
+        Same ownership semantics as ``update_enhanced_strategy``.
+        """
         try:
-            strategy = await self.get_enhanced_strategy(strategy_id)
+            strategy = await self.get_enhanced_strategy(strategy_id, user_id=user_id)
             if not strategy:
                 return False
-            
+
             self.db.delete(strategy)
             self.db.commit()
             return True

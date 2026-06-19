@@ -138,16 +138,29 @@ async def update_content_strategy(
     """Update a content strategy."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid user ID in authentication token"
+            )
         logger.info(f"Updating content strategy: {strategy_id} for user: {clerk_user_id}")
-        
+
         db_service = EnhancedStrategyDBService(db)
-        updated_strategy = await db_service.update_enhanced_strategy(strategy_id, update_data)
-        
+        # Pass the authenticated user id so the DB service enforces
+        # tenant ownership. The previous code omitted this, which
+        # allowed any authenticated user to update any other user's
+        # strategy by guessing an integer ID (the
+        # ``get_enhanced_strategy`` call inside the service was
+        # loading without a user filter).
+        updated_strategy = await db_service.update_enhanced_strategy(
+            strategy_id, update_data, user_id=clerk_user_id
+        )
+
         if not updated_strategy:
             raise ContentPlanningErrorHandler.handle_not_found_error("Content strategy", strategy_id)
-        
+
         return ContentStrategyResponse(**updated_strategy.to_dict())
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -163,16 +176,24 @@ async def delete_content_strategy(
     """Delete a content strategy."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid user ID in authentication token"
+            )
         logger.info(f"Deleting content strategy: {strategy_id} for user: {clerk_user_id}")
-        
+
         db_service = EnhancedStrategyDBService(db)
-        deleted = await db_service.delete_enhanced_strategy(strategy_id)
-        
+        # Same ownership enforcement as the PUT handler above.
+        deleted = await db_service.delete_enhanced_strategy(
+            strategy_id, user_id=clerk_user_id
+        )
+
         if deleted:
             return {"message": f"Content strategy {strategy_id} deleted successfully"}
         else:
             raise ContentPlanningErrorHandler.handle_not_found_error("Content strategy", strategy_id)
-        
+
     except HTTPException:
         raise
     except Exception as e:
