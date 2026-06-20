@@ -191,27 +191,71 @@ inputDataPoints, autoPopulatedFields), not hardcoded.
 The claim in #594 is overstated. These are normal React
 component patterns.
 
-### H1: SQLAlchemy namespace collision -- LIVE but uncertain severity
+### H1: SQLAlchemy mapper configuration failure -- LIVE (CRITICAL, confirmed)
 
 `backend/models/enhanced_strategy_models.py`:
 
 - Line 32: `performance_metrics = Column(JSON, nullable=True)`
 - Line 90: `performance_metrics = relationship("StrategyPerformanceMetrics", ...)`
 
-In SQLAlchemy 1.4+ / 2.0, two mapped attributes with the same
-name on the same class is a configuration error. The fact that
-`from models.enhanced_strategy_models import EnhancedContentStrategy`
-imports without raising suggests either the class is never
-fully configured in a request path, or the SQLAlchemy version
-emits only a warning. A deeper test against an actual request
-to `/enhanced-strategies/{id}` is needed to confirm whether this
-is a real runtime failure or a hidden time bomb. The fix is a
-rename of one of the two (typically the column to
-`performance_metrics_json` and keeping the relationship name).
+Confirmed at the SQLAlchemy level. Running
+`sqlalchemy.inspect(EnhancedContentStrategy)` (or any query path
+that triggers mapper configuration) raises:
 
-This is deferred from the quick-win scope because confirming the
-severity requires a runtime test that we are not running in this
-phase.
+```
+sqlalchemy.exc.InvalidRequestError: When initializing mapper
+Mapper[EnhancedContentStrategy(enhanced_content_strategies)],
+expression 'StrategyPerformanceMetrics' failed to locate a name
+```
+
+The class import itself succeeds because SQLAlchemy defers
+relationship resolution until first mapper configuration. Any
+endpoint that loads an `EnhancedContentStrategy` from the DB
+(every read path in `routes/strategies.py` and
+`endpoints/strategy_crud.py`) hits this on first call.
+
+**The collision is more widespread than the column/relationship
+pair above.** `backend/models/monitoring_models.py` declares four
+classes (`StrategyMonitoringPlan`, `MonitoringTask`,
+`StrategyPerformanceMetrics`, `StrategyActivationStatus`) that
+each use `relationship("EnhancedContentStrategy",
+back_populates=...)` referencing four attributes on
+`EnhancedContentStrategy` (`monitoring_plans`, `monitoring_tasks`,
+`performance_metrics`, `activation_status`). All four are also
+exposed as a `relationship("Strategy..."` from the other side,
+creating a circular import: `monitoring_models.py` imports `Base`
+from `enhanced_strategy_models.py`, so adding a top-level
+`from models.monitoring_models import StrategyPerformanceMetrics`
+to `enhanced_strategy_models.py` fails with
+`ImportError: cannot import name 'Base' from partially initialized
+module 'models.enhanced_strategy_models'`.
+
+**Fix shape** (not yet applied -- awaiting sign-off because it
+touches the schema and the model init order):
+
+1. Break the cycle by removing the `back_populates=...` from
+   `monitoring_models.py:19, 42, 84, 99` and replacing each with
+   `backref="..."` on the `relationship("EnhancedContentStrategy", ...)`
+   side. `backref` creates the reverse attribute on the
+   `EnhancedContentStrategy` class automatically, so the
+   `relationship(...)` declarations on
+   `enhanced_strategy_models.py:89-91` can be deleted.
+2. Rename the `performance_metrics` column to
+   `performance_metrics_data` so the column and the backref'd
+   relationship don't collide on the same name.
+3. Update the 2 readers (`strategy_analyzer.py:203`,
+   `prompt_engineering.py:33`) and the 1 constructor
+   (`strategy_service.py:98`).
+4. Add an Alembic / SQL migration: `ALTER TABLE
+   enhanced_content_strategies RENAME COLUMN performance_metrics
+   TO performance_metrics_data;`
+
+Touches: `enhanced_strategy_models.py` (1 column rename + 3
+relationship lines removed), `monitoring_models.py` (4
+relationship declarations), 3 reader files, 1 constructor file,
+1 db_service unpack, 1 db_service setattr loop, 1 SQL migration
+script. About 15-25 lines net across 6-8 files, plus a DB
+migration that must be run before deployment.
 
 ### H2: Unhandled `RuntimeError` in content calendar -- likely LIVE (reliability)
 
@@ -276,10 +320,15 @@ metrics. The values shown to the user come from the props
 | `cs/phase-3.7` | H2: try/except around `_generate_content_calendar` | 1 file | deferred |
 | `cs/phase-3.8` | H3: type audit for `user_id` (string vs int) across callers | tbd | deferred |
 | `cs/phase-3.9` | H4: escape `%` and `_` in `search_term` before LIKE | 1 file | deferred |
+| `cs/phase-3.10` | H1: break circular import + rename `performance_metrics` column | 6-8 files + DB migration | deferred, awaiting sign-off |
 
-Total `cs/phase-3` quick-win scope: 2 files, ~10-20 line changes.
-Both items are surgical fixes that close a real security hole
-(C1) and a real silent data loss bug (C5).
+Total `cs/phase-3` quick-win scope so far: 2 files, ~10-20 line
+changes. H1 escalated during the audit from "rename 1 column" to
+"break a circular import across 4 model classes + 1 column rename
++ 1 SQL migration." That is a real bug (mapper configuration
+throws `InvalidRequestError` on first DB read), but the fix
+touches the schema, so I am pausing for user sign-off before
+touching it.
 
 ---
 

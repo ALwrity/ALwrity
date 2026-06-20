@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 
 # Import the same Base from enhanced_strategy_models
@@ -8,15 +8,34 @@ from models.enhanced_strategy_models import Base
 class StrategyMonitoringPlan(Base):
     """Model for storing strategy monitoring plans"""
     __tablename__ = "strategy_monitoring_plans"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     strategy_id = Column(Integer, ForeignKey("enhanced_content_strategies.id"), nullable=False)
     plan_data = Column(JSON, nullable=False)  # Store the complete monitoring plan
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationship to strategy
-    strategy = relationship("EnhancedContentStrategy", back_populates="monitoring_plans")
+
+    # Relationship to strategy.
+    # This module imports Base from enhanced_strategy_models, so a
+    # top-level import of EnhancedContentStrategy here would create a
+    # circular import -- the class would be only partially defined.
+    # The original code used ``back_populates="monitoring_plans"``,
+    # which requires a matching ``back_populates="strategy"`` on the
+    # strategy class, and the resulting forward-reference string
+    # resolution triggered ``InvalidRequestError: expression
+    # '...' failed to locate a name`` on first DB read.
+    #
+    # Fix: use ``backref`` here. The forward ``strategy`` attribute
+    # on this class is the explicit relationship; the reverse
+    # ``monitoring_plans`` attribute is auto-created on
+    # EnhancedContentStrategy with the cascade configured via the
+    # backref kwargs. Cascade goes on the strategy side (the parent
+    # in the delete chain) so deleting a strategy deletes its
+    # monitoring plans.
+    strategy = relationship(
+        "EnhancedContentStrategy",
+        backref=backref("monitoring_plans", cascade="all, delete-orphan"),
+    )
 
 class MonitoringTask(Base):
     """Model for storing individual monitoring tasks"""
@@ -39,7 +58,14 @@ class MonitoringTask(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
-    strategy = relationship("EnhancedContentStrategy", back_populates="monitoring_tasks")
+    # See StrategyMonitoringPlan above for the rationale behind
+    # using backref (not back_populates) on the strategy relationship.
+    # Cascade goes on the backref (strategy) side, so deleting a
+    # strategy deletes its monitoring tasks.
+    strategy = relationship(
+        "EnhancedContentStrategy",
+        backref=backref("monitoring_tasks", cascade="all, delete-orphan"),
+    )
     execution_logs = relationship("TaskExecutionLog", back_populates="task", cascade="all, delete-orphan")
 
 class TaskExecutionLog(Base):
@@ -79,9 +105,16 @@ class StrategyPerformanceMetrics(Base):
     confidence_score = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationship to strategy
-    strategy = relationship("EnhancedContentStrategy", back_populates="performance_metrics")
+
+    # The ``strategy`` relationship uses backref (not back_populates)
+    # to break the circular import. See StrategyMonitoringPlan above
+    # for the full rationale. Cascade goes on the backref (strategy)
+    # side, so deleting a strategy deletes its performance metric
+    # records.
+    strategy = relationship(
+        "EnhancedContentStrategy",
+        backref=backref("performance_metrics", cascade="all, delete-orphan"),
+    )
 
 class StrategyActivationStatus(Base):
     """Model for storing strategy activation status"""
@@ -94,6 +127,12 @@ class StrategyActivationStatus(Base):
     status = Column(String(50), default='active')  # 'active', 'inactive', 'paused'
     performance_score = Column(Integer, nullable=True)
     last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationship to strategy
-    strategy = relationship("EnhancedContentStrategy", back_populates="activation_status")
+
+    # The ``strategy`` relationship uses backref (not back_populates)
+    # to break the circular import. See StrategyMonitoringPlan above
+    # for the full rationale. Cascade goes on the backref (strategy)
+    # side, so deleting a strategy deletes its activation status.
+    strategy = relationship(
+        "EnhancedContentStrategy",
+        backref=backref("activation_status", cascade="all, delete-orphan"),
+    )

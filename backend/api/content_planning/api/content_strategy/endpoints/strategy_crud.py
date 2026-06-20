@@ -222,9 +222,18 @@ async def update_enhanced_strategy(
             )
         
         # Update strategy fields
+        # Remap the public-API key 'performance_metrics' (the JSON
+        # column) to the renamed attribute 'performance_metrics_data'.
+        # The relationship slot on the model is also named
+        # 'performance_metrics' but expects a list of
+        # StrategyPerformanceMetrics records, not a JSON dict, so
+        # the setattr loop must not stomp it. (C2 mass-assignment
+        # fix is a separate concern -- this only prevents the
+        # relationship from being clobbered.)
         for field, value in update_data.items():
-            if hasattr(existing_strategy, field):
-                setattr(existing_strategy, field, value)
+            target_field = 'performance_metrics_data' if field == 'performance_metrics' else field
+            if hasattr(existing_strategy, target_field):
+                setattr(existing_strategy, target_field, value)
         
         existing_strategy.updated_at = datetime.utcnow()
         

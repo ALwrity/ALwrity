@@ -29,7 +29,14 @@ class EnhancedContentStrategy(Base):
     implementation_timeline = Column(String(100), nullable=True)  # 3 months, 6 months, 1 year, etc.
     market_share = Column(String(50), nullable=True)  # Current market share percentage
     competitive_position = Column(String(50), nullable=True)  # Leader, challenger, niche, emerging
-    performance_metrics = Column(JSON, nullable=True)  # Current performance data
+    # Renamed from 'performance_metrics' to 'performance_metrics_data' to
+    # avoid colliding with the StrategyPerformanceMetrics relationship
+    # (back_populates='performance_metrics') declared later on this class.
+    # The original column held a free-form JSON blob of current performance
+    # data; the relationship points at the strategy_performance_metrics
+    # table that records per-period metrics. They are different concepts
+    # and must not share an attribute name.
+    performance_metrics_data = Column("performance_metrics", JSON, nullable=True)  # Current performance data
     
     # Audience Intelligence (6 inputs)
     content_preferences = Column(JSON, nullable=True)  # Preferred content formats and topics
@@ -84,11 +91,25 @@ class EnhancedContentStrategy(Base):
     # Relationships
     autofill_insights = relationship("ContentStrategyAutofillInsights", back_populates="strategy", cascade="all, delete-orphan")
     
-    # Monitoring relationships
-    monitoring_plans = relationship("StrategyMonitoringPlan", back_populates="strategy", cascade="all, delete-orphan")
-    monitoring_tasks = relationship("MonitoringTask", back_populates="strategy", cascade="all, delete-orphan")
-    performance_metrics = relationship("StrategyPerformanceMetrics", back_populates="strategy", cascade="all, delete-orphan")
-    activation_status = relationship("StrategyActivationStatus", back_populates="strategy", cascade="all, delete-orphan")
+    # Monitoring relationships.
+    # These four collection attributes (monitoring_plans,
+    # monitoring_tasks, performance_metrics, activation_status) are
+    # auto-created on this class via ``backref`` declared in
+    # monitoring_models.py. Declaring them here with
+    # ``back_populates=`` would have required a matching
+    # ``relationship("EnhancedContentStrategy", back_populates=...)``
+    # on the monitoring side, but monitoring_models imports Base from
+    # this module -- so a top-level import of EnhancedContentStrategy
+    # there would create a circular import and SQLAlchemy would fail
+    # with ``InvalidRequestError: expression '...' failed to locate a
+    # name`` on the first DB read.
+    #
+    # The backref form puts the explicit relationship on the monitoring
+    # side and uses ``backref(..., cascade="all, delete-orphan")`` to
+    # apply the cascade to the auto-created collection on this side
+    # -- so deleting a strategy still cascades to delete its
+    # monitoring plans / tasks / metrics / activation status, just as
+    # the original back_populates configuration did.
     
     def __repr__(self):
         return f"<EnhancedContentStrategy(id={self.id}, name='{self.name}', industry='{self.industry}')>"
@@ -109,7 +130,7 @@ class EnhancedContentStrategy(Base):
             'implementation_timeline': self.implementation_timeline,
             'market_share': self.market_share,
             'competitive_position': self.competitive_position,
-            'performance_metrics': self.performance_metrics,
+            'performance_metrics': self.performance_metrics_data,
             
             # Audience Intelligence
             'content_preferences': self.content_preferences,
