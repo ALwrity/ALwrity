@@ -16,9 +16,19 @@ from cryptography.fernet import Fernet, InvalidToken
 from ..analytics_cache_service import analytics_cache
 
 from services.database import get_user_db_path
+from .oauth_provider_base import OAuthProviderBase, resolve_encryption_key
 
-class BingOAuthService:
+class BingOAuthService(OAuthProviderBase):
     """Manages Bing Webmaster Tools OAuth2 authentication flow."""
+
+    # SQL fragments consumed by OAuthProviderBase._migrate_plaintext_tokens_if_needed
+    _select_plaintext_tokens_sql = (
+        "SELECT id, access_token, refresh_token FROM bing_oauth_tokens WHERE user_id = ?"
+    )
+    _update_token_sql = (
+        "UPDATE bing_oauth_tokens SET access_token = ?, refresh_token = ?, updated_at = datetime('now') "
+        "WHERE id = ? AND user_id = ?"
+    )
 
     def __init__(self):
         # Bing Webmaster OAuth2 credentials
@@ -30,74 +40,13 @@ class BingOAuthService:
 
         # Token encryption (matches the Wix/WordPress pattern; closes
         # a security gap where Bing tokens were stored in plaintext).
-        self.token_encryption_key = (
-            os.getenv("BING_TOKEN_ENCRYPTION_KEY")
-            or os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY")
-        )
+        self.token_encryption_key = resolve_encryption_key("bing")
         self._fernet = self._initialize_fernet()
         self._migration_done: set = set()
 
         if not self.client_id or not self.client_secret or self.client_id == 'your_bing_client_id_here':
             logger.warning("Bing Webmaster OAuth client credentials not configured. Please set BING_CLIENT_ID and BING_CLIENT_SECRET environment variables with valid Bing Webmaster application credentials.")
             logger.warning("To get credentials: 1. Go to https://www.bing.com/webmasters/ 2. Sign in to Bing Webmaster Tools 3. Go to Settings > API Access 4. Create OAuth client")
-
-    def _initialize_fernet(self) -> Optional[Fernet]:
-        if not self.token_encryption_key:
-            logger.error("Bing token encryption key is not configured.")
-            return None
-        try:
-            return Fernet(self.token_encryption_key.encode("utf-8"))
-        except Exception:
-            logger.error("Bing token encryption key is invalid.")
-            return None
-
-    def _encrypt_token(self, token: Optional[str]) -> Optional[str]:
-        if not token:
-            return None
-        if not self._fernet:
-            raise ValueError("Token encryption is unavailable: missing/invalid managed key")
-        return self._fernet.encrypt(token.encode("utf-8")).decode("utf-8")
-
-    def _decrypt_token(self, token_blob: Optional[str]) -> Optional[str]:
-        if not token_blob:
-            return None
-        if not self._fernet:
-            raise ValueError("Token decryption is unavailable: missing/invalid managed key")
-        return self._fernet.decrypt(token_blob.encode("utf-8")).decode("utf-8")
-
-    def _is_likely_encrypted_blob(self, value: Optional[str]) -> bool:
-        return bool(value and value.startswith("gAAAAA"))
-
-    def _migrate_plaintext_tokens_if_needed(self, conn: sqlite3.Connection, user_id: str) -> None:
-        """One-time migration path: re-encrypt plaintext rows during rollout."""
-        if not self._fernet or user_id in self._migration_done:
-            return
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, access_token, refresh_token FROM bing_oauth_tokens WHERE user_id = ?",
-            (user_id,),
-        )
-        rows = cursor.fetchall()
-        migrated = 0
-        for token_id, access_token, refresh_token in rows:
-            needs_access = access_token and not self._is_likely_encrypted_blob(access_token)
-            needs_refresh = refresh_token and not self._is_likely_encrypted_blob(refresh_token)
-            if not (needs_access or needs_refresh):
-                continue
-            enc_access = self._encrypt_token(access_token) if needs_access else access_token
-            enc_refresh = self._encrypt_token(refresh_token) if needs_refresh else refresh_token
-            cursor.execute(
-                "UPDATE bing_oauth_tokens SET access_token = ?, refresh_token = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?",
-                (enc_access, enc_refresh, token_id, user_id),
-            )
-            migrated += 1
-        if migrated:
-            conn.commit()
-            logger.info(f"Bing OAuth token migration completed for user {user_id}; rows migrated={migrated}")
-        self._migration_done.add(user_id)
-
-    def _get_db_path(self, user_id: str) -> str:
-        return get_user_db_path(user_id)
 
     def _init_db(self, user_id: str):
         """Initialize database tables for OAuth tokens."""

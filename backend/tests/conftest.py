@@ -245,6 +245,9 @@ class _PatchedUserDB:
         import services.youtube.youtube_oauth_service as yt_mod
         import services.gsc_service as gsc_mod
         import services.integrations.wordpress_service as wp_service_mod
+        # _get_db_path was moved to the OAuth provider base class in the
+        # cs4 refactor; the patch must target the base module too.
+        import services.integrations.oauth_provider_base as oauth_base_mod
 
         modules = [
             database_module,
@@ -256,6 +259,7 @@ class _PatchedUserDB:
             yt_mod,
             gsc_mod,
             wp_service_mod,
+            oauth_base_mod,
         ]
         for mod in modules:
             self._monkeypatch.setattr(

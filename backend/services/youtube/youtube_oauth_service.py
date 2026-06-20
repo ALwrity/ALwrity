@@ -21,16 +21,38 @@ from cryptography.fernet import Fernet
 from loguru import logger
 
 from services.database import get_user_db_path
+from services.integrations.oauth_provider_base import OAuthProviderBase, resolve_encryption_key
 
 
-class YouTubeOAuthService:
-    """Manages YouTube OAuth2 authentication flow and token storage."""
+class YouTubeOAuthService(OAuthProviderBase):
+    """Manages YouTube OAuth2 authentication flow and token storage.
+
+    Inherits Fernet token encryption + plaintext migration from
+    OAuthProviderBase. YouTube keeps two overrides because the
+    base class semantics differ slightly:
+    - _initialize_fernet: YouTube raises on missing key (fail-fast
+      on misconfiguration); the base class returns None (warn-and-continue).
+      Step 3 of the cs4 plan normalizes this across all 4 providers.
+    - _decrypt_token: YouTube swallows decryption errors and returns
+      None so the caller's `if not access_token` check can handle
+      a corrupted row; the base class propagates. Kept here to preserve
+      the existing call-site contract.
+    """
 
     SCOPES = [
         "https://www.googleapis.com/auth/youtube.upload",
         "https://www.googleapis.com/auth/youtube.readonly",
         "https://www.googleapis.com/auth/youtube.force-ssl",
     ]
+
+    # SQL fragments consumed by OAuthProviderBase._migrate_plaintext_tokens_if_needed
+    _select_plaintext_tokens_sql = (
+        "SELECT id, access_token, refresh_token FROM youtube_oauth_tokens WHERE user_id = ?"
+    )
+    _update_token_sql = (
+        "UPDATE youtube_oauth_tokens SET access_token = ?, refresh_token = ?, updated_at = datetime('now') "
+        "WHERE id = ? AND user_id = ?"
+    )
 
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path
@@ -45,9 +67,7 @@ class YouTubeOAuthService:
         self.redirect_uri = os.getenv("YOUTUBE_REDIRECT_URI", default_redirect)
 
         # Token encryption
-        self.token_encryption_key = os.getenv(
-            "YOUTUBE_TOKEN_ENCRYPTION_KEY"
-        ) or os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY")
+        self.token_encryption_key = resolve_encryption_key("youtube")
         self._fernet: Fernet = self._initialize_fernet()
         self._migration_done: set = set()
 
@@ -62,6 +82,9 @@ class YouTubeOAuthService:
             )
 
     def _initialize_fernet(self) -> Fernet:
+        # YouTube-specific: fail fast on missing key (vs the base
+        # class's warn-and-return-None). Step 3 of the cs4 plan will
+        # pick one policy for all 4 providers.
         if not self.token_encryption_key:
             raise ValueError(
                 "YOUTUBE_TOKEN_ENCRYPTION_KEY (or OAUTH_TOKEN_ENCRYPTION_KEY) is not set. "
@@ -73,12 +96,10 @@ class YouTubeOAuthService:
         except Exception as e:
             raise ValueError(f"Invalid YOUTUBE_TOKEN_ENCRYPTION_KEY: {e}")
 
-    def _encrypt_token(self, token: Optional[str]) -> Optional[str]:
-        if not token:
-            return None
-        return self._fernet.encrypt(token.encode("utf-8")).decode("utf-8")
-
     def _decrypt_token(self, token_blob: Optional[str]) -> Optional[str]:
+        # YouTube-specific: swallow decryption errors and return None
+        # so the caller's `if not access_token` check can handle a
+        # corrupted row. The base class propagates the exception.
         if not token_blob:
             return None
         try:
@@ -86,9 +107,6 @@ class YouTubeOAuthService:
         except Exception as e:
             logger.error(f"YouTube OAuth: token decryption failed: {e}")
             return None
-
-    def _is_likely_encrypted_blob(self, value: Optional[str]) -> bool:
-        return bool(value and value.startswith("gAAAAA"))
 
     def _build_client_config(self) -> Optional[Dict[str, Any]]:
         if not self.client_id or not self.client_secret:
@@ -105,9 +123,6 @@ class YouTubeOAuthService:
                 "javascript_origins": [],
             }
         }
-
-    def _get_db_path(self, user_id: str) -> str:
-        return get_user_db_path(user_id)
 
     def _init_db(self, user_id: str):
         db_path = self._get_db_path(user_id)
@@ -142,33 +157,6 @@ class YouTubeOAuthService:
             """)
             conn.commit()
             logger.debug(f"YouTube OAuth tables initialized for user {user_id}")
-
-    def _migrate_plaintext_tokens_if_needed(self, conn: sqlite3.Connection, user_id: str) -> None:
-        if not self._fernet or user_id in self._migration_done:
-            return
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, access_token, refresh_token FROM youtube_oauth_tokens WHERE user_id = ?",
-            (user_id,),
-        )
-        rows = cursor.fetchall()
-        migrated = 0
-        for token_id, access_token, refresh_token in rows:
-            needs_access = access_token and not self._is_likely_encrypted_blob(access_token)
-            needs_refresh = refresh_token and not self._is_likely_encrypted_blob(refresh_token)
-            if not (needs_access or needs_refresh):
-                continue
-            enc_access = self._encrypt_token(access_token) if needs_access else access_token
-            enc_refresh = self._encrypt_token(refresh_token) if needs_refresh else refresh_token
-            cursor.execute(
-                "UPDATE youtube_oauth_tokens SET access_token = ?, refresh_token = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?",
-                (enc_access, enc_refresh, token_id, user_id),
-            )
-            migrated += 1
-        if migrated:
-            conn.commit()
-            logger.info(f"YouTube OAuth token migration completed for user {user_id}; rows={migrated}")
-        self._migration_done.add(user_id)
 
     def generate_authorization_url(self, user_id: str) -> Optional[str]:
         """Generate Google OAuth authorization URL for YouTube scopes."""
