@@ -12,13 +12,14 @@ from datetime import datetime, timedelta
 from loguru import logger
 import json
 from urllib.parse import quote
+from cryptography.fernet import Fernet, InvalidToken
 from ..analytics_cache_service import analytics_cache
 
 from services.database import get_user_db_path
 
 class BingOAuthService:
     """Manages Bing Webmaster Tools OAuth2 authentication flow."""
-    
+
     def __init__(self):
         # Bing Webmaster OAuth2 credentials
         self.client_id = os.getenv('BING_CLIENT_ID', '')
@@ -27,10 +28,74 @@ class BingOAuthService:
         self.base_url = "https://www.bing.com"
         self.api_base_url = "https://www.bing.com/webmaster/api.svc/json"
 
+        # Token encryption (matches the Wix/WordPress pattern; closes
+        # a security gap where Bing tokens were stored in plaintext).
+        self.token_encryption_key = (
+            os.getenv("BING_TOKEN_ENCRYPTION_KEY")
+            or os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY")
+        )
+        self._fernet = self._initialize_fernet()
+        self._migration_done: set = set()
+
         if not self.client_id or not self.client_secret or self.client_id == 'your_bing_client_id_here':
             logger.warning("Bing Webmaster OAuth client credentials not configured. Please set BING_CLIENT_ID and BING_CLIENT_SECRET environment variables with valid Bing Webmaster application credentials.")
             logger.warning("To get credentials: 1. Go to https://www.bing.com/webmasters/ 2. Sign in to Bing Webmaster Tools 3. Go to Settings > API Access 4. Create OAuth client")
-    
+
+    def _initialize_fernet(self) -> Optional[Fernet]:
+        if not self.token_encryption_key:
+            logger.error("Bing token encryption key is not configured.")
+            return None
+        try:
+            return Fernet(self.token_encryption_key.encode("utf-8"))
+        except Exception:
+            logger.error("Bing token encryption key is invalid.")
+            return None
+
+    def _encrypt_token(self, token: Optional[str]) -> Optional[str]:
+        if not token:
+            return None
+        if not self._fernet:
+            raise ValueError("Token encryption is unavailable: missing/invalid managed key")
+        return self._fernet.encrypt(token.encode("utf-8")).decode("utf-8")
+
+    def _decrypt_token(self, token_blob: Optional[str]) -> Optional[str]:
+        if not token_blob:
+            return None
+        if not self._fernet:
+            raise ValueError("Token decryption is unavailable: missing/invalid managed key")
+        return self._fernet.decrypt(token_blob.encode("utf-8")).decode("utf-8")
+
+    def _is_likely_encrypted_blob(self, value: Optional[str]) -> bool:
+        return bool(value and value.startswith("gAAAAA"))
+
+    def _migrate_plaintext_tokens_if_needed(self, conn: sqlite3.Connection, user_id: str) -> None:
+        """One-time migration path: re-encrypt plaintext rows during rollout."""
+        if not self._fernet or user_id in self._migration_done:
+            return
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, access_token, refresh_token FROM bing_oauth_tokens WHERE user_id = ?",
+            (user_id,),
+        )
+        rows = cursor.fetchall()
+        migrated = 0
+        for token_id, access_token, refresh_token in rows:
+            needs_access = access_token and not self._is_likely_encrypted_blob(access_token)
+            needs_refresh = refresh_token and not self._is_likely_encrypted_blob(refresh_token)
+            if not (needs_access or needs_refresh):
+                continue
+            enc_access = self._encrypt_token(access_token) if needs_access else access_token
+            enc_refresh = self._encrypt_token(refresh_token) if needs_refresh else refresh_token
+            cursor.execute(
+                "UPDATE bing_oauth_tokens SET access_token = ?, refresh_token = ?, updated_at = datetime('now') WHERE id = ? AND user_id = ?",
+                (enc_access, enc_refresh, token_id, user_id),
+            )
+            migrated += 1
+        if migrated:
+            conn.commit()
+            logger.info(f"Bing OAuth token migration completed for user {user_id}; rows migrated={migrated}")
+        self._migration_done.add(user_id)
+
     def _get_db_path(self, user_id: str) -> str:
         return get_user_db_path(user_id)
 
@@ -213,11 +278,13 @@ class BingOAuthService:
             
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
+                encrypted_access = self._encrypt_token(access_token)
+                encrypted_refresh = self._encrypt_token(refresh_token)
                 cursor.execute('''
-                    INSERT INTO bing_oauth_tokens 
+                    INSERT INTO bing_oauth_tokens
                     (user_id, access_token, refresh_token, token_type, expires_at, scope)
                     VALUES (?, ?, ?, ?, ?, ?)
-                ''', (user_id, access_token, refresh_token, token_type, expires_at, 'webmaster.manage'))
+                ''', (user_id, encrypted_access, encrypted_refresh, token_type, expires_at, 'webmaster.manage'))
                 conn.commit()
                 logger.info(f"Bing OAuth: Token inserted into database for user {user_id}")
             
@@ -307,8 +374,9 @@ class BingOAuthService:
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return []
-                
+
             with sqlite3.connect(db_path) as conn:
+                self._migrate_plaintext_tokens_if_needed(conn, user_id)
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT id, access_token, refresh_token, token_type, expires_at, scope, created_at
@@ -316,13 +384,32 @@ class BingOAuthService:
                     WHERE user_id = ? AND is_active = TRUE AND expires_at > datetime('now')
                     ORDER BY created_at DESC
                 ''', (user_id,))
-                
+
                 tokens = []
                 for row in cursor.fetchall():
+                    access_token_val = row[1]
+                    refresh_token_val = row[2]
+                    try:
+                        decrypted_access = (
+                            self._decrypt_token(access_token_val)
+                            if self._is_likely_encrypted_blob(access_token_val)
+                            else access_token_val
+                        )
+                    except InvalidToken:
+                        logger.error(f"Failed to decrypt Bing access token for user {user_id}, token_id={row[0]}")
+                        continue
+                    try:
+                        decrypted_refresh = (
+                            self._decrypt_token(refresh_token_val)
+                            if self._is_likely_encrypted_blob(refresh_token_val)
+                            else refresh_token_val
+                        )
+                    except InvalidToken:
+                        decrypted_refresh = None
                     tokens.append({
                         "id": row[0],
-                        "access_token": row[1],
-                        "refresh_token": row[2],
+                        "access_token": decrypted_access,
+                        "refresh_token": decrypted_refresh,
                         "token_type": row[3],
                         "expires_at": row[4],
                         "scope": row[5],
@@ -339,10 +426,11 @@ class BingOAuthService:
             # Ensure DB tables exist for this user before querying
             self._init_db(user_id)
             db_path = self._get_db_path(user_id)
-            
+
             with sqlite3.connect(db_path) as conn:
+                self._migrate_plaintext_tokens_if_needed(conn, user_id)
                 cursor = conn.cursor()
-                
+
                 # Get all tokens (active and expired)
                 cursor.execute('''
                     SELECT id, access_token, refresh_token, token_type, expires_at, scope, created_at, is_active
@@ -350,16 +438,34 @@ class BingOAuthService:
                     WHERE user_id = ?
                     ORDER BY created_at DESC
                 ''', (user_id,))
-                
+
                 all_tokens = []
                 active_tokens = []
                 expired_tokens = []
-                
+
                 for row in cursor.fetchall():
+                    access_token_val = row[1]
+                    refresh_token_val = row[2]
+                    try:
+                        decrypted_access = (
+                            self._decrypt_token(access_token_val)
+                            if self._is_likely_encrypted_blob(access_token_val)
+                            else access_token_val
+                        )
+                    except InvalidToken:
+                        decrypted_access = None
+                    try:
+                        decrypted_refresh = (
+                            self._decrypt_token(refresh_token_val)
+                            if self._is_likely_encrypted_blob(refresh_token_val)
+                            else refresh_token_val
+                        )
+                    except InvalidToken:
+                        decrypted_refresh = None
                     token_data = {
                         "id": row[0],
-                        "access_token": row[1],
-                        "refresh_token": row[2],
+                        "access_token": decrypted_access,
+                        "refresh_token": decrypted_refresh,
                         "token_type": row[3],
                         "expires_at": row[4],
                         "scope": row[5],
@@ -367,7 +473,7 @@ class BingOAuthService:
                         "is_active": bool(row[7])
                     }
                     all_tokens.append(token_data)
-                    
+
                     # Determine expiry using robust parsing and is_active flag
                     is_active_flag = bool(row[7])
                     not_expired = False
@@ -482,11 +588,12 @@ class BingOAuthService:
             db_path = self._get_db_path(user_id)
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
+                encrypted_access = self._encrypt_token(access_token)
                 cursor.execute('''
-                    UPDATE bing_oauth_tokens 
+                    UPDATE bing_oauth_tokens
                     SET access_token = ?, expires_at = ?, is_active = TRUE, updated_at = datetime('now')
                     WHERE user_id = ? AND refresh_token = ?
-                ''', (access_token, expires_at, user_id, refresh_token))
+                ''', (encrypted_access, expires_at, user_id, refresh_token))
                 conn.commit()
             
             logger.info(f"Bing access token refreshed for user {user_id}")
@@ -696,12 +803,13 @@ class BingOAuthService:
                         expires_at_value = datetime.now() + timedelta(seconds=int(refreshed_token["expires_in"]))
                     except Exception:
                         expires_at_value = None
+                encrypted_access = self._encrypt_token(refreshed_token["access_token"])
                 cursor.execute('''
-                    UPDATE bing_oauth_tokens 
+                    UPDATE bing_oauth_tokens
                     SET access_token = ?, expires_at = ?, is_active = TRUE, updated_at = datetime('now')
                     WHERE id = ?
                 ''', (
-                    refreshed_token["access_token"],
+                    encrypted_access,
                     expires_at_value,
                     token_id
                 ))
