@@ -17,6 +17,7 @@ export { default as ImageGenerationSuggestions } from './ImageGenerationSuggesti
 export { default as ImageGenerationDemo } from './ImageGenerationDemo';
 export { default as ImageGenerationTest } from './ImageGenerationTest';
 export { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
+export { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
 
 // Persona Integration Components - Now integrated into main LinkedInWriter
 

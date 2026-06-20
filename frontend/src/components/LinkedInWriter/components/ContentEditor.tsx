@@ -9,7 +9,9 @@ import {
 } from '../../TextEditor';
 import { readPrefs } from '../utils/linkedInWriterUtils';
 import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
+import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
 import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
+import { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
@@ -75,10 +77,17 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     industry: prefs.industry,
   });
 
+  const selectionVideo = useLinkedInSelectionVideo({
+    topic,
+    industry: prefs.industry,
+  });
+
   // Initialize text selection handler
   const textSelectionHandler = useTextSelectionHandler(contentRef, {
     onGenerateImage: selectionImage.openForSelection,
     isGeneratingImage: selectionImage.isGenerating,
+    onGenerateVideo: selectionVideo.openForSelection,
+    isGeneratingVideo: selectionVideo.isGenerating,
   });
 
   // Handle selected text replacement for quick edits
@@ -437,6 +446,16 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         isGenerating={selectionImage.isGenerating}
         generatedPreview={selectionImage.generatedPreview}
         onClosePreview={selectionImage.closePreview}
+      />
+
+      <LinkedInSelectionVideoModal
+        open={selectionVideo.modalOpen}
+        onClose={selectionVideo.closeModal}
+        onGenerate={selectionVideo.handleGenerate}
+        initialPrompt={selectionVideo.initialPrompt}
+        isGenerating={selectionVideo.isGenerating}
+        generatedPreview={selectionVideo.generatedPreview}
+        onClosePreview={selectionVideo.closePreview}
       />
     </div>
   );

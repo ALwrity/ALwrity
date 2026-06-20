@@ -29,6 +29,7 @@ CORE_ROUTER_REGISTRY = [
     {"name": "facebook_writer", "module": "api.facebook_writer.routers", "attr": "facebook_router", "features": {"all", "core", "facebook"}},
     {"name": "linkedin", "module": "routers.linkedin", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "linkedin_image", "module": "api.linkedin_image_generation", "attr": "router", "features": {"all", "core", "linkedin"}},
+    {"name": "linkedin_video", "module": "api.linkedin_video_generation", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "brainstorm", "module": "api.brainstorm", "attr": "router", "features": {"all", "core"}},
     {"name": "hallucination_detector", "module": "api.hallucination_detector", "attr": "router", "features": {"all", "core"}},
     {"name": "writing_assistant", "module": "api.writing_assistant", "attr": "router", "features": {"all", "core", "blog_writer"}},
