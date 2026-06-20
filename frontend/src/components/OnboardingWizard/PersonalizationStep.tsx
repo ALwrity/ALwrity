@@ -1,23 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  Box, 
-  Button, 
-  Typography, 
-  Alert, 
-  Divider,
+import {
+  Box,
+  Button,
+  Typography,
+  Alert,
   Stack,
-  Tooltip,
   CircularProgress,
 } from '@mui/material';
-import { 
-  TextFields, 
-  Face, 
-  RecordVoiceOver,
+import {
   InfoOutlined,
   Psychology as PsychologyIcon,
   AutoAwesome as AutoAwesomeIcon,
   Assessment as AssessmentIcon,
-  Lightbulb
 } from '@mui/icons-material';
 import { 
   getPersonalizationConfigurationOptions,
@@ -34,6 +28,7 @@ import { ComingSoonSection } from './PersonaStep/ComingSoonSection';
 import { BrandAvatarStudio } from './PersonalizationStep/components/BrandAvatarStudio';
 import { VoiceAvatarPlaceholder } from './PersonalizationStep/components/VoiceAvatarPlaceholder';
 import { TestPersonaModal } from './PersonalizationStep/components/TestPersonaModal';
+import { Step4Hero } from './PersonaStep/Step4Hero';
 
 interface PersonalizationStepProps {
   onContinue: (data?: any) => void;
@@ -89,6 +84,16 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   const [platformPersonas, setPlatformPersonas] = useState<Record<string, any>>({});
   const [qualityMetrics, setQualityMetrics] = useState<QualityMetrics | null>(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['linkedin', 'blog']);
+  // Phase 2: deterministic completeness + data-sufficiency scores.
+  // Backed by the backend's `PersonaPromptBuilder.compute_completeness` +
+  // `OnboardingDataCollector.calculate_data_sufficiency`. Optional — when
+  // absent, EvidenceAccordion falls back to LLM-confidence-only.
+  const [completeness, setCompleteness] = useState<{
+    score?: number | null;
+    structural_score?: number | null;
+    missing?: string[] | null;
+  } | null>(null);
+  const [dataSufficiency, setDataSufficiency] = useState<number | null>(null);
 
   // UI state
   const [showPreview, setShowPreview] = useState(false);
@@ -103,9 +108,31 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   const [voiceUrl, setVoiceUrl] = useState<string>('');
   const [introVideoUrl, setIntroVideoUrl] = useState<string>('');
   
-  // Modal State
+  // Modal State — `hasTriggeredModal` is persisted in sessionStorage so the
+  // auto-open only fires once per browser session (avoids re-popping the
+  // modal every time the user navigates back to Step 4).
+  const TEST_DRIVE_SEEN_KEY = 'test_drive_modal_seen';
   const [showTestPersonaModal, setShowTestPersonaModal] = useState(false);
-  const [hasTriggeredModal, setHasTriggeredModal] = useState(false);
+  const [hasTriggeredModal, setHasTriggeredModal] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem(TEST_DRIVE_SEEN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const openTestDriveModal = useCallback(() => {
+    setShowTestPersonaModal(true);
+  }, []);
+
+  const closeTestDriveModal = useCallback(() => {
+    setShowTestPersonaModal(false);
+    // Mark as seen so we don't auto-open again this session
+    setHasTriggeredModal(true);
+    try {
+      sessionStorage.setItem(TEST_DRIVE_SEEN_KEY, '1');
+    } catch { /* ignore */ }
+  }, []);
 
   const checkAssetStatus = useCallback(async () => {
     try {
@@ -263,6 +290,10 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
           setCorePersona(parsedData.core_persona);
           setPlatformPersonas(parsedData.platform_personas);
           setQualityMetrics(parsedData.quality_metrics);
+          setCompleteness(parsedData.completeness ?? null);
+          setDataSufficiency(
+            typeof parsedData.data_sufficiency === 'number' ? parsedData.data_sufficiency : null
+          );
           setShowPreview(true);
           setGenerationStep('preview');
           setProgress(100);
@@ -286,6 +317,8 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         setCorePersona(p.core_persona);
         setPlatformPersonas(p.platform_personas || {});
         setQualityMetrics(p.quality_metrics || null);
+        setCompleteness(p.completeness ?? null);
+        setDataSufficiency(typeof p.data_sufficiency === 'number' ? p.data_sufficiency : null);
         if (Array.isArray(p.selected_platforms)) {
           setSelectedPlatforms(p.selected_platforms);
         }
@@ -334,6 +367,12 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         setCorePersona(personaResult.core_persona);
         setPlatformPersonas(personaResult.platform_personas);
         setQualityMetrics(personaResult.quality_metrics);
+        setCompleteness(personaResult.completeness ?? null);
+        setDataSufficiency(
+          typeof personaResult.data_sufficiency === 'number'
+            ? personaResult.data_sufficiency
+            : null
+        );
         setShowPreview(true);
         setGenerationStep('preview');
         setProgress(100);
@@ -424,9 +463,12 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
       onValidationChange(isComplete);
     }
 
-    // Trigger Test Persona Modal when all requirements are met
+    // Trigger Test Persona Modal when all requirements are met (only once per session)
     if (isComplete && !hasTriggeredModal && !showTestPersonaModal) {
         setHasTriggeredModal(true);
+        try {
+          sessionStorage.setItem(TEST_DRIVE_SEEN_KEY, '1');
+        } catch { /* ignore */ }
         setShowTestPersonaModal(true);
     }
   }, [corePersona, platformPersonas, qualityMetrics, isGenerating, generationStep, onValidationChange, brandAvatarSet, voiceCloneSet, hasTriggeredModal, showTestPersonaModal]);
@@ -441,27 +483,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
       </Box>
     );
   }
-
-  const tabs = [
-    { 
-      id: 'text', 
-      label: 'Brand Identity', 
-      icon: <TextFields />,
-      tooltip: 'Define your writing style, brand voice, and content characteristics.'
-    },
-    { 
-      id: 'image', 
-      label: 'Brand Avatar', 
-      icon: <Face />,
-      tooltip: 'Create or enhance a visual avatar for your brand using AI.'
-    },
-    { 
-      id: 'audio', 
-      label: 'Voice Clone', 
-      icon: <RecordVoiceOver />,
-      tooltip: 'Create a premium AI voice model based on your unique vocal characteristics.'
-    },
-  ];
 
   const websiteUrl =
     onboardingData?.websiteAnalysis?.website_url ||
@@ -478,60 +499,23 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   }
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       transition: 'background-color 0.3s ease',
       bgcolor: 'transparent',
     }}>
-      {/* Tabbed Navigation Styled as Buttons */}
-      <Stack 
-        direction="row" 
-        spacing={2} 
-        justifyContent="center" 
-        sx={{ mb: 6 }}
-      >
-        {tabs.map((tab) => (
-          <Tooltip key={tab.id} title={tab.tooltip} arrow placement="top">
-            <Button
-              variant={activeTab === tab.id ? 'contained' : 'outlined'}
-              startIcon={tab.icon}
-              onClick={() => setActiveTab(tab.id as PersonalizationTab)}
-              sx={{
-                px: 4,
-                py: 1.5,
-                borderRadius: 3,
-                textTransform: 'none',
-                fontWeight: 'bold',
-                boxShadow: activeTab === tab.id ? 4 : 0,
-                transition: 'all 0.2s ease',
-                background: activeTab === tab.id ? 'linear-gradient(45deg, #7C3AED 0%, #EC4899 100%)' : undefined,
-                color: activeTab === tab.id ? '#FFFFFF' : undefined,
-                '&:hover': {
-                  transform: 'translateY(-2px)',
-                  boxShadow: 2,
-                }
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                {tab.label}
-                <Lightbulb 
-                  sx={{ 
-                    fontSize: 18,
-                    color: (
-                      (tab.id === 'text' && corePersona) || 
-                      (tab.id === 'image' && brandAvatarSet) || 
-                      (tab.id === 'audio' && voiceCloneSet)
-                    ) 
-                      ? (activeTab === tab.id ? '#A7F3D0' : '#10B981') // Light green on active, Green on inactive
-                      : (activeTab === tab.id ? '#FCA5A5' : '#EF4444'), // Light red on active, Red on inactive
-                    filter: 'drop-shadow(0 0 2px currentColor)',
-                    transition: 'color 0.3s ease'
-                  }} 
-                />
-              </Box>
-            </Button>
-          </Tooltip>
-        ))}
-      </Stack>
+      {/* Step 4 Hero — explainer card at top of step. Now contains the tab switcher
+          (clickable source tiles) and the inline completion bar with progress +
+          Regenerate + All-set buttons. The standalone tab row is gone. */}
+      <Step4Hero
+        activeTab={activeTab}
+        onTabChange={(t) => setActiveTab(t)}
+        voiceDone={!!(corePersona && Object.keys(platformPersonas).length > 0 && qualityMetrics)}
+        visualDone={brandAvatarSet}
+        cloneDone={voiceCloneSet}
+        isRegenerating={isGenerating}
+        onRegenerate={handleRegenerate}
+        onTestDrive={openTestDriveModal}
+      />
 
       <Box sx={{ minHeight: 400 }}>
         {activeTab === 'text' && (
@@ -564,9 +548,11 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
               setCorePersona={setCorePersona}
               setPlatformPersonas={setPlatformPersonas}
               handleRegenerate={handleRegenerate}
+              completeness={completeness}
+              data_sufficiency={dataSufficiency}
             />
 
-            <ComingSoonSection onTestPersona={() => setShowTestPersonaModal(true)} />
+             <ComingSoonSection onTestPersona={openTestDriveModal} />
           </Box>
         )}
 
@@ -591,33 +577,48 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         )}
       </Box>
 
-      <Divider sx={{ my: 4 }} />
-
-      {activeTab === 'text' && (
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <InfoOutlined color="action" fontSize="small" />
-            <Typography variant="caption" color="text.secondary">
-              All steps (Identity, Avatar, and Voice) are required to complete your brand personalization.
-            </Typography>
-          </Box>
-
-          <Box>
-            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-            {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
-            
-            {/* 'Save & Continue' button removed as per requirements. 
-                Navigation is now handled by the main Wizard button (2). */}
-          </Box>
+      {/* Inline error/success — friendly, with retry on errors */}
+      {(error || success) && (
+        <Box sx={{ mt: 2 }}>
+          {error && (
+            <Alert
+              severity="error"
+              sx={{ mb: 1, borderRadius: 2 }}
+              action={
+                <Button
+                  size="small"
+                  color="error"
+                  variant="text"
+                  onClick={handleRegenerate}
+                  sx={{ textTransform: 'none', fontWeight: 600 }}
+                >
+                  Try again
+                </Button>
+              }
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.25 }}>
+                We hit a snag
+              </Typography>
+              <Typography variant="caption">{error}</Typography>
+            </Alert>
+          )}
+          {success && (
+            <Alert severity="success" sx={{ mb: 1, borderRadius: 2 }}>
+              {success}
+            </Alert>
+          )}
         </Box>
       )}
 
       {/* Test Persona Modal */}
-      <TestPersonaModal 
-        open={showTestPersonaModal} 
-        onClose={() => setShowTestPersonaModal(false)}
+      <TestPersonaModal
+        open={showTestPersonaModal}
+        onClose={closeTestDriveModal}
         avatarUrl={avatarUrl}
         voiceUrl={voiceUrl}
+        corePersona={corePersona}
+        hasVoiceClone={voiceCloneSet}
+        hasBrandAvatar={brandAvatarSet}
         onVideoGenerated={(url) => setIntroVideoUrl(url || '')}
       />
     </Box>

@@ -13,6 +13,7 @@ from .data_collector import OnboardingDataCollector
 from .prompt_builder import PersonaPromptBuilder
 from services.persona.linkedin.linkedin_persona_service import LinkedInPersonaService
 from services.persona.facebook.facebook_persona_service import FacebookPersonaService
+from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
 
 
 class CorePersonaService:
@@ -39,15 +40,72 @@ class CorePersonaService:
     
     def generate_core_persona(self, onboarding_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate core writing persona using the provider-agnostic LLM gateway."""
-        
-        # Build analysis prompt
-        prompt = self.prompt_builder.build_persona_analysis_prompt(onboarding_data)
+
+        # Phase 2: deterministic linguistic analysis of the brand's own
+        # content. We feed real numbers (sentence length, active/passive
+        # ratio, readability, vocabulary sophistication, etc.) into the
+        # prompt as a new `LINGUISTIC ANALYSIS (deterministic)` section
+        # so the LLM can ground its `linguistic_fingerprint` claims in
+        # measured reality, not vibes. We swallow any analyzer error and
+        # fall back to None so the prompt builder just omits the section.
+        linguistic_analysis: Any = None
+        try:
+            text_samples = self.data_collector.extract_text_samples_from_onboarding_data(onboarding_data)
+            if text_samples:
+                linguistic_analysis = get_linguistic_analyzer().analyze_writing_style(text_samples)
+                if isinstance(linguistic_analysis, dict) and "error" in linguistic_analysis:
+                    logger.warning(
+                        f"Linguistic analyzer returned error; falling back to soft-mock. "
+                        f"Error: {linguistic_analysis.get('error')}"
+                    )
+                    linguistic_analysis = None
+        except Exception as e:
+            logger.warning(
+                f"Could not run deterministic linguistic analysis: {e}. "
+                f"Persona will fall back to soft-mock linguistic_fingerprint."
+            )
+            linguistic_analysis = None
+
+        # Build analysis prompt (now includes the linguistic_analysis section
+        # if we got real numbers)
+        prompt = self.prompt_builder.build_persona_analysis_prompt(
+            onboarding_data,
+            linguistic_analysis=linguistic_analysis,
+        )
         
         # Get schema for structured response
         persona_schema = self.prompt_builder.get_persona_schema()
         
         # Extract user_id for tracking
         user_id = onboarding_data.get("session_info", {}).get("user_id")
+        
+        # System prompt: persona-extractor, not generic analyst.
+        # Goal: produce a persona SO specific to this user that no other
+        # brand in the world would produce the same output. The data is
+        # already extensive (see prompt_builder); the system prompt
+        # enforces the bar of specificity.
+        system_prompt = (
+            "You are a brand voice extractor. Your job is to read the comprehensive "
+            "analysis below and produce a brand voice that is SO specific to this user "
+            "that no other brand in the world would produce the same output.\n\n"
+            "CRITICAL RULES:\n"
+            "1. Every claim in the output MUST be grounded in the data provided. If a "
+            "section of the data is empty, write `null` for that field — do NOT invent "
+            "generic values.\n"
+            "2. Do not use generic archetypes like 'expert', 'thought leader', or "
+            "'industry professional' unless the data explicitly supports it. "
+            "If the data is thin, the archetype should reflect that (\"data-thin — needs "
+            "more inputs\") rather than defaulting to a cliché.\n"
+            "3. Use specific evidence from the data (e.g., 'uses first-person plural "
+            "\"we\" 73% of the time' not 'generally first-person').\n"
+            "4. The persona should make it impossible to mistake this brand for any "
+            "other brand. A third-party reader should immediately recognize content "
+            "written from this persona as belonging to this specific brand.\n"
+            "5. The 'evidence' field in the output is REQUIRED and must cite which "
+            "data sections led to each major claim.\n"
+            "6. The 'what_was_missing' field is REQUIRED and must list which data "
+            "sections were empty or thin. The user uses this to know what to plug in."
+        )
         
         try:
             # Generate structured response using the provider-agnostic gateway
@@ -57,7 +115,7 @@ class CorePersonaService:
                 json_struct=persona_schema,
                 temperature=0.2,  # Low temperature for consistent analysis
                 max_tokens=8192,
-                system_prompt="You are an expert writing style analyst and persona developer. Analyze the provided data to create a precise, actionable writing persona.",
+                system_prompt=system_prompt,
                 user_id=user_id,
                 flow_type="core_persona_generation"
             )

@@ -7,7 +7,8 @@ import {
   CardContent,
   Stack,
   Chip,
-  Button
+  Button,
+  Tooltip
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -28,11 +29,12 @@ interface Platform {
   description: string;
   icon: React.ReactNode;
   category: 'website' | 'social' | 'analytics';
-  status: 'available' | 'connected' | 'coming_soon' | 'disabled';
+  status: 'available' | 'connected' | 'coming_soon' | 'disabled' | 'needs_reauth';
   features: string[];
   benefits: string[];
   oauthUrl?: string;
   isEnabled: boolean;
+  tooltip?: string;
 }
 
 interface PlatformSectionProps {
@@ -46,6 +48,9 @@ interface PlatformSectionProps {
   onDisconnect?: (platformId: string) => void;
   setConnectedPlatforms?: (platforms: string[]) => void;
   fadeTimeout?: number;
+  // Optional per-platform status overrides from the parent. Keys are platform.id.
+  // When provided, these override the default connected/available inference from connectedPlatforms.
+  liveStatus?: Record<string, Platform['status']>;
 }
 
 const PlatformSection: React.FC<PlatformSectionProps> = ({
@@ -58,13 +63,15 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
   onConnect,
   onDisconnect,
   setConnectedPlatforms,
-  fadeTimeout = 800
+  fadeTimeout = 800,
+  liveStatus
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'connected': return 'success';
       case 'available': return 'primary';
       case 'coming_soon': return 'warning';
+      case 'needs_reauth': return 'warning';
       case 'disabled': return 'default';
       default: return 'default';
     }
@@ -75,6 +82,7 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
       case 'connected': return <CheckIcon />;
       case 'available': return <LaunchIcon />;
       case 'coming_soon': return <ScheduleIcon />;
+      case 'needs_reauth': return <ErrorIcon />;
       case 'disabled': return <ErrorIcon />;
       default: return <InfoIcon />;
     }
@@ -85,15 +93,22 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
       case 'connected': return 'Connected';
       case 'available': return 'Connect';
       case 'coming_soon': return 'Coming Soon';
+      case 'needs_reauth': return 'Reconnect';
       case 'disabled': return 'Disabled';
       default: return 'Unknown';
     }
   };
 
-  const platformsWithStatus = platforms.map(platform => ({
-    ...platform,
-    status: connectedPlatforms.includes(platform.id) ? 'connected' : platform.status
-  }));
+  const platformsWithStatus = platforms.map(platform => {
+    // Live status from parent (e.g. from useIntegrationStatus) takes precedence.
+    if (liveStatus && liveStatus[platform.id]) {
+      return { ...platform, status: liveStatus[platform.id] };
+    }
+    return {
+      ...platform,
+      status: connectedPlatforms.includes(platform.id) ? 'connected' : platform.status
+    };
+  });
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -155,9 +170,16 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
                       {platform.icon}
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                        {platform.name}
-                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                          {platform.name}
+                        </Typography>
+                        {platform.tooltip && (
+                          <Tooltip title={platform.tooltip} arrow placement="top">
+                            <InfoIcon sx={{ fontSize: 16, color: '#94a3b8', cursor: 'help' }} />
+                          </Tooltip>
+                        )}
+                      </Stack>
                       <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
                         {platform.description}
                       </Typography>
