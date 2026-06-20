@@ -4,6 +4,8 @@ export { ContentEditor } from './ContentEditor';
 export { LoadingIndicator } from './LoadingIndicator';
 export { WelcomeMessage } from './WelcomeMessage';
 export { FeatureCarousel } from './FeatureCarousel';
+export { LinkedInConnectionPlaceholder } from './LinkedInConnectionPlaceholder';
+export { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 export { InfoModals } from './InfoModals';
 export { ProgressTracker } from './ProgressTracker';
 export type { ProgressStep } from './ProgressTracker';
@@ -16,8 +18,6 @@ export { CopilotRecommendationsRenderer } from './CopilotRecommendationsRenderer
 export { default as ImageGenerationSuggestions } from './ImageGenerationSuggestions';
 export { default as ImageGenerationDemo } from './ImageGenerationDemo';
 export { default as ImageGenerationTest } from './ImageGenerationTest';
-export { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
-export { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
 
 // Persona Integration Components - Now integrated into main LinkedInWriter
 

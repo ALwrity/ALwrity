@@ -9,6 +9,7 @@ import RegisterLinkedInActions from './RegisterLinkedInActions';
 import RegisterLinkedInEditActions from './RegisterLinkedInEditActions';
 import RegisterLinkedInActionsEnhanced from './RegisterLinkedInActionsEnhanced';
 import { Header, ContentEditor, LoadingIndicator, WelcomeMessage, ProgressTracker, type ProgressStep } from './components';
+import PublishLinkedInPanel from './components/PublishLinkedInPanel';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
@@ -487,6 +488,8 @@ Always use the most appropriate tool for the user's request.`.trim();
               </Button>
             </div>
           )}
+
+          {draft && !isGenerating && <PublishLinkedInPanel draft={draft} />}
           
         </>) : (
           /* Welcome Message - Show when no content */

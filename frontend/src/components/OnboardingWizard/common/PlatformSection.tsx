@@ -7,8 +7,7 @@ import {
   CardContent,
   Stack,
   Chip,
-  Button,
-  Tooltip
+  Button
 } from '@mui/material';
 import {
   CheckCircle as CheckIcon,
@@ -21,6 +20,7 @@ import PlatformCard from './PlatformCard';
 import GSCPlatformCard from './GSCPlatformCard';
 import WordPressOAuthPlatformCard from './WordPressOAuthPlatformCard';
 import WixPlatformCard from './WixPlatformCard';
+import LinkedInPlatformCard from './LinkedInPlatformCard';
 import { type GSCSite } from '../../../api/gsc';
 
 interface Platform {
@@ -29,12 +29,11 @@ interface Platform {
   description: string;
   icon: React.ReactNode;
   category: 'website' | 'social' | 'analytics';
-  status: 'available' | 'connected' | 'coming_soon' | 'disabled' | 'needs_reauth';
+  status: 'available' | 'connected' | 'coming_soon' | 'disabled';
   features: string[];
   benefits: string[];
   oauthUrl?: string;
   isEnabled: boolean;
-  tooltip?: string;
 }
 
 interface PlatformSectionProps {
@@ -48,9 +47,6 @@ interface PlatformSectionProps {
   onDisconnect?: (platformId: string) => void;
   setConnectedPlatforms?: (platforms: string[]) => void;
   fadeTimeout?: number;
-  // Optional per-platform status overrides from the parent. Keys are platform.id.
-  // When provided, these override the default connected/available inference from connectedPlatforms.
-  liveStatus?: Record<string, Platform['status']>;
 }
 
 const PlatformSection: React.FC<PlatformSectionProps> = ({
@@ -63,15 +59,13 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
   onConnect,
   onDisconnect,
   setConnectedPlatforms,
-  fadeTimeout = 800,
-  liveStatus
+  fadeTimeout = 800
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'connected': return 'success';
       case 'available': return 'primary';
       case 'coming_soon': return 'warning';
-      case 'needs_reauth': return 'warning';
       case 'disabled': return 'default';
       default: return 'default';
     }
@@ -82,7 +76,6 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
       case 'connected': return <CheckIcon />;
       case 'available': return <LaunchIcon />;
       case 'coming_soon': return <ScheduleIcon />;
-      case 'needs_reauth': return <ErrorIcon />;
       case 'disabled': return <ErrorIcon />;
       default: return <InfoIcon />;
     }
@@ -93,22 +86,15 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
       case 'connected': return 'Connected';
       case 'available': return 'Connect';
       case 'coming_soon': return 'Coming Soon';
-      case 'needs_reauth': return 'Reconnect';
       case 'disabled': return 'Disabled';
       default: return 'Unknown';
     }
   };
 
-  const platformsWithStatus = platforms.map(platform => {
-    // Live status from parent (e.g. from useIntegrationStatus) takes precedence.
-    if (liveStatus && liveStatus[platform.id]) {
-      return { ...platform, status: liveStatus[platform.id] };
-    }
-    return {
-      ...platform,
-      status: connectedPlatforms.includes(platform.id) ? 'connected' : platform.status
-    };
-  });
+  const platformsWithStatus = platforms.map(platform => ({
+    ...platform,
+    status: connectedPlatforms.includes(platform.id) ? 'connected' : platform.status
+  }));
 
   return (
     <Box sx={{ mb: 4 }}>
@@ -150,6 +136,13 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
                 connectedPlatforms={connectedPlatforms}
                 setConnectedPlatforms={setConnectedPlatforms || (() => {})}
               />
+            ) : platform.id === 'linkedin' ? (
+              <LinkedInPlatformCard
+                onConnect={onConnect}
+                onDisconnect={onDisconnect}
+                connectedPlatforms={connectedPlatforms}
+                setConnectedPlatforms={setConnectedPlatforms || (() => {})}
+              />
             ) : platform.category === 'social' ? (
               <Card 
                 sx={{
@@ -170,16 +163,9 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
                       {platform.icon}
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                          {platform.name}
-                        </Typography>
-                        {platform.tooltip && (
-                          <Tooltip title={platform.tooltip} arrow placement="top">
-                            <InfoIcon sx={{ fontSize: 16, color: '#94a3b8', cursor: 'help' }} />
-                          </Tooltip>
-                        )}
-                      </Stack>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                        {platform.name}
+                      </Typography>
                       <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
                         {platform.description}
                       </Typography>
