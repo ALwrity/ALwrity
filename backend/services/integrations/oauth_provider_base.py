@@ -78,36 +78,52 @@ class OAuthProviderBase:
         self.token_encryption_key: str | None  (set in __init__)
     """
 
-    def _initialize_fernet(self) -> Optional[Fernet]:
+    def _initialize_fernet(self) -> Fernet:
+        """Initialize Fernet, raising on missing or invalid key.
+
+        OAuth tokens must be encrypted at rest. The user's 'no
+        fallbacks' mandate means a missing or invalid key fails
+        fast at service construction, not lazily on the first
+        token operation (where the failure mode is a confusing
+        'Fernet is None' deep in the call stack).
+
+        Subclasses inherit this behavior by default. The previous
+        'warn and return None' behavior in Wix/WordPress/Bing
+        is a step-3 change: this commit normalizes all 4
+        providers to fail-fast at construction.
+
+        To override (e.g. to fail-soft in a test fixture), set
+        self._fernet manually after __init__.
+        """
         if not self.token_encryption_key:
-            logger.error(
-                f"{type(self).__name__} token encryption key is not configured."
+            raise ValueError(
+                f"{type(self).__name__} token encryption key is not configured. "
+                f"Set the appropriate env var (BING_TOKEN_ENCRYPTION_KEY / "
+                f"WIX_TOKEN_ENCRYPTION_KEY / WORDPRESS_TOKEN_ENCRYPTION_KEY / "
+                f"YOUTUBE_TOKEN_ENCRYPTION_KEY) or the shared "
+                f"OAUTH_TOKEN_ENCRYPTION_KEY fallback. "
+                f"Generate a key: python -c \"from cryptography.fernet import Fernet; "
+                f"print(Fernet.generate_key().decode())\""
             )
-            return None
         try:
             return Fernet(self.token_encryption_key.encode("utf-8"))
-        except Exception:
-            logger.error(
-                f"{type(self).__name__} token encryption key is invalid."
+        except Exception as e:
+            raise ValueError(
+                f"{type(self).__name__} token encryption key is invalid: {e}"
             )
-            return None
 
     def _encrypt_token(self, token: Optional[str]) -> Optional[str]:
         if not token:
             return None
-        if not self._fernet:
-            raise ValueError(
-                "Token encryption is unavailable: missing/invalid managed key"
-            )
+        # _fernet is guaranteed by _initialize_fernet raising at
+        # construction. The AttributeError that would result from
+        # None is a programmer error (someone set _fernet=None
+        # directly), not a runtime condition.
         return self._fernet.encrypt(token.encode("utf-8")).decode("utf-8")
 
     def _decrypt_token(self, token_blob: Optional[str]) -> Optional[str]:
         if not token_blob:
             return None
-        if not self._fernet:
-            raise ValueError(
-                "Token decryption is unavailable: missing/invalid managed key"
-            )
         return self._fernet.decrypt(token_blob.encode("utf-8")).decode("utf-8")
 
     def _is_likely_encrypted_blob(self, value: Optional[str]) -> bool:
@@ -125,7 +141,7 @@ class OAuthProviderBase:
 
         See WixOAuthService for the canonical pattern.
         """
-        if not self._fernet or user_id in self._migration_done:
+        if user_id in self._migration_done:
             return
         cursor = conn.cursor()
         cursor.execute(self._select_plaintext_tokens_sql, (user_id,))
