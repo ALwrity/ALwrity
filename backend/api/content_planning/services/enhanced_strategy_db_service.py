@@ -253,12 +253,20 @@ class EnhancedStrategyDBService:
     async def search_enhanced_strategies(self, user_id: str, search_term: str) -> List[EnhancedContentStrategy]:
         """Search enhanced strategies by name or industry."""
         try:
+            # Escape SQL LIKE wildcards in the user-supplied search
+            # term before building the pattern. Without this, a user
+            # passing '%' or '_' would have the LIKE pattern match
+            # broadly (e.g. '%' alone matches every strategy they
+            # own). The escape uses '\' as the ESCAPE character, so
+            # we also escape '\' itself.
+            escaped = search_term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
             return self.db.query(EnhancedContentStrategy).filter(
                 and_(
                     EnhancedContentStrategy.user_id == user_id,
                     or_(
-                        EnhancedContentStrategy.name.ilike(f"%{search_term}%"),
-                        EnhancedContentStrategy.industry.ilike(f"%{search_term}%")
+                        EnhancedContentStrategy.name.ilike(pattern, escape="\\"),
+                        EnhancedContentStrategy.industry.ilike(pattern, escape="\\")
                     )
                 )
             ).all()
