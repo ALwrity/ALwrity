@@ -10,6 +10,7 @@ export interface LinkedInImageGenerationParams {
   style?: ImageStyle | string;
   aspectRatio?: AspectRatio | string;
   contentType?: string;
+  model?: string;
 }
 
 export interface LinkedInImageGenerationResult {
@@ -21,24 +22,16 @@ export interface LinkedInImageGenerationResult {
   error?: string;
 }
 
-/** Build a LinkedIn-optimized visual prompt from selected post text. */
+/** Build a short seed prompt; heavy optimization happens on the backend. */
 export function buildPromptFromSelection(
   selectedText: string,
   topic?: string,
   industry?: string
 ): string {
-  const snippet = selectedText.trim().slice(0, 400);
-  const topicLine = topic ? `Topic: ${topic}.` : '';
-  const industryLine = industry ? `Industry: ${industry}.` : '';
-  return [
-    'Create a professional LinkedIn post image that visually supports this content:',
-    snippet,
-    topicLine,
-    industryLine,
-    'Professional business aesthetic, mobile-optimized, clear visual hierarchy, no cluttered text overlays.',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const snippet = selectedText.trim().slice(0, 200);
+  const topicPart = topic ? `Topic: ${topic}.` : '';
+  const industryPart = industry ? `Industry: ${industry}.` : '';
+  return `Visual for LinkedIn post: ${snippet}. ${topicPart} ${industryPart}`.trim();
 }
 
 /** Map modal aspect ratio to LinkedIn API aspect ratio values. */
@@ -83,6 +76,7 @@ export async function generateLinkedInImage(
       style: params.style || 'Realistic',
     },
     aspect_ratio: aspectRatio,
+    model: params.model,
   });
 
   const data = response.data;

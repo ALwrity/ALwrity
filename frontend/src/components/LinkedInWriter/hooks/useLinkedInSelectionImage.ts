@@ -73,6 +73,7 @@ export function useLinkedInSelectionImage({
           industry,
           style: settings.style,
           aspectRatio: settings.aspectRatio,
+          model: settings.model,
         });
 
         if (!result.success || !result.imageId) {

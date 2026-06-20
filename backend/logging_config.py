@@ -158,7 +158,6 @@ def setup_clean_logging():
             'exa_service',
             'step3_research_service',
             'sitemap_service',
-            'linkedin_image_generator',
             'router_manager',
             'frontend_serving',
             'database',
@@ -200,6 +199,24 @@ def setup_clean_logging():
             level="INFO",
             format=common_format,
             filter=video_generation_filter,
+            backtrace=True,
+            diagnose=True,
+        )
+
+        def linkedin_image_filter(record):
+            msg = record.get("message", "")
+            name = record.get("name", "")
+            return (
+                "[LinkedInImageGen]" in msg
+                or "api.linkedin_image_generation" in name
+                or "services.linkedin.image_generation" in name
+            )
+
+        logger.add(
+            sys.stdout.write,
+            level="INFO",
+            format=common_format,
+            filter=linkedin_image_filter,
             backtrace=True,
             diagnose=True,
         )

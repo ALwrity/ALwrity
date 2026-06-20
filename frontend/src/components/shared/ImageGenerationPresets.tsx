@@ -6,7 +6,7 @@
  */
 
 import React from 'react';
-import { ImagePreset, ImageModalTheme, CustomRecommendations } from './ImageGenerationModal.types';
+import { ImagePreset, ImageModalTheme, CustomRecommendations, LinkedInModelOption } from './ImageGenerationModal.types';
 
 // ============================================
 // YouTube Creator Presets
@@ -269,7 +269,33 @@ export const LINKEDIN_RECOMMENDATIONS: CustomRecommendations = {
     <strong>16:9:</strong> Wide landscape — mapped to LinkedIn 1.91:1 feed format<br />
     <strong>3:4:</strong> Portrait orientation for mobile-first posts
   </>,
+  model: <>
+    <strong>FLUX Kontext Pro:</strong> Best default for professional LinkedIn feed images<br />
+    <strong>Ideogram V3 Turbo:</strong> Strong for detailed scenes with text-safe composition<br />
+    <strong>Qwen Image:</strong> Fast iterations and conceptual business visuals
+  </>,
 };
+
+export const LINKEDIN_IMAGE_MODELS: LinkedInModelOption[] = [
+  {
+    id: 'flux-kontext-pro',
+    name: 'FLUX Kontext Pro',
+    description: 'Professional feed images • High quality • Recommended default',
+    costPerImage: '$0.08',
+  },
+  {
+    id: 'ideogram-v3-turbo',
+    name: 'Ideogram V3 Turbo ✨',
+    description: 'Detailed scenes • Strong composition • $0.10/image',
+    costPerImage: '$0.10',
+  },
+  {
+    id: 'qwen-image',
+    name: 'Qwen Image ⚡',
+    description: 'Fast generation • Conceptual visuals • $0.05/image',
+    costPerImage: '$0.05',
+  },
+];
 
 export const BRAND_AVATAR_RECOMMENDATIONS: CustomRecommendations = {
   style: <>

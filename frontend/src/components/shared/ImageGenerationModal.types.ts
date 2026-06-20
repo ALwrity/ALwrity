@@ -11,7 +11,7 @@ export interface ImageGenerationSettings {
   style: ImageStyle;
   renderingSpeed: RenderingSpeed;
   aspectRatio: AspectRatio;
-  model?: ImageModel;
+  model?: ImageModel | LinkedInImageModel;
 }
 
 // Style options for image generation
@@ -23,8 +23,11 @@ export type RenderingSpeed = 'Turbo' | 'Default' | 'Quality';
 // Aspect ratio options
 export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
 
-// Available AI models for image generation
+// Available AI models for image generation (YouTube, Story Writer, Brand Avatar, etc.)
 export type ImageModel = 'ideogram-v3-turbo' | 'qwen-image';
+
+/** LinkedIn-only model union; not part of shared ImageModel */
+export type LinkedInImageModel = 'flux-kontext-pro' | 'ideogram-v3-turbo' | 'qwen-image';
 
 // Preset configuration for quick-apply presets
 export interface ImagePreset {
@@ -37,6 +40,13 @@ export interface ImagePreset {
   aspectRatio: AspectRatio;
   model?: ImageModel;
   image?: string; // Path to example image
+}
+
+export interface LinkedInModelOption {
+  id: LinkedInImageModel;
+  name: string;
+  description: string;
+  costPerImage: string;
 }
 
 // Model option for the model selector
@@ -88,8 +98,8 @@ export interface ImageGenerationModalProps {
   
   // Model selection
   showModelSelection?: boolean;
-  availableModels?: ModelOption[];
-  defaultModel?: ImageModel;
+  availableModels?: Array<ModelOption | LinkedInModelOption>;
+  defaultModel?: ImageModel | LinkedInImageModel;
   
   // Default values
   defaultStyle?: ImageStyle;

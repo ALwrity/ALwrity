@@ -8,20 +8,20 @@ imagery for LinkedIn content.
 
 import os
 import asyncio
-import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, Tuple
 from pathlib import Path
 from PIL import Image
 from io import BytesIO
+from loguru import logger
 
-# Import existing infrastructure
 from ...onboarding.api_key_manager import APIKeyManager
 from ...llm_providers.main_image_generation import generate_image
 from ...llm_providers.main_image_editing import edit_image as common_edit_image
-
-# Set up logging
-logger = logging.getLogger(__name__)
+from .linkedin_image_prompt_builder import (
+    build_linkedin_selection_prompt,
+    optimize_linkedin_prompt,
+)
 
 
 class LinkedInImageGenerator:
@@ -49,7 +49,7 @@ class LinkedInImageGenerator:
         self.max_file_size_mb = 5
         self.supported_formats = ["PNG", "JPEG"]
         
-        logger.info("LinkedIn Image Generator initialized")
+        logger.info("[LinkedInImageGen] LinkedIn Image Generator initialized")
     
     async def generate_image(
         self, 
@@ -57,7 +57,8 @@ class LinkedInImageGenerator:
         content_context: Dict[str, Any],
         aspect_ratio: str = "1:1",
         style_preference: str = "professional",
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        model: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate LinkedIn-optimized image using AI provider.
@@ -74,15 +75,29 @@ class LinkedInImageGenerator:
         """
         try:
             start_time = datetime.now()
-            logger.info(f"Starting LinkedIn image generation for topic: {content_context.get('topic', 'Unknown')}")
-            
-            # Enhance prompt with LinkedIn-specific context
-            enhanced_prompt = self._enhance_prompt_for_linkedin(
-                prompt, content_context, style_preference, aspect_ratio
+            style = content_context.get("style") or style_preference or "Realistic"
+            logger.info(
+                f"[LinkedInImageGen] Starting generation topic={content_context.get('topic', 'Unknown')} "
+                f"aspect_ratio={aspect_ratio} model={model or 'default'} user={user_id}"
             )
-            
-            # Generate image using tenant-aware provider selection
-            generation_result = await self._generate_with_provider(enhanced_prompt, aspect_ratio, user_id)
+
+            structured_prompt = build_linkedin_selection_prompt(
+                prompt, content_context, aspect_ratio, style
+            )
+            logger.info(
+                f"[LinkedInImageGen] Structured prompt ({len(structured_prompt)} chars): "
+                f"{structured_prompt[:200]}..."
+            )
+
+            enhanced_prompt = await optimize_linkedin_prompt(structured_prompt, user_id)
+            logger.info(
+                f"[LinkedInImageGen] Optimized prompt ({len(enhanced_prompt)} chars): "
+                f"{enhanced_prompt[:200]}..."
+            )
+
+            generation_result = await self._generate_with_provider(
+                enhanced_prompt, aspect_ratio, user_id, model
+            )
             
             if not generation_result.get('success'):
                 return {
@@ -99,6 +114,11 @@ class LinkedInImageGenerator:
             )
             
             generation_time = (datetime.now() - start_time).total_seconds()
+            resolution = processed_image['resolution']
+            logger.info(
+                f"[LinkedInImageGen] Post-processing complete "
+                f"{resolution[0]}x{resolution[1]} px elapsed={generation_time:.2f}s"
+            )
             
             return {
                 'success': True,
@@ -106,8 +126,9 @@ class LinkedInImageGenerator:
                 'image_url': processed_image.get('image_url'),
                 'metadata': {
                     'prompt_used': enhanced_prompt,
+                    'structured_prompt': structured_prompt,
                     'original_prompt': prompt,
-                    'style_preference': style_preference,
+                    'style_preference': style,
                     'aspect_ratio': aspect_ratio,
                     'content_context': content_context,
                     'generation_time': generation_time,
@@ -125,7 +146,7 @@ class LinkedInImageGenerator:
             }
             
         except Exception as e:
-            logger.error(f"Error in LinkedIn image generation: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error in LinkedIn image generation: {str(e)}")
             return {
                 'success': False,
                 'error': f"Image generation failed: {str(e)}",
@@ -172,7 +193,7 @@ class LinkedInImageGenerator:
             if result and result.image_bytes:
                 generation_time = (datetime.now() - start_time).total_seconds()
                 logger.info(
-                    "LinkedIn image edited successfully via provider=%s model=%s in %.2fs",
+                    "[LinkedInImageGen] Image edited successfully via provider={} model={} in {:.2f}s",
                     result.provider, result.model, generation_time,
                 )
                 return {
@@ -206,72 +227,6 @@ class LinkedInImageGenerator:
                 'generation_time': (datetime.now() - start_time).total_seconds() if 'start_time' in locals() else 0
             }
     
-    def _enhance_prompt_for_linkedin(
-        self, 
-        prompt: str, 
-        content_context: Dict[str, Any],
-        style_preference: str,
-        aspect_ratio: str
-    ) -> str:
-        """
-        Enhance user prompt with LinkedIn-specific context and best practices.
-        
-        Args:
-            prompt: Original user prompt
-            content_context: LinkedIn content context
-            style_preference: Preferred visual style
-            aspect_ratio: Image aspect ratio
-            
-        Returns:
-            Enhanced prompt optimized for LinkedIn
-        """
-        topic = content_context.get('topic', 'business')
-        industry = content_context.get('industry', 'business')
-        content_type = content_context.get('content_type', 'post')
-        
-        # Base LinkedIn optimization
-        linkedin_optimizations = [
-            f"Create a professional LinkedIn {content_type} image for {topic}",
-            f"Industry: {industry}",
-            f"Professional business aesthetic suitable for LinkedIn audience",
-            f"Mobile-optimized design for LinkedIn feed viewing",
-            f"Aspect ratio: {aspect_ratio}",
-            "High-quality, modern design with clear visual hierarchy",
-            "Professional color scheme and typography",
-            "Suitable for business and professional networking"
-        ]
-        
-        # Style-specific enhancements
-        if style_preference == "professional":
-            style_enhancements = [
-                "Corporate aesthetics with clean lines and geometric shapes",
-                "Professional color palette (blues, grays, whites)",
-                "Modern business environment or abstract business concepts",
-                "Clean, minimalist design approach"
-            ]
-        elif style_preference == "creative":
-            style_enhancements = [
-                "Eye-catching and engaging visual style",
-                "Vibrant colors while maintaining professional appeal",
-                "Creative composition that encourages social media engagement",
-                "Modern design elements with business context"
-            ]
-        else:  # industry-specific
-            style_enhancements = [
-                f"Industry-specific visual elements for {industry}",
-                "Professional yet creative approach",
-                "Balanced design suitable for business audience",
-                "Industry-relevant imagery and color schemes"
-            ]
-        
-        # Combine all enhancements
-        enhanced_prompt = f"{prompt}\n\n"
-        enhanced_prompt += "\n".join(linkedin_optimizations)
-        enhanced_prompt += "\n" + "\n".join(style_enhancements)
-        
-        logger.info(f"Enhanced prompt for LinkedIn: {enhanced_prompt[:200]}...")
-        return enhanced_prompt
-    
     def _enhance_edit_prompt_for_linkedin(
         self, 
         edit_prompt: str, 
@@ -301,7 +256,13 @@ class LinkedInImageGenerator:
         
         return enhanced_edit_prompt
     
-    async def _generate_with_provider(self, prompt: str, aspect_ratio: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    async def _generate_with_provider(
+        self,
+        prompt: str,
+        aspect_ratio: str,
+        user_id: Optional[str] = None,
+        model: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Generate image using unified image generation infrastructure.
         Provider resolution, pre-flight validation, and usage tracking
@@ -326,19 +287,19 @@ class LinkedInImageGenerator:
                 "1:1.25": (1080, 1350),  # LinkedIn recommended portrait
             }
             width, height = aspect_map.get(aspect_ratio, (1024, 1024))
-            
-            # Delegate to unified image generation system.
-            # Generate_image() handles: provider resolution, pre-flight validation,
-            # model auto-detection, generation, and usage tracking.
-            # We do NOT pass explicit provider or model — let generate_image() resolve
-            # them from tenant config and user defaults.
+            logger.info(
+                f"[LinkedInImageGen] Delegating to provider pipeline "
+                f"aspect_ratio={aspect_ratio} dimensions={width}x{height} model={model or 'default'}"
+            )
+
+            options: Dict[str, Any] = {"width": width, "height": height}
+            if model:
+                options["model"] = model
+
             result = generate_image(
                 prompt=prompt,
-                options={
-                    "width": width,
-                    "height": height,
-                },
-                user_id=user_id
+                options=options,
+                user_id=user_id,
             )
             
             if result and result.image_bytes:
@@ -358,7 +319,7 @@ class LinkedInImageGenerator:
                 }
 
         except Exception as e:
-            logger.error(f"Error in image generation: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error in image generation: {str(e)}")
             return {
                 'success': False,
                 'error': f"Image generation failed: {str(e)}"

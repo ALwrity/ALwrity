@@ -23,7 +23,7 @@ describe('linkedInImageService', () => {
   });
 
   describe('buildPromptFromSelection', () => {
-    it('includes selected text and LinkedIn context', () => {
+    it('returns a short seed prompt with topic and industry', () => {
       const prompt = buildPromptFromSelection(
         'AI is transforming how teams collaborate.',
         'Future of Work',
@@ -33,7 +33,8 @@ describe('linkedInImageService', () => {
       expect(prompt).toContain('AI is transforming how teams collaborate.');
       expect(prompt).toContain('Topic: Future of Work.');
       expect(prompt).toContain('Industry: Technology.');
-      expect(prompt).toContain('LinkedIn');
+      expect(prompt).toContain('Visual for LinkedIn post:');
+      expect(prompt).not.toContain('Professional business aesthetic, mobile-optimized');
     });
   });
 
@@ -52,6 +53,28 @@ describe('linkedInImageService', () => {
   });
 
   describe('generateLinkedInImage', () => {
+    it('sends model in POST body when provided', async () => {
+      (aiApiClient.post as jest.Mock).mockResolvedValue({
+        data: { success: true, image_id: 'model-test-id' },
+      });
+
+      await generateLinkedInImage({
+        prompt: 'Professional LinkedIn visual',
+        selectedText: 'Selected post excerpt.',
+        topic: 'Leadership',
+        industry: 'Business',
+        model: 'flux-kontext-pro',
+      });
+
+      expect(aiApiClient.post).toHaveBeenCalledWith(
+        '/api/linkedin/generate-image',
+        expect.objectContaining({
+          model: 'flux-kontext-pro',
+          prompt: 'Professional LinkedIn visual',
+        })
+      );
+    });
+
     it('logs URL on success', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 

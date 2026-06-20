@@ -20,10 +20,12 @@ import {
   ImageGenerationModal,
   ImageGenerationSettings as SharedImageGenerationSettings,
 } from '../../shared/ImageGenerationModal';
+import type { LinkedInImageModel } from '../../shared/ImageGenerationModal.types';
 import {
   LINKEDIN_PRESETS,
   LINKEDIN_THEME,
   LINKEDIN_RECOMMENDATIONS,
+  LINKEDIN_IMAGE_MODELS,
 } from '../../shared/ImageGenerationPresets';
 
 export interface LinkedInImageGenerationSettings {
@@ -31,6 +33,7 @@ export interface LinkedInImageGenerationSettings {
   style: 'Auto' | 'Fiction' | 'Realistic';
   renderingSpeed: 'Default' | 'Turbo' | 'Quality';
   aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+  model: LinkedInImageModel;
 }
 
 export interface GeneratedLinkedInImagePreview {
@@ -58,12 +61,24 @@ export const LinkedInSelectionImageModal: React.FC<LinkedInSelectionImageModalPr
   generatedPreview,
   onClosePreview,
 }) => {
+  const toLinkedInModel = (model?: string): LinkedInImageModel => {
+    if (
+      model === 'flux-kontext-pro' ||
+      model === 'ideogram-v3-turbo' ||
+      model === 'qwen-image'
+    ) {
+      return model;
+    }
+    return 'flux-kontext-pro';
+  };
+
   const handleGenerate = (settings: SharedImageGenerationSettings) => {
     onGenerate({
       prompt: settings.prompt,
       style: settings.style,
       renderingSpeed: settings.renderingSpeed,
       aspectRatio: settings.aspectRatio,
+      model: toLinkedInModel(settings.model),
     });
   };
 
@@ -123,7 +138,9 @@ export const LinkedInSelectionImageModal: React.FC<LinkedInSelectionImageModalPr
       presets={LINKEDIN_PRESETS}
       presetsLabel="LinkedIn-ready presets"
       presetsHelp="Quickly apply a LinkedIn-friendly look. Each preset adjusts style, composition, and aspect ratio."
-      showModelSelection={false}
+      showModelSelection={true}
+      availableModels={LINKEDIN_IMAGE_MODELS}
+      defaultModel="flux-kontext-pro"
       defaultStyle="Realistic"
       defaultRenderingSpeed="Quality"
       defaultAspectRatio="1:1"

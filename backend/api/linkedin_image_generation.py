@@ -1,4 +1,5 @@
 import os
+import time
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -34,6 +35,7 @@ class ImageGenerationRequest(BaseModel):
     prompt: str
     content_context: Dict[str, Any]
     aspect_ratio: Optional[str] = "1:1"
+    model: Optional[str] = None
 
 class ImagePromptResponse(BaseModel):
     style: str
@@ -103,16 +105,23 @@ async def generate_linkedin_image(
     """
     try:
         user_id = current_user.get("id")
-        logger.info(f"Generating LinkedIn image with prompt: {request.prompt[:100]}... for user {user_id}")
-        
-        # Use our LinkedIn image generator service
+        start_time = time.time()
+        logger.info(
+            f"[LinkedInImageGen] Request received user={user_id} "
+            f"aspect_ratio={request.aspect_ratio} model={request.model or 'default'} "
+            f"prompt_len={len(request.prompt)}"
+        )
+
         image_result = await image_generator.generate_image(
             prompt=request.prompt,
             content_context=request.content_context,
-            user_id=user_id
+            aspect_ratio=request.aspect_ratio or "1:1",
+            user_id=user_id,
+            model=request.model,
         )
         
         if image_result and image_result.get('success'):
+            logger.info("[LinkedInImageGen] Provider generation complete, storing image...")
             # Store the generated image
             store_result = await image_storage.store_image(
                 image_data=image_result['image_data'],
@@ -130,15 +139,18 @@ async def generate_linkedin_image(
 
             if not store_result.get('success'):
                 error_msg = store_result.get('error', 'Failed to store generated image')
-                logger.error(f"Image storage failed: {error_msg}")
+                logger.error(f"[LinkedInImageGen] Image storage failed: {error_msg}")
                 return ImageGenerationResponse(
                     success=False,
                     error=error_msg
                 )
 
             image_id = store_result['image_id']
-            
-            logger.info(f"Image generated and stored successfully with ID: {image_id}")
+            elapsed = time.time() - start_time
+            logger.info(
+                f"[LinkedInImageGen] Complete image_id={image_id} "
+                f"storage_path={store_result.get('storage_path')} elapsed={elapsed:.2f}s"
+            )
             
             return ImageGenerationResponse(
                 success=True,
@@ -149,14 +161,14 @@ async def generate_linkedin_image(
             )
         else:
             error_msg = image_result.get('error', 'Unknown error during image generation')
-            logger.error(f"Image generation failed: {error_msg}")
+            logger.error(f"[LinkedInImageGen] Image generation failed: {error_msg}")
             return ImageGenerationResponse(
                 success=False,
                 error=error_msg
             )
             
     except Exception as e:
-        logger.error(f"Error generating LinkedIn image: {str(e)}")
+        logger.error(f"[LinkedInImageGen] Error generating LinkedIn image: {str(e)}")
         return ImageGenerationResponse(
             success=False,
             error=f"Failed to generate image: {str(e)}"

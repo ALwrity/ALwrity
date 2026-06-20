@@ -139,8 +139,10 @@ class WaveSpeedEditProvider(ImageEditProvider):
         
         # REUSE: Same client as generation provider
         self.client = WaveSpeedClient(api_key=self.api_key)
-        logger.info("[WaveSpeed Edit Provider] Initialized with %d models", 
-                   len(self.SUPPORTED_MODELS))
+        logger.info(
+            "[WaveSpeed Edit Provider] Initialized with {} models",
+            len(self.SUPPORTED_MODELS),
+        )
     
     def _validate_options(self, options: ImageEditOptions) -> None:
         """Validate editing options.
@@ -205,8 +207,10 @@ class WaveSpeedEditProvider(ImageEditProvider):
         model_info = self.SUPPORTED_MODELS[model]
         model_path = model_info["model_path"]
         
-        logger.info("[WaveSpeed Edit] Starting edit: model=%s, operation=%s, prompt=%s",
-                   model, options.operation, options.prompt[:100])
+        logger.info(
+            "[WaveSpeed Edit] Starting edit: model={}, operation={}, prompt={}",
+            model, options.operation, options.prompt[:100],
+        )
         
         try:
             # Prepare extra parameters based on model capabilities
@@ -269,8 +273,10 @@ class WaveSpeedEditProvider(ImageEditProvider):
                 if resolution == "8k" and "cost_8k" in model_info:
                     estimated_cost = model_info["cost_8k"]
             
-            logger.info("[WaveSpeed Edit] ✅ Successfully edited image: %d bytes, %dx%d",
-                       len(image_bytes), width, height)
+            logger.info(
+                "[WaveSpeed Edit] ✅ Successfully edited image: {} bytes, {}x{}",
+                len(image_bytes), width, height,
+            )
             
             # REUSE: Same result format as generation
             return ImageGenerationResult(
