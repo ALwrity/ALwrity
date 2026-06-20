@@ -24,6 +24,14 @@ interface CorePersonaDisplayProps {
   } | null;
   /** Phase 2: data-sufficiency (0-100) from the backend. */
   data_sufficiency?: number | null;
+  /**
+   * Phase 2 (merge): when the merged "How we built this persona"
+   * accordion is enabled at the PersonaPreviewSection level, the old
+   * EvidenceAccordion here is redundant. Pass `true` to hide it. The
+   * default is `false` (current behavior — both render) so flipping
+   * the merge flag off is risk-free.
+   */
+  hideEvidenceAccordion?: boolean;
 }
 
 /**
@@ -35,6 +43,7 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
   onChange,
   completeness,
   data_sufficiency,
+  hideEvidenceAccordion = false,
 }) => {
   // Helper function to update nested fields
   const updateField = (path: string[], value: any) => {
@@ -529,7 +538,9 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
            brand's content, what_was_missing gaps, confidence score). The
            data was already returned by the backend; the rest of the UI
            was just hiding it. */}
-      <EvidenceAccordion persona={persona} completeness={completeness} data_sufficiency={data_sufficiency} />
+      {!hideEvidenceAccordion && (
+        <EvidenceAccordion persona={persona} completeness={completeness} data_sufficiency={data_sufficiency} />
+      )}
 
       {/* 5. Persona Generation Summary */}
       <SectionAccordion
