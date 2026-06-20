@@ -31,6 +31,22 @@ import os
 
 logger = get_service_logger("onboarding.data_integration")
 
+
+class OnboardingDataIntegrationError(Exception):
+    """Raised when the onboarding data integration pipeline fails.
+
+    Used in place of a silent empty-dict / zero-score fallback. The
+    integration surface touches every downstream strategy-analysis
+    step (autofill, gap analysis, AI recommendations, calendar
+    generation) and a fabricated or empty integrated_data result
+    would propagate through the system as if real data had been
+    processed -- producing strategies with 0.0 quality scores and
+    empty canonical profiles that the user could mistake for a
+    real, low-quality integration. Fail fast and let the caller
+    decide how to surface the error.
+    """
+
+
 class OnboardingDataIntegrationService:
     """Service for onboarding data integration and processing."""
 
@@ -121,7 +137,10 @@ class OnboardingDataIntegrationService:
 
         except Exception as e:
             logger.error(f"Error processing onboarding data (sync) for user {user_id}: {str(e)}")
-            return self._get_fallback_data()
+            logger.error("Traceback:\n%s", traceback.format_exc())
+            raise OnboardingDataIntegrationError(
+                f"Onboarding data integration failed for user {user_id}: {str(e)}"
+            ) from e
 
     async def refresh_integrated_data(self, user_id: str, db: Session) -> None:
         """
@@ -304,7 +323,9 @@ class OnboardingDataIntegrationService:
         except Exception as e:
             logger.error(f"Error processing onboarding data for user {user_id}: {str(e)}")
             logger.error("Traceback:\n%s", traceback.format_exc())
-            return self._get_fallback_data()
+            raise OnboardingDataIntegrationError(
+                f"Onboarding data integration failed for user {user_id}: {str(e)}"
+            ) from e
 
     def _get_website_analysis(self, user_id: str, db: Session) -> Dict[str, Any]:
         """Get website analysis data for the user."""
@@ -1192,27 +1213,6 @@ class OnboardingDataIntegrationService:
         except Exception as e:
             logger.error(f"Error getting Bing analytics for user {user_id}: {str(e)}")
             return {}
-
-    def _get_fallback_data(self) -> Dict[str, Any]:
-        """Get fallback data when processing fails."""
-        return {
-            'website_analysis': {},
-            'research_preferences': {},
-            'api_keys_data': {},
-            'onboarding_session': {},
-            'persona_data': {},
-            'competitor_analysis': [],
-            'gsc_analytics': {},
-            'bing_analytics': {},
-            'data_quality': {
-                'overall_score': 0.0,
-                'completeness': 0.0,
-                'freshness': 0.0,
-                'relevance': 0.0,
-                'confidence': 0.0
-            },
-            'processing_timestamp': datetime.utcnow().isoformat()
-        }
 
     async def get_integrated_data(self, user_id: int, db: Session) -> Optional[Dict[str, Any]]:
         """Get previously integrated onboarding data for a user."""
