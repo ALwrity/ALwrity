@@ -257,15 +257,27 @@ relationship declarations), 3 reader files, 1 constructor file,
 script. About 15-25 lines net across 6-8 files, plus a DB
 migration that must be run before deployment.
 
-### H2: Unhandled `RuntimeError` in content calendar -- likely LIVE (reliability)
+### H2: Unhandled `RuntimeError` in content calendar -- STALE
 
-`strategy_generator.py:459` is referenced as the location of an
-unhandled `RuntimeError` in `_generate_content_calendar()`. The
-audit was not exhaustive on this one; the pattern in the
-surrounding code (a coroutine that catches the same exception
-type elsewhere) suggests this is a real gap. Deferred from the
-quick-win scope because the fix requires adding a try/except
-in a function we have not fully read in this audit.
+On review of `strategy_generator.py:344-459` and
+`ai_generation_endpoints.py:155-191`, this is **not a real gap**.
+
+- `_generate_content_calendar` has its own internal
+  `except Exception as e:` at line 457 that catches every
+  internal failure (including any `KeyError`, `TypeError`,
+  `ValueError` from the schema, or AI service error) and
+  re-raises as `RuntimeError("Failed to generate content
+  calendar: ...")` at line 459.
+- The endpoint at `ai_generation_endpoints.py:181` has
+  `except RuntimeError as e:` that returns HTTP 503 with the
+  error message.
+
+So the chain is: any internal error → re-raised as
+`RuntimeError` → caught at the endpoint → 503 to the client.
+The audit's "unhandled `RuntimeError`" was a misread of the
+code; the `raise` at line 459 is the function's own re-raise
+inside its except block, not an unhandled path. No code change
+needed.
 
 ### H3: user_id type mismatch -- LIVE (data integrity)
 
@@ -317,18 +329,19 @@ metrics. The values shown to the user come from the props
 | `cs/phase-3.4` | C3: replace fabricated AI with LLM or flag as placeholder | 2 files | deferred |
 | `cs/phase-3.5` | C4: add TTL + cleanup to in-memory `_task_status` | 1 file | deferred |
 | `cs/phase-3.6` | H1: rename the SQLAlchemy `performance_metrics` column or relationship | 1 file | deferred |
-| `cs/phase-3.7` | H2: try/except around `_generate_content_calendar` | 1 file | deferred |
+| `cs/phase-3.7` | H2: try/except around `_generate_content_calendar` | 0 files (stale on review) | closed |
 | `cs/phase-3.8` | H3: type audit for `user_id` (string vs int) across callers | tbd | deferred |
 | `cs/phase-3.9` | H4: escape `%` and `_` in `search_term` before LIKE | 1 file | deferred |
 | `cs/phase-3.10` | H1: break circular import + rename `performance_metrics` column | 6-8 files + DB migration | deferred, awaiting sign-off |
 
-Total `cs/phase-3` quick-win scope so far: 2 files, ~10-20 line
-changes. H1 escalated during the audit from "rename 1 column" to
-"break a circular import across 4 model classes + 1 column rename
-+ 1 SQL migration." That is a real bug (mapper configuration
-throws `InvalidRequestError` on first DB read), but the fix
-touches the schema, so I am pausing for user sign-off before
-touching it.
+Total `cs/phase-3` quick-win scope so far: 5 fixes shipped
+locally (C1 ownership, C5 dedent, C2 allow-list, H1 mapper, H4
+LIKE escape), 1 fix closed as stale (H2 -- the supposed
+unhandled `RuntimeError` is actually caught at the endpoint).
+H1 escalated during the audit from "rename 1 column" to "break
+a circular import across 4 model classes + 1 column rename"
+and was shipped after user sign-off -- the DB column name
+stays the same so no SQL migration is required.
 
 ---
 
