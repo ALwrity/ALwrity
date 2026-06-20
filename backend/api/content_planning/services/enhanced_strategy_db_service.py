@@ -73,7 +73,17 @@ class EnhancedStrategyDBService:
     async def create_enhanced_strategy(self, strategy_data: Dict[str, Any]) -> Optional[EnhancedContentStrategy]:
         """Create a new enhanced strategy."""
         try:
-            strategy = EnhancedContentStrategy(**strategy_data)
+            # The public API still uses 'performance_metrics' as the JSON
+            # column key, but the SQLAlchemy attribute on the model was
+            # renamed to 'performance_metrics_data' to avoid colliding
+            # with the StrategyPerformanceMetrics relationship (which
+            # also goes by 'performance_metrics' on the model). Remap
+            # before passing to the constructor so we don't try to
+            # assign the JSON dict to the relationship slot.
+            data = dict(strategy_data)
+            if 'performance_metrics' in data:
+                data['performance_metrics_data'] = data.pop('performance_metrics')
+            strategy = EnhancedContentStrategy(**data)
             self.db.add(strategy)
             self.db.commit()
             self.db.refresh(strategy)
@@ -109,9 +119,16 @@ class EnhancedStrategyDBService:
             if not strategy:
                 return None
 
+            # Remap the public-API key 'performance_metrics' (the JSON
+            # column) to the renamed attribute 'performance_metrics_data'.
+            # The relationship slot on the model is also named
+            # 'performance_metrics' but expects a list of
+            # StrategyPerformanceMetrics records, not a JSON dict, so
+            # the setattr loop must not stomp it.
             for key, value in update_data.items():
-                if hasattr(strategy, key):
-                    setattr(strategy, key, value)
+                target_key = 'performance_metrics_data' if key == 'performance_metrics' else key
+                if hasattr(strategy, target_key):
+                    setattr(strategy, target_key, value)
 
             strategy.updated_at = datetime.utcnow()
             self.db.commit()
