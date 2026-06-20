@@ -43,6 +43,55 @@ _LIST_FIELDS: tuple[str, ...] = (
 class ProfileIntelligenceValidationError(Exception):
     """Raised when AI profile intelligence output fails validation."""
 
+    def __init__(self, message: str, *, validation_code: str = "validation_failed") -> None:
+        super().__init__(message)
+        self.validation_code = validation_code
+
+
+def normalize_ai_profile_intelligence_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    """
+    Best-effort normalize LLM JSON before strict Pydantic validation.
+
+    Strips strings, replaces empty scalars with ``Unknown``, drops empty list
+    items, and ignores unexpected keys from the model.
+    """
+    normalized: dict[str, Any] = {}
+
+    for field_name in _SCALAR_FIELDS:
+        cleaned = clean_str(raw.get(field_name))
+        normalized[field_name] = cleaned if cleaned else UNKNOWN_SENTINEL
+
+    for field_name in _LIST_FIELDS:
+        items = raw.get(field_name)
+        if not isinstance(items, list):
+            normalized[field_name] = []
+            continue
+        normalized[field_name] = [
+            cleaned
+            for item in items
+            if isinstance(item, str) and (cleaned := clean_str(item))
+        ]
+
+    logger.debug(
+        "{} normalize_ai_profile_intelligence_raw scalar_unknowns={} list_counts={}",
+        _LOG_PREFIX,
+        sum(1 for key in _SCALAR_FIELDS if normalized[key] == UNKNOWN_SENTINEL),
+        {key: len(normalized[key]) for key in _LIST_FIELDS},
+    )
+    return normalized
+
+
+def _first_pydantic_field_hint(exc: ValidationError) -> str:
+    """Extract a concise field hint from a Pydantic validation error."""
+    for error in exc.errors():
+        loc = error.get("loc") or ()
+        field = ".".join(str(part) for part in loc if part != "__root__")
+        msg = error.get("msg", "invalid value")
+        if field:
+            return f"{field}: {msg}"
+        return str(msg)
+    return "schema validation failed"
+
 
 def validate_ai_profile_intelligence_payload(
     raw: Any,
@@ -76,13 +125,16 @@ def validate_ai_profile_intelligence_payload(
     try:
         payload = AIProfileIntelligencePayload.model_validate(raw)
     except ValidationError as exc:
+        field_hint = _first_pydantic_field_hint(exc)
         logger.exception(
-            "{} validate_ai_profile_intelligence_payload pydantic error: {}",
+            "{} validate_ai_profile_intelligence_payload pydantic error hint={}: {}",
             _LOG_PREFIX,
+            field_hint,
             exc,
         )
         raise ProfileIntelligenceValidationError(
-            "AI profile intelligence failed schema validation"
+            f"AI profile intelligence failed schema validation ({field_hint})",
+            validation_code="schema_validation",
         ) from exc
 
     _run_post_checks(payload)
@@ -142,7 +194,8 @@ def _run_post_checks(payload: AIProfileIntelligencePayload) -> None:
                 field_name,
             )
             raise ProfileIntelligenceValidationError(
-                f"AI profile intelligence field {field_name!r} must not be whitespace-only"
+                f"AI profile intelligence field {field_name!r} must not be whitespace-only",
+                validation_code="empty_scalar",
             )
         if cleaned == "":
             logger.error(
@@ -151,7 +204,8 @@ def _run_post_checks(payload: AIProfileIntelligencePayload) -> None:
                 field_name,
             )
             raise ProfileIntelligenceValidationError(
-                f"AI profile intelligence field {field_name!r} must not be empty"
+                f"AI profile intelligence field {field_name!r} must not be empty",
+                validation_code="empty_scalar",
             )
         if cleaned != value:
             logger.error(
@@ -161,7 +215,8 @@ def _run_post_checks(payload: AIProfileIntelligencePayload) -> None:
             )
             raise ProfileIntelligenceValidationError(
                 f"AI profile intelligence field {field_name!r} must not contain "
-                "leading or trailing whitespace"
+                "leading or trailing whitespace",
+                validation_code="untrimmed_scalar",
             )
 
     for field_name in _LIST_FIELDS:
@@ -177,7 +232,8 @@ def _run_post_checks(payload: AIProfileIntelligencePayload) -> None:
                     index,
                 )
                 raise ProfileIntelligenceValidationError(
-                    f"AI profile intelligence field {field_name!r} items must be strings"
+                    f"AI profile intelligence field {field_name!r} items must be strings",
+                    validation_code="invalid_list_item",
                 )
             if clean_str(item) == "":
                 logger.error(
@@ -188,7 +244,8 @@ def _run_post_checks(payload: AIProfileIntelligencePayload) -> None:
                 )
                 raise ProfileIntelligenceValidationError(
                     f"AI profile intelligence field {field_name!r} "
-                    f"contains an empty list item"
+                    f"contains an empty list item",
+                    validation_code="empty_list_item",
                 )
 
 

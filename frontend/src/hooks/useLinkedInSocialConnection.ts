@@ -446,7 +446,12 @@ export const useLinkedInSocialConnection = () => {
 
     try {
 
-      await connectWithLinkedInOAuth();
+      await connectWithLinkedInOAuth({
+        verifyConnected: async () => {
+          const connectionStatus = await getLinkedInConnectionStatus();
+          return connectionStatus.connected;
+        },
+      });
 
       console.info('[LinkedInConnect] OAuth connect succeeded');
 

@@ -35,7 +35,10 @@ from models.linkedin_social_models import (
     CompletionQuestionResponse,
     ProfileCompletionResponse,
     ProfileIntelligenceMetaResponse,
+    ProfileAnalysisErrorResponse,
     ProfileValidationResponse,
+    TopicRecommendationResponse,
+    TopicRecommendationsMetaResponse,
 )
 from services.integrations.linkedin.profile_intelligence_llm import ProfileIntelligenceLLMError
 from services.integrations.linkedin.profile_intelligence_service import (
@@ -45,6 +48,15 @@ from services.integrations.linkedin.profile_intelligence_service import (
 )
 from services.integrations.linkedin.profile_intelligence_validator import (
     ProfileIntelligenceValidationError,
+)
+from services.integrations.linkedin.topic_recommendation_llm import TopicRecommendationLLMError
+from services.integrations.linkedin.topic_recommendation_service import (
+    TopicRecommendationAcquireMeta,
+    TopicRecommendationError,
+    get_or_generate_topic_recommendations,
+)
+from services.integrations.linkedin.topic_recommendation_validator import (
+    TopicRecommendationValidationError,
 )
 from services.integrations.linkedin.analytics_dates import (
     InvalidAnalyticsDateRange,
@@ -78,7 +90,49 @@ from services.integrations.oauth_callback_utils import (
 
 router = APIRouter(prefix="/api/linkedin-social", tags=["LinkedIn Social"])
 
+_RECOMMENDATIONS_USER_ERROR = (
+    "We couldn't load content suggestions right now. Please try again."
+)
+
+_ANALYSIS_PHASE_LABELS: Dict[int, str] = {
+    1: "Acquire Profile Data",
+    2: "Build Profile Context",
+    3: "Validate Profile",
+    4: "Profile Completion",
+    5: "AI Profile Intelligence",
+    6: "Topic Recommendations",
+}
+
 _oauth_service = LinkedInOAuthService()
+
+
+def _make_analysis_error(
+    phase: int,
+    error_code: str,
+    user_message: str,
+    exc: Optional[Exception] = None,
+    *,
+    user_id: str = "",
+) -> ProfileAnalysisErrorResponse:
+    """Build a structured analysis error and log safe diagnostics."""
+    phase_label = _ANALYSIS_PHASE_LABELS.get(phase, f"Phase {phase}")
+    debug_message = str(exc)[:500] if exc else None
+    logger.error(
+        "[LinkedInAnalysis] phase={} ({}) code={} user_id={} user_message={} debug={}",
+        phase,
+        phase_label,
+        error_code,
+        user_id,
+        user_message,
+        debug_message,
+    )
+    return ProfileAnalysisErrorResponse(
+        failed_phase=phase,
+        phase_label=phase_label,
+        error_code=error_code,
+        user_message=user_message,
+        debug_message=debug_message,
+    )
 
 
 class LinkedInAuthCallbackRequest(BaseModel):
@@ -293,11 +347,15 @@ def _load_profile_intelligence_for_response(
     repository: ProfileRepository,
     *,
     force_regenerate: bool = False,
-) -> tuple[Optional[AIProfileIntelligenceResponse], Optional[ProfileIntelligenceMetaResponse]]:
+) -> tuple[
+    Optional[AIProfileIntelligenceResponse],
+    Optional[ProfileIntelligenceMetaResponse],
+    Optional[ProfileAnalysisErrorResponse],
+]:
     """
     Generate or load AI profile intelligence for API responses.
 
-    Returns ``(None, None)`` when profile is incomplete without calling the LLM.
+    Returns ``(None, None, analysis_error)`` on failure instead of raising HTTP errors.
     """
     if not profile_validation.get("is_profile_complete"):
         logger.info(
@@ -306,10 +364,10 @@ def _load_profile_intelligence_for_response(
             user_id,
             profile_validation.get("missing_fields"),
         )
-        return None, None
+        return None, None, None
 
     logger.info(
-        "[ProfileIntelligence] API load start user_id={} force_regenerate={}",
+        "[LinkedInAnalysis] Phase 5 start user_id={} force_regenerate={}",
         user_id,
         force_regenerate,
     )
@@ -321,74 +379,278 @@ def _load_profile_intelligence_for_response(
             repository=repository,
             force_regenerate=force_regenerate,
         )
-    except (ProfileIntelligenceLLMError, ProfileIntelligenceValidationError) as exc:
-        _raise_profile_intelligence_http_error(exc, user_id=user_id)
-    except (ProfileIntelligenceError, ValueError) as exc:
-        _raise_profile_intelligence_http_error(exc, user_id=user_id)
-    except Exception as exc:
-        _raise_profile_intelligence_http_error(exc, user_id=user_id)
-
-    if not stored:
-        logger.warning(
-            "[ProfileIntelligence] API load returned empty intelligence user_id={}",
-            user_id,
-        )
-        return None, None
-
-    logger.info(
-        "[ProfileIntelligence] API load complete user_id={} source={}",
-        user_id,
-        meta.get("source"),
-    )
-    return _stored_intelligence_to_response(stored), _intelligence_meta_to_response(meta)
-
-
-def _raise_profile_intelligence_http_error(exc: Exception, *, user_id: str) -> None:
-    """Map Phase 5 intelligence failures to HTTP status codes."""
-    if isinstance(exc, ProfileIntelligenceLLMError):
-        error_kind = getattr(exc, "error_kind", "unknown")
+    except ProfileIntelligenceLLMError as exc:
+        error_kind = getattr(exc, "error_kind", "llm_error")
         logger.exception(
             "[ProfileIntelligence] LLM failure user_id={} kind={}: {}",
             user_id,
             error_kind,
             exc,
         )
-        raise HTTPException(
-            status_code=503,
-            detail="Unable to generate AI profile intelligence.",
-        ) from exc
-
-    if isinstance(exc, ProfileIntelligenceValidationError):
+        return (
+            None,
+            None,
+            _make_analysis_error(
+                5,
+                error_kind,
+                "We couldn't analyze your LinkedIn profile right now. Please try again.",
+                exc,
+                user_id=user_id,
+            ),
+        )
+    except ProfileIntelligenceValidationError as exc:
+        validation_code = getattr(exc, "validation_code", "validation_failed")
         logger.exception(
-            "[ProfileIntelligence] validation failure user_id={}: {}",
+            "[ProfileIntelligence] validation failure user_id={} code={}: {}",
             user_id,
+            validation_code,
             exc,
         )
-        raise HTTPException(
-            status_code=503,
-            detail="Unable to generate AI profile intelligence.",
-        ) from exc
-
-    if isinstance(exc, (ProfileIntelligenceError, ValueError)):
+        return (
+            None,
+            None,
+            _make_analysis_error(
+                5,
+                validation_code,
+                "Profile analysis returned invalid data from AI. Please try again.",
+                exc,
+                user_id=user_id,
+            ),
+        )
+    except (ProfileIntelligenceError, ValueError) as exc:
         logger.exception(
             "[ProfileIntelligence] orchestration failure user_id={}: {}",
             user_id,
             exc,
         )
-        raise HTTPException(
-            status_code=500,
-            detail="Unable to generate AI profile intelligence.",
-        ) from exc
+        return (
+            None,
+            None,
+            _make_analysis_error(
+                5,
+                "orchestration_error",
+                "We couldn't analyze your LinkedIn profile right now. Please try again.",
+                exc,
+                user_id=user_id,
+            ),
+        )
+    except Exception as exc:
+        logger.exception(
+            "[ProfileIntelligence] unexpected failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        return (
+            None,
+            None,
+            _make_analysis_error(
+                5,
+                "unexpected_error",
+                "We couldn't analyze your LinkedIn profile right now. Please try again.",
+                exc,
+                user_id=user_id,
+            ),
+        )
 
-    logger.exception(
-        "[ProfileIntelligence] unexpected failure user_id={}: {}",
+    if not stored:
+        logger.warning(
+            "[ProfileIntelligence] API load returned empty intelligence user_id={}",
+            user_id,
+        )
+        return (
+            None,
+            None,
+            _make_analysis_error(
+                5,
+                "empty_result",
+                "Profile analysis did not return any results. Please try again.",
+                user_id=user_id,
+            ),
+        )
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 5 complete user_id={} source={}",
         user_id,
-        exc,
+        meta.get("source"),
     )
-    raise HTTPException(
-        status_code=500,
-        detail="Unable to generate AI profile intelligence.",
-    ) from exc
+    return _stored_intelligence_to_response(stored), _intelligence_meta_to_response(meta), None
+
+
+def _recommendation_dict_to_response(item: dict[str, Any]) -> TopicRecommendationResponse:
+    """Map a single recommendation dict to API response model."""
+    return TopicRecommendationResponse.model_validate(item)
+
+
+def _recommendations_meta_to_response(
+    meta: TopicRecommendationAcquireMeta,
+) -> Optional[TopicRecommendationsMetaResponse]:
+    """Map orchestrator meta to API response when recommendations were acquired."""
+    source = meta.get("source")
+    if source not in ("cache", "generated"):
+        return None
+    return TopicRecommendationsMetaResponse(
+        source=source,  # type: ignore[arg-type]
+        recommendations_updated_at=meta.get("recommendations_updated_at"),
+    )
+
+
+def _load_topic_recommendations_for_response(
+    user_id: str,
+    ai_profile_intelligence: dict[str, Any],
+    profile_validation: ProfileValidationResult,
+    repository: ProfileRepository,
+    *,
+    force_regenerate: bool = False,
+) -> tuple[
+    Optional[List[TopicRecommendationResponse]],
+    Optional[TopicRecommendationsMetaResponse],
+    Optional[str],
+    Optional[ProfileAnalysisErrorResponse],
+]:
+    """
+    Generate or load topic recommendations for API responses.
+
+    Returns user-facing ``recommendations_error`` string plus structured ``analysis_error``.
+    """
+    if not profile_validation.get("is_profile_complete"):
+        logger.info(
+            "[TopicRecommendation] API skip — profile incomplete user_id={} missing_fields={}",
+            user_id,
+            profile_validation.get("missing_fields"),
+        )
+        return None, None, None, None
+
+    if not isinstance(ai_profile_intelligence, dict) or not ai_profile_intelligence:
+        logger.info(
+            "[TopicRecommendation] API skip — intelligence missing user_id={}",
+            user_id,
+        )
+        return (
+            None,
+            None,
+            None,
+            _make_analysis_error(
+                6,
+                "missing_intelligence",
+                "Complete profile analysis before generating topic suggestions.",
+                user_id=user_id,
+            ),
+        )
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 6 start user_id={} force_regenerate={}",
+        user_id,
+        force_regenerate,
+    )
+    try:
+        recommendations, meta = get_or_generate_topic_recommendations(
+            user_id,
+            ai_profile_intelligence,
+            profile_validation=profile_validation,
+            repository=repository,
+            force_regenerate=force_regenerate,
+        )
+    except TopicRecommendationLLMError as exc:
+        error_kind = getattr(exc, "error_kind", "llm_failure")
+        logger.exception(
+            "[TopicRecommendation] LLM failure user_id={} kind={}: {}",
+            user_id,
+            error_kind,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            6,
+            error_kind,
+            _RECOMMENDATIONS_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _RECOMMENDATIONS_USER_ERROR, analysis_error
+    except TopicRecommendationValidationError as exc:
+        validation_code = getattr(exc, "validation_code", "validation_failed")
+        logger.exception(
+            "[TopicRecommendation] validation failure user_id={} code={}: {}",
+            user_id,
+            validation_code,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            6,
+            validation_code,
+            _RECOMMENDATIONS_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _RECOMMENDATIONS_USER_ERROR, analysis_error
+    except (TopicRecommendationError, ValueError) as exc:
+        logger.exception(
+            "[TopicRecommendation] orchestration failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            6,
+            "orchestration_failed",
+            _RECOMMENDATIONS_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _RECOMMENDATIONS_USER_ERROR, analysis_error
+    except Exception as exc:
+        logger.exception(
+            "[TopicRecommendation] unexpected failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            6,
+            "unexpected_error",
+            _RECOMMENDATIONS_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _RECOMMENDATIONS_USER_ERROR, analysis_error
+
+    if not recommendations:
+        logger.warning(
+            "[TopicRecommendation] API load returned empty recommendations user_id={}",
+            user_id,
+        )
+        analysis_error = _make_analysis_error(
+            6,
+            "empty_response",
+            _RECOMMENDATIONS_USER_ERROR,
+            user_id=user_id,
+        )
+        return None, None, _RECOMMENDATIONS_USER_ERROR, analysis_error
+
+    try:
+        response_items = [
+            _recommendation_dict_to_response(item) for item in recommendations
+        ]
+    except Exception as exc:
+        logger.exception(
+            "[TopicRecommendation] response mapping failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            6,
+            "response_mapping_failed",
+            _RECOMMENDATIONS_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _RECOMMENDATIONS_USER_ERROR, analysis_error
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 6 complete user_id={} source={} count={}",
+        user_id,
+        meta.get("source"),
+        len(response_items),
+    )
+    return response_items, _recommendations_meta_to_response(meta), None, None
+
 
 
 def _build_profile_completion_payload(
@@ -499,6 +761,10 @@ async def get_linkedin_profile(
         False,
         description="Force regeneration of AI profile intelligence (Phase 5)",
     ),
+    refresh_recommendations: bool = Query(
+        False,
+        description="Force regeneration of topic recommendations (Phase 6)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInProfileAcquireResponse:
     """
@@ -508,14 +774,22 @@ async def get_linkedin_profile(
     Phase 2: cache-first ``profile_context`` built from the normalized profile.
     Phase 3/4: ``profile_validation`` and completion questions when incomplete.
     Phase 5: ``ai_profile_intelligence`` when profile is complete.
+    Phase 6: ``recommendations`` when profile is complete and intelligence exists.
     """
     user_id = _user_id(current_user)
     logger.info(
-        "[LinkedInProfile] GET /profile user_id={} refresh={} refresh_intelligence={}",
+        "[LinkedInAnalysis] pipeline start user_id={} refresh={} refresh_intelligence={} "
+        "refresh_recommendations={}",
         user_id,
         refresh,
         refresh_intelligence,
+        refresh_recommendations,
     )
+
+    last_completed_phase = 0
+    analysis_error: Optional[ProfileAnalysisErrorResponse] = None
+
+    logger.info("[LinkedInAnalysis] Phase 1 start user_id={}", user_id)
     try:
         profile, meta = await get_or_fetch_profile(
             user_id,
@@ -526,8 +800,15 @@ async def get_linkedin_profile(
         _raise_profile_acquire_http_error(exc, user_id=user_id)
     except Exception as exc:
         _raise_profile_acquire_http_error(exc, user_id=user_id)
+    last_completed_phase = 1
+    logger.info(
+        "[LinkedInAnalysis] Phase 1 complete user_id={} source={}",
+        user_id,
+        meta.get("source"),
+    )
 
     repository = ProfileRepository(oauth=_oauth_service)
+    logger.info("[LinkedInAnalysis] Phase 2 start user_id={}", user_id)
     try:
         profile_context, context_meta = get_or_build_profile_context(
             user_id,
@@ -539,7 +820,14 @@ async def get_linkedin_profile(
         _raise_profile_context_http_error(exc, user_id=user_id)
     except Exception as exc:
         _raise_profile_context_http_error(exc, user_id=user_id)
+    last_completed_phase = 2
+    logger.info(
+        "[LinkedInAnalysis] Phase 2 complete user_id={} source={}",
+        user_id,
+        context_meta.get("source"),
+    )
 
+    logger.info("[LinkedInAnalysis] Phase 3 start user_id={}", user_id)
     try:
         profile_validation, _validation_meta = get_or_validate_profile_context(
             user_id,
@@ -551,13 +839,25 @@ async def get_linkedin_profile(
         _raise_profile_validation_http_error(exc, user_id=user_id)
     except Exception as exc:
         _raise_profile_validation_http_error(exc, user_id=user_id)
+    last_completed_phase = 3
+    if not profile_validation.get("is_profile_complete"):
+        last_completed_phase = 4
+        logger.info(
+            "[LinkedInAnalysis] Phase 4 required user_id={} missing_fields={}",
+            user_id,
+            profile_validation.get("missing_fields"),
+        )
+    else:
+        logger.info("[LinkedInAnalysis] Phase 3 complete user_id={} profile_complete=true", user_id)
 
     ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
     ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
+    intelligence_error: Optional[ProfileAnalysisErrorResponse] = None
     if profile_validation.get("is_profile_complete"):
         (
             ai_profile_intelligence,
             ai_profile_intelligence_meta,
+            intelligence_error,
         ) = _load_profile_intelligence_for_response(
             user_id,
             profile_context,
@@ -565,6 +865,10 @@ async def get_linkedin_profile(
             repository,
             force_regenerate=refresh_intelligence,
         )
+        if intelligence_error:
+            analysis_error = intelligence_error
+        elif ai_profile_intelligence is not None:
+            last_completed_phase = 5
     else:
         logger.info(
             "[ProfileIntelligence] GET /profile skipping intelligence — incomplete "
@@ -573,10 +877,41 @@ async def get_linkedin_profile(
             profile_validation.get("missing_fields"),
         )
 
+    recommendations: Optional[List[TopicRecommendationResponse]] = None
+    recommendations_meta: Optional[TopicRecommendationsMetaResponse] = None
+    recommendations_error: Optional[str] = None
+    if ai_profile_intelligence is not None:
+        intelligence_dict = ai_profile_intelligence.model_dump()
+        (
+            recommendations,
+            recommendations_meta,
+            recommendations_error,
+            recommendations_analysis_error,
+        ) = _load_topic_recommendations_for_response(
+            user_id,
+            intelligence_dict,
+            profile_validation,
+            repository,
+            force_regenerate=refresh_recommendations,
+        )
+        if recommendations_analysis_error:
+            analysis_error = recommendations_analysis_error
+        elif recommendations:
+            last_completed_phase = 6
+    elif profile_validation.get("is_profile_complete") and intelligence_error is None:
+        logger.info(
+            "[TopicRecommendation] GET /profile skipping recommendations — no intelligence "
+            "user_id={}",
+            user_id,
+        )
+
     logger.info(
-        "[LinkedInProfile] GET /profile complete user_id={} profile_source={} "
-        "context_source={} is_profile_complete={} intelligence_source={}",
+        "[LinkedInAnalysis] pipeline complete user_id={} last_completed_phase={} "
+        "profile_source={} context_source={} is_profile_complete={} "
+        "intelligence_source={} recommendations_source={} recommendations_count={} "
+        "recommendations_error={} analysis_error_phase={}",
         user_id,
+        last_completed_phase,
         meta.get("source"),
         context_meta.get("source"),
         profile_validation.get("is_profile_complete"),
@@ -585,6 +920,10 @@ async def get_linkedin_profile(
             if ai_profile_intelligence_meta
             else None
         ),
+        recommendations_meta.source if recommendations_meta else None,
+        len(recommendations) if recommendations else 0,
+        bool(recommendations_error),
+        analysis_error.failed_phase if analysis_error else None,
     )
     return LinkedInProfileAcquireResponse(
         profile=profile,
@@ -602,6 +941,11 @@ async def get_linkedin_profile(
         profile_completion=profile_completion,
         ai_profile_intelligence=ai_profile_intelligence,
         ai_profile_intelligence_meta=ai_profile_intelligence_meta,
+        recommendations=recommendations,
+        recommendations_meta=recommendations_meta,
+        recommendations_error=recommendations_error,
+        last_completed_phase=last_completed_phase or None,
+        analysis_error=analysis_error,
     )
 
 
@@ -656,12 +1000,21 @@ async def complete_linkedin_profile(
         (
             ai_profile_intelligence,
             ai_profile_intelligence_meta,
+            _intelligence_error,
         ) = _load_profile_intelligence_for_response(
             user_id,
             result.profile_context,
             result.profile_validation,
             repository,
         )
+        if _intelligence_error:
+            logger.warning(
+                "[ProfileCompletion] POST /profile/complete intelligence failed user_id={} "
+                "phase={} code={}",
+                user_id,
+                _intelligence_error.failed_phase,
+                _intelligence_error.error_code,
+            )
 
     return _completion_result_to_response(
         result,
@@ -819,18 +1172,30 @@ async def handle_oauth_callback_get(
                 )
                 return HTMLResponse(content=html)
 
-            # Success case - store credentials
-            if not resolved_account_id:
-                logger.error(f"[LinkedInConnect] Unipile callback missing account_id user_id={user_id}")
-                raise HTTPException(status_code=400, detail="Missing account_id from Unipile callback")
+            # Success case - store credentials (account_id may arrive via notify_url only)
+            if resolved_account_id:
+                ok = await _oauth_service.handle_unipile_callback(
+                    user_id=user_id,
+                    account_id=resolved_account_id,
+                    status="success",
+                )
+                if not ok:
+                    raise HTTPException(
+                        status_code=400, detail="Failed to store Unipile credentials"
+                    )
+            else:
+                logger.warning(
+                    f"[LinkedInConnect] Unipile callback missing account_id user_id={user_id}; "
+                    "attempting account sync (notify_url may have already stored credentials)"
+                )
+                await _oauth_service.try_sync_unipile_accounts(user_id)
 
-            ok = await _oauth_service.handle_unipile_callback(
-                user_id=user_id,
-                account_id=resolved_account_id,
-                status="success",
-            )
-            if not ok:
-                raise HTTPException(status_code=400, detail="Failed to store Unipile credentials")
+            status_after = _oauth_service.get_connection_status(user_id)
+            if not status_after.get("connected"):
+                logger.warning(
+                    f"[LinkedInConnect] Unipile browser callback complete but not connected yet "
+                    f"user_id={user_id}; client will poll status or wait for webhook"
+                )
 
             logger.info(f"[LinkedInConnect] Unipile callback succeeded user_id={user_id}")
             payload = {

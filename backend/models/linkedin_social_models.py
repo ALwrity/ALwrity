@@ -148,8 +148,36 @@ class ProfileIntelligenceMetaResponse(BaseModel):
     ai_intelligence_updated_at: Optional[str] = None
 
 
+class TopicRecommendationResponse(BaseModel):
+    """Phase 6 single personalized content recommendation."""
+
+    id: str
+    title: str
+    why_this_fits: str
+    recommended_format: Literal["LinkedIn Post", "LinkedIn Article"]
+    target_audience: List[str] = Field(default_factory=list)
+    growth_impact: Literal["High", "Medium", "Low"]
+
+
+class TopicRecommendationsMetaResponse(BaseModel):
+    """Phase 6 recommendations acquisition metadata."""
+
+    source: Literal["cache", "generated"]
+    recommendations_updated_at: Optional[str] = None
+
+
+class ProfileAnalysisErrorResponse(BaseModel):
+    """Structured failure from the LinkedIn analysis pipeline (Phases 1–6)."""
+
+    failed_phase: int = Field(..., ge=1, le=6)
+    phase_label: str
+    error_code: str
+    user_message: str
+    debug_message: Optional[str] = None
+
+
 class LinkedInProfileAcquireResponse(BaseModel):
-    """Normalized own-profile snapshot with Phase 2–5 analysis context."""
+    """Normalized own-profile snapshot with Phase 2–6 analysis context."""
 
     profile: Dict[str, Any] = Field(default_factory=dict)
     meta: LinkedInProfileMetaResponse
@@ -159,6 +187,16 @@ class LinkedInProfileAcquireResponse(BaseModel):
     profile_completion: Optional[ProfileCompletionResponse] = None
     ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
     ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
+    recommendations: Optional[List[TopicRecommendationResponse]] = None
+    recommendations_meta: Optional[TopicRecommendationsMetaResponse] = None
+    recommendations_error: Optional[str] = None
+    last_completed_phase: Optional[int] = Field(
+        None,
+        ge=1,
+        le=6,
+        description="Highest pipeline phase that completed successfully in this request",
+    )
+    analysis_error: Optional[ProfileAnalysisErrorResponse] = None
 
 
 class LinkedInProfileCompleteRequest(BaseModel):

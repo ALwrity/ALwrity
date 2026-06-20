@@ -3,7 +3,7 @@
  * Separate from linkedInWriterApi.ts (content generation).
  */
 
-import { apiClient, ConnectionError, NetworkError } from './client';
+import { apiClient, ConnectionError, longRunningApiClient, NetworkError, RequestTimeoutError } from './client';
 
 export interface LinkedInConnectionStatus {
   connected: boolean;
@@ -153,6 +153,37 @@ export interface LinkedInProfileIntelligenceMeta {
   ai_intelligence_updated_at?: string | null;
 }
 
+/** Phase 6 — recommended content format from backend. */
+export type LinkedInRecommendedFormat = 'LinkedIn Post' | 'LinkedIn Article';
+
+/** Phase 6 — estimated growth impact from backend. */
+export type LinkedInGrowthImpact = 'High' | 'Medium' | 'Low';
+
+/** Phase 6 — single personalized topic recommendation. */
+export interface LinkedInTopicRecommendation {
+  id: string;
+  title: string;
+  why_this_fits: string;
+  recommended_format: LinkedInRecommendedFormat;
+  target_audience: string[];
+  growth_impact: LinkedInGrowthImpact;
+}
+
+/** Phase 6 — recommendations cache/generation metadata. */
+export interface LinkedInTopicRecommendationsMeta {
+  source: 'cache' | 'generated';
+  recommendations_updated_at?: string | null;
+}
+
+/** Structured failure from the LinkedIn analysis pipeline (Phases 1–6). */
+export interface LinkedInProfileAnalysisError {
+  failed_phase: number;
+  phase_label: string;
+  error_code: string;
+  user_message: string;
+  debug_message?: string | null;
+}
+
 export interface LinkedInProfileAcquireResponse {
   profile: Record<string, unknown>;
   meta: {
@@ -170,6 +201,12 @@ export interface LinkedInProfileAcquireResponse {
   /** Present when profile is complete and Phase 5 intelligence was generated or cached. */
   ai_profile_intelligence?: LinkedInAIProfileIntelligence | null;
   ai_profile_intelligence_meta?: LinkedInProfileIntelligenceMeta | null;
+  /** Present when profile is complete and Phase 6 recommendations were generated or cached. */
+  recommendations?: LinkedInTopicRecommendation[] | null;
+  recommendations_meta?: LinkedInTopicRecommendationsMeta | null;
+  recommendations_error?: string | null;
+  last_completed_phase?: number | null;
+  analysis_error?: LinkedInProfileAnalysisError | null;
 }
 
 export interface LinkedInProfileCompleteResponse {
@@ -208,6 +245,12 @@ export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> 
 }
 
 export function getLinkedInSocialErrorMessage(err: unknown): string {
+  if (err instanceof RequestTimeoutError) {
+    return (
+      'LinkedIn analysis is taking longer than expected. Please wait a moment and try again.'
+    );
+  }
+
   if (err instanceof NetworkError) {
     return 'Cannot reach the ALwrity server. Check that the backend is running and try again.';
   }
@@ -312,10 +355,11 @@ export async function getLinkedInPersonalAnalytics(
   return response.data;
 }
 
-/** Normalized profile, context, validation, completion, and AI intelligence (Phases 1–5). */
+/** Normalized profile, context, validation, completion, intelligence, and recommendations (Phases 1–6). */
 export async function getLinkedInProfile(
   refresh = false,
-  refreshIntelligence = false
+  refreshIntelligence = false,
+  refreshRecommendations = false
 ): Promise<LinkedInProfileAcquireResponse> {
   const params: Record<string, boolean> = {};
   if (refresh) {
@@ -324,10 +368,118 @@ export async function getLinkedInProfile(
   if (refreshIntelligence) {
     params.refresh_intelligence = true;
   }
-  const response = await apiClient.get(`${BASE}/profile`, {
+  if (refreshRecommendations) {
+    params.refresh_recommendations = true;
+  }
+
+  // Phases 5–6 run Gemini LLM calls; full pipeline can exceed the 60s default timeout.
+  const client =
+    refreshIntelligence || refreshRecommendations ? longRunningApiClient : apiClient;
+
+  const response = await client.get(`${BASE}/profile`, {
     params: Object.keys(params).length > 0 ? params : undefined,
   });
   return response.data;
+}
+
+/** Run the full LinkedIn analysis pipeline (Phases 1–6) for topic suggestions. */
+export async function runLinkedInTopicAnalysis(): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[TopicSuggestion] starting full analysis pipeline (Phases 1–6)');
+  return getLinkedInProfile(true, true, true);
+}
+
+const _PHASE_LABELS: Record<number, string> = {
+  1: 'Acquire Profile Data',
+  2: 'Build Profile Context',
+  3: 'Validate Profile',
+  4: 'Profile Completion',
+  5: 'AI Profile Intelligence',
+  6: 'Topic Recommendations',
+};
+
+/** Map HTTP failures from GET /profile to a structured analysis error for debugging. */
+export function mapProfileHttpErrorToAnalysisError(err: unknown): LinkedInProfileAnalysisError {
+  const fallback: LinkedInProfileAnalysisError = {
+    failed_phase: 1,
+    phase_label: _PHASE_LABELS[1],
+    error_code: 'request_failed',
+    user_message: getLinkedInSocialErrorMessage(err),
+    debug_message: err instanceof Error ? err.message : String(err),
+  };
+
+  if (!err || typeof err !== 'object' || !('response' in err)) {
+    if (err instanceof RequestTimeoutError) {
+      return {
+        failed_phase: 1,
+        phase_label: _PHASE_LABELS[1],
+        error_code: 'request_timeout',
+        user_message: getLinkedInSocialErrorMessage(err),
+        debug_message: err.message,
+      };
+    }
+    return fallback;
+  }
+
+  const axiosErr = err as {
+    response?: { status?: number; data?: { detail?: string } };
+  };
+  const status = axiosErr.response?.status;
+  const detail = axiosErr.response?.data?.detail ?? '';
+
+  if (status === 401) {
+    return {
+      failed_phase: 1,
+      phase_label: _PHASE_LABELS[1],
+      error_code: 'not_connected',
+      user_message: 'LinkedIn account is not connected. Please connect and try again.',
+      debug_message: detail || fallback.debug_message,
+    };
+  }
+  if (status === 502) {
+    return {
+      failed_phase: 1,
+      phase_label: _PHASE_LABELS[1],
+      error_code: 'unipile_fetch_failed',
+      user_message: 'Could not load your LinkedIn profile. Check your connection and try again.',
+      debug_message: detail || fallback.debug_message,
+    };
+  }
+  if (detail.toLowerCase().includes('context')) {
+    return {
+      failed_phase: 2,
+      phase_label: _PHASE_LABELS[2],
+      error_code: 'context_build_failed',
+      user_message: 'Could not process your LinkedIn profile data. Please try again.',
+      debug_message: detail,
+    };
+  }
+  if (detail.toLowerCase().includes('validat')) {
+    return {
+      failed_phase: 3,
+      phase_label: _PHASE_LABELS[3],
+      error_code: 'validation_failed',
+      user_message: 'Could not validate your LinkedIn profile. Please try again.',
+      debug_message: detail,
+    };
+  }
+
+  return {
+    ...fallback,
+    debug_message: detail || fallback.debug_message,
+  };
+}
+
+export function logProfileAnalysisError(
+  context: string,
+  error: LinkedInProfileAnalysisError
+): void {
+  console.error(`[TopicSuggestion] ${context}`, {
+    phase: error.failed_phase,
+    phaseLabel: error.phase_label,
+    errorCode: error.error_code,
+    userMessage: error.user_message,
+    debugMessage: error.debug_message,
+  });
 }
 
 /** Submit profile completion answers and receive updated validation state. */

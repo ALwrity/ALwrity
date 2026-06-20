@@ -24,6 +24,49 @@ def compute_profile_content_hash(profile: dict[str, Any]) -> str:
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+_INTELLIGENCE_HASH_FIELDS: tuple[str, ...] = (
+    "professional_identity",
+    "primary_expertise",
+    "industry",
+    "experience_level",
+    "knowledge_domains",
+    "writing_opportunities",
+    "target_audience",
+    "communication_style",
+    "brand_positioning",
+    "summary",
+)
+
+
+def compute_ai_intelligence_hash(intelligence: dict[str, Any]) -> str:
+    """
+    Return SHA-256 hex digest of canonical ``AIProfileIntelligence`` JSON.
+
+    Strips server ``meta`` and hashes only LLM intelligence fields (Phase 6 cache key).
+    """
+    if not isinstance(intelligence, dict):
+        logger.error(
+            "[TopicRecommendation] compute_ai_intelligence_hash invalid type={}",
+            type(intelligence).__name__,
+        )
+        raise TypeError("AI profile intelligence must be a dict")
+
+    payload = {
+        key: intelligence[key]
+        for key in _INTELLIGENCE_HASH_FIELDS
+        if key in intelligence
+    }
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    logger.debug(
+        "[TopicRecommendation] compute_ai_intelligence_hash hash={} bytes={} fields={}",
+        digest[:12],
+        len(canonical),
+        len(payload),
+    )
+    return digest
+
+
 def compute_profile_context_hash(context: dict[str, Any]) -> str:
     """
     Return SHA-256 hex digest of canonical ``LinkedInProfileContext`` JSON.
@@ -62,8 +105,10 @@ class ProfileRepository:
         "profile_validation_json",
         "user_completion_json",
         "ai_profile_intelligence_json",
+        "topic_recommendations_json",
         "profile_context_updated_at",
         "ai_intelligence_updated_at",
+        "recommendations_updated_at",
         "created_at",
         "updated_at",
     )
@@ -105,7 +150,9 @@ class ProfileRepository:
                     profile_content_hash, fetched_at,
                     profile_context_json, profile_validation_json,
                     user_completion_json, ai_profile_intelligence_json,
+                    topic_recommendations_json,
                     profile_context_updated_at, ai_intelligence_updated_at,
+                    recommendations_updated_at,
                     created_at, updated_at
                 FROM linkedin_analysis_context
                 WHERE user_id = ?
@@ -722,7 +769,188 @@ class ProfileRepository:
             now,
             context_hash[:12] if context_hash else None,
         )
+        self._clear_topic_recommendations(user_id, db_path=db_path, updated_at=now)
         return now
+
+    def get_topic_recommendations(
+        self,
+        user_id: str,
+        *,
+        row: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Read cached topic recommendations JSON for ``user_id``.
+
+        Args:
+            user_id: ALwrity user ID
+            row: Optional pre-loaded analysis row to avoid a second DB read
+
+        Returns:
+            Parsed Phase 6 recommendations dict, or ``None`` when not stored/invalid
+        """
+        logger.info(
+            "[TopicRecommendation] ProfileRepository.get_topic_recommendations user_id={}",
+            user_id,
+        )
+        if row is None:
+            row = self.get_analysis_row(user_id)
+        if not row:
+            logger.info(
+                "[TopicRecommendation] ProfileRepository.get_topic_recommendations "
+                "no row user_id={}",
+                user_id,
+            )
+            return None
+        raw_json = row.get("topic_recommendations_json")
+        if not raw_json:
+            logger.info(
+                "[TopicRecommendation] ProfileRepository.get_topic_recommendations "
+                "empty topic_recommendations_json user_id={}",
+                user_id,
+            )
+            return None
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            logger.exception(
+                "[TopicRecommendation] Invalid topic_recommendations_json user_id={}: {}",
+                user_id,
+                exc,
+            )
+            return None
+        if not isinstance(parsed, dict):
+            logger.error(
+                "[TopicRecommendation] topic_recommendations_json is not an object user_id={}",
+                user_id,
+            )
+            return None
+        logger.info(
+            "[TopicRecommendation] ProfileRepository.get_topic_recommendations hit user_id={}",
+            user_id,
+        )
+        return parsed
+
+    def save_topic_recommendations(
+        self,
+        user_id: str,
+        recommendations: dict[str, Any],
+        *,
+        intelligence_hash: Optional[str] = None,
+    ) -> str:
+        """
+        Persist Phase 6 topic recommendations JSON and ``recommendations_updated_at``.
+
+        Requires an existing ``linkedin_analysis_context`` row.
+
+        Args:
+            user_id: ALwrity user ID
+            recommendations: Validated stored recommendations dict
+            intelligence_hash: Optional intelligence hash to stamp in ``meta``
+
+        Returns:
+            ISO timestamp written to ``recommendations_updated_at``
+
+        Raises:
+            ValueError: When no analysis row exists or recommendations is not a dict
+        """
+        logger.info(
+            "[TopicRecommendation] ProfileRepository.save_topic_recommendations user_id={}",
+            user_id,
+        )
+        if not isinstance(recommendations, dict):
+            raise ValueError("Topic recommendations must be a dict")
+
+        recommendations_to_save = recommendations
+        if intelligence_hash is not None:
+            recommendations_to_save = json.loads(
+                json.dumps(recommendations, separators=(",", ":"), default=str)
+            )
+            meta = recommendations_to_save.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+                recommendations_to_save["meta"] = meta
+            meta["built_from_intelligence_hash"] = intelligence_hash
+
+        recommendations_json = json.dumps(
+            recommendations_to_save,
+            separators=(",", ":"),
+            default=str,
+        )
+        now = datetime.utcnow().isoformat()
+        db_path = self._ensure_db(user_id)
+
+        existing = self.get_analysis_row(user_id)
+        if not existing:
+            logger.error(
+                "[TopicRecommendation] save_topic_recommendations no analysis row user_id={}",
+                user_id,
+            )
+            raise ValueError(
+                f"No linkedin_analysis_context row for user_id={user_id!r}; "
+                "acquire normalized profile first"
+            )
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE linkedin_analysis_context
+                    SET topic_recommendations_json = ?,
+                        recommendations_updated_at = ?,
+                        updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (recommendations_json, now, now, user_id),
+                )
+                conn.commit()
+            except sqlite3.Error as exc:
+                logger.exception(
+                    "[TopicRecommendation] save_topic_recommendations db error user_id={}: {}",
+                    user_id,
+                    exc,
+                )
+                raise ValueError("Failed to persist topic recommendations") from exc
+
+        logger.info(
+            "[TopicRecommendation] ProfileRepository.save_topic_recommendations "
+            "complete user_id={} recommendations_updated_at={} intelligence_hash={}",
+            user_id,
+            now,
+            intelligence_hash[:12] if intelligence_hash else None,
+        )
+        return now
+
+    def _clear_topic_recommendations(
+        self,
+        user_id: str,
+        *,
+        db_path: str,
+        updated_at: str,
+    ) -> None:
+        """Clear Phase 6 recommendations when upstream intelligence changes."""
+        logger.info(
+            "[TopicRecommendation] ProfileRepository._clear_topic_recommendations user_id={}",
+            user_id,
+        )
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE linkedin_analysis_context
+                SET topic_recommendations_json = NULL,
+                    recommendations_updated_at = NULL,
+                    updated_at = ?
+                WHERE user_id = ?
+                """,
+                (updated_at, user_id),
+            )
+            conn.commit()
+        logger.info(
+            "[TopicRecommendation] ProfileRepository._clear_topic_recommendations complete "
+            "user_id={}",
+            user_id,
+        )
 
     def has_fresh_profile(
         self,
@@ -790,8 +1018,10 @@ class ProfileRepository:
                     profile_validation_json = NULL,
                     user_completion_json = NULL,
                     ai_profile_intelligence_json = NULL,
+                    topic_recommendations_json = NULL,
                     profile_context_updated_at = NULL,
                     ai_intelligence_updated_at = NULL,
+                    recommendations_updated_at = NULL,
                     updated_at = ?
                 WHERE user_id = ?
                 """,

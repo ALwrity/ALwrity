@@ -193,14 +193,28 @@ class LinkedInOAuthService:
                     profile_validation_json TEXT,
                     user_completion_json TEXT,
                     ai_profile_intelligence_json TEXT,
+                    topic_recommendations_json TEXT,
 
                     profile_context_updated_at TIMESTAMP,
                     ai_intelligence_updated_at TIMESTAMP,
+                    recommendations_updated_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
                 """
             )
+            cursor.execute("PRAGMA table_info(linkedin_analysis_context)")
+            analysis_cols = {row[1] for row in cursor.fetchall()}
+            if "topic_recommendations_json" not in analysis_cols:
+                cursor.execute(
+                    "ALTER TABLE linkedin_analysis_context "
+                    "ADD COLUMN topic_recommendations_json TEXT"
+                )
+            if "recommendations_updated_at" not in analysis_cols:
+                cursor.execute(
+                    "ALTER TABLE linkedin_analysis_context "
+                    "ADD COLUMN recommendations_updated_at TIMESTAMP"
+                )
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_linkedin_analysis_user

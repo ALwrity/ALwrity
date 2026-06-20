@@ -22,6 +22,7 @@ from services.integrations.linkedin.profile_intelligence_llm import (
 from services.integrations.linkedin.profile_intelligence_validator import (
     ProfileIntelligenceValidationError,
     build_stored_ai_profile_intelligence,
+    normalize_ai_profile_intelligence_raw,
     validate_ai_profile_intelligence_payload,
 )
 from services.integrations.linkedin.profile_repository import (
@@ -315,15 +316,18 @@ def _call_llm_with_validation_retry(
         sorted(raw.keys()) if isinstance(raw, dict) else None,
     )
 
+    normalized = normalize_ai_profile_intelligence_raw(raw) if isinstance(raw, dict) else raw
+
     try:
-        validate_ai_profile_intelligence_payload(raw)
+        validate_ai_profile_intelligence_payload(normalized)
         logger.info("{} Validation passed on first attempt user_id={}", _LOG_PREFIX, user_id)
-        return raw
+        return normalized
     except ProfileIntelligenceValidationError as first_error:
         logger.warning(
-            "{} Validation failed — retrying LLM once user_id={}: {}",
+            "{} Validation failed — retrying LLM once user_id={} code={}: {}",
             _LOG_PREFIX,
             user_id,
+            first_error.validation_code,
             first_error,
         )
 
@@ -342,17 +346,25 @@ def _call_llm_with_validation_retry(
         sorted(retry_raw.keys()) if isinstance(retry_raw, dict) else None,
     )
 
+    retry_normalized = (
+        normalize_ai_profile_intelligence_raw(retry_raw)
+        if isinstance(retry_raw, dict)
+        else retry_raw
+    )
+
     try:
-        validate_ai_profile_intelligence_payload(retry_raw)
+        validate_ai_profile_intelligence_payload(retry_normalized)
         logger.info("{} Validation passed on retry user_id={}", _LOG_PREFIX, user_id)
-        return retry_raw
+        return retry_normalized
     except ProfileIntelligenceValidationError as retry_error:
         logger.exception(
-            "{} Validation failed after retry user_id={}: {}",
+            "{} Validation failed after retry user_id={} code={}: {}",
             _LOG_PREFIX,
             user_id,
+            retry_error.validation_code,
             retry_error,
         )
-        raise ProfileIntelligenceLLMError(
-            "AI profile intelligence failed validation after retry"
+        raise ProfileIntelligenceValidationError(
+            f"AI profile intelligence failed validation after retry ({retry_error})",
+            validation_code=retry_error.validation_code,
         ) from retry_error
