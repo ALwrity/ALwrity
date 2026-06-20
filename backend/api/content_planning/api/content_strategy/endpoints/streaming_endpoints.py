@@ -40,13 +40,22 @@ def get_db():
         db.close()
 
 async def stream_data(data_generator):
-    """Helper function to stream data as Server-Sent Events"""
+    """Helper function to stream data as Server-Sent Events.
+
+    Yields each chunk back-to-back with no artificial delay. The
+    previous 100ms-per-chunk sleep was added during development
+    to keep the connection from feeling spammy in a local browser
+    test, but it adds up to multi-second latency on a real stream
+    (e.g. 5 progress chunks -> 500ms of pure dead air) and there
+    is no rate-limiting or backpressure problem in production --
+    SSE clients handle bursts of events natively. If a caller
+    needs a delay, they can add one in their own generator.
+    """
     async for chunk in data_generator:
         if isinstance(chunk, dict):
             yield f"data: {json.dumps(chunk)}\n\n"
         else:
             yield f"data: {json.dumps({'message': str(chunk)})}\n\n"
-        await asyncio.sleep(0.1)  # Small delay to prevent overwhelming
 
 @router.get("/stream/strategies")
 async def stream_enhanced_strategies(
