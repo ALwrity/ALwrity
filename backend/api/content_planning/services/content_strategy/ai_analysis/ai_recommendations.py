@@ -14,17 +14,15 @@ from models.enhanced_strategy_models import EnhancedContentStrategy, EnhancedAIA
 # Import modular components
 from .prompt_engineering import PromptEngineeringService
 from .quality_validation import QualityValidationService
-from .strategic_intelligence_analyzer import StrategicIntelligenceAnalyzer
 
 logger = logging.getLogger(__name__)
 
 class AIRecommendationsService:
     """Service for AI recommendation generation."""
-    
+
     def __init__(self):
         self.prompt_engineering_service = PromptEngineeringService()
         self.quality_validation_service = QualityValidationService()
-        self.strategic_intelligence_analyzer = StrategicIntelligenceAnalyzer()
         
         # Analysis types for comprehensive recommendations
         self.analysis_types = [
