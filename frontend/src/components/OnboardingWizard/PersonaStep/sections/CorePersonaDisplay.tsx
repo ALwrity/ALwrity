@@ -11,10 +11,19 @@ import { SectionAccordion } from '../components/SectionAccordion';
 import { EditableTextField } from '../components/EditableTextField';
 import { EditableChipArray } from '../components/EditableChipArray';
 import { corePersonaTooltips } from '../utils/personaTooltips';
+import { EvidenceAccordion } from './EvidenceAccordion';
 
 interface CorePersonaDisplayProps {
   persona: any;
   onChange: (updatedPersona: any) => void;
+  /** Phase 2: deterministic completeness from the backend, used by EvidenceAccordion. */
+  completeness?: {
+    score?: number | null;
+    structural_score?: number | null;
+    missing?: string[] | null;
+  } | null;
+  /** Phase 2: data-sufficiency (0-100) from the backend. */
+  data_sufficiency?: number | null;
 }
 
 /**
@@ -23,7 +32,9 @@ interface CorePersonaDisplayProps {
  */
 export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
   persona,
-  onChange
+  onChange,
+  completeness,
+  data_sufficiency,
 }) => {
   // Helper function to update nested fields
   const updateField = (path: string[], value: any) => {
@@ -45,6 +56,57 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
   const getNestedValue = (obj: any, path: string[], defaultValue: any = '') => {
     return path.reduce((current, key) => current?.[key], obj) ?? defaultValue;
   };
+
+  // Read the LLM-supplied evidence citation for a given field. The backend's
+  // prompt explicitly requires the model to cite which data section led to
+  // each major claim, so we surface that citation as the "How we calculated"
+  // section of the field's tooltip. If the evidence layer is missing (older
+  // cached persona, generation without the new prompt), we fall back to
+  // the generic tooltip from `corePersonaTooltips`.
+  const evidenceCitation = (key: 'persona_name_basis' | 'archetype_basis' | 'core_belief_basis' | 'tone_basis'): string | null => {
+    const raw = getNestedValue(persona, ['evidence', key], null);
+    if (!raw) return null;
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const lower = trimmed.toLowerCase();
+    if (lower === 'null' || lower === 'none' || lower === 'n/a') return null;
+    return trimmed;
+  };
+
+  const enrichTooltip = (
+    base: { title: string; description: string; howWeCalculated: string; whyItMatters: string; example?: string },
+    citation: string | null
+  ) => {
+    if (!citation) return base;
+    return {
+      ...base,
+      // Prepend the LLM's own citation. The tooltip renders
+      // `howWeCalculated` under a "🔍 How we calculated this:" header, so
+      // the user sees the AI's exact words about why this field is what it is.
+      howWeCalculated: `The AI said: "${citation}"\n\n${base.howWeCalculated}`,
+    };
+  };
+
+  // The prompt requires the LLM to populate both
+  // `linguistic_fingerprint.lexical_features.go_to_phrases` and
+  // `evidence.verbatim_phrases_used`. The two are related but distinct:
+  // the first is the curated list the LLM recommends, the second is the
+  // evidence trail of which phrases actually came from the user's content.
+  // We surface the evidence trail in the chip array as a fallback when
+  // the curated list is empty, so the user always sees real phrases.
+  const resolvedGoToPhrases: string[] = (() => {
+    const curated: string[] = Array.isArray(
+      getNestedValue(persona, ['linguistic_fingerprint', 'lexical_features', 'go_to_phrases'], [])
+    )
+      ? getNestedValue(persona, ['linguistic_fingerprint', 'lexical_features', 'go_to_phrases'], [])
+      : [];
+    const evidencePhrases: string[] = Array.isArray(persona?.evidence?.verbatim_phrases_used)
+      ? persona.evidence.verbatim_phrases_used.filter((s: any) => typeof s === 'string' && s.trim())
+      : [];
+    // Curated wins if it has anything. Otherwise fall back to evidence.
+    return curated.length > 0 ? curated : evidencePhrases;
+  })();
 
   return (
     <Box>
@@ -76,7 +138,7 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
                 onChange={(val) => updateField(['identity', 'persona_name'], val)}
                 placeholder="e.g., The Thought Leader"
                 helperText="A descriptive name for your brand voice"
-                tooltipInfo={corePersonaTooltips.personaName}
+                tooltipInfo={enrichTooltip(corePersonaTooltips.personaName, evidenceCitation('persona_name_basis'))}
               />
             </Grid>
             <Grid item xs={12} sm={6} sx={{ width: '100%' }}>
@@ -86,7 +148,7 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
                 onChange={(val) => updateField(['identity', 'archetype'], val)}
                 placeholder="e.g., Expert Educator, Innovator, Storyteller"
                 helperText="The primary role your brand embodies"
-                tooltipInfo={corePersonaTooltips.archetype}
+                tooltipInfo={enrichTooltip(corePersonaTooltips.archetype, evidenceCitation('archetype_basis'))}
               />
             </Grid>
             <Grid item xs={12} sx={{ width: '100%' }}>
@@ -97,7 +159,7 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
                 multiline
                 placeholder="What is the fundamental belief driving your brand?"
                 helperText="The underlying philosophy or conviction"
-                tooltipInfo={corePersonaTooltips.coreBelief}
+                tooltipInfo={enrichTooltip(corePersonaTooltips.coreBelief, evidenceCitation('core_belief_basis'))}
               />
             </Grid>
             <Grid item xs={12}>
@@ -198,7 +260,7 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
               />
               <EditableChipArray
                 label="Go-To Phrases"
-                values={getNestedValue(persona, ['linguistic_fingerprint', 'lexical_features', 'go_to_phrases'], [])}
+                values={resolvedGoToPhrases}
                 onChange={(vals) => updateField(['linguistic_fingerprint', 'lexical_features', 'go_to_phrases'], vals)}
                 placeholder="Add signature phrases..."
                 color="secondary"
@@ -325,7 +387,7 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
                 onChange={(val) => updateField(['tonal_range', 'default_tone'], val)}
                 placeholder="e.g., Professional yet approachable"
                 helperText="The primary tone used in most content"
-                tooltipInfo={corePersonaTooltips.defaultTone}
+                tooltipInfo={enrichTooltip(corePersonaTooltips.defaultTone, evidenceCitation('tone_basis'))}
               />
               <EditableTextField
                 label="Emotional Range"
@@ -462,10 +524,17 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
         </Box>
       </SectionAccordion>
 
+      {/* 4.5 Evidence & Confidence — surfaces the LLM's own audit trail
+           (evidence.*_basis citations, verbatim phrases lifted from the
+           brand's content, what_was_missing gaps, confidence score). The
+           data was already returned by the backend; the rest of the UI
+           was just hiding it. */}
+      <EvidenceAccordion persona={persona} completeness={completeness} data_sufficiency={data_sufficiency} />
+
       {/* 5. Persona Generation Summary */}
       <SectionAccordion
-        title="Persona Generation Summary"
-        subtitle="How your persona was created"
+        title="What this persona means for your content"
+        subtitle="How ALwrity will use this going forward"
         icon={<AssessmentIcon />}
         color="success.main"
       >
@@ -476,25 +545,23 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
           borderRadius: 3,
           borderLeft: '4px solid #0ea5e9'
         }}>
-          <Typography variant="h6" gutterBottom sx={{ color: '#0c4a6e', fontWeight: 600, mb: 3 }}>
-            ✨ Your AI Writing Persona
+          <Typography variant="h6" gutterBottom sx={{ color: '#0c4a6e', fontWeight: 600, mb: 2 }}>
+            ✨ What ALwrity will do with this persona
           </Typography>
           <Typography variant="body2" paragraph sx={{ lineHeight: 1.8, color: '#0c4a6e' }}>
-            This persona was generated by analyzing comprehensive data from your website,
-            competitor research, sitemap analysis, and business context. Our AI examined
-            your writing style patterns, tone consistency, sentence structure, vocabulary
-            choices, and brand voice to create an authentic digital replica of your
-            communication style.
+            Every blog post, LinkedIn update, podcast script, image caption, and video
+            voiceover that ALwrity generates for you will be filtered through this persona
+            — your sentence rhythms, go-to words, default tone, and forbidden tones. The
+            result is content that sounds like you, not generic AI.
           </Typography>
           <Typography variant="body2" paragraph sx={{ lineHeight: 1.8, color: '#0c4a6e' }}>
-            The persona includes linguistic fingerprints (sentence metrics, lexical features,
-            rhetorical devices), tonal guidelines, and stylistic constraints that ensure
-            content generated across different platforms maintains your unique voice while
-            optimizing for each platform's best practices.
+            Each platform persona (LinkedIn, blog, podcast, etc.) adapts this core to
+            that platform&apos;s constraints — character limits, formality, link behaviour —
+            while preserving the voice you see above.
           </Typography>
           <Typography variant="body2" sx={{ lineHeight: 1.8, fontStyle: 'italic', color: '#0c4a6e' }}>
             You can edit any field above to refine your persona. All changes are saved
-            automatically and will be used to generate content that truly sounds like you.
+            automatically and will be used the next time ALwrity writes for you.
           </Typography>
         </Box>
       </SectionAccordion>

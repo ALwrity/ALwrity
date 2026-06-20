@@ -60,6 +60,7 @@ import {
   ImageGenerationSettings, 
   ImageModel 
 } from '../../../shared/ImageGenerationModal.types';
+import { UsedInStrip } from '../../PersonaStep/UsedInStrip';
 import { 
   BRAND_AVATAR_PRESETS, 
   BRAND_AVATAR_THEME, 
@@ -369,10 +370,16 @@ export const BrandAvatarStudio: React.FC<{ domainName?: string; onAvatarSet?: ()
   return (
     <Box sx={{ py: 1, px: 0, minHeight: '100%' }}>
       <Stack spacing={1.5}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ color: '#111827', fontWeight: 800, letterSpacing: '-0.02em', fontSize: '1rem' }}>
-            Brand Avatar {domainName ? domainName : ''}
-          </Typography>
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+            <Box>
+              <Typography variant="h6" sx={{ color: '#111827', fontWeight: 800, letterSpacing: '-0.02em', fontSize: '1rem' }}>
+                Brand Visual {domainName ? `for ${domainName}` : ''}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                The face of your brand — appears in every image, video, and social card.
+              </Typography>
+            </Box>
           <Stack direction="row" spacing={1}>
             <Button
               startIcon={<HelpOutline sx={{ fontSize: 14 }} />}
@@ -420,6 +427,13 @@ export const BrandAvatarStudio: React.FC<{ domainName?: string; onAvatarSet?: ()
               />
             </Tooltip>
           </Stack>
+        </Box>
+          <Box sx={{ pl: 0.5, mb: 0.5 }}>
+            <UsedInStrip
+              size="sm"
+              tools={['image-studio', 'video', 'podcast', 'linkedin', 'blog']}
+            />
+          </Box>
         </Box>
 
         <Grid container spacing={1.5}>

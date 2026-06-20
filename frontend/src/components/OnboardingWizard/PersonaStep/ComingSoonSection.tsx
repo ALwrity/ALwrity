@@ -36,16 +36,17 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
   const features = [
     {
       id: 'test-persona',
-      title: 'Test Your Persona',
-      description: 'Generate content with different personas to see the difference',
+      title: 'Test with your data',
+      description: 'Try text, voice, image, and video with your brand',
       icon: <PsychologyIcon />,
       status: 'Available',
       color: '#10b981', // Green for available
       details: [
-        'Compare content generated with and without your persona',
-        'Test Brand, Blog, and LinkedIn brand voices side-by-side',
-        'Directly apply Brand Voice to any Alwrity tool',
-        'AI-powered feedback on brand voice consistency'
+        'Compare text written with and without your brand voice (side-by-side)',
+        'Hear your voice clone read a new script in your voice',
+        'Generate platform-tuned variations of your brand avatar',
+        'Make a talking-head video from your avatar + voice clone',
+        'Directly apply your brand voice to any Alwrity tool'
       ]
     }
   ];
@@ -73,7 +74,7 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
             gap: 1
           }}
         >
-          Try it out
+          Try it now
         </Typography>
         <Grid container spacing={3}>
           {features.map((feature) => (
@@ -165,7 +166,7 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
                       }
                     }}
                   >
-                    {feature.id === 'test-persona' ? 'Try Now' : 'Learn More'}
+                    {feature.id === 'test-persona' ? 'Test now' : 'Learn More'}
                   </Button>
                 </CardContent>
               </Card>
@@ -288,7 +289,7 @@ export const ComingSoonSection: React.FC<ComingSoonSectionProps> = ({
               }
             }}
           >
-            {selectedFeatureData?.id === 'test-persona' ? 'Try Now' : 'Notify Me When Ready'}
+            {selectedFeatureData?.id === 'test-persona' ? 'Test now' : 'Notify Me When Ready'}
           </Button>
         </DialogActions>
       </Dialog>

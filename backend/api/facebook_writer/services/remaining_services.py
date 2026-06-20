@@ -1,4 +1,3 @@
-import os
 """Remaining Facebook Writer services - placeholder implementations."""
 
 from typing import Dict, Any, List
@@ -10,15 +9,14 @@ from .base_service import FacebookWriterBaseService
 class FacebookReelService(FacebookWriterBaseService):
     """Service for generating Facebook reels."""
     
-    def generate_reel(self, request: FacebookReelRequest) -> FacebookReelResponse:
+    def generate_reel(self, request: FacebookReelRequest, user_id: str) -> FacebookReelResponse:
         """Generate a Facebook reel script."""
         try:
             actual_reel_type = request.custom_reel_type if request.reel_type.value == "Custom" else request.reel_type.value
             actual_style = request.custom_style if request.reel_style.value == "Custom" else request.reel_style.value
             
             # Get persona data for enhanced content generation
-            user_id = int(os.getenv("ALWRITY_FALLBACK_USER_ID", "0"))
-            persona_data = self._get_persona_data(user_id)
+            persona_data = self._get_persona_data(int(user_id))
             
             base_prompt = f"""
             Create a Facebook Reel script for:

@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Box,
-  Button,
   Typography,
   Alert,
   Chip,
@@ -13,7 +12,6 @@ import {
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
   Psychology as PsychologyIcon,
   AutoAwesome as AutoAwesomeIcon,
   Assessment as AssessmentIcon,
@@ -38,6 +36,14 @@ interface PersonaPreviewSectionProps {
   setCorePersona: (persona: any) => void;
   setPlatformPersonas: (personas: Record<string, any>) => void;
   handleRegenerate: () => void;
+  /** Phase 2: deterministic completeness from the backend, plumbed to EvidenceAccordion. */
+  completeness?: {
+    score?: number | null;
+    structural_score?: number | null;
+    missing?: string[] | null;
+  } | null;
+  /** Phase 2: data-sufficiency (0-100) from the backend. */
+  data_sufficiency?: number | null;
 }
 
 const availablePlatforms = [
@@ -58,7 +64,9 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
   setExpandedAccordion,
   setCorePersona,
   setPlatformPersonas,
-  handleRegenerate
+  handleRegenerate,
+  completeness,
+  data_sufficiency,
 }) => {
   if (!showPreview || !corePersona) {
     return null;
@@ -67,61 +75,9 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
   return (
     <Fade in={true}>
       <Box>
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mb: 4,
-          p: 3,
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
-          borderRadius: 3,
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-        }}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-              Your AI Writing Brand Voice
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Comprehensive analysis of your unique brand identity and communication style
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRegenerate}
-            size="small"
-            sx={{
-              borderColor: '#e2e8f0',
-              color: '#475569',
-              '&:hover': {
-                borderColor: '#3b82f6',
-                backgroundColor: '#f8fafc'
-              }
-            }}
-          >
-            Regenerate
-          </Button>
-        </Box>
-
-        <Alert 
-          severity="info" 
-          icon={<AutoAwesomeIcon />}
-          sx={{ 
-            mb: 4, 
-            borderRadius: 3,
-            backgroundColor: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            '& .MuiAlert-message': { color: '#0369a1' }
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-            Adaptive Learning Active
-          </Typography>
-          <Typography variant="body2">
-            This Brand Voice was initialized from your website's home page. As you generate more content, ALwrity will automatically refine and update your brand identity to match your evolving style.
-          </Typography>
-        </Alert>
+        {/* The "Your Brand Voice" header and "Why this matters" alert are now
+            consolidated into the Step4Hero card at the top of the step.
+            The Regenerate button lives in the hero too. */}
 
         {/* Core Persona */}
         <Accordion
@@ -167,10 +123,10 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                  Brand Writing Style
+                  Your core writing style
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Your unique brand voice and communication characteristics
+                  Tone, vocabulary, sentence structure, and personality — fully editable.
                 </Typography>
               </Box>
               {qualityMetrics && (
@@ -196,6 +152,8 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
                 setCorePersona(updatedPersona);
                 // TODO: Add debounced auto-save
               }}
+              completeness={completeness}
+              data_sufficiency={data_sufficiency}
             />
           </AccordionDetails>
         </Accordion>
@@ -244,10 +202,10 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                  Platform Adaptations
+                  How it changes per platform
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Optimized for different content platforms
+                  Your voice on LinkedIn, blogs, Twitter, etc. — adapted for each audience.
                 </Typography>
               </Box>
               <Chip
@@ -353,10 +311,10 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                    Quality Assessment
+                    How well did we capture your voice?
                   </Typography>
                   <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Performance metrics and recommendations
+                    Plain-English breakdown of every score, plus a confidence badge and the data gaps the AI couldn't fill.
                   </Typography>
                 </Box>
                 <Chip
@@ -378,7 +336,7 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               </Box>
             </AccordionSummary>
             <AccordionDetails sx={{ px: 4, pb: 4 }}>
-              <QualityMetricsDisplay metrics={qualityMetrics} />
+              <QualityMetricsDisplay metrics={qualityMetrics} corePersona={corePersona} />
             </AccordionDetails>
           </Accordion>
         )}
