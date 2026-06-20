@@ -29,6 +29,39 @@ from ....utils.response_builders import ResponseBuilder
 from ....utils.constants import ERROR_MESSAGES, SUCCESS_MESSAGES
 from ....utils.data_parsers import parse_strategy_data
 
+# Fields on EnhancedContentStrategy that callers are allowed to set
+# via PUT /strategies/{id}. The previous setattr loop accepted any
+# key, which let an authenticated user overwrite system-managed
+# columns (id, user_id, created_at) or stamp ownership-changing
+# values onto a strategy they already own. Anything outside this
+# list is silently dropped.
+# 'performance_metrics' is the public-API name for the JSON column
+# whose attribute is 'performance_metrics_data' on the model; both
+# are accepted and routed to the same column.
+ALLOWED_UPDATE_FIELDS = frozenset({
+    "name", "industry",
+    "business_objectives", "target_metrics", "content_budget",
+    "team_size", "implementation_timeline", "market_share",
+    "competitive_position", "performance_metrics",
+    "performance_metrics_data",
+    "content_preferences", "consumption_patterns",
+    "audience_pain_points", "buying_journey", "seasonal_trends",
+    "engagement_metrics",
+    "top_competitors", "competitor_content_strategies",
+    "market_gaps", "industry_trends", "emerging_trends",
+    "preferred_formats", "content_mix", "content_frequency",
+    "optimal_timing", "quality_metrics", "editorial_guidelines",
+    "brand_voice",
+    "traffic_sources", "conversion_rates", "content_roi_targets",
+    "ab_testing_capabilities",
+    "target_audience", "content_pillars", "ai_recommendations",
+    "comprehensive_ai_analysis", "onboarding_data_used",
+    "strategic_scores", "market_positioning",
+    "competitive_advantages", "strategic_risks",
+    "opportunity_analysis",
+    "completion_percentage", "data_source_transparency",
+})
+
 router = APIRouter(tags=["Strategy CRUD"])
 
 
@@ -221,19 +254,19 @@ async def update_enhanced_strategy(
                 detail="You don't have permission to update this strategy"
             )
         
-        # Update strategy fields
-        # Remap the public-API key 'performance_metrics' (the JSON
-        # column) to the renamed attribute 'performance_metrics_data'.
-        # The relationship slot on the model is also named
-        # 'performance_metrics' but expects a list of
-        # StrategyPerformanceMetrics records, not a JSON dict, so
-        # the setattr loop must not stomp it. (C2 mass-assignment
-        # fix is a separate concern -- this only prevents the
-        # relationship from being clobbered.)
+        # Update strategy fields.
+        # Only keys in ALLOWED_UPDATE_FIELDS are accepted; any
+        # other key (including 'id', 'user_id', 'created_at',
+        # relationship names, etc.) is silently dropped. This
+        # closes the mass-assignment surface: an authenticated
+        # user can no longer overwrite system-managed columns
+        # or stamp ownership-changing values onto a strategy
+        # they already own.
         for field, value in update_data.items():
-            target_field = 'performance_metrics_data' if field == 'performance_metrics' else field
-            if hasattr(existing_strategy, target_field):
-                setattr(existing_strategy, target_field, value)
+            if field not in ALLOWED_UPDATE_FIELDS:
+                continue
+            if hasattr(existing_strategy, field):
+                setattr(existing_strategy, field, value)
         
         existing_strategy.updated_at = datetime.utcnow()
         
