@@ -424,3 +424,56 @@ scope. The remaining 4 (C2 mass assignment, C3 fabricated AI, C4
 in-memory state, H1 model namespace) are real issues but require
 larger changes that are out of scope for the 1-2 day quick-win
 window.
+
+---
+
+## 7. Phase 4 P0-1 caller audit (follow-up to #598)
+
+After shipping the Phase 4 fail-fast fix (commit `9f16fb55`,
+which replaced `_get_fallback_data()` in
+`OnboardingDataIntegrationService` with a hard raise of
+`OnboardingDataIntegrationError`), an audit was done on the 14
+external call sites of `process_onboarding_data` to see which
+ones would now surface as HTTP 500 instead of the previous
+silent degraded response.
+
+The audit identified 8 callers with `except Exception` blocks
+that re-raise. The hypothesis was that those would now turn
+into 500s for the user. Empirical testing on
+`process_onboarding_data` showed the opposite:
+
+- **Normal DB conditions** (user has no data, partial data,
+  empty user_id, db errors at the per-source getter level) all
+  return a fully-formed `integrated_data` dict with empty
+  source fields and a real (low) data_quality score. The
+  per-source `_get_X` methods each have their own try/except
+  that returns `{}` on failure, and the orchestrator-level
+  methods (`_build_canonical_profile`, `_assess_data_quality`,
+  `_store_integrated_data`) are all defensive with isinstance
+  checks and their own error handling.
+
+- **Truly exceptional failures** (caller passes `db=None`,
+  SQLAlchemy crash, type errors in the orchestrator) do raise,
+  and now surface as 500. Previously these would have been
+  masked by the fake fallback.
+
+So the 8 "unsafe" callers are actually safe in normal
+operation. The 500 only fires on real bugs (caller bugs or
+internal integration bugs), which is exactly what the
+fail-fast mandate asks for: when something actually breaks,
+the user sees the error; when the integration succeeds (even
+with empty data), the user gets a real response. **No more
+fake 0.0-quality integration masks.**
+
+No code changes needed. The 8 callers can stay as-is. Tested
+with three realistic scenarios:
+
+1. Empty DB for a fresh user: `process_onboarding_data`
+   returned a complete dict (12 keys, data_quality with 0.0
+   scores -- the correct assessment for an empty profile).
+2. db.query() raising: `process_onboarding_data` did not
+   raise (per-source try/except absorbed it).
+3. db=None (caller bug): `process_onboarding_data` raised
+   OnboardingDataIntegrationError with the original
+   AttributeError as __cause__ -- the caller bug is now
+   visible, which is correct.
