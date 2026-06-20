@@ -86,7 +86,8 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   // Phase 2: deterministic completeness + data-sufficiency scores.
   // Backed by the backend's `PersonaPromptBuilder.compute_completeness` +
   // `OnboardingDataCollector.calculate_data_sufficiency`. Optional — when
-  // absent, EvidenceAccordion falls back to LLM-confidence-only.
+  // absent, the merged "How we built this persona" accordion falls back
+  // to LLM-confidence-only.
   const [completeness, setCompleteness] = useState<{
     score?: number | null;
     structural_score?: number | null;
