@@ -90,6 +90,14 @@ export function connectWithLinkedInOAuth(
       if (settled) return;
       settled = true;
       cleanup();
+      try {
+        if (popup && !popup.closed) {
+          popup.close();
+          console.info('[LinkedInConnect] OAuth popup closed by opener');
+        }
+      } catch (err) {
+        console.warn('[LinkedInConnect] could not close OAuth popup:', err);
+      }
       console.info('[LinkedInConnect] OAuth connect resolved', { source });
       window.dispatchEvent(new CustomEvent('linkedin-oauth-success'));
       resolve();

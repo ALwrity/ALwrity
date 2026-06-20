@@ -65,13 +65,20 @@ def build_oauth_callback_html(
           var payload = {payload_json};
           var targetOrigin = {target_origin_json};
           var destination = window.opener || window.parent;
-          if (destination && targetOrigin) {{
-            try {{
-              destination.postMessage(payload, targetOrigin);
-              window.close();
-              return;
-            }} catch (_e) {{}}
+          if (destination) {{
+            if (targetOrigin) {{
+              try {{
+                destination.postMessage(payload, targetOrigin);
+              }} catch (_e) {{}}
+            }} else {{
+              try {{
+                destination.postMessage(payload, '*');
+              }} catch (_e2) {{}}
+            }}
           }}
+          try {{
+            window.close();
+          }} catch (_e3) {{}}
         }})();
       </script>
     </body>
