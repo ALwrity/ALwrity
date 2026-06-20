@@ -28,15 +28,12 @@ class YouTubeOAuthService(OAuthProviderBase):
     """Manages YouTube OAuth2 authentication flow and token storage.
 
     Inherits Fernet token encryption + plaintext migration from
-    OAuthProviderBase. YouTube keeps two overrides because the
-    base class semantics differ slightly:
-    - _initialize_fernet: YouTube raises on missing key (fail-fast
-      on misconfiguration); the base class returns None (warn-and-continue).
-      Step 3 of the cs4 plan normalizes this across all 4 providers.
+    OAuthProviderBase. YouTube keeps one override because the
+    call-site contract differs from the base:
     - _decrypt_token: YouTube swallows decryption errors and returns
       None so the caller's `if not access_token` check can handle
-      a corrupted row; the base class propagates. Kept here to preserve
-      the existing call-site contract.
+      a corrupted row; the base class propagates. Kept here to
+      preserve the existing call-site contract.
     """
 
     SCOPES = [
@@ -81,20 +78,11 @@ class YouTubeOAuthService(OAuthProviderBase):
                 "YouTube upload will not work until these are configured."
             )
 
-    def _initialize_fernet(self) -> Fernet:
-        # YouTube-specific: fail fast on missing key (vs the base
-        # class's warn-and-return-None). Step 3 of the cs4 plan will
-        # pick one policy for all 4 providers.
-        if not self.token_encryption_key:
-            raise ValueError(
-                "YOUTUBE_TOKEN_ENCRYPTION_KEY (or OAUTH_TOKEN_ENCRYPTION_KEY) is not set. "
-                "OAuth tokens must be encrypted at rest. "
-                "Generate a key: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\""
-            )
-        try:
-            return Fernet(self.token_encryption_key.encode("utf-8"))
-        except Exception as e:
-            raise ValueError(f"Invalid YOUTUBE_TOKEN_ENCRYPTION_KEY: {e}")
+    # _initialize_fernet is inherited from OAuthProviderBase. YouTube
+    # used to override it to raise on missing key; the base class
+    # now does the same thing with a unified error message that
+    # names the correct env var per provider, so the override is
+    # redundant. (Step 3 of the cs4 plan.)
 
     def _decrypt_token(self, token_blob: Optional[str]) -> Optional[str]:
         # YouTube-specific: swallow decryption errors and return None
