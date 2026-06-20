@@ -24,7 +24,6 @@ import { usePersonaInitialization } from './PersonaStep/personaInitialization';
 import { usePersonaGeneration } from './PersonaStep/personaGeneration';
 import { PersonaPreviewSection } from './PersonaStep/PersonaPreviewSection';
 import { PersonaLoadingState } from './PersonaStep/PersonaLoadingState';
-import { ComingSoonSection } from './PersonaStep/ComingSoonSection';
 import { BrandAvatarStudio } from './PersonalizationStep/components/BrandAvatarStudio';
 import { VoiceAvatarPlaceholder } from './PersonalizationStep/components/VoiceAvatarPlaceholder';
 import { TestPersonaModal } from './PersonalizationStep/components/TestPersonaModal';
@@ -551,8 +550,6 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
               completeness={completeness}
               data_sufficiency={dataSufficiency}
             />
-
-             <ComingSoonSection onTestPersona={openTestDriveModal} />
           </Box>
         )}
 

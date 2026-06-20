@@ -18,7 +18,11 @@ import {
   Lightbulb as LightbulbIcon,
   FormatQuote as FormatQuoteIcon,
   WarningAmber as WarningAmberIcon,
-  CheckCircleOutline as CheckCircleOutlineIcon
+  CheckCircleOutline as CheckCircleOutlineIcon,
+  ChatBubbleOutline as ChatBubbleOutlineIcon,
+  Theaters as TheatersIcon,
+  AutoAwesome as AutoAwesomeIcon,
+  MusicNote as MusicNoteIcon
 } from '@mui/icons-material';
 
 interface EvidenceAccordionProps {
@@ -61,12 +65,38 @@ function confidenceTone(score: number | null | undefined): {
   pct: number;
 } {
   if (score === null || score === undefined || isNaN(score)) {
-    return { label: 'No confidence reported', color: 'warning', bg: '#fef3c7', pct: 0 };
+    return { label: 'no confidence reported', color: 'warning', bg: '#fef3c7', pct: 0 };
   }
   const pct = Math.max(0, Math.min(1, score));
-  if (pct >= 0.7) return { label: 'High confidence', color: 'success', bg: '#dcfce7', pct };
-  if (pct >= 0.4) return { label: 'Moderate confidence', color: 'warning', bg: '#fef3c7', pct };
-  return { label: 'Low confidence — data is thin', color: 'error', bg: '#fee2e2', pct };
+  if (pct >= 0.7) return { label: 'high confidence', color: 'success', bg: '#dcfce7', pct };
+  if (pct >= 0.4) return { label: 'moderate confidence', color: 'warning', bg: '#fef3c7', pct };
+  return { label: 'low confidence — data is thin', color: 'error', bg: '#fee2e2', pct };
+}
+
+/**
+ * Render a single missing-data chip label. Turns the backend's mixed
+ * sources (structural field names + LLM-reported strings) into the
+ * same user-facing shape: "we didn't have <thing>".
+ */
+function missingLabel(raw: string): string {
+  let s = String(raw || '').trim();
+  if (!s) return '';
+  // Strip the backend's "(reported) " prefix the LLM strings carry
+  // when they were copied into the structural missing array.
+  s = s.replace(/^\(reported\)\s+/i, '');
+  // Normalize underscores to spaces everywhere, so "brand_dna was
+  // empty" reads naturally instead of leaking a field-name token.
+  // Also lowercase the whole thing so "LINGUISTIC_ANALYSIS" doesn't
+  // leak into user-facing chips.
+  s = s.replace(/_/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  if (!s) return '';
+  // Sentence form: has whitespace, starts with a letter.
+  if (/[a-zA-Z]/.test(s[0] || '') && /\s/.test(s)) {
+    if (/^(no |not |missing )/.test(s)) return s;
+    return `we didn't have ${s}`;
+  }
+  // Single token (field name, no whitespace).
+  return `we didn't have ${s.toLowerCase()}`;
 }
 
 /**
@@ -107,7 +137,7 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
 
   // Phase 2: blend the LLM's self-rated confidence with the backend's
   // structural completeness (60% LLM, 40% structural) so a confident LLM
-  // can't paper over real data gaps. Falls back to the LLM-only score
+  // can't paper over real gaps. Falls back to the LLM-only score
   // when `completeness` isn't provided (Phase 1 callers / older results).
   const blendedConfidence = useMemo(() => {
     const llm = typeof confidence === 'number' ? confidence : null;
@@ -120,19 +150,32 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
     return 0.6 * llm + 0.4 * structural;
   }, [confidence, completeness]);
 
-  // Count of structural gaps the user could fill. Combines backend
-  // `completeness.missing` (deterministic) + LLM's `what_was_missing`
-  // (self-reported) so the badge honestly reflects the total.
+  // Count of gaps the user could fill, normalized to avoid double-counting.
+  //
+  // The backend's `compute_completeness` merges two sources into one
+  // array: (1) structural field-name gaps like `linguistic_fingerprint.
+  // sentence_metrics`, and (2) LLM-reported free-text strings from
+  // `persona.what_was_missing` (prefixed with "(reported) " in the
+  // merged array so the UI can tell them apart). The frontend
+  // previously counted *both* the prefixed structural entries AND the
+  // raw `missing` (LLM) array, which double-counted LLM-reported
+  // items. The fix: strip the "(reported) " prefix in our count
+  // derivation, then dedupe against the raw LLM array. Items appear
+  // once in the final count, even if they were sourced from both.
   const totalGaps = useMemo(() => {
-    const structuralGaps = Array.isArray(completeness?.missing)
-      ? completeness.missing.filter((s: any) => typeof s === 'string' && s.trim() && !s.startsWith('(reported) '))
-      : [];
-    // dedupe with `missing` (LLM-reported)
     const seen = new Set<string>();
-    let count = 0;
-    for (const s of structuralGaps) { if (!seen.has(s)) { seen.add(s); count++; } }
-    for (const s of missing) { if (!seen.has(s)) { seen.add(s); count++; } }
-    return count;
+    const add = (s: string) => {
+      if (!s || !s.trim()) return;
+      // Normalize: strip the backend's "(reported) " marker so the
+      // LLM-reported and the structural copies collapse to one entry.
+      const normalized = s.trim().replace(/^\(reported\)\s+/, '').toLowerCase();
+      if (!seen.has(normalized)) { seen.add(normalized); }
+    };
+    if (Array.isArray(completeness?.missing)) {
+      completeness.missing.forEach((s: any) => add(String(s)));
+    }
+    missing.forEach((s: string) => add(s));
+    return seen.size;
   }, [completeness, missing]);
 
   const tone = useMemo(() => confidenceTone(blendedConfidence), [blendedConfidence]);
@@ -208,8 +251,8 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
                   <Typography variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
                     The AI rated its own confidence and the backend blended it
                     with the structural completeness of the returned fields
-                    (60% LLM, 40% deterministic). Higher = more data was
-                    available, fewer gaps, less guessing.
+                    (60% LLM self-rating, 40% structural completeness). Higher
+                    = more data was available, fewer gaps, less guessing.
                     {typeof data_sufficiency === 'number' && (
                       <>
                         {' '}Source-data sufficiency: {Math.round(data_sufficiency)}%.
@@ -270,7 +313,9 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
               </Box>
             )}
 
-            {/* 2. Citation blocks: why this name / archetype / belief / tone */}
+            {/* 2. Citation blocks: why this name / archetype / belief / tone.
+                Each row gets a small question-type icon for scannability
+                (Enhancement #3). */}
             {(nameBasis || archetypeBasis || beliefBasis || toneBasis) && (
               <Box sx={{ mb: 2.5 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -282,6 +327,7 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
                 <Stack spacing={1.25}>
                   {nameBasis && (
                     <EvidenceRow
+                      icon={<ChatBubbleOutlineIcon sx={{ fontSize: 18 }} />}
                       question={`Why "${personaName || 'this name'}"?`}
                       answer={nameBasis}
                       accent="#7c3aed"
@@ -289,6 +335,7 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
                   )}
                   {archetypeBasis && (
                     <EvidenceRow
+                      icon={<TheatersIcon sx={{ fontSize: 18 }} />}
                       question={`Why "${archetype || 'this archetype'}"?`}
                       answer={archetypeBasis}
                       accent="#ec4899"
@@ -296,6 +343,7 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
                   )}
                   {beliefBasis && (
                     <EvidenceRow
+                      icon={<AutoAwesomeIcon sx={{ fontSize: 18 }} />}
                       question="Why this core belief?"
                       answer={beliefBasis}
                       accent="#0ea5e9"
@@ -303,6 +351,7 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
                   )}
                   {toneBasis && (
                     <EvidenceRow
+                      icon={<MusicNoteIcon sx={{ fontSize: 18 }} />}
                       question="Why this default tone?"
                       answer={toneBasis}
                       accent="#10b981"
@@ -343,82 +392,135 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
               </Box>
             )}
 
-            {/* 4. Data gaps — what we didn't have */}
-            {missing.length > 0 && (
-              <Box
-                sx={{
-                  p: 2,
-                  borderRadius: 2,
-                  backgroundColor: '#fffbeb',
-                  border: '1px solid #fde68a',
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <WarningAmberIcon sx={{ fontSize: 18, color: '#d97706' }} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#78350f' }}>
-                    Data we didn't have
-                  </Typography>
-                </Box>
-                <Typography variant="caption" sx={{ color: '#92400e', display: 'block', mb: 1.25 }}>
-                  The AI told us these sections were empty or too thin to inform the persona.
-                  Add this data to improve confidence.
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
-                  {missing.map((item, idx) => (
+            {/* 4. Data gaps — what we didn't have.
+                Combines structural gaps (from completeness.missing) and
+                LLM-reported gaps (from persona.what_was_missing), dedupes,
+                and renders them with consistent user-facing phrasing via
+                `missingLabel`. Shows a count in the header (Enhancement #1).
+                When the user has zero gaps but has at least one evidence
+                block, render a positive green state (Enhancement #2). */}
+            {(() => {
+              // Build a single deduped list of user-friendly gap strings.
+              const seenNorm = new Set<string>();
+              const labels: string[] = [];
+              const add = (raw: any) => {
+                const label = missingLabel(String(raw || ''));
+                if (!label) return;
+                const norm = label.toLowerCase().trim();
+                if (seenNorm.has(norm)) return;
+                seenNorm.add(norm);
+                labels.push(label);
+              };
+              // Structural gaps (no "(reported) " prefix here — missingLabel strips it)
+              if (Array.isArray(completeness?.missing)) {
+                completeness.missing.forEach(add);
+              }
+              // LLM-reported gaps (raw strings)
+              missing.forEach(add);
+
+              if (labels.length === 0) return null;
+              return (
+                <Box
+                  sx={{
+                    p: 2,
+                    borderRadius: 2,
+                    backgroundColor: '#fffbeb',
+                    border: '1px solid #fde68a',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <WarningAmberIcon sx={{ fontSize: 18, color: '#d97706' }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#78350f' }}>
+                      Data we didn't have
+                    </Typography>
                     <Chip
-                      key={`${item}-${idx}`}
-                      icon={<WarningAmberIcon sx={{ fontSize: 16 }} />}
-                      label={item}
+                      label={`${labels.length} gap${labels.length === 1 ? '' : 's'}`}
                       size="small"
                       sx={{
-                        backgroundColor: '#fef3c7',
+                        ml: 0.5,
+                        backgroundColor: '#fde68a',
                         color: '#78350f',
-                        fontWeight: 500,
-                        border: '1px solid #fcd34d',
-                        '& .MuiChip-icon': { color: '#d97706' },
+                        fontWeight: 700,
+                        height: 22,
+                        fontSize: '0.75rem',
+                        '& .MuiChip-label': { px: 1 },
                       }}
                     />
-                  ))}
+                  </Box>
+                  <Typography variant="caption" sx={{ color: '#92400e', display: 'block', mb: 1.25 }}>
+                    The AI told us these sections were empty or too thin to inform the persona.
+                    Add this data to improve confidence.
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75, mb: 1.5 }}>
+                    {labels.map((label, idx) => (
+                      <Chip
+                        key={`${label}-${idx}`}
+                        icon={<WarningAmberIcon sx={{ fontSize: 16 }} />}
+                        label={label}
+                        size="small"
+                        sx={{
+                          backgroundColor: '#fef3c7',
+                          color: '#78350f',
+                          fontWeight: 500,
+                          border: '1px solid #fcd34d',
+                          '& .MuiChip-icon': { color: '#d97706' },
+                        }}
+                      />
+                    ))}
+                  </Box>
+                  <Tooltip
+                    arrow
+                    title="Re-run Step 2 of onboarding with more complete inputs (e.g. paste more competitor research, add audience data) and regenerate to fill these gaps."
+                  >
+                    <Chip
+                      label="Add this data →"
+                      size="small"
+                      color="warning"
+                      onClick={() => {
+                        // Soft CTA: open the wizard at the right step if we can.
+                        // We don't hard-navigate here to avoid surprising the user;
+                        // a tooltip explains the path. The wizard itself handles
+                        // step-level navigation.
+                        try {
+                          const event = new CustomEvent('alwrity:navigate-to-step', {
+                            detail: { step: 2 },
+                          });
+                          window.dispatchEvent(event);
+                        } catch {
+                          /* no-op */
+                        }
+                      }}
+                      sx={{ fontWeight: 700, cursor: 'pointer' }}
+                    />
+                  </Tooltip>
                 </Box>
-                <Tooltip
-                  arrow
-                  title="Re-run Step 2 of onboarding with more complete inputs (e.g. paste more competitor research, add audience data) and regenerate to fill these gaps."
-                >
-                  <Chip
-                    label="Add this data →"
-                    size="small"
-                    color="warning"
-                    onClick={() => {
-                      // Soft CTA: open the wizard at the right step if we can.
-                      // We don't hard-navigate here to avoid surprising the user;
-                      // a tooltip explains the path. The wizard itself handles
-                      // step-level navigation.
-                      try {
-                        const event = new CustomEvent('alwrity:navigate-to-step', {
-                          detail: { step: 2 },
-                        });
-                        window.dispatchEvent(event);
-                      } catch {
-                        /* no-op */
-                      }
-                    }}
-                    sx={{ fontWeight: 700, cursor: 'pointer' }}
-                  />
-                </Tooltip>
-              </Box>
-            )}
+              );
+            })()}
 
-            {/* If evidence is present but every optional block is empty, show a
-                positive acknowledgement so the user doesn't think the panel
-                is broken. */}
-            {!nameBasis && !archetypeBasis && !beliefBasis && !toneBasis && verbatimPhrases.length === 0 && missing.length === 0 && (
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#047857' }}>
-                <CheckCircleOutlineIcon fontSize="small" />
-                <Typography variant="body2">
-                  The persona was generated with a full data set — no gaps reported.
-                </Typography>
-              </Box>
-            )}
+            {/* If the user has at least one evidence block but zero gaps,
+                show a positive green acknowledgement (Enhancement #2) so the
+                amber section's absence doesn't read as a missing feature. */}
+            {!(Array.isArray(completeness?.missing) && completeness.missing.length > 0) &&
+              missing.length === 0 &&
+              (nameBasis || archetypeBasis || beliefBasis || toneBasis || verbatimPhrases.length > 0) && (
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    p: 1.5,
+                    borderRadius: 1.5,
+                    backgroundColor: '#ecfdf5',
+                    border: '1px solid #a7f3d0',
+                    color: '#047857',
+                  }}
+                >
+                  <CheckCircleOutlineIcon fontSize="small" />
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    The persona was generated with a full data set — no gaps reported.
+                  </Typography>
+                </Box>
+              )}
 
             {/* Tiny footer note for transparency */}
             <Divider sx={{ mt: 2.5, mb: 1 }} />
@@ -438,11 +540,12 @@ export const EvidenceAccordion: React.FC<EvidenceAccordionProps> = ({ persona, c
  * Internal helper: a "question → answer" citation row.
  * Kept in the same file to avoid creating a new component for a 30-liner.
  */
-const EvidenceRow: React.FC<{ question: string; answer: string; accent: string }> = ({
-  question,
-  answer,
-  accent,
-}) => (
+const EvidenceRow: React.FC<{
+  question: string;
+  answer: string;
+  accent: string;
+  icon?: React.ReactNode;
+}> = ({ question, answer, accent, icon }) => (
   <Box
     sx={{
       p: 1.5,
@@ -451,10 +554,13 @@ const EvidenceRow: React.FC<{ question: string; answer: string; accent: string }
       borderLeft: `3px solid ${accent}`,
     }}
   >
-    <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a', mb: 0.5 }}>
-      {question}
-    </Typography>
-    <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.55 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, color: accent }}>
+      {icon}
+      <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
+        {question}
+      </Typography>
+    </Box>
+    <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.55, pl: icon ? 3.25 : 0 }}>
       {answer}
     </Typography>
   </Box>
