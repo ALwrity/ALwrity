@@ -1,6 +1,6 @@
 {
-  "short_name": "Alwrity",
-  "name": "Alwrity - AI Content Creation Platform",
+  "short_name": "ALwrity",
+  "name": "ALwrity — AI Digital Marketing Operating System",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,6 +10,6 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
+  "theme_color": "#667eea",
   "background_color": "#ffffff"
-} 
+}

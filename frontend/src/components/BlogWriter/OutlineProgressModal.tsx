@@ -146,14 +146,6 @@ export const OutlineProgressModal: React.FC<OutlineProgressModalProps> = ({
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [progressMessages]);
-
-  if (!isVisible) return null;
-
   const isContentGen = !!titleOverride;
   const stages = isContentGen ? contentStageDefinitions : stageDefinitions;
   const isRunning = status === 'running' || status === 'pending';
@@ -162,7 +154,6 @@ export const OutlineProgressModal: React.FC<OutlineProgressModalProps> = ({
 
   const statusInfo = statusThemes[status] || statusThemes.running;
 
-  // Determine latest stage index from messages
   const latestStageIndex = useMemo(() => {
     if (progressMessages.length === 0) return -1;
     const lastMsg = progressMessages[progressMessages.length - 1] || '';
@@ -200,7 +191,15 @@ export const OutlineProgressModal: React.FC<OutlineProgressModalProps> = ({
     const active = stagesWithState.filter(s => s.state === 'active').length;
     if (done === 0 && active === 0) return 0;
     return Math.round(((done + active * 0.5) / stages.length) * 100);
-  }, [stagesWithState, isComplete, isFailed]);
+  }, [stagesWithState, isComplete, isFailed, stages.length]);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [progressMessages]);
+
+  if (!isVisible) return null;
 
   const closeable = isComplete || isFailed;
 
