@@ -185,11 +185,7 @@ rate_limiter = RateLimiter(window_seconds=60, max_requests=200)
 frontend_serving = FrontendServing(app)
 router_manager = RouterManager(app)
 
-onboarding_manager = None
-if OnboardingManager is not None:
-    onboarding_manager = OnboardingManager(app)
-else:
-    logger.info("OnboardingManager is disabled due to feature mode configuration")
+onboarding_manager = OnboardingManager(app)
 
 # Middleware Order (FastAPI executes in REVERSE order of registration - LIFO):
 # Registration order:  1. Monitoring  2. Rate Limit  3. API Key Injection
@@ -259,12 +255,6 @@ async def feature_profile_status():
 @app.get("/api/onboarding/status")
 async def onboarding_status():
     """Get onboarding manager status."""
-    if onboarding_manager is None:
-        return {
-            "enabled": False,
-            "status": "disabled",
-            "message": "Onboarding manager is disabled in this runtime configuration.",
-        }
     return onboarding_manager.get_onboarding_status()
 
 # Include routers using modular utilities
