@@ -74,6 +74,7 @@ interface IntegrationPlatform {
   benefits: string[];
   oauthUrl?: string;
   isEnabled: boolean;
+  tooltip?: string;
 }
 
 const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataChange }) => {
@@ -113,13 +114,63 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
   // Bing OAuth hook
   const { connected: bingConnected, sites: bingSites, connect: connectBing, refreshStatus: refreshBingStatus } = useBingOAuth();
 
+  // Hardcoded value-prop copy for each platform.
+  // oneLiner = short value prop shown under the name.
+  // tooltip   = longer "what this unlocks" text behind a hover ⓘ.
+  const INTEGRATION_COPY: Record<string, { oneLiner: string; tooltip: string }> = {
+    wix: {
+      oneLiner: 'Publish posts directly to your Wix site.',
+      tooltip: 'Auto-publish blog posts to your Wix site, sync media, and use Wix SEO settings to optimize each post before it goes live.',
+    },
+    wordpress: {
+      oneLiner: 'Publish posts directly to your WordPress site.',
+      tooltip: 'Secure OAuth login to WordPress.com or self-hosted sites. Push drafts, manage media, and apply SEO meta from ALwrity in one click.',
+    },
+    gsc: {
+      oneLiner: 'See what people search before they find you.',
+      tooltip: 'Powers AI Visibility, Search Console insights, and the SEO agent. We use cached GSC data to find low-CTR pages, striking-distance queries, and cannibalization.',
+    },
+    bing: {
+      oneLiner: 'Add Bing search data to your SEO picture.',
+      tooltip: 'Complements GSC with Bing search performance, index coverage, and crawl stats. Cached for fast, quota-safe weekly recommendations.',
+    },
+    facebook: {
+      oneLiner: 'Schedule and publish Facebook posts.',
+      tooltip: 'Connect a Facebook Page to schedule posts, recycle top performers, and pull engagement metrics back into your dashboard.',
+    },
+    twitter: {
+      oneLiner: 'Schedule and publish tweets.',
+      tooltip: 'Connect an X account to schedule threads, monitor trends, and track engagement on every post you publish from ALwrity.',
+    },
+    linkedin: {
+      oneLiner: 'Publish to your personal profile or company page.',
+      tooltip: 'Great for B2B. Schedule posts, run AI-drafted articles, and pull network analytics. Uses your Step 4 persona to keep tone on-brand.',
+    },
+    instagram: {
+      oneLiner: 'Schedule and publish Instagram posts.',
+      tooltip: 'Connect an Instagram Business account to schedule feed posts, manage captions with your persona, and pull reach and engagement metrics.',
+    },
+    youtube: {
+      oneLiner: 'Optimize videos and pull channel analytics.',
+      tooltip: 'Pull view, watch-time, and CTR data for your YouTube channel. Video SEO and thumbnail suggestions are on the roadmap.',
+    },
+    tiktok: {
+      oneLiner: 'Pull TikTok performance and trends.',
+      tooltip: 'Pull video performance and trend data once TikTok connectors ship. Roadmap: trend-aware short-form repurposing from your best posts.',
+    },
+    pinterest: {
+      oneLiner: 'Schedule pins and pull Pinterest analytics.',
+      tooltip: 'Connect a Pinterest Business account to schedule pins and boards, and pull impression and click metrics into your dashboard.',
+    },
+  };
+
   // Initialize integrations data
   const [integrations] = useState<IntegrationPlatform[]>([
     // Website Platforms
     {
       id: 'wix',
       name: 'Wix',
-      description: 'Connect your Wix website for automated content publishing and analytics',
+      description: INTEGRATION_COPY.wix.oneLiner,
       icon: <WixIcon />,
       category: 'website',
       status: 'available',
@@ -131,7 +182,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'wordpress',
       name: 'WordPress',
-      description: 'Connect your WordPress.com sites with secure OAuth authentication',
+      description: INTEGRATION_COPY.wordpress.oneLiner,
       icon: <WordPressIcon />,
       category: 'website',
       status: 'available',
@@ -143,7 +194,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'gsc',
       name: 'Google Search Console',
-      description: 'Connect GSC for comprehensive SEO analytics and content optimization',
+      description: INTEGRATION_COPY.gsc.oneLiner,
       icon: <GoogleIcon />,
       category: 'analytics',
       status: 'available',
@@ -155,7 +206,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'bing',
       name: 'Bing Webmaster Tools',
-      description: 'Connect Bing Webmaster for comprehensive SEO insights and search performance data',
+      description: INTEGRATION_COPY.bing.oneLiner,
       icon: <AnalyticsIcon />,
       category: 'analytics',
       status: 'available',
@@ -168,7 +219,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'facebook',
       name: 'Facebook',
-      description: 'Connect your Facebook page for AI-powered content creation and posting',
+      description: INTEGRATION_COPY.facebook.oneLiner,
       icon: <FacebookIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -179,7 +230,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'twitter',
       name: 'Twitter',
-      description: 'Connect your Twitter account for automated tweeting and analytics',
+      description: INTEGRATION_COPY.twitter.oneLiner,
       icon: <TwitterIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -190,7 +241,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'linkedin',
       name: 'LinkedIn',
-      description: 'Connect your LinkedIn profile for professional content publishing',
+      description: INTEGRATION_COPY.linkedin.oneLiner,
       icon: <LinkedInIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -201,7 +252,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'instagram',
       name: 'Instagram',
-      description: 'Connect your Instagram account for visual content management',
+      description: INTEGRATION_COPY.instagram.oneLiner,
       icon: <InstagramIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -212,7 +263,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'youtube',
       name: 'YouTube',
-      description: 'Connect your YouTube channel for video content optimization',
+      description: INTEGRATION_COPY.youtube.oneLiner,
       icon: <YouTubeIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -223,7 +274,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'tiktok',
       name: 'TikTok',
-      description: 'Connect your TikTok account for short-form content optimization',
+      description: INTEGRATION_COPY.tiktok.oneLiner,
       icon: <TikTokIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -234,7 +285,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     {
       id: 'pinterest',
       name: 'Pinterest',
-      description: 'Connect your Pinterest account for visual content strategy',
+      description: INTEGRATION_COPY.pinterest.oneLiner,
       icon: <PinterestIcon />,
       category: 'social',
       status: 'coming_soon',
@@ -247,7 +298,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
   useEffect(() => {
     updateHeaderContent({
       title: 'Connect Your Platforms',
-      description: 'Connect your websites and social media accounts to enable AI-powered content publishing and analytics'
+      description: 'Plug in the sites and channels you publish to. Everything is optional — connect what you have now, and add the rest later in Settings.'
     });
   }, [updateHeaderContent]);
 
@@ -345,12 +396,72 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
   const analyticsPlatforms = integrations.filter(p => p.category === 'analytics');
   const socialPlatforms = integrations.filter(p => p.category === 'social');
 
+  // Attach hardcoded tooltip text to each platform for the card UI.
+  const withTooltip = (list: IntegrationPlatform[]) =>
+    list.map(p => ({ ...p, tooltip: INTEGRATION_COPY[p.id]?.tooltip || p.tooltip }));
+
 
   // Primary Site Selection State
   const [primarySite, setPrimarySite] = useState<string>('');
-  
+
   // Get sites from hooks for the memo
   const { sites: wixSites, connected: wixConnected } = useWixConnection();
+
+  // Live status per platform, derived from the existing OAuth hooks (no new API calls).
+  // Source of truth per platform:
+  //   - gsc:    connectedPlatforms includes 'gsc' (set by useGSCConnection after getStatus)
+  //   - bing:   bingConnected (from useBingOAuth)
+  //   - wix:    wixConnected  (from useWixConnection)
+  //   - wp:     wordpressConnected (from useWordPressOAuth)
+  // needs_reauth = local state thinks connected but underlying hook says not connected
+  //                (e.g. cached flag survived but token was revoked server-side).
+  const liveStatus: Record<string, IntegrationPlatform['status']> = {
+    gsc: connectedPlatforms.includes('gsc') ? 'connected' : 'available',
+    bing: bingConnected ? 'connected' : 'available',
+    wix: wixConnected ? 'connected' : 'available',
+    wordpress: wordpressConnected ? 'connected' : 'available',
+    facebook: 'coming_soon',
+    twitter: 'coming_soon',
+    linkedin: 'coming_soon',
+    instagram: 'coming_soon',
+    youtube: 'coming_soon',
+    tiktok: 'coming_soon',
+    pinterest: 'coming_soon',
+  };
+
+  // Platforms that are actually connectable today (not coming_soon).
+  const CONNECTABLE_IDS = ['gsc', 'bing', 'wix', 'wordpress'] as const;
+  const connectedCount = CONNECTABLE_IDS.filter(id => liveStatus[id] === 'connected').length;
+  const allConnectableEmpty = connectedCount === 0;
+
+  // Per-platform readiness row data: icon, display name, and a 1-line hint
+  // shown in the readiness panel for both connected and not-connected states.
+  const READINESS_ROWS: Record<string, { name: string; icon: React.ReactNode; connectedHint: string; disconnectedHint: string }> = {
+    gsc: {
+      name: 'Google Search Console',
+      icon: <GoogleIcon sx={{ fontSize: 18 }} />,
+      connectedHint: 'Powers SEO agent and AI Visibility.',
+      disconnectedHint: 'Connect for search analytics and SEO suggestions.',
+    },
+    bing: {
+      name: 'Bing Webmaster Tools',
+      icon: <AnalyticsIcon sx={{ fontSize: 18 }} />,
+      connectedHint: 'Adds Bing data to your SEO picture.',
+      disconnectedHint: 'Connect to add Bing search data.',
+    },
+    wix: {
+      name: 'Wix',
+      icon: <WixIcon sx={{ fontSize: 18 }} />,
+      connectedHint: 'Ready to publish posts to your Wix site.',
+      disconnectedHint: 'Connect to publish directly to Wix.',
+    },
+    wordpress: {
+      name: 'WordPress',
+      icon: <WordPressIcon sx={{ fontSize: 18 }} />,
+      connectedHint: 'Ready to publish posts to your WordPress site.',
+      disconnectedHint: 'Connect to publish directly to WordPress.',
+    },
+  };
   
   const availableSites = React.useMemo(() => {
     const sites: { url: string; source: string; name: string }[] = [];
@@ -499,10 +610,27 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
       {/* Website Platforms */}
       <Fade in timeout={800}>
         <div>
+          <Box sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+              All integrations are optional. Connect what you have now — you can add the rest anytime in Settings.
+            </Typography>
+            <Chip
+              size="small"
+              icon={<CheckCircleIcon sx={{ fontSize: 16 }} />}
+              label={`${connectedCount} of ${CONNECTABLE_IDS.length} connectable platforms connected`}
+              sx={{
+                ml: 'auto',
+                bgcolor: allConnectableEmpty ? '#f1f5f9' : '#ecfdf5',
+                color: allConnectableEmpty ? '#475569' : '#065f46',
+                fontWeight: 700,
+                '& .MuiChip-icon': { color: 'inherit' }
+              }}
+            />
+          </Box>
           <PlatformSection
             title="Website Platforms"
-            description="Connect your website for automated content publishing and SEO optimization"
-            platforms={websitePlatforms}
+            description="Publish blog posts and pages directly to your site."
+            platforms={withTooltip(websitePlatforms)}
             connectedPlatforms={connectedPlatforms}
             gscSites={null}
             isLoading={isLoading}
@@ -511,6 +639,7 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
               setConnectedPlatforms(connectedPlatforms.filter(p => p !== platformId));
             }}
             setConnectedPlatforms={setConnectedPlatforms}
+            liveStatus={liveStatus}
           />
         </div>
       </Fade>
@@ -632,12 +761,13 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
         <div>
           <PlatformSection
             title="Analytics & SEO"
-            description="Connect analytics platforms for data-driven content optimization"
-            platforms={analyticsPlatforms}
+            description="Plug in search data so the SEO and Content agents have real signals to work with."
+            platforms={withTooltip(analyticsPlatforms)}
             connectedPlatforms={connectedPlatforms}
             gscSites={gscSites}
                   isLoading={isLoading}
             onConnect={handlePlatformConnect}
+                  liveStatus={liveStatus}
                 />
         </div>
       </Fade>
@@ -681,17 +811,123 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
         </Fade>
       )}
 
+      {/* Data-Readiness Panel — honest state of the 4 connectable platforms */}
+      <Fade in timeout={1100}>
+        <Paper
+          elevation={1}
+          sx={{
+            mt: 3,
+            p: { xs: 2, md: 2.5 },
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: connectedCount > 0 ? '#bbf7d0' : '#e2e8f0',
+            background: connectedCount > 0
+              ? 'linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%)'
+              : 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                bgcolor: connectedCount > 0 ? '#dcfce7' : '#f1f5f9',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {connectedCount > 0 ? (
+                <CheckCircleIcon sx={{ color: '#16a34a' }} />
+              ) : (
+                <LightbulbIcon sx={{ color: '#94a3b8' }} />
+              )}
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                {connectedCount > 0
+                  ? `${connectedCount} of ${CONNECTABLE_IDS.length} connectable platforms connected`
+                  : 'No platforms connected yet'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#64748b' }}>
+                {connectedCount > 0
+                  ? 'You can finish onboarding now, or connect more to unlock features.'
+                  : 'Finish onboarding to add platforms later in Settings → Integrations.'}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 1 }}>
+            {CONNECTABLE_IDS.map(id => {
+              const row = READINESS_ROWS[id];
+              const isConnected = liveStatus[id] === 'connected';
+              return (
+                <Box
+                  key={id}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.25,
+                    p: 1.25,
+                    borderRadius: 1.5,
+                    border: '1px solid',
+                    borderColor: isConnected ? '#86efac' : '#e2e8f0',
+                    bgcolor: isConnected ? '#f0fdf4' : '#ffffff',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      bgcolor: isConnected ? '#dcfce7' : '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: isConnected ? '#16a34a' : '#94a3b8',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {row.icon}
+                  </Box>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#0f172a' }}>
+                      {row.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+                      {isConnected ? row.connectedHint : row.disconnectedHint}
+                    </Typography>
+                  </Box>
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: isConnected ? '#22c55e' : '#cbd5e1',
+                      flexShrink: 0,
+                    }}
+                  />
+                </Box>
+              );
+            })}
+          </Box>
+        </Paper>
+      </Fade>
+
       {/* Social Media Platforms */}
       <Fade in timeout={1200}>
         <div>
           <PlatformSection
             title="Social Media Platforms"
-            description="Connect your social media accounts for automated posting and engagement analytics"
-            platforms={socialPlatforms}
+            description="Schedule posts and pull engagement back into your dashboard."
+            platforms={withTooltip(socialPlatforms)}
             connectedPlatforms={connectedPlatforms}
             gscSites={null}
             isLoading={isLoading}
             onConnect={handlePlatformConnect}
+            liveStatus={liveStatus}
           />
         </div>
       </Fade>

@@ -11,6 +11,39 @@ from loguru import logger
 from services.database import get_db_session
 from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences, APIKey
 
+# Path tuples used to walk the onboarding_data tree looking for text that
+# the deterministic linguistic analyzer can compute metrics on. We keep
+# this list in one place (also referenced by prompt_builder._candidate_texts)
+# so Phase 2 (linguistic analysis) and Phase 1 (verbatim phrase extraction)
+# stay in lockstep.
+_TEXT_SAMPLE_PATHS: List[tuple] = [
+    ("websiteAnalysis", "crawl_result", "content"),
+    ("websiteAnalysis", "crawl_result", "text"),
+    ("websiteAnalysis", "crawl_result", "body"),
+    ("websiteAnalysis", "crawl_result", "meta_info", "description"),
+    ("websiteAnalysis", "crawl_result", "meta_info", "og_description"),
+    ("websiteAnalysis", "crawl_result", "meta_info", "twitter_description"),
+    ("websiteAnalysis", "crawl_result", "meta_info", "title"),
+    ("websiteAnalysis", "meta_info", "description"),
+    ("websiteAnalysis", "meta_info", "og_description"),
+    ("websiteAnalysis", "meta_info", "title"),
+    ("websiteAnalysis", "homepage"),
+    ("websiteAnalysis", "samples"),
+    ("websiteAnalysis", "content"),
+    ("websiteAnalysis", "style_guidelines", "guidelines", "tone_recommendations"),
+    ("websiteAnalysis", "style_guidelines", "guidelines", "structure_guidelines"),
+    ("websiteAnalysis", "style_guidelines", "guidelines", "vocabulary_suggestions"),
+    ("websiteAnalysis", "style_guidelines", "best_practices"),
+    ("websiteAnalysis", "style_guidelines", "ai_generation_tips"),
+    ("enhanced_analysis", "meta_data", "description"),
+    ("enhanced_analysis", "meta_data", "title"),
+    ("enhanced_analysis", "comprehensive_style_analysis"),
+    ("enhanced_analysis", "brand_voice_analysis"),
+    ("enhanced_analysis", "content_strategy_insights", "content_strategy"),
+    ("enhanced_analysis", "content_strategy_insights", "tone_recommendations"),
+    ("enhanced_analysis", "content_strategy_insights", "best_practices"),
+]
+
 
 class OnboardingDataCollector:
     """Collects comprehensive onboarding data for persona analysis."""
@@ -314,3 +347,93 @@ class OnboardingDataCollector:
             score = max(score, legacy_score)
         
         return min(score, 100.0)
+
+    def extract_text_samples_from_onboarding_data(
+        self,
+        onboarding_data: Dict[str, Any],
+        *,
+        max_samples: int = 6,
+        max_chars_per_sample: int = 4000,
+        min_chars: int = 200,
+    ) -> List[str]:
+        """Pull a list of text samples from onboarding data for deterministic
+        linguistic analysis.
+
+        Used by the persona generation flow to feed the
+        ``EnhancedLinguisticAnalyzer.analyze_writing_style`` call — which
+        produces the deterministic numbers that ground the LLM's
+        ``linguistic_fingerprint`` claims (average sentence length, active
+        vs passive ratio, readability, vocabulary sophistication, etc.).
+
+        We walk a known set of paths (frontend-style ``websiteAnalysis``
+        keys + backend-style ``enhanced_analysis`` keys) and pull whatever
+        text we can find. We dedupe and cap each sample at
+        ``max_chars_per_sample`` so a giant meta description doesn't blow
+        up NLTK tokenization later.
+
+        Filters out samples shorter than ``min_chars`` (they don't have
+        enough signal for a meaningful analysis) and caps the total
+        returned at ``max_samples`` (the analyzer's
+        ``_calculate_analysis_confidence`` rewards quantity, but we don't
+        want to spam it with 50 short snippets).
+
+        On any structural error, returns ``[]`` so callers can fall back
+        to the soft-mock path.
+        """
+        if not isinstance(onboarding_data, dict):
+            return []
+
+        try:
+            samples: List[str] = []
+            seen: set = set()
+
+            def _consider(value: Any) -> None:
+                """Add ``value`` to ``samples`` if it looks like usable text."""
+                if value is None:
+                    return
+                if isinstance(value, str):
+                    text = value.strip()
+                elif isinstance(value, list):
+                    for item in value:
+                        _consider(item)
+                    return
+                elif isinstance(value, dict):
+                    for v in value.values():
+                        _consider(v)
+                    return
+                else:
+                    return
+
+                if len(text) < min_chars:
+                    return
+                if len(text) > max_chars_per_sample:
+                    text = text[:max_chars_per_sample]
+                key = text[:120].lower()
+                if key in seen:
+                    return
+                seen.add(key)
+                samples.append(text)
+
+            for path in _TEXT_SAMPLE_PATHS:
+                if len(samples) >= max_samples:
+                    break
+                node: Any = onboarding_data
+                for key in path:
+                    if isinstance(node, dict) and key in node:
+                        node = node[key]
+                    else:
+                        node = None
+                        break
+                _consider(node)
+
+            logger.debug(
+                f"Extracted {len(samples)} text samples from onboarding data "
+                f"(min_chars={min_chars}, max_samples={max_samples})"
+            )
+            return samples
+        except Exception as e:
+            logger.warning(
+                f"Failed to extract text samples for linguistic analysis: {e}. "
+                f"Persona will fall back to soft-mock linguistic_fingerprint."
+            )
+            return []

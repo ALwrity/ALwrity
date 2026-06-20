@@ -10,7 +10,7 @@ export interface PlatformCardProps {
   name: string;
   description: string;
   icon: React.ReactNode;
-  status: 'available' | 'connected' | 'coming_soon' | 'disabled';
+  status: 'available' | 'connected' | 'coming_soon' | 'disabled' | 'needs_reauth';
   features: string[];
   isEnabled: boolean;
   isLoading: boolean;
@@ -22,6 +22,7 @@ const getStatusColor = (status: string) => {
     case 'connected': return 'success';
     case 'available': return 'primary';
     case 'coming_soon': return 'warning';
+    case 'needs_reauth': return 'warning';
     case 'disabled': return 'default';
     default: return 'default';
   }
@@ -32,6 +33,7 @@ const getStatusIcon = (status: string) => {
     case 'connected': return <CheckIcon />;
     case 'available': return <LaunchIcon />;
     case 'coming_soon': return <ScheduleIcon />;
+    case 'needs_reauth': return <ErrorIcon />;
     case 'disabled': return <ErrorIcon />;
     default: return <LaunchIcon />;
   }
@@ -42,6 +44,7 @@ const getStatusText = (status: string) => {
     case 'connected': return 'Connected';
     case 'available': return 'Connect';
     case 'coming_soon': return 'Coming Soon';
+    case 'needs_reauth': return 'Reconnect';
     case 'disabled': return 'Disabled';
     default: return 'Unknown';
   }

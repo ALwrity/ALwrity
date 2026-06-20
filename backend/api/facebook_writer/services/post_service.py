@@ -1,4 +1,3 @@
-import os
 """Facebook Post generation service."""
 
 from typing import Dict, Any
@@ -9,7 +8,7 @@ from .base_service import FacebookWriterBaseService
 class FacebookPostService(FacebookWriterBaseService):
     """Service for generating Facebook posts."""
     
-    def generate_post(self, request: FacebookPostRequest) -> FacebookPostResponse:
+    def generate_post(self, request: FacebookPostRequest, user_id: str) -> FacebookPostResponse:
         """
         Generate a Facebook post based on the request parameters.
         
@@ -25,8 +24,7 @@ class FacebookPostService(FacebookWriterBaseService):
             actual_tone = request.custom_tone if request.post_tone.value == "Custom" else request.post_tone.value
             
             # Get persona data for enhanced content generation
-            user_id = int(os.getenv("ALWRITY_FALLBACK_USER_ID", "0"))
-            persona_data = self._get_persona_data(user_id)
+            persona_data = self._get_persona_data(int(user_id))
             
             # Build the prompt
             base_prompt = self._build_post_prompt(request, actual_goal, actual_tone)
