@@ -5,13 +5,20 @@ import FactCheckResults from '../LinkedInWriter/components/FactCheckResults';
 interface TextSelectionHandlerOptions {
   onGenerateImage?: (text: string) => void;
   isGeneratingImage?: boolean;
+  onGenerateVideo?: (text: string) => void;
+  isGeneratingVideo?: boolean;
 }
 
 const useTextSelectionHandler = (
   contentRef: React.RefObject<HTMLDivElement>,
   options?: TextSelectionHandlerOptions
 ) => {
-  const { onGenerateImage, isGeneratingImage = false } = options || {};
+  const {
+    onGenerateImage,
+    isGeneratingImage = false,
+    onGenerateVideo,
+    isGeneratingVideo = false,
+  } = options || {};
   const [selectionMenu, setSelectionMenu] = useState<{ x: number; y: number; text: string } | null>(null);
   const [factCheckResults, setFactCheckResults] = useState<HallucinationDetectionResponse | null>(null);
   const [isFactChecking, setIsFactChecking] = useState(false);
@@ -324,7 +331,7 @@ const useTextSelectionHandler = (
                   setSelectionMenu(null);
                   onGenerateImage(text);
                 }}
-                disabled={isGeneratingImage}
+                disabled={isGeneratingImage || isGeneratingVideo}
                 style={{
                   background: isGeneratingImage ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)',
                   border: '1px solid rgba(255, 255, 255, 0.3)',
@@ -367,6 +374,63 @@ const useTextSelectionHandler = (
                   </>
                 ) : (
                   <>🖼️ Generate Image</>
+                )}
+              </button>
+            )}
+
+            {/* Generate Video Button */}
+            {onGenerateVideo && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const text = selectionMenu.text;
+                  setSelectionMenu(null);
+                  onGenerateVideo(text);
+                }}
+                disabled={isGeneratingVideo || isGeneratingImage}
+                style={{
+                  background: isGeneratingVideo ? 'rgba(255, 255, 255, 0.1)' : 'rgba(255, 255, 255, 0.2)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  borderRadius: '6px',
+                  padding: '6px 12px',
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  cursor: isGeneratingVideo ? 'not-allowed' : 'pointer',
+                  opacity: isGeneratingVideo ? 0.6 : 1,
+                  transition: 'all 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  width: '100%',
+                  justifyContent: 'center'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isGeneratingVideo) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isGeneratingVideo) {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }
+                }}
+              >
+                {isGeneratingVideo ? (
+                  <>
+                    <div style={{
+                      width: '12px',
+                      height: '12px',
+                      border: '2px solid rgba(255, 255, 255, 0.3)',
+                      borderTop: '2px solid white',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite'
+                    }} />
+                    Generating...
+                  </>
+                ) : (
+                  <>🎬 Generate Video</>
                 )}
               </button>
             )}

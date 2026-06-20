@@ -8,6 +8,16 @@ import {
   type LinkedInImageGenerationParams,
   type LinkedInImageGenerationResult,
 } from './linkedInImageService';
+import {
+  generateLinkedInVideo as generateLinkedInVideoService,
+  buildVideoPromptFromSelection as buildLinkedInVideoPrompt,
+  resolveLinkedInVideoUrl,
+  fetchLinkedInVideoBlobUrl,
+  pollLinkedInVideoTask,
+  mapMotionToApi,
+  type LinkedInVideoGenerationParams,
+  type LinkedInVideoGenerationStartResult,
+} from './linkedInVideoService';
 
 // LinkedIn-specific enums
 export enum LinkedInPostType {
@@ -307,10 +317,20 @@ export const linkedInWriterApi = {
     return generateLinkedInImageService(params);
   },
 
+  async generateVideo(params: LinkedInVideoGenerationParams): Promise<LinkedInVideoGenerationStartResult> {
+    return generateLinkedInVideoService(params);
+  },
+
   buildImagePromptFromSelection: buildLinkedInImagePrompt,
   resolveImageUrl: resolveLinkedInImageUrl,
   fetchImageBlobUrl: fetchLinkedInImageBlobUrl,
   mapImageAspectRatio: mapAspectRatioToLinkedIn,
+
+  buildVideoPromptFromSelection: buildLinkedInVideoPrompt,
+  resolveVideoUrl: resolveLinkedInVideoUrl,
+  fetchVideoBlobUrl: fetchLinkedInVideoBlobUrl,
+  pollVideoTask: pollLinkedInVideoTask,
+  mapVideoMotion: mapMotionToApi,
 };
 
 // ── Asset Library Save ────────────────────────────────────────────────

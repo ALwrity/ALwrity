@@ -27,6 +27,10 @@ class VideoScriptGenerator:
     ):
         """Generate LinkedIn video script with all processing steps."""
         try:
+            if 'hook' not in content_result and 'content' in content_result:
+                from services.linkedin.content_parser import parse_video_script_text
+                content_result = {**content_result, **parse_video_script_text(content_result['content'])}
+
             start_time = datetime.now()
             
             # Step 3: Add citations if requested
