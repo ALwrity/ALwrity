@@ -94,11 +94,7 @@ class EnhancedStrategyService:
     def _parse_ai_response(self, ai_response: Dict[str, Any], analysis_type: str) -> Dict[str, Any]:
         """Parse AI response - delegates to core service."""
         return self.core_service.strategy_analyzer.parse_ai_response(ai_response, analysis_type)
-    
-    def _get_fallback_recommendations(self, analysis_type: str) -> Dict[str, Any]:
-        """Get fallback recommendations - delegates to core service."""
-        return self.core_service.strategy_analyzer.get_fallback_recommendations(analysis_type)
-    
+
     def _extract_content_preferences_from_style(self, writing_style: Dict[str, Any]) -> Dict[str, Any]:
         """Extract content preferences from writing style - delegates to core service."""
         from .content_strategy.utils.strategy_utils import extract_content_preferences_from_style

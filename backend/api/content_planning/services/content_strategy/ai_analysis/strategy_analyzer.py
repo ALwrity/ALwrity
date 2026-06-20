@@ -537,22 +537,7 @@ class StrategyAnalyzer:
             'metrics': ai_response.get('metrics', {}),
             'confidence_score': ai_response.get('metrics', {}).get('confidence', 0.8)
         }
-    
-    def get_fallback_recommendations(self, analysis_type: str) -> Dict[str, Any]:
-        """
-        Get fallback recommendations - DISABLED.
-        
-        Args:
-            analysis_type: Type of analysis
-            
-        Returns:
-            Never returns - always raises error
-            
-        Raises:
-            RuntimeError: Always raised as fallbacks are disabled
-        """
-        raise RuntimeError(f"Fallback recommendations are disabled for {analysis_type}. Real AI insights required.")
-    
+
     async def get_latest_ai_analysis(self, strategy_id: int, db: Session) -> Optional[Dict[str, Any]]:
         """
         Get the latest AI analysis for a strategy.
@@ -628,12 +613,6 @@ def parse_ai_response(ai_response: Dict[str, Any], analysis_type: str) -> Dict[s
     """Parse and structure AI response."""
     analyzer = StrategyAnalyzer()
     return analyzer.parse_ai_response(ai_response, analysis_type)
-
-
-def get_fallback_recommendations(analysis_type: str) -> Dict[str, Any]:
-    """Get fallback recommendations (disabled)."""
-    analyzer = StrategyAnalyzer()
-    return analyzer.get_fallback_recommendations(analysis_type)
 
 
 async def get_latest_ai_analysis(strategy_id: int, db: Session) -> Optional[Dict[str, Any]]:
