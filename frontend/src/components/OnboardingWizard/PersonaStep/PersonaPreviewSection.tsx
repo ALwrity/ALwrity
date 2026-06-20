@@ -14,7 +14,6 @@ import {
   ExpandMore as ExpandMoreIcon,
   Psychology as PsychologyIcon,
   AutoAwesome as AutoAwesomeIcon,
-  Assessment as AssessmentIcon,
   LinkedIn as LinkedInIcon,
   Facebook as FacebookIcon,
   Twitter as TwitterIcon,
@@ -23,20 +22,7 @@ import {
 } from '@mui/icons-material';
 import { CorePersonaDisplay } from './sections/CorePersonaDisplay';
 import { PlatformPersonaDisplay } from './sections/PlatformPersonaDisplay';
-import { QualityMetricsDisplay } from './QualityMetricsDisplay';
 import { HowWeBuiltThisPersona } from './sections/HowWeBuiltThisPersona';
-
-/**
- * Phase 2 (merge): when `true`, the "How well did we capture your voice?"
- * accordion is replaced by the merged "How we built this persona"
- * accordion (which contains all 3 sub-sections), AND the
- * EvidenceAccordion inside CorePersonaDisplay is hidden. When `false`
- * (default), the original 2-accordion UX is preserved.
- *
- * Default: `false` — old behavior. Flip to `true` to opt into the
- * merged accordion (Phase 3 of the merge plan).
- */
-const MERGED_PERSONA_ACCORDION = false;
 
 interface PersonaPreviewSectionProps {
   showPreview: boolean;
@@ -49,7 +35,7 @@ interface PersonaPreviewSectionProps {
   setCorePersona: (persona: any) => void;
   setPlatformPersonas: (personas: Record<string, any>) => void;
   handleRegenerate: () => void;
-  /** Phase 2: deterministic completeness from the backend, plumbed to EvidenceAccordion. */
+  /** Phase 2: deterministic completeness from the backend, plumbed to HowWeBuiltThisPersona. */
   completeness?: {
     score?: number | null;
     structural_score?: number | null;
@@ -142,20 +128,9 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
                   Tone, vocabulary, sentence structure, and personality — fully editable.
                 </Typography>
               </Box>
-              {qualityMetrics && (
-                <Chip
-                  label={`${qualityMetrics.overall_score}% Quality`}
-                  sx={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    fontWeight: 600,
-                    '& .MuiChip-label': {
-                      px: 2
-                    }
-                  }}
-                  size="small"
-                />
-              )}
+              {/* Phase 3: the 'X% Quality' chip was dropped here because it
+                  duplicated the chip in the merged 'How we built this
+                  persona' accordion. The user can see the score there. */}
             </Box>
           </AccordionSummary>
           <AccordionDetails sx={{ px: 4, pb: 4 }}>
@@ -167,7 +142,6 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               }}
               completeness={completeness}
               data_sufficiency={data_sufficiency}
-              hideEvidenceAccordion={MERGED_PERSONA_ACCORDION}
             />
           </AccordionDetails>
         </Accordion>
@@ -280,93 +254,21 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
           </AccordionDetails>
         </Accordion>
 
-        {/* Phase 2 (merge): the "How well did we capture your voice?"
-            quality accordion is replaced by the merged "How we built
-            this persona" accordion when MERGED_PERSONA_ACCORDION is on.
-            Old path stays so we can flip the flag off if it breaks. */}
+        {/* Phase 3 (merge): the old "How well did we capture your voice?"
+            accordion and the old EvidenceAccordion (inside
+            CorePersonaDisplay) are both replaced by this single merged
+            "How we built this persona" accordion. Nothing is dropped —
+            it has 3 sub-sections: output quality, confidence & evidence,
+            and data gaps. */}
         {qualityMetrics && (
-          MERGED_PERSONA_ACCORDION ? (
-            <Box sx={{ mb: 4 }}>
-              <HowWeBuiltThisPersona
-                persona={corePersona}
-                completeness={completeness}
-                data_sufficiency={data_sufficiency}
-                qualityMetrics={qualityMetrics}
-              />
-            </Box>
-          ) : (
-            <Accordion
-              expanded={expandedAccordion === 'quality'}
-              onChange={() => setExpandedAccordion(expandedAccordion === 'quality' ? false : 'quality')}
-              sx={{
-                mb: 4,
-                background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                border: '1px solid #e2e8f0',
-                borderRadius: 3,
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-                '&:before': {
-                  display: 'none'
-                },
-                '&.Mui-expanded': {
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                }
-              }}
-            >
-              <AccordionSummary
-                expandIcon={<ExpandMoreIcon sx={{ color: '#64748b' }} />}
-                sx={{
-                  px: 4,
-                  py: 3,
-                  '&:hover': {
-                    backgroundColor: '#f8fafc'
-                  }
-                }}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%' }}>
-                  <Box
-                    sx={{
-                      p: 2,
-                      borderRadius: 2,
-                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                      color: 'white',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <AssessmentIcon sx={{ fontSize: 24 }} />
-                  </Box>
-                  <Box sx={{ flex: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                      How well did we capture your voice?
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b' }}>
-                      Plain-English breakdown of every score, plus a confidence badge and the data gaps the AI couldn't fill.
-                    </Typography>
-                  </Box>
-                  <Chip
-                    label={`${qualityMetrics.overall_score}% Quality`}
-                    sx={{
-                      background: qualityMetrics.overall_score >= 85
-                        ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                        : qualityMetrics.overall_score >= 70
-                        ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                        : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                      color: 'white',
-                      fontWeight: 600,
-                      '& .MuiChip-label': {
-                        px: 2
-                      }
-                    }}
-                    size="small"
-                  />
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails sx={{ px: 4, pb: 4 }}>
-                <QualityMetricsDisplay metrics={qualityMetrics} corePersona={corePersona} />
-              </AccordionDetails>
-            </Accordion>
-          )
+          <Box sx={{ mb: 4 }}>
+            <HowWeBuiltThisPersona
+              persona={corePersona}
+              completeness={completeness}
+              data_sufficiency={data_sufficiency}
+              qualityMetrics={qualityMetrics}
+            />
+          </Box>
         )}
       </Box>
     </Fade>

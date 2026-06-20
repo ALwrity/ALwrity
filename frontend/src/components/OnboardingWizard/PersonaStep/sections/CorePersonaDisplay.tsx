@@ -11,27 +11,28 @@ import { SectionAccordion } from '../components/SectionAccordion';
 import { EditableTextField } from '../components/EditableTextField';
 import { EditableChipArray } from '../components/EditableChipArray';
 import { corePersonaTooltips } from '../utils/personaTooltips';
-import { EvidenceAccordion } from './EvidenceAccordion';
 
 interface CorePersonaDisplayProps {
   persona: any;
   onChange: (updatedPersona: any) => void;
-  /** Phase 2: deterministic completeness from the backend, used by EvidenceAccordion. */
+  /**
+   * Phase 2: deterministic completeness from the backend. Phase 3: only
+   * still passed here for backward compatibility with the parent
+   * component, but unused — the merged "How we built this persona"
+   * accordion (rendered at the PersonaPreviewSection level) is the
+   * only consumer now. Kept on the interface so the parent doesn't
+   * need to be edited; will be removed in a follow-up cleanup pass.
+   */
   completeness?: {
     score?: number | null;
     structural_score?: number | null;
     missing?: string[] | null;
   } | null;
-  /** Phase 2: data-sufficiency (0-100) from the backend. */
-  data_sufficiency?: number | null;
   /**
-   * Phase 2 (merge): when the merged "How we built this persona"
-   * accordion is enabled at the PersonaPreviewSection level, the old
-   * EvidenceAccordion here is redundant. Pass `true` to hide it. The
-   * default is `false` (current behavior — both render) so flipping
-   * the merge flag off is risk-free.
+   * Phase 2: data-sufficiency (0-100) from the backend. Phase 3: same
+   * note as `completeness` — kept for interface compatibility, unused.
    */
-  hideEvidenceAccordion?: boolean;
+  data_sufficiency?: number | null;
 }
 
 /**
@@ -43,7 +44,6 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
   onChange,
   completeness,
   data_sufficiency,
-  hideEvidenceAccordion = false,
 }) => {
   // Helper function to update nested fields
   const updateField = (path: string[], value: any) => {
@@ -533,14 +533,10 @@ export const CorePersonaDisplay: React.FC<CorePersonaDisplayProps> = ({
         </Box>
       </SectionAccordion>
 
-      {/* 4.5 Evidence & Confidence — surfaces the LLM's own audit trail
-           (evidence.*_basis citations, verbatim phrases lifted from the
-           brand's content, what_was_missing gaps, confidence score). The
-           data was already returned by the backend; the rest of the UI
-           was just hiding it. */}
-      {!hideEvidenceAccordion && (
-        <EvidenceAccordion persona={persona} completeness={completeness} data_sufficiency={data_sufficiency} />
-      )}
+      {/* 4.5 Evidence & Confidence — moved to the merged "How we built
+           this persona" accordion (rendered at the
+           PersonaPreviewSection level) in Phase 3. The EvidenceAccordion
+           component itself has been deleted. */}
 
       {/* 5. Persona Generation Summary */}
       <SectionAccordion
