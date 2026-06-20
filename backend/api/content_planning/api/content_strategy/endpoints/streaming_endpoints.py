@@ -128,7 +128,7 @@ async def stream_strategic_intelligence(
             
             # Check bounded shared cache first
             cache_key = f"strategic_intelligence_{authenticated_user_id}"
-            cached_data = await streaming_cache_service.get_cached_data("streaming_intelligence", cache_key)
+            cached_data = await streaming_cache_service.get_cached_data("strategic_intelligence", cache_key)
             if cached_data:
                 logger.info(f"✅ Returning cached strategic intelligence data for user: {authenticated_user_id}")
                 yield {"type": "result", "status": "success", "data": cached_data, "progress": 100}
@@ -191,7 +191,7 @@ async def stream_strategic_intelligence(
             }
             
             # Cache the strategic intelligence data
-            await streaming_cache_service.set_cached_data("streaming_intelligence", cache_key, strategic_intelligence)
+            await streaming_cache_service.set_cached_data("strategic_intelligence", cache_key, strategic_intelligence)
             
             # Send progress update
             yield {"type": "progress", "message": "Finalizing strategic intelligence...", "progress": 80}
@@ -235,7 +235,7 @@ async def stream_keyword_research(
             
             # Check bounded shared cache first
             cache_key = f"keyword_research_{authenticated_user_id}"
-            cached_data = await streaming_cache_service.get_cached_data("streaming_intelligence", cache_key)
+            cached_data = await streaming_cache_service.get_cached_data("keyword_research", cache_key)
             if cached_data:
                 logger.info(f"✅ Returning cached keyword research data for user: {authenticated_user_id}")
                 yield {"type": "result", "status": "success", "data": cached_data, "progress": 100}
@@ -296,7 +296,7 @@ async def stream_keyword_research(
             }
             
             # Cache the keyword data
-            await streaming_cache_service.set_cached_data("streaming_intelligence", cache_key, keyword_data)
+            await streaming_cache_service.set_cached_data("keyword_research", cache_key, keyword_data)
             
             # Send progress update
             yield {"type": "progress", "message": "Finalizing keyword research...", "progress": 80}
