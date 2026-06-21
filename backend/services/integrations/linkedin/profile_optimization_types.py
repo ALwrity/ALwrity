@@ -82,13 +82,24 @@ class ProfileOptimizationItemPayload(BaseModel):
 
 
 class ProfileOptimizationLLMResponse(BaseModel):
-    """Structured LLM output for profile optimization backlog generation."""
+    """Structured LLM output for merged profile optimization backlog (10–15 items)."""
 
     model_config = ConfigDict(extra="forbid")
 
     recommendations: list[ProfileOptimizationItemPayload] = Field(
         min_length=PROFILE_OPTIMIZATION_BACKLOG_MIN,
         max_length=PROFILE_OPTIMIZATION_BACKLOG_MAX,
+    )
+
+
+class ProfileOptimizationBatchLLMResponse(BaseModel):
+    """Structured LLM output for a single Gemini batch (1–5 items)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    recommendations: list[ProfileOptimizationItemPayload] = Field(
+        min_length=1,
+        max_length=PROFILE_OPTIMIZATION_LLM_BATCH_SIZE,
     )
 
 
