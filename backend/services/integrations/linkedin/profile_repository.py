@@ -106,9 +106,11 @@ class ProfileRepository:
         "user_completion_json",
         "ai_profile_intelligence_json",
         "topic_recommendations_json",
+        "profile_optimization_json",
         "profile_context_updated_at",
         "ai_intelligence_updated_at",
         "recommendations_updated_at",
+        "profile_optimization_updated_at",
         "created_at",
         "updated_at",
     )
@@ -150,9 +152,9 @@ class ProfileRepository:
                     profile_content_hash, fetched_at,
                     profile_context_json, profile_validation_json,
                     user_completion_json, ai_profile_intelligence_json,
-                    topic_recommendations_json,
+                    topic_recommendations_json, profile_optimization_json,
                     profile_context_updated_at, ai_intelligence_updated_at,
-                    recommendations_updated_at,
+                    recommendations_updated_at, profile_optimization_updated_at,
                     created_at, updated_at
                 FROM linkedin_analysis_context
                 WHERE user_id = ?
@@ -354,6 +356,7 @@ class ProfileRepository:
             user_id,
             now,
         )
+        self._clear_profile_optimization(user_id, db_path=db_path, updated_at=now)
         return now
 
     def get_profile_validation(
@@ -770,6 +773,7 @@ class ProfileRepository:
             context_hash[:12] if context_hash else None,
         )
         self._clear_topic_recommendations(user_id, db_path=db_path, updated_at=now)
+        self._clear_profile_optimization(user_id, db_path=db_path, updated_at=now)
         return now
 
     def get_topic_recommendations(
@@ -952,6 +956,193 @@ class ProfileRepository:
             user_id,
         )
 
+    def get_profile_optimization(
+        self,
+        user_id: str,
+        *,
+        row: Optional[dict[str, Any]] = None,
+    ) -> Optional[dict[str, Any]]:
+        """
+        Read cached profile optimization JSON for ``user_id``.
+
+        Args:
+            user_id: ALwrity user ID
+            row: Optional pre-loaded analysis row to avoid a second DB read
+
+        Returns:
+            Parsed Phase 7 optimization dict, or ``None`` when not stored/invalid
+        """
+        logger.info(
+            "[ProfileOptimization] ProfileRepository.get_profile_optimization user_id={}",
+            user_id,
+        )
+        if row is None:
+            row = self.get_analysis_row(user_id)
+        if not row:
+            logger.info(
+                "[ProfileOptimization] ProfileRepository.get_profile_optimization "
+                "no row user_id={}",
+                user_id,
+            )
+            return None
+        raw_json = row.get("profile_optimization_json")
+        if not raw_json:
+            logger.info(
+                "[ProfileOptimization] ProfileRepository.get_profile_optimization "
+                "empty profile_optimization_json user_id={}",
+                user_id,
+            )
+            return None
+        try:
+            parsed = json.loads(raw_json)
+        except json.JSONDecodeError as exc:
+            logger.exception(
+                "[ProfileOptimization] Invalid profile_optimization_json user_id={}: {}",
+                user_id,
+                exc,
+            )
+            return None
+        if not isinstance(parsed, dict):
+            logger.error(
+                "[ProfileOptimization] profile_optimization_json is not an object user_id={}",
+                user_id,
+            )
+            return None
+        logger.info(
+            "[ProfileOptimization] ProfileRepository.get_profile_optimization hit user_id={}",
+            user_id,
+        )
+        return parsed
+
+    def save_profile_optimization(
+        self,
+        user_id: str,
+        stored: dict[str, Any],
+        *,
+        profile_context_hash: Optional[str] = None,
+        intelligence_hash: Optional[str] = None,
+    ) -> str:
+        """
+        Persist Phase 7 profile optimization JSON and ``profile_optimization_updated_at``.
+
+        Requires an existing ``linkedin_analysis_context`` row.
+
+        Args:
+            user_id: ALwrity user ID
+            stored: Validated stored optimization dict
+            profile_context_hash: Optional context hash to stamp in ``meta``
+            intelligence_hash: Optional intelligence hash to stamp in ``meta``
+
+        Returns:
+            ISO timestamp written to ``profile_optimization_updated_at``
+
+        Raises:
+            ValueError: When no analysis row exists or stored is not a dict
+        """
+        logger.info(
+            "[ProfileOptimization] ProfileRepository.save_profile_optimization user_id={}",
+            user_id,
+        )
+        if not isinstance(stored, dict):
+            raise ValueError("Profile optimization payload must be a dict")
+
+        stored_to_save = stored
+        if profile_context_hash is not None or intelligence_hash is not None:
+            stored_to_save = json.loads(
+                json.dumps(stored, separators=(",", ":"), default=str)
+            )
+            meta = stored_to_save.get("meta")
+            if not isinstance(meta, dict):
+                meta = {}
+                stored_to_save["meta"] = meta
+            if profile_context_hash is not None:
+                meta["built_from_profile_context_hash"] = profile_context_hash
+            if intelligence_hash is not None:
+                meta["built_from_intelligence_hash"] = intelligence_hash
+
+        optimization_json = json.dumps(
+            stored_to_save,
+            separators=(",", ":"),
+            default=str,
+        )
+        now = datetime.utcnow().isoformat()
+        db_path = self._ensure_db(user_id)
+
+        existing = self.get_analysis_row(user_id)
+        if not existing:
+            logger.error(
+                "[ProfileOptimization] save_profile_optimization no analysis row user_id={}",
+                user_id,
+            )
+            raise ValueError(
+                f"No linkedin_analysis_context row for user_id={user_id!r}; "
+                "acquire normalized profile first"
+            )
+
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    UPDATE linkedin_analysis_context
+                    SET profile_optimization_json = ?,
+                        profile_optimization_updated_at = ?,
+                        updated_at = ?
+                    WHERE user_id = ?
+                    """,
+                    (optimization_json, now, now, user_id),
+                )
+                conn.commit()
+            except sqlite3.Error as exc:
+                logger.exception(
+                    "[ProfileOptimization] save_profile_optimization db error user_id={}: {}",
+                    user_id,
+                    exc,
+                )
+                raise ValueError("Failed to persist profile optimization") from exc
+
+        logger.info(
+            "[ProfileOptimization] ProfileRepository.save_profile_optimization "
+            "complete user_id={} profile_optimization_updated_at={} "
+            "profile_context_hash={} intelligence_hash={}",
+            user_id,
+            now,
+            profile_context_hash[:12] if profile_context_hash else None,
+            intelligence_hash[:12] if intelligence_hash else None,
+        )
+        return now
+
+    def _clear_profile_optimization(
+        self,
+        user_id: str,
+        *,
+        db_path: str,
+        updated_at: str,
+    ) -> None:
+        """Clear Phase 7 optimization when upstream profile context or intelligence changes."""
+        logger.info(
+            "[ProfileOptimization] ProfileRepository._clear_profile_optimization user_id={}",
+            user_id,
+        )
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                UPDATE linkedin_analysis_context
+                SET profile_optimization_json = NULL,
+                    profile_optimization_updated_at = NULL,
+                    updated_at = ?
+                WHERE user_id = ?
+                """,
+                (updated_at, user_id),
+            )
+            conn.commit()
+        logger.info(
+            "[ProfileOptimization] ProfileRepository._clear_profile_optimization complete "
+            "user_id={}",
+            user_id,
+        )
+
     def has_fresh_profile(
         self,
         user_id: str,
@@ -1019,9 +1210,11 @@ class ProfileRepository:
                     user_completion_json = NULL,
                     ai_profile_intelligence_json = NULL,
                     topic_recommendations_json = NULL,
+                    profile_optimization_json = NULL,
                     profile_context_updated_at = NULL,
                     ai_intelligence_updated_at = NULL,
                     recommendations_updated_at = NULL,
+                    profile_optimization_updated_at = NULL,
                     updated_at = ?
                 WHERE user_id = ?
                 """,
