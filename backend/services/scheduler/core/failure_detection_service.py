@@ -475,7 +475,7 @@ class FailureDetectionService:
                 })
             
             # Check advertools tasks (paused tasks may also need attention)
-            from models.website_analysis_monitoring_models import AdvertoolsTask
+            from models.advertools_monitoring_models import AdvertoolsTask
             advertools_tasks = self.db.query(AdvertoolsTask).filter(
                 AdvertoolsTask.status.in_(["needs_intervention", "failed"])
             )

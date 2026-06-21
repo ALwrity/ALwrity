@@ -70,8 +70,9 @@ async def generate_facebook_persona_task(user_id: str):
         facebook_service = FacebookPersonaService()
         try:
             generated_persona = facebook_service.generate_facebook_persona(
-                core_persona, 
-                onboarding_data
+                core_persona,
+                onboarding_data,
+                user_id=user_id,
             )
             execution_time = (datetime.utcnow() - start_time).total_seconds()
             

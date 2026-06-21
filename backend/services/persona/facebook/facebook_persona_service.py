@@ -40,14 +40,24 @@ class FacebookPersonaService:
             logger.debug("FacebookPersonaService initialized")
             self._initialized = True
     
-    def generate_facebook_persona(self, core_persona: Dict[str, Any], onboarding_data: Dict[str, Any]) -> Dict[str, Any]:
+    def generate_facebook_persona(
+        self,
+        core_persona: Dict[str, Any],
+        onboarding_data: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Generate Facebook-specific persona adaptation using optimized chained prompts.
-        
+
         Args:
             core_persona: The core persona data
             onboarding_data: User onboarding data
-            
+            user_id: Optional explicit Clerk user ID. Used for subscription
+                checks / usage tracking. Falls back to looking up
+                ``onboarding_data["session_info"]["user_id"]`` so
+                direct callers (which embed the user_id in the
+                onboarding dict) still work.
+
         Returns:
             Facebook-optimized persona data
         """
@@ -62,9 +72,14 @@ class FacebookPersonaService:
 
             # Get Facebook-specific schema
             schema = self._get_enhanced_facebook_schema()
-            
-            # Extract user_id for tracking
-            user_id = onboarding_data.get("session_info", {}).get("user_id")
+
+            # Resolve user_id for the LLM gateway's subscription check.
+            # Prefer the explicit kwarg (the scheduler passes it that
+            # way), fall back to the legacy nested key.
+            if not user_id and isinstance(onboarding_data, dict):
+                session_info = onboarding_data.get("session_info")
+                if isinstance(session_info, dict):
+                    user_id = session_info.get("user_id")
 
             # Generate structured response using the provider-agnostic gateway
             # (handles GPT_PROVIDER routing, subscription/usage checks, fallbacks)
