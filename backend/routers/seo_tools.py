@@ -44,6 +44,29 @@ router = APIRouter(prefix="/api/seo", tags=["AI SEO Tools"])
 LOG_DIR = "logs/seo_tools"
 
 
+# ---------------------------------------------------------------------------
+# Sitemap benchmark idempotency
+# ---------------------------------------------------------------------------
+# Without this, a click-spam user (or a frontend that auto-retries the
+# onboarding-step3 endpoint on every state change) launches N parallel
+# background benchmarks against the same domain. Each one makes fresh
+# HTTP requests to alwrity.com and its competitors, which trips
+# rate-limit (HTTP 429/436) and floods the logs with duplicate
+# "Connection closed" / "Failed to fetch sitemap" errors.
+#
+# The actual dedup logic lives in services/sitemap_benchmark_dedup.py
+# so it can be unit-tested in isolation (the seo_tools router has
+# unrelated pre-existing import issues that would otherwise break the
+# test collection).
+from services.sitemap_benchmark_dedup import (
+    SITEMAP_BENCHMARK_DEDUP_WINDOW_SEC as _SITEMAP_BENCHMARK_DEDUP_WINDOW_SEC,
+    is_recent_sitemap_benchmark_in_flight as _is_recent_sitemap_benchmark_in_flight,
+    mark_sitemap_benchmark_started as _mark_sitemap_benchmark_started,
+    mark_sitemap_benchmark_finished as _mark_sitemap_benchmark_finished,
+)
+
+
+
 def ensure_seo_logging_dir() -> str:
     """Create SEO log directory at runtime (no import-time writes)."""
     ensure_global_operational_dirs({"logs"})
@@ -721,6 +744,10 @@ async def _run_sitemap_benchmark_background(
     db = get_session_for_user(user_id)
     if not db:
         logger.error(f"Failed to get database session for user {user_id}")
+        # Even on early failure, refresh the dedup gate so we don't
+        # keep getting hit by duplicate requests while the system is
+        # misconfigured.
+        _mark_sitemap_benchmark_finished(user_id)
         return
 
     try:
@@ -753,6 +780,11 @@ async def _run_sitemap_benchmark_background(
         except Exception as update_err:
             logger.error(f"Failed to update error status: {update_err}")
     finally:
+        # Refresh the dedup gate so we don't hammer upstream sitemaps
+        # with rapid-fire retries. Without this, a failed run would
+        # allow the next /run call to immediately re-trigger, which
+        # is what produced the original log flood.
+        _mark_sitemap_benchmark_finished(user_id)
         db.close()
 
 @router.post("/competitive-sitemap-benchmarking/run", response_model=BaseResponse)
@@ -768,6 +800,44 @@ async def run_competitive_sitemap_benchmarking(
         user_id = str(current_user.get("id")) if current_user else None
         if not user_id:
             raise HTTPException(status_code=401, detail="Unauthorized")
+
+        # Idempotency: refuse to start a new run if a recent one is in
+        # progress for this user. This prevents the thundering herd
+        # that hammers upstream sitemaps with N concurrent identical
+        # fetches, which then trips 429/436 rate limits and logs
+        # dozens of duplicate errors. The dedup key is per user so
+        # different users don't block each other.
+        if _is_recent_sitemap_benchmark_in_flight(user_id):
+            logger.info(
+                f"⏭️ [DEDUP] Skipping new sitemap benchmark for user {user_id} — "
+                f"a recent run is still in flight or completed within the dedup window"
+            )
+            db_dedup = get_session_for_user(user_id)
+            try:
+                existing = None
+                if db_dedup:
+                    integration_service = OnboardingDataIntegrationService()
+                    integrated = integration_service.get_integrated_data_sync(user_id, db_dedup)
+                    website_analysis = integrated.get("website_analysis") if isinstance(integrated, dict) else {}
+                    seo_audit = website_analysis.get("seo_audit") if isinstance(website_analysis, dict) else {}
+                    existing = seo_audit.get("competitive_sitemap_benchmarking") if isinstance(seo_audit, dict) else None
+            finally:
+                try:
+                    if db_dedup:
+                        db_dedup.close()
+                except Exception:
+                    pass
+
+            execution_time = (datetime.utcnow() - start_time).total_seconds()
+            return BaseResponse(
+                success=True,
+                message="Competitive sitemap benchmarking already in progress; reusing existing run",
+                execution_time=execution_time,
+                data={
+                    "status": "reused",
+                    "report": existing,
+                },
+            )
 
         # Get initial data to validate request
         db = get_session_for_user(user_id)
@@ -798,6 +868,12 @@ async def run_competitive_sitemap_benchmarking(
 
             # Set status to processing
             await integration_service.update_competitive_sitemap_benchmarking_status(user_id, "processing", db)
+
+            # Mark the dedup gate so subsequent duplicate /run calls
+            # within _SITEMAP_BENCHMARK_DEDUP_WINDOW_SEC return the
+            # existing result instead of launching another background
+            # task against the same domain.
+            _mark_sitemap_benchmark_started(user_id)
 
             # Queue background task
             background_tasks.add_task(
