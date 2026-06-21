@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 PROFILE_OPTIMIZATION_SCHEMA_VERSION = 1
 PROFILE_OPTIMIZATION_ACTIVE_BATCH_SIZE = 5
+PROFILE_OPTIMIZATION_LLM_BATCH_SIZE = 5
 PROFILE_OPTIMIZATION_BACKLOG_MIN = 10
 PROFILE_OPTIMIZATION_BACKLOG_MAX = 15
 DEFAULT_PROFILE_OPTIMIZATION_MODEL = "gemini-2.5-flash"
@@ -142,9 +143,62 @@ def gap_severity_rank(severity: str) -> int:
 
 def profile_optimization_json_schema() -> dict[str, Any]:
     """
-    Return JSON schema for Gemini structured output (LLM fields only).
+    Return strict JSON schema for post-LLM validation (Step 3 Pydantic checks).
+
+    Not sent to Gemini — use ``profile_optimization_gemini_json_schema()`` for API calls.
 
     Returns:
-        JSON schema dict suitable for ``gemini_structured_json_response``
+        Full Pydantic JSON schema for backlog validation (10–15 items, enums, etc.)
     """
     return ProfileOptimizationLLMResponse.model_json_schema()
+
+
+_GEMINI_ITEM_PROPERTIES: dict[str, Any] = {
+    "profile_section": {"type": "string"},
+    "issue": {"type": "string"},
+    "why_it_matters": {"type": "string"},
+    "current_state_summary": {"type": "string"},
+    "recommended_action": {"type": "string"},
+    "suggested_copy": {"type": "string"},
+    "impact": {"type": "string"},
+    "effort": {"type": "string"},
+    "best_practice_ref": {"type": "string"},
+    "completion_criteria": {"type": "string"},
+}
+
+
+def profile_optimization_gemini_json_schema() -> dict[str, Any]:
+    """
+    Return a lightweight JSON schema for Gemini structured output (single batch).
+
+    Keeps constraints minimal so Gemini accepts the schema. Enums, backlog count
+    (10–15), and field rules are enforced in ``profile_optimization_validator`` (Step 3).
+    Each LLM call returns at most ``PROFILE_OPTIMIZATION_LLM_BATCH_SIZE`` items; the
+    service layer merges multiple batches into the full backlog (Layer 2 / Step 4).
+
+    Returns:
+        Flat hand-crafted schema suitable for ``gemini_structured_json_response``
+    """
+    return {
+        "type": "object",
+        "properties": {
+            "recommendations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": _GEMINI_ITEM_PROPERTIES,
+                    "required": [
+                        "profile_section",
+                        "issue",
+                        "why_it_matters",
+                        "current_state_summary",
+                        "recommended_action",
+                        "impact",
+                        "effort",
+                    ],
+                },
+                "maxItems": PROFILE_OPTIMIZATION_LLM_BATCH_SIZE,
+            }
+        },
+        "required": ["recommendations"],
+    }
