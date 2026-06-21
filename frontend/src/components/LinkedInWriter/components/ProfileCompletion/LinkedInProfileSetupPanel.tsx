@@ -57,8 +57,10 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     optimizationMeta,
     optimizationError,
     optimizationUserError,
+    isOptimizationExpanded,
     openOptimizationPanel,
-    closeOptimizationPanel,
+    collapseOptimization,
+    expandOptimization,
     retryOptimization,
     refreshOptimization,
   } = useLinkedInProfileOptimization(isProfileComplete);
@@ -125,11 +127,13 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         noGapsMessage={
           optimizationMeta?.source === 'no_gaps' ? optimizationMeta.message ?? null : null
         }
-        onClose={closeOptimizationPanel}
+        isExpanded={isOptimizationExpanded}
+        isRefreshing={isOptimizationLoading}
+        onCollapse={collapseOptimization}
+        onExpand={expandOptimization}
         onRefresh={() => {
           void refreshOptimization();
         }}
-        isRefreshing={isOptimizationLoading}
       />
 
       {(optimizationError || optimizationUserError) && optimizationPanelState === 'error' && (
@@ -141,7 +145,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
               error_code: 'optimization_failed',
               user_message:
                 optimizationUserError ??
-                'We could not load profile suggestions right now. Please try again.',
+                "We couldn't load profile suggestions right now. Please try again.",
             }
           }
           onRetry={() => {

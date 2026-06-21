@@ -6,7 +6,9 @@ import type {
   LinkedInProfileOptimizationMeta,
 } from '../../../../api/linkedinSocial';
 import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
+import { formatRelativeUpdatedAt } from '../TopicRecommendations/topicRecommendationLabels';
 import { ProfileOptimizationCard } from './ProfileOptimizationCard';
+import { ProfileOptimizationSummaryBar } from './ProfileOptimizationSummaryBar';
 
 interface ProfileOptimizationPanelProps {
   isOpen: boolean;
@@ -14,9 +16,11 @@ interface ProfileOptimizationPanelProps {
   recommendations?: LinkedInProfileOptimizationItem[] | null;
   optimizationMeta?: LinkedInProfileOptimizationMeta | null;
   noGapsMessage?: string | null;
-  onClose: () => void;
-  onRefresh?: () => void;
+  isExpanded?: boolean;
   isRefreshing?: boolean;
+  onCollapse?: () => void;
+  onExpand?: () => void;
+  onRefresh?: () => void;
 }
 
 const SKELETON_CARD_STYLE: React.CSSProperties = {
@@ -33,6 +37,29 @@ const SKELETON_CARD_STYLE: React.CSSProperties = {
 
 const SKELETON_COUNT = 3;
 
+const hideSuggestionsButtonStyle: React.CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 8,
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#fff',
+  color: '#475569',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const panelBackgroundGlowStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '-50%',
+  left: '-50%',
+  width: '200%',
+  height: '200%',
+  background:
+    'radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)',
+  zIndex: 0,
+};
+
 /** Phase 7 — profile optimization recommendations panel. */
 export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> = ({
   isOpen,
@@ -40,17 +67,50 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   recommendations,
   optimizationMeta,
   noGapsMessage,
-  onClose,
-  onRefresh,
+  isExpanded = true,
   isRefreshing = false,
+  onCollapse,
+  onExpand,
+  onRefresh,
 }) => {
   if (!isOpen) {
     return null;
   }
 
+  const updatedLabel = formatRelativeUpdatedAt(
+    optimizationMeta?.profile_optimization_updated_at
+  );
+  const recommendationCount = recommendations?.length ?? 0;
   const showSkeleton = isLoading && !recommendations?.length;
   const showCards = !showSkeleton && recommendations && recommendations.length > 0;
   const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
+
+  if (!isExpanded && showCards && onExpand) {
+    return (
+      <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
+        <div
+          style={{
+            ...linkedInPlaceholderCardStyles.inner,
+            minHeight: 'unset',
+            padding: '16px 20px',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div style={panelBackgroundGlowStyle} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <ProfileOptimizationSummaryBar
+              recommendationCount={recommendationCount}
+              updatedLabel={updatedLabel}
+              isRefreshing={isRefreshing}
+              onExpand={onExpand}
+              onRefresh={onRefresh}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
@@ -59,125 +119,124 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
           ...linkedInPlaceholderCardStyles.inner,
           minHeight: 'unset',
           padding: '20px 24px',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
-          <div>
-            <h3
-              style={{
-                margin: '0 0 6px',
-                fontSize: 18,
-                fontWeight: 700,
-                color: '#1e293b',
-              }}
-            >
-              Profile optimization suggestions
-            </h3>
-            <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.55 }}>
-              Five high-impact improvements based on your profile gaps and LinkedIn best
-              practices.
-            </p>
-            {optimizationMeta?.profile_optimization_updated_at && (
-              <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>
-                Source: {optimizationMeta.source}
-                {typeof optimizationMeta.remaining_in_backlog === 'number' &&
-                  optimizationMeta.remaining_in_backlog > 0 &&
-                  ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
-              </p>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {onRefresh && showCards && (
-              <button
-                type="button"
-                onClick={onRefresh}
-                disabled={isRefreshing}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  border: '1px solid #cbd5e1',
-                  backgroundColor: '#fff',
-                  color: '#475569',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: isRefreshing ? 'wait' : 'pointer',
-                }}
-              >
-                {isRefreshing ? 'Refreshing…' : 'Refresh'}
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close profile optimization panel"
-              style={{
-                border: 'none',
-                background: 'transparent',
-                color: '#64748b',
-                fontSize: 20,
-                cursor: 'pointer',
-                lineHeight: 1,
-                padding: 4,
-              }}
-            >
-              ×
-            </button>
-          </div>
-        </div>
+        <div style={panelBackgroundGlowStyle} />
 
-        {showSkeleton && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                color: '#64748b',
-                fontSize: 14,
-                marginBottom: 4,
-              }}
-            >
-              <CircularProgress size={20} sx={{ color: '#0A66C2' }} />
-              Generating profile suggestions…
-            </div>
-            {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
-              <div key={index} style={SKELETON_CARD_STYLE} aria-hidden />
-            ))}
-          </div>
-        )}
-
-        {showNoGaps && (
-          <p
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div
             style={{
-              margin: 0,
-              padding: '12px 14px',
-              borderRadius: 8,
-              backgroundColor: '#ecfdf5',
-              border: '1px solid #6ee7b7',
-              color: '#047857',
-              fontSize: 14,
-              lineHeight: 1.55,
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 16,
             }}
           >
-            {noGapsMessage}
-          </p>
-        )}
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: '#1e293b',
+                }}
+              >
+                Profile optimization suggestions
+              </h3>
+              <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b', lineHeight: 1.55 }}>
+                Five high-impact improvements based on your profile gaps and LinkedIn best
+                practices.
+              </p>
+              {updatedLabel && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                  {updatedLabel}
+                  {optimizationMeta?.source ? ` · Source: ${optimizationMeta.source}` : ''}
+                </p>
+              )}
+              {!updatedLabel && optimizationMeta?.source && (
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                  Source: {optimizationMeta.source}
+                  {typeof optimizationMeta.remaining_in_backlog === 'number' &&
+                    optimizationMeta.remaining_in_backlog > 0 &&
+                    ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
+                </p>
+              )}
+            </div>
 
-        {showCards && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {recommendations.map((item, index) => (
-              <ProfileOptimizationCard key={item.id} recommendation={item} index={index} />
-            ))}
+            {showCards && onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                aria-expanded
+                aria-controls="profile-optimization-list"
+                style={hideSuggestionsButtonStyle}
+              >
+                Hide suggestions
+              </button>
+            )}
           </div>
-        )}
+
+          {showSkeleton && (
+            <>
+              <style>{`
+                @keyframes linkedinTopicRecShimmer {
+                  0% { background-position: 200% 0; }
+                  100% { background-position: -200% 0; }
+                }
+              `}</style>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    color: '#64748b',
+                    fontSize: 14,
+                    marginBottom: 4,
+                  }}
+                >
+                  <CircularProgress size={20} sx={{ color: '#0A66C2' }} />
+                  Generating profile suggestions…
+                </div>
+                {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
+                  <div key={index} style={SKELETON_CARD_STYLE} aria-hidden />
+                ))}
+              </div>
+            </>
+          )}
+
+          {showNoGaps && (
+            <p
+              style={{
+                margin: 0,
+                padding: '12px 14px',
+                borderRadius: 8,
+                backgroundColor: '#ecfdf5',
+                border: '1px solid #6ee7b7',
+                color: '#047857',
+                fontSize: 14,
+                lineHeight: 1.55,
+              }}
+            >
+              {noGapsMessage}
+            </p>
+          )}
+
+          {showCards && (
+            <div
+              id="profile-optimization-list"
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
+              {recommendations.map((item, index) => (
+                <ProfileOptimizationCard key={item.id} recommendation={item} index={index} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
