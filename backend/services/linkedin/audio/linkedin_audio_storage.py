@@ -38,7 +38,10 @@ class LinkedInAudioStorage:
 
         self.max_file_size_mb = 15
         self.max_files_per_user = 50
-        logger.info("LinkedIn Audio Storage initialized at {}", self.base_storage_path)
+        logger.info(
+            "[LinkedInAudioGen] Storage initialized at {}",
+            self.base_storage_path,
+        )
 
     def _create_storage_directories(self) -> None:
         self.audio_path.mkdir(parents=True, exist_ok=True)
@@ -109,6 +112,13 @@ class LinkedInAudioStorage:
                 encoding="utf-8",
             )
 
+            logger.info(
+                "[LinkedInAudioGen] Stored audio_id={} path={} size={} bytes",
+                audio_id,
+                file_path,
+                len(audio_data),
+            )
+
             return {
                 "success": True,
                 "audio_id": audio_id,
@@ -116,7 +126,7 @@ class LinkedInAudioStorage:
                 "metadata": record,
             }
         except Exception as exc:
-            logger.error("Error storing LinkedIn audio: {}", exc)
+            logger.error("[LinkedInAudioGen] Error storing audio: {}", exc)
             return {"success": False, "error": f"Audio storage failed: {exc}"}
 
     async def get_metadata(self, audio_id: str, user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -159,7 +169,8 @@ class LinkedInAudioStorage:
         try:
             Path(result["audio_path"]).unlink(missing_ok=True)
             self._metadata_file(audio_id).unlink(missing_ok=True)
+            logger.info("[LinkedInAudioGen] Deleted audio_id={}", audio_id)
             return {"success": True, "message": "Audio deleted successfully"}
         except Exception as exc:
-            logger.error("Error deleting LinkedIn audio {}: {}", audio_id, exc)
+            logger.error("[LinkedInAudioGen] Error deleting audio {}: {}", audio_id, exc)
             return {"success": False, "error": str(exc)}

@@ -64,6 +64,18 @@ class LinkedInAudioService:
         """
         start_time = datetime.now()
 
+        resolved_emotion = emotion or _TONE_EMOTION_MAP.get(
+            (tone or "").lower(), _DEFAULT_EMOTION
+        )
+
+        logger.info(
+            "[LinkedInAudioGen] Starting narration user={} voice={} emotion={} target_duration={}",
+            user_id,
+            voice_id,
+            resolved_emotion,
+            target_duration_seconds,
+        )
+
         try:
             narration_text = build_narration_text(
                 text=text,
@@ -72,10 +84,23 @@ class LinkedInAudioService:
                 speed=speed,
             )
         except ValueError as exc:
+            logger.warning("[LinkedInAudioGen] Invalid narration input: {}", exc)
             return {"success": False, "error": str(exc)}
 
-        resolved_emotion = emotion or _TONE_EMOTION_MAP.get(
-            (tone or "").lower(), _DEFAULT_EMOTION
+        estimated_duration = estimate_spoken_duration_seconds(narration_text, speed)
+        preview = narration_text[:200]
+        if len(narration_text) > 200:
+            preview = f"{preview}..."
+        logger.info(
+            "[LinkedInAudioGen] Narration text ({} chars, ~{:.1f}s): {}",
+            len(narration_text),
+            estimated_duration,
+            preview,
+        )
+
+        logger.info(
+            "[LinkedInAudioGen] Delegating to provider voice={}",
+            voice_id,
         )
 
         try:
@@ -93,10 +118,9 @@ class LinkedInAudioService:
         except HTTPException:
             raise
         except Exception as exc:
-            logger.error("LinkedIn audio generation failed: {}", exc, exc_info=True)
+            logger.error("[LinkedInAudioGen] Provider generation failed: {}", exc, exc_info=True)
             return {"success": False, "error": f"Audio generation failed: {exc}"}
 
-        estimated_duration = estimate_spoken_duration_seconds(narration_text, speed)
         generation_time = (datetime.now() - start_time).total_seconds()
 
         storage_result = await self.storage.store_audio(
@@ -119,12 +143,22 @@ class LinkedInAudioService:
         )
 
         if not storage_result.get("success"):
+            logger.error(
+                "[LinkedInAudioGen] Storage failed: {}",
+                storage_result.get("error", "unknown"),
+            )
             return {
                 "success": False,
                 "error": storage_result.get("error", "Failed to store audio"),
             }
 
         audio_id = storage_result["audio_id"]
+        logger.info(
+            "[LinkedInAudioGen] Complete audio_id={} file_size={} generation_time={:.2f}s",
+            audio_id,
+            audio_result.file_size,
+            generation_time,
+        )
         return {
             "success": True,
             "audio_id": audio_id,

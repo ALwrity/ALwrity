@@ -150,6 +150,7 @@ def setup_clean_logging():
             'content_analyzer',
             'linkedin_prompt_generator',
             'linkedin_image_storage',
+            'linkedin_audio_storage',
             'hallucination_detector',
             'writing_assistant',
             'enhanced_linguistic_analyzer',
@@ -200,6 +201,24 @@ def setup_clean_logging():
             level="INFO",
             format=common_format,
             filter=video_generation_filter,
+            backtrace=True,
+            diagnose=True,
+        )
+
+        def linkedin_audio_filter(record):
+            msg = record.get("message", "")
+            name = record.get("name", "")
+            return (
+                "[LinkedInAudioGen]" in msg
+                or "api.linkedin_audio_generation" in name
+                or "services.linkedin.audio" in name
+            )
+
+        logger.add(
+            sys.stdout.write,
+            level="INFO",
+            format=common_format,
+            filter=linkedin_audio_filter,
             backtrace=True,
             diagnose=True,
         )

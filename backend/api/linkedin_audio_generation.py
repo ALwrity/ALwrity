@@ -78,6 +78,18 @@ async def generate_audio_narration(
             else str(request.tone or "professional")
         )
 
+        text_len = len(request.text or "")
+        has_script = request.video_script is not None
+        logger.info(
+            "[LinkedInAudioGen] Request user={} voice={} target_duration={} "
+            "text_len={} has_script={}",
+            user_id,
+            request.voice_id or "default",
+            request.target_duration_seconds,
+            text_len,
+            has_script,
+        )
+
         result = await linkedin_audio_service.generate_narration(
             user_id=user_id,
             text=request.text,
@@ -106,6 +118,12 @@ async def generate_audio_narration(
         duration = time.time() - start_time
         background_tasks.add_task(log_api_request, http_request, db, duration, 200)
 
+        logger.info(
+            "[LinkedInAudioGen] Complete audio_id={} elapsed={:.2f}s",
+            result.get("audio_id"),
+            duration,
+        )
+
         meta = result.get("metadata") or {}
         return LinkedInAudioNarrationResponse(
             success=True,
@@ -118,7 +136,7 @@ async def generate_audio_narration(
         raise
     except Exception as exc:
         duration = time.time() - start_time
-        logger.error("Error generating LinkedIn audio narration: {}", exc)
+        logger.error("[LinkedInAudioGen] Error generating audio narration: {}", exc)
         background_tasks.add_task(log_api_request, http_request, db, duration, 500)
         raise HTTPException(
             status_code=500,
@@ -151,6 +169,14 @@ async def generate_audio_from_script_request(
     try:
         user_id = resolve_linkedin_user_id(current_user, http_request)
 
+        target_duration = min(max(getattr(request, "video_duration", 60), 30), 90)
+        logger.info(
+            "[LinkedInAudioGen] Script+audio request user={} topic={} target_duration={}",
+            user_id,
+            request.topic,
+            target_duration,
+        )
+
         script_response = await linkedin_service.generate_linkedin_video_script(request)
         if not script_response.success or not script_response.data:
             raise HTTPException(
@@ -161,7 +187,6 @@ async def generate_audio_from_script_request(
                 ),
             )
 
-        target_duration = min(max(getattr(request, "video_duration", 60), 30), 90)
         tone_value = (
             request.tone.value if hasattr(request.tone, "value") else str(request.tone)
         )
@@ -187,6 +212,12 @@ async def generate_audio_from_script_request(
         duration = time.time() - start_time
         background_tasks.add_task(log_api_request, http_request, db, duration, 200)
 
+        logger.info(
+            "[LinkedInAudioGen] Complete audio_id={} elapsed={:.2f}s",
+            result.get("audio_id"),
+            duration,
+        )
+
         meta = result.get("metadata") or {}
         return LinkedInAudioNarrationResponse(
             success=True,
@@ -199,7 +230,7 @@ async def generate_audio_from_script_request(
         raise
     except Exception as exc:
         duration = time.time() - start_time
-        logger.error("Error generating LinkedIn audio from script: {}", exc)
+        logger.error("[LinkedInAudioGen] Error generating audio from script: {}", exc)
         background_tasks.add_task(log_api_request, http_request, db, duration, 500)
         raise HTTPException(
             status_code=500,
@@ -221,15 +252,21 @@ async def get_linkedin_audio(
 ):
     user_id = resolve_linkedin_user_id_optional(current_user)
 
-    result = await linkedin_audio_storage.retrieve_audio(audio_id, user_id)
-    if not result.get("success") or not result.get("audio_path"):
-        raise HTTPException(status_code=404, detail="Audio not found")
+    try:
+        result = await linkedin_audio_storage.retrieve_audio(audio_id, user_id)
+        if not result.get("success") or not result.get("audio_path"):
+            raise HTTPException(status_code=404, detail="Audio not found")
 
-    return FileResponse(
-        path=result["audio_path"],
-        media_type="audio/mpeg",
-        filename=f"{audio_id}.mp3",
-    )
+        return FileResponse(
+            path=result["audio_path"],
+            media_type="audio/mpeg",
+            filename=f"{audio_id}.mp3",
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[LinkedInAudioGen] Error retrieving audio {}: {}", audio_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to retrieve audio")
 
 
 @router.get(
@@ -243,11 +280,15 @@ async def get_linkedin_audio_status(
 ):
     user_id = resolve_linkedin_user_id_optional(current_user)
 
-    metadata = await linkedin_audio_storage.get_metadata(audio_id, user_id)
-    if not metadata:
-        return {"success": False, "status": "not_found", "error": "Audio not found"}
+    try:
+        metadata = await linkedin_audio_storage.get_metadata(audio_id, user_id)
+        if not metadata:
+            return {"success": False, "status": "not_found", "error": "Audio not found"}
 
-    return {"success": True, "status": "completed", "metadata": metadata}
+        return {"success": True, "status": "completed", "metadata": metadata}
+    except Exception as exc:
+        logger.error("[LinkedInAudioGen] Error checking audio status {}: {}", audio_id, exc)
+        return {"success": False, "status": "error", "error": str(exc)}
 
 
 @router.delete(
@@ -261,7 +302,13 @@ async def delete_linkedin_audio(
 ):
     user_id = resolve_linkedin_user_id_optional(current_user)
 
-    result = await linkedin_audio_storage.delete_audio(audio_id, user_id)
-    if not result.get("success"):
-        raise HTTPException(status_code=404, detail=result.get("error", "Audio not found"))
-    return result
+    try:
+        result = await linkedin_audio_storage.delete_audio(audio_id, user_id)
+        if not result.get("success"):
+            raise HTTPException(status_code=404, detail=result.get("error", "Audio not found"))
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("[LinkedInAudioGen] Error deleting audio {}: {}", audio_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to delete audio")
