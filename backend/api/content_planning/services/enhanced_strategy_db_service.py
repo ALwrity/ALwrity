@@ -73,7 +73,17 @@ class EnhancedStrategyDBService:
     async def create_enhanced_strategy(self, strategy_data: Dict[str, Any]) -> Optional[EnhancedContentStrategy]:
         """Create a new enhanced strategy."""
         try:
-            strategy = EnhancedContentStrategy(**strategy_data)
+            # The public API still uses 'performance_metrics' as the JSON
+            # column key, but the SQLAlchemy attribute on the model was
+            # renamed to 'performance_metrics_data' to avoid colliding
+            # with the StrategyPerformanceMetrics relationship (which
+            # also goes by 'performance_metrics' on the model). Remap
+            # before passing to the constructor so we don't try to
+            # assign the JSON dict to the relationship slot.
+            data = dict(strategy_data)
+            if 'performance_metrics' in data:
+                data['performance_metrics_data'] = data.pop('performance_metrics')
+            strategy = EnhancedContentStrategy(**data)
             self.db.add(strategy)
             self.db.commit()
             self.db.refresh(strategy)
@@ -83,17 +93,43 @@ class EnhancedStrategyDBService:
             self.db.rollback()
             return None
     
-    async def update_enhanced_strategy(self, strategy_id: int, update_data: Dict[str, Any]) -> Optional[EnhancedContentStrategy]:
-        """Update an enhanced strategy."""
+    async def update_enhanced_strategy(
+        self,
+        strategy_id: int,
+        update_data: Dict[str, Any],
+        user_id: Optional[str] = None,
+    ) -> Optional[EnhancedContentStrategy]:
+        """Update an enhanced strategy.
+
+        The ``user_id`` argument enforces tenant ownership. When
+        provided, the strategy is loaded through
+        ``get_enhanced_strategy(strategy_id, user_id)`` which
+        returns ``None`` if the record does not exist OR does not
+        belong to the user. Either case surfaces as a 404 at the
+        route, which is the right behaviour -- the caller cannot
+        distinguish "not yours" from "not real" because doing so
+        would leak the existence of other users' strategy IDs.
+
+        Pass ``user_id=None`` to skip the ownership check (admin
+        / internal flows only). Production routes must always
+        pass a real user id.
+        """
         try:
-            strategy = await self.get_enhanced_strategy(strategy_id)
+            strategy = await self.get_enhanced_strategy(strategy_id, user_id=user_id)
             if not strategy:
                 return None
-            
+
+            # Remap the public-API key 'performance_metrics' (the JSON
+            # column) to the renamed attribute 'performance_metrics_data'.
+            # The relationship slot on the model is also named
+            # 'performance_metrics' but expects a list of
+            # StrategyPerformanceMetrics records, not a JSON dict, so
+            # the setattr loop must not stomp it.
             for key, value in update_data.items():
-                if hasattr(strategy, key):
-                    setattr(strategy, key, value)
-            
+                target_key = 'performance_metrics_data' if key == 'performance_metrics' else key
+                if hasattr(strategy, target_key):
+                    setattr(strategy, target_key, value)
+
             strategy.updated_at = datetime.utcnow()
             self.db.commit()
             self.db.refresh(strategy)
@@ -102,14 +138,21 @@ class EnhancedStrategyDBService:
             logger.error(f"Error updating enhanced strategy {strategy_id}: {str(e)}")
             self.db.rollback()
             return None
-    
-    async def delete_enhanced_strategy(self, strategy_id: int) -> bool:
-        """Delete an enhanced strategy."""
+
+    async def delete_enhanced_strategy(
+        self,
+        strategy_id: int,
+        user_id: Optional[str] = None,
+    ) -> bool:
+        """Delete an enhanced strategy.
+
+        Same ownership semantics as ``update_enhanced_strategy``.
+        """
         try:
-            strategy = await self.get_enhanced_strategy(strategy_id)
+            strategy = await self.get_enhanced_strategy(strategy_id, user_id=user_id)
             if not strategy:
                 return False
-            
+
             self.db.delete(strategy)
             self.db.commit()
             return True
@@ -210,12 +253,20 @@ class EnhancedStrategyDBService:
     async def search_enhanced_strategies(self, user_id: str, search_term: str) -> List[EnhancedContentStrategy]:
         """Search enhanced strategies by name or industry."""
         try:
+            # Escape SQL LIKE wildcards in the user-supplied search
+            # term before building the pattern. Without this, a user
+            # passing '%' or '_' would have the LIKE pattern match
+            # broadly (e.g. '%' alone matches every strategy they
+            # own). The escape uses '\' as the ESCAPE character, so
+            # we also escape '\' itself.
+            escaped = search_term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{escaped}%"
             return self.db.query(EnhancedContentStrategy).filter(
                 and_(
                     EnhancedContentStrategy.user_id == user_id,
                     or_(
-                        EnhancedContentStrategy.name.ilike(f"%{search_term}%"),
-                        EnhancedContentStrategy.industry.ilike(f"%{search_term}%")
+                        EnhancedContentStrategy.name.ilike(pattern, escape="\\"),
+                        EnhancedContentStrategy.industry.ilike(pattern, escape="\\")
                     )
                 )
             ).all()

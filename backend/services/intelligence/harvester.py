@@ -57,8 +57,23 @@ class SemanticHarvesterService:
             if not self.exa_service.enabled:
                 self.exa_service._try_initialize()
                 if not self.exa_service.enabled:
-                     logger.warning("[SemanticHarvester] Exa service disabled. Returning placeholder data.")
-                     return self._get_placeholder_data(website_url)
+                    # Phase 5 / Issue #617 #4: fail fast instead of
+                    # returning fabricated "Sample Page 1" data.
+                    # Pre-#4 the harvester silently produced a fake
+                    # document, which got indexed into the SIF
+                    # index and then surfaced in production search
+                    # results. Now we return an empty list and
+                    # log a clear warning so operators see that
+                    # Exa is the missing piece. The user can
+                    # configure Exa (or a future provider) to
+                    # actually harvest content.
+                    logger.warning(
+                        "[SemanticHarvester] Exa service disabled. "
+                        "Returning empty harvest; configure Exa in the "
+                        "user's integrations to enable content harvesting. "
+                        "(Issue #617 #4: was returning placeholder data.)"
+                    )
+                    return []
 
             # Preflight subscription check if user_id provided
             if user_id:
@@ -147,17 +162,6 @@ class SemanticHarvesterService:
             logger.error(f"[SemanticHarvester] Failed to harvest {website_url}: {e}")
             logger.error(f"[SemanticHarvester] Full traceback: {traceback.format_exc()}")
             return []
-
-    def _get_placeholder_data(self, website_url: str) -> List[Dict[str, Any]]:
-        """Return placeholder data for testing."""
-        return [
-            {
-                "url": f"{website_url}/page1",
-                "title": "Sample Page 1",
-                "content": "This is sample content from page 1",
-                "metadata": {"word_count": 100}
-            }
-        ]
 
     async def harvest_competitors(self, competitor_urls: List[str], pages_per_competitor: int = 10) -> List[Dict[str, Any]]:
         """Harvest content from multiple competitors with detailed logging."""

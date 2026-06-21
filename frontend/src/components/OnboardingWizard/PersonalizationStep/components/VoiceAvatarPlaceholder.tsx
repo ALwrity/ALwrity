@@ -27,6 +27,7 @@ import { createVoiceClone, createVoiceDesign, getLatestVoiceClone, setBrandVoice
 import { setCachedVoiceCloneInfo } from '../../../../services/podcastApi';
 import { getAuthTokenGetter, getApiUrl } from '../../../../api/client';
 import { OperationButton } from '../../../shared/OperationButton';
+import { UsedInStrip } from '../../PersonaStep/UsedInStrip';
 
 const pulse = keyframes`
   0% { transform: scale(1); }
@@ -303,7 +304,7 @@ export const VoiceAvatarPlaceholder: React.FC<{ domainName?: string; onVoiceSet?
               voice_description: voiceDescription
           });
           if (resp.success) {
-              setSuccess('Voice generated successfully. Use this for generating your Brand Voice.');
+              setSuccess('Brand voice saved. It will be used across all your ALwrity tools.');
               // Persist selection state locally
               try {
                 localStorage.setItem('brand_voice_selection', JSON.stringify({
@@ -591,7 +592,7 @@ export const VoiceAvatarPlaceholder: React.FC<{ domainName?: string; onVoiceSet?
         languageBoost,
       });
       if (resp.success) {
-        setSuccess('Voice generated successfully. Use this for generating your Brand Voice.');
+        setSuccess('Brand voice saved. It will be used across all your ALwrity tools.');
         setResultAudioUrl(resp.preview_audio_url || null);
         // Persist to cross-phase cache so Write phase can use it immediately
         setCachedVoiceCloneInfo({
@@ -643,10 +644,16 @@ export const VoiceAvatarPlaceholder: React.FC<{ domainName?: string; onVoiceSet?
   return (
     <Box sx={{ py: 1, px: 0, minHeight: '100%' }}>
       <Stack spacing={1.5}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6" sx={{ color: '#111827', fontWeight: 800, letterSpacing: '-0.02em', fontSize: '1rem' }}>
-            Voice Clone {domainName ? domainName : ''}
-          </Typography>
+        <Box>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box>
+              <Typography variant="h6" sx={{ color: '#111827', fontWeight: 800, letterSpacing: '-0.02em', fontSize: '1rem' }}>
+                Voice Clone {domainName ? `for ${domainName}` : ''}
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+                Your speaking voice — used in every podcast intro, video narration, and audio article.
+              </Typography>
+            </Box>
           <Stack direction="row" spacing={1}>
             <Button
               startIcon={<HelpOutline sx={{ fontSize: 14 }} />}
@@ -694,6 +701,13 @@ export const VoiceAvatarPlaceholder: React.FC<{ domainName?: string; onVoiceSet?
               />
             </Tooltip>
           </Stack>
+          </Box>
+          <Box sx={{ pl: 0.5, mb: 0.5 }}>
+            <UsedInStrip
+              size="sm"
+              tools={['podcast', 'video', 'blog', 'linkedin']}
+            />
+          </Box>
         </Box>
 
         <Paper sx={cardSx} elevation={0}>

@@ -30,6 +30,44 @@ from ....utils.constants import ERROR_MESSAGES, SUCCESS_MESSAGES
 
 router = APIRouter(tags=["AI Strategy Generation"])
 
+# Strategy generation tasks are tracked in an in-memory dict
+# (generate_comprehensive_strategy_polling._task_status). The dict
+# is created on first POST and never cleaned up -- every task adds
+# an entry, and nothing ever removes one, so the dict grows
+# monotonically for the lifetime of the worker process. A long-
+# running deployment (or a process that handles many strategy
+# generations) accumulates stale entries forever and slowly leaks
+# memory.
+#
+# Fix: store an expiry timestamp alongside each task, and prune
+# expired entries on every read/write. The TTL is generous
+# (1 hour) so slow AI generations still have time to finish, and
+# the GET path already returns 404 for missing tasks, so a pruned
+# expired task surfaces the same way to the client.
+TASK_STATUS_TTL_SECONDS = 3600
+
+
+def _prune_expired_tasks() -> None:
+    """Remove expired task entries from the in-memory store.
+
+    Called lazily on every read/write so we do not need a
+    background sweep thread. Expired entries are deleted from
+    both the status dict and the parallel expires-at dict; the
+    function is a no-op if the store has not been initialised
+    yet or is empty.
+    """
+    store = getattr(generate_comprehensive_strategy_polling, "_task_status", None)
+    if not store:
+        return
+    expires_at = getattr(generate_comprehensive_strategy_polling, "_task_expires_at", None)
+    if not expires_at:
+        return
+    now = datetime.utcnow().timestamp()
+    expired = [task_id for task_id, exp in expires_at.items() if exp <= now]
+    for task_id in expired:
+        store.pop(task_id, None)
+        expires_at.pop(task_id, None)
+
 # Helper function to get database session
 def get_db():
     db = get_db_session()
@@ -381,8 +419,18 @@ async def generate_comprehensive_strategy_polling(
         # Store status in memory (in production, use Redis or database)
         if not hasattr(generate_comprehensive_strategy_polling, '_task_status'):
             generate_comprehensive_strategy_polling._task_status = {}
-        
+        if not hasattr(generate_comprehensive_strategy_polling, '_task_expires_at'):
+            generate_comprehensive_strategy_polling._task_expires_at = {}
+
+        # Prune any tasks that have outlived their TTL before
+        # adding a new one, so the in-memory store cannot grow
+        # without bound.
+        _prune_expired_tasks()
+
         generate_comprehensive_strategy_polling._task_status[task_id] = generation_status
+        generate_comprehensive_strategy_polling._task_expires_at[task_id] = (
+            datetime.utcnow().timestamp() + TASK_STATUS_TTL_SECONDS
+        )
         
         # Start background task
         async def generate_strategy_background():
@@ -625,16 +673,20 @@ async def get_strategy_generation_status_by_task(
     """Get the status of strategy generation for a specific task."""
     try:
         logger.info(f"Getting strategy generation status for task: {task_id}")
-        
+
+        # Prune any tasks that have outlived their TTL so the
+        # lookup below cannot return a stale entry.
+        _prune_expired_tasks()
+
         # Check if task status exists
         if not hasattr(generate_comprehensive_strategy_polling, '_task_status'):
             raise HTTPException(
                 status_code=404,
                 detail="No task status found. Task may have expired or never existed."
             )
-        
+
         task_status = generate_comprehensive_strategy_polling._task_status.get(task_id)
-        
+
         if not task_status:
             raise HTTPException(
                 status_code=404,
@@ -741,6 +793,11 @@ async def get_latest_generated_strategy(
                 message="No strategy generation tasks found",
                 status_code=200
             )
+
+        # Prune any tasks that have outlived their TTL before
+        # iterating, so the fallback path cannot return a stale
+        # entry that should have been cleaned up.
+        _prune_expired_tasks()
         
         # Debug: Log all task statuses
         logger.info(f"📊 Total tasks in storage: {len(generate_comprehensive_strategy_polling._task_status)}")

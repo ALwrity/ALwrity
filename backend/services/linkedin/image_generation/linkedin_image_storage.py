@@ -158,6 +158,11 @@ class LinkedInImageStorage:
             await self._update_storage_stats()
             
             storage_time = (datetime.now() - start_time).total_seconds()
+
+            logger.info(
+                f"[LinkedInImageGen] Stored image_id={image_id} path={storage_path} "
+                f"size={len(image_data)} bytes elapsed={storage_time:.2f}s"
+            )
             
             return {
                 'success': True,

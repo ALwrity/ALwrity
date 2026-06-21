@@ -30,7 +30,7 @@ class PromptEngineeringService:
         - Implementation Timeline: {strategy.implementation_timeline}
         - Market Share: {strategy.market_share}
         - Competitive Position: {strategy.competitive_position}
-        - Performance Metrics: {strategy.performance_metrics}
+        - Performance Metrics: {strategy.performance_metrics_data}
         
         Audience Intelligence:
         - Content Preferences: {strategy.content_preferences}

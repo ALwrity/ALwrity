@@ -64,6 +64,31 @@ ERROR_CODES = {
 def error_response(code: str, message: str) -> dict:
     return {"code": code, "message": message}
 
+
+def _extract_clerk_user_id(
+    current_user: Optional[Dict[str, Any]], http_request: Request
+) -> Optional[str]:
+    if current_user:
+        return str(
+            current_user.get('clerk_user_id')
+            or current_user.get('id')
+            or current_user.get('sub')
+            or ''
+        ) or None
+    return http_request.headers.get("X-User-ID") or None
+
+
+def _require_clerk_user_id(
+    current_user: Optional[Dict[str, Any]], http_request: Request
+) -> str:
+    user_id = _extract_clerk_user_id(current_user, http_request)
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail=error_response('VALIDATION', "Authentication required. Please provide Clerk user ID."),
+        )
+    return user_id
+
 # Initialize router
 router = APIRouter(
     prefix="/api/linkedin",
@@ -153,11 +178,7 @@ async def generate_post(
             raise HTTPException(status_code=422, detail=error_response(ERROR_CODES['VALIDATION'], "Industry cannot be empty"))
         
         # Extract user_id
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
+        user_id = _require_clerk_user_id(current_user, http_request)
         
         # Rate limit check
         retry_after = check_rate_limit(user_id or 'anonymous')
@@ -169,7 +190,7 @@ async def generate_post(
             )
         
         # Generate post content
-        response = await linkedin_service.generate_linkedin_post(request)
+        response = await linkedin_service.generate_linkedin_post(request, user_id=user_id)
         
         if not response.success:
             raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Post generation failed"))
@@ -270,11 +291,7 @@ async def generate_article(
             raise HTTPException(status_code=422, detail=error_response(ERROR_CODES['VALIDATION'], "Industry cannot be empty"))
         
         # Extract user_id
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
+        user_id = _require_clerk_user_id(current_user, http_request)
         
         # Rate limit check
         retry_after = check_rate_limit(user_id or 'anonymous')
@@ -282,7 +299,7 @@ async def generate_article(
             raise HTTPException(status_code=429, detail=error_response(ERROR_CODES['RATE_LIMITED'], f"Rate limit exceeded. Retry after {retry_after} seconds."), headers={"Retry-After": str(retry_after)})
         
         # Generate article content
-        response = await linkedin_service.generate_linkedin_article(request)
+        response = await linkedin_service.generate_linkedin_article(request, user_id=user_id)
         
         if not response.success:
             raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Article generation failed"))
@@ -387,11 +404,7 @@ async def generate_carousel(
             raise HTTPException(status_code=422, detail=error_response(ERROR_CODES['VALIDATION'], "Number of slides must be between 3 and 15"))
         
         # Extract user_id
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
+        user_id = _require_clerk_user_id(current_user, http_request)
         
         # Rate limit check
         retry_after = check_rate_limit(user_id or 'anonymous')
@@ -399,7 +412,7 @@ async def generate_carousel(
             raise HTTPException(status_code=429, detail=error_response(ERROR_CODES['RATE_LIMITED'], f"Rate limit exceeded. Retry after {retry_after} seconds."), headers={"Retry-After": str(retry_after)})
         
         # Generate carousel content
-        response = await linkedin_service.generate_linkedin_carousel(request)
+        response = await linkedin_service.generate_linkedin_carousel(request, user_id=user_id)
         
         if not response.success:
             raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Carousel generation failed"))
@@ -482,14 +495,10 @@ async def generate_carousel_pdf(
     start_time = time.time()
 
     try:
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
+        user_id = _require_clerk_user_id(current_user, http_request)
 
         # First generate carousel content
-        content_result = await linkedin_service.generate_linkedin_carousel(request)
+        content_result = await linkedin_service.generate_linkedin_carousel(request, user_id=user_id)
 
         if not content_result.success or not content_result.data:
             raise HTTPException(status_code=500, detail=content_result.error or "Carousel generation failed")
@@ -575,11 +584,7 @@ async def generate_video_script(
             raise HTTPException(status_code=422, detail=error_response(ERROR_CODES['VALIDATION'], "Video length must be between 15 and 300 seconds"))
         
         # Extract user_id
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
+        user_id = _require_clerk_user_id(current_user, http_request)
         
         # Rate limit check
         retry_after = check_rate_limit(user_id or 'anonymous')
@@ -587,7 +592,7 @@ async def generate_video_script(
             raise HTTPException(status_code=429, detail=error_response(ERROR_CODES['RATE_LIMITED'], f"Rate limit exceeded. Retry after {retry_after} seconds."), headers={"Retry-After": str(retry_after)})
         
         # Generate video script content
-        response = await linkedin_service.generate_linkedin_video_script(request)
+        response = await linkedin_service.generate_linkedin_video_script(request, user_id=user_id)
         
         if not response.success:
             raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Video script generation failed"))
@@ -701,11 +706,7 @@ async def generate_comment_response(
             raise HTTPException(status_code=422, detail=error_response(ERROR_CODES['VALIDATION'], "Post context cannot be empty"))
         
         # Extract user_id
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
-        if not user_id:
-            user_id = http_request.headers.get("X-User-ID") or http_request.headers.get("Authorization")
+        user_id = _require_clerk_user_id(current_user, http_request)
         
         # Rate limit check
         retry_after = check_rate_limit(user_id or 'anonymous')
@@ -713,7 +714,7 @@ async def generate_comment_response(
             raise HTTPException(status_code=429, detail=error_response(ERROR_CODES['RATE_LIMITED'], f"Rate limit exceeded. Retry after {retry_after} seconds."), headers={"Retry-After": str(retry_after)})
         
         # Generate comment response
-        response = await linkedin_service.generate_linkedin_comment_response(request)
+        response = await linkedin_service.generate_linkedin_comment_response(request, user_id=user_id)
         
         if not response.success:
             raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Comment response generation failed"))
@@ -843,9 +844,11 @@ async def edit_linkedin_content(
     """Edit LinkedIn content using AI-powered text generation."""
     try:
         # Extract user_id for subscription checking
-        user_id = None
-        if current_user:
-            user_id = str(current_user.get('id', '') or current_user.get('sub', ''))
+        user_id = _extract_clerk_user_id(current_user, http_request)
+        if not user_id:
+            return LinkedInEditContentResponse(
+                success=False, error="Authentication required", edit_type=request.edit_type
+            )
         
         if not request.content.strip():
             return LinkedInEditContentResponse(

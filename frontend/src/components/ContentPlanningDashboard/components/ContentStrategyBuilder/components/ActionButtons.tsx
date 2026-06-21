@@ -8,6 +8,7 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
+import { useUser } from '@clerk/clerk-react';
 import { ActionButtonsProps, ActionButtonsBusinessLogicProps } from '../types/contentStrategy.types';
 import { useContentPlanningStore } from '../../../../../stores/contentPlanningStore';
 
@@ -32,6 +33,9 @@ export const useActionButtonsBusinessLogic = ({
   
   // Get the content planning store to cache the latest generated strategy
   const { setLatestGeneratedStrategy } = useContentPlanningStore();
+  // Resolve the active Clerk user so payloads carry the right tenant id
+  // (the previous hardcoded `user_id: 1` was a multi-tenant collision).
+  const { user } = useUser();
   
   const handleCreateStrategy = async () => {
     try {
@@ -56,7 +60,7 @@ export const useActionButtonsBusinessLogic = ({
         const strategyData = {
           ...formData,
           completion_percentage: completionStats.completion_percentage,
-          user_id: 1, // This would come from auth context
+          user_id: user?.id ?? null,
           name: formData.name || 'Enhanced Content Strategy',
           industry: formData.industry || 'General'
         };
@@ -101,7 +105,7 @@ export const useActionButtonsBusinessLogic = ({
 
       // Start polling-based strategy generation with actual strategy data
       const generationResult = await contentPlanningApi.startStrategyGenerationPolling(
-        strategyData.user_id || 1, 
+        Number(strategyData.user_id) || Number(user?.id),
         strategyData.name || 'Enhanced Content Strategy'
       );
       console.log('Strategy generation started:', generationResult);
@@ -211,19 +215,22 @@ export const useActionButtonsBusinessLogic = ({
       const strategyData = {
         ...formData,
         completion_percentage: completionStats.completion_percentage,
-        user_id: 1,
+        user_id: user?.id ?? null,
         name: formData.name || 'Enhanced Content Strategy',
         industry: formData.industry || 'General'
       };
       
       const newStrategy = await createEnhancedStrategy(strategyData);
       setCurrentStrategy(newStrategy);
-      
+
       // Update the cache with the saved strategy
       setLatestGeneratedStrategy(newStrategy);
-      console.log('💾 Updated cache with saved strategy');
-      
-      setError('Strategy saved successfully!');
+      console.log('💾 Updated cache with saved strategy', { userId: user?.id });
+
+      // Note: success is signalled by the setCurrentStrategy state
+      // change above; we deliberately do NOT call setError on the
+      // success path (it would trip the red error banner and
+      // pollute the error filter).
     } catch (err: any) {
       setError(`Error saving strategy: ${err.message || 'Unknown error'}`);
     } finally {

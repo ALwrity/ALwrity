@@ -86,6 +86,7 @@ const WorkflowProgressBar: React.FC<WorkflowProgressBarProps> = ({
     const summary = currentWorkflow?.provenanceSummary;
     if (!summary) return 'Daily Workflow';
     if (summary.generationMode === 'agent_committee') return 'Personalized by Agents';
+    if (summary.generationMode === 'llm_pillar_backfill') return 'AI-Assisted Plan';
     if (summary.generationMode === 'llm_generation' && !summary.fallbackUsed) return 'AI Personalized Guide';
     if (summary.fallbackUsed || summary.generationMode === 'controlled_fallback') return 'Baseline Daily Guide';
     return 'Daily Workflow';

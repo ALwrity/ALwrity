@@ -770,6 +770,22 @@ async def startup_event():
     try:
         _log_memory_usage()
         
+        # Phase 3.6: surface silent FILE_ENCRYPTION_SALT misconfiguration.
+        # Runs in non-strict mode so dev environments without the env var
+        # keep working; a clear warning is logged instead. Operators who
+        # need hard-fail behavior can set FILE_ENCRYPTION_SALT in the env.
+        try:
+            from services.intelligence.agent_flat_context import (
+                validate_file_encryption_salt,
+            )
+            salt_ok = validate_file_encryption_salt(strict=False)
+            if salt_ok:
+                logger.info("[STARTUP] FILE_ENCRYPTION_SALT validated (Phase 3.6)")
+        except Exception as salt_check_err:
+            logger.warning(
+                f"[STARTUP] Phase 3.6 salt check failed: {salt_check_err}"
+            )
+
         # Note: Pricing is initialized per-user in services/database.py:init_user_database()
         # which runs on first database access for each user. No global seeding needed at startup.
         

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import { Box, Button, TextField, Typography, Card, CardContent, CircularProgress, Alert, MenuItem, Divider } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveIcon from '@mui/icons-material/Save';
@@ -82,6 +83,10 @@ const BusinessDescriptionStep: React.FC<BusinessDescriptionStepProps> = ({ onBac
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   // const [showExamples, setShowExamples] = useState(false);
+  // Resolve the active Clerk user so the business info write carries
+  // the correct tenant id (the previous `const userId = 1;` was a
+  // multi-tenant collision).
+  const { user } = useUser();
 
   useEffect(() => {
     console.log('🔄 BusinessDescriptionStep mounted. Loading cached data...');
@@ -116,9 +121,7 @@ const BusinessDescriptionStep: React.FC<BusinessDescriptionStepProps> = ({ onBac
     console.log('🚀 Attempting to save business info:', derivedBusinessInfo);
 
     try {
-      // Simulate user_id for now, replace with actual user_id from auth context later
-      const userId = 1; 
-      const dataToSave = { ...derivedBusinessInfo, user_id: userId };
+      const dataToSave = { ...derivedBusinessInfo, user_id: user?.id ? Number(user.id) : undefined };
 
       const response = await businessInfoApi.saveBusinessInfo(dataToSave);
       console.log('✅ Business info saved to DB:', response);

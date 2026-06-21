@@ -279,12 +279,47 @@ def gemini_pro_text_gen(prompt, temperature=0.7, top_p=0.9, top_k=40, max_tokens
         return str(e)
 
 def _dict_to_types_schema(schema: Dict[str, Any]) -> types.Schema:
-    """Convert a lightweight dict schema to google.genai.types.Schema."""
+    """Convert a JSON schema dict to google.genai.types.Schema."""
     if not isinstance(schema, dict):
         raise ValueError("response_schema must be a dict compatible with types.Schema")
 
+    defs: Dict[str, Any] = {}
+    if isinstance(schema.get("$defs"), dict):
+        defs.update(schema["$defs"])
+    if isinstance(schema.get("definitions"), dict):
+        defs.update(schema["definitions"])
+
+    def _resolve_ref(node: Dict[str, Any]) -> Dict[str, Any]:
+        ref = node.get("$ref")
+        if not isinstance(ref, str) or not ref.startswith("#/"):
+            return node
+
+        parts = ref.lstrip("#/").split("/")
+        if parts and parts[0] in ("$defs", "definitions"):
+            parts = parts[1:]
+
+        target: Any = defs
+        for part in parts:
+            if isinstance(target, dict) and part in target:
+                target = target[part]
+            else:
+                logger.warning(
+                    "Gemini schema $ref could not be resolved ref={} part={}",
+                    ref,
+                    part,
+                )
+                return node
+        return target if isinstance(target, dict) else node
+
     def _convert(node: Dict[str, Any]) -> types.Schema:
+        if not isinstance(node, dict):
+            return types.Schema(type=types.Type.STRING)
+
+        if "$ref" in node:
+            node = _resolve_ref(node)
+
         node_type = (node.get("type") or "OBJECT").upper()
+
         if node_type == "OBJECT":
             props = node.get("properties") or {}
             props_types: Dict[str, types.Schema] = {}
@@ -293,22 +328,50 @@ def _dict_to_types_schema(schema: Dict[str, Any]) -> types.Schema:
                     props_types[key] = _convert(prop)
                 else:
                     props_types[key] = types.Schema(type=types.Type.STRING)
-            return types.Schema(type=types.Type.OBJECT, properties=props_types if props_types else None)
-        elif node_type == "ARRAY":
+            kwargs: Dict[str, Any] = {
+                "type": types.Type.OBJECT,
+                "properties": props_types if props_types else None,
+            }
+            required = node.get("required")
+            if isinstance(required, list):
+                kwargs["required"] = [str(item) for item in required]
+            return types.Schema(**kwargs)
+
+        if node_type == "ARRAY":
             items_node = node.get("items")
-            if isinstance(items_node, dict):
-                item_schema = _convert(items_node)
-            else:
-                item_schema = types.Schema(type=types.Type.STRING)
-            return types.Schema(type=types.Type.ARRAY, items=item_schema)
-        elif node_type == "NUMBER":
+            item_schema = (
+                _convert(items_node)
+                if isinstance(items_node, dict)
+                else types.Schema(type=types.Type.STRING)
+            )
+            kwargs: Dict[str, Any] = {"type": types.Type.ARRAY, "items": item_schema}
+            if isinstance(node.get("minItems"), int):
+                kwargs["minItems"] = node["minItems"]
+            if isinstance(node.get("maxItems"), int):
+                kwargs["maxItems"] = node["maxItems"]
+            return types.Schema(**kwargs)
+
+        if node_type == "STRING":
+            kwargs: Dict[str, Any] = {"type": types.Type.STRING}
+            enum_values = node.get("enum")
+            if isinstance(enum_values, list):
+                kwargs["enum"] = [str(value) for value in enum_values]
+            return types.Schema(**kwargs)
+
+        if node_type == "NUMBER":
             return types.Schema(type=types.Type.NUMBER)
-        elif node_type == "INTEGER":
+        if node_type == "INTEGER":
             return types.Schema(type=types.Type.NUMBER)
-        elif node_type == "BOOLEAN":
+        if node_type == "BOOLEAN":
             return types.Schema(type=types.Type.BOOLEAN)
-        else:
-            return types.Schema(type=types.Type.STRING)
+
+        enum_values = node.get("enum")
+        if isinstance(enum_values, list):
+            return types.Schema(
+                type=types.Type.STRING,
+                enum=[str(value) for value in enum_values],
+            )
+        return types.Schema(type=types.Type.STRING)
 
     return _convert(schema)
 

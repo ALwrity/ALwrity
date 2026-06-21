@@ -1,3 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow: 
+Disallow:
+
+Sitemap: https://www.alwrity.com/sitemap.xml

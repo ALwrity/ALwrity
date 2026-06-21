@@ -19,6 +19,22 @@ from services.scheduler.core.failure_detection_service import FailureDetectionSe
 from services.intelligence.sif_integration import SIFIntegrationService
 from utils.logger_utils import get_service_logger
 
+# Issue #620 #5: import ContentGuardianAgent at module top with
+# try/except. Pre-#5 the import was inside the ``execute_task``
+# except block, so a missing dependency silently disabled the
+# audit with only a ``logger.error`` line. Operators had no
+# way to see "ContentGuardianAgent is unavailable" at startup.
+# Now we record the failure once at import time so it's visible
+# in any boot log / health check.
+try:
+    from services.intelligence.agents.specialized import ContentGuardianAgent
+    _CONTENT_GUARDIAN_AVAILABLE = True
+    _CONTENT_GUARDIAN_IMPORT_ERROR: Optional[str] = None
+except ImportError as _guardian_import_err:
+    _CONTENT_GUARDIAN_AVAILABLE = False
+    _CONTENT_GUARDIAN_IMPORT_ERROR = str(_guardian_import_err)
+    ContentGuardianAgent = None  # type: ignore
+
 logger = get_service_logger("sif_indexing_executor")
 
 
@@ -66,27 +82,49 @@ class SIFIndexingExecutor(TaskExecutor):
                 .first()
             )
             if not onboarding_session:
+                # Issue #620 #4: pre-#4 the executor set
+                # ``task.status = "paused"`` and
+                # ``task.next_execution = None``, which permanently
+                # wedged the task. Users with a missing onboarding
+                # record (DB inconsistency, partial rollback, etc.)
+                # would never get their SIF index. The fix keeps
+                # the task ``active`` and reschedules a 24h retry
+                # so we get out of the wedged state automatically.
+                # The /sif-indexing/health endpoint already surfaces
+                # this kind of failure via the ``last_failure`` /
+                # ``error_message`` fields, so operators see it.
                 logger.info(
-                    f"Skipping SIF indexing for user {user_id}: no onboarding session found. "
-                    "Pausing task until onboarding completes."
+                    f"SIF indexing for user {user_id}: no onboarding session found. "
+                    "Scheduling 24h retry (will resume once the "
+                    "onboarding record is created). "
+                    "See /sif-indexing/health for monitoring."
                 )
                 task.last_executed = datetime.utcnow()
-                task.status = "paused"
-                task.next_execution = None
+                # Keep status as 'active' so the scheduler picks
+                # us up again at next_execution. We deliberately do
+                # NOT pause; pausing requires manual intervention
+                # which is the bug we are fixing.
+                task.status = "active"
+                task.next_execution = datetime.utcnow() + timedelta(hours=24)
 
                 task_log.status = "skipped"
                 task_log.result_data = {
                     "reason": "no_onboarding_session",
                     "website_url": website_url,
+                    "retry_at": task.next_execution.isoformat(),
                 }
                 task_log.execution_time_ms = int((time.time() - start_time) * 1000)
                 db.commit()
 
                 return TaskExecutionResult(
-                    success=False,
+                    success=True,
                     result_data=task_log.result_data,
                     execution_time_ms=task_log.execution_time_ms,
-                    retryable=False,
+                    # retryable=True so the failure-tracking
+                    # service doesn't escalate this to a 7-day
+                    # cool-off (which is for real failures, not
+                    # "wait for onboarding to finish").
+                    retryable=True,
                 )
             
             # Initialize SIF Service
@@ -102,21 +140,34 @@ class SIFIndexingExecutor(TaskExecutor):
             # This ensures the agent runs immediately after new data is indexed
             guardian_report = None
             if content_synced:
-                try:
-                    from services.intelligence.agents.specialized import ContentGuardianAgent
-                    # Re-use the intelligence service from sif_service
-                    guardian_agent = ContentGuardianAgent(
-                        intelligence_service=sif_service.intelligence_service,
-                        user_id=user_id,
-                        sif_service=sif_service
+                # Issue #620 #5: pre-#5 the import was inside this
+                # ``try`` block, so a missing ContentGuardianAgent
+                # dependency was silently swallowed with just a
+                # ``logger.error``. Now the import is at module
+                # top with a guard; we only enter the try/except
+                # if the agent is available.
+                if not _CONTENT_GUARDIAN_AVAILABLE:
+                    logger.warning(
+                        f"ContentGuardianAgent unavailable at import time "
+                        f"({_CONTENT_GUARDIAN_IMPORT_ERROR}); skipping site audit. "
+                        f"This was logged once at module import; the underlying "
+                        f"issue needs operator attention."
                     )
-                    
-                    logger.info("Triggering Content Guardian Site Audit...")
-                    guardian_report = await guardian_agent.perform_site_audit(website_url)
-                    
-                    # Persist the audit report in the task log result data
-                except Exception as e:
-                    logger.error(f"Failed to run Content Guardian audit: {e}")
+                else:
+                    try:
+                        # Re-use the intelligence service from sif_service
+                        guardian_agent = ContentGuardianAgent(
+                            intelligence_service=sif_service.intelligence_service,
+                            user_id=user_id,
+                            sif_service=sif_service
+                        )
+
+                        logger.info("Triggering Content Guardian Site Audit...")
+                        guardian_report = await guardian_agent.perform_site_audit(website_url)
+
+                        # Persist the audit report in the task log result data
+                    except Exception as e:
+                        logger.error(f"Failed to run Content Guardian audit: {e}")
             
             # Determine overall success
             success = metadata_synced or content_synced

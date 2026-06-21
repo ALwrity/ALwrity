@@ -95,7 +95,7 @@ class EnhancedStrategyService:
                 implementation_timeline=strategy_data.get('implementation_timeline'),
                 market_share=strategy_data.get('market_share'),
                 competitive_position=strategy_data.get('competitive_position'),
-                performance_metrics=strategy_data.get('performance_metrics'),
+                performance_metrics_data=strategy_data.get('performance_metrics'),
                 
                 # Audience Intelligence
                 content_preferences=strategy_data.get('content_preferences'),
@@ -394,9 +394,19 @@ class EnhancedStrategyService:
             enhanced_strategy_data = self._merge_strategy_with_onboarding(strategy_data, field_transformations)
 
             # Create strategy object
+            # Pop the public-API key 'performance_metrics' (a JSON blob)
+            # from the merged dict and pass it to the renamed column
+            # 'performance_metrics_data'. The relationship slot on the
+            # model is *also* named 'performance_metrics' but expects
+            # a list of StrategyPerformanceMetrics records, not a dict,
+            # so we must not pass the value through ``**enhanced_strategy_data``.
+            performance_metrics_value = enhanced_strategy_data.pop(
+                'performance_metrics', None
+            )
             strategy = EnhancedContentStrategy(
                 user_id=user_id,
                 **enhanced_strategy_data,
+                performance_metrics_data=performance_metrics_value,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow()
             )
@@ -534,12 +544,12 @@ class EnhancedStrategyService:
     def _merge_strategy_with_onboarding(self, strategy_data: Dict[str, Any], field_transformations: Dict[str, Any]) -> Dict[str, Any]:
         """Merge strategy data with onboarding data."""
         merged_data = strategy_data.copy()
-            
+
         for field, transformation in field_transformations.items():
             if field not in merged_data or merged_data[field] is None:
                 merged_data[field] = transformation.get('value')
-            
-            return merged_data
+
+        return merged_data
 
     def _should_regenerate_ai_recommendations(self, update_data: Dict[str, Any]) -> bool:
         """Determine if AI recommendations should be regenerated based on updates."""

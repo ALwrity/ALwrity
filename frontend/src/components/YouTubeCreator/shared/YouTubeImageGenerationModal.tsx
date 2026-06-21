@@ -55,14 +55,22 @@ export const YouTubeImageGenerationModal: React.FC<YouTubeImageGenerationModalPr
   isGenerating = false,
   sceneTitle,
 }) => {
-  // Adapter to convert shared settings to YouTube-specific settings
+  const toYouTubeModel = (
+    model?: string
+  ): YouTubeImageGenerationSettings['model'] => {
+    if (model === 'ideogram-v3-turbo' || model === 'qwen-image') {
+      return model;
+    }
+    return 'ideogram-v3-turbo';
+  };
+
   const handleGenerate = (settings: ImageGenerationSettings) => {
     const youtubeSettings: YouTubeImageGenerationSettings = {
       prompt: settings.prompt,
       style: settings.style,
       renderingSpeed: settings.renderingSpeed,
       aspectRatio: settings.aspectRatio,
-      model: settings.model || 'ideogram-v3-turbo',
+      model: toYouTubeModel(settings.model),
     };
     onGenerate(youtubeSettings);
   };

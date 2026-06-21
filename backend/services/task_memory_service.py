@@ -179,30 +179,72 @@ class TaskMemoryService:
             # but defer the disk save. The save is coalesced: at most one
             # save per (TASK_MEMORY_SAVE_BATCH_SIZE upserts) or one per
             # (TASK_MEMORY_SAVE_DEBOUNCE_SEC elapsed), whichever fires first.
+            #
+            # We now route through the canonical
+            # ``TxtaiIntelligenceService.index_content()`` method (rather
+            # than touching ``self.intelligence.embeddings.upsert()``
+            # directly). This gives us the same Windows file-lock
+            # handling, semantic-cache integration, and initialization
+            # guard that every other SIF caller gets. The previous
+            # direct-embeddings path could crash on Windows and skipped
+            # the semantic cache.
             if task.status in ["completed", "dismissed", "rejected", "skipped"]:
-                doc = {
-                    "id": history.vector_id,
-                    "text": f"{task.title}. {task.description}",
-                    "tags": f"task_memory {task.status} {task.pillar_id}",
-                    "status": task.status,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-
-                if hasattr(self.intelligence.embeddings, "upsert"):
-                    self.intelligence.embeddings.upsert([doc])
+                doc_text = f"{task.title}. {task.description}"
+                item_id = history.vector_id
+                # ``index_content`` accepts (id, text, metadata) tuples.
+                item = (
+                    item_id,
+                    doc_text,
+                    {
+                        "tags": f"task_memory {task.status} {task.pillar_id}",
+                        "status": task.status,
+                        "timestamp": datetime.utcnow().isoformat(),
+                    },
+                )
+                try:
+                    await self.intelligence.index_content([item])
                     self._pending_save_count += 1
 
                     if self._pending_save_count >= TASK_MEMORY_SAVE_BATCH_SIZE:
-                        # Hit the batch size — flush now.
                         await self._flush()
                     else:
-                        # Below threshold — schedule a debounced flush.
                         self._schedule_debounced_flush()
-                else:
-                    logger.debug(
-                        f"txtai embeddings object has no upsert() for user {self.user_id}; "
-                        f"task outcome recorded in DB only"
-                    )
+                except Exception as index_exc:
+                    # Fall back to the legacy direct-embeddings path
+                    # only if index_content is unavailable (e.g. txtai
+                    # not installed in this environment). The fallback
+                    # is best-effort: failures are logged, not raised.
+                    if hasattr(self.intelligence, "embeddings") and hasattr(
+                        self.intelligence.embeddings, "upsert"
+                    ):
+                        try:
+                            self.intelligence.embeddings.upsert(
+                                [
+                                    {
+                                        "id": item_id,
+                                        "text": doc_text,
+                                        "tags": item[2]["tags"],
+                                        "status": task.status,
+                                        "timestamp": item[2]["timestamp"],
+                                    }
+                                ]
+                            )
+                            self._pending_save_count += 1
+                            if self._pending_save_count >= TASK_MEMORY_SAVE_BATCH_SIZE:
+                                await self._flush()
+                            else:
+                                self._schedule_debounced_flush()
+                        except Exception as direct_exc:
+                            logger.debug(
+                                f"Both index_content and direct embeddings failed "
+                                f"for user {self.user_id}: index_exc={index_exc!r} "
+                                f"direct_exc={direct_exc!r}"
+                            )
+                    else:
+                        logger.debug(
+                            f"index_content failed and direct embeddings not available "
+                            f"for user {self.user_id}: {index_exc!r}"
+                        )
             else:
                 # Status is not semantically meaningful (e.g. "pending").
                 # No upsert, no save.

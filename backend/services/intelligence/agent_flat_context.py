@@ -71,6 +71,45 @@ class AgentFlatContextStore:
     def _master_salt(self) -> str:
         return os.getenv("FILE_ENCRYPTION_SALT", "")
 
+
+# Phase 3.6: surface the silent "salt missing → derived secret is
+# empty bytes" failure. Pre-3.6, ``derive_user_secret`` returned
+# ``b""`` with no log line, so a misconfigured deployment would
+# silently lose per-user isolation on encrypted files. We expose
+# ``validate_file_encryption_salt`` so ``app.py`` startup can call
+# it. Default behavior is **log a warning, do not raise** (preserves
+# dev environments where FILE_ENCRYPTION_SALT is intentionally
+# empty). Callers that require strict mode can pass ``strict=True``
+# to raise ``RuntimeError`` instead.
+
+_MIN_SALT_LENGTH = 16
+
+
+def validate_file_encryption_salt(strict: bool = False) -> bool:
+    """Validate that FILE_ENCRYPTION_SALT is present and sufficiently long.
+
+    Returns True if the salt is present and looks usable. Returns False
+    (and logs a warning) if the salt is missing or shorter than 16 chars.
+
+    When ``strict=True``, raises ``RuntimeError`` instead of returning
+    False. This is the mode the SIF integration service should use
+    once Phase 3.6b wires it in.
+    """
+    salt = os.getenv("FILE_ENCRYPTION_SALT", "")
+    if salt and len(salt) >= _MIN_SALT_LENGTH:
+        return True
+    msg = (
+        f"FILE_ENCRYPTION_SALT is missing or too short "
+        f"(got {len(salt)} chars, need at least {_MIN_SALT_LENGTH}). "
+        f"Per-user derived secrets will be empty bytes; encrypted file "
+        f"isolation is DEGRADED. Set FILE_ENCRYPTION_SALT in your env "
+        f"to a random string of at least {_MIN_SALT_LENGTH} chars."
+    )
+    if strict:
+        raise RuntimeError(msg)
+    logger.warning(f"[flat_context] Phase 3.6: {msg}")
+    return False
+
     def derive_user_secret(self) -> bytes:
         """Derive deterministic per-user secret from env salt + safe user id."""
         salt = self._master_salt()
@@ -91,8 +130,16 @@ class AgentFlatContextStore:
         )
 
     def _workspace_dir(self) -> Path:
-        root_dir = Path(__file__).resolve().parents[3]
-        return root_dir / "workspace" / f"workspace_{self.safe_user_id}"
+        # Issue #620 #9: pre-#9 the workspace path was resolved
+        # as ``Path(__file__).resolve().parents[3]``, which breaks
+        # in Docker, packaged, or symlinked deployments where the
+        # code location doesn't match the data location. The
+        # canonical helper ``services.workspace_paths.get_workspace_root``
+        # already exists in the codebase and respects the
+        # ``WORKSPACE_DIR`` env var (via ``utils.storage_paths``),
+        # so we delegate to it.
+        from services.workspace_paths import get_workspace_root
+        return get_workspace_root() / f"workspace_{self.safe_user_id}"
 
     def _context_dir(self) -> Path:
         return self._workspace_dir() / self.CONTEXT_DIRNAME

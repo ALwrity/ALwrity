@@ -44,6 +44,7 @@ import {
   RenderingSpeed,
   AspectRatio,
   ImageModel,
+  LinkedInImageModel,
   ImagePreset,
   DEFAULT_THEME,
   DEFAULT_MODELS,
@@ -90,7 +91,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   const [style, setStyle] = useState<ImageStyle>(defaultStyle);
   const [renderingSpeed, setRenderingSpeed] = useState<RenderingSpeed>(defaultRenderingSpeed);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(defaultAspectRatio);
-  const [model, setModel] = useState<ImageModel>(defaultModel);
+  const [model, setModel] = useState<ImageModel | LinkedInImageModel>(defaultModel);
 
   // Update state when initial values change
   useEffect(() => {
@@ -445,7 +446,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               <FormControl fullWidth>
                 <Select
                   value={model}
-                  onChange={(e) => setModel(e.target.value as ImageModel)}
+                  onChange={(e) => setModel(e.target.value as ImageModel | LinkedInImageModel)}
                   sx={selectSx}
                 >
                   {availableModels.map((m) => (

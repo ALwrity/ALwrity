@@ -120,7 +120,7 @@ def generate_image(prompt: str, options: Optional[Dict[str, Any]] = None, user_i
     if overlay_text and image_options.model and image_options.model.lower() in _TEXT_CAPABLE:
         image_options.prompt += f" Include the text '{overlay_text}' as a typographic element in the image."
 
-    logger.info("Generating image via provider=%s model=%s", provider_name, image_options.model)
+    logger.info(f"Generating image via provider={provider_name} model={image_options.model}")
     provider = _get_provider(provider_name, user_id=user_id)
     
     # Track response time

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import {
   Box,
   Typography,
@@ -53,6 +54,10 @@ const CreateTab: React.FC = () => {
   const location = useLocation();
   const { state: { strategyContext }, isFromStrategyActivation } = useStrategyCalendarContext();
   const [userData] = useState<any>({});
+  // Resolve the active Clerk user so calendar generation carries
+  // the correct tenant id (the previous `user_id: 1` was a
+  // multi-tenant collision across concurrent users).
+  const { user } = useUser();
 
   // Handle navigation from strategy activation
   useEffect(() => {
@@ -108,7 +113,7 @@ const CreateTab: React.FC = () => {
       
       // Transform calendarConfig to match backend CalendarGenerationRequest format
       const requestData = {
-        user_id: 1, // Default user ID
+        user_id: user?.id ?? null,
         strategy_id: strategyContext?.strategyId ? parseInt(strategyContext.strategyId) : undefined,
         calendar_type: calendarConfig.calendarType || 'monthly',
         industry: userData?.industry || 'technology',

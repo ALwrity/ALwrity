@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FeatureCarousel } from './FeatureCarousel';
+import { LinkedInConnectionPlaceholder } from './LinkedInConnectionPlaceholder';
 import { InfoModals } from './InfoModals';
 import { QuickCreate } from './QuickCreate';
 import { LinkedInPreferences } from '../utils/storageUtils';
@@ -56,11 +57,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       overflowY: 'auto',
       maxHeight: '100vh'
     }}>
-      {/* Enhanced Feature Carousel */}
-      <FeatureCarousel 
-        onFactCheckClick={() => setShowFactCheckModal(true)}
-        onCopilotClick={() => setShowCopilotModal(true)}
-      />
+      {/* LinkedIn connection status */}
+      <LinkedInConnectionPlaceholder />
 
       {/* Icon and Buttons Section */}
       <div style={{
@@ -289,6 +287,12 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           userPreferences={userPreferences}
         />
       </div>
+
+      {/* Feature carousel — moved below Quick Create */}
+      <FeatureCarousel
+        onFactCheckClick={() => setShowFactCheckModal(true)}
+        onCopilotClick={() => setShowCopilotModal(true)}
+      />
 
       {/* Info Modals */}
       <InfoModals

@@ -1,7 +1,22 @@
 import { useState, useEffect } from 'react';
 import { createClient, OAuthStrategy } from '@wix/sdk';
 import { WIX_CLIENT_ID, getWixRedirectOrigin, getWixTrustedOrigins } from '../../../config/wixConfig';
+import { getApiBaseUrl } from '../../../utils/apiUrl';
 import { markConnectionHandled, isAlreadyHandled, clearConnectionHandled } from '../../../utils/wixConnectionDedup';
+import { getLinkedInConnectErrorMessage } from '../../../api/linkedinSocial';
+import { connectWithLinkedInOAuth } from '../../../utils/linkedInOAuthConnect';
+
+const getTrustedOAuthOrigins = (): string[] => {
+  const origins = getWixTrustedOrigins();
+  try {
+    const apiUrl = getApiBaseUrl();
+    const parsed = new URL(apiUrl);
+    origins.push(`${parsed.protocol}//${parsed.host}`);
+  } catch {
+    // ignore invalid API URL
+  }
+  return [...new Set(origins)];
+};
 
 export const usePlatformConnections = () => {
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
@@ -11,7 +26,7 @@ export const usePlatformConnections = () => {
 
   useEffect(() => {
     const handler = (event: MessageEvent) => {
-      const trusted = getWixTrustedOrigins();
+      const trusted = getTrustedOAuthOrigins();
       if (!trusted.includes(event.origin)) return;
       if (!event.data || typeof event.data !== 'object') return;
 
@@ -27,6 +42,18 @@ export const usePlatformConnections = () => {
       }
       if (event.data.type === 'WIX_OAUTH_ERROR') {
         setToastMessage('Wix connection failed. Please try again.');
+        setShowToast(true);
+      }
+      if (event.data.type === 'LINKEDIN_OAUTH_SUCCESS') {
+        setConnectedPlatforms(prev => {
+          if (prev.includes('linkedin')) return prev;
+          return [...prev, 'linkedin'];
+        });
+        setToastMessage('LinkedIn account connected successfully!');
+        setShowToast(true);
+      }
+      if (event.data.type === 'LINKEDIN_OAUTH_ERROR') {
+        setToastMessage('LinkedIn connection failed. Please try again.');
         setShowToast(true);
       }
     };
@@ -112,6 +139,17 @@ export const usePlatformConnections = () => {
     }
   };
 
+  const handleLinkedInConnect = async () => {
+    try {
+      await connectWithLinkedInOAuth();
+    } catch (error) {
+      const message = getLinkedInConnectErrorMessage(error);
+      setToastMessage(message);
+      setShowToast(true);
+      throw error;
+    }
+  };
+
   const handleConnect = async (platformId: string) => {
     setIsLoading(true);
     try {
@@ -119,11 +157,14 @@ export const usePlatformConnections = () => {
         await handleWixConnect();
         return;
       }
-      
-      // For other platforms, you can add their connection logic here
-      
+      if (platformId === 'linkedin') {
+        await handleLinkedInConnect();
+        return;
+      }
     } catch (error) {
       console.error('Connection error:', error);
+      setToastMessage('Connection failed. Please try again.');
+      setShowToast(true);
     } finally {
       setIsLoading(false);
     }

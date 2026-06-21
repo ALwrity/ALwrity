@@ -20,6 +20,7 @@ from utils.logger_utils import get_service_logger
 from services.gsc_service import GSCService
 from services.integrations.bing_oauth import BingOAuthService
 from services.integrations.wordpress_oauth import WordPressOAuthService
+from services.integrations.wix_oauth import WixOAuthService
 from services.wix_service import WixService
 from services.database import get_user_db_path
 
@@ -605,29 +606,191 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
     
     async def _check_wix_token(self, user_id: str) -> TaskExecutionResult:
         """
-        Check Wix token validity.
-        
-        Note: Wix tokens are currently stored in frontend sessionStorage.
-        Backend storage needs to be implemented for automated checking.
+        Check and refresh Wix token.
+
+        Wix access tokens have a short lifespan (typically ~4 hours), so we use
+        a tighter 1-day expiration warning window than the 7-day window used
+        for Bing/WordPress/GSC. Refresh tokens are used to obtain new access
+        tokens silently via WixService.refresh_access_token, and the new
+        tokens are persisted via WixOAuthService.update_tokens.
         """
         try:
-            # TODO: Wix tokens are stored in frontend sessionStorage, not backend database
-            # Once backend storage is implemented, we can check tokens here
-            # For now, return not supported
-            
+            wix_oauth_service = WixOAuthService()
+            wix_service = WixService()
+
+            # Wix tokens live < 1 day, so warn a day ahead instead of a week.
+            wix_warning_days = 1
+
+            # Get token status (includes expired tokens)
+            token_status = wix_oauth_service.get_user_token_status(user_id)
+
+            if not token_status.get('has_tokens'):
+                return TaskExecutionResult(
+                    success=False,
+                    error_message="No Wix tokens found for user",
+                    result_data={
+                        'platform': 'wix',
+                        'user_id': user_id,
+                        'status': 'not_found',
+                        'check_time': datetime.utcnow().isoformat()
+                    },
+                    retryable=False
+                )
+
+            active_tokens = token_status.get('active_tokens', [])
+            expired_tokens = token_status.get('expired_tokens', [])
+
+            # If we have active tokens, check if any are expiring soon (< warning window)
+            if active_tokens:
+                now = datetime.utcnow()
+                needs_refresh = False
+                token_to_refresh = None
+
+                for token in active_tokens:
+                    expires_at_str = token.get('expires_at')
+                    if expires_at_str:
+                        try:
+                            expires_at = datetime.fromisoformat(
+                                expires_at_str.replace('Z', '+00:00')
+                            )
+                            days_until_expiry = (expires_at - now).days
+                            if days_until_expiry < wix_warning_days:
+                                needs_refresh = True
+                                token_to_refresh = token
+                                break
+                        except Exception:
+                            # If parsing fails, assume token is valid
+                            pass
+
+                if needs_refresh and token_to_refresh:
+                    refresh_token = token_to_refresh.get('refresh_token')
+                    token_id = token_to_refresh.get('id')
+                    if refresh_token:
+                        try:
+                            refreshed = wix_service.refresh_access_token(refresh_token)
+                        except Exception as refresh_exc:
+                            return TaskExecutionResult(
+                                success=False,
+                                error_message=f"Failed to refresh Wix token: {str(refresh_exc)[:200]}",
+                                result_data={
+                                    'platform': 'wix',
+                                    'user_id': user_id,
+                                    'status': 'refresh_failed',
+                                    'check_time': datetime.utcnow().isoformat()
+                                },
+                                retryable=False
+                            )
+
+                        if refreshed and refreshed.get('access_token'):
+                            wix_oauth_service.update_tokens(
+                                user_id=user_id,
+                                access_token=refreshed.get('access_token'),
+                                refresh_token=refreshed.get('refresh_token', refresh_token),
+                                expires_in=refreshed.get('expires_in'),
+                                token_id=token_id,
+                            )
+                            return TaskExecutionResult(
+                                success=True,
+                                result_data={
+                                    'platform': 'wix',
+                                    'user_id': user_id,
+                                    'status': 'refreshed',
+                                    'check_time': datetime.utcnow().isoformat(),
+                                    'message': 'Wix token refreshed successfully'
+                                }
+                            )
+                        return TaskExecutionResult(
+                            success=False,
+                            error_message="Failed to refresh Wix token",
+                            result_data={
+                                'platform': 'wix',
+                                'user_id': user_id,
+                                'status': 'refresh_failed',
+                                'check_time': datetime.utcnow().isoformat()
+                            },
+                            retryable=False
+                        )
+
+                # Token is valid and not expiring soon
+                return TaskExecutionResult(
+                    success=True,
+                    result_data={
+                        'platform': 'wix',
+                        'user_id': user_id,
+                        'status': 'valid',
+                        'check_time': datetime.utcnow().isoformat(),
+                        'message': 'Wix token is valid'
+                    }
+                )
+
+            # No active tokens, try to refresh the most recent expired one
+            if expired_tokens:
+                latest_token = expired_tokens[0]  # Already sorted by created_at DESC
+                refresh_token = latest_token.get('refresh_token')
+                token_id = latest_token.get('id')
+
+                if refresh_token:
+                    # Only refresh if expired within last 24 hours (grace period)
+                    expires_at_str = latest_token.get('expires_at')
+                    if expires_at_str:
+                        try:
+                            expires_at = datetime.fromisoformat(
+                                expires_at_str.replace('Z', '+00:00')
+                            )
+                            hours_since_expiry = (
+                                datetime.utcnow() - expires_at
+                            ).total_seconds() / 3600
+                            if hours_since_expiry < 24:
+                                try:
+                                    refreshed = wix_service.refresh_access_token(refresh_token)
+                                except Exception:
+                                    refreshed = None
+                                if refreshed and refreshed.get('access_token'):
+                                    wix_oauth_service.update_tokens(
+                                        user_id=user_id,
+                                        access_token=refreshed.get('access_token'),
+                                        refresh_token=refreshed.get('refresh_token', refresh_token),
+                                        expires_in=refreshed.get('expires_in'),
+                                        token_id=token_id,
+                                    )
+                                    return TaskExecutionResult(
+                                        success=True,
+                                        result_data={
+                                            'platform': 'wix',
+                                            'user_id': user_id,
+                                            'status': 'refreshed',
+                                            'check_time': datetime.utcnow().isoformat(),
+                                            'message': 'Wix token refreshed from expired state'
+                                        }
+                                    )
+                        except Exception:
+                            pass
+
+                return TaskExecutionResult(
+                    success=False,
+                    error_message="Wix token expired and could not be refreshed",
+                    result_data={
+                        'platform': 'wix',
+                        'user_id': user_id,
+                        'status': 'expired',
+                        'check_time': datetime.utcnow().isoformat(),
+                        'message': 'Wix token expired. User needs to reconnect.'
+                    },
+                    retryable=False
+                )
+
             return TaskExecutionResult(
                 success=False,
-                error_message="Wix token monitoring not yet supported - tokens stored in frontend sessionStorage",
+                error_message="No valid Wix tokens found",
                 result_data={
                     'platform': 'wix',
                     'user_id': user_id,
-                    'status': 'not_supported',
-                    'check_time': datetime.utcnow().isoformat(),
-                    'message': 'Wix token monitoring requires backend token storage implementation'
+                    'status': 'invalid',
+                    'check_time': datetime.utcnow().isoformat()
                 },
                 retryable=False
             )
-            
+
         except Exception as e:
             self.logger.error(f"Error checking Wix token for user {user_id}: {e}", exc_info=True)
             return TaskExecutionResult(

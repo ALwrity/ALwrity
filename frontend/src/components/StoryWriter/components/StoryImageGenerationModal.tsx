@@ -59,13 +59,20 @@ export const StoryImageGenerationModal: React.FC<StoryImageGenerationModalProps>
   const resolvedAspectRatio: AspectRatio =
     initialAspectRatio || '16:9';
 
+  const toStoryModel = (model?: string): ImageModel => {
+    if (model === 'ideogram-v3-turbo' || model === 'qwen-image') {
+      return model;
+    }
+    return resolvedDefaultModel;
+  };
+
   const handleGenerate = (settings: ImageGenerationSettings) => {
     const storySettings: StoryImageGenerationSettings = {
       prompt: settings.prompt,
       style: settings.style,
       renderingSpeed: settings.renderingSpeed,
       aspectRatio: settings.aspectRatio,
-      model: settings.model || resolvedDefaultModel,
+      model: toStoryModel(settings.model),
     };
     onGenerate(storySettings);
   };
