@@ -298,8 +298,15 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     const error = urlParams.get('error');
 
     if (wordpressConnected === 'true' && blogUrl) {
-      // WordPress OAuth successful
-      setConnectedPlatforms([...connectedPlatforms, 'wordpress']);
+      // WordPress OAuth successful. Use the functional setState form
+      // so we don't depend on the (potentially stale) connectedPlatforms
+      // closure. This effect is gated on URL params, so it should only
+      // run once per OAuth callback — but the setState must use the
+      // latest value in case the user navigated back to the page
+      // mid-flow.
+      setConnectedPlatforms((prev) =>
+        prev.includes('wordpress') ? prev : [...prev, 'wordpress'],
+      );
       // Remove query parameters from URL
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error) {
@@ -308,6 +315,10 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
       // Remove query parameters from URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+    // Intentionally empty deps: this effect must run only once on
+    // mount to read the OAuth callback query params. The setState
+    // uses the functional form so it doesn't read a stale
+    // connectedPlatforms value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
