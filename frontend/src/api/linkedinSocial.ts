@@ -184,6 +184,12 @@ export interface LinkedInProfileAnalysisError {
   debug_message?: string | null;
 }
 
+/** Phase 7 dev rubric output (Step 1 — no LLM). */
+export interface LinkedInProfileOptimizationDebug {
+  detected_gaps_count: number;
+  rule_ids: string[];
+}
+
 export interface LinkedInProfileAcquireResponse {
   profile: Record<string, unknown>;
   meta: {
@@ -207,6 +213,7 @@ export interface LinkedInProfileAcquireResponse {
   recommendations_error?: string | null;
   last_completed_phase?: number | null;
   analysis_error?: LinkedInProfileAnalysisError | null;
+  profile_optimization_debug?: LinkedInProfileOptimizationDebug | null;
 }
 
 export interface LinkedInProfileCompleteResponse {
@@ -363,6 +370,7 @@ export interface LinkedInProfileRequestOptions {
   refreshRecommendations?: boolean;
   includeProfileOptimization?: boolean;
   refreshProfileOptimization?: boolean;
+  debugProfileOptimizationGaps?: boolean;
 }
 
 /** Normalized profile, context, validation, completion, intelligence, and optional advisors. */
@@ -387,6 +395,9 @@ export async function getLinkedInProfile(
   }
   if (options.refreshProfileOptimization) {
     params.refresh_profile_optimization = true;
+  }
+  if (options.debugProfileOptimizationGaps) {
+    params.debug_profile_optimization_gaps = true;
   }
 
   const needsLongRunningClient =

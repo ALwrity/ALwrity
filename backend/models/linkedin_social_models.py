@@ -167,13 +167,20 @@ class TopicRecommendationsMetaResponse(BaseModel):
 
 
 class ProfileAnalysisErrorResponse(BaseModel):
-    """Structured failure from the LinkedIn analysis pipeline (Phases 1–6)."""
+    """Structured failure from the LinkedIn analysis pipeline (Phases 1–7)."""
 
-    failed_phase: int = Field(..., ge=1, le=6)
+    failed_phase: int = Field(..., ge=1, le=7)
     phase_label: str
     error_code: str
     user_message: str
     debug_message: Optional[str] = None
+
+
+class ProfileOptimizationDebugResponse(BaseModel):
+    """Dev-only rubric output for Step 1 manual testing (no LLM)."""
+
+    detected_gaps_count: int = Field(ge=0)
+    rule_ids: List[str] = Field(default_factory=list)
 
 
 class LinkedInProfileAcquireResponse(BaseModel):
@@ -193,10 +200,11 @@ class LinkedInProfileAcquireResponse(BaseModel):
     last_completed_phase: Optional[int] = Field(
         None,
         ge=1,
-        le=6,
+        le=7,
         description="Highest pipeline phase that completed successfully in this request",
     )
     analysis_error: Optional[ProfileAnalysisErrorResponse] = None
+    profile_optimization_debug: Optional[ProfileOptimizationDebugResponse] = None
 
 
 class LinkedInProfileCompleteRequest(BaseModel):

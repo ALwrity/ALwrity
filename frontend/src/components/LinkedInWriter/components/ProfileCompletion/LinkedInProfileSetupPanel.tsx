@@ -50,10 +50,18 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
   const {
     isOptimizationOpen,
+    isOptimizationLoading,
     isOptimizationDisabled,
+    optimizationDebug,
+    optimizationDebugError,
     openOptimizationPanel,
     closeOptimizationPanel,
+    retryOptimizationDebug,
   } = useLinkedInProfileOptimization(isProfileComplete);
+
+  const handleImproveProfile = () => {
+    void openOptimizationPanel();
+  };
 
   const handleGetTopicIdeas = () => {
     void runTopicAnalysis(false);
@@ -92,7 +100,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           foundationStatus={foundationStatus}
           isTopicRunning={isAnalyzing}
           isOptimizationDisabled={isOptimizationDisabled}
-          onImproveProfile={openOptimizationPanel}
+          onImproveProfile={handleImproveProfile}
           onGetTopicIdeas={handleGetTopicIdeas}
         />
       )}
@@ -104,7 +112,28 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         />
       )}
 
-      <ProfileOptimizationPanel isOpen={isOptimizationOpen} onClose={closeOptimizationPanel} />
+      <ProfileOptimizationPanel
+        isOpen={isOptimizationOpen}
+        isLoading={isOptimizationLoading}
+        optimizationDebug={optimizationDebug}
+        onClose={closeOptimizationPanel}
+      />
+
+      {optimizationDebugError && (
+        <AnalysisErrorAlert
+          error={{
+            failed_phase: 7,
+            phase_label: 'Profile Optimization',
+            error_code: 'rubric_debug_failed',
+            user_message: 'Could not analyze profile gaps. Please try again.',
+            debug_message: optimizationDebugError,
+          }}
+          onRetry={() => {
+            void retryOptimizationDebug();
+          }}
+          isRetrying={isOptimizationLoading}
+        />
+      )}
 
       {foundationStatus === 'needs_completion' && questions.length > 0 && (
         <ProfileCompletionForm
@@ -144,6 +173,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         foundationError={foundationError}
         topicError={topicError}
         intelligenceSource={aiProfileIntelligenceMeta?.source ?? null}
+        optimizationDebug={optimizationDebug}
       />
     </div>
   );

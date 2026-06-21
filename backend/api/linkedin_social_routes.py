@@ -36,6 +36,7 @@ from models.linkedin_social_models import (
     ProfileCompletionResponse,
     ProfileIntelligenceMetaResponse,
     ProfileAnalysisErrorResponse,
+    ProfileOptimizationDebugResponse,
     ProfileValidationResponse,
     TopicRecommendationResponse,
     TopicRecommendationsMetaResponse,
@@ -48,6 +49,10 @@ from services.integrations.linkedin.profile_intelligence_service import (
 )
 from services.integrations.linkedin.profile_intelligence_validator import (
     ProfileIntelligenceValidationError,
+)
+from services.integrations.linkedin.profile_optimization_rubric import (
+    ProfileOptimizationRubricError,
+    detect_profile_optimization_gaps,
 )
 from services.integrations.linkedin.topic_recommendation_llm import TopicRecommendationLLMError
 from services.integrations.linkedin.topic_recommendation_service import (
@@ -494,6 +499,51 @@ def _recommendations_meta_to_response(
     )
 
 
+def _build_profile_optimization_debug_response(
+    user_id: str,
+    profile_context: dict[str, Any],
+    profile_validation: ProfileValidationResult,
+) -> ProfileOptimizationDebugResponse:
+    """
+    Run Phase 7 rubric for dev/manual testing (no LLM).
+
+    Returns empty summary when profile context is unavailable.
+    """
+    logger.info(
+        "[ProfileOptimization] debug rubric start user_id={} is_profile_complete={}",
+        user_id,
+        profile_validation.get("is_profile_complete"),
+    )
+    try:
+        gaps = detect_profile_optimization_gaps(profile_context, profile_validation)
+    except ProfileOptimizationRubricError as exc:
+        logger.exception(
+            "[ProfileOptimization] debug rubric failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        return ProfileOptimizationDebugResponse(detected_gaps_count=0, rule_ids=[])
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] debug rubric unexpected error user_id={}: {}",
+            user_id,
+            exc,
+        )
+        return ProfileOptimizationDebugResponse(detected_gaps_count=0, rule_ids=[])
+
+    rule_ids = [gap.rule_id for gap in gaps]
+    logger.info(
+        "[ProfileOptimization] debug rubric complete user_id={} count={} top_rule_ids={}",
+        user_id,
+        len(gaps),
+        rule_ids[:3],
+    )
+    return ProfileOptimizationDebugResponse(
+        detected_gaps_count=len(gaps),
+        rule_ids=rule_ids,
+    )
+
+
 def _load_topic_recommendations_for_response(
     user_id: str,
     ai_profile_intelligence: dict[str, Any],
@@ -777,6 +827,10 @@ async def get_linkedin_profile(
         False,
         description="Force regeneration of profile optimization (Phase 7 — not yet implemented)",
     ),
+    debug_profile_optimization_gaps: bool = Query(
+        False,
+        description="Run Phase 7 rubric only and return detected gap summary (dev testing)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInProfileAcquireResponse:
     """
@@ -794,7 +848,8 @@ async def get_linkedin_profile(
     logger.info(
         "[LinkedInAnalysis] pipeline start user_id={} refresh={} refresh_intelligence={} "
         "refresh_recommendations={} include_recommendations={} "
-        "include_profile_optimization={} refresh_profile_optimization={}",
+        "include_profile_optimization={} refresh_profile_optimization={} "
+        "debug_profile_optimization_gaps={}",
         user_id,
         refresh,
         refresh_intelligence,
@@ -802,6 +857,7 @@ async def get_linkedin_profile(
         include_recommendations,
         include_profile_optimization,
         refresh_profile_optimization,
+        debug_profile_optimization_gaps,
     )
 
     last_completed_phase = 0
@@ -960,6 +1016,15 @@ async def get_linkedin_profile(
         bool(recommendations_error),
         analysis_error.failed_phase if analysis_error else None,
     )
+
+    profile_optimization_debug: Optional[ProfileOptimizationDebugResponse] = None
+    if debug_profile_optimization_gaps:
+        profile_optimization_debug = _build_profile_optimization_debug_response(
+            user_id,
+            profile_context,
+            profile_validation,
+        )
+
     return LinkedInProfileAcquireResponse(
         profile=profile,
         meta=LinkedInProfileMetaResponse(
@@ -981,6 +1046,7 @@ async def get_linkedin_profile(
         recommendations_error=recommendations_error,
         last_completed_phase=last_completed_phase or None,
         analysis_error=analysis_error,
+        profile_optimization_debug=profile_optimization_debug,
     )
 
 
