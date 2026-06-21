@@ -12,6 +12,7 @@ export type FoundationStatus =
 interface LinkedInAdvisorActionsBarProps {
   foundationStatus: FoundationStatus;
   isTopicRunning: boolean;
+  isOptimizationRunning?: boolean;
   isOptimizationDisabled: boolean;
   onImproveProfile: () => void;
   onGetTopicIdeas: () => void;
@@ -35,12 +36,13 @@ function foundationStatusLabel(status: FoundationStatus): string {
 export const LinkedInAdvisorActionsBar: React.FC<LinkedInAdvisorActionsBarProps> = ({
   foundationStatus,
   isTopicRunning,
+  isOptimizationRunning = false,
   isOptimizationDisabled,
   onImproveProfile,
   onGetTopicIdeas,
 }) => {
   const advisorsDisabled =
-    foundationStatus !== 'ready' || isTopicRunning || isOptimizationDisabled;
+    foundationStatus !== 'ready' || isTopicRunning || isOptimizationRunning || isOptimizationDisabled;
 
   return (
     <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
@@ -94,7 +96,7 @@ export const LinkedInAdvisorActionsBar: React.FC<LinkedInAdvisorActionsBarProps>
             title={
               isOptimizationDisabled
                 ? 'Complete your profile first'
-                : 'Profile optimization suggestions (coming in Step 5)'
+                : 'Get personalized profile optimization suggestions'
             }
             style={{
               background: advisorsDisabled
@@ -119,7 +121,7 @@ export const LinkedInAdvisorActionsBar: React.FC<LinkedInAdvisorActionsBarProps>
           <button
             type="button"
             onClick={onGetTopicIdeas}
-            disabled={foundationStatus !== 'ready' || isTopicRunning}
+            disabled={foundationStatus !== 'ready' || isTopicRunning || isOptimizationRunning}
             style={{
               background: '#fff',
               border: '2px solid #0A66C2',
@@ -129,8 +131,13 @@ export const LinkedInAdvisorActionsBar: React.FC<LinkedInAdvisorActionsBarProps>
               fontSize: 14,
               fontWeight: 700,
               cursor:
-                foundationStatus !== 'ready' || isTopicRunning ? 'not-allowed' : 'pointer',
-              opacity: foundationStatus !== 'ready' || isTopicRunning ? 0.65 : 1,
+                foundationStatus !== 'ready' || isTopicRunning || isOptimizationRunning
+                  ? 'not-allowed'
+                  : 'pointer',
+              opacity:
+                foundationStatus !== 'ready' || isTopicRunning || isOptimizationRunning
+                  ? 0.65
+                  : 1,
             }}
           >
             {isTopicRunning ? (

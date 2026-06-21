@@ -166,6 +166,43 @@ class TopicRecommendationsMetaResponse(BaseModel):
     recommendations_updated_at: Optional[str] = None
 
 
+class ProfileOptimizationResponse(BaseModel):
+    """Phase 7 single profile optimization recommendation."""
+
+    id: str
+    profile_section: Literal[
+        "headline",
+        "summary",
+        "profile_photo",
+        "custom_url",
+        "experience",
+        "skills",
+        "recommendations",
+        "education",
+        "certifications",
+        "featured",
+    ]
+    issue: str
+    why_it_matters: str
+    current_state_summary: str
+    recommended_action: str
+    suggested_copy: str = ""
+    impact: Literal["High", "Medium", "Low"]
+    effort: Literal["Low", "Medium", "High"]
+    best_practice_ref: str = ""
+    completion_criteria: str = ""
+
+
+class ProfileOptimizationMetaResponse(BaseModel):
+    """Phase 7 profile optimization acquisition metadata."""
+
+    source: Literal["cache", "generated", "no_gaps"]
+    profile_optimization_updated_at: Optional[str] = None
+    active_batch_index: int = Field(default=0, ge=0)
+    remaining_in_backlog: int = Field(default=0, ge=0)
+    message: Optional[str] = None
+
+
 class ProfileAnalysisErrorResponse(BaseModel):
     """Structured failure from the LinkedIn analysis pipeline (Phases 1–7)."""
 
@@ -197,6 +234,9 @@ class LinkedInProfileAcquireResponse(BaseModel):
     recommendations: Optional[List[TopicRecommendationResponse]] = None
     recommendations_meta: Optional[TopicRecommendationsMetaResponse] = None
     recommendations_error: Optional[str] = None
+    profile_optimization: Optional[List[ProfileOptimizationResponse]] = None
+    profile_optimization_meta: Optional[ProfileOptimizationMetaResponse] = None
+    profile_optimization_error: Optional[str] = None
     last_completed_phase: Optional[int] = Field(
         None,
         ge=1,

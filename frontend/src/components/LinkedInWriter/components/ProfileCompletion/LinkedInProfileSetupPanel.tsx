@@ -49,14 +49,18 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   } = useLinkedInProfileCompletion();
 
   const {
+    optimizationPanelState,
     isOptimizationOpen,
     isOptimizationLoading,
     isOptimizationDisabled,
-    optimizationDebug,
-    optimizationDebugError,
+    recommendations: optimizationRecommendations,
+    optimizationMeta,
+    optimizationError,
+    optimizationUserError,
     openOptimizationPanel,
     closeOptimizationPanel,
-    retryOptimizationDebug,
+    retryOptimization,
+    refreshOptimization,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
   const handleImproveProfile = () => {
@@ -99,6 +103,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         <LinkedInAdvisorActionsBar
           foundationStatus={foundationStatus}
           isTopicRunning={isAnalyzing}
+          isOptimizationRunning={isOptimizationLoading}
           isOptimizationDisabled={isOptimizationDisabled}
           onImproveProfile={handleImproveProfile}
           onGetTopicIdeas={handleGetTopicIdeas}
@@ -115,21 +120,32 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       <ProfileOptimizationPanel
         isOpen={isOptimizationOpen}
         isLoading={isOptimizationLoading}
-        optimizationDebug={optimizationDebug}
+        recommendations={optimizationRecommendations}
+        optimizationMeta={optimizationMeta}
+        noGapsMessage={
+          optimizationMeta?.source === 'no_gaps' ? optimizationMeta.message ?? null : null
+        }
         onClose={closeOptimizationPanel}
+        onRefresh={() => {
+          void refreshOptimization();
+        }}
+        isRefreshing={isOptimizationLoading}
       />
 
-      {optimizationDebugError && (
+      {(optimizationError || optimizationUserError) && optimizationPanelState === 'error' && (
         <AnalysisErrorAlert
-          error={{
-            failed_phase: 7,
-            phase_label: 'Profile Optimization',
-            error_code: 'rubric_debug_failed',
-            user_message: 'Could not analyze profile gaps. Please try again.',
-            debug_message: optimizationDebugError,
-          }}
+          error={
+            optimizationError ?? {
+              failed_phase: 7,
+              phase_label: 'Profile Optimization',
+              error_code: 'optimization_failed',
+              user_message:
+                optimizationUserError ??
+                'We could not load profile suggestions right now. Please try again.',
+            }
+          }
           onRetry={() => {
-            void retryOptimizationDebug();
+            void retryOptimization();
           }}
           isRetrying={isOptimizationLoading}
         />
@@ -172,8 +188,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         isProfileComplete={isProfileComplete}
         foundationError={foundationError}
         topicError={topicError}
+        optimizationError={optimizationError}
         intelligenceSource={aiProfileIntelligenceMeta?.source ?? null}
-        optimizationDebug={optimizationDebug}
       />
     </div>
   );
