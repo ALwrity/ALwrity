@@ -29,6 +29,12 @@ def execute_linkedin_video_generation_task(
     video_storage = LinkedInVideoStorage()
 
     try:
+        logger.info(
+            "[LinkedInVideoGen] Task started task_id={} user={} model={}",
+            task_id,
+            user_id,
+            model or "default",
+        )
         task_manager.update_task_status(
             task_id,
             "processing",
@@ -120,15 +126,21 @@ def execute_linkedin_video_generation_task(
                     },
                 )
                 logger.info(
-                    f"[LinkedInVideo] Saved to asset library: asset_id={asset_id}, "
-                    f"storage_path={store_result.get('storage_path')}, "
-                    f"asset_library_path=/asset-library?source_module=linkedin_writer&asset_type=video"
+                    "[LinkedInVideoGen] Saved to asset library asset_id={} storage_path={}",
+                    asset_id,
+                    store_result.get("storage_path"),
                 )
             finally:
                 db.close()
         except Exception as e:
-            logger.warning(f"[LinkedInVideo] Failed to save to asset library: {e}")
+            logger.warning("[LinkedInVideoGen] Failed to save to asset library: {}", e)
 
+        logger.info(
+            "[LinkedInVideoGen] Task complete task_id={} video_id={} elapsed_metadata={}s",
+            task_id,
+            video_id,
+            metadata.get("generation_time"),
+        )
         task_manager.update_task_status(
             task_id,
             "completed",
@@ -148,7 +160,7 @@ def execute_linkedin_video_generation_task(
             },
         )
     except Exception as exc:
-        logger.exception(f"[LinkedInVideo] Generation failed: {exc}")
+        logger.exception("[LinkedInVideoGen] Task failed task_id={}: {}", task_id, exc)
         task_manager.update_task_status(
             task_id,
             "failed",

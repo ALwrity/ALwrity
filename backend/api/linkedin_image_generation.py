@@ -78,7 +78,7 @@ async def generate_image_prompts(request: ImagePromptRequest):
     Generate three AI-optimized image prompts for LinkedIn content
     """
     try:
-        logger.info(f"Generating image prompts for {request.content_type} about {request.topic}")
+        logger.info(f"[LinkedInImageGen] Generating image prompts for {request.content_type} about {request.topic}")
         
         # Use our LinkedIn prompt generator service
         prompts = await prompt_generator.generate_three_prompts({
@@ -88,11 +88,11 @@ async def generate_image_prompts(request: ImagePromptRequest):
             'content': request.content
         })
         
-        logger.info(f"Generated {len(prompts)} image prompts successfully")
+        logger.info(f"[LinkedInImageGen] Generated {len(prompts)} image prompts successfully")
         return prompts
         
     except Exception as e:
-        logger.error(f"Error generating image prompts: {str(e)}")
+        logger.error(f"[LinkedInImageGen] Error generating image prompts: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate image prompts: {str(e)}")
 
 @router.post("/generate-image", response_model=ImageGenerationResponse)
@@ -191,7 +191,9 @@ async def edit_linkedin_image(
         if not request.prompt or not request.prompt.strip():
             raise HTTPException(status_code=400, detail="Prompt is required for image editing")
 
-        logger.info(f"Editing LinkedIn image with prompt: {request.prompt[:100]}... for user {user_id}")
+        logger.info(
+            f"[LinkedInImageGen] Editing image prompt_len={len(request.prompt)} user={user_id}"
+        )
 
         # Get input image bytes — from image_id (fetch from storage) or image_base64 (direct decode)
         input_image_bytes = None
@@ -200,7 +202,10 @@ async def edit_linkedin_image(
             if not stored or not stored.get('success'):
                 raise HTTPException(status_code=404, detail=f"Image not found: {request.image_id}")
             input_image_bytes = stored['image_data']
-            logger.info(f"Fetched image {request.image_id} from storage ({len(input_image_bytes)} bytes)")
+            logger.info(
+                f"[LinkedInImageGen] Fetched image {request.image_id} from storage "
+                f"({len(input_image_bytes)} bytes)"
+            )
         elif request.image_base64:
             input_image_bytes = base64.b64decode(request.image_base64)
         else:
@@ -235,9 +240,12 @@ async def edit_linkedin_image(
             )
             if stored_result and stored_result.get('success'):
                 new_image_id = stored_result.get('image_id')
-                logger.info(f"Edited image stored with ID: {new_image_id}")
+                logger.info(f"[LinkedInImageGen] Edited image stored image_id={new_image_id}")
             else:
-                logger.warning(f"Edited image not stored: {stored_result.get('error', 'unknown reason')}")
+                logger.warning(
+                    f"[LinkedInImageGen] Edited image not stored: "
+                    f"{stored_result.get('error', 'unknown reason')}"
+                )
 
             return ImageEditResponse(
                 success=True,
@@ -251,7 +259,7 @@ async def edit_linkedin_image(
             )
         else:
             error_msg = image_result.get('error', 'Unknown error during image editing')
-            logger.error(f"Image editing failed: {error_msg}")
+            logger.error(f"[LinkedInImageGen] Image editing failed: {error_msg}")
             return ImageEditResponse(
                 success=False,
                 error=error_msg
@@ -260,7 +268,7 @@ async def edit_linkedin_image(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error editing LinkedIn image: {str(e)}", exc_info=True)
+        logger.error(f"[LinkedInImageGen] Error editing image: {str(e)}", exc_info=True)
         return ImageEditResponse(
             success=False,
             error=f"Failed to edit image: {str(e)}"
@@ -292,7 +300,7 @@ async def get_image_status(
                 "error": "Image not found"
             }
     except Exception as e:
-        logger.error(f"Error checking image status: {str(e)}")
+        logger.error(f"[LinkedInImageGen] Error checking image status: {str(e)}")
         return {
             "success": False,
             "status": "error",
@@ -323,7 +331,7 @@ async def get_generated_image(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving image: {str(e)}")
+        logger.error(f"[LinkedInImageGen] Error retrieving image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve image: {str(e)}")
 
 @router.delete("/images/{image_id}")
@@ -342,7 +350,7 @@ async def delete_generated_image(
         else:
             return {"success": False, "message": "Failed to delete image"}
     except Exception as e:
-        logger.error(f"Error deleting image: {str(e)}")
+        logger.error(f"[LinkedInImageGen] Error deleting image: {str(e)}")
         return {"success": False, "error": str(e)}
 
 # Health check endpoint
@@ -387,7 +395,7 @@ async def health_check():
             "services": services
         }
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
+        logger.error(f"[LinkedInImageGen] Health check failed: {str(e)}")
         return {
             "status": "unhealthy",
             "error": str(e)

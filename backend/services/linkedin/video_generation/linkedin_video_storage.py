@@ -39,7 +39,10 @@ class LinkedInVideoStorage:
 
         self.videos_path.mkdir(parents=True, exist_ok=True)
         self.metadata_path.mkdir(parents=True, exist_ok=True)
-        logger.info(f"LinkedIn Video Storage initialized at {self.base_storage_path}")
+        logger.info(
+            "[LinkedInVideoGen] Storage initialized at {}",
+            self.base_storage_path,
+        )
 
     def _generate_video_id(self, video_data: bytes, metadata: Dict[str, Any]) -> str:
         hash_input = (
@@ -97,6 +100,12 @@ class LinkedInVideoStorage:
             with open(metadata_path, "w", encoding="utf-8") as f:
                 json.dump(meta, f, indent=2)
 
+            logger.info(
+                "[LinkedInVideoGen] Stored video_id={} path={} size={} bytes",
+                video_id,
+                video_path,
+                len(video_data),
+            )
             return {
                 "success": True,
                 "video_id": video_id,
@@ -104,7 +113,7 @@ class LinkedInVideoStorage:
                 "file_url": f"/api/linkedin/videos/{video_id}",
             }
         except Exception as e:
-            logger.error(f"Error storing LinkedIn video: {e}")
+            logger.error("[LinkedInVideoGen] Error storing video: {}", e)
             return {"success": False, "error": f"Video storage failed: {e}"}
 
     async def retrieve_video(
@@ -137,7 +146,7 @@ class LinkedInVideoStorage:
                 "metadata": metadata,
             }
         except Exception as e:
-            logger.error(f"Error retrieving LinkedIn video {video_id}: {e}")
+            logger.error("[LinkedInVideoGen] Error retrieving video {}: {}", video_id, e)
             return {"success": False, "error": f"Video retrieval failed: {e}"}
 
     async def get_storage_stats(self) -> Dict[str, Any]:

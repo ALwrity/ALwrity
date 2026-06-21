@@ -84,7 +84,7 @@ async def generate_linkedin_video(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to start LinkedIn video generation: {e}")
+        logger.error(f"[LinkedInVideoGen] Failed to start video generation: {e}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to start video generation: {e}",
@@ -110,7 +110,7 @@ async def get_video_generation_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error checking video generation status: {e}")
+        logger.error(f"[LinkedInVideoGen] Error checking video generation status: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get task status: {e}")
 
 
@@ -134,7 +134,7 @@ async def get_generated_video(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error retrieving LinkedIn video: {e}")
+        logger.error(f"[LinkedInVideoGen] Error retrieving video: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve video: {e}")
 
 
@@ -169,5 +169,5 @@ async def video_generation_health_check():
 
         return {"status": "healthy" if all_healthy else "degraded", "services": services}
     except Exception as e:
-        logger.error(f"Video health check failed: {e}")
+        logger.error(f"[LinkedInVideoGen] Health check failed: {e}")
         return {"status": "unhealthy", "error": str(e)}

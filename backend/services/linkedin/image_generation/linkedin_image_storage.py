@@ -63,7 +63,10 @@ class LinkedInImageStorage:
         self.max_images_per_user = 100  # Maximum images per user
         self._uuid_pattern = re.compile(r'^[a-f0-9]{16}$')
         
-        logger.info(f"LinkedIn Image Storage initialized at {self.base_storage_path}")
+        logger.info(
+            "[LinkedInImageGen] Storage initialized at {}",
+            self.base_storage_path,
+        )
     
     def _create_storage_directories(self):
         """Create necessary storage directories."""
@@ -78,10 +81,10 @@ class LinkedInImageStorage:
             (self.images_path / "carousels").mkdir(exist_ok=True)
             (self.images_path / "video_scripts").mkdir(exist_ok=True)
             
-            logger.info("Storage directories created successfully")
+            logger.info("[LinkedInImageGen] Storage directories created successfully")
             
         except Exception as e:
-            logger.error(f"Error creating storage directories: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error creating storage directories: {str(e)}")
             raise
     
     async def store_image(
@@ -177,7 +180,7 @@ class LinkedInImageStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error storing LinkedIn image: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error storing image: {str(e)}")
             return {
                 'success': False,
                 'error': f"Image storage failed: {str(e)}"
@@ -226,7 +229,7 @@ class LinkedInImageStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error retrieving LinkedIn image {image_id}: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error retrieving image {image_id}: {str(e)}")
             return {
                 'success': False,
                 'error': f"Image retrieval failed: {str(e)}"
@@ -258,14 +261,14 @@ class LinkedInImageStorage:
             # Delete image file
             if image_path.exists():
                 image_path.unlink()
-                logger.info(f"Deleted image file: {image_path}")
+                logger.info(f"[LinkedInImageGen] Deleted image file: {image_path}")
             
             # Delete metadata
             _, metadata_base = self._get_workspace_paths(user_id)
             metadata_path = metadata_base / f"{image_id}.json"
             if metadata_path.exists():
                 metadata_path.unlink()
-                logger.info(f"Deleted metadata file: {metadata_path}")
+                logger.info(f"[LinkedInImageGen] Deleted metadata file: {metadata_path}")
             
             # Update storage statistics
             await self._update_storage_stats()
@@ -276,7 +279,7 @@ class LinkedInImageStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error deleting LinkedIn image {image_id}: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error deleting image {image_id}: {str(e)}")
             return {
                 'success': False,
                 'error': f"Image deletion failed: {str(e)}"
@@ -327,7 +330,7 @@ class LinkedInImageStorage:
                         images.append(metadata)
                     
                 except Exception as e:
-                    logger.warning(f"Error reading metadata file {metadata_file}: {str(e)}")
+                    logger.warning(f"[LinkedInImageGen] Error reading metadata file {metadata_file}: {str(e)}")
                     continue
             
             return {
@@ -339,7 +342,7 @@ class LinkedInImageStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error listing LinkedIn images: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error listing images: {str(e)}")
             return {
                 'success': False,
                 'error': f"Image listing failed: {str(e)}"
@@ -386,7 +389,7 @@ class LinkedInImageStorage:
                                 errors.append(f"Failed to delete {image_id}: {delete_result['error']}")
                     
                 except Exception as e:
-                    logger.warning(f"Error processing metadata file {metadata_file}: {str(e)}")
+                    logger.warning(f"[LinkedInImageGen] Error processing metadata file {metadata_file}: {str(e)}")
                     continue
             
             return {
@@ -397,7 +400,7 @@ class LinkedInImageStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error cleaning up old LinkedIn images: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error cleaning up old images: {str(e)}")
             return {
                 'success': False,
                 'error': f"Cleanup failed: {str(e)}"
@@ -443,7 +446,7 @@ class LinkedInImageStorage:
             }
             
         except Exception as e:
-            logger.error(f"Error getting storage stats: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error getting storage stats: {str(e)}")
             return {
                 'success': False,
                 'error': f"Failed to get storage stats: {str(e)}"
@@ -464,7 +467,7 @@ class LinkedInImageStorage:
                         count += sum(1 for f in content_dir.glob("*.png") if f.is_file())
             return count
         except Exception as e:
-            logger.warning(f"Error counting images for user {user_id}: {e}")
+            logger.warning(f"[LinkedInImageGen] Error counting images for user {user_id}: {e}")
             return 0
     
     async def _check_disk_space(self, required_bytes: int) -> bool:
@@ -537,7 +540,7 @@ class LinkedInImageStorage:
                     if 'db' in locals():
                         db.close()
             except Exception as e:
-                logger.warning(f"Failed to resolve user workspace path: {e}")
+                logger.warning(f"[LinkedInImageGen] Failed to resolve user workspace path: {e}")
         
         return (self.images_path, self.metadata_path)
 
@@ -566,11 +569,11 @@ class LinkedInImageStorage:
             with open(storage_path, 'wb') as f:
                 f.write(image_data)
             
-            logger.info(f"Stored image file: {storage_path}")
+            logger.info(f"[LinkedInImageGen] Stored image file: {storage_path}")
             return True
             
         except Exception as e:
-            logger.error(f"Error storing image file: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error storing image file: {str(e)}")
             return False
     
     async def _store_metadata(self, image_id: str, metadata: Dict[str, Any], storage_path: Path, user_id: Optional[str] = None) -> bool:
@@ -590,11 +593,11 @@ class LinkedInImageStorage:
             with open(metadata_path, 'w') as f:
                 json.dump(metadata, f, indent=2, default=str)
             
-            logger.info(f"Stored metadata: {metadata_path}")
+            logger.info(f"[LinkedInImageGen] Stored metadata: {metadata_path}")
             return True
             
         except Exception as e:
-            logger.error(f"Error storing metadata: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error storing metadata: {str(e)}")
             return False
     
     async def _find_image_by_id(self, image_id: str, user_id: Optional[str] = None) -> Optional[Path]:
@@ -627,7 +630,7 @@ class LinkedInImageStorage:
             Dict containing image metadata if found
         """
         if not self._validate_image_id(image_id):
-            logger.warning(f"Invalid image ID format in metadata request: {image_id}")
+            logger.warning(f"[LinkedInImageGen] Invalid image ID format in metadata request: {image_id}")
             return None
         return await self._load_metadata(image_id, user_id)
 
@@ -640,7 +643,7 @@ class LinkedInImageStorage:
                 with open(metadata_path, 'r') as f:
                     return json.load(f)
         except Exception as e:
-            logger.error(f"Error loading metadata for {image_id}: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error loading metadata for {image_id}: {str(e)}")
         
         return None
     
@@ -649,9 +652,9 @@ class LinkedInImageStorage:
         try:
             if storage_path.exists():
                 storage_path.unlink()
-                logger.info(f"Cleaned up failed storage: {storage_path}")
+                logger.info(f"[LinkedInImageGen] Cleaned up failed storage: {storage_path}")
         except Exception as e:
-            logger.error(f"Error cleaning up failed storage: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error cleaning up failed storage: {str(e)}")
     
     async def _update_storage_stats(self):
         """Update storage statistics (placeholder for future implementation)."""

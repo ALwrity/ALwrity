@@ -150,6 +150,7 @@ def setup_clean_logging():
             'content_analyzer',
             'linkedin_prompt_generator',
             'linkedin_image_storage',
+            'linkedin_video_storage',
             'hallucination_detector',
             'writing_assistant',
             'enhanced_linguistic_analyzer',
@@ -217,6 +218,24 @@ def setup_clean_logging():
             level="INFO",
             format=common_format,
             filter=linkedin_image_filter,
+            backtrace=True,
+            diagnose=True,
+        )
+
+        def linkedin_video_filter(record):
+            msg = record.get("message", "")
+            name = record.get("name", "")
+            return (
+                "[LinkedInVideoGen]" in msg
+                or "api.linkedin_video_generation" in name
+                or "services.linkedin.video_generation" in name
+            )
+
+        logger.add(
+            sys.stdout.write,
+            level="INFO",
+            format=common_format,
+            filter=linkedin_video_filter,
             backtrace=True,
             diagnose=True,
         )

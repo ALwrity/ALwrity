@@ -174,7 +174,9 @@ class LinkedInImageGenerator:
         """
         try:
             start_time = datetime.now()
-            logger.info(f"Starting LinkedIn image editing with prompt: {edit_prompt[:100]}...")
+            logger.info(
+                f"[LinkedInImageGen] Starting image edit prompt_len={len(edit_prompt)} user={user_id}"
+            )
             
             # Enhance edit prompt for LinkedIn optimization
             enhanced_edit_prompt = self._enhance_edit_prompt_for_linkedin(
@@ -212,7 +214,7 @@ class LinkedInImageGenerator:
                     },
                 }
             else:
-                logger.warning("LinkedIn image editing returned no result")
+                logger.warning("[LinkedInImageGen] Image editing returned no result")
                 return {
                     'success': False,
                     'error': 'Image editing returned no result',
@@ -220,7 +222,7 @@ class LinkedInImageGenerator:
                 }
             
         except Exception as e:
-            logger.error(f"Error in LinkedIn image editing: {str(e)}", exc_info=True)
+            logger.error(f"[LinkedInImageGen] Error in image editing: {str(e)}", exc_info=True)
             return {
                 'success': False,
                 'error': f"Image editing failed: {str(e)}",
@@ -352,12 +354,17 @@ class LinkedInImageGenerator:
             
             # Validate resolution
             if width < self.min_resolution[0] or height < self.min_resolution[1]:
-                logger.warning(f"Generated image resolution {width}x{height} below minimum {self.min_resolution}")
+                logger.warning(
+                    f"[LinkedInImageGen] Resolution {width}x{height} below minimum {self.min_resolution}"
+                )
             
             # Validate file size
             image_size_mb = len(image_data) / (1024 * 1024)
             if image_size_mb > self.max_file_size_mb:
-                logger.warning(f"Generated image size {image_size_mb:.2f}MB exceeds maximum {self.max_file_size_mb}MB")
+                logger.warning(
+                    f"[LinkedInImageGen] Image size {image_size_mb:.2f}MB exceeds maximum "
+                    f"{self.max_file_size_mb}MB"
+                )
             
             # LinkedIn-specific optimizations
             optimized_image = self._optimize_for_linkedin(image, content_context)
@@ -376,7 +383,7 @@ class LinkedInImageGenerator:
             }
             
         except Exception as e:
-            logger.error(f"Error processing generated image: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error processing generated image: {str(e)}")
             # Return original image data if processing fails
             return {
                 'image_data': image_data,
@@ -406,7 +413,9 @@ class LinkedInImageGenerator:
                 new_width = int(width * ratio)
                 new_height = int(height * ratio)
                 image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                logger.info(f"Resized image to {new_width}x{new_height} for LinkedIn optimization")
+                logger.info(
+                    f"[LinkedInImageGen] Resized image to {new_width}x{new_height} for LinkedIn optimization"
+                )
             
             # Convert to RGB if necessary (for JPEG compatibility)
             if image.mode in ('RGBA', 'LA', 'P'):
@@ -420,7 +429,7 @@ class LinkedInImageGenerator:
             return image
             
         except Exception as e:
-            logger.error(f"Error optimizing image for LinkedIn: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error optimizing image for LinkedIn: {str(e)}")
             return image  # Return original if optimization fails
     
     async def validate_image_for_linkedin(self, image_data: bytes) -> Dict[str, Any]:
@@ -459,7 +468,7 @@ class LinkedInImageGenerator:
             return validation_results
             
         except Exception as e:
-            logger.error(f"Error validating image: {str(e)}")
+            logger.error(f"[LinkedInImageGen] Error validating image: {str(e)}")
             return {
                 'resolution_ok': False,
                 'aspect_ratio_suitable': False,
