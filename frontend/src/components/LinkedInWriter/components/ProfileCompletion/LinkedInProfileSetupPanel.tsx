@@ -1,12 +1,13 @@
 import React from 'react';
 
 import { useLinkedInProfileCompletion } from '../../../../hooks/useLinkedInProfileCompletion';
+import { useLinkedInProfileOptimization } from '../../../../hooks/useLinkedInProfileOptimization';
 import { LinkedInConnectedProfileCard } from '../LinkedInConnectedProfileCard';
 import { TopicRecommendationsPanel } from '../TopicRecommendations/TopicRecommendationsPanel';
-import {
-  AnalysisErrorAlert,
-  TopicSuggestionIntro,
-} from '../TopicRecommendations/TopicSuggestionIntro';
+import { AnalysisErrorAlert } from '../TopicRecommendations/TopicSuggestionIntro';
+import { LinkedInAdvisorActionsBar } from '../ProfileOptimization/LinkedInAdvisorActionsBar';
+import { LinkedInProfileDebugStrip } from '../ProfileOptimization/LinkedInProfileDebugStrip';
+import { ProfileOptimizationPanel } from '../ProfileOptimization/ProfileOptimizationPanel';
 import { ProfileCompletionForm } from './ProfileCompletionForm';
 
 interface LinkedInProfileSetupPanelProps {
@@ -25,8 +26,11 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   disconnectError,
 }) => {
   const {
-    analysisState,
-    analysisError,
+    foundationStatus,
+    foundationError,
+    lastCompletedPhase,
+    topicState,
+    topicError,
     isAnalyzing,
     questions,
     isSubmitting,
@@ -37,21 +41,41 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     isRecommendationsExpanded,
     collapseRecommendations,
     expandRecommendations,
+    isProfileComplete,
+    aiProfileIntelligenceMeta,
+    loadFoundation,
     runTopicAnalysis,
     submitCompletion,
   } = useLinkedInProfileCompletion();
 
-  const handleRunAnalysis = () => {
-    void runTopicAnalysis();
+  const {
+    isOptimizationOpen,
+    isOptimizationDisabled,
+    openOptimizationPanel,
+    closeOptimizationPanel,
+  } = useLinkedInProfileOptimization(isProfileComplete);
+
+  const handleGetTopicIdeas = () => {
+    void runTopicAnalysis(false);
   };
 
-  const handleRetry = () => {
-    void runTopicAnalysis();
+  const handleRetryTopic = () => {
+    void runTopicAnalysis(false);
   };
 
   const handleRefreshRecommendations = () => {
-    void runTopicAnalysis();
+    void runTopicAnalysis(true);
   };
+
+  const handleRetryFoundation = () => {
+    void loadFoundation();
+  };
+
+  const showAdvisorBar =
+    foundationStatus === 'loading' ||
+    foundationStatus === 'ready' ||
+    foundationStatus === 'needs_completion' ||
+    (foundationStatus === 'error' && !questions.length);
 
   return (
     <div style={{ width: '100%', maxWidth: 1200 }}>
@@ -63,15 +87,26 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         disconnectError={disconnectError}
       />
 
-      {analysisState === 'idle' && (
-        <TopicSuggestionIntro isAnalyzing={false} onRunAnalysis={handleRunAnalysis} />
+      {showAdvisorBar && (
+        <LinkedInAdvisorActionsBar
+          foundationStatus={foundationStatus}
+          isTopicRunning={isAnalyzing}
+          isOptimizationDisabled={isOptimizationDisabled}
+          onImproveProfile={openOptimizationPanel}
+          onGetTopicIdeas={handleGetTopicIdeas}
+        />
       )}
 
-      {analysisState === 'running' && (
-        <TopicSuggestionIntro isAnalyzing onRunAnalysis={handleRunAnalysis} />
+      {foundationStatus === 'error' && foundationError && (
+        <AnalysisErrorAlert
+          error={foundationError}
+          onRetry={handleRetryFoundation}
+        />
       )}
 
-      {analysisState === 'needs_completion' && questions.length > 0 && (
+      <ProfileOptimizationPanel isOpen={isOptimizationOpen} onClose={closeOptimizationPanel} />
+
+      {foundationStatus === 'needs_completion' && questions.length > 0 && (
         <ProfileCompletionForm
           questions={questions}
           onSubmit={submitCompletion}
@@ -80,28 +115,36 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         />
       )}
 
-      {analysisState === 'error' && analysisError && (
+      {topicState === 'error' && topicError && (
         <AnalysisErrorAlert
-          error={analysisError}
-          onRetry={handleRetry}
+          error={topicError}
+          onRetry={handleRetryTopic}
           isRetrying={isAnalyzing}
         />
       )}
 
-      {analysisState === 'complete' && (
+      {topicState === 'complete' && (
         <TopicRecommendationsPanel
           recommendations={recommendations}
           recommendationsMeta={recommendationsMeta}
           recommendationsError={recommendationsError}
-          analysisError={analysisError}
+          analysisError={topicError}
           isExpanded={isRecommendationsExpanded}
           isRefreshing={isAnalyzing}
           onCollapse={collapseRecommendations}
           onExpand={expandRecommendations}
           onRefresh={handleRefreshRecommendations}
-          onRetry={handleRetry}
+          onRetry={handleRetryTopic}
         />
       )}
+
+      <LinkedInProfileDebugStrip
+        lastCompletedPhase={lastCompletedPhase}
+        isProfileComplete={isProfileComplete}
+        foundationError={foundationError}
+        topicError={topicError}
+        intelligenceSource={aiProfileIntelligenceMeta?.source ?? null}
+      />
     </div>
   );
 };

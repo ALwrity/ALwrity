@@ -765,6 +765,18 @@ async def get_linkedin_profile(
         False,
         description="Force regeneration of topic recommendations (Phase 6)",
     ),
+    include_recommendations: bool = Query(
+        False,
+        description="Load topic recommendations from cache or generate on miss (Phase 6)",
+    ),
+    include_profile_optimization: bool = Query(
+        False,
+        description="Load profile optimization recommendations (Phase 7 — not yet implemented)",
+    ),
+    refresh_profile_optimization: bool = Query(
+        False,
+        description="Force regeneration of profile optimization (Phase 7 — not yet implemented)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInProfileAcquireResponse:
     """
@@ -773,17 +785,23 @@ async def get_linkedin_profile(
     Phase 1: cache-first normalized profile from ``linkedin_analysis_context``.
     Phase 2: cache-first ``profile_context`` built from the normalized profile.
     Phase 3/4: ``profile_validation`` and completion questions when incomplete.
-    Phase 5: ``ai_profile_intelligence`` when profile is complete.
-    Phase 6: ``recommendations`` when profile is complete and intelligence exists.
+    Phase 5: ``ai_profile_intelligence`` when profile is complete (cache-first).
+    Phase 6: ``recommendations`` only when ``include_recommendations`` or
+    ``refresh_recommendations`` is true.
+    Phase 7: profile optimization — stub until Step 5 (flags accepted, no loader yet).
     """
     user_id = _user_id(current_user)
     logger.info(
         "[LinkedInAnalysis] pipeline start user_id={} refresh={} refresh_intelligence={} "
-        "refresh_recommendations={}",
+        "refresh_recommendations={} include_recommendations={} "
+        "include_profile_optimization={} refresh_profile_optimization={}",
         user_id,
         refresh,
         refresh_intelligence,
         refresh_recommendations,
+        include_recommendations,
+        include_profile_optimization,
+        refresh_profile_optimization,
     )
 
     last_completed_phase = 0
@@ -880,7 +898,16 @@ async def get_linkedin_profile(
     recommendations: Optional[List[TopicRecommendationResponse]] = None
     recommendations_meta: Optional[TopicRecommendationsMetaResponse] = None
     recommendations_error: Optional[str] = None
-    if ai_profile_intelligence is not None:
+    should_load_recommendations = refresh_recommendations or include_recommendations
+    if include_profile_optimization or refresh_profile_optimization:
+        logger.info(
+            "[ProfileOptimization] GET /profile Phase 7 requested but not implemented "
+            "user_id={} include_profile_optimization={} refresh_profile_optimization={}",
+            user_id,
+            include_profile_optimization,
+            refresh_profile_optimization,
+        )
+    if ai_profile_intelligence is not None and should_load_recommendations:
         intelligence_dict = ai_profile_intelligence.model_dump()
         (
             recommendations,
@@ -898,6 +925,14 @@ async def get_linkedin_profile(
             analysis_error = recommendations_analysis_error
         elif recommendations:
             last_completed_phase = 6
+    elif ai_profile_intelligence is not None and not should_load_recommendations:
+        logger.info(
+            "[TopicRecommendation] GET /profile skipping recommendations — not requested "
+            "user_id={} include_recommendations={} refresh_recommendations={}",
+            user_id,
+            include_recommendations,
+            refresh_recommendations,
+        )
     elif profile_validation.get("is_profile_complete") and intelligence_error is None:
         logger.info(
             "[TopicRecommendation] GET /profile skipping recommendations — no intelligence "

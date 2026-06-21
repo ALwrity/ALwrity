@@ -355,26 +355,50 @@ export async function getLinkedInPersonalAnalytics(
   return response.data;
 }
 
-/** Normalized profile, context, validation, completion, intelligence, and recommendations (Phases 1–6). */
+/** Options for GET /api/linkedin-social/profile pipeline phases. */
+export interface LinkedInProfileRequestOptions {
+  refresh?: boolean;
+  refreshIntelligence?: boolean;
+  includeRecommendations?: boolean;
+  refreshRecommendations?: boolean;
+  includeProfileOptimization?: boolean;
+  refreshProfileOptimization?: boolean;
+}
+
+/** Normalized profile, context, validation, completion, intelligence, and optional advisors. */
 export async function getLinkedInProfile(
-  refresh = false,
-  refreshIntelligence = false,
-  refreshRecommendations = false
+  options: LinkedInProfileRequestOptions = {}
 ): Promise<LinkedInProfileAcquireResponse> {
   const params: Record<string, boolean> = {};
-  if (refresh) {
+  if (options.refresh) {
     params.refresh = true;
   }
-  if (refreshIntelligence) {
+  if (options.refreshIntelligence) {
     params.refresh_intelligence = true;
   }
-  if (refreshRecommendations) {
+  if (options.includeRecommendations) {
+    params.include_recommendations = true;
+  }
+  if (options.refreshRecommendations) {
     params.refresh_recommendations = true;
   }
+  if (options.includeProfileOptimization) {
+    params.include_profile_optimization = true;
+  }
+  if (options.refreshProfileOptimization) {
+    params.refresh_profile_optimization = true;
+  }
 
-  // Phases 5–6 run Gemini LLM calls; full pipeline can exceed the 60s default timeout.
-  const client =
-    refreshIntelligence || refreshRecommendations ? longRunningApiClient : apiClient;
+  const needsLongRunningClient =
+    options.refreshIntelligence ||
+    options.refreshRecommendations ||
+    options.includeRecommendations ||
+    options.refreshProfileOptimization ||
+    options.includeProfileOptimization;
+
+  const client = needsLongRunningClient ? longRunningApiClient : apiClient;
+
+  console.info('[LinkedInProfile] GET /profile', params);
 
   const response = await client.get(`${BASE}/profile`, {
     params: Object.keys(params).length > 0 ? params : undefined,
@@ -382,10 +406,36 @@ export async function getLinkedInProfile(
   return response.data;
 }
 
-/** Run the full LinkedIn analysis pipeline (Phases 1–6) for topic suggestions. */
-export async function runLinkedInTopicAnalysis(): Promise<LinkedInProfileAcquireResponse> {
-  console.info('[TopicSuggestion] starting full analysis pipeline (Phases 1–6)');
-  return getLinkedInProfile(true, true, true);
+/** Phases 1–5 only — foundation load on LinkedIn Writer mount (no Phase 6/7). */
+export async function getLinkedInProfileFoundation(
+  refresh = false,
+  refreshIntelligence = false
+): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[LinkedInProfileCompletion] loading foundation (Phases 1–5)', {
+    refresh,
+    refreshIntelligence,
+  });
+  return getLinkedInProfile({ refresh, refreshIntelligence });
+}
+
+export interface RunLinkedInTopicAnalysisOptions {
+  refresh?: boolean;
+  refreshIntelligence?: boolean;
+  /** Bypass topic recommendation cache and force Phase 6 LLM regen. */
+  forceRegenerate?: boolean;
+}
+
+/** Topic advisor (Phase 6) — cache-first unless forceRegenerate. */
+export async function runLinkedInTopicAnalysis(
+  options: RunLinkedInTopicAnalysisOptions = {}
+): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[TopicSuggestion] loading topic recommendations (Phase 6)', options);
+  return getLinkedInProfile({
+    refresh: options.refresh ?? false,
+    refreshIntelligence: options.refreshIntelligence ?? false,
+    includeRecommendations: true,
+    refreshRecommendations: options.forceRegenerate ?? false,
+  });
 }
 
 const _PHASE_LABELS: Record<number, string> = {
