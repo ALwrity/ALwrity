@@ -86,24 +86,26 @@ async def get_latest_avatar(
     """Get the latest generated brand avatar for the user."""
     try:
         user_id = _extract_user_id(current_user)
-        
-        logger.warning(f"[latest-avatar] Looking for avatar for user_id: {user_id}")
-        
+
+        # Per-call status reports — demoted from warning to debug
+        # so they don't pollute the log on every dashboard refresh.
+        logger.debug(f"[latest-avatar] Looking for avatar for user_id: {user_id}")
+
         # Search for assets that are either:
         # 1. Saved with source_module=BRAND_AVATAR_GENERATOR (new)
         # 2. Saved with source_module=STORY_WRITER but have metadata category='brand_avatar' (legacy)
-        
+
         # Fetch candidates (limit to recent 20 to avoid performance issues)
         candidates = db.query(ContentAsset).filter(
             ContentAsset.user_id == user_id,
             ContentAsset.asset_type == AssetType.IMAGE,
             ContentAsset.source_module.in_([
-                AssetSource.BRAND_AVATAR_GENERATOR, 
+                AssetSource.BRAND_AVATAR_GENERATOR,
                 AssetSource.STORY_WRITER
             ])
         ).order_by(desc(ContentAsset.created_at)).limit(50).all()
-        
-        logger.warning(f"[latest-avatar] Found {len(candidates)} candidate(s)")
+
+        logger.debug(f"[latest-avatar] Found {len(candidates)} candidate(s)")
         
         asset = None
         for candidate in candidates:
