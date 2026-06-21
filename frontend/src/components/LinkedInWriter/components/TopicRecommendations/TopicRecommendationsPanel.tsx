@@ -8,6 +8,7 @@ import type {
 import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
 import { TopicRecommendationCard } from './TopicRecommendationCard';
 import { formatRelativeUpdatedAt } from './topicRecommendationLabels';
+import { TopicRecommendationsSummaryBar } from './TopicRecommendationsSummaryBar';
 import { AnalysisErrorAlert } from './TopicSuggestionIntro';
 
 interface TopicRecommendationsPanelProps {
@@ -15,7 +16,11 @@ interface TopicRecommendationsPanelProps {
   recommendationsMeta: LinkedInTopicRecommendationsMeta | null;
   recommendationsError: string | null;
   analysisError?: LinkedInProfileAnalysisError | null;
+  isExpanded?: boolean;
   isRefreshing?: boolean;
+  onCollapse?: () => void;
+  onExpand?: () => void;
+  onRefresh?: () => void;
   onRetry?: () => void;
 }
 
@@ -33,22 +38,77 @@ const SKELETON_CARD_STYLE: React.CSSProperties = {
 
 const SKELETON_COUNT = 3;
 
+const hideTopicsButtonStyle: React.CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 8,
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#fff',
+  color: '#475569',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
+const panelBackgroundGlowStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: '-50%',
+  left: '-50%',
+  width: '200%',
+  height: '200%',
+  background:
+    'radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)',
+  zIndex: 0,
+};
+
 export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps> = ({
   recommendations,
   recommendationsMeta,
   recommendationsError,
   analysisError = null,
+  isExpanded = true,
   isRefreshing = false,
+  onCollapse,
+  onExpand,
+  onRefresh,
   onRetry,
 }) => {
   const updatedLabel = formatRelativeUpdatedAt(
     recommendationsMeta?.recommendations_updated_at
   );
+  const recommendationCount = recommendations?.length ?? 0;
   const showSkeleton = isRefreshing && !recommendations?.length;
   const displayError = analysisError?.user_message ?? recommendationsError;
   const showError = Boolean(displayError) && !showSkeleton;
   const showEmpty =
     !showSkeleton && !showError && (!recommendations || recommendations.length === 0);
+  const showRecommendationCards =
+    !showSkeleton && !showError && recommendations && recommendations.length > 0;
+
+  if (!isExpanded && showRecommendationCards && onExpand) {
+    return (
+      <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
+        <div
+          style={{
+            ...linkedInPlaceholderCardStyles.inner,
+            minHeight: 'unset',
+            padding: '16px 20px',
+          }}
+        >
+          <div style={panelBackgroundGlowStyle} />
+          <div style={{ position: 'relative', zIndex: 1 }}>
+            <TopicRecommendationsSummaryBar
+              recommendationCount={recommendationCount}
+              updatedLabel={updatedLabel}
+              isRefreshing={isRefreshing}
+              onExpand={onExpand}
+              onRefresh={onRefresh}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
@@ -59,38 +119,50 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
           padding: '20px 24px',
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            top: '-50%',
-            left: '-50%',
-            width: '200%',
-            height: '200%',
-            background:
-              'radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)',
-            zIndex: 0,
-          }}
-        />
+        <div style={panelBackgroundGlowStyle} />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ marginBottom: 16 }}>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: 18,
-                fontWeight: 700,
-                color: '#1e293b',
-              }}
-            >
-              What to write next
-            </h3>
-            <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
-              Five ideas tailored to your profile
-            </p>
-            {updatedLabel && (
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
-                {updatedLabel}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: '#1e293b',
+                }}
+              >
+                What to write next
+              </h3>
+              <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
+                Five ideas tailored to your profile
               </p>
+              {updatedLabel && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                  {updatedLabel}
+                </p>
+              )}
+            </div>
+
+            {showRecommendationCards && onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                aria-expanded
+                aria-controls="topic-recommendations-list"
+                style={hideTopicsButtonStyle}
+              >
+                Hide topics
+              </button>
             )}
           </div>
 
@@ -165,8 +237,11 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
             </p>
           )}
 
-          {!showSkeleton && !showError && recommendations && recommendations.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {showRecommendationCards && (
+            <div
+              id="topic-recommendations-list"
+              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+            >
               {recommendations.map((item, index) => (
                 <TopicRecommendationCard
                   key={item.id}

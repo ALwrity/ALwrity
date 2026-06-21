@@ -34,6 +34,9 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     recommendations,
     recommendationsMeta,
     recommendationsError,
+    isRecommendationsExpanded,
+    collapseRecommendations,
+    expandRecommendations,
     runTopicAnalysis,
     submitCompletion,
   } = useLinkedInProfileCompletion();
@@ -43,6 +46,10 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   };
 
   const handleRetry = () => {
+    void runTopicAnalysis();
+  };
+
+  const handleRefreshRecommendations = () => {
     void runTopicAnalysis();
   };
 
@@ -87,7 +94,11 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           recommendationsMeta={recommendationsMeta}
           recommendationsError={recommendationsError}
           analysisError={analysisError}
+          isExpanded={isRecommendationsExpanded}
           isRefreshing={isAnalyzing}
+          onCollapse={collapseRecommendations}
+          onExpand={expandRecommendations}
+          onRefresh={handleRefreshRecommendations}
           onRetry={handleRetry}
         />
       )}

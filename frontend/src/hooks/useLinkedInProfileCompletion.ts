@@ -94,9 +94,20 @@ export function useLinkedInProfileCompletion() {
   const [recommendationsMeta, setRecommendationsMeta] =
     useState<LinkedInTopicRecommendationsMeta | null>(null);
   const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
+  const [isRecommendationsExpanded, setIsRecommendationsExpanded] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const analysisAttemptRef = useRef(0);
+
+  const collapseRecommendations = useCallback(() => {
+    console.info(`${REC_LOG_PREFIX} user collapsed topic list`);
+    setIsRecommendationsExpanded(false);
+  }, []);
+
+  const expandRecommendations = useCallback(() => {
+    console.info(`${REC_LOG_PREFIX} user expanded topic list`);
+    setIsRecommendationsExpanded(true);
+  }, []);
 
   const applyProfileResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
     setProfileValidation(data.profile_validation ?? null);
@@ -116,6 +127,9 @@ export function useLinkedInProfileCompletion() {
 
     const nextState = resolveAnalysisState(data);
     setAnalysisState(nextState);
+    if (nextState === 'error' || nextState === 'complete') {
+      setIsRecommendationsExpanded(true);
+    }
 
     console.info(`${TOPIC_LOG_PREFIX} pipeline response applied`, {
       analysisState: nextState,
@@ -133,6 +147,7 @@ export function useLinkedInProfileCompletion() {
     setAnalysisState('running');
     setAnalysisError(null);
     setRecommendationsError(null);
+    setIsRecommendationsExpanded(true);
 
     try {
       await waitForBackendCooldown();
@@ -149,6 +164,7 @@ export function useLinkedInProfileCompletion() {
       logProfileAnalysisError('HTTP request failed', mapped);
       setAnalysisError(mapped);
       setAnalysisState('error');
+      setIsRecommendationsExpanded(true);
       setRecommendations(null);
       setRecommendationsMeta(null);
       setRecommendationsError(mapped.user_message);
@@ -211,6 +227,9 @@ export function useLinkedInProfileCompletion() {
     recommendations,
     recommendationsMeta,
     recommendationsError,
+    isRecommendationsExpanded,
+    collapseRecommendations,
+    expandRecommendations,
     isProfileComplete,
     isSubmitting,
     submitError,
