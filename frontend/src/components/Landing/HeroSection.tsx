@@ -148,11 +148,10 @@ const HeroSection: React.FC = () => {
         bgcolor: '#000',
         color: theme.palette.getContrastText('#000'),
         overflow: 'hidden',
-        minHeight: { xs: 'auto', md: 'calc(100vh - 48px)' },
-        maxHeight: { md: 'calc(100vh - 48px)' },
+        minHeight: { xs: 'auto', md: '100vh' },
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
       }}
     >
       <Box
@@ -206,15 +205,18 @@ const HeroSection: React.FC = () => {
       <Container
         maxWidth="lg"
         sx={{
-          pt: { xs: 1.5, md: 2 },
-          pb: { xs: 1.5, md: 2 },
+          pt: { xs: 6.5, md: 7 },
+          pb: { xs: 2.5, md: 3 },
           position: 'relative',
           zIndex: 3,
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <motion.div variants={stagger} initial="hidden" animate="visible">
-          <Stack spacing={0} alignItems="center" textAlign="center">
-            {/* Top chips */}
+        <motion.div variants={stagger} initial="hidden" animate="visible" style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
+          <Stack spacing={0} alignItems="center" textAlign="center" sx={{ flex: 1, width: '100%' }}>
+            {/* Top chips — close below fixed nav */}
             <motion.div variants={fadeInUp} style={{ width: '100%' }}>
               <Stack
                 direction="row"
@@ -222,7 +224,7 @@ const HeroSection: React.FC = () => {
                 alignItems="center"
                 flexWrap="wrap"
                 justifyContent="center"
-                sx={{ mb: { xs: 2, md: 2.5 } }}
+                sx={{ mb: { xs: 2.5, md: 3.5 }, mt: 0 }}
               >
                 <Chip
                   icon={<RocketLaunch sx={{ fontSize: '1rem !important' }} />}
@@ -261,7 +263,7 @@ const HeroSection: React.FC = () => {
                   fontWeight: 900,
                   letterSpacing: '-0.03em',
                   lineHeight: 1.06,
-                  mb: { xs: 1.5, md: 2 },
+                  mb: { xs: 2.75, md: 4 },
                   color: '#fff',
                   textShadow: `
                     0 2px 10px rgba(0, 0, 0, 0.8),
@@ -289,7 +291,7 @@ const HeroSection: React.FC = () => {
                   maxWidth: '780px',
                   mx: 'auto',
                   lineHeight: 1.45,
-                  mb: { xs: 2, md: 2.5 },
+                  mb: { xs: 3.25, md: 4.5 },
                   color: 'rgba(255, 255, 255, 0.92)',
                   textShadow: `
                     0 2px 8px rgba(0, 0, 0, 0.8),
@@ -302,33 +304,40 @@ const HeroSection: React.FC = () => {
               </Typography>
             </motion.div>
 
-            {/* Glass CTA panel — compact */}
-            <motion.div variants={fadeInUp} style={{ width: '100%' }}>
+            <Box sx={{ flex: 1, minHeight: { xs: 24, md: 48 }, width: '100%' }} />
+
+            {/* Glass CTA panel — anchored toward bottom of hero */}
+            <motion.div variants={fadeInUp} style={{ width: '100%', marginTop: 'auto' }}>
               <Box
                 sx={{
                   ...glassPanelSx,
-                  px: { xs: 1.75, md: 2.25 },
-                  py: { xs: 1.75, md: 2 },
-                  maxWidth: 480,
+                  px: { xs: 2.25, md: 3 },
+                  py: { xs: 2.75, md: 3.25 },
+                  minHeight: { xs: 220, md: 260 },
+                  maxWidth: 560,
                   width: '100%',
                   mx: 'auto',
+                  mb: { xs: 1.25, md: 1.5 },
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
                 }}
               >
-                <Stack spacing={0} alignItems="center" sx={{ width: '100%' }}>
+                <Stack spacing={0} alignItems="center" sx={{ width: '100%', flex: 1, justifyContent: 'space-evenly' }}>
                   <Button
                     onClick={handleAuthNavigation}
                     variant="contained"
-                    size="medium"
-                    startIcon={<Lightbulb sx={{ fontSize: '1.1rem !important' }} />}
+                    size="large"
+                    startIcon={<Lightbulb sx={{ fontSize: '1.35rem !important' }} />}
                     sx={{
-                      py: 1.1,
-                      px: 3,
-                      fontSize: '0.95rem',
+                      py: 1.55,
+                      px: 4,
+                      fontSize: { xs: '1.05rem', md: '1.12rem' },
                       fontWeight: 700,
                       borderRadius: 2.5,
                       width: 'auto',
-                      minWidth: { xs: 200, sm: 220 },
-                      maxWidth: 260,
+                      minWidth: { xs: 240, sm: 270 },
+                      maxWidth: 320,
                       background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
                       backgroundImage: `
                         linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%),
@@ -362,11 +371,12 @@ const HeroSection: React.FC = () => {
                   <Typography
                     variant="body2"
                     sx={{
-                      color: 'rgba(255, 255, 255, 0.85)',
+                      color: 'rgba(255, 255, 255, 0.9)',
                       fontWeight: 500,
-                      fontSize: '0.72rem',
-                      mt: 2,
+                      fontSize: { xs: '0.82rem', md: '0.92rem' },
+                      mt: 2.75,
                       mb: 0,
+                      lineHeight: 1.5,
                       textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
                     }}
                   >
@@ -376,7 +386,7 @@ const HeroSection: React.FC = () => {
                   <Grid
                     container
                     spacing={{ xs: 1, md: 1.25 }}
-                    sx={{ mx: 'auto', maxWidth: 400, mt: 2.75 }}
+                    sx={{ mx: 'auto', maxWidth: 420, mt: 3 }}
                   >
                     {stats.map((stat, index) => (
                       <Grid item xs={6} md={3} key={index}>

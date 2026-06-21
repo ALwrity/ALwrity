@@ -38,13 +38,8 @@ const EnterpriseCTA: React.FC = () => {
   } as const;
 
   return (
-    <Box
-      sx={{
-        py: { xs: 3, md: 4 },
-        bgcolor: '#0a0a0a',
-      }}
-    >
-      <Container maxWidth="lg" sx={{ px: { xs: 1.5, md: 2 } }}>
+    <Box sx={{ py: { xs: 3, md: 4 }, bgcolor: '#0a0a0a' }}>
+      <Container maxWidth="lg" sx={{ px: { xs: 2, md: 3 } }}>
         <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }}>
           <Box
             sx={{
@@ -61,8 +56,7 @@ const EnterpriseCTA: React.FC = () => {
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      height: '100%',
-                      minHeight: { xs: 260, md: 360 },
+                      minHeight: { xs: 220, md: 300 },
                       width: '100%',
                     }}
                   >
@@ -75,7 +69,7 @@ const EnterpriseCTA: React.FC = () => {
                           sx={{
                             width: '100%',
                             height: '100%',
-                            minHeight: { xs: 260, md: 360 },
+                            minHeight: { xs: 220, md: 300 },
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'center',
@@ -83,7 +77,7 @@ const EnterpriseCTA: React.FC = () => {
                             gap: 2,
                             borderRadius: 3,
                             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+                            boxShadow: '0 16px 36px rgba(0,0,0,0.35)',
                           }}
                         >
                           <Box
@@ -106,10 +100,14 @@ const EnterpriseCTA: React.FC = () => {
                         </Box>
                       }
                       sx={{
-                        borderRadius: 3,
-                        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
-                        transition: 'transform 0.3s ease',
                         width: '100%',
+                        height: 'auto',
+                        maxWidth: '100%',
+                        objectFit: 'contain',
+                        borderRadius: 3,
+                        boxShadow: '0 16px 36px rgba(0,0,0,0.35)',
+                        transition: 'transform 0.3s ease',
+                        display: 'block',
                         '&:hover': { transform: 'scale(1.02)' },
                       }}
                     />
@@ -119,11 +117,16 @@ const EnterpriseCTA: React.FC = () => {
 
               <Grid item xs={12} md={7}>
                 <motion.div variants={fadeInUp}>
-                  <Stack spacing={3} alignItems={{ xs: 'center', md: 'flex-start' }} textAlign={{ xs: 'center', md: 'left' }}>
+                  <Stack spacing={2.5} alignItems={{ xs: 'center', md: 'flex-start' }} textAlign={{ xs: 'center', md: 'left' }}>
                     <Typography variant="h3" component="h2" sx={{ ...landingSectionTitleSx, color: 'white' }}>
                       Ready to Transform Your Content Creation?
                     </Typography>
-                    <Typography variant="h6" color="rgba(255,255,255,0.75)" maxWidth="620px" sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, fontWeight: 400 }}>
+                    <Typography
+                      variant="h6"
+                      color="rgba(255,255,255,0.75)"
+                      maxWidth="620px"
+                      sx={{ fontSize: { xs: '0.95rem', md: '1.05rem' }, fontWeight: 400 }}
+                    >
                       Join thousands of creators, marketers, and businesses already using ALwrity's open-source AI platform.
                       Start creating professional content in minutes, not hours.
                     </Typography>

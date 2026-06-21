@@ -160,16 +160,21 @@ const SolopreneurDilemma: React.FC = () => {
           >
             <Box sx={{ flex: 1 }}>
               <motion.div variants={itemVariants}>
-                <Typography 
-                  variant="h2" 
+                <Typography
+                  variant="h2"
                   component="h2"
-                  sx={{ 
+                  sx={{
                     ...landingSectionTitleSx,
                     color: 'white',
                     textShadow: '0 2px 10px rgba(0, 0, 0, 0.8)',
+                    lineHeight: 1.12,
                   }}
                 >
-                  Content Struggle Real: Scale Smart, Burn Out Less
+                  Content Struggle Is Real:
+                  <br />
+                  Scale Smart,
+                  <br />
+                  Burn Out Less
                 </Typography>
               </motion.div>
             </Box>

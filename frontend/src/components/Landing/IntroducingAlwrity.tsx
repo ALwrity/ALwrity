@@ -86,13 +86,13 @@ const IntroducingAlwrity: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        minHeight: { xs: 'auto', md: 'calc(100vh - 48px)' },
-        maxHeight: { md: 'calc(100vh - 48px)' },
+        minHeight: { xs: 'auto', md: 'auto' },
+        py: { xs: 3.5, md: 4.5 },
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         backgroundColor: '#0a0a0a',
-        overflow: 'hidden',
+        overflow: 'visible',
         '&::after': {
           content: '""',
           position: 'absolute',
@@ -120,9 +120,9 @@ const IntroducingAlwrity: React.FC = () => {
         },
       }}
     >
-      <Container maxWidth="lg" sx={{ py: { xs: 3, md: 3.5 }, position: 'relative', zIndex: 2 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2, md: 2.5 }, position: 'relative', zIndex: 2 }}>
         <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.15 }}>
-          <Stack spacing={{ xs: 3, md: 3.5 }} alignItems="center" textAlign="center">
+          <Stack spacing={{ xs: 2.25, md: 2.75 }} alignItems="center" textAlign="center">
             {/* Main header */}
             <motion.div variants={fadeInUp}>
               <Typography variant="h3" component="h2" sx={{ ...landingSectionTitleSx, color: 'white' }}>
@@ -185,7 +185,15 @@ const IntroducingAlwrity: React.FC = () => {
                 >
                   Why Choose ALwrity?
                 </Typography>
-                <Typography variant="body1" color="rgba(255,255,255,0.85)" maxWidth="640px" sx={{ fontSize: { xs: '0.9rem', md: '0.95rem' } }}>
+                <Typography
+                  variant="body1"
+                  color="rgba(255,255,255,0.85)"
+                  sx={{
+                    fontSize: { xs: '0.88rem', md: '0.92rem' },
+                    whiteSpace: { xs: 'normal', md: 'nowrap' },
+                    maxWidth: '100%',
+                  }}
+                >
                   Built for creators, by creators. Open-source, privacy-focused, and designed to scale with your ambitions.
                 </Typography>
               </Stack>

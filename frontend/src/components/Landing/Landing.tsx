@@ -721,7 +721,16 @@ const Landing: React.FC = () => {
               <Typography variant="h3" component="h2" gutterBottom sx={{ ...landingSectionTitleSx, color: 'text.primary' }}>
                 Choose Your Plan
               </Typography>
-              <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 640, mx: 'auto' }}>
+              <Typography
+                variant="h6"
+                color="text.secondary"
+                sx={{
+                  maxWidth: 900,
+                  mx: 'auto',
+                  whiteSpace: { xs: 'normal', md: 'nowrap' },
+                  fontSize: { xs: '0.95rem', md: '1.05rem' },
+                }}
+              >
                 Start Free to Test-Drive: Then Choose the Plan That Fits Your Workflow
               </Typography>
             </Box>

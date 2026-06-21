@@ -32,7 +32,20 @@ const sanitizeUrlForLogging = (url: string | undefined): string => {
   }
 };
 
-// Global subscription error handler - will be set by the app
+/** Routes that must stay reachable without auth (no 401 → home redirect). */
+const isPublicAppRoute = (): boolean => {
+  const path = window.location.pathname;
+  return ['/', '/pricing', '/privacy', '/terms', '/code-of-conduct', '/contact'].includes(path);
+};
+
+const PUBLIC_API_PATHS = ['/api/subscription/plans', '/api/subscription/pricing'];
+
+const isPublicApiPath = (url?: string): boolean => {
+  if (!url) return false;
+  return PUBLIC_API_PATHS.some((path) => url.includes(path));
+};
+
+// Global subscription error handler
 // Can be async to support subscription status refresh
 let globalSubscriptionErrorHandler: ((error: any) => boolean | Promise<boolean>) | null = null;
 
@@ -230,8 +243,9 @@ apiClient.interceptors.request.use(
 
     try {
       if (!authTokenGetter) {
-        // If authTokenGetter is not set, reject the request to prevent 401 errors
-        // This usually means TokenInstaller hasn't run yet or Clerk isn't ready
+        if (isPublicApiPath(config.url)) {
+          return config;
+        }
         console.error(`[apiClient] ❌ authTokenGetter not set for ${config.url} - rejecting request`);
         console.error(`[apiClient] This usually means TokenInstaller hasn't run yet. Please wait for authentication to initialize.`);
         return Promise.reject(new Error('Authentication not ready. Please wait for sign-in to complete.'));
@@ -246,15 +260,14 @@ apiClient.interceptors.request.use(
               const safeUrlWithToken = sanitizeUrlForLogging(config.url);
               console.log(`[apiClient] ✅ Auth token attached for request to ${safeUrlWithToken}`);
             }
+          } else if (isPublicApiPath(config.url) || isPublicAppRoute()) {
+            // Signed-out visitors on public pages can call public APIs without a token
+            return config;
           } else {
-            // Token getter returned null - reject request to prevent 401 errors
-            // ProtectedRoute should ensure user is authenticated before components render
             console.error(`[apiClient] ❌ authTokenGetter returned null for ${config.url} - rejecting request`);
             console.error(`[apiClient] User ID from localStorage: ${localStorage.getItem('user_id') || 'none'}`);
             
-            // Redirect if on protected route to force re-auth
-            const isRootRoute = window.location.pathname === '/';
-            if (!isRootRoute) {
+            if (!isPublicAppRoute()) {
                console.warn('[apiClient] Redirecting to login due to missing auth token');
                try { window.location.assign('/'); } catch {}
             }
@@ -368,12 +381,11 @@ apiClient.interceptors.response.use(
       }
 
       // If retry failed, token is expired - sign out user and redirect to sign in
-      const isRootRoute = window.location.pathname === '/';
       const isContentPlanningRoute = window.location.pathname.includes('/content-planning');
       
       // Don't redirect from root route or content-planning during app initialization
       // ProtectedRoute should handle authentication state
-      if (!isRootRoute && !isContentPlanningRoute) {
+      if (!isPublicAppRoute() && !isContentPlanningRoute) {
         // Token expired - sign out user and redirect to landing/sign-in
         console.warn('401 Unauthorized - token expired, signing out user');
         
@@ -407,12 +419,11 @@ apiClient.interceptors.response.use(
 
     // Handle 401 errors that weren't retried (e.g., no authTokenGetter, already retried, etc.)
     if (error?.response?.status === 401 && (originalRequest._retry || !authTokenGetter)) {
-      const isRootRoute = window.location.pathname === '/';
       const isContentPlanningRoute = window.location.pathname.includes('/content-planning');
       
       // Don't redirect for content-planning during initial load - let ProtectedRoute handle it
       // This prevents redirect loops when requests are made before auth is fully ready
-      if (!isRootRoute && !isContentPlanningRoute) {
+      if (!isPublicAppRoute() && !isContentPlanningRoute) {
         // Token expired - sign out user and redirect
         console.warn('401 Unauthorized - token expired (not retried), signing out user');
         localStorage.removeItem('user_id');
@@ -528,10 +539,8 @@ aiApiClient.interceptors.response.use(
         console.error('Token refresh failed:', retryError);
       }
       
-      const isRootRoute = window.location.pathname === '/';
-      
       // Don't redirect from root route during app initialization
-      if (!isRootRoute) {
+      if (!isPublicAppRoute()) {
         // Token expired - sign out user and redirect
         console.warn('401 Unauthorized - token expired, signing out user');
         localStorage.removeItem('user_id');
@@ -589,8 +598,7 @@ longRunningApiClient.interceptors.request.use(
             console.warn(`[longRunningApiClient] ⚠️ authTokenGetter returned null for ${config.url} - user may not be signed in`);
             
             // Redirect if on protected route to force re-auth
-            const isRootRoute = window.location.pathname === '/';
-            if (!isRootRoute) {
+            if (!isPublicAppRoute()) {
                console.warn('[longRunningApiClient] Redirecting to login due to missing auth token');
                try { window.location.assign('/'); } catch {}
             }
@@ -650,9 +658,7 @@ longRunningApiClient.interceptors.response.use(
     if (error?.response?.status === 401) {
       // Redirect on 401 unless we're on root route (app initialization)
       // We allow redirect on onboarding to handle expired sessions
-      const isRootRoute = window.location.pathname === '/';
-      
-      if (!isRootRoute) {
+      if (!isPublicAppRoute()) {
         try { window.location.assign('/'); } catch {}
       } else {
         console.warn('401 Unauthorized during initialization - token may need refresh (not redirecting)');
@@ -698,8 +704,7 @@ pollingApiClient.interceptors.request.use(
             console.warn(`[pollingApiClient] ⚠️ authTokenGetter returned null for ${config.url} - user may not be signed in`);
 
             // Redirect if on protected route to force re-auth
-            const isRootRoute = window.location.pathname === '/';
-            if (!isRootRoute) {
+            if (!isPublicAppRoute()) {
                console.warn('[pollingApiClient] Redirecting to login due to missing auth token');
                try { window.location.assign('/'); } catch {}
             }
@@ -759,9 +764,7 @@ pollingApiClient.interceptors.response.use(
     if (error?.response?.status === 401) {
       // Redirect on 401 unless we're on root route (app initialization)
       // We allow redirect on onboarding to handle expired sessions
-      const isRootRoute = window.location.pathname === '/';
-      
-      if (!isRootRoute) {
+      if (!isPublicAppRoute()) {
         try { window.location.assign('/'); } catch {}
       } else {
         console.warn('401 Unauthorized during initialization - token may need refresh (not redirecting)');

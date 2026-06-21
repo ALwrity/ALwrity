@@ -39,7 +39,7 @@ const features: Feature[] = [
   },
   {
     image: '/Alwrity-copilot2.png',
-    title: 'Intelligent Copilot Partner',
+    title: 'Intelligent Writing Partner',
     description: 'Context-aware AI Copilot that understands your content goals and audience. Get real-time suggestions and enhancements tailored to your strategy.',
     icon: <Psychology />,
     badge: 'Context-Aware',
@@ -60,7 +60,7 @@ const features: Feature[] = [
   },
   {
     image: '/Fact-check1.png',
-    title: 'Fact-Checked Content',
+    title: 'Hallucination-Free Content',
     description: 'Advanced fact-checking with source verification and credibility scoring. Every claim is analyzed, validated, and cited with authority ratings.',
     icon: <FactCheck />,
     badge: 'Verified',
@@ -97,13 +97,28 @@ const FeatureCardImage: React.FC<FeatureCardImageProps> = ({ feature, theme }) =
   const imageAlt = `ALwrity Copilot — ${feature.title}`;
 
   return (
-    <Box sx={{ width: '100%', height: { xs: 160, md: 175 }, position: 'relative', overflow: 'hidden' }}>
+    <Box
+      sx={{
+        width: '100%',
+        height: { xs: 200, md: 240 },
+        position: 'relative',
+        overflow: 'hidden',
+        bgcolor: '#eef1f6',
+        flexShrink: 0,
+      }}
+    >
       {status === 'loaded' && (
         <Box
           component="img"
           src={feature.image}
           alt={imageAlt}
-          sx={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }}
+          sx={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center top',
+            display: 'block',
+          }}
         />
       )}
       {status === 'error' && (
@@ -227,11 +242,10 @@ const FeatureShowcase: React.FC = () => {
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
-        minHeight: { xs: 'auto', md: 'calc(100vh - 48px)' },
-        maxHeight: { md: 'calc(100vh - 48px)' },
+        minHeight: { xs: 'auto', md: '100vh' },
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         '&::after': {
           content: '""',
           position: 'absolute',
@@ -247,14 +261,14 @@ const FeatureShowcase: React.FC = () => {
       <Container
         maxWidth="xl"
         sx={{
-          py: { xs: 3, md: 3.5 },
-          pt: { xs: 4, md: 5 },
+          pb: { xs: 3, md: 3.5 },
+          pt: { xs: 2, md: 2.5 },
           position: 'relative',
           zIndex: 2,
         }}
       >
         <Stack spacing={0} alignItems="center">
-          <Stack spacing={1.25} alignItems="center" textAlign="center" sx={{ mb: landingSectionHeaderGap }}>
+          <Stack spacing={1.25} alignItems="center" textAlign="center" sx={{ mb: landingSectionHeaderGap, mt: 0 }}>
             <Typography variant="h3" component="h2" sx={{ ...landingSectionTitleSx, color: '#fff' }}>
               Experience the Platform
             </Typography>
@@ -268,7 +282,7 @@ const FeatureShowcase: React.FC = () => {
             </Typography>
           </Stack>
 
-          <Box sx={{ position: 'relative', width: '100%', overflow: 'hidden', px: { xs: 0.5, md: 2 } }}>
+          <Box sx={{ position: 'relative', width: '100%', overflow: 'visible', px: { xs: 5, md: 9 } }}>
             <AnimatePresence mode="wait" custom={currentPage}>
               <motion.div
                 key={currentPage}
@@ -283,8 +297,8 @@ const FeatureShowcase: React.FC = () => {
                   sx={{
                     display: 'grid',
                     gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-                    gap: { xs: 2, md: 2.5 },
-                    px: { xs: 1, md: 2 },
+                    gap: { xs: 2, md: 3 },
+                    px: { xs: 0.5, md: 1 },
                   }}
                 >
                   {currentFeatures.map((feature, index) => (
@@ -393,14 +407,15 @@ const FeatureShowcase: React.FC = () => {
                   onClick={handlePrev}
                   sx={{
                     position: 'absolute',
-                    left: { xs: -4, md: -8 },
+                    left: { xs: 4, md: 8 },
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                     color: 'white',
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     zIndex: 10,
+                    boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                   }}
                 >
                   <ArrowBack />
@@ -410,14 +425,15 @@ const FeatureShowcase: React.FC = () => {
                   onClick={handleNext}
                   sx={{
                     position: 'absolute',
-                    right: { xs: -4, md: -8 },
+                    right: { xs: 4, md: 8 },
                     top: '50%',
                     transform: 'translateY(-50%)',
                     background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
                     color: 'white',
-                    width: 40,
-                    height: 40,
+                    width: 44,
+                    height: 44,
                     zIndex: 10,
+                    boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                   }}
                 >
                   <ArrowForward />
