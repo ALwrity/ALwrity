@@ -8,10 +8,14 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Button,
+  ButtonGroup,
   Fade
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
+  UnfoldMore as UnfoldMoreIcon,
+  UnfoldLess as UnfoldLessIcon,
   Psychology as PsychologyIcon,
   AutoAwesome as AutoAwesomeIcon,
   LinkedIn as LinkedInIcon,
@@ -24,14 +28,23 @@ import { CorePersonaDisplay } from './sections/CorePersonaDisplay';
 import { PlatformPersonaDisplay } from './sections/PlatformPersonaDisplay';
 import { HowWeBuiltThisPersona } from './sections/HowWeBuiltThisPersona';
 
+/** Accordion ids the "Expand all / Collapse all" button controls.
+ *  Order matches the visual order in the UI (top to bottom). */
+const PERSONA_ACCORDION_IDS = ['core', 'platforms', 'how-we-built'] as const;
+
 interface PersonaPreviewSectionProps {
   showPreview: boolean;
   corePersona: any;
   platformPersonas: Record<string, any>;
   qualityMetrics: any;
   selectedPlatforms: string[];
-  expandedAccordion: string | false;
-  setExpandedAccordion: (accordion: string | false) => void;
+  /**
+   * Phase 4: now an array of open accordion ids. The "Expand all"
+   * button sets this to all 3 ids; "Collapse all" sets it to [].
+   * Each accordion checks `.includes(id)` to decide its open state.
+   */
+  expandedAccordion: string[];
+  setExpandedAccordion: (accordion: string[]) => void;
   setCorePersona: (persona: any) => void;
   setPlatformPersonas: (personas: Record<string, any>) => void;
   handleRegenerate: () => void;
@@ -67,6 +80,24 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
   completeness,
   data_sufficiency,
 }) => {
+  // Phase 4: helper to toggle a single accordion in the array state.
+  const toggleAccordion = (id: string) => {
+    setExpandedAccordion(
+      expandedAccordion.includes(id)
+        ? expandedAccordion.filter((x) => x !== id)
+        : [...expandedAccordion, id],
+    );
+  };
+
+  // "Expand all" / "Collapse all" — drive all 3 accordions together.
+  // The 'platforms' accordion only counts if the user has selected
+  // any platforms, so we don't show an empty one.
+  const visibleIds = PERSONA_ACCORDION_IDS.filter(
+    (id) => id !== 'platforms' || selectedPlatforms.length > 0,
+  );
+  const allExpanded = visibleIds.every((id) => expandedAccordion.includes(id));
+  const expandAll = () => setExpandedAccordion([...visibleIds]);
+  const collapseAll = () => setExpandedAccordion([]);
   if (!showPreview || !corePersona) {
     return null;
   }
@@ -78,10 +109,35 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
             consolidated into the Step4Hero card at the top of the step.
             The Regenerate button lives in the hero too. */}
 
+        {/* Phase 4: "Expand all / Collapse all" button bar.
+            Drives all 3 persona accordions together. Hidden on
+            mobile (the accordions are big enough to scroll; the
+            button is a power-user convenience for desktop). */}
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'flex-end', mb: 1.5 }}>
+          <ButtonGroup size="small" variant="outlined" aria-label="expand or collapse all persona accordions">
+            <Button
+              onClick={expandAll}
+              disabled={allExpanded}
+              startIcon={<UnfoldMoreIcon sx={{ fontSize: 18 }} />}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Expand all
+            </Button>
+            <Button
+              onClick={collapseAll}
+              disabled={expandedAccordion.length === 0}
+              startIcon={<UnfoldLessIcon sx={{ fontSize: 18 }} />}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Collapse all
+            </Button>
+          </ButtonGroup>
+        </Box>
+
         {/* Core Persona */}
         <Accordion
-          expanded={expandedAccordion === 'core'}
-          onChange={() => setExpandedAccordion(expandedAccordion === 'core' ? false : 'core')}
+          expanded={expandedAccordion.includes('core')}
+          onChange={() => toggleAccordion('core')}
           sx={{
             mb: 3,
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -148,8 +204,8 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
 
         {/* Platform Adaptations */}
         <Accordion
-          expanded={expandedAccordion === 'platforms'}
-          onChange={() => setExpandedAccordion(expandedAccordion === 'platforms' ? false : 'platforms')}
+          expanded={expandedAccordion.includes('platforms')}
+          onChange={() => toggleAccordion('platforms')}
           sx={{
             mb: 3,
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -259,7 +315,8 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
             CorePersonaDisplay) are both replaced by this single merged
             "How we built this persona" accordion. Nothing is dropped —
             it has 3 sub-sections: output quality, confidence & evidence,
-            and data gaps. */}
+            and data gaps. Phase 4: wired into the expandedAccordion
+            array state so "Expand all / Collapse all" drives it. */}
         {qualityMetrics && (
           <Box sx={{ mb: 4 }}>
             <HowWeBuiltThisPersona
@@ -267,6 +324,18 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               completeness={completeness}
               data_sufficiency={data_sufficiency}
               qualityMetrics={qualityMetrics}
+              expanded={expandedAccordion.includes('how-we-built')}
+              onChange={(_, isExpanded) => {
+                if (isExpanded) {
+                  setExpandedAccordion(
+                    Array.from(new Set([...expandedAccordion, 'how-we-built'])),
+                  );
+                } else {
+                  setExpandedAccordion(
+                    expandedAccordion.filter((x) => x !== 'how-we-built'),
+                  );
+                }
+              }}
             />
           </Box>
         )}
