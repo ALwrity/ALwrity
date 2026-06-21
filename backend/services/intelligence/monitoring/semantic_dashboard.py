@@ -104,6 +104,11 @@ class RealTimeSemanticMonitor:
         self.monitored_competitors: Set[str] = set()
         self.alert_subscribers: List[str] = []
         self.monitoring_history: List[Dict[str, Any]] = []
+        # Reference to the asyncio task running the monitoring loop.
+        # Stored so stop_monitoring() can cancel and await it cleanly
+        # (previously the task was fire-and-forget and could outlive
+        # the caller's intent).
+        self._monitoring_task: Optional[asyncio.Task] = None
         
         logger.info(f"Real-time semantic monitor initialized for user {user_id}")
 
@@ -112,9 +117,26 @@ class RealTimeSemanticMonitor:
         Public wrapper for semantic health check.
         Aggregates metrics into a single health status object.
         """
+        # If SIF isn't enabled for this user (no onboarding session),
+        # surface a distinct 'not_available' status instead of warning.
+        # This lets the frontend render a clear 'not set up' state and
+        # avoid polling for users who will never get a different result.
+        if not self.sif_enabled:
+            return SemanticHealthMetric(
+                metric_name="semantic_health",
+                value=0.0,
+                threshold=0.0,
+                status="not_available",
+                timestamp=datetime.utcnow().isoformat(),
+                description="Semantic monitoring is not enabled for this user (no onboarding session).",
+                recommendations=[
+                    "Complete onboarding to enable semantic monitoring",
+                ],
+            )
+
         # Call internal method (ignoring user_id arg if passed, as we use self.user_id)
         metrics = await self._check_semantic_health()
-        
+
         if not metrics:
             # Return a canonical semantic health summary when no metrics are available.
             return SemanticHealthMetric(
@@ -172,29 +194,54 @@ class RealTimeSemanticMonitor:
     async def start_monitoring(self, competitors: List[str] = None) -> bool:
         """Start real-time semantic monitoring."""
         try:
+            # If a previous loop is still running, cancel it before
+            # starting a new one. Prevents accumulating stale loops
+            # when start_monitoring() is called repeatedly.
+            if self._monitoring_task is not None and not self._monitoring_task.done():
+                self._monitoring_task.cancel()
+                try:
+                    await self._monitoring_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+                self._monitoring_task = None
+
             self.is_monitoring = True
             if competitors:
                 self.monitored_competitors = set(competitors)
-            
+
             logger.info(f"Started semantic monitoring for user {self.user_id}")
             logger.info(f"Monitoring {len(self.monitored_competitors)} competitors")
-            
-            # Start background monitoring task
-            asyncio.create_task(self._monitoring_loop())
-            
+
+            # Start background monitoring task and keep a reference so
+            # stop_monitoring() can cancel it cleanly. The previous
+            # implementation used a fire-and-forget asyncio.create_task()
+            # which made the loop uncancellable from outside.
+            self._monitoring_task = asyncio.create_task(self._monitoring_loop())
+
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to start semantic monitoring: {e}")
             return False
-    
+
     async def stop_monitoring(self) -> bool:
         """Stop real-time semantic monitoring."""
         try:
             self.is_monitoring = False
+
+            # Cancel and await the background loop. If the task already
+            # finished, this is a no-op.
+            if self._monitoring_task is not None and not self._monitoring_task.done():
+                self._monitoring_task.cancel()
+                try:
+                    await self._monitoring_task
+                except (asyncio.CancelledError, Exception):
+                    pass
+            self._monitoring_task = None
+
             logger.info(f"Stopped semantic monitoring for user {self.user_id}")
             return True
-            
+
         except Exception as e:
             logger.error(f"Failed to stop semantic monitoring: {e}")
             return False
@@ -220,13 +267,42 @@ class RealTimeSemanticMonitor:
                 }
                 
                 self.monitoring_history.append(snapshot)
-                
+
                 # Keep only last 24 hours of history
                 cutoff_time = datetime.now() - timedelta(hours=24)
                 self.monitoring_history = [
                     h for h in self.monitoring_history
                     if datetime.fromisoformat(h["timestamp"]) > cutoff_time
                 ]
+
+                # Phase 5: persist the snapshot to DB so the dashboard
+                # has durable history across process restarts and
+                # multi-instance deployments. Best-effort: failures
+                # are logged and the in-memory list is still kept.
+                try:
+                    from services.database import get_session_for_user
+                    from models.semantic_monitoring_snapshot import (
+                        SemanticMonitoringSnapshot,
+                    )
+                    db = get_session_for_user(self.user_id)
+                    if db is not None:
+                        try:
+                            SemanticMonitoringSnapshot.append_snapshot(
+                                db, self.user_id, snapshot
+                            )
+                            # Reclaim disk: prune anything older than 24h
+                            # in the same transaction.
+                            SemanticMonitoringSnapshot.prune_old_snapshots(
+                                db, max_age_hours=24
+                            )
+                            db.commit()
+                        finally:
+                            db.close()
+                except Exception as persist_exc:
+                    logger.warning(
+                        f"Failed to persist semantic monitoring snapshot "
+                        f"for user {self.user_id}: {persist_exc}"
+                    )
                 
                 # Check for alerts
                 await self._check_alerts(health_metrics, competitor_updates, content_insights)
@@ -641,12 +717,52 @@ class RealTimeSemanticMonitor:
             return {"error": str(e)}
     
     def get_monitoring_history(self, hours: int = 24) -> List[Dict[str, Any]]:
-        """Get monitoring history for the specified number of hours."""
+        """Get monitoring history for the specified number of hours.
+
+        Phase 5: prefer the durable DB-backed history when available
+        so the dashboard can show data across process restarts. Falls
+        back to the in-memory list if the DB is unreachable. The two
+        sources are merged (DB rows first, then in-memory snapshots
+        newer than what the DB returned) so the caller sees the most
+        complete view possible.
+        """
+        db_snapshots: List[Dict[str, Any]] = []
+        try:
+            from services.database import get_session_for_user
+            from models.semantic_monitoring_snapshot import (
+                SemanticMonitoringSnapshot,
+            )
+            db = get_session_for_user(self.user_id)
+            if db is not None:
+                try:
+                    db_snapshots = SemanticMonitoringSnapshot.get_recent_snapshots(
+                        db, self.user_id, hours=hours
+                    )
+                finally:
+                    db.close()
+        except Exception as db_exc:
+            logger.warning(
+                f"Failed to read semantic monitoring history from DB "
+                f"for user {self.user_id}: {db_exc}"
+            )
+
+        # In-memory list filtered to the same window. This is the
+        # in-flight view (newest snapshots) and may overlap with the
+        # DB rows, so we dedupe by timestamp.
         cutoff_time = datetime.now() - timedelta(hours=hours)
-        return [
+        in_memory = [
             h for h in self.monitoring_history
             if datetime.fromisoformat(h["timestamp"]) > cutoff_time
         ]
+        seen_timestamps = {h.get("timestamp") for h in db_snapshots}
+        merged = list(db_snapshots)
+        for snap in in_memory:
+            if snap.get("timestamp") not in seen_timestamps:
+                merged.append(snap)
+                seen_timestamps.add(snap.get("timestamp"))
+        # Sort by timestamp so callers get a stable ordering
+        merged.sort(key=lambda h: h.get("timestamp", ""))
+        return merged
 
 
 class SemanticDashboardAPI:

@@ -169,6 +169,34 @@ const buildCooldownError = () => {
   );
 };
 
+const isApplicationLevel502 = (error: { response?: { status?: number; data?: unknown } }): boolean => {
+  if (error.response?.status !== 502) {
+    return false;
+  }
+  const data = error.response.data;
+  if (!data || typeof data !== 'object') {
+    return false;
+  }
+  const detail = (data as { detail?: unknown }).detail;
+  return typeof detail === 'string' && detail.trim().length > 0;
+};
+
+const shouldOpenBackendCooldown = (error: {
+  response?: { status?: number; data?: unknown };
+}): boolean => {
+  if (!error.response) {
+    return true;
+  }
+  const status = error.response.status;
+  if (status === 503 || status === 504) {
+    return true;
+  }
+  if (status === 502 && isApplicationLevel502(error)) {
+    return false;
+  }
+  return typeof status === 'number' && status >= 500;
+};
+
 export const isBackendCooldownActive = (): boolean => isBackendTemporarilyUnavailable();
 
 export const getBackendCooldownSecondsRemaining = (): number => {
@@ -277,6 +305,32 @@ export class NetworkError extends Error {
   }
 }
 
+export class RequestTimeoutError extends NetworkError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RequestTimeoutError';
+  }
+}
+
+const isAxiosTimeout = (error: { code?: string; message?: string }): boolean =>
+  error.code === 'ECONNABORTED' || /timeout/i.test(error.message ?? '');
+
+const rejectNoResponseError = (error: { code?: string; message?: string }) => {
+  openBackendCooldown(error?.message || 'network_error');
+  if (isAxiosTimeout(error)) {
+    return Promise.reject(
+      new RequestTimeoutError(
+        'Request timed out before the server finished processing. Try again in a moment.'
+      )
+    );
+  }
+  return Promise.reject(
+    new NetworkError(
+      'Unable to connect to the backend server. Please check if the server is running.'
+    )
+  );
+};
+
 // Add response interceptor with automatic token refresh on 401
 apiClient.interceptors.response.use(
   (response) => {
@@ -289,19 +343,21 @@ apiClient.interceptors.response.use(
     // Handle network errors and timeouts (backend not available)
     if (!error.response) {
       // Network error, timeout, or backend not reachable
-      openBackendCooldown(error?.message || 'network_error');
-      const connectionError = new NetworkError(
-        'Unable to connect to the backend server. Please check if the server is running.'
-      );
       console.error('Network/Connection Error:', error.message || error);
-      return Promise.reject(connectionError);
+      return rejectNoResponseError(error);
     }
 
     // Handle server errors (5xx)
     if (error.response.status >= 500) {
-      openBackendCooldown(`http_${error.response.status}`);
+      if (shouldOpenBackendCooldown(error)) {
+        openBackendCooldown(`http_${error.response.status}`);
+      }
+      const detail =
+        typeof error.response.data?.detail === 'string'
+          ? error.response.data.detail
+          : undefined;
       const connectionError = new ConnectionError(
-        'Backend server is experiencing issues. Please try again later.'
+        detail || 'Backend server is experiencing issues. Please try again later.'
       );
       console.error('Server Error:', error.response.status, error.response.data);
       return Promise.reject(connectionError);
@@ -457,10 +513,7 @@ aiApiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (!error.response) {
-      openBackendCooldown(error?.message || 'network_error');
-      return Promise.reject(
-        new NetworkError('Unable to connect to the backend server. Please check if the server is running.')
-      );
+      return rejectNoResponseError(error);
     }
 
     if (error.response.status >= 500) {
@@ -577,10 +630,7 @@ longRunningApiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (!error.response) {
-      openBackendCooldown(error?.message || 'network_error');
-      return Promise.reject(
-        new NetworkError('Unable to connect to the backend server. Please check if the server is running.')
-      );
+      return rejectNoResponseError(error);
     }
 
     if (error.response.status >= 500) {
@@ -686,10 +736,7 @@ pollingApiClient.interceptors.response.use(
     const originalRequest = error.config;
 
     if (!error.response) {
-      openBackendCooldown(error?.message || 'network_error');
-      return Promise.reject(
-        new NetworkError('Unable to connect to the backend server. Please check if the server is running.')
-      );
+      return rejectNoResponseError(error);
     }
 
     if (error.response.status >= 500) {

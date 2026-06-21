@@ -53,6 +53,8 @@ interface QualityMetrics {
 
 interface QualityMetricsDisplayProps {
   metrics: QualityMetrics;
+  /** The full core persona (for the new `confidence` + `what_was_missing` badge). */
+  corePersona?: any;
 }
 
 interface MetricInfo {
@@ -108,7 +110,7 @@ const MetricTooltipBody: React.FC<{ info: MetricInfo }> = ({ info }) => (
   </Box>
 );
 
-export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ metrics }) => {
+export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ metrics, corePersona }) => {
   const isNewMetrics = metrics.core_completeness !== undefined;
   const w = metrics.weights || {};
 
@@ -251,8 +253,159 @@ export const QualityMetricsDisplay: React.FC<QualityMetricsDisplayProps> = ({ me
     ? metrics.recommendations[0]
     : 'Your personas demonstrate excellent quality across all assessment criteria!';
 
+  // Confidence / "what was missing" derived from the new persona schema.
+  // We compute a structural completeness (in case the backend's
+  // `confidence` field is missing — e.g. personas generated before the
+  // schema upgrade) AND we also read `what_was_missing` for a chip list.
+  const personaConfidence: number | null = (() => {
+    if (!corePersona) return null;
+    if (typeof corePersona.confidence === 'number') {
+      return Math.max(0, Math.min(1, corePersona.confidence));
+    }
+    // Fallback: rough structural completeness (cheap heuristic)
+    const fields = [
+      corePersona?.identity?.persona_name,
+      corePersona?.identity?.archetype,
+      corePersona?.identity?.core_belief,
+      corePersona?.identity?.brand_voice_description,
+      corePersona?.tonal_range?.default_tone,
+      corePersona?.linguistic_fingerprint?.lexical_features?.go_to_phrases,
+      corePersona?.linguistic_fingerprint?.sentence_metrics?.average_sentence_length_words,
+      corePersona?.stylistic_constraints?.punctuation,
+    ];
+    const filled = fields.filter((f) => {
+      if (f == null) return false;
+      if (typeof f === 'string') return f.trim().length > 0;
+      if (Array.isArray(f)) return f.length > 0;
+      if (typeof f === 'object') return Object.keys(f).length > 0;
+      return true;
+    }).length;
+    return filled / fields.length;
+  })();
+  const whatWasMissing: string[] = Array.isArray(corePersona?.what_was_missing)
+    ? corePersona.what_was_missing
+    : [];
+  const evidenceField: any = corePersona?.evidence;
+  const hasEvidence = evidenceField && typeof evidenceField === 'object' && Object.keys(evidenceField).length > 0;
+  const confidencePct = personaConfidence != null ? Math.round(personaConfidence * 100) : null;
+  const confidenceBand = (() => {
+    if (confidencePct == null) return { label: '—', color: '#94a3b8', bg: '#f1f5f9' };
+    if (confidencePct >= 80) return { label: 'High confidence', color: '#047857', bg: 'linear-gradient(90deg, #10b981 0%, #059669 100%)' };
+    if (confidencePct >= 60) return { label: 'Medium confidence', color: '#b45309', bg: 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)' };
+    return { label: 'Low confidence', color: '#b91c1c', bg: 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)' };
+  })();
+
   return (
     <Box>
+      {/* Confidence badge — drives the user to plug gaps if low */}
+      {confidencePct != null && (
+        <Box
+          sx={{
+            mb: 2,
+            p: 1.75,
+            borderRadius: 3,
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flexWrap: 'wrap', rowGap: 1 }}>
+            <Chip
+              size="small"
+              label={`${confidencePct}% ${confidenceBand.label}`}
+              sx={{
+                fontWeight: 700,
+                background: confidenceBand.bg,
+                color: 'white',
+                fontSize: '0.75rem',
+                height: 26,
+              }}
+            />
+            <Typography variant="caption" sx={{ color: '#475569', fontSize: '0.75rem' }}>
+              {confidencePct >= 80
+                ? 'Your brand voice is grounded in rich, multi-source data.'
+                : confidencePct >= 60
+                ? 'Your brand voice is decent but could be sharper. See gaps below.'
+                : 'Your brand voice is data-thin. Plug the gaps below to make it sound more like you.'}
+            </Typography>
+            <Box sx={{ flex: 1 }} />
+            {whatWasMissing.length > 0 && (
+              <Tooltip
+                arrow
+                placement="top"
+                title={
+                  <Box>
+                    <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
+                      What the AI couldn't find
+                    </Typography>
+                    {whatWasMissing.map((m, i) => (
+                      <Typography key={i} variant="caption" sx={{ display: 'block' }}>
+                        • {m}
+                      </Typography>
+                    ))}
+                  </Box>
+                }
+              >
+                <Chip
+                  size="small"
+                  icon={<InfoIcon sx={{ fontSize: 14 }} />}
+                  label={`${whatWasMissing.length} data gap${whatWasMissing.length === 1 ? '' : 's'}`}
+                  sx={{
+                    height: 24,
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    bgcolor: '#fef3c7',
+                    color: '#92400e',
+                    cursor: 'help',
+                  }}
+                />
+              </Tooltip>
+            )}
+            {hasEvidence && (
+              <Tooltip
+                arrow
+                placement="top"
+                title={
+                  <Box sx={{ maxWidth: 280 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
+                      How we built your persona
+                    </Typography>
+                    {evidenceField.persona_name_basis && (
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        <strong>Name:</strong> {evidenceField.persona_name_basis}
+                      </Typography>
+                    )}
+                    {evidenceField.archetype_basis && (
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        <strong>Archetype:</strong> {evidenceField.archetype_basis}
+                      </Typography>
+                    )}
+                    {evidenceField.tone_basis && (
+                      <Typography variant="caption" sx={{ display: 'block' }}>
+                        <strong>Tone:</strong> {evidenceField.tone_basis}
+                      </Typography>
+                    )}
+                  </Box>
+                }
+              >
+                <Chip
+                  size="small"
+                  icon={<HelpOutlineIcon sx={{ fontSize: 14 }} />}
+                  label="Why this voice?"
+                  sx={{
+                    height: 24,
+                    fontSize: '0.7rem',
+                    fontWeight: 600,
+                    bgcolor: '#ede9fe',
+                    color: '#5b21b6',
+                    cursor: 'help',
+                  }}
+                />
+              </Tooltip>
+            )}
+          </Stack>
+        </Box>
+      )}
+
       {/* Top row: Overall score (radial) + key insights */}
       <Stack
         direction={{ xs: 'column', md: 'row' }}

@@ -20,6 +20,7 @@ import PlatformCard from './PlatformCard';
 import GSCPlatformCard from './GSCPlatformCard';
 import WordPressOAuthPlatformCard from './WordPressOAuthPlatformCard';
 import WixPlatformCard from './WixPlatformCard';
+import LinkedInPlatformCard from './LinkedInPlatformCard';
 import { type GSCSite } from '../../../api/gsc';
 
 interface Platform {
@@ -130,6 +131,13 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
               />
             ) : platform.id === 'wix' ? (
               <WixPlatformCard
+                onConnect={onConnect}
+                onDisconnect={onDisconnect}
+                connectedPlatforms={connectedPlatforms}
+                setConnectedPlatforms={setConnectedPlatforms || (() => {})}
+              />
+            ) : platform.id === 'linkedin' ? (
+              <LinkedInPlatformCard
                 onConnect={onConnect}
                 onDisconnect={onDisconnect}
                 connectedPlatforms={connectedPlatforms}

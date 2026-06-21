@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   Box,
-  Button,
   Typography,
   Alert,
   Chip,
@@ -9,14 +8,16 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Button,
+  ButtonGroup,
   Fade
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
+  UnfoldMore as UnfoldMoreIcon,
+  UnfoldLess as UnfoldLessIcon,
   Psychology as PsychologyIcon,
   AutoAwesome as AutoAwesomeIcon,
-  Assessment as AssessmentIcon,
   LinkedIn as LinkedInIcon,
   Facebook as FacebookIcon,
   Twitter as TwitterIcon,
@@ -25,7 +26,11 @@ import {
 } from '@mui/icons-material';
 import { CorePersonaDisplay } from './sections/CorePersonaDisplay';
 import { PlatformPersonaDisplay } from './sections/PlatformPersonaDisplay';
-import { QualityMetricsDisplay } from './QualityMetricsDisplay';
+import { HowWeBuiltThisPersona } from './sections/HowWeBuiltThisPersona';
+
+/** Accordion ids the "Expand all / Collapse all" button controls.
+ *  Order matches the visual order in the UI (top to bottom). */
+const PERSONA_ACCORDION_IDS = ['core', 'platforms', 'how-we-built'] as const;
 
 interface PersonaPreviewSectionProps {
   showPreview: boolean;
@@ -33,11 +38,24 @@ interface PersonaPreviewSectionProps {
   platformPersonas: Record<string, any>;
   qualityMetrics: any;
   selectedPlatforms: string[];
-  expandedAccordion: string | false;
-  setExpandedAccordion: (accordion: string | false) => void;
+  /**
+   * Phase 4: now an array of open accordion ids. The "Expand all"
+   * button sets this to all 3 ids; "Collapse all" sets it to [].
+   * Each accordion checks `.includes(id)` to decide its open state.
+   */
+  expandedAccordion: string[];
+  setExpandedAccordion: (accordion: string[]) => void;
   setCorePersona: (persona: any) => void;
   setPlatformPersonas: (personas: Record<string, any>) => void;
   handleRegenerate: () => void;
+  /** Phase 2: deterministic completeness from the backend, plumbed to HowWeBuiltThisPersona. */
+  completeness?: {
+    score?: number | null;
+    structural_score?: number | null;
+    missing?: string[] | null;
+  } | null;
+  /** Phase 2: data-sufficiency (0-100) from the backend. */
+  data_sufficiency?: number | null;
 }
 
 const availablePlatforms = [
@@ -58,8 +76,28 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
   setExpandedAccordion,
   setCorePersona,
   setPlatformPersonas,
-  handleRegenerate
+  handleRegenerate,
+  completeness,
+  data_sufficiency,
 }) => {
+  // Phase 4: helper to toggle a single accordion in the array state.
+  const toggleAccordion = (id: string) => {
+    setExpandedAccordion(
+      expandedAccordion.includes(id)
+        ? expandedAccordion.filter((x) => x !== id)
+        : [...expandedAccordion, id],
+    );
+  };
+
+  // "Expand all" / "Collapse all" — drive all 3 accordions together.
+  // The 'platforms' accordion only counts if the user has selected
+  // any platforms, so we don't show an empty one.
+  const visibleIds = PERSONA_ACCORDION_IDS.filter(
+    (id) => id !== 'platforms' || selectedPlatforms.length > 0,
+  );
+  const allExpanded = visibleIds.every((id) => expandedAccordion.includes(id));
+  const expandAll = () => setExpandedAccordion([...visibleIds]);
+  const collapseAll = () => setExpandedAccordion([]);
   if (!showPreview || !corePersona) {
     return null;
   }
@@ -67,66 +105,39 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
   return (
     <Fade in={true}>
       <Box>
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          mb: 4,
-          p: 3,
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid #e2e8f0',
-          borderRadius: 3,
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)'
-        }}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: '#1e293b', mb: 0.5 }}>
-              Your AI Writing Brand Voice
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
-              Comprehensive analysis of your unique brand identity and communication style
-            </Typography>
-          </Box>
-          <Button
-            variant="outlined"
-            startIcon={<RefreshIcon />}
-            onClick={handleRegenerate}
-            size="small"
-            sx={{
-              borderColor: '#e2e8f0',
-              color: '#475569',
-              '&:hover': {
-                borderColor: '#3b82f6',
-                backgroundColor: '#f8fafc'
-              }
-            }}
-          >
-            Regenerate
-          </Button>
-        </Box>
+        {/* The "Your Brand Voice" header and "Why this matters" alert are now
+            consolidated into the Step4Hero card at the top of the step.
+            The Regenerate button lives in the hero too. */}
 
-        <Alert 
-          severity="info" 
-          icon={<AutoAwesomeIcon />}
-          sx={{ 
-            mb: 4, 
-            borderRadius: 3,
-            backgroundColor: '#f0f9ff',
-            border: '1px solid #bae6fd',
-            '& .MuiAlert-message': { color: '#0369a1' }
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-            Adaptive Learning Active
-          </Typography>
-          <Typography variant="body2">
-            This Brand Voice was initialized from your website's home page. As you generate more content, ALwrity will automatically refine and update your brand identity to match your evolving style.
-          </Typography>
-        </Alert>
+        {/* Phase 4: "Expand all / Collapse all" button bar.
+            Drives all 3 persona accordions together. Hidden on
+            mobile (the accordions are big enough to scroll; the
+            button is a power-user convenience for desktop). */}
+        <Box sx={{ display: { xs: 'none', sm: 'flex' }, justifyContent: 'flex-end', mb: 1.5 }}>
+          <ButtonGroup size="small" variant="outlined" aria-label="expand or collapse all persona accordions">
+            <Button
+              onClick={expandAll}
+              disabled={allExpanded}
+              startIcon={<UnfoldMoreIcon sx={{ fontSize: 18 }} />}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Expand all
+            </Button>
+            <Button
+              onClick={collapseAll}
+              disabled={expandedAccordion.length === 0}
+              startIcon={<UnfoldLessIcon sx={{ fontSize: 18 }} />}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Collapse all
+            </Button>
+          </ButtonGroup>
+        </Box>
 
         {/* Core Persona */}
         <Accordion
-          expanded={expandedAccordion === 'core'}
-          onChange={() => setExpandedAccordion(expandedAccordion === 'core' ? false : 'core')}
+          expanded={expandedAccordion.includes('core')}
+          onChange={() => toggleAccordion('core')}
           sx={{
             mb: 3,
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -167,26 +178,15 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                  Brand Writing Style
+                  Your core writing style
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Your unique brand voice and communication characteristics
+                  Tone, vocabulary, sentence structure, and personality — fully editable.
                 </Typography>
               </Box>
-              {qualityMetrics && (
-                <Chip
-                  label={`${qualityMetrics.overall_score}% Quality`}
-                  sx={{
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    fontWeight: 600,
-                    '& .MuiChip-label': {
-                      px: 2
-                    }
-                  }}
-                  size="small"
-                />
-              )}
+              {/* Phase 3: the 'X% Quality' chip was dropped here because it
+                  duplicated the chip in the merged 'How we built this
+                  persona' accordion. The user can see the score there. */}
             </Box>
           </AccordionSummary>
           <AccordionDetails sx={{ px: 4, pb: 4 }}>
@@ -196,14 +196,16 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
                 setCorePersona(updatedPersona);
                 // TODO: Add debounced auto-save
               }}
+              completeness={completeness}
+              data_sufficiency={data_sufficiency}
             />
           </AccordionDetails>
         </Accordion>
 
         {/* Platform Adaptations */}
         <Accordion
-          expanded={expandedAccordion === 'platforms'}
-          onChange={() => setExpandedAccordion(expandedAccordion === 'platforms' ? false : 'platforms')}
+          expanded={expandedAccordion.includes('platforms')}
+          onChange={() => toggleAccordion('platforms')}
           sx={{
             mb: 3,
             background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
@@ -244,10 +246,10 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               </Box>
               <Box sx={{ flex: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                  Platform Adaptations
+                  How it changes per platform
                 </Typography>
                 <Typography variant="body2" sx={{ color: '#64748b' }}>
-                  Optimized for different content platforms
+                  Your voice on LinkedIn, blogs, Twitter, etc. — adapted for each audience.
                 </Typography>
               </Box>
               <Chip
@@ -308,79 +310,34 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
           </AccordionDetails>
         </Accordion>
 
-        {/* Quality Metrics */}
+        {/* Phase 3 (merge): the old "How well did we capture your voice?"
+            accordion and the old EvidenceAccordion (inside
+            CorePersonaDisplay) are both replaced by this single merged
+            "How we built this persona" accordion. Nothing is dropped —
+            it has 3 sub-sections: output quality, confidence & evidence,
+            and data gaps. Phase 4: wired into the expandedAccordion
+            array state so "Expand all / Collapse all" drives it. */}
         {qualityMetrics && (
-          <Accordion
-            expanded={expandedAccordion === 'quality'}
-            onChange={() => setExpandedAccordion(expandedAccordion === 'quality' ? false : 'quality')}
-            sx={{
-              mb: 4,
-              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-              border: '1px solid #e2e8f0',
-              borderRadius: 3,
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
-              '&:before': {
-                display: 'none'
-              },
-              '&.Mui-expanded': {
-                boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-              }
-            }}
-          >
-            <AccordionSummary
-              expandIcon={<ExpandMoreIcon sx={{ color: '#64748b' }} />}
-              sx={{
-                px: 4,
-                py: 3,
-                '&:hover': {
-                  backgroundColor: '#f8fafc'
+          <Box sx={{ mb: 4 }}>
+            <HowWeBuiltThisPersona
+              persona={corePersona}
+              completeness={completeness}
+              data_sufficiency={data_sufficiency}
+              qualityMetrics={qualityMetrics}
+              expanded={expandedAccordion.includes('how-we-built')}
+              onChange={(_, isExpanded) => {
+                if (isExpanded) {
+                  setExpandedAccordion(
+                    Array.from(new Set([...expandedAccordion, 'how-we-built'])),
+                  );
+                } else {
+                  setExpandedAccordion(
+                    expandedAccordion.filter((x) => x !== 'how-we-built'),
+                  );
                 }
               }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, width: '100%' }}>
-                <Box
-                  sx={{
-                    p: 2,
-                    borderRadius: 2,
-                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                    color: 'white',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <AssessmentIcon sx={{ fontSize: 24 }} />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 0.5 }}>
-                    Quality Assessment
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#64748b' }}>
-                    Performance metrics and recommendations
-                  </Typography>
-                </Box>
-                <Chip
-                  label={`${qualityMetrics.overall_score}% Quality`}
-                  sx={{
-                    background: qualityMetrics.overall_score >= 85
-                      ? 'linear-gradient(135deg, #10b981 0%, #059669 100%)'
-                      : qualityMetrics.overall_score >= 70
-                      ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)'
-                      : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                    color: 'white',
-                    fontWeight: 600,
-                    '& .MuiChip-label': {
-                      px: 2
-                    }
-                  }}
-                  size="small"
-                />
-              </Box>
-            </AccordionSummary>
-            <AccordionDetails sx={{ px: 4, pb: 4 }}>
-              <QualityMetricsDisplay metrics={qualityMetrics} />
-            </AccordionDetails>
-          </Accordion>
+            />
+          </Box>
         )}
       </Box>
     </Fade>

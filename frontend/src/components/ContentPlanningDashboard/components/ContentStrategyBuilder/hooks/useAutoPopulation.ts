@@ -34,7 +34,7 @@ export const useAutoPopulation = ({
         isAutoPopulating
       });
     }
-  }, [autoPopulateAttempted, isAutoPopulating, autoPopulateFromOnboarding]);
+  }, [autoPopulateAttempted, isAutoPopulating, autoPopulateFromOnboarding, completionStats]);
 
   return {
     autoPopulateAttempted,

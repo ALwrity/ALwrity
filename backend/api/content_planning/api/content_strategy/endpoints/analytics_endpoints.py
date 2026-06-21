@@ -37,6 +37,45 @@ def get_db():
     finally:
         db.close()
 
+
+async def _verify_strategy_ownership(
+    strategy_id: int,
+    current_user: Dict[str, Any],
+    db_service: "EnhancedStrategyDBService",
+) -> Dict[str, Any]:
+    """Load the strategy and confirm the authenticated user owns it.
+
+    The six analytics endpoints in this module all accept a
+    strategy_id from the URL and an authenticated current_user
+    from the auth dependency, but until this helper was added
+    none of them actually compared the two. Any authenticated
+    caller could read analytics, AI history, completion stats,
+    or trigger AI re-generation on any strategy in the system.
+
+    Returns the loaded strategy dict on success. Raises 404 if
+    the strategy does not exist, and 403 if the strategy exists
+    but is owned by a different user. 404 is preferred to 403 for
+    the not-yours case so we do not leak the existence of other
+    users' strategy IDs to a probing attacker.
+    """
+    clerk_user_id = str(current_user.get("id", ""))
+    if not clerk_user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Authenticated user id missing from request",
+        )
+    strategy = await db_service.get_enhanced_strategy(strategy_id)
+    if not strategy:
+        raise ContentPlanningErrorHandler.handle_not_found_error(
+            "Enhanced strategy", strategy_id
+        )
+    if str(strategy.user_id) != clerk_user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Not authorized to access this strategy",
+        )
+    return strategy
+
 @router.get("/{strategy_id}/analytics")
 async def get_enhanced_strategy_analytics(
     strategy_id: int,
@@ -46,19 +85,20 @@ async def get_enhanced_strategy_analytics(
     """Get comprehensive analytics for an enhanced strategy."""
     try:
         logger.info(f"🚀 Getting analytics for enhanced strategy: {strategy_id}")
-        
+
         db_service = EnhancedStrategyDBService(db)
-        
+        await _verify_strategy_ownership(strategy_id, current_user, db_service)
+
         # Get strategy with analytics
         strategies_with_analytics = await db_service.get_enhanced_strategies_with_analytics(
             strategy_id=strategy_id
         )
-        
+
         if not strategies_with_analytics:
             raise ContentPlanningErrorHandler.handle_not_found_error("Enhanced strategy", strategy_id)
-        
+
         strategy_analytics = strategies_with_analytics[0]
-        
+
         logger.info(f"✅ Enhanced strategy analytics retrieved successfully: {strategy_id}")
         
         return ResponseBuilder.create_success_response(
@@ -82,14 +122,10 @@ async def get_enhanced_strategy_ai_analysis(
     """Get AI analysis history for an enhanced strategy."""
     try:
         logger.info(f"🚀 Getting AI analysis for enhanced strategy: {strategy_id}")
-        
+
         db_service = EnhancedStrategyDBService(db)
-        
-        # Verify strategy exists
-        strategy = await db_service.get_enhanced_strategy(strategy_id)
-        if not strategy:
-            raise ContentPlanningErrorHandler.handle_not_found_error("Enhanced strategy", strategy_id)
-        
+        await _verify_strategy_ownership(strategy_id, current_user, db_service)
+
         # Get AI analysis history
         ai_analysis_history = await db_service.get_ai_analysis_history(strategy_id, limit)
         
@@ -119,14 +155,12 @@ async def get_enhanced_strategy_completion_stats(
     """Get completion statistics for an enhanced strategy."""
     try:
         logger.info(f"🚀 Getting completion stats for enhanced strategy: {strategy_id}")
-        
+
         db_service = EnhancedStrategyDBService(db)
-        
-        # Get strategy
-        strategy = await db_service.get_enhanced_strategy(strategy_id)
-        if not strategy:
-            raise ContentPlanningErrorHandler.handle_not_found_error("Enhanced strategy", strategy_id)
-        
+        strategy = await _verify_strategy_ownership(
+            strategy_id, current_user, db_service
+        )
+
         # Calculate completion stats
         completion_stats = {
             "strategy_id": strategy_id,
@@ -159,8 +193,9 @@ async def get_enhanced_strategy_onboarding_integration(
     """Get onboarding data integration for an enhanced strategy."""
     try:
         logger.info(f"🚀 Getting onboarding integration for enhanced strategy: {strategy_id}")
-        
+
         db_service = EnhancedStrategyDBService(db)
+        await _verify_strategy_ownership(strategy_id, current_user, db_service)
         onboarding_integration = await db_service.get_onboarding_integration(strategy_id)
         
         if not onboarding_integration:
@@ -190,18 +225,21 @@ async def generate_enhanced_ai_recommendations(
     """Generate AI recommendations for an enhanced strategy."""
     try:
         logger.info(f"🚀 Generating AI recommendations for enhanced strategy: {strategy_id}")
-        
+
         # Get strategy
         db_service = EnhancedStrategyDBService(db)
-        strategy = await db_service.get_enhanced_strategy(strategy_id)
-        
-        if not strategy:
-            raise ContentPlanningErrorHandler.handle_not_found_error("Enhanced strategy", strategy_id)
-        
+        strategy = await _verify_strategy_ownership(
+            strategy_id, current_user, db_service
+        )
+
         # Generate AI recommendations
         enhanced_service = EnhancedStrategyService(db_service)
-        # Pass user_id for subscription checks
-        user_id = str(strategy.user_id) if hasattr(strategy, 'user_id') else None
+        # Use the authenticated user id (not strategy.user_id) for
+        # subscription checks and downstream attribution. The previous
+        # code derived user_id from strategy.user_id, which is fine
+        # for an owned strategy but would silently attribute work to
+        # the strategy owner in any path that bypassed auth.
+        user_id = str(current_user.get("id", ""))
         await enhanced_service._generate_comprehensive_ai_recommendations(strategy, db, user_id=user_id)
         
         # Get updated strategy data
@@ -230,18 +268,18 @@ async def regenerate_enhanced_strategy_ai_analysis(
     """Regenerate AI analysis for an enhanced strategy."""
     try:
         logger.info(f"🚀 Regenerating AI analysis for enhanced strategy: {strategy_id}, type: {analysis_type}")
-        
+
         # Get strategy
         db_service = EnhancedStrategyDBService(db)
-        strategy = await db_service.get_enhanced_strategy(strategy_id)
-        
-        if not strategy:
-            raise ContentPlanningErrorHandler.handle_not_found_error("Enhanced strategy", strategy_id)
-        
+        strategy = await _verify_strategy_ownership(
+            strategy_id, current_user, db_service
+        )
+
         # Regenerate AI analysis
         enhanced_service = EnhancedStrategyService(db_service)
-        # Pass user_id for subscription checks
-        user_id = str(strategy.user_id) if hasattr(strategy, 'user_id') else None
+        # Use the authenticated user id, not strategy.user_id (see
+        # ai-recommendations endpoint above for rationale).
+        user_id = str(current_user.get("id", ""))
         await enhanced_service._generate_specialized_recommendations(strategy, analysis_type, db, user_id=user_id)
         
         # Get updated strategy data

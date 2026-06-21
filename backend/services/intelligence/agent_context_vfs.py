@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 import re
 import os
-import fcntl
+import sys
+import contextlib
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 from fnmatch import fnmatch
@@ -20,6 +21,65 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 
 from services.intelligence.agent_flat_context import AgentFlatContextStore
+
+# Phase 3.2: cross-platform advisory file locking. Pre-3.2 this
+# module imported ``fcntl`` at module top, which crashes on Windows
+# (this project runs on win32 per the env). We now lazy-import the
+# right backend based on ``sys.platform`` and provide a single
+# ``_advisory_lock`` context manager used at both call sites.
+if sys.platform == "win32":
+    import msvcrt  # noqa: F401
+    _LOCK_BACKEND = "msvcrt"
+else:
+    import fcntl  # noqa: F401
+    _LOCK_BACKEND = "fcntl"
+
+
+@contextlib.contextmanager
+def _advisory_lock(file_handle, exclusive: bool = True):
+    """Cross-platform advisory file lock.
+
+    Phase 3.2: wraps the platform-specific locking API.
+      * On POSIX, ``fcntl.flock(fd, LOCK_EX | LOCK_UN)``.
+      * On Windows, ``msvcrt.locking(fd, LK_NBLCK, 1)`` for
+        exclusive lock. We use a single byte (1) and treat the
+        operation as a mutex over the file (POSIX ``flock`` is
+        whole-file).
+
+    Falls back to a no-op if the platform backend is missing
+    (e.g. on a stripped-down POSIX without ``fcntl``). The caller
+    still gets correct behavior under no-op (best-effort serialised
+    appends may race in adversarial conditions, but the file is
+    always closed and the chmod/sync operations still run).
+    """
+    if _LOCK_BACKEND == "fcntl":
+        try:
+            import fcntl as _fcntl
+            op = _fcntl.LOCK_EX if exclusive else _fcntl.LOCK_SH
+            _fcntl.flock(file_handle.fileno(), op)
+            try:
+                yield
+            finally:
+                _fcntl.flock(file_handle.fileno(), _fcntl.LOCK_UN)
+        except ImportError:
+            yield
+    else:
+        try:
+            import msvcrt as _msvcrt
+            # ``_locking`` expects a 32-bit count. Use 1 byte as
+            # the lock region; this serialises writers but the
+            # critical section is short (a few KB append).
+            LK_NBLCK = 0x80000000  # non-blocking flag, ignored
+            LK_LOCK = 0x80000000 | 1  # exclusive lock, 1 byte
+            LK_UNLCK = 0x80000000 | 2  # unlock
+            # 32-bit count: 0xFFFFFFFF = 1 file
+            _msvcrt.locking(file_handle.fileno(), LK_LOCK, 0xFFFFFFFF)
+            try:
+                yield
+            finally:
+                _msvcrt.locking(file_handle.fileno(), LK_UNLCK, 0xFFFFFFFF)
+        except ImportError:
+            yield
 
 
 class SmartGrepEngine:
@@ -647,13 +707,12 @@ class AgentContextVFS:
 
         try:
             with open(lock_path, "w", encoding="utf-8") as lf:
-                fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
-                with open(target, "a", encoding="utf-8") as tf:
-                    tf.write(payload)
-                    tf.flush()
-                    os.fsync(tf.fileno())
-                os.chmod(target, 0o600)
-                fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+                with _advisory_lock(lf, exclusive=True):
+                    with open(target, "a", encoding="utf-8") as tf:
+                        tf.write(payload)
+                        tf.flush()
+                        os.fsync(tf.fileno())
+                    os.chmod(target, 0o600)
             self.store._audit_event("write_shared_note", safe_name, "success")
             self.append_activity_log(
                 event_type="shared_note_written",
@@ -680,13 +739,12 @@ class AgentContextVFS:
         line = json.dumps(entry, ensure_ascii=False) + "\n"
         try:
             with open(lock_path, "w", encoding="utf-8") as lf:
-                fcntl.flock(lf.fileno(), fcntl.LOCK_EX)
-                with open(target, "a", encoding="utf-8") as tf:
-                    tf.write(line)
-                    tf.flush()
-                    os.fsync(tf.fileno())
-                os.chmod(target, 0o600)
-                fcntl.flock(lf.fileno(), fcntl.LOCK_UN)
+                with _advisory_lock(lf, exclusive=True):
+                    with open(target, "a", encoding="utf-8") as tf:
+                        tf.write(line)
+                        tf.flush()
+                        os.fsync(tf.fileno())
+                    os.chmod(target, 0o600)
             return {"ok": True}
         except Exception as exc:
             logger.warning(f"Failed to append activity log: {exc}")

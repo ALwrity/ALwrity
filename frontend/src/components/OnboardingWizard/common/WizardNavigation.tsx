@@ -93,6 +93,8 @@ export const WizardNavigation: React.FC<WizardNavigationProps> = ({
               onClick={onNext}
               disabled={!isCurrentStepValid}
               endIcon={<ArrowForward />}
+              id="wizard-next-button"
+              data-testid="wizard-next-button"
               sx={{
                 borderRadius: 2,
                 textTransform: 'none',

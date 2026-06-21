@@ -14,6 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   landingSectionTitleSx,
   landingSectionSubtitleSx,
+  landingSectionHeaderGap,
   landingCardHoverSx,
 } from './landingStyles';
 
@@ -163,6 +164,19 @@ const FeatureCardImage: React.FC<FeatureCardImageProps> = ({ feature, theme }) =
           }}
         />
       )}
+      {(status === 'loaded' || status === 'error') && (
+        <Box
+          sx={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '40%',
+            background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.4))',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </Box>
   );
 };
@@ -254,7 +268,7 @@ const FeatureShowcase: React.FC = () => {
         }}
       >
         <Stack spacing={0} alignItems="center">
-          <Stack spacing={1.25} alignItems="center" textAlign="center" sx={{ mb: { xs: 2, md: 2.5 }, mt: 0 }}>
+          <Stack spacing={1.25} alignItems="center" textAlign="center" sx={{ mb: landingSectionHeaderGap, mt: 0 }}>
             <Typography variant="h3" component="h2" sx={{ ...landingSectionTitleSx, color: '#fff' }}>
               Experience the Platform
             </Typography>

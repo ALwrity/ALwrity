@@ -1,4 +1,3 @@
-import os
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from loguru import logger
@@ -17,13 +16,13 @@ class StrategyCopilotService:
         self, 
         category: str, 
         user_description: str, 
-        current_form_data: Dict[str, Any]
+        current_form_data: Dict[str, Any],
+        user_id: str
     ) -> Dict[str, Any]:
         """Generate data for a specific category."""
         try:
             # Get user onboarding data
-            user_id = int(os.getenv("ALWRITY_FALLBACK_USER_ID", "0"))
-            integrated_data = await self.onboarding_integration_service.process_onboarding_data(str(user_id), self.db)
+            integrated_data = await self.onboarding_integration_service.process_onboarding_data(user_id, self.db)
             onboarding_data = integrated_data.get('canonical_profile', {})
             
             # Build prompt for category generation
@@ -78,12 +77,11 @@ class StrategyCopilotService:
             logger.error(f"Error validating field {field_id}: {str(e)}")
             raise
     
-    async def analyze_strategy(self, form_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def analyze_strategy(self, form_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """Analyze complete strategy for completeness and coherence."""
         try:
             # Get user data for context
-            user_id = int(os.getenv("ALWRITY_FALLBACK_USER_ID", "0"))
-            integrated_data = await self.onboarding_integration_service.process_onboarding_data(str(user_id), self.db)
+            integrated_data = await self.onboarding_integration_service.process_onboarding_data(user_id, self.db)
             onboarding_data = integrated_data.get('canonical_profile', {})
             
             # Build analysis prompt
@@ -111,7 +109,8 @@ class StrategyCopilotService:
     async def generate_field_suggestions(
         self, 
         field_id: str, 
-        current_form_data: Dict[str, Any]
+        current_form_data: Dict[str, Any],
+        user_id: str
     ) -> Dict[str, Any]:
         """Generate suggestions for a specific field."""
         try:
@@ -119,9 +118,7 @@ class StrategyCopilotService:
             field_definition = self._get_field_definition(field_id)
             
             # Get user data
-            user_id = int(os.getenv("ALWRITY_FALLBACK_USER_ID", "0"))
-            # Use SSOT
-            integrated_data = await self.onboarding_integration_service.process_onboarding_data(str(user_id), self.db)
+            integrated_data = await self.onboarding_integration_service.process_onboarding_data(user_id, self.db)
             onboarding_data = integrated_data.get('canonical_profile', {})
             
             # Build suggestions prompt

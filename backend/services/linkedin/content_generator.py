@@ -23,6 +23,7 @@ from services.linkedin.content_generator_prompts import (
     VideoScriptGenerator
 )
 from services.llm_providers.main_text_generation import llm_text_gen
+from services.linkedin.content_parser import parse_video_script_text
 from services.persona_analysis_service import PersonaAnalysisService
 import time
 
@@ -560,8 +561,10 @@ class ContentGenerator:
             )
             
             content_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
-            
+            parsed = parse_video_script_text(content_text)
+
             return {
+                **parsed,
                 'content': content_text,
                 'sources': [],
                 'citations': [],

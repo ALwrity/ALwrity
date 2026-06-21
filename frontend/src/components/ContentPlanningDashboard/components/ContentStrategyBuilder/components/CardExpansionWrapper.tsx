@@ -59,7 +59,6 @@ const CardExpansionWrapper: React.FC<CardExpansionWrapperProps> = ({
         gridColumn: isExpandedFinal ? '1 / -1' : 'auto',
         transition: 'grid-column 0.3s ease',
         zIndex: isExpandedFinal ? 10 : 1,
-        border: '1px solid blue', // Debug border
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -109,13 +108,8 @@ const CardExpansionWrapper: React.FC<CardExpansionWrapperProps> = ({
               height: '5px',
               background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
               zIndex: 1,
-            } : {},
-            // Debug styling
-            ...(isExpandedFinal && {
-              outline: '2px solid red',
-              outlineOffset: '2px',
-            }),
-          }}
+             } : {},
+           }}
         >
           {/* Hover Hint - Only show when not expanded */}
           <AnimatePresence>

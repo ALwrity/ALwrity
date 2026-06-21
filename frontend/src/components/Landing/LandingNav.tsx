@@ -19,14 +19,14 @@ import CloseIcon from '@mui/icons-material/Close';
 import BrandMark from './BrandMark';
 
 type NavItem =
-  | { label: string; id: string; href?: never }
-  | { label: string; href: string };
+  | { label: string; id: string; href?: never; newTab?: never }
+  | { label: string; href: string; newTab?: boolean; id?: never };
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Home', id: 'hero' },
   { label: 'Lifecycle', id: 'lifecycle' },
   { label: 'Features', id: 'features' },
-  { label: 'Pricing', href: '/pricing' },
+  { label: 'Pricing', href: '/pricing', newTab: true },
 ];
 
 const NAV_HIDE_DELAY_MS = 3500;
@@ -37,6 +37,7 @@ const LandingNav: React.FC = () => {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navVisible, setNavVisible] = useState(true);
+  const [elevated, setElevated] = useState(false);
   const lastScrollY = useRef(0);
   const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,6 +72,7 @@ const LandingNav: React.FC = () => {
   useEffect(() => {
     const onScroll = () => {
       const y = window.scrollY;
+      setElevated(y > 24);
 
       if (y <= 16) {
         revealNav(false);
@@ -123,6 +125,10 @@ const LandingNav: React.FC = () => {
   const handleNavClick = (item: NavItem) => {
     if ('href' in item && item.href) {
       setMobileOpen(false);
+      if (item.newTab) {
+        window.open(item.href, '_blank', 'noopener,noreferrer');
+        return;
+      }
       navigate(item.href);
       return;
     }
@@ -139,14 +145,16 @@ const LandingNav: React.FC = () => {
     <>
       <AppBar
         position="fixed"
-        elevation={0}
+        elevation={elevated ? 4 : 0}
         sx={{
-          background: 'transparent',
-          backdropFilter: 'none',
-          boxShadow: 'none',
-          borderBottom: 'none',
+          background: elevated
+            ? `linear-gradient(135deg, rgba(0,0,0,0.92) 0%, rgba(20,20,30,0.95) 100%)`
+            : 'transparent',
+          backdropFilter: elevated ? 'blur(12px)' : 'none',
+          borderBottom: elevated ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
+          boxShadow: elevated ? undefined : 'none',
           transform: navVisible ? 'translateY(0)' : 'translateY(-110%)',
-          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+          transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s ease, box-shadow 0.3s ease',
           pointerEvents: navVisible ? 'auto' : 'none',
         }}
       >

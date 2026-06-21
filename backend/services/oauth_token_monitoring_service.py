@@ -4,7 +4,7 @@ Service for creating and managing OAuth token monitoring tasks.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Callable, List, Optional, Tuple
 from sqlalchemy.orm import Session
 from utils.logger_utils import get_service_logger
 import os
@@ -17,7 +17,98 @@ from services.gsc_service import GSCService
 from services.integrations.bing_oauth import BingOAuthService
 from services.integrations.wordpress_oauth import WordPressOAuthService
 from services.integrations.wix_oauth import WixOAuthService
+# YouTube OAuth service is imported lazily inside _check_youtube() so the
+# module import doesn't fail in environments where Google credentials aren't
+# configured.
 from services.database import get_user_db_path
+
+
+# Per-platform connection checkers. Each is Callable[[str], bool]: takes a
+# user_id, returns True if the user has at least one valid token for that
+# platform. Order matches the historical order of the inline blocks so the
+# returned list preserves stability for callers.
+def _check_gsc(user_id: str) -> bool:
+    db_path = get_user_db_path(user_id)
+    gsc_service = GSCService(db_path=db_path)
+    return bool(gsc_service.load_user_credentials(user_id))
+
+
+def _check_bing(user_id: str) -> bool:
+    bing_service = BingOAuthService()
+    token_status = bing_service.get_user_token_status(user_id)
+    if token_status.get('has_active_tokens'):
+        return True
+    expired = token_status.get('expired_tokens', [])
+    return bool(expired) and any(t.get('refresh_token') for t in expired)
+
+
+def _check_wordpress(user_id: str) -> bool:
+    db_path = get_user_db_path(user_id)
+    wordpress_service = WordPressOAuthService(db_path=db_path)
+    token_status = wordpress_service.get_user_token_status(user_id)
+    return bool(token_status.get('has_tokens'))
+
+
+def _check_wix(user_id: str) -> bool:
+    db_path = get_user_db_path(user_id)
+    wix_service = WixOAuthService(db_path=db_path)
+    token_status = wix_service.get_user_token_status(user_id)
+    if token_status.get('has_active_tokens'):
+        return True
+    expired = token_status.get('expired_tokens', [])
+    return bool(expired) and any(t.get('refresh_token') for t in expired)
+
+
+def _check_youtube(user_id: str) -> bool:
+    # Imported lazily so the module can load in environments without
+    # GOOGLE_CLIENT_ID / YOUTUBE_TOKEN_ENCRYPTION_KEY configured.
+    from services.youtube.youtube_oauth_service import YouTubeOAuthService
+    try:
+        youtube_service = YouTubeOAuthService()
+        status = youtube_service.get_connection_status(user_id)
+        return bool(status.get('connected'))
+    except Exception as exc:
+        # Constructor may raise (missing key, missing client_id) or the
+        # status call may hit a database error. Either way, treat as
+        # "not connected" so we don't poison the whole detection.
+        logger.debug(
+            f"[OAuth Monitoring] YouTube check skipped for user {user_id}: {exc}"
+        )
+        return False
+
+
+# Stable ordering preserved from the previous inline implementation.
+_PLATFORM_CHECKS: List[Tuple[str, Callable[[str], bool]]] = [
+    ('gsc', _check_gsc),
+    ('bing', _check_bing),
+    ('wordpress', _check_wordpress),
+    ('wix', _check_wix),
+    ('youtube', _check_youtube),
+]
+
+
+def _safe_check(platform: str, checker: Callable[[str], bool], user_id: str) -> bool:
+    """Run a per-platform connection check, swallowing any exception.
+
+    One platform's check must never abort the rest of the detection loop.
+    """
+    try:
+        connected = bool(checker(user_id))
+        if connected:
+            logger.debug(
+                f"[OAuth Monitoring] \u2705 {platform} connected for user {user_id}"
+            )
+        else:
+            logger.debug(
+                f"[OAuth Monitoring] \u274c {platform} not connected for user {user_id}"
+            )
+        return connected
+    except Exception as exc:
+        logger.warning(
+            f"[OAuth Monitoring] \u26a0\ufe0f {platform} check failed for user {user_id}: {exc}",
+            exc_info=True,
+        )
+        return False
 
 
 def get_connected_platforms(user_id: str) -> List[str]:
@@ -37,113 +128,15 @@ def get_connected_platforms(user_id: str) -> List[str]:
     Returns:
         List of connected platform identifiers: ['gsc', 'bing', 'wordpress', 'wix', 'youtube']
     """
-    connected = []
-    
+    connected: List[str] = []
+
     # Use DEBUG level for routine checks (called frequently by dashboard)
     logger.debug(f"[OAuth Monitoring] Checking connected platforms for user: {user_id}")
-    
-    try:
-        # Check GSC - use dynamic database path
-        db_path = get_user_db_path(user_id)
-        gsc_service = GSCService(db_path=db_path)
-        gsc_credentials = gsc_service.load_user_credentials(user_id)
-        if gsc_credentials:
-            connected.append('gsc')
-            logger.debug(f"[OAuth Monitoring] ✅ GSC connected for user {user_id}")
-        else:
-            logger.debug(f"[OAuth Monitoring] ❌ GSC not connected for user {user_id}")
-    except Exception as e:
-        logger.warning(f"[OAuth Monitoring] ⚠️ GSC check failed for user {user_id}: {e}", exc_info=True)
-    
-    try:
-        # Check Bing - use dynamic database path
-        db_path = get_user_db_path(user_id)
-        bing_service = BingOAuthService()
-        token_status = bing_service.get_user_token_status(user_id)
-        has_active_tokens = token_status.get('has_active_tokens', False)
-        has_expired_tokens = token_status.get('has_expired_tokens', False)
-        expired_tokens = token_status.get('expired_tokens', [])
-        
-        # Check if expired tokens have refresh tokens (can be refreshed)
-        has_refreshable_tokens = any(token.get('refresh_token') for token in expired_tokens)
-        
-        # Consider connected if user has active tokens OR expired tokens with refresh tokens
-        if has_active_tokens or (has_expired_tokens and has_refreshable_tokens):
-            connected.append('bing')
-            logger.debug(f"[OAuth Monitoring] ✅ Bing connected for user {user_id}")
-        else:
-            logger.debug(f"[OAuth Monitoring] ❌ Bing not connected for user {user_id}")
-    except Exception as e:
-        logger.warning(f"[OAuth Monitoring] ⚠️ Bing check failed for user {user_id}: {e}", exc_info=True)
-    
-    try:
-        # Check WordPress - use dynamic database path
-        db_path = get_user_db_path(user_id)
-        wordpress_service = WordPressOAuthService(db_path=db_path)
-        token_status = wordpress_service.get_user_token_status(user_id)
-        has_active_tokens = token_status.get('has_active_tokens', False)
-        has_tokens = token_status.get('has_tokens', False)
-        
-        # Consider connected if user has any tokens (WordPress tokens may not have refresh tokens)
-        # If tokens exist, user was connected even if expired (may need re-auth)
-        if has_tokens:
-            connected.append('wordpress')
-            logger.debug(f"[OAuth Monitoring] ✅ WordPress connected for user {user_id}")
-        else:
-            logger.debug(f"[OAuth Monitoring] ❌ WordPress not connected for user {user_id}")
-    except Exception as e:
-        logger.warning(f"[OAuth Monitoring] ⚠️ WordPress check failed for user {user_id}: {e}", exc_info=True)
-    
-    try:
-        # Check Wix - use dynamic database path
-        db_path = get_user_db_path(user_id)
-        wix_service = WixOAuthService(db_path=db_path)
-        token_status = wix_service.get_user_token_status(user_id)
-        has_active_tokens = token_status.get('has_active_tokens', False)
-        has_expired_tokens = token_status.get('has_expired_tokens', False)
-        expired_tokens = token_status.get('expired_tokens', [])
-        
-        # Check if expired tokens have refresh tokens (can be refreshed)
-        has_refreshable_tokens = any(token.get('refresh_token') for token in expired_tokens)
-        
-        # Consider connected if user has active tokens OR expired tokens with refresh tokens
-        if has_active_tokens or (has_expired_tokens and has_refreshable_tokens):
-            connected.append('wix')
-            logger.debug(f"[OAuth Monitoring] ✅ Wix connected for user {user_id}")
-        else:
-            logger.debug(f"[OAuth Monitoring] ❌ Wix not connected for user {user_id}")
-    except Exception as e:
-        logger.warning(f"[OAuth Monitoring] ⚠️ Wix check failed for user {user_id}: {e}", exc_info=True)
-    
-    try:
-        # Check YouTube - use dynamic database path
-        db_path = get_user_db_path(user_id)
-        import sqlite3
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='youtube_oauth_tokens'"
-            )
-            if cursor.fetchone():
-                cursor.execute(
-                    "SELECT id, is_active, expires_at FROM youtube_oauth_tokens WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
-                    (user_id,),
-                )
-                row = cursor.fetchone()
-                if row:
-                    token_id, is_active, expires_at_str = row
-                    if is_active:
-                        connected.append("youtube")
-                        logger.debug(f"[OAuth Monitoring] ✅ YouTube connected for user {user_id}")
-                    else:
-                        logger.debug(f"[OAuth Monitoring] ❌ YouTube token inactive for user {user_id}")
-                else:
-                    logger.debug(f"[OAuth Monitoring] ❌ YouTube not connected for user {user_id}")
-            else:
-                logger.debug(f"[OAuth Monitoring] ❌ YouTube table not found for user {user_id}")
-    except Exception as e:
-        logger.warning(f"[OAuth Monitoring] ⚠️ YouTube check failed for user {user_id}: {e}", exc_info=True)
-    
+
+    for platform_id, checker in _PLATFORM_CHECKS:
+        if _safe_check(platform_id, checker, user_id):
+            connected.append(platform_id)
+
     # Don't log here - let the caller log a formatted summary if needed
     # This function is called frequently and should be silent
     return connected

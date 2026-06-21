@@ -55,8 +55,10 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
             raise ValueError("WaveSpeed API key not found. Set WAVESPEED_API_KEY environment variable.")
         
         self.client = WaveSpeedClient(api_key=self.api_key)
-        logger.info("[WaveSpeed Image Provider] Initialized with available models: %s", 
-                   list(self.SUPPORTED_MODELS.keys()))
+        logger.info(
+            "[WaveSpeed Image Provider] Initialized with available models: {}",
+            list(self.SUPPORTED_MODELS.keys()),
+        )
     
     @retry(
         stop=stop_after_attempt(3),
@@ -118,7 +120,7 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         Returns:
             Image bytes
         """
-        logger.info("[Ideogram V3] Starting image generation: %s", options.prompt[:100])
+        logger.info("[Ideogram V3] Starting image generation: {}", options.prompt[:100])
         
         try:
             # Prepare parameters for WaveSpeed Ideogram V3 API
@@ -154,11 +156,11 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
             else:
                 raise ValueError(f"Unexpected response format from WaveSpeed API: {type(result)}")
             
-            logger.info("[Ideogram V3] ✅ Successfully generated image: %d bytes", len(image_bytes))
+            logger.info("[Ideogram V3] ✅ Successfully generated image: {} bytes", len(image_bytes))
             return image_bytes
             
         except Exception as e:
-            logger.error("[Ideogram V3] ❌ Error generating image: %s", str(e), exc_info=True)
+            logger.error("[Ideogram V3] ❌ Error generating image: {}", str(e), exc_info=True)
             raise RuntimeError(f"Ideogram V3 generation failed: {str(e)}")
     
     def _generate_qwen_image(self, options: ImageGenerationOptions) -> bytes:
@@ -170,7 +172,7 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         Returns:
             Image bytes
         """
-        logger.info("[Qwen Image] Starting image generation: %s", options.prompt[:100])
+        logger.info("[Qwen Image] Starting image generation: {}", options.prompt[:100])
         
         try:
             # Prepare parameters for WaveSpeed Qwen Image API
@@ -203,11 +205,11 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
             else:
                 raise ValueError(f"Unexpected response format from WaveSpeed API: {type(result)}")
             
-            logger.info("[Qwen Image] ✅ Successfully generated image: %d bytes", len(image_bytes))
+            logger.info("[Qwen Image] ✅ Successfully generated image: {} bytes", len(image_bytes))
             return image_bytes
             
         except Exception as e:
-            logger.error("[Qwen Image] ❌ Error generating image: %s", str(e), exc_info=True)
+            logger.error("[Qwen Image] ❌ Error generating image: {}", str(e), exc_info=True)
             raise RuntimeError(f"Qwen Image generation failed: {str(e)}")
     
     def _generate_flux_kontext_pro(self, options: ImageGenerationOptions) -> bytes:
@@ -219,7 +221,7 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         Returns:
             Image bytes
         """
-        logger.info("[FLUX Kontext Pro] Starting image generation: %s", options.prompt[:100])
+        logger.info("[FLUX Kontext Pro] Starting image generation: {}", options.prompt)
         
         try:
             # Prepare parameters for WaveSpeed FLUX Kontext Pro API
@@ -252,11 +254,11 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
             else:
                 raise ValueError(f"Unexpected response format from WaveSpeed API: {type(result)}")
             
-            logger.info("[FLUX Kontext Pro] ✅ Successfully generated image: %d bytes", len(image_bytes))
+            logger.info("[FLUX Kontext Pro] ✅ Successfully generated image: {} bytes", len(image_bytes))
             return image_bytes
             
         except Exception as e:
-            logger.error("[FLUX Kontext Pro] ❌ Error generating image: %s", str(e), exc_info=True)
+            logger.error("[FLUX Kontext Pro] ❌ Error generating image: {}", str(e), exc_info=True)
             raise RuntimeError(f"FLUX Kontext Pro generation failed: {str(e)}")
     
     def generate(self, options: ImageGenerationOptions) -> ImageGenerationResult:

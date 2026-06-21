@@ -133,7 +133,8 @@ async def generate_facebook_post(
     """Generate a Facebook post with engagement optimization."""
     try:
         logger.info(f"Generating Facebook post for business: {request.business_type}")
-        response = post_service.generate_post(request)
+        user_id = str(current_user.get('id', '') or current_user.get('sub', '') or '0') if current_user else '0'
+        response = post_service.generate_post(request, user_id)
         
         if not response.success:
             raise HTTPException(status_code=400, detail=response.error)
@@ -185,7 +186,8 @@ async def generate_facebook_story(
     """Generate a Facebook story with visual suggestions."""
     try:
         logger.info(f"Generating Facebook story for business: {request.business_type}")
-        response = story_service.generate_story(request)
+        user_id = str(current_user.get('id', '') or current_user.get('sub', '') or '0') if current_user else '0'
+        response = story_service.generate_story(request, user_id)
         
         if not response.success:
             raise HTTPException(status_code=400, detail=response.error)
@@ -231,7 +233,8 @@ async def generate_facebook_reel(
     """Generate a Facebook reel script with music suggestions."""
     try:
         logger.info(f"Generating Facebook reel for business: {request.business_type}")
-        response = reel_service.generate_reel(request)
+        user_id = str(current_user.get('id', '') or current_user.get('sub', '') or '0') if current_user else '0'
+        response = reel_service.generate_reel(request, user_id)
         
         if not response.success:
             raise HTTPException(status_code=400, detail=response.error)

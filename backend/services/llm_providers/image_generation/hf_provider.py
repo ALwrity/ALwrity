@@ -32,7 +32,7 @@ class HuggingFaceImageProvider(ImageGenerationProvider):
             raise RuntimeError("HF_TOKEN is required for Hugging Face image generation")
         self.provider = provider
         self.client = InferenceClient(provider=self.provider, api_key=self.api_key)
-        logger.info("HuggingFaceImageProvider initialized (provider=%s)", self.provider)
+        logger.info("HuggingFaceImageProvider initialized (provider={})", self.provider)
 
     def generate(self, options: ImageGenerationOptions) -> ImageGenerationResult:
         model = options.model or DEFAULT_HF_MODEL

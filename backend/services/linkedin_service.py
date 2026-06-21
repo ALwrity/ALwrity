@@ -26,6 +26,13 @@ from services.citation import CitationManager
 from services.quality import ContentQualityAnalyzer
 
 
+def _effective_user_id(user_id: Optional[str], request) -> str:
+    if user_id:
+        return user_id
+    raw = getattr(request, 'user_id', '') or ''
+    return str(raw) if raw else ''
+
+
 class LinkedInService:
     """
     LinkedIn content generation service with provider-agnostic LLM access.
@@ -61,7 +68,9 @@ class LinkedInService:
                 self._quality_analyzer = None
         return self._quality_analyzer
     
-    async def generate_linkedin_post(self, request: LinkedInPostRequest) -> LinkedInPostResponse:
+    async def generate_linkedin_post(
+        self, request: LinkedInPostRequest, user_id: Optional[str] = None
+    ) -> LinkedInPostResponse:
         """
         Generate a LinkedIn post with enhanced grounding capabilities.
         
@@ -82,9 +91,9 @@ class LinkedInService:
             # Step 1: Conduct research if enabled
             from services.linkedin.research_handler import ResearchHandler
             research_handler = ResearchHandler(self)
-            user_id = str(getattr(request, 'user_id', '') or '')
+            effective_user_id = _effective_user_id(user_id, request)
             research_sources, research_time = await research_handler.conduct_research(
-                request, request.research_enabled, request.search_engine, 10, user_id=user_id
+                request, request.research_enabled, request.search_engine, 10, user_id=effective_user_id
             )
             
             # Step 2: Generate content based on grounding level
@@ -101,7 +110,7 @@ class LinkedInService:
                 content_result = await content_generator.generate_grounded_post_content(
                     request=request,
                     research_sources=research_sources,
-                    user_id=str(getattr(request, 'user_id', ''))
+                    user_id=effective_user_id
                 )
             else:
                 logger.error("Grounding not enabled, Error generating LinkedIn post")
@@ -123,7 +132,9 @@ class LinkedInService:
                 error=f"Failed to generate LinkedIn post: {str(e)}"
             )
     
-    async def generate_linkedin_article(self, request: LinkedInArticleRequest) -> LinkedInArticleResponse:
+    async def generate_linkedin_article(
+        self, request: LinkedInArticleRequest, user_id: Optional[str] = None
+    ) -> LinkedInArticleResponse:
         """
         Generate a LinkedIn article with enhanced grounding capabilities.
         
@@ -140,9 +151,9 @@ class LinkedInService:
             # Step 1: Conduct research if enabled
             from services.linkedin.research_handler import ResearchHandler
             research_handler = ResearchHandler(self)
-            user_id = str(getattr(request, 'user_id', '') or '')
+            effective_user_id = _effective_user_id(user_id, request)
             research_sources, research_time = await research_handler.conduct_research(
-                request, request.research_enabled, request.search_engine, 15, user_id=user_id
+                request, request.research_enabled, request.search_engine, 15, user_id=effective_user_id
             )
             
             # Step 2: Generate content based on grounding level
@@ -159,7 +170,7 @@ class LinkedInService:
                 content_result = await content_generator.generate_grounded_article_content(
                     request=request,
                     research_sources=research_sources,
-                    user_id=str(getattr(request, 'user_id', ''))
+                    user_id=effective_user_id
                 )
             else:
                 logger.error("Grounding not enabled - cannot generate LinkedIn article without AI provider")
@@ -181,7 +192,9 @@ class LinkedInService:
                 error=f"Failed to generate LinkedIn article: {str(e)}"
             )
     
-    async def generate_linkedin_carousel(self, request: LinkedInCarouselRequest) -> LinkedInCarouselResponse:
+    async def generate_linkedin_carousel(
+        self, request: LinkedInCarouselRequest, user_id: Optional[str] = None
+    ) -> LinkedInCarouselResponse:
         """
         Generate a LinkedIn carousel with enhanced grounding capabilities.
         
@@ -198,9 +211,9 @@ class LinkedInService:
             # Step 1: Conduct research if enabled
             from services.linkedin.research_handler import ResearchHandler
             research_handler = ResearchHandler(self)
-            user_id = str(getattr(request, 'user_id', '') or '')
+            effective_user_id = _effective_user_id(user_id, request)
             research_sources, research_time = await research_handler.conduct_research(
-                request, request.research_enabled, request.search_engine, 12, user_id=user_id
+                request, request.research_enabled, request.search_engine, 12, user_id=effective_user_id
             )
             
             # Step 2: Generate content based on grounding level
@@ -217,7 +230,7 @@ class LinkedInService:
                 content_result = await content_generator.generate_grounded_carousel_content(
                     request=request,
                     research_sources=research_sources,
-                    user_id=str(getattr(request, 'user_id', ''))
+                    user_id=effective_user_id
                 )
             else:
                 logger.error("Grounding not enabled - cannot generate LinkedIn carousel without AI provider")
@@ -274,7 +287,9 @@ class LinkedInService:
                 error=f"Failed to generate LinkedIn carousel: {str(e)}"
             )
     
-    async def generate_linkedin_video_script(self, request: LinkedInVideoScriptRequest) -> LinkedInVideoScriptResponse:
+    async def generate_linkedin_video_script(
+        self, request: LinkedInVideoScriptRequest, user_id: Optional[str] = None
+    ) -> LinkedInVideoScriptResponse:
         """
         Generate a LinkedIn video script with enhanced grounding capabilities.
         
@@ -291,9 +306,9 @@ class LinkedInService:
             # Step 1: Conduct research if enabled
             from services.linkedin.research_handler import ResearchHandler
             research_handler = ResearchHandler(self)
-            user_id = str(getattr(request, 'user_id', '') or '')
+            effective_user_id = _effective_user_id(user_id, request)
             research_sources, research_time = await research_handler.conduct_research(
-                request, request.research_enabled, request.search_engine, 8, user_id=user_id
+                request, request.research_enabled, request.search_engine, 8, user_id=effective_user_id
             )
             
             # Step 2: Generate content based on grounding level
@@ -310,7 +325,7 @@ class LinkedInService:
                 content_result = await content_generator.generate_grounded_video_script_content(
                     request=request,
                     research_sources=research_sources,
-                    user_id=str(getattr(request, 'user_id', ''))
+                    user_id=effective_user_id
                 )
             else:
                 logger.error("Grounding not enabled - cannot generate LinkedIn video script without AI provider")
@@ -329,9 +344,10 @@ class LinkedInService:
             if result['success']:
                 # Convert to LinkedInVideoScriptResponse
                 from models.linkedin_models import VideoScript
+                from services.linkedin.content_parser import normalize_main_content
                 video_script = VideoScript(
                     hook=result['data']['hook'],
-                    main_content=result['data']['main_content'],
+                    main_content=normalize_main_content(result['data']['main_content']),
                     conclusion=result['data']['conclusion'],
                     captions=result['data'].get('captions'),
                     thumbnail_suggestions=result['data'].get('thumbnail_suggestions', []),
@@ -358,7 +374,9 @@ class LinkedInService:
                 error=f"Failed to generate LinkedIn video script: {str(e)}"
             )
     
-    async def generate_linkedin_comment_response(self, request: LinkedInCommentResponseRequest) -> LinkedInCommentResponseResult:
+    async def generate_linkedin_comment_response(
+        self, request: LinkedInCommentResponseRequest, user_id: Optional[str] = None
+    ) -> LinkedInCommentResponseResult:
         """
         Generate a LinkedIn comment response with optional grounding capabilities.
         
@@ -375,9 +393,9 @@ class LinkedInService:
             # Step 1: Conduct research if enabled
             from services.linkedin.research_handler import ResearchHandler
             research_handler = ResearchHandler(self)
-            user_id = str(getattr(request, 'user_id', '') or '')
+            effective_user_id = _effective_user_id(user_id, request)
             research_sources, research_time = await research_handler.conduct_research(
-                request, request.research_enabled, request.search_engine, 5, user_id=user_id
+                request, request.research_enabled, request.search_engine, 5, user_id=effective_user_id
             )
             
             # Step 2: Generate response based on grounding level
@@ -394,7 +412,7 @@ class LinkedInService:
                 response_result = await content_generator.generate_grounded_comment_response(
                     request=request,
                     research_sources=research_sources,
-                    user_id=str(getattr(request, 'user_id', ''))
+                    user_id=effective_user_id
                 )
             else:
                 logger.error("Grounding not enabled - cannot generate LinkedIn comment response without AI provider")

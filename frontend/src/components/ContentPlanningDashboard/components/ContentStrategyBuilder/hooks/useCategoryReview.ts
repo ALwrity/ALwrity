@@ -51,11 +51,8 @@ export const useCategoryReview = ({ completionStats, setError, setActiveCategory
 
     setIsMarkingReviewed(true);
     setCategoryCompletionMessage('🔄 Marking category as reviewed...');
-    
+
     try {
-      // Simulate processing time for better UX
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
       // Mark category as reviewed
       setReviewedCategories(prev => {
         const updated = new Set([...Array.from(prev), activeCategory]);
@@ -63,37 +60,38 @@ export const useCategoryReview = ({ completionStats, setError, setActiveCategory
         saveReviewedCategories(updated);
         return updated;
       });
-      
+
       // Get category name for display
-      const categoryName = activeCategory.split('_').map(word => 
+      const categoryName = activeCategory.split('_').map(word =>
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' ');
-      
+
       setCategoryCompletionMessage(`✅ ${categoryName} reviewed and confirmed!`);
-      
-      // Auto-navigate to next unreviewed category
-      setTimeout(() => {
-        const allCategories = Object.keys(completionStats.category_completion);
-        const currentIndex = allCategories.indexOf(activeCategory);
-        
-        // Use the updated reviewedCategories state that includes the current category
-        const updatedReviewedCategories = new Set([...Array.from(reviewedCategories), activeCategory]);
-        
-        const nextUnreviewedCategory = allCategories.find((categoryId, index) => {
-          if (index <= currentIndex) return false;
-          return !updatedReviewedCategories.has(categoryId);
-        });
-        
-        if (nextUnreviewedCategory) {
-          // Actually navigate to the next category
-          setActiveCategory(nextUnreviewedCategory);
-          setCategoryCompletionMessage(`🎯 Moving to next category: ${nextUnreviewedCategory.split('_').map(word => 
-            word.charAt(0).toUpperCase() + word.slice(1)
-          ).join(' ')}`);
-        } else {
-          setCategoryCompletionMessage('🎉 All categories reviewed and confirmed! You can now create your strategy.');
-        }
-      }, 1500);
+
+      // Auto-navigate to next unreviewed category on the next tick
+      // (the artificial 1.5s setTimeout was removed -- React state
+      // updates batch, so the navigation lands on the same frame as
+      // the toast update).
+      const allCategories = Object.keys(completionStats.category_completion);
+      const currentIndex = allCategories.indexOf(activeCategory);
+
+      // Use the updated reviewedCategories state that includes the current category
+      const updatedReviewedCategories = new Set([...Array.from(reviewedCategories), activeCategory]);
+
+      const nextUnreviewedCategory = allCategories.find((categoryId, index) => {
+        if (index <= currentIndex) return false;
+        return !updatedReviewedCategories.has(categoryId);
+      });
+
+      if (nextUnreviewedCategory) {
+        // Actually navigate to the next category
+        setActiveCategory(nextUnreviewedCategory);
+        setCategoryCompletionMessage(`🎯 Moving to next category: ${nextUnreviewedCategory.split('_').map(word =>
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ')}`);
+      } else {
+        setCategoryCompletionMessage('🎉 All categories reviewed and confirmed! You can now create your strategy.');
+      }
     } catch (error: any) {
       setError(`Error marking category as reviewed: ${error.message || 'Unknown error'}`);
       console.error('Error in handleConfirmCategoryReview:', error);

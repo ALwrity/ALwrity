@@ -1,8 +1,25 @@
 """
 SIF Phase 2 Integration Module
 
-This module demonstrates how to integrate the intelligent caching system
-with the existing SIF framework for improved performance and user experience.
+This module is the canonical production entry point for the
+Semantic Intelligence Framework (SIF) integration layer. It
+orchestrates ``TxtaiIntelligenceService`` (per-user FAISS
+embeddings), the ``SemanticCacheManager``, the
+``SemanticHarvesterService``, and the SIF agent team to provide
+context-aware retrieval for the rest of the ALwrity backend
+(onboarding, website analysis, SEO dashboard, agent framework).
+
+Failure-mode contract (Phase 1.2.3)
+----------------------------------
+Public methods follow the SIFError contract defined in
+``sif_errors``. The strict context-fallback methods
+(``get_step*_context``) raise :class:`SIFContextMissing` after all
+three fallback tiers return no data; this is a documented
+runtime condition (the user has not completed that onboarding
+step) and is *not* a system fault. SIFError subclasses raised
+by the underlying ``intelligence_service.search`` (Phase 1.2.2)
+are caught and logged at the tier level; the method falls
+through to the next tier. Only SIFContextMissing surfaces.
 """
 
 import asyncio
@@ -18,6 +35,8 @@ from models.onboarding import WebsiteAnalysis, OnboardingSession, CompetitorAnal
 # Import existing SIF components
 from .txtai_service import TxtaiIntelligenceService
 from .semantic_cache import semantic_cache_manager, SemanticCacheStats
+from .sif_errors import SIFContextMissing, SIFError
+from .sif_metrics import inc_counter as _sif_metrics_inc  # Phase 4.2
 from services.intelligence.harvester import SemanticHarvesterService
 from services.intelligence.agent_flat_context import AgentFlatContextStore
 
@@ -53,20 +72,106 @@ class SIFIntegrationService:
         logger.info(f"SIF Integration Service initialized for user {user_id}")
 
     def get_trend_surfer_agent(self):
-        """Lazy load TrendSurferAgent"""
+        """Lazy load TrendSurferAgent.
+
+        Phase 5 / Issue #12: pre-#12 this raised whatever the
+        ``TrendSurferAgent`` constructor raised (txtai not
+        available, LLM init failure, etc.) directly to the caller.
+        That bubbled up as a 500 from every API endpoint that
+        touches the agent. Now we catch construction failures,
+        set ``self.trend_surfer_agent = None`` to force a retry
+        on the next call, and raise a descriptive error.
+        """
         if not self.trend_surfer_agent:
-            from services.intelligence.agents.trend_surfer_agent import TrendSurferAgent
-            self.trend_surfer_agent = TrendSurferAgent(
-                intelligence_service=self.intelligence_service,
-                user_id=self.user_id
-            )
+            try:
+                from services.intelligence.agents.trend_surfer_agent import TrendSurferAgent
+                self.trend_surfer_agent = TrendSurferAgent(
+                    intelligence_service=self.intelligence_service,
+                    user_id=self.user_id
+                )
+            except Exception as e:
+                # Reset to None so a future call retries construction
+                # (transient failures like a missing optional LLM
+                # provider may resolve on the next request).
+                self.trend_surfer_agent = None
+                logger.error(
+                    f"Failed to construct TrendSurferAgent for user {self.user_id}: {e}",
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"TrendSurferAgent unavailable for user {self.user_id}: {e}"
+                ) from e
         return self.trend_surfer_agent
+
+    def get_strategy_agent(self):
+        """Lazy load StrategyArchitectAgent. See Issue #12.
+
+        Same try/except pattern as ``get_trend_surfer_agent`` so
+        that a single failure here does not permanently wedge the
+        service: the next call retries construction.
+        """
+        if not self.strategy_agent:
+            try:
+                from .sif_agents import StrategyArchitectAgent
+                self.strategy_agent = StrategyArchitectAgent(
+                    self.intelligence_service, user_id=self.user_id
+                )
+            except Exception as e:
+                self.strategy_agent = None
+                logger.error(
+                    f"Failed to construct StrategyArchitectAgent for user {self.user_id}: {e}",
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"StrategyArchitectAgent unavailable for user {self.user_id}: {e}"
+                ) from e
+        return self.strategy_agent
+
+    def get_guardian_agent(self):
+        """Lazy load ContentGuardianAgent. See Issue #12."""
+        if not self.guardian_agent:
+            try:
+                from services.intelligence.agents.specialized import ContentGuardianAgent
+                self.guardian_agent = ContentGuardianAgent(
+                    self.intelligence_service,
+                    user_id=self.user_id,
+                    sif_service=self,
+                )
+            except Exception as e:
+                self.guardian_agent = None
+                logger.error(
+                    f"Failed to construct ContentGuardianAgent for user {self.user_id}: {e}",
+                    exc_info=True,
+                )
+                raise RuntimeError(
+                    f"ContentGuardianAgent unavailable for user {self.user_id}: {e}"
+                ) from e
+        return self.guardian_agent
 
 
     async def get_step2_website_context(self) -> Dict[str, Any]:
         """
         Retrieve onboarding step 2 website context with a strict fallback chain:
         flat file -> database -> SIF semantic index.
+
+        Returns:
+            A dict with at least ``source`` and ``data`` keys. The
+            ``source`` is one of ``"flat_file"``, ``"database"``,
+            ``"sif_semantic"`` (each indicating which tier produced
+            the data), or, pre-1.2.3, ``"none"`` (no tier had data).
+            The Phase 1.2.3 contract raises :class:`SIFContextMissing`
+            instead of returning the ``"none"`` stub.
+
+        Raises:
+            SIFContextMissing: All three tiers returned no data. This
+                is a legitimate runtime condition (the user has not
+                yet completed onboarding step 2) and is *not* a
+                system fault. Callers should log and continue.
+            SIFError subclasses: A tier-level fault (e.g. SIF
+                unavailability from Phase 1.2.2) is logged and
+                swallowed within the tier; the method falls
+                through to the next tier. Only SIFContextMissing
+                surfaces out of this method.
         """
         # 1) Fastest: flat-file agent context
         try:
@@ -113,37 +218,63 @@ class SIFIntegrationService:
             if db:
                 db.close()
 
-        # 3) Semantic fallback
+        # 3) Semantic fallback. Phase 1.2.2 made intelligence_service.search
+        # raise SIFError subclasses on real faults; we catch those
+        # here and fall through (the tier failed, but the *user*
+        # condition is "no context yet" until proven otherwise).
         try:
             results = await self.intelligence_service.search("website analysis brand voice style", limit=1)
-            if results:
-                top = results[0]
-                metadata = top.get("object") if isinstance(top, dict) else None
-                if isinstance(metadata, str):
-                    try:
-                        metadata = json.loads(metadata)
-                    except Exception:
-                        metadata = {}
-                if isinstance(metadata, dict):
-                    report = metadata.get("full_report") if isinstance(metadata.get("full_report"), dict) else metadata
-                    return {
-                        "source": "sif_semantic",
-                        "data": report,
-                        "agent_summary": {
-                            "quick_facts": {
-                                "website_url": report.get("website_url") if isinstance(report, dict) else None,
-                            }
-                        },
-                    }
+        except SIFError as se:
+            logger.warning(
+                f"SIF semantic fallback raised {type(se).__name__} for user {self.user_id} "
+                f"(continuing to SIFContextMissing): {se}"
+            )
+            results = None
         except Exception as e:
             logger.warning(f"SIF semantic fallback failed for user {self.user_id}: {e}")
+            results = None
 
-        return {"source": "none", "data": {}}
+        if results:
+            top = results[0]
+            metadata = top.get("object") if isinstance(top, dict) else None
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except Exception:
+                    metadata = {}
+            if isinstance(metadata, dict):
+                report = metadata.get("full_report") if isinstance(metadata.get("full_report"), dict) else metadata
+                return {
+                    "source": "sif_semantic",
+                    "data": report,
+                    "agent_summary": {
+                        "quick_facts": {
+                            "website_url": report.get("website_url") if isinstance(report, dict) else None,
+                        }
+                    },
+                }
+
+        # All three tiers exhausted with no data. Pre-1.2.3 returned
+        # ``{"source": "none", "data": {}}``. We now raise
+        # SIFContextMissing so callers (and operators) can
+        # distinguish "user has no context yet" from "context was
+        # found and used".
+        raise SIFContextMissing(
+            "No step 2 website context available for user (all 3 tiers exhausted)",
+            user_id=self.user_id,
+            operation="get_step2_website_context",
+        )
 
     async def get_step3_research_context(self) -> Dict[str, Any]:
         """
         Retrieve onboarding step 3 research context with fallback chain:
         flat file -> database -> SIF semantic index.
+
+        Returns:
+            A dict with at least ``source`` and ``data`` keys.
+
+        Raises:
+            SIFContextMissing: All three tiers returned no data.
         """
         try:
             flat_doc = AgentFlatContextStore(self.user_id).load_step3_context_document()
@@ -190,33 +321,50 @@ class SIFIntegrationService:
 
         try:
             results = await self.intelligence_service.search("research preferences competitors onboarding step 3", limit=1)
-            if results:
-                top = results[0]
-                metadata = top.get("object") if isinstance(top, dict) else None
-                if isinstance(metadata, str):
-                    try:
-                        metadata = json.loads(metadata)
-                    except Exception:
-                        metadata = {}
-                report = metadata.get("full_report") if isinstance(metadata, dict) and isinstance(metadata.get("full_report"), dict) else (metadata if isinstance(metadata, dict) else {})
-                return {
-                    "source": "sif_semantic",
-                    "data": report,
-                    "agent_summary": {
-                        "quick_facts": {
-                            "research_depth": report.get("research_depth") if isinstance(report, dict) else None,
-                        }
-                    },
-                }
+        except SIFError as se:
+            logger.warning(
+                f"Step 3 SIF semantic fallback raised {type(se).__name__} for user {self.user_id}: {se}"
+            )
+            results = None
         except Exception as e:
             logger.warning(f"Step 3 semantic fallback failed for user {self.user_id}: {e}")
+            results = None
 
-        return {"source": "none", "data": {}}
+        if results:
+            top = results[0]
+            metadata = top.get("object") if isinstance(top, dict) else None
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except Exception:
+                    metadata = {}
+            report = metadata.get("full_report") if isinstance(metadata, dict) and isinstance(metadata.get("full_report"), dict) else (metadata if isinstance(metadata, dict) else {})
+            return {
+                "source": "sif_semantic",
+                "data": report,
+                "agent_summary": {
+                    "quick_facts": {
+                        "research_depth": report.get("research_depth") if isinstance(report, dict) else None,
+                    }
+                },
+            }
+
+        raise SIFContextMissing(
+            "No step 3 research context available for user (all 3 tiers exhausted)",
+            user_id=self.user_id,
+            operation="get_step3_research_context",
+        )
 
     async def get_step4_persona_context(self) -> Dict[str, Any]:
         """
         Retrieve onboarding step 4 persona context with fallback chain:
         flat file -> database -> SIF semantic index.
+
+        Returns:
+            A dict with at least ``source`` and ``data`` keys.
+
+        Raises:
+            SIFContextMissing: All three tiers returned no data.
         """
         try:
             flat_doc = AgentFlatContextStore(self.user_id).load_step4_context_document()
@@ -263,33 +411,50 @@ class SIFIntegrationService:
 
         try:
             results = await self.intelligence_service.search("persona platform personas onboarding step 4", limit=1)
-            if results:
-                top = results[0]
-                metadata = top.get("object") if isinstance(top, dict) else None
-                if isinstance(metadata, str):
-                    try:
-                        metadata = json.loads(metadata)
-                    except Exception:
-                        metadata = {}
-                report = metadata.get("full_report") if isinstance(metadata, dict) and isinstance(metadata.get("full_report"), dict) else (metadata if isinstance(metadata, dict) else {})
-                return {
-                    "source": "sif_semantic",
-                    "data": report,
-                    "agent_summary": {
-                        "quick_facts": {
-                            "has_core_persona": bool(report.get("core_persona")) if isinstance(report, dict) else False,
-                        }
-                    },
-                }
+        except SIFError as se:
+            logger.warning(
+                f"Step 4 SIF semantic fallback raised {type(se).__name__} for user {self.user_id}: {se}"
+            )
+            results = None
         except Exception as e:
             logger.warning(f"Step 4 semantic fallback failed for user {self.user_id}: {e}")
+            results = None
 
-        return {"source": "none", "data": {}}
+        if results:
+            top = results[0]
+            metadata = top.get("object") if isinstance(top, dict) else None
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except Exception:
+                    metadata = {}
+            report = metadata.get("full_report") if isinstance(metadata, dict) and isinstance(metadata.get("full_report"), dict) else (metadata if isinstance(metadata, dict) else {})
+            return {
+                "source": "sif_semantic",
+                "data": report,
+                "agent_summary": {
+                    "quick_facts": {
+                        "has_core_persona": bool(report.get("core_persona")) if isinstance(report, dict) else False,
+                    }
+                },
+            }
+
+        raise SIFContextMissing(
+            "No step 4 persona context available for user (all 3 tiers exhausted)",
+            user_id=self.user_id,
+            operation="get_step4_persona_context",
+        )
 
     async def get_step5_integrations_context(self) -> Dict[str, Any]:
         """
         Retrieve onboarding step 5 integrations context with fallback chain:
         flat file -> SIF semantic index.
+
+        Returns:
+            A dict with at least ``source`` and ``data`` keys.
+
+        Raises:
+            SIFContextMissing: All tiers returned no data.
         """
         try:
             flat_doc = AgentFlatContextStore(self.user_id).load_step5_context_document()
@@ -307,28 +472,39 @@ class SIFIntegrationService:
 
         try:
             results = await self.intelligence_service.search("integrations onboarding step 5 connected providers", limit=1)
-            if results:
-                top = results[0]
-                metadata = top.get("object") if isinstance(top, dict) else None
-                if isinstance(metadata, str):
-                    try:
-                        metadata = json.loads(metadata)
-                    except Exception:
-                        metadata = {}
-                report = metadata.get("full_report") if isinstance(metadata, dict) and isinstance(metadata.get("full_report"), dict) else (metadata if isinstance(metadata, dict) else {})
-                return {
-                    "source": "sif_semantic",
-                    "data": report,
-                    "agent_summary": {
-                        "quick_facts": {
-                            "connected_integrations_count": len((report.get("integrations") or {})) if isinstance(report, dict) and isinstance(report.get("integrations"), dict) else None,
-                        }
-                    },
-                }
+        except SIFError as se:
+            logger.warning(
+                f"Step 5 SIF semantic fallback raised {type(se).__name__} for user {self.user_id}: {se}"
+            )
+            results = None
         except Exception as e:
             logger.warning(f"Step 5 semantic fallback failed for user {self.user_id}: {e}")
+            results = None
 
-        return {"source": "none", "data": {}}
+        if results:
+            top = results[0]
+            metadata = top.get("object") if isinstance(top, dict) else None
+            if isinstance(metadata, str):
+                try:
+                    metadata = json.loads(metadata)
+                except Exception:
+                    metadata = {}
+            report = metadata.get("full_report") if isinstance(metadata, dict) and isinstance(metadata.get("full_report"), dict) else (metadata if isinstance(metadata, dict) else {})
+            return {
+                "source": "sif_semantic",
+                "data": report,
+                "agent_summary": {
+                    "quick_facts": {
+                        "connected_integrations_count": len((report.get("integrations") or {})) if isinstance(report, dict) and isinstance(report.get("integrations"), dict) else None,
+                    }
+                },
+            }
+
+        raise SIFContextMissing(
+            "No step 5 integrations context available for user (all tiers exhausted)",
+            user_id=self.user_id,
+            operation="get_step5_integrations_context",
+        )
 
     async def get_flat_context_manifest(self) -> Dict[str, Any]:
         """Return lightweight manifest of available flat context documents for this user."""
@@ -380,7 +556,16 @@ class SIFIntegrationService:
         merged["document_count"] = len(merged["documents"])
         return merged
 
-    async def index_market_trends_run(self, trends_result: Dict[str, Any], run_id: str) -> bool:
+    async def index_market_trends_run(self, trends_result: Dict[str, Any], run_id: str) -> None:
+        """
+        Index a market-trends run into the SIF index.
+
+        Raises:
+            SIFEmbeddingFailed: If the underlying ``intelligence_service.index_content``
+                call raised.
+            SIFError: Any other internal fault surfaces as the
+                specific subclass raised (Phase 1.2.2 contracts).
+        """
         try:
             latest_id = f"market_trends_latest:{self.user_id}"
             run_doc_id = f"market_trends_run:{self.user_id}:{run_id}"
@@ -415,10 +600,23 @@ class SIFIntegrationService:
                     (run_doc_id, text_content, {**base_metadata, "is_latest": False}),
                 ]
             )
-            return True
+            _sif_metrics_inc("sif_sync_total", "market_trends_success")
         except Exception as e:
-            logger.error(f"Failed to index market trends run: {e}")
-            return False
+            logger.error(f"Failed to index market trends run: {e}", exc_info=True)
+            _sif_metrics_inc("sif_sync_total", "market_trends_error")
+            # Phase 1.2.3: re-raise as SIFEmbeddingFailed so callers
+            # can distinguish "index worked" from "index failed at
+            # the embedding layer" from "index failed because
+            # something else broke". Pre-1.2.3 returned False; callers
+            # (sif_indexing_executor, sif_integration callers) wrap
+            # in ``try/except Exception`` so the behavior is preserved.
+            from .sif_errors import SIFEmbeddingFailed
+            raise SIFEmbeddingFailed(
+                f"Failed to index market trends run: {e}",
+                user_id=self.user_id,
+                operation="index_market_trends_run",
+                cause=e,
+            ) from e
 
     async def sync_content_strategy_dashboard_to_sif(self, db=None) -> bool:
         close_db = False
@@ -427,7 +625,7 @@ class SIFIntegrationService:
                 db = get_session_for_user(self.user_id)
                 close_db = True
             if not db:
-                return False
+                return
 
             items_to_index = []
 
@@ -562,25 +760,38 @@ class SIFIntegrationService:
 
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
-                return True
-            return False
+            _sif_metrics_inc("sif_sync_total", "content_strategy_success")
+            return
         except Exception as e:
-            logger.error(f"Failed to sync content strategy dashboard to SIF: {e}")
-            return False
+            logger.error(f"Failed to sync content strategy dashboard to SIF: {e}", exc_info=True)
+            from .sif_errors import SIFEmbeddingFailed
+            _sif_metrics_inc("sif_sync_total", "content_strategy_error")
+            raise SIFEmbeddingFailed(
+                f"Failed to sync content strategy dashboard to SIF: {e}",
+                user_id=self.user_id,
+                operation="sync_content_strategy_dashboard_to_sif",
+                cause=e,
+            ) from e
         finally:
             if close_db and db:
                 db.close()
     
-    async def sync_onboarding_data_to_sif(self):
+    async def sync_onboarding_data_to_sif(self) -> None:
         """
         Embeds existing onboarding data (WebsiteAnalysis, CompetitorAnalysis) into the SIF index.
         This ensures agents can query this data semantically without direct DB access.
+
+        Raises:
+            SIFEmbeddingFailed: If the underlying intelligence_service
+                raised during the index call.
+            SIFError: Any other internal fault (e.g. DB failure)
+                surfaces as the specific subclass raised.
         """
         try:
             logger.info(f"Syncing onboarding data to SIF for user {self.user_id}")
             db = get_session_for_user(self.user_id)
             if not db:
-                return False
+                return
 
             items_to_index = []
 
@@ -647,27 +858,40 @@ class SIFIntegrationService:
                     await self.sync_content_strategy_dashboard_to_sif(db=db)
                 except Exception:
                     pass
-                return True
             else:
                 logger.info("No onboarding data found to sync")
-                return False
+            _sif_metrics_inc("sif_sync_total", "onboarding_success")
 
         except Exception as e:
-            logger.error(f"Failed to sync onboarding data to SIF: {e}")
-            return False
+            logger.error(f"Failed to sync onboarding data to SIF: {e}", exc_info=True)
+            from .sif_errors import SIFEmbeddingFailed
+            _sif_metrics_inc("sif_sync_total", "onboarding_error")
+            raise SIFEmbeddingFailed(
+                f"Failed to sync onboarding data to SIF: {e}",
+                user_id=self.user_id,
+                operation="sync_onboarding_data_to_sif",
+                cause=e,
+            ) from e
         finally:
             if db:
                 db.close()
 
-    async def sync_seo_dashboard_to_sif(self):
+    async def sync_seo_dashboard_to_sif(self) -> None:
         """
         Embeds SEO Dashboard data (GSC/Bing metrics) into the SIF index.
+
+        Raises:
+            SIFEmbeddingFailed: If the underlying intelligence_service
+                raised during the index call.
+            SIFError: Any other internal fault surfaces as the
+                specific subclass raised.
         """
+
         try:
             logger.info(f"Syncing SEO Dashboard data to SIF for user {self.user_id}")
             db = get_session_for_user(self.user_id)
             if not db:
-                return False
+                return
 
             from services.seo.dashboard_service import SEODashboardService
             dashboard_service = SEODashboardService(db)
@@ -771,24 +995,36 @@ class SIFIntegrationService:
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
                 logger.info(f"Successfully synced SEO Dashboard data to SIF")
-                return True
-            
-            return False
-            
+            _sif_metrics_inc("sif_sync_total", "seo_dashboard_success")
+            return
+
         except Exception as e:
-            logger.error(f"Failed to sync SEO Dashboard data: {e}")
-            return False
+            logger.error(f"Failed to sync SEO Dashboard data: {e}", exc_info=True)
+            from .sif_errors import SIFEmbeddingFailed
+            _sif_metrics_inc("sif_sync_total", "seo_dashboard_error")
+            raise SIFEmbeddingFailed(
+                f"Failed to sync SEO Dashboard data: {e}",
+                user_id=self.user_id,
+                operation="sync_seo_dashboard_to_sif",
+                cause=e,
+            ) from e
         finally:
             if db:
                 db.close()
 
-    async def sync_user_website_content(self, website_url: str) -> bool:
+    async def sync_user_website_content(self, website_url: str) -> None:
         """
         Harvests and indexes user website content using incremental upsert strategy.
         This ensures that:
         1. New content is added to the index.
         2. Existing content is updated (refreshed).
         3. Only recent/relevant pages are processed (snapshot approach).
+
+        Raises:
+            SIFEmbeddingFailed: If the underlying intelligence_service
+                raised during the index call.
+            SIFError: Any other internal fault surfaces as the
+                specific subclass raised.
         """
         try:
             logger.info(f"Syncing user website content for {website_url} (User: {self.user_id})")
@@ -799,7 +1035,7 @@ class SIFIntegrationService:
             
             if not harvested_pages:
                 logger.warning(f"No content harvested from {website_url}")
-                return False
+                return
                 
             logger.info(f"Harvested {len(harvested_pages)} pages from {website_url}")
             
@@ -840,13 +1076,19 @@ class SIFIntegrationService:
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
                 logger.info(f"Successfully synced {len(items_to_index)} pages to SIF index")
-                return True
-            
-            return False
-            
+            _sif_metrics_inc("sif_sync_total", "website_content_success")
+            return
+
         except Exception as e:
-            logger.error(f"Failed to sync user website content: {e}")
-            return False
+            logger.error(f"Failed to sync user website content: {e}", exc_info=True)
+            from .sif_errors import SIFEmbeddingFailed
+            _sif_metrics_inc("sif_sync_total", "website_content_error")
+            raise SIFEmbeddingFailed(
+                f"Failed to sync user website content: {e}",
+                user_id=self.user_id,
+                operation="sync_user_website_content",
+                cause=e,
+            ) from e
 
     async def get_seo_dashboard_context(self) -> Dict[str, Any]:
         """
