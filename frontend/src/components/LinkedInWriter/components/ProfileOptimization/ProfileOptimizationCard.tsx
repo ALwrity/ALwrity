@@ -17,6 +17,9 @@ import {
 interface ProfileOptimizationCardProps {
   recommendation: LinkedInProfileOptimizationItem;
   index: number;
+  onMarkDone?: (recommendationId: string) => void;
+  onSkip?: (recommendationId: string) => void;
+  isMarking?: boolean;
 }
 
 const LOG_PREFIX = '[ProfileOptimizationCard]';
@@ -80,6 +83,9 @@ async function copySuggestedCopy(text: string, recommendationId: string): Promis
 export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = ({
   recommendation,
   index,
+  onMarkDone,
+  onSkip,
+  isMarking = false,
 }) => {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -261,6 +267,60 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
               )}
             </div>
           </Collapse>
+
+          {(onMarkDone || onSkip) && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 8,
+                marginTop: 14,
+                paddingTop: 14,
+                borderTop: '1px solid #e2e8f0',
+              }}
+            >
+              {onMarkDone && (
+                <button
+                  type="button"
+                  onClick={() => onMarkDone(recommendation.id)}
+                  disabled={isMarking}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: isMarking ? '#94a3b8' : 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: isMarking ? 'wait' : 'pointer',
+                    opacity: isMarking ? 0.8 : 1,
+                  }}
+                >
+                  {isMarking ? 'Saving…' : 'Mark as done'}
+                </button>
+              )}
+              {onSkip && (
+                <button
+                  type="button"
+                  onClick={() => onSkip(recommendation.id)}
+                  disabled={isMarking}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #cbd5e1',
+                    backgroundColor: '#fff',
+                    color: '#64748b',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: isMarking ? 'wait' : 'pointer',
+                    opacity: isMarking ? 0.7 : 1,
+                  }}
+                >
+                  Skip
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </article>

@@ -63,6 +63,11 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     expandOptimization,
     retryOptimization,
     refreshOptimization,
+    markOptimizationItemComplete,
+    loadNextOptimizationBatch,
+    markingRecommendationId,
+    isLoadingNextBatch,
+    showNextBatchCta,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
   const handleImproveProfile = () => {
@@ -129,14 +134,27 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         }
         isExpanded={isOptimizationExpanded}
         isRefreshing={isOptimizationLoading}
+        showNextBatchCta={showNextBatchCta}
+        isLoadingNextBatch={isLoadingNextBatch}
+        markingRecommendationId={markingRecommendationId}
         onCollapse={collapseOptimization}
         onExpand={expandOptimization}
         onRefresh={() => {
           void refreshOptimization();
         }}
+        onMarkDone={(recommendationId) => {
+          void markOptimizationItemComplete(recommendationId, 'done');
+        }}
+        onSkip={(recommendationId) => {
+          void markOptimizationItemComplete(recommendationId, 'skipped');
+        }}
+        onLoadNextBatch={() => {
+          void loadNextOptimizationBatch();
+        }}
       />
 
-      {(optimizationError || optimizationUserError) && optimizationPanelState === 'error' && (
+      {(optimizationError || optimizationUserError) &&
+        optimizationPanelState === 'error' && (
         <AnalysisErrorAlert
           error={
             optimizationError ?? {
@@ -152,6 +170,20 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
             void retryOptimization();
           }}
           isRetrying={isOptimizationLoading}
+        />
+        )}
+
+      {optimizationUserError && optimizationPanelState === 'complete' && (
+        <AnalysisErrorAlert
+          error={{
+            failed_phase: 7,
+            phase_label: 'Profile Optimization',
+            error_code: 'batch_progression_failed',
+            user_message: optimizationUserError,
+          }}
+          onRetry={() => {
+            void retryOptimization();
+          }}
         />
       )}
 

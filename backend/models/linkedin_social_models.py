@@ -196,11 +196,25 @@ class ProfileOptimizationResponse(BaseModel):
 class ProfileOptimizationMetaResponse(BaseModel):
     """Phase 7 profile optimization acquisition metadata."""
 
-    source: Literal["cache", "generated", "no_gaps"]
+    source: Literal["cache", "generated", "no_gaps", "batch_advanced"]
     profile_optimization_updated_at: Optional[str] = None
     active_batch_index: int = Field(default=0, ge=0)
     remaining_in_backlog: int = Field(default=0, ge=0)
     message: Optional[str] = None
+
+
+class ProfileOptimizationCompleteRequest(BaseModel):
+    """Request body for marking a profile optimization recommendation complete."""
+
+    status: Literal["done", "skipped"] = "done"
+
+
+class ProfileOptimizationBatchActionResponse(BaseModel):
+    """Response after completing an item or loading the next optimization batch."""
+
+    profile_optimization: List[ProfileOptimizationResponse] = Field(default_factory=list)
+    profile_optimization_meta: ProfileOptimizationMetaResponse
+    show_next_batch_cta: bool = False
 
 
 class ProfileAnalysisErrorResponse(BaseModel):

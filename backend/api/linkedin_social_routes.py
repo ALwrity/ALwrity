@@ -36,6 +36,8 @@ from models.linkedin_social_models import (
     ProfileCompletionResponse,
     ProfileIntelligenceMetaResponse,
     ProfileAnalysisErrorResponse,
+    ProfileOptimizationBatchActionResponse,
+    ProfileOptimizationCompleteRequest,
     ProfileOptimizationDebugResponse,
     ProfileOptimizationMetaResponse,
     ProfileOptimizationResponse,
@@ -59,7 +61,12 @@ from services.integrations.linkedin.profile_optimization_rubric import (
 )
 from services.integrations.linkedin.profile_optimization_service import (
     ProfileOptimizationAcquireMeta,
+    ProfileOptimizationBatchNotReadyError,
     ProfileOptimizationError,
+    ProfileOptimizationItemNotFoundError,
+    ProfileOptimizationNotStoredError,
+    advance_profile_optimization_batch,
+    get_next_profile_optimization_batch,
     get_or_generate_profile_optimization,
 )
 from services.integrations.linkedin.profile_optimization_validator import (
@@ -728,7 +735,7 @@ def _profile_optimization_meta_to_response(
 ) -> Optional[ProfileOptimizationMetaResponse]:
     """Map orchestrator meta to API response when optimization was acquired."""
     source = meta.get("source")
-    if source not in ("cache", "generated", "no_gaps"):
+    if source not in ("cache", "generated", "no_gaps", "batch_advanced"):
         return None
     return ProfileOptimizationMetaResponse(
         source=source,  # type: ignore[arg-type]
@@ -736,6 +743,24 @@ def _profile_optimization_meta_to_response(
         active_batch_index=int(meta.get("active_batch_index") or 0),
         remaining_in_backlog=int(meta.get("remaining_in_backlog") or 0),
         message=meta.get("message"),
+    )
+
+
+def _batch_action_response_from_items(
+    items: list[dict[str, Any]],
+    meta: ProfileOptimizationAcquireMeta,
+) -> ProfileOptimizationBatchActionResponse:
+    """Build batch action API response from service-layer items and meta."""
+    meta_response = _profile_optimization_meta_to_response(meta)
+    if meta_response is None:
+        raise ValueError("Invalid profile optimization meta from service")
+    response_items = [_optimization_dict_to_response(item) for item in items]
+    remaining = meta_response.remaining_in_backlog
+    show_next_batch_cta = len(response_items) == 0 and remaining > 0
+    return ProfileOptimizationBatchActionResponse(
+        profile_optimization=response_items,
+        profile_optimization_meta=meta_response,
+        show_next_batch_cta=show_next_batch_cta,
     )
 
 
@@ -1368,6 +1393,159 @@ async def complete_linkedin_profile(
         ai_profile_intelligence=ai_profile_intelligence,
         ai_profile_intelligence_meta=ai_profile_intelligence_meta,
     )
+
+
+@router.post(
+    "/profile/optimization/{recommendation_id}/complete",
+    response_model=ProfileOptimizationBatchActionResponse,
+)
+async def complete_profile_optimization_recommendation(
+    recommendation_id: str,
+    body: ProfileOptimizationCompleteRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ProfileOptimizationBatchActionResponse:
+    """
+    Mark an active profile optimization recommendation done or skipped.
+
+    Removes the item from the active batch and persists progress without calling the LLM.
+    """
+    user_id = _user_id(current_user)
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/{}/complete user_id={} status={}",
+        recommendation_id,
+        user_id,
+        body.status,
+    )
+    repository = ProfileRepository(oauth=_oauth_service)
+    try:
+        items, meta = advance_profile_optimization_batch(
+            user_id,
+            recommendation_id,
+            body.status,
+            repository=repository,
+        )
+    except ProfileOptimizationNotStoredError as exc:
+        logger.warning(
+            "[ProfileOptimization] complete not stored user_id={} recommendation_id={}: {}",
+            user_id,
+            recommendation_id,
+            exc,
+        )
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProfileOptimizationItemNotFoundError as exc:
+        logger.warning(
+            "[ProfileOptimization] complete item not found user_id={} recommendation_id={}: {}",
+            user_id,
+            recommendation_id,
+            exc,
+        )
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProfileOptimizationError as exc:
+        logger.exception(
+            "[ProfileOptimization] complete failed user_id={} recommendation_id={}: {}",
+            user_id,
+            recommendation_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to update profile optimization progress.",
+        ) from exc
+
+    try:
+        response = _batch_action_response_from_items(items, meta)
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] complete response mapping failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to format profile optimization response.",
+        ) from exc
+
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/{}/complete success user_id={} "
+        "active_count={} remaining_in_backlog={} show_next_batch_cta={}",
+        recommendation_id,
+        user_id,
+        len(response.profile_optimization),
+        response.profile_optimization_meta.remaining_in_backlog,
+        response.show_next_batch_cta,
+    )
+    return response
+
+
+@router.post(
+    "/profile/optimization/next-batch",
+    response_model=ProfileOptimizationBatchActionResponse,
+)
+async def load_next_profile_optimization_batch(
+    current_user: dict = Depends(get_current_user),
+) -> ProfileOptimizationBatchActionResponse:
+    """
+    Promote the next five recommendations from backlog after the active batch is cleared.
+
+    Does not call the LLM when backlog items remain.
+    """
+    user_id = _user_id(current_user)
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/next-batch user_id={}",
+        user_id,
+    )
+    repository = ProfileRepository(oauth=_oauth_service)
+    try:
+        items, meta = get_next_profile_optimization_batch(
+            user_id,
+            repository=repository,
+        )
+    except ProfileOptimizationNotStoredError as exc:
+        logger.warning(
+            "[ProfileOptimization] next-batch not stored user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProfileOptimizationBatchNotReadyError as exc:
+        logger.warning(
+            "[ProfileOptimization] next-batch not ready user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProfileOptimizationError as exc:
+        logger.exception(
+            "[ProfileOptimization] next-batch failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to load the next profile optimization batch.",
+        ) from exc
+
+    try:
+        response = _batch_action_response_from_items(items, meta)
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] next-batch response mapping failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to format profile optimization response.",
+        ) from exc
+
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/next-batch success user_id={} "
+        "active_count={} remaining_in_backlog={}",
+        user_id,
+        len(response.profile_optimization),
+        response.profile_optimization_meta.remaining_in_backlog,
+    )
+    return response
 
 
 @router.get("/connection/status", response_model=LinkedInConnectionStatusResponse)

@@ -56,10 +56,23 @@ class ProfileOptimizationError(Exception):
 class ProfileOptimizationAcquireMeta(TypedDict, total=False):
     """Metadata for profile optimization acquisition."""
 
-    source: Literal["cache", "generated", "no_gaps"]
+    source: Literal["cache", "generated", "no_gaps", "batch_advanced"]
     profile_optimization_updated_at: Optional[str]
     remaining_in_backlog: int
+    active_batch_index: int
     message: Optional[str]
+
+
+class ProfileOptimizationNotStoredError(ProfileOptimizationError):
+    """Raised when no stored profile optimization exists for the user."""
+
+
+class ProfileOptimizationItemNotFoundError(ProfileOptimizationError):
+    """Raised when the recommendation id is not in the active batch."""
+
+
+class ProfileOptimizationBatchNotReadyError(ProfileOptimizationError):
+    """Raised when the next batch cannot be loaded yet."""
 
 
 def get_or_generate_profile_optimization(
@@ -171,22 +184,28 @@ def get_or_generate_profile_optimization(
             user_id=user_id,
         ):
             recommendations = extract_active_recommendations_list(cached)
-            backlog = cached.get("backlog")
-            remaining = len(backlog) if isinstance(backlog, list) else 0
-            meta: ProfileOptimizationAcquireMeta = {
-                "source": "cache",
-                "profile_optimization_updated_at": row.get("profile_optimization_updated_at"),
-                "remaining_in_backlog": remaining,
-            }
-            logger.info(
-                "{} Cache hit user_id={} profile_optimization_updated_at={} "
-                "active_count={} remaining_in_backlog={}",
-                _LOG_PREFIX,
-                user_id,
-                meta.get("profile_optimization_updated_at"),
-                len(recommendations),
-                remaining,
+            meta: ProfileOptimizationAcquireMeta = _meta_from_stored(
+                cached,
+                row,
+                source="cache",
             )
+            if not recommendations and meta.get("remaining_in_backlog", 0) > 0:
+                logger.info(
+                    "{} Cache hit with cleared active batch user_id={} remaining_in_backlog={}",
+                    _LOG_PREFIX,
+                    user_id,
+                    meta.get("remaining_in_backlog"),
+                )
+            else:
+                logger.info(
+                    "{} Cache hit user_id={} profile_optimization_updated_at={} "
+                    "active_count={} remaining_in_backlog={}",
+                    _LOG_PREFIX,
+                    user_id,
+                    meta.get("profile_optimization_updated_at"),
+                    len(recommendations),
+                    meta.get("remaining_in_backlog"),
+                )
             return recommendations, meta
 
         logger.info(
@@ -236,27 +255,303 @@ def get_or_generate_profile_optimization(
         generate_fn=generate_fn,
     )
     recommendations = extract_active_recommendations_list(stored)
-    backlog = stored.get("backlog")
-    remaining = len(backlog) if isinstance(backlog, list) else 0
     updated_row = repo.get_analysis_row(user_id)
-    opt_updated = (
-        updated_row.get("profile_optimization_updated_at") if updated_row else None
+    generated_meta: ProfileOptimizationAcquireMeta = _meta_from_stored(
+        stored,
+        updated_row or row,
+        source="generated",
     )
-
-    generated_meta: ProfileOptimizationAcquireMeta = {
-        "source": "generated",
-        "profile_optimization_updated_at": opt_updated,
-        "remaining_in_backlog": remaining,
-    }
     logger.info(
         "{} Profile optimization finished source=generated user_id={} active_count={} "
         "remaining_in_backlog={}",
         _LOG_PREFIX,
         user_id,
         len(recommendations),
-        remaining,
+        generated_meta.get("remaining_in_backlog"),
     )
     return recommendations, generated_meta
+
+
+def advance_profile_optimization_batch(
+    user_id: str,
+    recommendation_id: str,
+    status: Literal["done", "skipped"],
+    *,
+    repository: Optional[ProfileRepository] = None,
+) -> tuple[list[dict[str, Any]], ProfileOptimizationAcquireMeta]:
+    """
+    Mark an active recommendation done/skipped and remove it from the active batch.
+
+    Does not pull from backlog until ``get_next_profile_optimization_batch`` is called
+    after the active batch is fully cleared.
+
+    Args:
+        user_id: ALwrity user ID
+        recommendation_id: Server-assigned recommendation ``id``
+        status: ``done`` or ``skipped``
+        repository: Optional ``ProfileRepository`` (for testing)
+
+    Returns:
+        Updated active recommendations and acquire meta
+
+    Raises:
+        ProfileOptimizationNotStoredError: When optimization was never generated
+        ProfileOptimizationItemNotFoundError: When id is not in the active batch
+        ProfileOptimizationError: When persistence fails
+    """
+    logger.info(
+        "{} advance_profile_optimization_batch start user_id={} recommendation_id={} status={}",
+        _LOG_PREFIX,
+        user_id,
+        recommendation_id,
+        status,
+    )
+    repo = repository or ProfileRepository()
+    row = repo.get_analysis_row(user_id)
+    if not row:
+        logger.error(
+            "{} advance_profile_optimization_batch no analysis row user_id={}",
+            _LOG_PREFIX,
+            user_id,
+        )
+        raise ProfileOptimizationNotStoredError(
+            f"No linkedin_analysis_context row for user_id={user_id!r}"
+        )
+
+    stored = repo.get_profile_optimization(user_id, row=row)
+    if not stored:
+        logger.warning(
+            "{} advance_profile_optimization_batch no stored optimization user_id={}",
+            _LOG_PREFIX,
+            user_id,
+        )
+        raise ProfileOptimizationNotStoredError(
+            "No profile optimization recommendations stored for this user"
+        )
+
+    meta_block = stored.get("meta")
+    if not isinstance(meta_block, dict):
+        meta_block = {}
+        stored["meta"] = meta_block
+
+    completed_ids = meta_block.get("completed_ids")
+    if not isinstance(completed_ids, list):
+        completed_ids = []
+        meta_block["completed_ids"] = completed_ids
+
+    if recommendation_id in completed_ids:
+        logger.info(
+            "{} advance_profile_optimization_batch idempotent hit user_id={} "
+            "recommendation_id={} already_completed=true",
+            _LOG_PREFIX,
+            user_id,
+            recommendation_id,
+        )
+        recommendations = extract_active_recommendations_list(stored)
+        return recommendations, _meta_from_stored(stored, row, source="cache")
+
+    recommendations_raw = stored.get("recommendations")
+    if not isinstance(recommendations_raw, list):
+        recommendations_raw = []
+
+    active_items = [item for item in recommendations_raw if isinstance(item, dict)]
+    match_index = next(
+        (index for index, item in enumerate(active_items) if item.get("id") == recommendation_id),
+        None,
+    )
+    if match_index is None:
+        logger.warning(
+            "{} advance_profile_optimization_batch item not found user_id={} "
+            "recommendation_id={} active_ids={}",
+            _LOG_PREFIX,
+            user_id,
+            recommendation_id,
+            [item.get("id") for item in active_items],
+        )
+        raise ProfileOptimizationItemNotFoundError(
+            f"Recommendation {recommendation_id!r} is not in the active batch"
+        )
+
+    removed = active_items.pop(match_index)
+    stored["recommendations"] = active_items
+    completed_ids.append(recommendation_id)
+
+    logger.info(
+        "{} advance_profile_optimization_batch removed user_id={} recommendation_id={} "
+        "status={} section={} active_remaining={} backlog_remaining={}",
+        _LOG_PREFIX,
+        user_id,
+        recommendation_id,
+        status,
+        removed.get("profile_section"),
+        len(active_items),
+        len(stored.get("backlog") or []),
+    )
+
+    try:
+        updated_at = repo.save_profile_optimization(user_id, stored)
+        row = repo.get_analysis_row(user_id) or row
+        row["profile_optimization_updated_at"] = updated_at
+    except ValueError as exc:
+        logger.exception(
+            "{} advance_profile_optimization_batch persist failed user_id={}: {}",
+            _LOG_PREFIX,
+            user_id,
+            exc,
+        )
+        raise ProfileOptimizationError(
+            "Unable to persist profile optimization batch progress"
+        ) from exc
+
+    batch_meta = _meta_from_stored(stored, row, source="batch_advanced")
+    logger.info(
+        "{} advance_profile_optimization_batch complete user_id={} active_count={} "
+        "remaining_in_backlog={} show_next_batch_cta={}",
+        _LOG_PREFIX,
+        user_id,
+        len(active_items),
+        batch_meta.get("remaining_in_backlog"),
+        len(active_items) == 0 and bool(batch_meta.get("remaining_in_backlog")),
+    )
+    return active_items, batch_meta
+
+
+def get_next_profile_optimization_batch(
+    user_id: str,
+    *,
+    repository: Optional[ProfileRepository] = None,
+) -> tuple[list[dict[str, Any]], ProfileOptimizationAcquireMeta]:
+    """
+    Promote the next active batch from backlog when the current batch is fully cleared.
+
+    Args:
+        user_id: ALwrity user ID
+        repository: Optional ``ProfileRepository`` (for testing)
+
+    Returns:
+        New active recommendations and acquire meta
+
+    Raises:
+        ProfileOptimizationNotStoredError: When optimization was never generated
+        ProfileOptimizationBatchNotReadyError: When active batch is not empty or backlog empty
+        ProfileOptimizationError: When persistence fails
+    """
+    logger.info(
+        "{} get_next_profile_optimization_batch start user_id={}",
+        _LOG_PREFIX,
+        user_id,
+    )
+    repo = repository or ProfileRepository()
+    row = repo.get_analysis_row(user_id)
+    if not row:
+        raise ProfileOptimizationNotStoredError(
+            f"No linkedin_analysis_context row for user_id={user_id!r}"
+        )
+
+    stored = repo.get_profile_optimization(user_id, row=row)
+    if not stored:
+        raise ProfileOptimizationNotStoredError(
+            "No profile optimization recommendations stored for this user"
+        )
+
+    active_items = extract_active_recommendations_list(stored)
+    if active_items:
+        logger.warning(
+            "{} get_next_profile_optimization_batch active batch not cleared user_id={} "
+            "active_count={}",
+            _LOG_PREFIX,
+            user_id,
+            len(active_items),
+        )
+        raise ProfileOptimizationBatchNotReadyError(
+            "Complete or skip all recommendations in the current batch first"
+        )
+
+    backlog_raw = stored.get("backlog")
+    backlog = [item for item in backlog_raw if isinstance(item, dict)] if isinstance(
+        backlog_raw, list
+    ) else []
+
+    if not backlog:
+        logger.info(
+            "{} get_next_profile_optimization_batch backlog empty user_id={}",
+            _LOG_PREFIX,
+            user_id,
+        )
+        raise ProfileOptimizationBatchNotReadyError(
+            "No more recommendations in backlog — refresh to regenerate"
+        )
+
+    next_active = backlog[:PROFILE_OPTIMIZATION_ACTIVE_BATCH_SIZE]
+    remaining_backlog = backlog[PROFILE_OPTIMIZATION_ACTIVE_BATCH_SIZE:]
+    stored["recommendations"] = next_active
+    stored["backlog"] = remaining_backlog
+
+    meta_block = stored.get("meta")
+    if not isinstance(meta_block, dict):
+        meta_block = {}
+        stored["meta"] = meta_block
+    previous_index = int(meta_block.get("active_batch_index") or 0)
+    meta_block["active_batch_index"] = previous_index + 1
+
+    logger.info(
+        "{} get_next_profile_optimization_batch rotating user_id={} "
+        "previous_batch_index={} new_batch_index={} promoted_count={} "
+        "remaining_in_backlog={}",
+        _LOG_PREFIX,
+        user_id,
+        previous_index,
+        meta_block["active_batch_index"],
+        len(next_active),
+        len(remaining_backlog),
+    )
+
+    try:
+        updated_at = repo.save_profile_optimization(user_id, stored)
+        row = repo.get_analysis_row(user_id) or row
+        row["profile_optimization_updated_at"] = updated_at
+    except ValueError as exc:
+        logger.exception(
+            "{} get_next_profile_optimization_batch persist failed user_id={}: {}",
+            _LOG_PREFIX,
+            user_id,
+            exc,
+        )
+        raise ProfileOptimizationError(
+            "Unable to persist next profile optimization batch"
+        ) from exc
+
+    batch_meta = _meta_from_stored(stored, row, source="batch_advanced")
+    logger.info(
+        "{} get_next_profile_optimization_batch complete user_id={} active_count={} "
+        "remaining_in_backlog={}",
+        _LOG_PREFIX,
+        user_id,
+        len(next_active),
+        batch_meta.get("remaining_in_backlog"),
+    )
+    return next_active, batch_meta
+
+
+def _meta_from_stored(
+    stored: dict[str, Any],
+    row: dict[str, Any],
+    *,
+    source: Literal["cache", "generated", "no_gaps", "batch_advanced"],
+) -> ProfileOptimizationAcquireMeta:
+    """Build acquire meta from persisted optimization JSON and analysis row."""
+    backlog = stored.get("backlog")
+    remaining = len(backlog) if isinstance(backlog, list) else 0
+    meta_block = stored.get("meta")
+    active_batch_index = 0
+    if isinstance(meta_block, dict):
+        active_batch_index = int(meta_block.get("active_batch_index") or 0)
+    return {
+        "source": source,
+        "profile_optimization_updated_at": row.get("profile_optimization_updated_at"),
+        "remaining_in_backlog": remaining,
+        "active_batch_index": active_batch_index,
+    }
 
 
 def _is_profile_optimization_cache_valid(
@@ -341,14 +636,24 @@ def _is_profile_optimization_cache_valid(
 
     recommendations = cached.get("recommendations")
     active_count = len(recommendations) if isinstance(recommendations, list) else 0
+    backlog = cached.get("backlog")
+    backlog_count = len(backlog) if isinstance(backlog, list) else 0
     if active_count < 1 or active_count > PROFILE_OPTIMIZATION_ACTIVE_BATCH_SIZE:
-        logger.warning(
-            "{} Cache invalid — active recommendations count user_id={} count={}",
-            _LOG_PREFIX,
-            user_id,
-            active_count,
-        )
-        return False
+        if active_count == 0 and backlog_count > 0:
+            logger.debug(
+                "{} Cache valid with empty active batch user_id={} backlog_count={}",
+                _LOG_PREFIX,
+                user_id,
+                backlog_count,
+            )
+        else:
+            logger.warning(
+                "{} Cache invalid — active recommendations count user_id={} count={}",
+                _LOG_PREFIX,
+                user_id,
+                active_count,
+            )
+            return False
 
     logger.debug(
         "{} Cache valid user_id={} context_hash={} intelligence_hash={}",

@@ -192,11 +192,18 @@ export interface LinkedInProfileOptimizationItem {
 
 /** Phase 7 — profile optimization cache/generation metadata. */
 export interface LinkedInProfileOptimizationMeta {
-  source: 'cache' | 'generated' | 'no_gaps';
+  source: 'cache' | 'generated' | 'no_gaps' | 'batch_advanced';
   profile_optimization_updated_at?: string | null;
   active_batch_index?: number;
   remaining_in_backlog?: number;
   message?: string | null;
+}
+
+/** Phase 7 — response after marking an item complete or loading the next batch. */
+export interface LinkedInProfileOptimizationBatchActionResponse {
+  profile_optimization: LinkedInProfileOptimizationItem[];
+  profile_optimization_meta: LinkedInProfileOptimizationMeta;
+  show_next_batch_cta: boolean;
 }
 
 /** Structured failure from the LinkedIn analysis pipeline (Phases 1–7). */
@@ -486,6 +493,56 @@ export async function runLinkedInProfileOptimization(
     includeProfileOptimization: true,
     refreshProfileOptimization: options.forceRegenerate ?? false,
   });
+}
+
+/** Mark a profile optimization recommendation done or skipped (Phase 7 batch progression). */
+export async function completeProfileOptimizationRecommendation(
+  recommendationId: string,
+  status: 'done' | 'skipped' = 'done'
+): Promise<LinkedInProfileOptimizationBatchActionResponse> {
+  console.info('[ProfileOptimization] marking recommendation complete', {
+    recommendationId,
+    status,
+  });
+  try {
+    const response = await apiClient.post(
+      `${BASE}/profile/optimization/${encodeURIComponent(recommendationId)}/complete`,
+      { status }
+    );
+    console.info('[ProfileOptimization] recommendation marked complete', {
+      recommendationId,
+      activeCount: response.data.profile_optimization?.length ?? 0,
+      remainingInBacklog: response.data.profile_optimization_meta?.remaining_in_backlog ?? 0,
+      showNextBatchCta: response.data.show_next_batch_cta,
+    });
+    return response.data;
+  } catch (err) {
+    console.error('[ProfileOptimization] complete recommendation failed', {
+      recommendationId,
+      status,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+/** Load the next five recommendations from server backlog without LLM (Phase 7). */
+export async function loadNextProfileOptimizationBatch(): Promise<LinkedInProfileOptimizationBatchActionResponse> {
+  console.info('[ProfileOptimization] loading next optimization batch');
+  try {
+    const response = await apiClient.post(`${BASE}/profile/optimization/next-batch`);
+    console.info('[ProfileOptimization] next batch loaded', {
+      activeCount: response.data.profile_optimization?.length ?? 0,
+      remainingInBacklog: response.data.profile_optimization_meta?.remaining_in_backlog ?? 0,
+      batchIndex: response.data.profile_optimization_meta?.active_batch_index ?? 0,
+    });
+    return response.data;
+  } catch (err) {
+    console.error('[ProfileOptimization] load next batch failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 const _PHASE_LABELS: Record<number, string> = {

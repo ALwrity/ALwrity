@@ -18,9 +18,15 @@ interface ProfileOptimizationPanelProps {
   noGapsMessage?: string | null;
   isExpanded?: boolean;
   isRefreshing?: boolean;
+  showNextBatchCta?: boolean;
+  isLoadingNextBatch?: boolean;
+  markingRecommendationId?: string | null;
   onCollapse?: () => void;
   onExpand?: () => void;
   onRefresh?: () => void;
+  onMarkDone?: (recommendationId: string) => void;
+  onSkip?: (recommendationId: string) => void;
+  onLoadNextBatch?: () => void;
 }
 
 const SKELETON_CARD_STYLE: React.CSSProperties = {
@@ -69,9 +75,15 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   noGapsMessage,
   isExpanded = true,
   isRefreshing = false,
+  showNextBatchCta = false,
+  isLoadingNextBatch = false,
+  markingRecommendationId = null,
   onCollapse,
   onExpand,
   onRefresh,
+  onMarkDone,
+  onSkip,
+  onLoadNextBatch,
 }) => {
   if (!isOpen) {
     return null;
@@ -84,8 +96,10 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   const showSkeleton = isLoading && !recommendations?.length;
   const showCards = !showSkeleton && recommendations && recommendations.length > 0;
   const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
+  const showNextBatchBanner =
+    !showSkeleton && !showCards && !showNoGaps && showNextBatchCta && Boolean(onLoadNextBatch);
 
-  if (!isExpanded && showCards && onExpand) {
+  if (!isExpanded && (showCards || showNextBatchBanner) && onExpand) {
     return (
       <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
         <div
@@ -226,13 +240,74 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
             </p>
           )}
 
+          {showNextBatchBanner && (
+            <div
+              style={{
+                padding: '16px 18px',
+                borderRadius: 12,
+                backgroundColor: '#eff6ff',
+                border: '1px solid #bfdbfe',
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <div style={{ flex: '1 1 240px' }}>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontWeight: 700,
+                    color: '#1e3a8a',
+                  }}
+                >
+                  Batch complete
+                </p>
+                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#1d4ed8', lineHeight: 1.5 }}>
+                  {optimizationMeta?.remaining_in_backlog ?? 0} more recommendation
+                  {(optimizationMeta?.remaining_in_backlog ?? 0) === 1 ? '' : 's'} waiting in
+                  your backlog.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={onLoadNextBatch}
+                disabled={isLoadingNextBatch}
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: isLoadingNextBatch
+                    ? '#94a3b8'
+                    : 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: isLoadingNextBatch ? 'wait' : 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {isLoadingNextBatch ? 'Loading…' : 'Get your next 5 recommendations'}
+              </button>
+            </div>
+          )}
+
           {showCards && (
             <div
               id="profile-optimization-list"
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
             >
               {recommendations.map((item, index) => (
-                <ProfileOptimizationCard key={item.id} recommendation={item} index={index} />
+                <ProfileOptimizationCard
+                  key={item.id}
+                  recommendation={item}
+                  index={index}
+                  onMarkDone={onMarkDone}
+                  onSkip={onSkip}
+                  isMarking={markingRecommendationId === item.id}
+                />
               ))}
             </div>
           )}

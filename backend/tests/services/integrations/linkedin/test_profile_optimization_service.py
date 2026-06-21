@@ -14,6 +14,10 @@ from services.integrations.linkedin.profile_intelligence_validator import (
 )
 from services.integrations.linkedin.profile_optimization_service import (
     PROFILE_LOOKS_STRONG_MESSAGE,
+    ProfileOptimizationBatchNotReadyError,
+    ProfileOptimizationItemNotFoundError,
+    advance_profile_optimization_batch,
+    get_next_profile_optimization_batch,
     get_or_generate_profile_optimization,
 )
 from services.integrations.linkedin.profile_optimization_validator import (
@@ -325,3 +329,187 @@ def test_force_regenerate_bypasses_cache(repo: ProfileRepository) -> None:
     )
 
     assert counter["calls"] == 2
+
+
+def _optimization_item(index: int, section: str, item_id: str) -> dict[str, Any]:
+    return {
+        "id": item_id,
+        "profile_section": section,
+        "issue": f"Issue {index}",
+        "why_it_matters": f"Why {index}.",
+        "current_state_summary": f"Current {index}.",
+        "recommended_action": f"Action {index}.",
+        "suggested_copy": "",
+        "impact": "High",
+        "effort": "Low",
+        "best_practice_ref": "Enhancement Report §1.2",
+        "completion_criteria": f"Done {index}.",
+    }
+
+
+def _seed_stored_with_backlog(
+    repository: ProfileRepository,
+    context: dict,
+    intelligence: dict[str, Any],
+    *,
+    active_ids: list[str],
+    backlog_ids: list[str],
+) -> None:
+    context_hash = compute_profile_context_hash(context)
+    intelligence_hash = compute_ai_intelligence_hash(intelligence)
+    sections = [
+        "headline",
+        "summary",
+        "experience",
+        "skills",
+        "custom_url",
+        "certifications",
+        "education",
+        "featured",
+        "recommendations",
+        "profile_photo",
+    ]
+    active = [
+        _optimization_item(index + 1, sections[index], item_id)
+        for index, item_id in enumerate(active_ids)
+    ]
+    backlog = [
+        _optimization_item(index + 6, sections[index + 5], item_id)
+        for index, item_id in enumerate(backlog_ids)
+    ]
+    stored = {
+        "meta": {
+            "built_from_profile_context_hash": context_hash,
+            "built_from_intelligence_hash": intelligence_hash,
+            "schema_version": 1,
+            "model": "gemini-2.5-flash",
+            "active_batch_index": 0,
+            "completed_ids": [],
+        },
+        "recommendations": active,
+        "backlog": backlog,
+    }
+    repository.save_profile_optimization(
+        _USER_ID,
+        stored,
+        profile_context_hash=context_hash,
+        intelligence_hash=intelligence_hash,
+    )
+
+
+def test_advance_profile_optimization_batch_removes_item(repo: ProfileRepository) -> None:
+    context = _complete_context()
+    validation, intelligence = _seed_repo(repo, context)
+    active_ids = [f"active-{index}" for index in range(1, 6)]
+    backlog_ids = [f"backlog-{index}" for index in range(1, 6)]
+    _seed_stored_with_backlog(
+        repo, context, intelligence, active_ids=active_ids, backlog_ids=backlog_ids
+    )
+
+    items, meta = advance_profile_optimization_batch(
+        _USER_ID,
+        active_ids[0],
+        "done",
+        repository=repo,
+    )
+
+    assert len(items) == 4
+    assert all(item["id"] != active_ids[0] for item in items)
+    assert meta["source"] == "batch_advanced"
+    assert meta["remaining_in_backlog"] == 5
+    stored = repo.get_profile_optimization(_USER_ID)
+    assert stored is not None
+    assert active_ids[0] in stored["meta"]["completed_ids"]
+
+
+def test_get_next_profile_optimization_batch_without_llm(repo: ProfileRepository) -> None:
+    context = _complete_context()
+    _, intelligence = _seed_repo(repo, context)
+    active_ids = [f"active-{index}" for index in range(1, 6)]
+    backlog_ids = [f"backlog-{index}" for index in range(1, 6)]
+    _seed_stored_with_backlog(
+        repo, context, intelligence, active_ids=active_ids, backlog_ids=backlog_ids
+    )
+    counter: dict[str, int] = {}
+
+    for item_id in active_ids:
+        advance_profile_optimization_batch(
+            _USER_ID,
+            item_id,
+            "done",
+            repository=repo,
+        )
+
+    items, meta = get_next_profile_optimization_batch(_USER_ID, repository=repo)
+
+    assert counter.get("calls", 0) == 0
+    assert len(items) == 5
+    assert items[0]["id"] == backlog_ids[0]
+    assert meta["source"] == "batch_advanced"
+    assert meta["remaining_in_backlog"] == 0
+    assert meta["active_batch_index"] == 1
+
+
+def test_get_next_profile_optimization_batch_rejects_when_active_not_cleared(
+    repo: ProfileRepository,
+) -> None:
+    context = _complete_context()
+    _, intelligence = _seed_repo(repo, context)
+    active_ids = [f"active-{index}" for index in range(1, 6)]
+    backlog_ids = [f"backlog-{index}" for index in range(1, 6)]
+    _seed_stored_with_backlog(
+        repo, context, intelligence, active_ids=active_ids, backlog_ids=backlog_ids
+    )
+
+    with pytest.raises(ProfileOptimizationBatchNotReadyError):
+        get_next_profile_optimization_batch(_USER_ID, repository=repo)
+
+
+def test_advance_profile_optimization_batch_item_not_found(repo: ProfileRepository) -> None:
+    context = _complete_context()
+    _, intelligence = _seed_repo(repo, context)
+    active_ids = [f"active-{index}" for index in range(1, 6)]
+    backlog_ids = [f"backlog-{index}" for index in range(1, 6)]
+    _seed_stored_with_backlog(
+        repo, context, intelligence, active_ids=active_ids, backlog_ids=backlog_ids
+    )
+
+    with pytest.raises(ProfileOptimizationItemNotFoundError):
+        advance_profile_optimization_batch(
+            _USER_ID,
+            "missing-id",
+            "done",
+            repository=repo,
+        )
+
+
+def test_cache_hit_with_empty_active_batch_and_backlog(repo: ProfileRepository) -> None:
+    context = _complete_context()
+    validation, intelligence = _seed_repo(repo, context)
+    active_ids = [f"active-{index}" for index in range(1, 6)]
+    backlog_ids = [f"backlog-{index}" for index in range(1, 6)]
+    _seed_stored_with_backlog(
+        repo, context, intelligence, active_ids=active_ids, backlog_ids=backlog_ids
+    )
+    for item_id in active_ids:
+        advance_profile_optimization_batch(
+            _USER_ID,
+            item_id,
+            "done",
+            repository=repo,
+        )
+    counter: dict[str, int] = {}
+
+    recommendations, meta = get_or_generate_profile_optimization(
+        _USER_ID,
+        context,
+        validation,
+        intelligence,
+        repository=repo,
+        generate_fn=_mock_generate_fn_factory(counter),
+    )
+
+    assert counter.get("calls", 0) == 0
+    assert recommendations == []
+    assert meta["source"] == "cache"
+    assert meta["remaining_in_backlog"] == 5
