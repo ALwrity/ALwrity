@@ -75,9 +75,18 @@ class WixAuthService:
             headers['wix-client-id'] = self.client_id
         response = requests.get(f"{self.base_url}/sites/v1/site", headers=headers)
         if response.status_code == 404:
-            logger.warning("Wix site info not found (404) — user may not have a published site or token lacks sites scope")
+            # 404 is the normal case for a Wix account that hasn't
+            # published a site yet (or whose token doesn't have the
+            # sites scope). Demoted from warning to debug so it
+            # doesn't pollute the log on every healthy user who
+            # just hasn't set up a Wix site.
+            logger.debug("Wix site info not found (404) — user may not have a published site or token lacks sites scope")
             return {"_no_site": True, "error": "No Wix site found for this account"}
         if response.status_code == 401:
+            # 401 IS a real problem — the user's token is expired or
+            # invalid and they need to reconnect. Keep at warning
+            # so it shows in the console (logging_config.py emits
+            # WARNING+ to stdout) and the user / operator notices.
             logger.warning("Wix site info request unauthorized (401) — token expired or invalid")
             return {"_auth_failed": True, "error": "Token expired or invalid — reconnect required"}
         response.raise_for_status()

@@ -120,11 +120,17 @@ async def get_analytics_data(
             platform_list = [p.strip() for p in platforms.split(',') if p.strip()]
         
         logger.info(f"Getting analytics data for user: {user_id}, platforms: {platform_list}, start_date: {start_date}, end_date: {end_date}")
-        
+
         analytics_data = await analytics_service.get_comprehensive_analytics(user_id, platform_list, start_date=start_date, end_date=end_date)
         summary = analytics_service.get_analytics_summary(analytics_data)
-        
-        logger.warning(
+
+        # The "summary" and per-platform "snapshot" log lines are
+        # status reports, not problems. They were logged at warning
+        # level which made every successful analytics call show up
+        # as a warning in the log. Demoted to debug so the console
+        # (which only shows WARNING+ per logging_config.py) stays
+        # clean.
+        logger.debug(
             "Analytics summary for user {user}: total_clicks={clicks}, total_impressions={impr}, overall_ctr={ctr}, platforms={platforms}",
             user=user_id,
             clicks=summary.get("total_clicks"),
@@ -134,7 +140,7 @@ async def get_analytics_data(
         )
         for platform_name, data in analytics_data.items():
             try:
-                logger.warning(
+                logger.debug(
                     "Analytics platform snapshot {platform}: status={status}, total_clicks={clicks}, total_impressions={impr}",
                     platform=platform_name,
                     status=data.status,

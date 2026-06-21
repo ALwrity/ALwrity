@@ -1126,7 +1126,7 @@ class OnboardingDataIntegrationService:
                 db.close()
             
             if gsc_data and gsc_data.get('status') != 'disconnected' and not gsc_data.get('error'):
-                logger.info(f"Retrieved GSC analytics for user {user_id}")
+                logger.debug(f"Retrieved GSC analytics for user {user_id}")
                 return {
                     'data': gsc_data.get('data', {}),
                     'metrics': gsc_data.get('metrics', {}),
@@ -1135,7 +1135,13 @@ class OnboardingDataIntegrationService:
                     'confidence_level': 0.9
                 }
             else:
-                logger.warning(f"No GSC analytics found or not connected for user {user_id}")
+                # "not connected" is the normal state for a user who
+                # hasn't completed the GSC OAuth step yet. Log at
+                # debug level — logging_config.py only emits WARNING+
+                # to the console, so a stream of these would otherwise
+                # make every healthy user look like they have a
+                # problem.
+                logger.debug(f"No GSC analytics for user {user_id} (GSC not connected or no data)")
                 return {}
                 
         except Exception as e:
@@ -1186,7 +1192,7 @@ class OnboardingDataIntegrationService:
                     logger.warning(f"Could not get Bing analytics summary: {e}")
             
             if bing_data and bing_data.get('status') != 'disconnected' and not bing_data.get('error'):
-                logger.info(f"Retrieved Bing analytics for user {user_id}")
+                logger.debug(f"Retrieved Bing analytics for user {user_id}")
                 return {
                     'data': bing_data.get('data', {}),
                     'metrics': bing_data.get('metrics', {}),
@@ -1197,7 +1203,7 @@ class OnboardingDataIntegrationService:
                 }
             elif analytics_summary and not analytics_summary.get('error'):
                 # Use stored analytics if available even if API is disconnected
-                logger.info(f"Retrieved Bing analytics from storage for user {user_id}")
+                logger.debug(f"Retrieved Bing analytics from storage for user {user_id}")
                 return {
                     'data': {},
                     'metrics': {},
@@ -1207,7 +1213,13 @@ class OnboardingDataIntegrationService:
                     'confidence_level': 0.85
                 }
             else:
-                logger.warning(f"No Bing analytics found or not connected for user {user_id}")
+                # "not connected" is the normal state for a user who
+                # hasn't completed the Bing OAuth step yet. Log at
+                # debug level — logging_config.py only emits WARNING+
+                # to the console, so a stream of these would otherwise
+                # make every healthy user look like they have a
+                # problem.
+                logger.debug(f"No Bing analytics for user {user_id} (Bing not connected or no data)")
                 return {}
                 
         except Exception as e:
