@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 
-import type {
-  LinkedInProfileAnalysisError,
-  LinkedInProfileOptimizationDebug,
-} from '../../../../api/linkedinSocial';
+import type { LinkedInProfileAnalysisError } from '../../../../api/linkedinSocial';
 
 interface LinkedInProfileDebugStripProps {
   lastCompletedPhase: number | null;
   isProfileComplete: boolean;
   foundationError: LinkedInProfileAnalysisError | null;
   topicError: LinkedInProfileAnalysisError | null;
+  optimizationError?: LinkedInProfileAnalysisError | null;
   intelligenceSource?: string | null;
-  optimizationDebug?: LinkedInProfileOptimizationDebug | null;
 }
 
 /** Dev/staging only — collapsible pipeline debug footer. */
@@ -20,8 +17,8 @@ export const LinkedInProfileDebugStrip: React.FC<LinkedInProfileDebugStripProps>
   isProfileComplete,
   foundationError,
   topicError,
+  optimizationError = null,
   intelligenceSource,
-  optimizationDebug,
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -29,7 +26,7 @@ export const LinkedInProfileDebugStrip: React.FC<LinkedInProfileDebugStripProps>
     return null;
   }
 
-  const activeError = topicError ?? foundationError;
+  const activeError = optimizationError ?? topicError ?? foundationError;
 
   return (
     <div
@@ -66,12 +63,6 @@ export const LinkedInProfileDebugStrip: React.FC<LinkedInProfileDebugStripProps>
           <div>last_completed_phase: {lastCompletedPhase ?? 'null'}</div>
           <div>is_profile_complete: {String(isProfileComplete)}</div>
           <div>intelligence_source: {intelligenceSource ?? 'null'}</div>
-          {optimizationDebug && (
-            <>
-              <div>detected_gaps_count: {optimizationDebug.detected_gaps_count}</div>
-              <div>top_rule_ids: {optimizationDebug.rule_ids.slice(0, 3).join(', ') || 'none'}</div>
-            </>
-          )}
           {activeError && (
             <>
               <div>failed_phase: {activeError.failed_phase}</div>

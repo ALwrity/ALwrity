@@ -175,7 +175,31 @@ export interface LinkedInTopicRecommendationsMeta {
   recommendations_updated_at?: string | null;
 }
 
-/** Structured failure from the LinkedIn analysis pipeline (Phases 1–6). */
+/** Phase 7 — single profile optimization recommendation. */
+export interface LinkedInProfileOptimizationItem {
+  id: string;
+  profile_section: string;
+  issue: string;
+  why_it_matters: string;
+  current_state_summary: string;
+  recommended_action: string;
+  suggested_copy?: string;
+  impact: 'High' | 'Medium' | 'Low';
+  effort: 'Low' | 'Medium' | 'High';
+  best_practice_ref?: string;
+  completion_criteria?: string;
+}
+
+/** Phase 7 — profile optimization cache/generation metadata. */
+export interface LinkedInProfileOptimizationMeta {
+  source: 'cache' | 'generated' | 'no_gaps';
+  profile_optimization_updated_at?: string | null;
+  active_batch_index?: number;
+  remaining_in_backlog?: number;
+  message?: string | null;
+}
+
+/** Structured failure from the LinkedIn analysis pipeline (Phases 1–7). */
 export interface LinkedInProfileAnalysisError {
   failed_phase: number;
   phase_label: string;
@@ -211,6 +235,9 @@ export interface LinkedInProfileAcquireResponse {
   recommendations?: LinkedInTopicRecommendation[] | null;
   recommendations_meta?: LinkedInTopicRecommendationsMeta | null;
   recommendations_error?: string | null;
+  profile_optimization?: LinkedInProfileOptimizationItem[] | null;
+  profile_optimization_meta?: LinkedInProfileOptimizationMeta | null;
+  profile_optimization_error?: string | null;
   last_completed_phase?: number | null;
   analysis_error?: LinkedInProfileAnalysisError | null;
   profile_optimization_debug?: LinkedInProfileOptimizationDebug | null;
@@ -449,6 +476,18 @@ export async function runLinkedInTopicAnalysis(
   });
 }
 
+/** Profile advisor (Phase 7) — cache-first unless forceRegenerate. */
+export async function runLinkedInProfileOptimization(
+  options: { forceRegenerate?: boolean; refreshIntelligence?: boolean } = {}
+): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[ProfileOptimization] loading profile optimization (Phase 7)', options);
+  return getLinkedInProfile({
+    refreshIntelligence: options.refreshIntelligence ?? false,
+    includeProfileOptimization: true,
+    refreshProfileOptimization: options.forceRegenerate ?? false,
+  });
+}
+
 const _PHASE_LABELS: Record<number, string> = {
   1: 'Acquire Profile Data',
   2: 'Build Profile Context',
@@ -456,6 +495,7 @@ const _PHASE_LABELS: Record<number, string> = {
   4: 'Profile Completion',
   5: 'AI Profile Intelligence',
   6: 'Topic Recommendations',
+  7: 'Profile Optimization',
 };
 
 /** Map HTTP failures from GET /profile to a structured analysis error for debugging. */
@@ -534,7 +574,9 @@ export function logProfileAnalysisError(
   context: string,
   error: LinkedInProfileAnalysisError
 ): void {
-  console.error(`[TopicSuggestion] ${context}`, {
+  const prefix =
+    error.failed_phase === 7 ? '[ProfileOptimization]' : '[TopicSuggestion]';
+  console.error(`${prefix} ${context}`, {
     phase: error.failed_phase,
     phaseLabel: error.phase_label,
     errorCode: error.error_code,
