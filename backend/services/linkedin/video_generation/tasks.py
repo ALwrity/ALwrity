@@ -22,6 +22,7 @@ def execute_linkedin_video_generation_task(
     duration: int = 5,
     resolution: str = "720p",
     motion_preset: str = "medium",
+    model: Optional[str] = None,
 ):
     """Background task: generate, store, save to asset library, update task status."""
     video_generator = LinkedInVideoGenerator()
@@ -44,6 +45,7 @@ def execute_linkedin_video_generation_task(
                 resolution=resolution,
                 motion_preset=motion_preset,
                 user_id=user_id,
+                model=model,
             )
 
         task_manager.update_task_status(

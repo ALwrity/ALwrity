@@ -16,8 +16,6 @@ export const LINKEDIN_VIDEO_PRESETS: VideoPreset[] = [
     key: 'professionalLandscape',
     title: 'Professional Landscape',
     subtitle: '16:9 format for LinkedIn feed video',
-    prompt:
-      'Professional LinkedIn video, corporate business context, cinematic wide composition, polished corporate look, subtle camera movement, modern workplace aesthetic',
     aspectRatio: '16:9',
     duration: 5,
     resolution: '720p',
@@ -27,8 +25,6 @@ export const LINKEDIN_VIDEO_PRESETS: VideoPreset[] = [
     key: 'squareFeed',
     title: 'Square Feed',
     subtitle: '1:1 format for LinkedIn mobile feed',
-    prompt:
-      'LinkedIn square feed video, professional business visual, centered composition, clean modern aesthetic, mobile-optimized framing',
     aspectRatio: '1:1',
     duration: 5,
     resolution: '720p',
@@ -38,8 +34,6 @@ export const LINKEDIN_VIDEO_PRESETS: VideoPreset[] = [
     key: 'portraitMobile',
     title: 'Portrait Mobile',
     subtitle: '9:16 vertical for mobile-first posts',
-    prompt:
-      'LinkedIn portrait mobile video, vertical composition, professional business tone, engaging visual storytelling, mobile-first framing',
     aspectRatio: '9:16',
     duration: 5,
     resolution: '720p',
@@ -49,8 +43,6 @@ export const LINKEDIN_VIDEO_PRESETS: VideoPreset[] = [
     key: 'thoughtLeadership',
     title: 'Thought Leadership',
     subtitle: 'Executive tone with subtle motion',
-    prompt:
-      'Thought leadership LinkedIn video, executive presence, minimalist design, authoritative professional tone, subtle elegant camera movement, editorial quality',
     aspectRatio: '16:9',
     duration: 8,
     resolution: '1080p',
@@ -92,6 +84,13 @@ export const LINKEDIN_VIDEO_RECOMMENDATIONS: VideoCustomRecommendations = {
       <strong>Subtle:</strong> Professional, minimal movement — best for executive content<br />
       <strong>Medium:</strong> Balanced motion for most LinkedIn posts<br />
       <strong>Dynamic:</strong> Energetic movement for attention-grabbing clips
+    </>
+  ),
+  model: (
+    <>
+      <strong>HunyuanVideo 1.5:</strong> Best default for quick LinkedIn feed clips (5–10s)<br />
+      <strong>LTX-2 Pro:</strong> Cinematic 1080p with synchronized audio<br />
+      <strong>Google Veo 3.1:</strong> Premium quality with flexible resolution options
     </>
   ),
 };

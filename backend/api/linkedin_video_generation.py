@@ -26,6 +26,7 @@ class VideoGenerationRequest(BaseModel):
     duration: Optional[int] = Field(default=5, ge=5, le=10)
     resolution: Optional[str] = "720p"
     motion_preset: Optional[str] = "medium"
+    model: Optional[str] = None
 
 
 class VideoGenerationStartResponse(BaseModel):
@@ -50,7 +51,8 @@ async def generate_linkedin_video(
             raise HTTPException(status_code=400, detail="Prompt is required")
 
         logger.info(
-            f"Starting LinkedIn video generation for user {user_id}: {request.prompt[:100]}..."
+            f"[LinkedInVideoGen] Request user={user_id} model={request.model or 'default'} "
+            f"prompt_len={len(request.prompt)}"
         )
 
         task_id = task_manager.create_task(
@@ -68,6 +70,7 @@ async def generate_linkedin_video(
             duration=request.duration or 5,
             resolution=request.resolution or "720p",
             motion_preset=request.motion_preset or "medium",
+            model=request.model,
         )
 
         return VideoGenerationStartResponse(

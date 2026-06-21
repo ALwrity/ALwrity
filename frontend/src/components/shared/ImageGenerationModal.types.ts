@@ -34,7 +34,7 @@ export interface ImagePreset {
   key: string;
   title: string;
   subtitle: string;
-  prompt: string;
+  prompt?: string;
   style: ImageStyle;
   renderingSpeed: RenderingSpeed;
   aspectRatio: AspectRatio;

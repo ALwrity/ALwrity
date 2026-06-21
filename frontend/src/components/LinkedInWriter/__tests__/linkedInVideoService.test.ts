@@ -30,7 +30,7 @@ describe('linkedInVideoService', () => {
   });
 
   describe('buildVideoPromptFromSelection', () => {
-    it('includes selected text and LinkedIn context', () => {
+    it('returns a short seed prompt with topic and industry', () => {
       const prompt = buildVideoPromptFromSelection(
         'AI is transforming how teams collaborate.',
         'Future of Work',
@@ -40,7 +40,8 @@ describe('linkedInVideoService', () => {
       expect(prompt).toContain('AI is transforming how teams collaborate.');
       expect(prompt).toContain('Topic: Future of Work.');
       expect(prompt).toContain('Industry: Technology.');
-      expect(prompt).toContain('LinkedIn');
+      expect(prompt).toContain('Video for LinkedIn post:');
+      expect(prompt).not.toContain('Professional business aesthetic');
     });
   });
 
@@ -60,6 +61,25 @@ describe('linkedInVideoService', () => {
   });
 
   describe('generateLinkedInVideo', () => {
+    it('sends model in POST body when provided', async () => {
+      jest.mocked(aiApiClient.post).mockResolvedValue({
+        data: { task_id: 'task-model', status: 'pending', message: 'Started' },
+      });
+
+      await generateLinkedInVideo({
+        prompt: 'Professional business video',
+        selectedText: 'Leadership insights',
+        topic: 'Leadership',
+        industry: 'Business',
+        model: 'ltx-2-pro',
+      });
+
+      expect(aiApiClient.post).toHaveBeenCalledWith(
+        '/api/linkedin/generate-video',
+        expect.objectContaining({ model: 'ltx-2-pro' })
+      );
+    });
+
     it('returns task_id on success', async () => {
       jest.mocked(aiApiClient.post).mockResolvedValue({
         data: {

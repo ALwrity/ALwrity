@@ -162,6 +162,7 @@ export function useLinkedInSelectionVideo({
           duration: settings.duration,
           resolution: settings.resolution,
           motion: settings.motion,
+          model: settings.model,
         });
 
         if (!result.success || !result.taskId) {

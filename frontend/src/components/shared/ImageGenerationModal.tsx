@@ -118,13 +118,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   };
 
   const applyPreset = (preset: ImagePreset) => {
-    // Combine the preset prompt with current scene prompt context
-    setPrompt((current) => {
-      if (!current || current.trim() === "" || current.trim() === initialPrompt.trim()) {
-        return `${initialPrompt}\n${preset.prompt}`.trim();
-      }
-      return `${current}\n${preset.prompt}`.trim();
-    });
+    if (preset.prompt?.trim()) {
+      setPrompt((current) => {
+        if (!current || current.trim() === "" || current.trim() === initialPrompt.trim()) {
+          return `${initialPrompt}\n${preset.prompt}`.trim();
+        }
+        return `${current}\n${preset.prompt}`.trim();
+      });
+    }
     setStyle(preset.style);
     setRenderingSpeed(preset.renderingSpeed);
     setAspectRatio(preset.aspectRatio);

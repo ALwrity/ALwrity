@@ -137,7 +137,7 @@ export const LinkedInSelectionImageModal: React.FC<LinkedInSelectionImageModalPr
       generateButtonLabel="Generate Image"
       presets={LINKEDIN_PRESETS}
       presetsLabel="LinkedIn-ready presets"
-      presetsHelp="Quickly apply a LinkedIn-friendly look. Each preset adjusts style, composition, and aspect ratio."
+      presetsHelp="Each preset adjusts style and aspect ratio only — not your prompt."
       showModelSelection={true}
       availableModels={LINKEDIN_IMAGE_MODELS}
       defaultModel="flux-kontext-pro"

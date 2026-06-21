@@ -7,6 +7,7 @@ import type {
   VideoResolution,
   VideoDuration,
   VideoMotionPreset,
+  LinkedInVideoModel,
 } from '../components/shared/VideoGenerationModal.types';
 
 export interface LinkedInVideoGenerationParams {
@@ -19,6 +20,7 @@ export interface LinkedInVideoGenerationParams {
   resolution?: VideoResolution | string;
   motion?: VideoMotionPreset | string;
   contentType?: string;
+  model?: LinkedInVideoModel | string;
 }
 
 export interface LinkedInVideoGenerationStartResult {
@@ -42,24 +44,16 @@ export interface LinkedInVideoTaskResult {
   resolution?: string;
 }
 
-/** Build a LinkedIn-optimized video prompt from selected post text. */
+/** Build a short video seed prompt; heavy optimization happens on the backend. */
 export function buildVideoPromptFromSelection(
   selectedText: string,
   topic?: string,
   industry?: string
 ): string {
-  const snippet = selectedText.trim().slice(0, 400);
-  const topicLine = topic ? `Topic: ${topic}.` : '';
-  const industryLine = industry ? `Industry: ${industry}.` : '';
-  return [
-    'Create a professional LinkedIn video that visually supports this content:',
-    snippet,
-    topicLine,
-    industryLine,
-    'Professional business aesthetic, mobile-optimized, cinematic quality, no text overlays or watermarks.',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const snippet = selectedText.trim().slice(0, 200);
+  const topicPart = topic ? `Topic: ${topic}.` : '';
+  const industryPart = industry ? `Industry: ${industry}.` : '';
+  return `Video for LinkedIn post: ${snippet}. ${topicPart} ${industryPart}`.trim();
 }
 
 /** Map UI motion preset to API value. */
@@ -92,10 +86,10 @@ export function resolveLinkedInVideoUrl(videoId: string, baseUrl?: string): stri
   return `${base}/api/linkedin/videos/${videoId}`;
 }
 
-async function ensureVideoPreflight(): Promise<void> {
+async function ensureVideoPreflight(model: string = 'hunyuan-video-1.5'): Promise<void> {
   const operation: PreflightOperation = {
     provider: 'video',
-    model: 'hunyuan-video-1.5',
+    model,
     operation_type: 'video_generation',
     actual_provider_name: 'wavespeed',
   };
@@ -110,7 +104,7 @@ async function ensureVideoPreflight(): Promise<void> {
 export async function generateLinkedInVideo(
   params: LinkedInVideoGenerationParams
 ): Promise<LinkedInVideoGenerationStartResult> {
-  await ensureVideoPreflight();
+  await ensureVideoPreflight(params.model || 'hunyuan-video-1.5');
 
   const response = await aiApiClient.post('/api/linkedin/generate-video', {
     prompt: params.prompt,
@@ -124,6 +118,7 @@ export async function generateLinkedInVideo(
     duration: params.duration || 5,
     resolution: params.resolution || '720p',
     motion_preset: mapMotionToApi(params.motion || 'Medium'),
+    model: params.model,
   });
 
   const data = response.data;

@@ -39,8 +39,10 @@ import {
   VideoResolution,
   VideoDuration,
   VideoMotionPreset,
+  LinkedInVideoModel,
   VideoPreset,
   DEFAULT_VIDEO_THEME,
+  DEFAULT_LINKEDIN_VIDEO_MODELS,
 } from './VideoGenerationModal.types';
 
 export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
@@ -56,7 +58,10 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   generateButtonLabel = 'Generate Video',
   presets = [],
   presetsLabel = 'Quick Presets',
-  presetsHelp = 'Quickly apply a preset look. Each preset adjusts format, duration, and motion.',
+  presetsHelp = 'Quickly apply a preset look. Each preset adjusts format, duration, resolution, and motion only.',
+  showModelSelection = false,
+  availableModels = DEFAULT_LINKEDIN_VIDEO_MODELS,
+  defaultModel = 'hunyuan-video-1.5',
   defaultAspectRatio = '16:9',
   defaultDuration = 5,
   defaultResolution = '720p',
@@ -69,6 +74,7 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
   const [duration, setDuration] = useState<VideoDuration>(defaultDuration);
   const [resolution, setResolution] = useState<VideoResolution>(defaultResolution);
   const [motion, setMotion] = useState<VideoMotionPreset>(defaultMotion);
+  const [model, setModel] = useState<LinkedInVideoModel>(defaultModel);
 
   useEffect(() => {
     setPrompt(initialPrompt);
@@ -76,25 +82,32 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
     setDuration(defaultDuration);
     setResolution(defaultResolution);
     setMotion(defaultMotion);
-  }, [initialPrompt, defaultAspectRatio, defaultDuration, defaultResolution, defaultMotion]);
+    setModel(defaultModel);
+  }, [initialPrompt, defaultAspectRatio, defaultDuration, defaultResolution, defaultMotion, defaultModel]);
 
   const handleGenerate = () => {
-    onGenerate({
+    const settings: VideoGenerationSettings = {
       prompt,
       aspectRatio,
       duration,
       resolution,
       motion,
-    });
+    };
+    if (showModelSelection) {
+      settings.model = model;
+    }
+    onGenerate(settings);
   };
 
   const applyPreset = (preset: VideoPreset) => {
-    setPrompt((current) => {
-      if (!current || current.trim() === '' || current.trim() === initialPrompt.trim()) {
-        return `${initialPrompt}\n${preset.prompt}`.trim();
-      }
-      return `${current}\n${preset.prompt}`.trim();
-    });
+    if (preset.prompt?.trim()) {
+      setPrompt((current) => {
+        if (!current || current.trim() === '' || current.trim() === initialPrompt.trim()) {
+          return `${initialPrompt}\n${preset.prompt}`.trim();
+        }
+        return `${current}\n${preset.prompt}`.trim();
+      });
+    }
     setAspectRatio(preset.aspectRatio);
     setDuration(preset.duration);
     setResolution(preset.resolution);
@@ -273,6 +286,44 @@ export const VideoGenerationModal: React.FC<VideoGenerationModalProps> = ({
           </Box>
 
           <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+          {showModelSelection && availableModels.length > 0 && (
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>
+                  AI Model
+                </Typography>
+                <Tooltip
+                  title="Choose the text-to-video model. Different models vary in quality, speed, and cost."
+                  arrow
+                >
+                  <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    <HelpOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+              <FormControl fullWidth>
+                <Select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value as LinkedInVideoModel)}
+                  disabled={isGenerating}
+                  sx={selectSx}
+                >
+                  {availableModels.map((m) => (
+                    <MenuItem key={m.id} value={m.id}>
+                      <Stack>
+                        <Typography sx={{ color: 'white' }}>{m.name}</Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                          {m.description} · {m.costHint}
+                        </Typography>
+                      </Stack>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {renderRecommendation(recommendations?.model, theme.secondaryAccent, 'Model Recommendation')}
+            </Box>
+          )}
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Box flex={1}>

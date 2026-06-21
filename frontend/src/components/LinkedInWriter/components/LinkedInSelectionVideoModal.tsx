@@ -34,6 +34,7 @@ import type {
   VideoResolution,
   VideoDuration,
   VideoMotionPreset,
+  LinkedInVideoModel,
 } from '../../shared/VideoGenerationModal.types';
 
 export interface LinkedInVideoGenerationSettings {
@@ -42,6 +43,7 @@ export interface LinkedInVideoGenerationSettings {
   duration: VideoDuration;
   resolution: VideoResolution;
   motion: VideoMotionPreset;
+  model: LinkedInVideoModel;
 }
 
 export interface GeneratedLinkedInVideoPreview {
@@ -80,6 +82,17 @@ export const LinkedInSelectionVideoModal: React.FC<LinkedInSelectionVideoModalPr
     downloadLinkedInVideoBlob(generatedPreview.blobUrl, filename);
   };
 
+  const toLinkedInVideoModel = (value?: string): LinkedInVideoModel => {
+    if (
+      value === 'hunyuan-video-1.5' ||
+      value === 'ltx-2-pro' ||
+      value === 'veo3.1'
+    ) {
+      return value;
+    }
+    return 'hunyuan-video-1.5';
+  };
+
   const handleGenerate = (settings: SharedVideoGenerationSettings) => {
     onGenerate({
       prompt: settings.prompt,
@@ -87,6 +100,7 @@ export const LinkedInSelectionVideoModal: React.FC<LinkedInSelectionVideoModalPr
       duration: settings.duration,
       resolution: settings.resolution,
       motion: settings.motion,
+      model: toLinkedInVideoModel(settings.model),
     });
   };
 
@@ -206,7 +220,9 @@ export const LinkedInSelectionVideoModal: React.FC<LinkedInSelectionVideoModalPr
       generateButtonLabel="Generate Video"
       presets={LINKEDIN_VIDEO_PRESETS}
       presetsLabel="LinkedIn-ready presets"
-      presetsHelp="Quickly apply a LinkedIn-friendly video look. Each preset adjusts format, duration, and motion."
+      presetsHelp="Each preset adjusts format, duration, resolution, and motion only — not your prompt."
+      showModelSelection={true}
+      defaultModel="hunyuan-video-1.5"
       defaultAspectRatio="16:9"
       defaultDuration={5}
       defaultResolution="720p"
