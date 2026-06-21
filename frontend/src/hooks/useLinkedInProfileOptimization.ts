@@ -30,6 +30,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [optimizationError, setOptimizationError] =
     useState<LinkedInProfileAnalysisError | null>(null);
   const [optimizationUserError, setOptimizationUserError] = useState<string | null>(null);
+  const [isOptimizationExpanded, setIsOptimizationExpanded] = useState(true);
 
   const loadOptimization = useCallback(async (forceRegenerate = false) => {
     if (!isProfileComplete) {
@@ -41,6 +42,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     setPanelState('loading');
     setOptimizationError(null);
     setOptimizationUserError(null);
+    setIsOptimizationExpanded(true);
 
     try {
       const data = await runLinkedInProfileOptimization({ forceRegenerate });
@@ -55,7 +57,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
         setOptimizationUserError(
           data.profile_optimization_error ??
             data.analysis_error.user_message ??
-            'We could not load profile suggestions right now.'
+            "We couldn't load profile suggestions right now. Please try again."
         );
         setPanelState('error');
         return;
@@ -89,6 +91,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setRecommendations(items);
       setOptimizationMeta(meta);
       setPanelState('complete');
+      setIsOptimizationExpanded(true);
       console.info(`${LOG_PREFIX} loaded recommendations`, {
         count: items.length,
         source: meta?.source,
@@ -109,9 +112,20 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   }, [loadOptimization]);
 
   const closeOptimizationPanel = useCallback(() => {
-    console.info(`${LOG_PREFIX} user closed profile optimization panel`);
+    console.info(`${LOG_PREFIX} user collapsed profile optimization panel to idle`);
     setPanelState('idle');
     setOptimizationUserError(null);
+    setIsOptimizationExpanded(true);
+  }, []);
+
+  const collapseOptimization = useCallback(() => {
+    console.info(`${LOG_PREFIX} user collapsed profile optimization list`);
+    setIsOptimizationExpanded(false);
+  }, []);
+
+  const expandOptimization = useCallback(() => {
+    console.info(`${LOG_PREFIX} user expanded profile optimization list`);
+    setIsOptimizationExpanded(true);
   }, []);
 
   const retryOptimization = useCallback(async () => {
@@ -132,8 +146,11 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     optimizationMeta,
     optimizationError,
     optimizationUserError,
+    isOptimizationExpanded,
     openOptimizationPanel,
     closeOptimizationPanel,
+    collapseOptimization,
+    expandOptimization,
     retryOptimization,
     refreshOptimization,
   };

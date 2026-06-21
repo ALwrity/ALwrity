@@ -32,6 +32,19 @@ export function formatOptimizationImpact(impact: string): string {
   }
 }
 
+export function formatOptimizationEffort(effort: string): string {
+  switch (effort) {
+    case 'Low':
+      return 'Quick win';
+    case 'Medium':
+      return 'Some effort';
+    case 'High':
+      return 'Worth the investment';
+    default:
+      return effort;
+  }
+}
+
 export function impactStyle(impact: string): CSSProperties {
   switch (impact) {
     case 'High':
@@ -41,4 +54,41 @@ export function impactStyle(impact: string): CSSProperties {
     default:
       return { backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', color: '#64748b' };
   }
+}
+
+export function effortStyle(effort: string): CSSProperties {
+  switch (effort) {
+    case 'Low':
+      return { backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1d4ed8' };
+    case 'Medium':
+      return { backgroundColor: '#f5f3ff', border: '1px solid #ddd6fe', color: '#6d28d9' };
+    default:
+      return { backgroundColor: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c' };
+  }
+}
+
+const CHIP_BASE: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  padding: '3px 10px',
+  borderRadius: 999,
+  fontSize: 12,
+  fontWeight: 600,
+};
+
+export function sectionBadgeStyle(): CSSProperties {
+  return {
+    ...CHIP_BASE,
+    backgroundColor: '#eff6ff',
+    border: '1px solid #bfdbfe',
+    color: '#1d4ed8',
+  };
+}
+
+export function impactBadgeStyle(impact: string): CSSProperties {
+  return { ...CHIP_BASE, ...impactStyle(impact) };
+}
+
+export function effortBadgeStyle(effort: string): CSSProperties {
+  return { ...CHIP_BASE, ...effortStyle(effort) };
 }
