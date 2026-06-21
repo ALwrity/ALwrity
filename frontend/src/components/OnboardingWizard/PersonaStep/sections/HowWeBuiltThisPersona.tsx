@@ -63,6 +63,24 @@ interface HowWeBuiltThisPersonaProps {
   /** Output-quality metrics (the same shape QualityMetricsDisplay
    *  already accepts). */
   qualityMetrics?: any;
+  /**
+   * Phase 4: controlled expand state. When provided, the accordion
+   * is fully controlled (no internal `defaultExpanded`). When
+   * omitted, falls back to uncontrolled with `defaultExpanded`.
+   * The parent uses the controlled form so the "Expand all /
+   * Collapse all" button can drive all 3 persona accordions
+   * together.
+   */
+  expanded?: boolean;
+  onChange?: (event: React.SyntheticEvent, isExpanded: boolean) => void;
+  /**
+   * Phase 4: expand the accordion by default on the FIRST view
+   * (tracked via sessionStorage). After the user manually
+   * expands/collapses once, the sessionStorage flag takes over and
+   * we respect their choice. Set to `false` to opt out of the
+   * auto-expand behavior entirely (always default-collapsed).
+   */
+  autoExpandFirstView?: boolean;
 }
 
 /**
@@ -186,6 +204,9 @@ export const HowWeBuiltThisPersona: React.FC<HowWeBuiltThisPersonaProps> = ({
   completeness,
   data_sufficiency,
   qualityMetrics,
+  expanded,
+  onChange,
+  autoExpandFirstView = true,
 }) => {
   // -------- Sub-section 2/3 inputs (confidence, evidence, gaps) --------
   const evidence = persona?.evidence ?? {};
@@ -281,9 +302,41 @@ export const HowWeBuiltThisPersona: React.FC<HowWeBuiltThisPersonaProps> = ({
   const hasSub3 = gaps.count > 0;
   const hasAnyContent = hasSub1 || hasSub2 || hasSub3;
 
+  // -------- Phase 4: expand by default on first view ----------
+  // The first time the user sees the merged accordion, expand it so
+  // they don't miss the new transparency UI (sub-sections 2/3: the
+  // evidence citations + data gaps). After their first render, we
+  // set a sessionStorage flag and respect their choice on subsequent
+  // visits. This is opt-out via `autoExpandFirstView={false}`.
+  const [firstViewDefaultOpen, setFirstViewDefaultOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!autoExpandFirstView) return;
+    if (typeof window === 'undefined') return;
+    try {
+      const seen = window.sessionStorage.getItem('alwrity_howwebuilt_seen');
+      if (!seen) {
+        setFirstViewDefaultOpen(true);
+        // Mark as seen so subsequent visits default-collapsed
+        window.sessionStorage.setItem('alwrity_howwebuilt_seen', '1');
+      }
+    } catch {
+      // sessionStorage may be blocked; safe to ignore
+    }
+  }, [autoExpandFirstView]);
+
+  // Decide the actual `expanded` / `defaultExpanded` props.
+  // - If parent passes `expanded`, we are controlled.
+  // - Else we are uncontrolled, and on the first render we open if
+  //   `firstViewDefaultOpen` is true.
+  const isControlled = typeof expanded === 'boolean';
+  const accordionExpandedProp = isControlled
+    ? { expanded, onChange }
+    : { defaultExpanded: firstViewDefaultOpen };
+
   return (
     <Accordion
-      defaultExpanded={false}
+      {...accordionExpandedProp}
       sx={{
         mb: 1.5,
         borderRadius: 2,

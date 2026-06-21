@@ -97,7 +97,10 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
 
   // UI state
   const [showPreview, setShowPreview] = useState(false);
-  const [expandedAccordion, setExpandedAccordion] = useState<string | false>('core');
+  // Phase 4: now an array of open accordion ids (or empty = all closed),
+  // so the "Expand all / Collapse all" button can drive multiple
+  // accordions together. Default: only "core" open on first render.
+  const [expandedAccordion, setExpandedAccordion] = useState<string[]>(['core']);
   const [, setHasCheckedCache] = useState(false);
   const [configurationOptions, setConfigurationOptions] = useState<any>(null);
 
