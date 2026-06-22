@@ -364,7 +364,7 @@ async def test_get_linkedin_profile_passes_refresh_recommendations_flag() -> Non
 
 @pytest.mark.asyncio
 async def test_get_linkedin_profile_recommendations_llm_error_returns_graceful_error() -> None:
-    from services.integrations.linkedin.topic_recommendation_llm import (
+    from services.integrations.linkedin.topic_recommendation_service import (
         TopicRecommendationLLMError,
     )
 

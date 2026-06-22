@@ -72,9 +72,9 @@ from services.integrations.linkedin.profile_optimization_service import (
 from services.integrations.linkedin.profile_optimization_validator import (
     ProfileOptimizationValidationError,
 )
-from services.integrations.linkedin.topic_recommendation_llm import TopicRecommendationLLMError
 from services.integrations.linkedin.topic_recommendation_service import (
     TopicRecommendationAcquireMeta,
+    TopicRecommendationLLMError,
     TopicRecommendationError,
     get_or_generate_topic_recommendations,
 )
