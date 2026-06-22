@@ -35,6 +35,13 @@ if "services.llm_providers.main_image_generation" not in sys.modules:
     async def _enhance_image_prompt(prompt, user_id=None):
         return prompt
 
+    async def generate_image_variation(*args, **kwargs):
+        return {"url": "", "variations": []}
+
+    _llm_img.generate_image_variation = generate_image_variation
+    _llm_img._enhance_image_prompt = _enhance_image_prompt
+    sys.modules["services.llm_providers.main_image_generation"] = _llm_img
+
 # =========================================================================
 # Schema helpers (subset of real services' tables — enough for the
 # services under test to query what they need).
