@@ -76,7 +76,6 @@ backend/lib/workspace/
 backend/lib/workspace/users/
 backend/logs/
 backend/linkedin_images/
-backend/test/
 backend/.onboarding_progress_user*
 backend/.onboarding_*.json
 
@@ -236,8 +235,6 @@ gsc_credentials_template.json
 .dmypy.json
 dmypy.json
 
-docs
-
 
 # Pyre type checker
 .pyre/
@@ -248,10 +245,6 @@ gsc_credentials.json
 *.key
 *.crt
 
-# Test files
-test_*.py
-*_test.py
-tests/
 
 # Documentation build
 docs/_build/
