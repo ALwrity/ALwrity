@@ -356,7 +356,7 @@ Please prioritize this feedback and adjust the analysis accordingly.
 You are an expert podcast producer and research strategist. Given a podcast idea, craft concise podcast-ready assets
 that sound like episode plans (not fiction stories).
 
-{f"USER PERSONALIZATION CONTEXT (Podcast Bible):\n{bible_context}\n" if bible_context else ""}
+{bible_prompt_context}
 {feedback_context}
 
 Podcast Idea: "{request.idea}"
@@ -510,14 +510,29 @@ async def regenerate_research_queries(
         except Exception as e:
             logger.warning(f"Failed to serialize bible for query regeneration: {e}")
     
+    feedback_prompt = f"USER FEEDBACK: {feedback}\n" if feedback else ""
+
+    existing_analysis_context = ""
+    if request.existing_analysis:
+        existing_analysis_context = (
+            f"EXISTING ANALYSIS CONTEXT:\n"
+            f"- Topic: {topic}\n"
+            f"- Keywords: {keywords}\n"
+            f"- Audience: {audience}\n"
+        )
+
+    bible_prompt_context = ""
+    if bible_context:
+        bible_prompt_context = f"PODCAST BIBLE CONTEXT:\n{bible_context}\n"
+
     prompt = f"""
 You are a research strategist for podcast content. Given a podcast idea, existing analysis, and user feedback,
 generate 7 new research queries that address the user's specific needs.
 
-{f"USER FEEDBACK: {feedback}" if feedback else ""}
+{feedback_prompt}
 
-{f"EXISTING ANALYSIS CONTEXT:\n- Topic: {topic}\n- Keywords: {keywords}\n- Audience: {audience}\n" if request.existing_analysis else ""}
-{f"PODCAST BIBLE CONTEXT:\n{bible_context}\n" if bible_context else ""}
+{existing_analysis_context}
+{bible_prompt_context}
 
 Podcast Idea: "{idea}"
 

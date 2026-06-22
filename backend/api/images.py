@@ -719,6 +719,30 @@ def suggest_prompts(
             "infographic": "Multi-section infographic designs with clear visual hierarchy. Use designated areas for each data point or concept. Design with text overlay zones for information labels. Professional infographic aesthetics with clean, organized layouts."
         }.get(image_type, "General blog image guidance.")
 
+        if visual_summary:
+            visual_data_section = visual_summary
+        else:
+            visual_data_section = (
+                f"Subheadings: {', '.join(subheads[:5])}\n"
+                f"Key Points: {', '.join(key_points[:5])}\n"
+                f"Keywords: {', '.join([str(k) for k in keywords[:8]])}"
+            )
+
+        negative_prompt_suffix = (
+            f", {negative_prompt_additions}" if negative_prompt_additions else ""
+        )
+
+        overlay_text_guidance = (
+            "Include the overlay_text IN the generated image as a typographic element (headline, label, etc.) — "
+            "it will be rendered as part of the image. Keep it minimal: 1-8 words (key statistic or section title). "
+            "Use statistics from the visual data when available."
+            if can_render_text
+            else
+            "Suggest overlay_text (short: <= 8 words, typically a key statistic or section title) as metadata only — "
+            "it will be rendered as HTML overlay. Do NOT include text in the image. "
+            "Use statistics from the visual data when available."
+        )
+        
         # Build comprehensive prompt with visual data and model-specific guidance
         prompt = f"""
         Provider: {provider}
@@ -727,7 +751,7 @@ def suggest_prompts(
         Title: {title}
         
         VISUAL DATA EXTRACTED FROM CONTENT:
-        {visual_summary if visual_summary else f"Subheadings: {', '.join(subheads[:5])}\nKey Points: {', '.join(key_points[:5])}\nKeywords: {', '.join([str(k) for k in keywords[:8]])}"}
+        {visual_data_section}
         
         CONTEXT:
         Audience: {audience}
@@ -765,19 +789,13 @@ def suggest_prompts(
         - Specify lighting and quality descriptors when appropriate
         
         NEGATIVE PROMPT:
-        Include a suitable negative_prompt that excludes: people posing, social media graphics, posters, text rendered as images, busy compositions, watermarks, logos{f", {negative_prompt_additions}" if negative_prompt_additions else ""}.
+        Include a suitable negative_prompt that excludes: people posing, social media graphics, posters, text rendered as images, busy compositions, watermarks, logos{negative_prompt_suffix}.
         
         DIMENSIONS:
         Default to 1024x1024 for consistent blog image format. Do NOT reference specific pixel dimensions in the prompt text.
         
         OVERLAY TEXT:
-        {("Include the overlay_text IN the generated image as a typographic element (headline, label, etc.) — "
-          "it will be rendered as part of the image. Keep it minimal: 1-8 words (key statistic or section title). "
-          "Use statistics from the visual data when available.")
-         if can_render_text else
-         ("Suggest overlay_text (short: <= 8 words, typically a key statistic or section title) as metadata only — "
-          "it will be rendered as HTML overlay. Do NOT include text in the image. "
-          "Use statistics from the visual data when available.")}
+        {overlay_text_guidance}
         """
 
         # Get user_id for llm_text_gen subscription check (required)
