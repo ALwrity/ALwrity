@@ -39,6 +39,7 @@ import { useTransformStudio } from '../../hooks/useTransformStudio';
 import { ImageStudioLayout } from './ImageStudioLayout';
 import { OperationButton } from '../shared/OperationButton';
 import { PreflightOperation } from '../../services/billingService';
+import { getApiUrl } from '../../api/client';
 
 const MotionPaper = motion.create(Paper);
 const MotionCard = motion.create(Card);
@@ -200,7 +201,7 @@ export const TransformStudio: React.FC = () => {
         if (response.video_url) {
           // Get auth token for video URL (video elements can't use headers)
           const token = await (window as any).Clerk?.session?.getToken();
-          const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+          const baseUrl = getApiUrl();
           const videoUrlWithToken = token 
             ? `${baseUrl}${response.video_url}?token=${encodeURIComponent(token)}`
             : `${baseUrl}${response.video_url}`;
@@ -218,7 +219,7 @@ export const TransformStudio: React.FC = () => {
         if (response.video_url) {
           // Get auth token for video URL (video elements can't use headers)
           const token = await (window as any).Clerk?.session?.getToken();
-          const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+          const baseUrl = getApiUrl();
           const videoUrlWithToken = token 
             ? `${baseUrl}${response.video_url}?token=${encodeURIComponent(token)}`
             : `${baseUrl}${response.video_url}`;

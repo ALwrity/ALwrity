@@ -89,7 +89,7 @@ export const usePhaseNavigation = (
         description: 'Optimize for search engines',
         completed: seoCompleted,
         current: core.currentPhase === 'seo',
-        disabled: !contentCompleted,
+        disabled: !hasContent,
       },
       {
         id: 'publish',

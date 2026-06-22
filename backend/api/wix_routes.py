@@ -6,7 +6,8 @@ Handles Wix authentication, connection status, and blog publishing.
 
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import HTMLResponse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
+from collections import defaultdict
 from loguru import logger
 from pydantic import BaseModel
 import os
@@ -32,6 +33,61 @@ wix_service = WixService()
 
 # Initialize Wix OAuth service for token storage
 wix_oauth_service = WixOAuthService()
+
+# ---------------------------------------------------------------------------
+# Rate limiting for 401 recovery — prevents rapid retry loops when Wix
+# keeps rejecting freshly refreshed tokens (e.g. account revoked, site
+# deleted, experiment routing issues). In-memory per-process state is
+# "approximately correct" for production: the exact limit is per-worker,
+# but the worst case is bounded in each process.
+# ---------------------------------------------------------------------------
+_recovery_attempts: Dict[str, List[float]] = defaultdict(list)
+_RECOVERY_COOLDOWN_SECONDS = 30      # Minimum seconds between recovery attempts per user
+_MAX_RECOVERIES_PER_WINDOW = 5       # Max recovery attempts per rolling window
+_RECOVERY_WINDOW_SECONDS = 300       # Rolling window length (5 minutes)
+
+
+def _allow_recovery(user_id: str) -> Tuple[bool, Optional[str]]:
+    """
+    Check whether a token recovery (401 → refresh → retry) is allowed
+    for *user_id* based on recent attempt history. Resets on successful
+    API calls that don't trigger recovery.
+
+    Returns:
+        (allowed, reason) — ``allowed`` is ``True`` when the recovery
+        may proceed; ``reason`` is a short string suitable for log
+        messages when denied.
+    """
+    now = time.time()
+    window_start = now - _RECOVERY_WINDOW_SECONDS
+
+    # Purge entries outside the rolling window
+    recent = [ts for ts in _recovery_attempts.get(user_id, []) if ts > window_start]
+    _recovery_attempts[user_id] = recent
+
+    # Cooldown: must be at least N seconds since the last attempt
+    if recent and (now - recent[-1]) < _RECOVERY_COOLDOWN_SECONDS:
+        return False, "cooldown active"
+
+    # Rate cap: at most N attempts per rolling window
+    if len(recent) >= _MAX_RECOVERIES_PER_WINDOW:
+        return False, f"rate limit ({len(recent)}/{_RECOVERY_WINDOW_SECONDS // 60}min)"
+
+    return True, None
+
+
+def _record_recovery(user_id: str) -> None:
+    """Record a recovery attempt for rate limiting."""
+    now = time.time()
+    window_start = now - _RECOVERY_WINDOW_SECONDS
+    recent = [ts for ts in _recovery_attempts.get(user_id, []) if ts > window_start]
+    recent.append(now)
+    _recovery_attempts[user_id] = recent
+
+
+def _clear_recovery_state(user_id: str) -> None:
+    """Called after a successful API call (no 401) to reset the rate limiter."""
+    _recovery_attempts.pop(user_id, None)
 
 
 def _get_current_user_id(current_user: dict) -> str:
@@ -193,9 +249,162 @@ def _resolve_valid_wix_token(current_user: dict) -> Dict[str, Any]:
             "refresh_token": refreshed.get("refresh_token", refresh_token),
             "member_id": candidate.get("member_id"),
             "site_id": site_id,
+            "id": token_id,
         }
 
     raise HTTPException(status_code=401, detail="Wix token expired and cannot be refreshed")
+
+
+def _execute_with_401_recovery(
+    fn,
+    *,
+    user_id: str,
+    operation: str,
+    token_holder: Dict[str, Optional[str]],
+    token_id: Optional[int] = None,
+    refresh_token: Optional[str] = None,
+) -> Tuple[Any, bool]:
+    """
+    Run a Wix-bound callable and silently recover from a single 401 by
+    refreshing the stored access token and retrying once.
+
+    Wix can invalidate a token server-side for many reasons (rotation,
+    user disconnect, account changes) that our local ``expires_at``
+    doesn't capture. The pre-flight check in ``_resolve_valid_wix_token``
+    will happily hand us a token that Wix then rejects with 401. Rather
+    than forcing the user through a full OAuth re-connect for what is
+    usually a 4-hour refresh, attempt one transparent refresh + retry.
+
+    The ``token_holder`` dict lets the helper swap the access token
+    between attempts so the retry uses the freshly refreshed value.
+    Pass it as ``{"access_token": "..."}``; the helper writes back
+    ``token_holder["access_token"]`` after a successful refresh.
+
+    Behaviour:
+        - First call:  ``fn()`` with ``token_holder["access_token"]``
+        - If 401:      refresh the stored token (one attempt), update
+                       ``token_holder["access_token"]``, call ``fn()``
+                       again
+        - If retry 401s, or refresh fails:  re-raise the latest
+                       ``WixAPIError`` so the caller maps it to the
+                       normal 401 "please reconnect" response.
+
+    Rate limiting:
+        Recovery is subject to per-user rate limiting (cooldown + max
+        attempts per rolling window) to prevent rapid retry loops when
+        Wix keeps rejecting refreshed tokens. See ``_allow_recovery``.
+
+    Args:
+        fn: Zero-arg callable that performs the API call. It should
+            read ``token_holder["access_token"]`` each time it runs
+            (not capture the value in a closure).
+        user_id: Current user id (used to refresh the stored token).
+        operation: Human-readable operation name for logs.
+        token_holder: Mutable dict holding the current access token
+            under key ``"access_token"``. Updated in place on refresh.
+        token_id: Optional stored Wix token id to update on refresh.
+        refresh_token: Optional stored refresh token; required to attempt
+                       a refresh on 401.
+
+    Returns:
+        ``(fn_result, was_refreshed)`` — ``was_refreshed`` is ``True``
+        when a 401 was caught, the token was successfully refreshed,
+        and the retry succeeded.
+
+    Raises:
+        WixAPIError: Re-raised after a failed refresh + retry, or when
+                     rate limiting prevents the recovery attempt, so the
+                     caller's error mapper produces the standard 401.
+    """
+    from services.integrations.wix.retry import WixAPIError
+
+    try:
+        result = fn()
+        _clear_recovery_state(user_id)
+        return result, False
+    except WixAPIError as exc:
+        if exc.status_code != 401:
+            raise
+
+        if not refresh_token:
+            logger.warning(
+                f"{operation}: 401 from Wix but no refresh_token on file — user must reconnect"
+            )
+            raise
+
+        # Rate limit check — if we're refreshing too often, surface the
+        # 401 so the user gets the standard "reconnect" response instead
+        # of burning through refresh tokens.
+        allowed, reason = _allow_recovery(user_id)
+        if not allowed:
+            logger.warning(
+                f"{operation}: 401 rate-limited for user {user_id[:8]}... "
+                f"({reason}) — surfacing original 401"
+            )
+            raise
+
+        logger.info(
+            f"{operation}: 401 from Wix — attempting silent token refresh "
+            f"for user {user_id[:8]}..."
+        )
+        try:
+            refreshed = wix_service.refresh_access_token(refresh_token)
+        except Exception as refresh_exc:
+            logger.warning(
+                f"{operation}: token refresh failed, surfacing original 401: "
+                f"{str(refresh_exc)[:120]}"
+            )
+            # Re-raise the ORIGINAL 401 from the API call (not the refresh
+            # network exception) so the caller's error mapper produces a
+            # consistent "please reconnect" response.
+            raise exc from refresh_exc
+
+        new_access = refreshed.get("access_token")
+        new_refresh = refreshed.get("refresh_token", refresh_token)
+        expires_in = refreshed.get("expires_in")
+        if not new_access:
+            logger.warning(
+                f"{operation}: refresh response missing access_token — surfacing 401"
+            )
+            raise exc  # surface the original 401, not a bare raise
+
+        # Update the in-memory holder so the retry uses the new token.
+        token_holder["access_token"] = new_access
+        _record_recovery(user_id)
+
+        # Persist the new token so the next request uses it.
+        try:
+            wix_oauth_service.update_tokens(
+                user_id=user_id,
+                access_token=new_access,
+                refresh_token=new_refresh,
+                expires_in=expires_in,
+                token_id=token_id,
+            )
+            logger.info(
+                f"{operation}: token refreshed successfully for "
+                f"user {user_id[:8]}... — retrying once"
+            )
+        except Exception as persist_exc:
+            logger.warning(
+                f"{operation}: failed to persist refreshed token, "
+                f"retrying with in-memory token: {str(persist_exc)[:120]}"
+            )
+
+        # Retry once. If it 401s again, the refresh didn't help — the
+        # underlying token is genuinely bad (revoked, site deleted, etc.)
+        # and we want to surface that to the user as a reconnect request.
+        try:
+            retry_result = fn()
+            _clear_recovery_state(user_id)
+            return retry_result, True
+        except WixAPIError as retry_exc:
+            if retry_exc.status_code == 401:
+                logger.warning(
+                    f"{operation}: 401 persisted after token refresh — "
+                    f"Wix still rejects. User will need to reconnect."
+                )
+            raise
 
 
 class WixAuthRequest(BaseModel):
@@ -603,30 +812,45 @@ async def get_wix_status(current_user: dict = Depends(get_current_user)) -> Dict
 async def publish_to_wix(request: WixPublishRequest, current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
     """
     Publish blog post to Wix using server-stored OAuth tokens.
-    
+
     The backend resolves the access token from the database (via
     _resolve_valid_wix_token), so callers do NOT need to pass
     access_token unless they want to override the stored one.
+
+    If Wix rejects the resolved token with 401 (server-side token
+    rotation / revocation / short-lived expiry that the local
+    ``expires_at`` doesn't capture), the publish call is transparently
+    retried once with a freshly refreshed token. See
+    ``_execute_with_401_recovery`` for the full recovery flow.
     """
+    user_id = _get_current_user_id(current_user)
     try:
         site_id = request.site_id
+        stored_token_id: Optional[int] = None
+        stored_refresh_token: Optional[str] = None
+        # ``token_holder`` is a mutable container so the 401-recovery helper
+        # can swap in a refreshed access token between attempts.
+        token_holder: Dict[str, Optional[str]] = {"access_token": None}
         if request.access_token:
             from services.integrations.wix.utils import normalize_token_string
-            access_token = normalize_token_string(request.access_token)
-            logger.info(f"Wix publish: using frontend-fallback token for user {_get_current_user_id(current_user)[:8]}...")
+            token_holder["access_token"] = normalize_token_string(request.access_token)
+            logger.info(f"Wix publish: using frontend-fallback token for user {user_id[:8]}...")
         else:
             try:
                 token_info = _resolve_valid_wix_token(current_user)
-                access_token = token_info["access_token"]
+                token_holder["access_token"] = token_info["access_token"]
+                stored_token_id = token_info.get("id")
+                stored_refresh_token = token_info.get("refresh_token")
                 if not site_id:
                     site_id = token_info.get("site_id")
-                if not site_id:
-                    meta_info = extract_meta_from_token(access_token)
+                if not site_id and token_holder["access_token"]:
+                    meta_info = extract_meta_from_token(token_holder["access_token"])
                     site_id = meta_info.get('metaSiteId')
-                logger.info(f"Wix publish: using backend DB token for user {_get_current_user_id(current_user)[:8]}...")
+                logger.info(f"Wix publish: using backend DB token for user {user_id[:8]}...")
             except HTTPException:
-                access_token = None
+                token_holder["access_token"] = None
 
+        access_token = token_holder["access_token"]
         if not access_token:
             return {
                 "success": False,
@@ -687,18 +911,27 @@ async def publish_to_wix(request: WixPublishRequest, current_user: dict = Depend
         if tag_ids:
             tag_ids = [str(t) for t in tag_ids if t is not None]
 
-        result = wix_service.create_blog_post(
-            access_token=access_token,
-            title=request.title,
-            content=request.content,
-            cover_image_url=request.cover_image_url,
-            category_ids=category_ids,
-            tag_ids=tag_ids,
-            publish=request.publish,
-            member_id=member_id,
-            seo_metadata=seo_metadata,
-            site_id=site_id,
+        result, token_refreshed = _execute_with_401_recovery(
+            lambda: wix_service.create_blog_post(
+                access_token=token_holder["access_token"],
+                title=request.title,
+                content=request.content,
+                cover_image_url=request.cover_image_url,
+                category_ids=category_ids,
+                tag_ids=tag_ids,
+                publish=request.publish,
+                member_id=member_id,
+                seo_metadata=seo_metadata,
+                site_id=site_id,
+            ),
+            user_id=user_id,
+            operation="Wix publish",
+            token_holder=token_holder,
+            token_id=stored_token_id,
+            refresh_token=stored_refresh_token,
         )
+        if token_refreshed:
+            logger.info(f"Wix publish: transparent token refresh succeeded for user {user_id[:8]}...")
         post = result.get("draftPost") or result.get("post") or result
         raw_url = post.get("url")
         if isinstance(raw_url, dict):
@@ -709,13 +942,17 @@ async def publish_to_wix(request: WixPublishRequest, current_user: dict = Depend
             post_url = None
         publish_warnings = result.get("_warnings", [])
         all_warnings = [w for w in [content_warning] + publish_warnings if w]
-        return {
+        response: Dict[str, Any] = {
             "success": True,
             "post_id": str(post.get("id", "")),
             "url": post_url,
             "publish_state": "PUBLISHED" if request.publish else "DRAFT",
-            **({"warning": " | ".join(all_warnings)} if all_warnings else {}),
         }
+        if all_warnings:
+            response["warning"] = " | ".join(all_warnings)
+        if token_refreshed:
+            response["_token_refreshed"] = True
+        return response
     except Exception as e:
         logger.error(f"Failed to publish to Wix: {e}")
         raise _map_wix_error(e, "Failed to publish to Wix")
@@ -732,13 +969,28 @@ async def get_blog_categories(current_user: dict = Depends(get_current_user)) ->
     Returns:
         List of blog categories
     """
+    user_id = _get_current_user_id(current_user)
     try:
         token_info = _resolve_valid_wix_token(current_user)
-        categories = wix_service.get_blog_categories(token_info["access_token"])
-        return {
+        token_holder = {"access_token": token_info["access_token"]}
+
+        result, token_refreshed = _execute_with_401_recovery(
+            lambda: wix_service.get_blog_categories(
+                access_token=token_holder["access_token"],
+            ),
+            user_id=user_id,
+            operation="Wix fetch categories",
+            token_holder=token_holder,
+            token_id=token_info.get("id"),
+            refresh_token=token_info.get("refresh_token"),
+        )
+        response: Dict[str, Any] = {
             "success": True,
-            "categories": categories
+            "categories": result,
         }
+        if token_refreshed:
+            response["_token_refreshed"] = True
+        return response
     except Exception as e:
         logger.error(f"Failed to get blog categories: {e}")
         raise _map_wix_error(e, "Failed to fetch Wix blog categories")
@@ -755,13 +1007,28 @@ async def get_blog_tags(current_user: dict = Depends(get_current_user)) -> Dict[
     Returns:
         List of blog tags
     """
+    user_id = _get_current_user_id(current_user)
     try:
         token_info = _resolve_valid_wix_token(current_user)
-        tags = wix_service.get_blog_tags(token_info["access_token"])
-        return {
+        token_holder = {"access_token": token_info["access_token"]}
+
+        result, token_refreshed = _execute_with_401_recovery(
+            lambda: wix_service.get_blog_tags(
+                access_token=token_holder["access_token"],
+            ),
+            user_id=user_id,
+            operation="Wix fetch tags",
+            token_holder=token_holder,
+            token_id=token_info.get("id"),
+            refresh_token=token_info.get("refresh_token"),
+        )
+        response: Dict[str, Any] = {
             "success": True,
-            "tags": tags
+            "tags": result,
         }
+        if token_refreshed:
+            response["_token_refreshed"] = True
+        return response
     except Exception as e:
         logger.error(f"Failed to get blog tags: {e}")
         raise _map_wix_error(e, "Failed to fetch Wix blog tags")

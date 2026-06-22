@@ -117,11 +117,46 @@ export const SEOMetadataModal: React.FC<SEOMetadataModalProps> = ({
   const [genProgress, setGenProgress] = useState(0);
 
   const metadataStageDefinitions = [
-    { id: 'analyzing', label: 'Analyzing', icon: '🔍' },
-    { id: 'title', label: 'SEO Title', icon: '📝' },
-    { id: 'description', label: 'Description', icon: '📋' },
-    { id: 'social', label: 'Social Tags', icon: '📱' },
-    { id: 'compiling', label: 'Compiling', icon: '⚡' },
+    {
+      id: 'analyzing',
+      label: 'Analyzing',
+      icon: '🔍',
+      headline: 'Reading your blog to understand the topic',
+      description: 'We scan your blog content, outline, and research notes to grasp the central topic, audience, and the keywords that matter most.',
+      tip: 'Good SEO starts with knowing what your post is really about — not just the words, but the questions your readers want answered.'
+    },
+    {
+      id: 'title',
+      label: 'SEO Title',
+      icon: '📝',
+      headline: 'Crafting a search-friendly title',
+      description: 'We draft an SEO title (50–60 characters) that fits Google’s snippet, includes your focus keyword, and still reads naturally to humans.',
+      tip: 'Titles are the #1 thing people see in search results. A clear, keyword-rich title can lift click-through rates by 20–30%.'
+    },
+    {
+      id: 'description',
+      label: 'Description',
+      icon: '📋',
+      headline: 'Writing the meta description and tags',
+      description: 'We compose a 150–160 character meta description, pick a URL slug, choose a focus keyword, and generate blog tags and categories that match your topic.',
+      tip: 'Meta descriptions don’t directly boost ranking, but they heavily influence whether someone clicks your link over a competitor’s.'
+    },
+    {
+      id: 'social',
+      label: 'Social Tags',
+      icon: '📱',
+      headline: 'Preparing social media cards',
+      description: 'We generate Open Graph (Facebook/LinkedIn) and Twitter Card tags so your post looks great when shared — complete with title, description, and a hero image.',
+      tip: 'Posts with proper Open Graph tags get 2–3× more engagement on LinkedIn and Facebook compared to plain link shares.'
+    },
+    {
+      id: 'compiling',
+      label: 'Compiling',
+      icon: '⚡',
+      headline: 'Packaging the final metadata package',
+      description: 'We assemble JSON-LD structured data (Schema.org Article), finalize the optimization score, and get everything ready to send to WordPress or Wix when you publish.',
+      tip: 'Structured data helps search engines understand your article and can enable rich results (like article cards) directly in search.'
+    },
   ];
 
   // Progress simulation while generating (preserves last stage position on error)
@@ -385,6 +420,12 @@ export const SEOMetadataModal: React.FC<SEOMetadataModalProps> = ({
       const sanitized = sanitizeMetadata(result);
       setMetadataResult(sanitized);
       setEditableMetadata(sanitized);
+      // Notify parent so SEO metadata is in app state (e.g. for pre-publish check,
+      // SEO analysis flow, and persistence). Without this, only the cache-hit
+      // path or an explicit "Apply Metadata" click would push it to the parent.
+      if (onMetadataGenerated) {
+        onMetadataGenerated(sanitized);
+      }
       console.log('📊 Metadata result set:', result);
 
     } catch (err: any) {
@@ -618,36 +659,90 @@ export const SEOMetadataModal: React.FC<SEOMetadataModalProps> = ({
       </DialogTitle>
 
       <DialogContent sx={{ p: 0 }}>
-        {isGenerating && (
-          <Box sx={{ p: 4 }}>
-            {/* Progress bar */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5 }}>
-              <Box sx={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
-                <Box sx={{ width: `${progressPct}%`, height: '100%', borderRadius: 2, background: 'linear-gradient(90deg, #3b82f6, #2563eb)', transition: 'width 0.5s ease' }} />
+        {isGenerating && (() => {
+          const activeStage = metadataStageDefinitions[Math.max(0, latestStageIndex)];
+          const activeStageState = stagesWithState[Math.max(0, latestStageIndex)];
+          return (
+            <Box sx={{ p: 4 }}>
+              {/* What is SEO Metadata? intro card */}
+              <Box sx={{ mb: 3, p: 2.5, borderRadius: 2, background: 'linear-gradient(135deg, #eff6ff, #f0f9ff)', border: '1px solid #bfdbfe' }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e3a8a', mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <span style={{ fontSize: 18 }}>💡</span> What is SEO Metadata?
+                </Typography>
+                <Typography variant="body2" sx={{ color: '#1e40af', lineHeight: 1.55 }}>
+                  SEO metadata is the behind-the-scenes information that tells search engines (like Google) and social media sites what your blog is about. A great post with weak metadata is like a beautiful book with no title on the cover — people scroll right past it. We’re creating the title, description, tags, and share cards so your blog actually gets discovered and clicked.
+                </Typography>
               </Box>
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', fontSize: '0.65rem' }}>
-                {stagesWithState.filter(s => s.state === 'done').length}/{metadataStageDefinitions.length}
-              </Typography>
-            </Box>
 
-            {/* Stage chips */}
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              {stagesWithState.map(stage => {
-                const copy = stageStateStyle[stage.state];
-                return (
-                  <Box key={stage.id} sx={{ flex: 1, py: 1, px: 0.5, borderRadius: 1.5, backgroundColor: copy.background, border: `1px solid ${copy.border}`, textAlign: 'center', animation: stage.state === 'active' ? 'seoMetaPulse 2s ease-in-out infinite' : undefined, transition: 'all 0.3s ease' }}>
-                    <Box sx={{ fontSize: 18, lineHeight: 1, mb: 0.25 }}>
-                      {stage.state === 'active' ? <CircularProgress size={16} thickness={5} sx={{ color: '#1d4ed8' }} /> : stage.icon}
-                    </Box>
-                    <Typography variant="caption" sx={{ fontWeight: 600, color: copy.color, display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
-                      {stage.state === 'active' ? 'Working…' : stage.state === 'done' ? 'Done' : stage.state === 'error' ? 'Error' : stage.label}
+              {/* Progress bar */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <Box sx={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: '#e5e7eb', overflow: 'hidden' }}>
+                  <Box sx={{ width: `${progressPct}%`, height: '100%', borderRadius: 3, background: 'linear-gradient(90deg, #3b82f6, #2563eb)', transition: 'width 0.5s ease' }} />
+                </Box>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#64748b', fontSize: '0.7rem' }}>
+                  {stagesWithState.filter(s => s.state === 'done').length}/{metadataStageDefinitions.length} steps
+                </Typography>
+              </Box>
+
+              {/* Active stage detail card */}
+              {activeStage && activeStageState && (
+                <Box sx={{ mb: 2.5, p: 2, borderRadius: 2, background: '#ffffff', border: '1px solid #e0e7ff', borderLeft: '4px solid #2563eb' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.75 }}>
+                    <Box sx={{ fontSize: 20, lineHeight: 1 }}>{activeStage.icon}</Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1e293b', flex: 1 }}>
+                      {activeStage.headline}
+                    </Typography>
+                    {activeStageState.state === 'active' && <CircularProgress size={14} thickness={5} sx={{ color: '#2563eb' }} />}
+                    {activeStageState.state === 'done' && <Typography sx={{ fontSize: 14, color: '#047857', fontWeight: 700 }}>✓</Typography>}
+                  </Box>
+                  <Typography variant="body2" sx={{ color: '#475569', lineHeight: 1.55, mb: 1.25 }}>
+                    {activeStage.description}
+                  </Typography>
+                  <Box sx={{ display: 'flex', gap: 0.75, alignItems: 'flex-start', p: 1.25, borderRadius: 1.5, background: '#fef3c7', border: '1px solid #fde68a' }}>
+                    <Typography sx={{ fontSize: 13, lineHeight: 1.4, color: '#78350f', flex: 1 }}>
+                      <strong>Did you know?</strong> {activeStage.tip}
                     </Typography>
                   </Box>
-                );
-              })}
+                </Box>
+              )}
+
+              {/* Stage chips (compact stepper) */}
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                {stagesWithState.map(stage => {
+                  const copy = stageStateStyle[stage.state];
+                  return (
+                    <Box key={stage.id} sx={{ flex: 1, py: 1, px: 0.5, borderRadius: 1.5, backgroundColor: copy.background, border: `1px solid ${copy.border}`, textAlign: 'center', animation: stage.state === 'active' ? 'seoMetaPulse 2s ease-in-out infinite' : undefined, transition: 'all 0.3s ease' }}>
+                      <Box sx={{ fontSize: 18, lineHeight: 1, mb: 0.25 }}>
+                        {stage.state === 'active' ? <CircularProgress size={16} thickness={5} sx={{ color: '#1d4ed8' }} /> : stage.icon}
+                      </Box>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: copy.color, display: 'block', fontSize: '0.6rem', lineHeight: 1.2 }}>
+                        {stage.state === 'active' ? 'Working…' : stage.state === 'done' ? 'Done' : stage.state === 'error' ? 'Error' : stage.label}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              {/* What happens next preview */}
+              <Box sx={{ mt: 3, p: 2, borderRadius: 2, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.5, fontSize: '0.65rem', display: 'block', mb: 1 }}>
+                  What happens next
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  <Typography variant="body2" sx={{ color: '#334155', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>📝</span> Review and edit any of the generated fields in the tabs
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#334155', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>✅</span> Click <strong style={{ marginLeft: 2, marginRight: 2 }}>Apply Metadata</strong> to lock it in
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: '#334155', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span>🚀</span> Your metadata will travel with the post to WordPress or Wix
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
-          </Box>
-        )}
+          );
+        })()}
 
         {error && (
           <Box sx={{ p: 3 }}>

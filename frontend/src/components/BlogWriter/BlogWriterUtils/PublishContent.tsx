@@ -7,6 +7,7 @@ import WixConnectModal from './WixConnectModal';
 import { useWixPublish } from '../../../hooks/useWixPublish';
 import { useTextToSpeech } from '../../../hooks/useTextToSpeech';
 import PublishProgressModal from '../PublishProgressModal';
+import FlowAnalysisProgressModal from '../FlowAnalysisProgressModal';
 
 const saveCompleteBlogAsset = async (
   title: string,
@@ -43,7 +44,7 @@ interface PublishContentProps {
   sectionImages?: Record<string, string>;
   onOpenSEOMetadata?: () => void;
   flowAnalysisResults?: any;
-  onRunFlowAnalysis?: () => void;
+  onRunFlowAnalysis?: (options?: { forceRefresh?: boolean }) => Promise<{ success: boolean; error?: string; fromCache?: boolean }>;
 }
 
 export const PublishContent: React.FC<PublishContentProps> = ({
@@ -77,6 +78,8 @@ export const PublishContent: React.FC<PublishContentProps> = ({
   const [copyDone, setCopyDone] = useState(false);
   const [wixContentWarning, setWixContentWarning] = useState<string | null>(null);
   const [flowRunning, setFlowRunning] = useState(false);
+  const [flowAnalysisError, setFlowAnalysisError] = useState<string | null>(null);
+  const [showFlowAnalysisModal, setShowFlowAnalysisModal] = useState(false);
   const [hallucinationResults, setHallucinationResults] = useState<any>(null);
   const [hallucinationRunning, setHallucinationRunning] = useState(false);
   const [publishHistory, setPublishHistory] = useState<{ entries: any[]; total: number } | null>(null);
@@ -412,25 +415,29 @@ export const PublishContent: React.FC<PublishContentProps> = ({
             </div>
 
             {/* Flow Analysis check */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: flowAnalysisResults ? '#f0fdf4' : '#fafafa', borderRadius: 8, border: `1px solid ${flowAnalysisResults ? '#86efac' : '#e2e8f0'}` }}>
+            <div
+              onClick={() => {
+                if (flowRunning) return;
+                setShowFlowAnalysisModal(true);
+              }}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: flowAnalysisResults ? '#f0fdf4' : '#fafafa', borderRadius: 8, border: `1px solid ${flowAnalysisResults ? '#86efac' : '#e2e8f0'}`, cursor: flowRunning ? 'not-allowed' : 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: '1rem' }}>{flowAnalysisResults ? '✅' : '🔲'}</span>
                 <div>
                   <div style={{ fontWeight: 500, fontSize: '0.85rem', color: '#0f172a' }}>Flow Analysis</div>
                   <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
                     {flowAnalysisResults
-                      ? `Flow: ${(flowAnalysisResults.overall_flow_score * 100).toFixed(0)} | Consistency: ${(flowAnalysisResults.overall_consistency_score * 100).toFixed(0)} | Progression: ${(flowAnalysisResults.overall_progression_score * 100).toFixed(0)}`
-                      : 'Not yet run'}
+                      ? `Flow: ${(flowAnalysisResults.overall_flow_score * 100).toFixed(0)} | Consistency: ${(flowAnalysisResults.overall_consistency_score * 100).toFixed(0)} | Progression: ${(flowAnalysisResults.overall_progression_score * 100).toFixed(0)} — click to view`
+                      : 'Not yet run — click to start'}
                   </div>
                 </div>
               </div>
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (onRunFlowAnalysis) {
-                    setFlowRunning(true);
-                    onRunFlowAnalysis();
-                    // Reset loading after a reasonable timeout
-                    setTimeout(() => setFlowRunning(false), 30000);
+                    setShowFlowAnalysisModal(true);
                   }
                 }}
                 disabled={flowRunning || !onRunFlowAnalysis}
@@ -651,6 +658,34 @@ export const PublishContent: React.FC<PublishContentProps> = ({
         done={publishProgress?.done ?? false}
         error={publishProgress?.error}
         onClose={() => setPublishProgress(null)}
+      />
+
+      <FlowAnalysisProgressModal
+        isOpen={showFlowAnalysisModal}
+        onClose={() => {
+          setShowFlowAnalysisModal(false);
+          setFlowAnalysisError(null);
+          setFlowRunning(false);
+        }}
+        flowAnalysisResults={flowAnalysisResults}
+        isAnalyzing={flowRunning}
+        error={flowAnalysisError}
+        onReanalyze={async () => {
+          if (!onRunFlowAnalysis) return;
+          setFlowRunning(true);
+          setFlowAnalysisError(null);
+          try {
+            // "Re-analyze" forces a fresh LLM call, bypassing the modal-level cache.
+            const result = await onRunFlowAnalysis({ forceRefresh: true });
+            if (result && !result.success) {
+              setFlowAnalysisError(result.error || 'Flow analysis failed');
+            }
+          } catch (err: any) {
+            setFlowAnalysisError(err?.message || 'Unexpected error');
+          } finally {
+            setFlowRunning(false);
+          }
+        }}
       />
 
       {/* Publish History modal */}

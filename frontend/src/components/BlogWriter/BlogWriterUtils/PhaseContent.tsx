@@ -44,7 +44,7 @@ interface PhaseContentProps {
   buildFullMarkdown?: () => string;
   convertMarkdownToHTML?: (md: string) => string;
   onOpenSEOMetadata?: () => void;
-  onRunFlowAnalysis?: () => void;
+  onRunFlowAnalysis?: (options?: { forceRefresh?: boolean }) => Promise<{ success: boolean; error?: string; fromCache?: boolean }>;
   brainstormResult?: import('../../../api/gscBrainstorm').BrainstormResult;
   onBrainstormResult?: (result: import('../../../api/gscBrainstorm').BrainstormResult) => void;
   onResearchWithKeywords?: (keywords: string) => void;

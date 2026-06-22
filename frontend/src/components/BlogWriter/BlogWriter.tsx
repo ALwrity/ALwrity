@@ -7,6 +7,7 @@ import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import { debug } from '../../utils/debug';
+import { hashContent, getFlowCacheKey } from '../../utils/contentHash';
 import WriterCopilotSidebar from './BlogWriterUtils/WriterCopilotSidebar';
 import { blogWriterApi } from '../../services/blogWriterApi';
 import { researchCache } from '../../services/researchCache';
@@ -504,6 +505,8 @@ const BlogWriter: React.FC = () => {
     setSections({});
     setSeoAnalysis(null);
     setSeoMetadata(null);
+    setFlowAnalysisResults(null);
+    setFlowAnalysisCompleted(false);
     setContentConfirmed(false);
     setOutlineConfirmed(false);
     setSelectedTitle('');
@@ -519,6 +522,9 @@ const BlogWriter: React.FC = () => {
       localStorage.removeItem('blog_seo_recommendations_applied');
       localStorage.removeItem('blog_publish_completed');
       localStorage.removeItem('blog_last_asset_id');
+      localStorage.removeItem('blog_flow_analysis');
+      localStorage.removeItem('blog_flow_analysis_fingerprint');
+      localStorage.removeItem('blog_flow_analysis_completed');
     } catch {
       // ignore localStorage errors
     }
@@ -526,6 +532,7 @@ const BlogWriter: React.FC = () => {
     resetAsset();
     setSearchParams({}, { replace: true });
   }, [setResearch, setOutline, setSections, setSeoAnalysis, setSeoMetadata,
+      setFlowAnalysisResults, setFlowAnalysisCompleted,
       setContentConfirmed, setOutlineConfirmed, setSelectedTitle, setTitleOptions,
       setCurrentPhase, resetAsset, setSearchParams]);
 
@@ -634,7 +641,8 @@ const BlogWriter: React.FC = () => {
     setIsSEOMetadataModalOpen(true);
   }, [setIsSEOMetadataModalOpen]);
 
-  const handleRunFlowAnalysis = React.useCallback(async () => {
+  const handleRunFlowAnalysis = React.useCallback(async (options?: { forceRefresh?: boolean }): Promise<{ success: boolean; error?: string; fromCache?: boolean }> => {
+    const forceRefresh = options?.forceRefresh === true;
     try {
       const payload = {
         title: selectedTitle || 'Blog Post',
@@ -644,13 +652,60 @@ const BlogWriter: React.FC = () => {
           content: sections[s.id] || '',
         })),
       };
+
+      // Modal-level cache check: skip the LLM round-trip if we've already
+      // scored this exact (title + content) and the caller didn't force-refresh.
+      if (!forceRefresh && typeof window !== 'undefined') {
+        try {
+          const fullMarkdown = payload.sections
+            .map(s => `## ${s.heading}\n\n${s.content}`)
+            .join('\n\n');
+          const hash = await hashContent(`${payload.title}\n${fullMarkdown}`);
+          const cacheKey = getFlowCacheKey(hash, payload.title);
+          const cached = window.localStorage.getItem(cacheKey);
+          if (cached) {
+            const parsed = JSON.parse(cached);
+            if (parsed && typeof parsed.overall_flow_score === 'number') {
+              debug.log('[FlowAnalysis] Cache hit, skipping API call', { cacheKey });
+              setFlowAnalysisResults(parsed);
+              setFlowAnalysisCompleted(true);
+              return { success: true, fromCache: true };
+            }
+            // Invalid shape — clear so we don't keep hitting it
+            window.localStorage.removeItem(cacheKey);
+          }
+        } catch (e) {
+          debug.warn('[FlowAnalysis] Cache check failed, falling through to API', e);
+        }
+      }
+
       const result = await blogWriterApi.analyzeFlowBasic(payload);
       if (result.success && result.analysis) {
         setFlowAnalysisResults(result.analysis);
         setFlowAnalysisCompleted(true);
+        // Write to modal-level cache so re-opening the modal is instant
+        if (typeof window !== 'undefined') {
+          try {
+            const fullMarkdown = payload.sections
+              .map(s => `## ${s.heading}\n\n${s.content}`)
+              .join('\n\n');
+            const hash = await hashContent(`${payload.title}\n${fullMarkdown}`);
+            const cacheKey = getFlowCacheKey(hash, payload.title);
+            window.localStorage.setItem(cacheKey, JSON.stringify(result.analysis));
+            debug.log('[FlowAnalysis] Cached result', { cacheKey });
+          } catch (e) {
+            debug.warn('[FlowAnalysis] Failed to cache result', e);
+          }
+        }
+        return { success: true };
       }
-    } catch (err) {
+      const errorMsg = result.error || 'Flow analysis failed';
+      console.error('Flow analysis failed:', errorMsg);
+      return { success: false, error: errorMsg };
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Network error during flow analysis';
       console.error('Flow analysis failed:', err);
+      return { success: false, error: errorMsg };
     }
   }, [selectedTitle, outline, sections, setFlowAnalysisResults, setFlowAnalysisCompleted]);
 

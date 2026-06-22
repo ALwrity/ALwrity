@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BlogOutlineSection, BlogResearchResponse, BlogSEOMetadataResponse, BlogSEOAnalyzeResponse, SourceMappingStats, GroundingInsights, ResearchCoverage } from '../services/blogWriterApi';
 import { researchCache } from '../services/researchCache';
 import { blogWriterCache } from '../services/blogWriterCache';
+import { computeContentFingerprint, hashSectionContent } from '../utils/contentHash';
 
 const MINOR_TITLE_WORDS = new Set([
   'a', 'an', 'and', 'or', 'but', 'the', 'for', 'nor', 'on', 'at', 'to', 'from', 'by',
@@ -55,6 +56,8 @@ const restoreInitialState = () => {
   let sections: Record<string, string> = {};
   let seoAnalysis: BlogSEOAnalyzeResponse | null = null;
   let seoMetadata: BlogSEOMetadataResponse | null = null;
+  let flowAnalysisResults: any = null;
+  let flowAnalysisCompleted: boolean = false;
   let outlineConfirmed: boolean = false;
   let contentConfirmed: boolean = false;
   let sourceMappingStats: SourceMappingStats | null = null;
@@ -121,6 +124,39 @@ const restoreInitialState = () => {
       }
     }
 
+    // Restore flow analysis results — discard if section content has changed
+    // since they were generated (the per-section content hash is part of the
+    // fingerprint, unlike SEO metadata which only depends on outline shape).
+    flowAnalysisResults = readLS<any>('blog_flow_analysis', null);
+    flowAnalysisCompleted = readLSBool('blog_flow_analysis_completed', false);
+    if (flowAnalysisResults) {
+      if (outline.length === 0 || Object.keys(sections).length === 0) {
+        flowAnalysisResults = null;
+        flowAnalysisCompleted = false;
+        try { localStorage.removeItem('blog_flow_analysis'); } catch {}
+        try { localStorage.removeItem('blog_flow_analysis_completed'); } catch {}
+      } else {
+        const savedFingerprint = readLS<string | null>('blog_flow_analysis_fingerprint', null);
+        const contentHashesById: Record<string, string> = {};
+        for (const id of Object.keys(sections)) {
+          contentHashesById[id] = hashSectionContent(sections[id]);
+        }
+        const currentFingerprint = computeContentFingerprint(
+          outline.map(s => s.id),
+          selectedTitle,
+          contentHashesById,
+        );
+        if (savedFingerprint !== currentFingerprint) {
+          // Content edited since analysis — discard stale results
+          flowAnalysisResults = null;
+          flowAnalysisCompleted = false;
+          try { localStorage.removeItem('blog_flow_analysis'); } catch {}
+          try { localStorage.removeItem('blog_flow_analysis_fingerprint'); } catch {}
+          try { localStorage.removeItem('blog_flow_analysis_completed'); } catch {}
+        }
+      }
+    }
+
     // Restore section images (log only once per session, not on every hook mount)
     const savedSectionImages = readLS<Record<string, string> | null>('blog_section_images', null);
     if (savedSectionImages && Object.keys(savedSectionImages).length > 0) {
@@ -142,6 +178,8 @@ const restoreInitialState = () => {
     sections,
     seoAnalysis,
     seoMetadata,
+    flowAnalysisResults,
+    flowAnalysisCompleted,
     outlineConfirmed,
     contentConfirmed,
     sourceMappingStats,
@@ -169,8 +207,8 @@ export const useBlogWriterState = () => {
   const [introduction, setIntroduction] = useState<string>(localStorage.getItem('blog_introduction') || '');
   const [continuityRefresh, setContinuityRefresh] = useState<number>(0);
   const [outlineTaskId, setOutlineTaskId] = useState<string | null>(null);
-  const [flowAnalysisCompleted, setFlowAnalysisCompleted] = useState<boolean>(false);
-  const [flowAnalysisResults, setFlowAnalysisResults] = useState<any>(null);
+  const [flowAnalysisCompleted, setFlowAnalysisCompleted] = useState<boolean>(initialState.flowAnalysisCompleted);
+  const [flowAnalysisResults, setFlowAnalysisResults] = useState<any>(initialState.flowAnalysisResults);
   
   // Enhanced metadata state
   const [sourceMappingStats, setSourceMappingStats] = useState<SourceMappingStats | null>(initialState.sourceMappingStats);
@@ -279,6 +317,35 @@ export const useBlogWriterState = () => {
     } catch {}
   }, [seoMetadata, outline, selectedTitle]);
 
+  // Persist flow analysis results + content fingerprint to localStorage
+  // whenever they change. The fingerprint includes per-section content hashes
+  // so any edit to a section invalidates the cached results on the next load.
+  useEffect(() => {
+    try {
+      if (flowAnalysisResults) {
+        localStorage.setItem('blog_flow_analysis', JSON.stringify(flowAnalysisResults));
+        const contentHashesById: Record<string, string> = {};
+        for (const id of Object.keys(sections)) {
+          contentHashesById[id] = hashSectionContent(sections[id]);
+        }
+        const fingerprint = computeContentFingerprint(
+          outline.map(s => s.id),
+          selectedTitle,
+          contentHashesById,
+        );
+        localStorage.setItem('blog_flow_analysis_fingerprint', fingerprint);
+      } else {
+        localStorage.removeItem('blog_flow_analysis');
+        localStorage.removeItem('blog_flow_analysis_fingerprint');
+      }
+      if (flowAnalysisCompleted) {
+        localStorage.setItem('blog_flow_analysis_completed', 'true');
+      } else {
+        localStorage.removeItem('blog_flow_analysis_completed');
+      }
+    } catch {}
+  }, [flowAnalysisResults, flowAnalysisCompleted, sections, outline, selectedTitle]);
+
   // Persist sectionImages to localStorage whenever they change
   useEffect(() => {
     try {
@@ -325,15 +392,17 @@ export const useBlogWriterState = () => {
 
   // Handle research completion
   const handleResearchComplete = useCallback((researchData: BlogResearchResponse) => {
-    // New research topic — any prior SEO metadata is now stale
+    // New research topic — any prior SEO metadata + flow analysis are now stale
     setSeoMetadata(null);
+    setFlowAnalysisResults(null);
+    setFlowAnalysisCompleted(false);
 
     setResearch(researchData);
     const formattedAngles = dedupeTitles(
       (researchData?.suggested_angles || []).map(formatContentAngleToTitle)
     );
     setResearchTitles(formattedAngles);
-    
+
     // Prefill title from research if no title is currently selected
     if (!selectedTitle && formattedAngles.length > 0) {
       const firstTitle = formattedAngles[0];
@@ -345,8 +414,10 @@ export const useBlogWriterState = () => {
   // Handle outline completion with enhanced metadata
   const handleOutlineComplete = useCallback((result: any) => {
     if (result?.outline) {
-      // New content structure — any prior SEO metadata is now stale
+      // New content structure — any prior SEO metadata + flow analysis are now stale
       setSeoMetadata(null);
+      setFlowAnalysisResults(null);
+      setFlowAnalysisCompleted(false);
 
       setOutline(result.outline);
 
