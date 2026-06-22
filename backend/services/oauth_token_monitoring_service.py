@@ -77,6 +77,30 @@ def _check_youtube(user_id: str) -> bool:
         return False
 
 
+def _check_linkedin(user_id: str) -> bool:
+    # Imported lazily for the same reason as YouTube: LinkedInOAuthService
+    # inherits from OAuthProviderBase and fails fast at construction if
+    # LINKEDIN_TOKEN_ENCRYPTION_KEY (or OAUTH_TOKEN_ENCRYPTION_KEY) is
+    # missing. Lazy import keeps the dispatch module loadable in
+    # environments where the key isn't configured yet.
+    from services.integrations.linkedin_oauth import LinkedInOAuthService
+    try:
+        linkedin_service = LinkedInOAuthService()
+        token_status = linkedin_service.get_user_token_status(user_id)
+        if token_status.get('has_active_tokens'):
+            return True
+        expired = token_status.get('expired_tokens', [])
+        return bool(expired) and any(t.get('linkedin_refresh_token') for t in expired)
+    except Exception as exc:
+        # Constructor may raise (missing key) or the status call may
+        # hit a database error. Either way, treat as "not connected"
+        # so we don't poison the whole detection.
+        logger.debug(
+            f"[OAuth Monitoring] LinkedIn check skipped for user {user_id}: {exc}"
+        )
+        return False
+
+
 # Stable ordering preserved from the previous inline implementation.
 _PLATFORM_CHECKS: List[Tuple[str, Callable[[str], bool]]] = [
     ('gsc', _check_gsc),
@@ -84,6 +108,7 @@ _PLATFORM_CHECKS: List[Tuple[str, Callable[[str], bool]]] = [
     ('wordpress', _check_wordpress),
     ('wix', _check_wix),
     ('youtube', _check_youtube),
+    ('linkedin', _check_linkedin),
 ]
 
 
@@ -114,19 +139,20 @@ def _safe_check(platform: str, checker: Callable[[str], bool], user_id: str) -> 
 def get_connected_platforms(user_id: str) -> List[str]:
     """
     Detect which platforms are connected for a user by checking token storage.
-    
+
     Checks:
     - GSC: gsc_credentials table
     - Bing: bing_oauth_tokens table
     - WordPress: wordpress_oauth_tokens table
     - Wix: wix_oauth_tokens table
     - YouTube: youtube_oauth_tokens table
-    
+    - LinkedIn: linkedin_oauth_tokens table (Zernio / native / Unipile)
+
     Args:
         user_id: User ID (Clerk string)
-        
+
     Returns:
-        List of connected platform identifiers: ['gsc', 'bing', 'wordpress', 'wix', 'youtube']
+        List of connected platform identifiers: ['gsc', 'bing', 'wordpress', 'wix', 'youtube', 'linkedin']
     """
     connected: List[str] = []
 
@@ -158,7 +184,7 @@ def create_oauth_monitoring_tasks(
         db: Database session
         platforms: Optional list of platforms to create tasks for.
                    If None, auto-detects connected platforms.
-                   Valid values: 'gsc', 'bing', 'wordpress', 'wix'
+                   Valid values: 'gsc', 'bing', 'wordpress', 'wix', 'youtube', 'linkedin'
         
     Returns:
         List of created OAuthTokenMonitoringTask instances

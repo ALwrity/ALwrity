@@ -5,7 +5,7 @@ Handles building comprehensive prompts for research persona generation.
 Generates personalized research defaults, suggestions, and configurations.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import json
 from loguru import logger
 
@@ -225,32 +225,32 @@ Generate a comprehensive research persona in JSON format with the following stru
      * Match the enhancement style to the user's writing guidelines and preferences
 
 6. RECOMMENDED PRESETS:
-   - "recommended_presets": **PHASE 3 ENHANCEMENT** - Generate 3-5 personalized research preset templates using comprehensive analysis:
-     * **USE CONTENT THEMES**: If content_themes available, create at least one preset per major theme (up to 3 themes)
-       - Example: If themes include ["AI automation", "content marketing", "SEO strategies"], create presets for each
-       - Use theme names in preset keywords: "Research latest {theme} trends and best practices"
-     * **USE CRAWL ANALYSIS**: Leverage crawl_analysis.content_categories and crawl_analysis.main_topics for preset generation
-       - Create presets that match the user's actual website content categories
-       - Use main_topics for preset keywords and descriptions
-     * **CONTENT TYPE BASED**: Generate presets based on content_type (from Phase 1):
-     * **Content-Type-Specific Presets**: Use content_type.primary_type and content_type.secondary_types to create presets:
-       - If primary_type == "blog": Create "Blog Topic Research" preset with trending topics
-       - If primary_type == "article": Create "Article Research" preset with in-depth analysis
-       - If primary_type == "case_study": Create "Case Study Research" preset with real-world examples
-       - If primary_type == "tutorial": Create "Tutorial Research" preset with step-by-step guides
-       - If "tutorial" in secondary_types: Add "How-To Guide Research" preset
-       - If "comparison" in secondary_types or style_patterns: Add "Comparison Research" preset
-       - If content_type.purpose == "thought_leadership": Create "Thought Leadership Research" with expert insights
-       - If content_type.purpose == "education": Create "Educational Content Research" preset
-     * **Use Extracted Topics**: If extracted_topics available, create at least one preset using actual website topics:
-       - "Latest {extracted_topic} Trends" preset
-       - "{extracted_topic} Best Practices" preset
+    - "recommended_presets": **PHASE 3 ENHANCEMENT** - Generate 3-5 personalized research preset templates using comprehensive analysis:
+      * **USE CONTENT THEMES**: If content_themes available, create at least one preset per major theme (up to 3 themes)
+        - Example: If themes include ["AI automation", "content marketing", "SEO strategies"], create presets for each
+        - Use theme names in preset keywords: "Research latest {{theme}} trends and best practices"
+      * **USE CRAWL ANALYSIS**: Leverage crawl_analysis.content_categories and crawl_analysis.main_topics for preset generation
+        - Create presets that match the user's actual website content categories
+        - Use main_topics for preset keywords and descriptions
+      * **CONTENT TYPE BASED**: Generate presets based on content_type (from Phase 1):
+      * **Content-Type-Specific Presets**: Use content_type.primary_type and content_type.secondary_types to create presets:
+        - If primary_type == "blog": Create "Blog Topic Research" preset with trending topics
+        - If primary_type == "article": Create "Article Research" preset with in-depth analysis
+        - If primary_type == "case_study": Create "Case Study Research" preset with real-world examples
+        - If primary_type == "tutorial": Create "Tutorial Research" preset with step-by-step guides
+        - If "tutorial" in secondary_types: Add "How-To Guide Research" preset
+        - If "comparison" in secondary_types or style_patterns: Add "Comparison Research" preset
+        - If content_type.purpose == "thought_leadership": Create "Thought Leadership Research" with expert insights
+        - If content_type.purpose == "education": Create "Educational Content Research" preset
+      * **Use Extracted Topics**: If extracted_topics available, create at least one preset using actual website topics:
+        - "Latest {{extracted_topic}} Trends" preset
+        - "{{extracted_topic}} Best Practices" preset
      * Each preset should include:
        - name: Descriptive, action-oriented name that clearly indicates what research will be done
-         * Use research_angles as inspiration for preset names (e.g., "Compare {Industry} Tools", "{Industry} ROI Analysis")
-         * If competitor_analysis exists, create at least one competitive analysis preset (e.g., "Competitive Landscape Analysis")
-         * Make names specific and actionable, not generic
-         * **NEW**: Include content type in name when relevant (e.g., "Blog: {Industry} Trends", "Tutorial: {Topic} Guide")
+          * Use research_angles as inspiration for preset names (e.g., "Compare {{Industry}} Tools", "{{Industry}} ROI Analysis")
+          * If competitor_analysis exists, create at least one competitive analysis preset (e.g., "Competitive Landscape Analysis")
+          * Make names specific and actionable, not generic
+          * **NEW**: Include content type in name when relevant (e.g., "Blog: {{Industry}} Trends", "Tutorial: {{Topic}} Guide")
        - keywords: Research query string that is:
          * **NEW**: Use extracted_topics and extracted_keywords when available for more relevant queries
          * Specific and detailed (not vague like "AI tools")
@@ -651,6 +651,132 @@ Generate the research persona now:
             logger.debug(f"Error extracting style guidelines: {e}")
             return []
     
+    def _analyze_crawl_result_comprehensive(self, crawl_result: Dict[str, Any]) -> Dict[str, Any]:
+        """Comprehensive crawl-result analysis used by the Phase 3 prompt.
+
+        Returns a dict shaped for ``json.dumps``-friendly consumption in
+        the LLM prompt. Safe to call with an empty / non-dict input —
+        returns an empty dict so the prompt template can fall back to
+        "No crawl analysis available" without raising.
+
+        The original implementation lived in an unreleased branch and
+        was never merged; calling code (build_research_persona_prompt)
+        was, however, already wired up. Without this method the
+        scheduled research-persona task crashes with
+        ``'ResearchPersonaPromptBuilder' object has no attribute
+        '_analyze_crawl_result_comprehensive'`` and the user is blocked
+        at onboarding step 4.
+        """
+        if not isinstance(crawl_result, dict) or not crawl_result:
+            return {}
+
+        try:
+            topics = self._extract_topics_from_crawl(crawl_result) or []
+            keywords = self._extract_keywords_from_crawl(crawl_result) or []
+            metadata = (
+                crawl_result.get("metadata", {})
+                if isinstance(crawl_result.get("metadata"), dict)
+                else {}
+            )
+            analysis: Dict[str, Any] = {
+                "content_categories": [],
+                "main_topics": topics[:10],
+                "main_keywords": keywords[:15],
+                "title": metadata.get("title") or crawl_result.get("title") or "",
+                "description": metadata.get("description") or crawl_result.get("description") or "",
+                "language": metadata.get("language") or crawl_result.get("language") or "",
+            }
+            # Derive lightweight categories from headings/sections if
+            # the upstream crawl didn't already tag them.
+            if isinstance(crawl_result.get("headings"), list):
+                analysis["heading_count"] = len(crawl_result["headings"])
+            if isinstance(crawl_result.get("sections"), list):
+                analysis["section_count"] = len(crawl_result["sections"])
+                analysis["content_categories"] = [
+                    s.get("category")
+                    for s in crawl_result["sections"][:10]
+                    if isinstance(s, dict) and s.get("category")
+                ]
+            return analysis
+        except Exception as exc:
+            logger.debug(f"_analyze_crawl_result_comprehensive failed: {exc}")
+            return {}
+
+    def _map_writing_style_comprehensive(
+        self,
+        writing_style: Dict[str, Any],
+        content_characteristics: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Phase 3 writing-style → research-depth mapping.
+
+        Mirrors the prompt's priority order:
+        1. writing_style.complexity ("high" / "medium" / "low")
+        2. content_characteristics.vocabulary_level
+        3. fallback to "medium" (targeted research)
+
+        Returns a dict the prompt template can render; an empty dict
+        signals "no style mapping available".
+        """
+        if not isinstance(writing_style, dict):
+            writing_style = {}
+        if not isinstance(content_characteristics, dict):
+            content_characteristics = {}
+
+        complexity = (writing_style.get("complexity") or "").lower()
+        vocabulary_level = (content_characteristics.get("vocabulary_level") or "").lower()
+
+        # Phase 3 priority order from the prompt template.
+        if complexity == "high" or vocabulary_level in {"advanced", "high"}:
+            research_depth_preference = "comprehensive"
+            provider_preference = "exa"
+        elif complexity == "low" or vocabulary_level in {"simple", "low", "beginner"}:
+            research_depth_preference = "basic"
+            provider_preference = "exa"
+        else:
+            research_depth_preference = "targeted"
+            provider_preference = "exa"
+
+        return {
+            "research_depth_preference": research_depth_preference,
+            "provider_preference": provider_preference,
+            "complexity": complexity or "medium",
+            "vocabulary_level": vocabulary_level or "medium",
+        }
+
+    def _extract_content_themes(
+        self,
+        crawl_result: Dict[str, Any],
+        topics: Optional[List[str]] = None,
+    ) -> List[str]:
+        """Phase 3 theme extraction for preset generation.
+
+        Combines crawl-derived topics with metadata keywords. Returns
+        a deduplicated, normalised list (max 8 themes) for the LLM
+        prompt to render into the ``recommended_presets`` section.
+        """
+        if not isinstance(crawl_result, dict):
+            crawl_result = {}
+        if not isinstance(topics, list):
+            topics = []
+
+        themes: List[str] = []
+        seen: set = set()
+
+        for candidate in list(topics) + self._extract_keywords_from_crawl(crawl_result)[:8]:
+            if not candidate or not isinstance(candidate, str):
+                continue
+            cleaned = candidate.strip()
+            if not cleaned:
+                continue
+            key = cleaned.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            themes.append(cleaned)
+            if len(themes) >= 8:
+                break
+        return themes
+
     def get_json_schema(self) -> Dict[str, Any]:
         """Return JSON schema for structured LLM response."""
         # This will be used with llm_text_gen(json_struct=...)

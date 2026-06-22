@@ -284,7 +284,18 @@ class AdvertoolsService:
             if not all_text.strip():
                 return {"success": False, "error": "Extracted text is empty."}
 
-            word_freq = await loop.run_in_executor(None, lambda: adv.word_frequency([all_text], rm_stopwords=True))
+            word_freq = await loop.run_in_executor(
+                None,
+                # advertools >=0.13 renamed the ``rm_stopwords`` boolean
+                # to ``rm_words`` (a set of stopwords). The default
+                # English stopword set is what the old boolean True
+                # behaviour produced, so use ``adv.stopwords['english']``
+                # to preserve the original behaviour.
+                lambda: adv.word_frequency(
+                    [all_text],
+                    rm_words=adv.stopwords.get("english", set()),
+                ),
+            )
             top_themes = word_freq.head(20).to_dict(orient='records')
 
             # Additional metrics: Readability, word count
