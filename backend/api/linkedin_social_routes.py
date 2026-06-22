@@ -54,7 +54,6 @@ from services.integrations.linkedin.profile_intelligence_service import (
 from services.integrations.linkedin.profile_intelligence_validator import (
     ProfileIntelligenceValidationError,
 )
-from services.integrations.linkedin.profile_optimization_llm import ProfileOptimizationLLMError
 from services.integrations.linkedin.profile_optimization_rubric import (
     ProfileOptimizationRubricError,
     detect_profile_optimization_gaps,
@@ -64,6 +63,7 @@ from services.integrations.linkedin.profile_optimization_service import (
     ProfileOptimizationBatchNotReadyError,
     ProfileOptimizationError,
     ProfileOptimizationItemNotFoundError,
+    ProfileOptimizationLLMError,
     ProfileOptimizationNotStoredError,
     advance_profile_optimization_batch,
     get_next_profile_optimization_batch,

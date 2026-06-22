@@ -1,4 +1,8 @@
-"""Tests for Phase 7 profile optimization prompt and LLM adapter."""
+"""Tests for Phase 7 profile optimization prompt and LLM integration.
+
+Tests the service-level LLM integration via get_or_generate_profile_optimization,
+which uses llm_text_gen for subscription checking, usage tracking, and provider routing.
+"""
 
 from __future__ import annotations
 
@@ -10,12 +14,12 @@ from prompts.linkedin.profile_optimization_prompt import (
     PROFILE_OPTIMIZATION_SYSTEM_PROMPT,
     build_profile_optimization_user_prompt,
 )
-from services.integrations.linkedin.profile_optimization_llm import (
-    ProfileOptimizationLLMError,
-    call_profile_optimization_llm,
-)
 from services.integrations.linkedin.profile_optimization_rubric import (
     detect_profile_optimization_gaps,
+)
+from services.integrations.linkedin.profile_optimization_service import (
+    ProfileOptimizationLLMError,
+    get_or_generate_profile_optimization,
 )
 from services.integrations.linkedin.profile_optimization_types import (
     DetectedGap,
@@ -23,6 +27,8 @@ from services.integrations.linkedin.profile_optimization_types import (
     profile_optimization_gemini_json_schema,
     profile_optimization_json_schema,
 )
+from services.integrations.linkedin.profile_repository import ProfileRepository
+from services.integrations.linkedin.profile_validator import validate_profile_completeness
 
 
 def _sample_context() -> dict:
@@ -115,22 +121,85 @@ def test_gemini_schema_is_lightweight_and_capped() -> None:
     assert "minItems" in strict_dump or "minLength" in strict_dump
 
 
-def test_call_profile_optimization_llm_uses_gemini_schema() -> None:
+def _complete_context() -> dict:
+    """Create a complete profile context that passes validation."""
+    from services.integrations.linkedin.profile_context_types import default_profile_context
+
+    context = default_profile_context()
+    context["personal_information"].update({
+        "name": "Jane Doe",
+        "first_name": "Jane",
+        "last_name": "Doe",
+        "headline": "Senior Engineer | Cloud | Python",
+        "about": "Backend engineer with 8 years of experience.",
+    })
+    context["professional_information"].update({
+        "job_title": "Senior Engineer",
+        "company": "ACME Corp",
+        "skills": [{"name": "Python", "endorsement_count": 5}],
+        "skills_total_count": 1,
+        "experience": [
+            {"title": "Senior Engineer", "company": "ACME", "description": "Building APIs"}
+        ],
+    })
+    context["linkedin_information"].update({
+        "profile_picture": "https://example.com/pic.jpg",
+        "public_identifier": "jane-doe",
+        "profile_url": "https://linkedin.com/in/jane-doe",
+    })
+    return context
+
+
+def test_service_uses_gemini_schema_via_mock(tmp_path) -> None:
+    """Test that the service passes the correct schema to the LLM."""
     captured: dict = {}
 
-    def mock_generate_fn(**kwargs: object) -> dict:
+    def mock_generate_fn(**kwargs: object) -> str:
         captured.update(kwargs)
-        return {"recommendations": []}
+        return json.dumps({
+            "recommendations": [
+                {
+                    "profile_section": "headline",
+                    "issue": "Test",
+                    "why_it_matters": "Test",
+                    "current_state_summary": "Test",
+                    "recommended_action": "Test",
+                    "suggested_copy": "Test",
+                    "impact": "High",
+                    "effort": "Low",
+                    "best_practice_ref": "Test",
+                    "completion_criteria": "Test",
+                }
+            ]
+        })
 
-    call_profile_optimization_llm(
-        system_prompt=PROFILE_OPTIMIZATION_SYSTEM_PROMPT,
-        user_prompt="{}",
+    # Setup minimal repository
+    db_file = tmp_path / "test.db"
+    repo = ProfileRepository(db_path=str(db_file))
+    repo.save_normalized_profile("test-user", "acc-1", {"name": "Test"})
+
+    context = _complete_context()
+
+    repo.save_profile_context("test-user", context)
+    validation = validate_profile_completeness(context)
+
+    # Call with mock generate_fn
+    get_or_generate_profile_optimization(
+        "test-user",
+        context,
+        validation,
+        _sample_intelligence(),
+        repository=repo,
         generate_fn=mock_generate_fn,
     )
-    assert captured["schema"] == profile_optimization_gemini_json_schema()
+
+    # Verify schema was passed
+    assert "json_struct" in captured
+    assert captured["json_struct"] == profile_optimization_gemini_json_schema()
 
 
-def test_call_profile_optimization_llm_with_mock_generate_fn() -> None:
+def test_service_handles_json_string_response(tmp_path) -> None:
+    """Test that the service correctly parses JSON string responses from llm_text_gen."""
     mock_response = {
         "recommendations": [
             {
@@ -148,38 +217,84 @@ def test_call_profile_optimization_llm_with_mock_generate_fn() -> None:
         ]
     }
 
-    def mock_generate_fn(**kwargs: object) -> dict:
+    def mock_generate_fn(**kwargs: object) -> str:
         assert kwargs.get("system_prompt")
-        assert kwargs.get("schema") == profile_optimization_gemini_json_schema()
-        return mock_response
+        assert kwargs.get("json_struct") == profile_optimization_gemini_json_schema()
+        return json.dumps(mock_response)
 
-    result = call_profile_optimization_llm(
-        system_prompt=PROFILE_OPTIMIZATION_SYSTEM_PROMPT,
-        user_prompt='{"detected_gaps":[]}',
-        user_id="user-1",
+    # Setup minimal repository
+    db_file = tmp_path / "test.db"
+    repo = ProfileRepository(db_path=str(db_file))
+    repo.save_normalized_profile("test-user", "acc-1", {"name": "Test"})
+
+    context = _complete_context()
+
+    repo.save_profile_context("test-user", context)
+    validation = validate_profile_completeness(context)
+
+    result, meta = get_or_generate_profile_optimization(
+        "test-user",
+        context,
+        validation,
+        _sample_intelligence(),
+        repository=repo,
         generate_fn=mock_generate_fn,
     )
-    assert result == mock_response
+
+    assert result is not None
+    assert len(result) == 1
+    assert result[0]["profile_section"] == "headline"
 
 
-def test_call_profile_optimization_llm_invalid_json_raises() -> None:
+def test_service_invalid_json_raises_llm_error(tmp_path) -> None:
+    """Test that invalid JSON responses raise ProfileOptimizationLLMError."""
+    def mock_generate_fn(**kwargs: object) -> str:
+        return "not-json"
+
+    # Setup minimal repository
+    db_file = tmp_path / "test.db"
+    repo = ProfileRepository(db_path=str(db_file))
+    repo.save_normalized_profile("test-user", "acc-1", {"name": "Test"})
+
+    context = _complete_context()
+
+    repo.save_profile_context("test-user", context)
+    validation = validate_profile_completeness(context)
+
     with pytest.raises(ProfileOptimizationLLMError) as exc_info:
-        call_profile_optimization_llm(
-            system_prompt=PROFILE_OPTIMIZATION_SYSTEM_PROMPT,
-            user_prompt="{}",
-            generate_fn=lambda **kwargs: "not-json",
+        get_or_generate_profile_optimization(
+            "test-user",
+            context,
+            validation,
+            _sample_intelligence(),
+            repository=repo,
+            generate_fn=mock_generate_fn,
         )
     assert exc_info.value.error_kind == "invalid_json"
 
 
-def test_call_profile_optimization_llm_provider_error_mapped() -> None:
+def test_service_provider_error_mapped(tmp_path) -> None:
+    """Test that provider errors are correctly classified."""
     def mock_generate_fn(**kwargs: object) -> None:
         raise RuntimeError("429 rate limit exceeded")
 
+    # Setup minimal repository
+    db_file = tmp_path / "test.db"
+    repo = ProfileRepository(db_path=str(db_file))
+    repo.save_normalized_profile("test-user", "acc-1", {"name": "Test"})
+
+    context = _complete_context()
+
+    repo.save_profile_context("test-user", context)
+    validation = validate_profile_completeness(context)
+
     with pytest.raises(ProfileOptimizationLLMError) as exc_info:
-        call_profile_optimization_llm(
-            system_prompt=PROFILE_OPTIMIZATION_SYSTEM_PROMPT,
-            user_prompt="{}",
+        get_or_generate_profile_optimization(
+            "test-user",
+            context,
+            validation,
+            _sample_intelligence(),
+            repository=repo,
             generate_fn=mock_generate_fn,
         )
     assert exc_info.value.error_kind == "quota_or_rate_limit"

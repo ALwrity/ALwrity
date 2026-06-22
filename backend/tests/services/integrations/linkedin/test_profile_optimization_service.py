@@ -115,10 +115,12 @@ def _valid_llm_batch() -> dict[str, Any]:
     return {"recommendations": items}
 
 
+import json
+
 def _mock_generate_fn_factory(counter: dict[str, int]):
-    def mock_generate_fn(**_kwargs: Any) -> dict[str, Any]:
+    def mock_generate_fn(**_kwargs: Any) -> str:
         counter["calls"] = counter.get("calls", 0) + 1
-        return _valid_llm_batch()
+        return json.dumps(_valid_llm_batch())
 
     return mock_generate_fn
 
