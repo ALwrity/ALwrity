@@ -14,8 +14,6 @@ interface HeaderProps {
   showPreferencesModal: boolean;
   onPreferencesModalChange: (show: boolean) => void;
   onPreferencesChange: (prefs: Partial<LinkedInPreferences>) => void;
-  onClearHistory: () => void;
-  getHistoryLength: () => number;
   hasDraft: boolean;
   onResetDraft: () => void;
 }
@@ -26,8 +24,6 @@ export const Header: React.FC<HeaderProps> = ({
   showPreferencesModal,
   onPreferencesModalChange,
   onPreferencesChange,
-  onClearHistory,
-  getHistoryLength,
   hasDraft,
   onResetDraft
 }) => {
@@ -417,6 +413,59 @@ export const Header: React.FC<HeaderProps> = ({
                     </div>
                   </div>
                   
+                  {/* Quick Actions */}
+                  <div style={{ borderTop: '1px solid #e9ecef', paddingTop: '12px', marginTop: '12px' }}>
+                    <div style={{ marginBottom: '8px', fontWeight: 600, color: '#333', fontSize: '12px' }}>Quick Actions</div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => { onPreferencesModalChange(false); window.dispatchEvent(new CustomEvent('linkedinwriter:showTodaysTasks')); }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          background: '#f8f9fa',
+                          color: '#333',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#e3f2fd'; e.currentTarget.style.borderColor = '#0a66c2'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8f9fa'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                        title="View today's tasks"
+                      >
+                        📅 Today's Tasks
+                      </button>
+                      <button
+                        onClick={() => { onPreferencesModalChange(false); setShowBrainstormModal(true); }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 12px',
+                          background: '#f8f9fa',
+                          color: '#333',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: 6,
+                          cursor: 'pointer',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#e3f2fd'; e.currentTarget.style.borderColor = '#0a66c2'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = '#f8f9fa'; e.currentTarget.style.borderColor = '#e2e8f0'; }}
+                        title="Brainstorm content ideas"
+                      >
+                        💡 Brainstorm Ideas
+                      </button>
+                    </div>
+                  </div>
+
                   <style>{`
                     @keyframes slideIn {
                       from { opacity: 0; transform: translateY(-10px); }
@@ -431,67 +480,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
         
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          {/* Today's Tasks Button */}
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('linkedinwriter:showTodaysTasks'))}
-            style={{
-              padding: '8px 16px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 500,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-            title="View today's tasks"
-          >
-            📅 Today's Tasks
-          </button>
-          
-          {/* Brainstorm Ideas Button */}
-          <button
-            onClick={() => setShowBrainstormModal(true)}
-            style={{
-              padding: '8px 16px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 500,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6
-            }}
-            title="Brainstorm content ideas"
-          >
-            💡 Brainstorm Ideas
-          </button>
-          
-          {/* Clear Memory Button */}
-          <button
-            onClick={onClearHistory}
-            style={{
-              padding: '8px 16px',
-              background: 'rgba(255, 255, 255, 0.1)',
-              color: 'white',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              borderRadius: 6,
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 500
-            }}
-            title={`Clear chat memory (${getHistoryLength()} messages)`}
-          >
-            Clear Memory ({getHistoryLength()})
-          </button>
-          
-          {/* Shared Header Controls - Usage Stats & User Dropdown */}
           <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
         </div>
       </div>
