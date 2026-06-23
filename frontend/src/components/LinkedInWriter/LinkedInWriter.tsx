@@ -420,12 +420,13 @@ Always use the most appropriate tool for the user's request.`.trim();
 
       {/* Lightweight progress tracker under header */}
       <div style={{ 
-        padding: '6px 16px',
-        transition: 'all 300ms ease',
+        padding: '4px 16px',
+        transition: 'opacity 400ms ease, transform 400ms ease',
         opacity: progressActive || progressSteps.length > 0 ? 1 : 0,
-        transform: progressActive || progressSteps.length > 0 ? 'translateY(0)' : 'translateY(-10px)',
-        height: progressActive || progressSteps.length > 0 ? 'auto' : 0,
-        overflow: 'hidden'
+        transform: progressActive || progressSteps.length > 0 ? 'translateY(0)' : 'translateY(-8px)',
+        maxHeight: progressActive || progressSteps.length > 0 ? '2000px' : 0,
+        overflow: 'hidden',
+        pointerEvents: progressActive || progressSteps.length > 0 ? 'auto' : 'none'
       }}>
         <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
       </div>

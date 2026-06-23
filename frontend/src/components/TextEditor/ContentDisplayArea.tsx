@@ -246,27 +246,32 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
         {/* Citation Styling */}
         <style>{`
           .liw-cite {
-            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
-            border: 1px solid #64b5f6;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 22px;
+            height: 18px;
+            padding: 0 5px;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+            color: #0a66c2;
+            background: rgba(10, 102, 194, 0.1);
+            border: 1px solid rgba(10, 102, 194, 0.25);
             border-radius: 4px;
-            padding: 2px 6px;
-            margin: 0 2px;
-            font-size: 0.8em;
-            font-weight: 600;
-            color: #1976d2;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 4px rgba(25, 118, 210, 0.1);
+            vertical-align: super;
+            transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+            box-shadow: 0 1px 3px rgba(10, 102, 194, 0.08);
           }
           .liw-cite:hover {
-            background: linear-gradient(135deg, #bbdefb, #90caf9);
-            border-color: #42a5f5;
-            box-shadow: 0 4px 8px rgba(25, 118, 210, 0.2);
-            transform: translateY(-1px);
+            background: rgba(10, 102, 194, 0.18);
+            border-color: rgba(10, 102, 194, 0.4);
+            box-shadow: 0 2px 6px rgba(10, 102, 194, 0.15);
           }
           .liw-cite:active {
-            transform: translateY(0);
-            box-shadow: 0 2px 4px rgba(25, 118, 210, 0.1);
+            background: rgba(10, 102, 194, 0.25);
+            box-shadow: 0 1px 2px rgba(10, 102, 194, 0.1);
           }
           
           @keyframes spin {

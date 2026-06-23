@@ -16,232 +16,253 @@ interface ProgressTrackerProps {
   active: boolean;
 }
 
+/* Educational descriptions shown beneath each step's label */
+const STEP_EDUCATION: Record<string, string> = {
+  personalize: 'We analyze your topic, industry, and target audience to tailor the content for maximum LinkedIn engagement and relevance.',
+  prepare_queries: 'Smart research queries are crafted to find authoritative, up-to-date sources — ensuring your content is built on reliable data.',
+  research: 'We search across trusted sources to collect statistics, trends, case studies, and insights that make your content credible and valuable.',
+  grounding: 'Every claim, statistic, and data point is mapped back to its original source — this is what makes your content trustworthy and authoritative.',
+  content_generation: 'Your content is written with LinkedIn-optimized structure: strong hooks, scannable formatting, professional tone, and engagement-driving elements.',
+  citations: 'Factual claims are linked to their sources with visible [Source N] markers — building transparency and credibility with your audience.',
+  quality_analysis: 'The content is reviewed for engagement potential, readability, LinkedIn best practices, and alignment with your chosen tone and audience.',
+  finalize: 'Final formatting tweaks, hashtag integration, and platform-specific optimizations are applied before delivering the result.'
+};
+
 export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active }) => {
   if (!steps || steps.length === 0) return null;
   
   const completedSteps = steps.filter(step => step.status === 'completed').length;
   const progressPercentage = Math.round((completedSteps / steps.length) * 100);
-  
+
   return (
     <div style={{
       marginBottom: '24px',
       padding: '20px',
-      borderRadius: '16px',
-      border: '1px solid rgba(10,102,194,0.15)',
-      background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(250,253,255,0.98))',
-      boxShadow: '0 8px 32px rgba(10,102,194,0.12)',
+      borderRadius: '12px',
+      border: '1px solid rgba(10,102,194,0.1)',
+      background: 'rgba(255,255,255,0.85)',
+      backdropFilter: 'blur(8px)',
+      WebkitBackdropFilter: 'blur(8px)',
+      boxShadow: '0 2px 12px rgba(10,102,194,0.06)',
       position: 'relative',
       overflow: 'hidden'
     }}>
-      {/* Header with progress percentage */}
+      {/* Header */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        marginBottom: '20px',
-        paddingBottom: '16px',
-        borderBottom: '1px solid rgba(10,102,194,0.1)'
+        marginBottom: '16px',
+        paddingBottom: '12px',
+        borderBottom: '1px solid rgba(10,102,194,0.06)'
       }}>
+        <div>
+          <div style={{
+            fontSize: '15px',
+            fontWeight: '600',
+            color: '#0f172a',
+            marginBottom: '2px'
+          }}>
+            Content Generation
+          </div>
+          <div style={{
+            fontSize: '12px',
+            color: '#64748b',
+            lineHeight: '1.4'
+          }}>
+            {active
+              ? 'Researching, writing, and optimizing your content'
+              : 'Generation complete — your content is ready below.'}
+          </div>
+        </div>
         <div style={{
-          fontSize: '16px',
+          fontSize: '13px',
           fontWeight: '600',
-          color: '#0f172a'
+          color: progressPercentage === 100 ? '#10b981' : '#0a66c2',
+          padding: '4px 12px',
+          background: progressPercentage === 100
+            ? 'rgba(16,185,129,0.08)'
+            : 'rgba(10,102,194,0.08)',
+          borderRadius: '20px',
+          whiteSpace: 'nowrap'
         }}>
-          LinkedIn Content Generation
+          {progressPercentage}%
         </div>
-        <div style={{
-          fontSize: '14px',
-          fontWeight: '500',
-          color: '#0a66c2',
-          padding: '6px 12px',
-          background: 'rgba(10,102,194,0.1)',
-          borderRadius: '20px'
-        }}>
-          {progressPercentage}% Complete
-        </div>
-      </div>
-      
-      {/* Progress bar */}
-      <div style={{
-        width: '100%',
-        height: '6px',
-        background: '#e2e8f0',
-        borderRadius: '3px',
-        marginBottom: '20px',
-        overflow: 'hidden'
-      }}>
-        <div style={{
-          width: `${progressPercentage}%`,
-          height: '100%',
-          background: 'linear-gradient(90deg, #0a66c2, #3b82f6)',
-          borderRadius: '3px',
-          transition: 'width 0.5s ease',
-          boxShadow: '0 0 8px rgba(10,102,194,0.3)'
-        }} />
       </div>
       
       {/* Steps */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '16px'
+        gap: '4px'
       }}>
-        {steps.map((step, idx) => (
-          <div key={step.id} style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '16px',
-            padding: '16px',
-            borderRadius: '12px',
-            background: step.status === 'active' ? 'rgba(10,102,194,0.05)' : 'transparent',
-            border: step.status === 'active' ? '1px solid rgba(10,102,194,0.2)' : '1px solid transparent',
-            transition: 'all 300ms ease',
-            position: 'relative'
-          }}>
-            {/* Step indicator */}
-            <div style={{
+        {steps.map((step, idx) => {
+          const isLast = idx === steps.length - 1;
+          return (
+            <div key={step.id} style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%',
-              background: step.status === 'completed' ? '#10b981' : 
-                         step.status === 'active' ? '#0a66c2' : 
-                         step.status === 'error' ? '#ef4444' : '#cbd5e1',
-              color: 'white',
-              fontSize: '14px',
-              fontWeight: '600',
-              flexShrink: 0,
+              gap: '12px',
+              padding: '10px 12px',
+              borderRadius: '8px',
+              background: step.status === 'active' ? 'rgba(10,102,194,0.04)' : 'transparent',
+              transition: 'all 300ms ease',
               position: 'relative'
             }}>
-              {step.status === 'completed' ? '✓' : 
-               step.status === 'active' ? '●' : 
-               step.status === 'error' ? '✕' : (idx + 1)}
-              
-              {/* Active step glow effect */}
-              {step.status === 'active' && (
-                <div style={{
-                  position: 'absolute',
-                  top: '-4px',
-                  left: '-4px',
-                  right: '-4px',
-                  bottom: '-4px',
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, rgba(10,102,194,0.3) 0%, transparent 70%)',
-                  animation: 'pulse 2s ease-in-out infinite alternate',
-                  zIndex: -1
-                }} />
-              )}
-            </div>
-            
-            {/* Step content */}
-            <div style={{ flex: 1 }}>
+              {/* Step indicator + connector line */}
               <div style={{
-                fontSize: '14px',
-                fontWeight: '600',
-                color: step.status === 'active' ? '#0a66c2' : 
-                       step.status === 'completed' ? '#10b981' : 
-                       step.status === 'error' ? '#ef4444' : '#64748b',
-                marginBottom: '4px',
-                transition: 'color 200ms ease'
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                flexShrink: 0,
+                width: '24px'
               }}>
-                {step.label}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: step.status === 'completed' ? '#10b981' : 
+                             step.status === 'active' ? '#0a66c2' : 
+                             step.status === 'error' ? '#ef4444' : '#e2e8f0',
+                  color: step.status === 'completed' || step.status === 'active' || step.status === 'error' ? 'white' : '#94a3b8',
+                  fontSize: '11px',
+                  fontWeight: '700',
+                  transition: 'all 300ms ease'
+                }}>
+                  {step.status === 'completed' ? (
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path d="M3 7.5L6 10.5L11 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  ) : step.status === 'active' ? (
+                    <div style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      background: 'white',
+                      animation: 'progressPulse 1.5s ease-in-out infinite'
+                    }} />
+                  ) : step.status === 'error' ? (
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path d="M4 4L10 10M10 4L4 10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  ) : (
+                    <span>{idx + 1}</span>
+                  )}
+                </div>
+                {/* Connector line to next step */}
+                {!isLast && (
+                  <div style={{
+                    width: '1.5px',
+                    flex: 1,
+                    minHeight: '6px',
+                    background: step.status === 'completed' ? '#10b981' : '#e2e8f0',
+                    marginTop: '3px',
+                    transition: 'background 300ms ease'
+                  }} />
+                )}
               </div>
               
-              {/* Step message */}
-              {step.message && (
+              {/* Step content */}
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{
                   fontSize: '13px',
-                  color: step.status === 'active' ? '#475569' : '#94a3b8',
-                  lineHeight: '1.4',
-                  fontStyle: step.status === 'active' ? 'normal' : 'italic'
+                  fontWeight: '500',
+                  color: step.status === 'active' ? '#0a66c2' : 
+                         step.status === 'completed' ? '#0f172a' : 
+                         step.status === 'error' ? '#ef4444' : '#94a3b8',
+                  marginBottom: step.status === 'active' ? '4px' : '0',
+                  transition: 'color 200ms ease'
                 }}>
-                  {step.message}
+                  {step.label}
                 </div>
-              )}
-              
-              {/* Step details */}
-              {step.details && step.status === 'completed' && (
-                <div style={{
-                  marginTop: '8px',
-                  padding: '8px 12px',
-                  background: 'rgba(16,185,129,0.1)',
-                  borderRadius: '8px',
-                  fontSize: '12px',
-                  color: '#065f46'
-                }}>
-                  {Object.entries(step.details).map(([key, value]) => (
-                    <div key={key} style={{ marginBottom: '4px' }}>
-                      <strong>{key}:</strong> {String(value)}
-                    </div>
-                  ))}
-                </div>
-              )}
+                
+                {/* Educational description — shown only while active */}
+                {step.status === 'active' && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#64748b',
+                    lineHeight: '1.5'
+                  }}>
+                    {STEP_EDUCATION[step.id] || step.message || ''}
+                  </div>
+                )}
+                
+                {/* Step message */}
+                {step.message && step.status !== 'active' && (
+                  <div style={{
+                    fontSize: '12px',
+                    color: '#94a3b8',
+                    lineHeight: '1.4',
+                    marginTop: '2px'
+                  }}>
+                    {step.message}
+                  </div>
+                )}
+                
+                {/* Step details */}
+                {step.details && step.status === 'completed' && (
+                  <div style={{
+                    marginTop: '4px',
+                    padding: '4px 8px',
+                    background: 'rgba(16,185,129,0.06)',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    color: '#065f46'
+                  }}>
+                    {Object.entries(step.details).map(([key, value]) => (
+                      <div key={key} style={{ marginBottom: '1px' }}>
+                        <strong>{key}:</strong> {String(value)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            
-            {/* Status indicator */}
-            <div style={{
-              padding: '4px 8px',
-              borderRadius: '12px',
-              fontSize: '11px',
-              fontWeight: '500',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-              background: step.status === 'completed' ? 'rgba(16,185,129,0.1)' :
-                         step.status === 'active' ? 'rgba(10,102,194,0.1)' :
-                         step.status === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(203,213,225,0.1)',
-              color: step.status === 'completed' ? '#065f46' :
-                     step.status === 'active' ? '#0a66c2' :
-                     step.status === 'error' ? '#991b1b' : '#64748b',
-              flexShrink: 0
-            }}>
-              {step.status}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       
       {/* Active status indicator */}
       {active && (
         <div style={{
-          marginTop: '20px',
-          padding: '12px 16px',
-          background: 'rgba(10,102,194,0.05)',
-          borderRadius: '12px',
-          border: '1px solid rgba(10,102,194,0.1)',
+          marginTop: '16px',
+          padding: '10px 14px',
+          background: 'rgba(10,102,194,0.03)',
+          borderRadius: '8px',
+          border: '1px solid rgba(10,102,194,0.06)',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px'
+          gap: '10px'
         }}>
           <div style={{
-            width: '12px',
-            height: '12px',
+            width: '6px',
+            height: '6px',
             borderRadius: '50%',
             background: '#0a66c2',
-            animation: 'pulse 1.5s ease-in-out infinite'
+            flexShrink: 0
           }} />
           <div style={{
-            fontSize: '14px',
-            color: '#0a66c2',
-            fontWeight: '500'
+            fontSize: '12px',
+            color: '#64748b',
+            lineHeight: '1.5',
+            flex: 1
           }}>
-            Content generation in progress...
+            <strong style={{ color: '#0a66c2' }}>Why this matters:</strong> Every step produces research-backed, LinkedIn-optimized content with visible source citations.
           </div>
         </div>
       )}
       
       {/* CSS Animations */}
-      <style dangerouslySetInnerHTML={{
-        __html: `
-          @keyframes pulse {
-            0% { opacity: 0.6; transform: scale(1); }
-            100% { opacity: 1; transform: scale(1.1); }
-          }
-        `
-      }} />
+      <style>{`
+        @keyframes progressPulse {
+          0%, 100% { opacity: 0.4; transform: scale(0.8); }
+          50% { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 };
 
-
+export default ProgressTracker;

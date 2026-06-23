@@ -5,12 +5,15 @@ Handles the main content generation logic for posts and articles.
 Uses llm_text_gen for provider-agnostic LLM access (respects GPT_PROVIDER).
 """
 
+import json
+import re
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from loguru import logger
 from models.linkedin_models import (
     LinkedInPostRequest, LinkedInArticleRequest, LinkedInPostResponse, LinkedInArticleResponse,
-    PostContent, ArticleContent, GroundingLevel, ResearchSource
+    PostContent, ArticleContent, GroundingLevel, ResearchSource, LinkedInPostOutput, Citation,
+    HashtagSuggestion, LinkedInArticleOutput, LinkedInCarouselOutput, LinkedInVideoScriptOutput
 )
 from services.linkedin.quality_handler import QualityHandler
 from services.linkedin.content_generator_prompts import (
@@ -23,7 +26,6 @@ from services.linkedin.content_generator_prompts import (
     VideoScriptGenerator
 )
 from services.llm_providers.main_text_generation import llm_text_gen
-from services.linkedin.content_parser import parse_video_script_text
 from services.persona_analysis_service import PersonaAnalysisService
 import time
 
@@ -106,13 +108,23 @@ class ContentGenerator:
                 del self._cache_timestamps[key]
             logger.info(f"Cleared persona cache for user {user_id}")
     
+    def _extract_citation_text(self, content: str, source_num: int) -> str:
+        """Extract the sentence surrounding a [Source N] marker for citation text display."""
+        pattern = re.compile(rf'([^.]*?\[Source {re.escape(str(source_num))}\][^.]*\.)')
+        match = pattern.search(content)
+        if match:
+            text = match.group(1).strip()
+            return text[:200]
+        return f"Source {source_num}"
+
     def _build_research_context(self, research_sources: List) -> str:
         """Build research context string from research sources for prompt injection."""
         if not research_sources:
             return ""
         
-        context_parts = ["\n\nRESEARCH CONTEXT (use this information to ground your content with facts and data):"]
-        for i, source in enumerate(research_sources[:5], 1):  # Limit to top 5 sources
+        today = datetime.now().strftime("%B %d, %Y")
+        context_parts = [f"\n\nTODAY'S DATE: {today}\n\nRESEARCH CONTEXT (use this information to ground your content with facts and data):"]
+        for i, source in enumerate(research_sources[:8], 1):  # Limit to top 8 sources
             title = getattr(source, 'title', f'Source {i}')
             url = getattr(source, 'url', '')
             content = getattr(source, 'content', '')
@@ -158,22 +170,31 @@ class ContentGenerator:
                 logger.info(f"  - First research source: {research_sources[0] if research_sources else 'None'}")
                 logger.info(f"  - Research sources types: {[type(s) for s in research_sources[:3]]}")
             
-            # Step 3: Add citations if requested
+            # Step 3: Build citations from structured LLM output or fall back to extraction
             citations = []
             source_list = None
             final_research_sources = research_sources
             
-            if request.include_citations and research_sources and self.citation_manager:
-                try:
-                    logger.info(f"Processing citations for content length: {len(content_result['content'])}")
-                    citations = self.citation_manager.extract_citations(content_result['content'])
-                    logger.info(f"Extracted {len(citations)} citations from content")
-                    source_list = self.citation_manager.generate_source_list(research_sources)
-                    logger.info(f"Generated source list: {source_list[:200] if source_list else 'None'}")
-                except Exception as e:
-                    logger.warning(f"Citation processing failed: {e}")
+            if request.include_citations:
+                # Prefer structured citations from LLM json_struct output
+                if content_result.get('citations'):
+                    citations = content_result['citations']
+                    logger.info(f"Using {len(citations)} structured citations from LLM output")
+                elif research_sources and self.citation_manager:
+                    try:
+                        logger.info(f"Falling back to citation extraction for content length: {len(content_result['content'])}")
+                        citations = self.citation_manager.extract_citations(content_result['content'])
+                        logger.info(f"Extracted {len(citations)} citations from content")
+                    except Exception as e:
+                        logger.warning(f"Citation extraction fallback failed: {e}")
+                
+                if research_sources and self.citation_manager:
+                    try:
+                        source_list = self.citation_manager.generate_source_list(research_sources)
+                    except Exception as e:
+                        logger.warning(f"Source list generation failed: {e}")
             else:
-                logger.info(f"Citation processing skipped: include_citations={request.include_citations}, research_sources={len(research_sources) if research_sources else 0}, citation_manager={self.citation_manager is not None}")
+                logger.info(f"Citation processing skipped: include_citations={request.include_citations}")
             
             # Step 4: Analyze content quality
             quality_metrics = None
@@ -190,10 +211,17 @@ class ContentGenerator:
                     logger.warning(f"Quality analysis failed: {e}")
             
             # Step 5: Build response
+            # Convert string hashtags from LLM output to HashtagSuggestion objects
+            raw_hashtags = content_result.get('hashtags', [])
+            if raw_hashtags and isinstance(raw_hashtags[0], str):
+                hashtag_suggestions = [HashtagSuggestion(hashtag=h if h.startswith('#') else f'#{h}', category="generated") for h in raw_hashtags]
+            else:
+                hashtag_suggestions = raw_hashtags
+            
             post_content = PostContent(
                 content=content_result['content'],
                 character_count=len(content_result['content']),
-                hashtags=content_result.get('hashtags', []),
+                hashtags=hashtag_suggestions,
                 call_to_action=content_result.get('call_to_action'),
                 engagement_prediction=content_result.get('engagement_prediction'),
                 citations=citations,
@@ -250,12 +278,23 @@ class ContentGenerator:
             source_list = None
             final_research_sources = research_sources
             
-            if request.include_citations and research_sources and self.citation_manager:
-                try:
-                    citations = self.citation_manager.extract_citations(content_result['content'])
-                    source_list = self.citation_manager.generate_source_list(research_sources)
-                except Exception as e:
-                    logger.warning(f"Citation processing failed: {e}")
+            if request.include_citations:
+                # Prefer structured citations from LLM json_struct output
+                if content_result.get('citations'):
+                    citations = content_result['citations']
+                    logger.info(f"Using {len(citations)} structured citations from LLM output for article")
+                elif research_sources and self.citation_manager:
+                    try:
+                        citations = self.citation_manager.extract_citations(content_result['content'])
+                        logger.info(f"Extracted {len(citations)} citations from article content")
+                    except Exception as e:
+                        logger.warning(f"Citation extraction fallback for article failed: {e}")
+                
+                if research_sources and self.citation_manager:
+                    try:
+                        source_list = self.citation_manager.generate_source_list(research_sources)
+                    except Exception as e:
+                        logger.warning(f"Source list generation for article failed: {e}")
             
             # Step 4: Analyze content quality
             quality_metrics = None
@@ -388,7 +427,7 @@ class ContentGenerator:
     
     # Grounded content generation methods
     async def generate_grounded_post_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
-        """Generate post content using provider-agnostic llm_text_gen."""
+        """Generate post content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             # Build the prompt using persona if available
             uid = int(getattr(request, "user_id", 0) or 0)
@@ -416,21 +455,51 @@ class ContentGenerator:
             if research_context:
                 prompt += research_context
             
-            # Generate content using provider-agnostic gateway
+            # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(
                 prompt=prompt,
+                json_struct=LinkedInPostOutput.model_json_schema(),
                 user_id=user_id,
                 flow_type="linkedin_post",
                 max_tokens=request.max_length,
                 temperature=0.7
             )
             
-            content_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
+            # Parse structured response (handle both dict from Gemini and str from others)
+            if isinstance(raw_response, dict):
+                parsed = raw_response
+            else:
+                cleaned = str(raw_response).strip()
+                if cleaned.startswith('```json'):
+                    cleaned = cleaned[7:]
+                elif cleaned.startswith('```'):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith('```'):
+                    cleaned = cleaned[:-3]
+                parsed = json.loads(cleaned)
+            
+            content_text = parsed.get('content', '').strip()
+            hashtags = parsed.get('hashtags', [])
+            call_to_action = parsed.get('call_to_action')
+            cited_indices = parsed.get('cited_source_indices', [])
+            
+            # Build citations from cited source indices
+            citations = []
+            for idx in cited_indices:
+                if isinstance(idx, int) and 0 < idx <= len(research_sources):
+                    citations.append(Citation(
+                        type="inline",
+                        reference=f"Source {idx}",
+                        source_index=idx - 1,
+                        text=self._extract_citation_text(content_text, idx)
+                    ))
             
             return {
                 'content': content_text,
-                'sources': [],
-                'citations': [],
+                'hashtags': hashtags,
+                'call_to_action': call_to_action,
+                'sources': research_sources,
+                'citations': citations,
                 'grounding_enabled': bool(research_sources),
                 'fallback_used': False
             }
@@ -440,7 +509,7 @@ class ContentGenerator:
             raise Exception(f"Failed to generate LinkedIn post: {str(e)}")
     
     async def generate_grounded_article_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
-        """Generate article content using provider-agnostic llm_text_gen."""
+        """Generate article content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             # Build the prompt using persona if available
             uid = int(getattr(request, "user_id", 0) or 0)
@@ -468,38 +537,55 @@ class ContentGenerator:
             if research_context:
                 prompt += research_context
             
-            # Generate content using provider-agnostic gateway
+            # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(
                 prompt=prompt,
+                json_struct=LinkedInArticleOutput.model_json_schema(),
                 user_id=user_id,
                 flow_type="linkedin_article",
                 max_tokens=request.word_count * 10,
                 temperature=0.7
             )
             
-            content_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
+            # Parse structured response (handle both dict from Gemini and str from others)
+            if isinstance(raw_response, dict):
+                parsed = raw_response
+            else:
+                cleaned = str(raw_response).strip()
+                if cleaned.startswith('```json'):
+                    cleaned = cleaned[7:]
+                elif cleaned.startswith('```'):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith('```'):
+                    cleaned = cleaned[:-3]
+                parsed = json.loads(cleaned)
             
-            # Extract title from article content (first markdown heading or first line)
-            title = ""
-            for line in content_text.split('\n'):
-                stripped = line.strip()
-                if stripped.startswith('# '):
-                    title = stripped[2:].strip()
-                    break
-            if not title:
-                for line in content_text.split('\n'):
-                    stripped = line.strip()
-                    if stripped:
-                        title = stripped[:100].strip()
-                        break
-            if not title:
-                title = request.topic or "LinkedIn Article"
+            content_text = parsed.get('content', '').strip()
+            title = parsed.get('title', request.topic or "LinkedIn Article")
+            sections = parsed.get('sections', [])
+            seo_metadata = parsed.get('seo_metadata')
+            reading_time = parsed.get('reading_time')
+            cited_indices = parsed.get('cited_source_indices', [])
+            
+            # Build citations from cited source indices
+            citations = []
+            for idx in cited_indices:
+                if isinstance(idx, int) and 0 < idx <= len(research_sources):
+                    citations.append(Citation(
+                        type="inline",
+                        reference=f"Source {idx}",
+                        source_index=idx - 1,
+                        text=self._extract_citation_text(content_text, idx)
+                    ))
             
             return {
                 'content': content_text,
                 'title': title,
-                'sources': [],
-                'citations': [],
+                'sections': sections,
+                'seo_metadata': seo_metadata,
+                'reading_time': reading_time,
+                'sources': research_sources,
+                'citations': citations,
                 'grounding_enabled': bool(research_sources),
                 'fallback_used': False
             }
@@ -509,7 +595,7 @@ class ContentGenerator:
             raise Exception(f"Failed to generate LinkedIn article: {str(e)}")
     
     async def generate_grounded_carousel_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
-        """Generate carousel content using provider-agnostic llm_text_gen."""
+        """Generate carousel content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             prompt = CarouselPromptBuilder.build_carousel_prompt(request)
             
@@ -518,21 +604,61 @@ class ContentGenerator:
             if research_context:
                 prompt += research_context
             
-            # Generate content using provider-agnostic gateway
+            # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(
                 prompt=prompt,
+                json_struct=LinkedInCarouselOutput.model_json_schema(),
                 user_id=user_id,
                 flow_type="linkedin_carousel",
                 max_tokens=2000,
                 temperature=0.7
             )
             
-            content_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
+            # Parse structured response (handle both dict from Gemini and str from others)
+            if isinstance(raw_response, dict):
+                parsed = raw_response
+            else:
+                cleaned = str(raw_response).strip()
+                if cleaned.startswith('```json'):
+                    cleaned = cleaned[7:]
+                elif cleaned.startswith('```'):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith('```'):
+                    cleaned = cleaned[:-3]
+                parsed = json.loads(cleaned)
+            
+            slides_raw = parsed.get('slides', [])
+            # Convert slide dicts if they came through as plain dicts from JSON
+            slides = []
+            for s in slides_raw:
+                if isinstance(s, dict):
+                    slides.append(s)
+                else:
+                    slides.append(s.model_dump() if hasattr(s, 'model_dump') else dict(s))
+            
+            cited_indices = parsed.get('cited_source_indices', [])
+            
+            # Build citations from cited source indices
+            citations = []
+            all_slide_content = " ".join([s.get('content', '') for s in slides])
+            for idx in cited_indices:
+                if isinstance(idx, int) and 0 < idx <= len(research_sources):
+                    citations.append(Citation(
+                        type="inline",
+                        reference=f"Source {idx}",
+                        source_index=idx - 1,
+                        text=self._extract_citation_text(all_slide_content, idx)
+                    ))
             
             return {
-                'content': content_text,
-                'sources': [],
-                'citations': [],
+                'content': parsed.get('content', ''),
+                'slides': slides,
+                'title': parsed.get('title', ''),
+                'cover_slide': parsed.get('cover_slide'),
+                'cta_slide': parsed.get('cta_slide'),
+                'design_guidelines': parsed.get('design_guidelines', {}),
+                'sources': research_sources,
+                'citations': citations,
                 'grounding_enabled': bool(research_sources),
                 'fallback_used': False
             }
@@ -542,7 +668,7 @@ class ContentGenerator:
             raise Exception(f"Failed to generate LinkedIn carousel: {str(e)}")
     
     async def generate_grounded_video_script_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
-        """Generate video script content using provider-agnostic llm_text_gen."""
+        """Generate video script content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             prompt = VideoScriptPromptBuilder.build_video_script_prompt(request)
             
@@ -551,23 +677,66 @@ class ContentGenerator:
             if research_context:
                 prompt += research_context
             
-            # Generate content using provider-agnostic gateway
+            # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(
                 prompt=prompt,
+                json_struct=LinkedInVideoScriptOutput.model_json_schema(),
                 user_id=user_id,
                 flow_type="linkedin_video_script",
                 max_tokens=1500,
                 temperature=0.7
             )
             
-            content_text = raw_response if isinstance(raw_response, str) else str(raw_response or "")
-            parsed = parse_video_script_text(content_text)
-
+            # Parse structured response (handle both dict from Gemini and str from others)
+            if isinstance(raw_response, dict):
+                parsed = raw_response
+            else:
+                cleaned = str(raw_response).strip()
+                if cleaned.startswith('```json'):
+                    cleaned = cleaned[7:]
+                elif cleaned.startswith('```'):
+                    cleaned = cleaned[3:]
+                if cleaned.endswith('```'):
+                    cleaned = cleaned[:-3]
+                parsed = json.loads(cleaned)
+            
+            hook = parsed.get('hook', '')
+            main_content_raw = parsed.get('main_content', [])
+            main_content = []
+            for s in main_content_raw:
+                if isinstance(s, dict):
+                    main_content.append(s)
+                else:
+                    main_content.append(s.model_dump() if hasattr(s, 'model_dump') else dict(s))
+            conclusion = parsed.get('conclusion', '')
+            captions = parsed.get('captions')
+            thumbnail_suggestions = parsed.get('thumbnail_suggestions', [])
+            video_description = parsed.get('video_description', '')
+            cited_indices = parsed.get('cited_source_indices', [])
+            
+            # Build citations from cited source indices
+            citations = []
+            all_scene_content = " ".join([s.get('content', '') for s in main_content])
+            full_content = f"{hook} {all_scene_content} {conclusion}"
+            for idx in cited_indices:
+                if isinstance(idx, int) and 0 < idx <= len(research_sources):
+                    citations.append(Citation(
+                        type="inline",
+                        reference=f"Source {idx}",
+                        source_index=idx - 1,
+                        text=self._extract_citation_text(full_content, idx)
+                    ))
+            
             return {
-                **parsed,
-                'content': content_text,
-                'sources': [],
-                'citations': [],
+                'hook': hook,
+                'main_content': main_content,
+                'conclusion': conclusion,
+                'captions': captions,
+                'thumbnail_suggestions': thumbnail_suggestions,
+                'video_description': video_description,
+                'content': full_content,
+                'sources': research_sources,
+                'citations': citations,
                 'grounding_enabled': bool(research_sources),
                 'fallback_used': False
             }

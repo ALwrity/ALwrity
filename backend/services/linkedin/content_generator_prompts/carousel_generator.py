@@ -33,10 +33,17 @@ class CarouselGenerator:
             citations = []
             source_list = None
             if request.include_citations and research_sources:
-                # Extract citations from all slides
-                all_content = " ".join([slide['content'] for slide in content_result['slides']])
-                citations = self.citation_manager.extract_citations(all_content) if self.citation_manager else []
-                source_list = self.citation_manager.generate_source_list(research_sources) if self.citation_manager else None
+                # Prefer structured citations from LLM json_struct output
+                if content_result.get('citations'):
+                    citations = content_result['citations']
+                    logger.info(f"Using {len(citations)} structured citations from LLM output for carousel")
+                elif self.citation_manager:
+                    # Extract citations from all slides (backward compat for non-structured mode)
+                    all_content = " ".join([slide['content'] for slide in content_result['slides']])
+                    citations = self.citation_manager.extract_citations(all_content)
+                
+                if self.citation_manager:
+                    source_list = self.citation_manager.generate_source_list(research_sources)
             
             # Step 4: Analyze content quality
             quality_metrics = None
