@@ -414,8 +414,6 @@ Always use the most appropriate tool for the user's request.`.trim();
         showPreferencesModal={showPreferencesModal}
         onPreferencesModalChange={setShowPreferencesModal}
         onPreferencesChange={handlePreferencesChange}
-        onClearHistory={handleClearHistory}
-        getHistoryLength={getHistoryLength}
         hasDraft={!!draft}
         onResetDraft={handleClear}
       />
@@ -438,7 +436,7 @@ Always use the most appropriate tool for the user's request.`.trim();
 
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', backgroundColor: '#ffffff' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
         {/* Loading Indicator */}
         <LoadingIndicator
           isGenerating={isGenerating}

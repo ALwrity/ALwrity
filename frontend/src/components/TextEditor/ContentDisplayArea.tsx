@@ -87,6 +87,14 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
     }
   }, [draft, localDraft]);
 
+  // Auto-size textarea to show all content
+  useEffect(() => {
+    if (textareaRef.current && assistantOn) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [localDraft, assistantOn]);
+
   // Cleanup debounced saver
   useEffect(() => {
     return () => {
@@ -101,7 +109,6 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
       onMouseUp={assistantOn ? undefined : onTextSelection}
       style={{ 
         padding: '20px',
-        minHeight: '400px',
         lineHeight: '1.6',
         position: 'relative',
         userSelect: 'text',
@@ -209,7 +216,6 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                 autoFocus
                 style={{
                   width: '100%',
-                  minHeight: '300px',
                   outline: 'none',
                   border: '1px solid #e0e0e0',
                   borderRadius: '8px',

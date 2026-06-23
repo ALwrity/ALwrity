@@ -111,8 +111,7 @@ get_db = get_db_dependency
 async def log_api_request(request: Request, db: Session, duration: float, status_code: int):
     """Log API request to database for monitoring."""
     try:
-        await monitor.add_request(
-            db=db,
+        request_record = APIRequest(
             path=str(request.url.path),
             method=request.method,
             status_code=status_code,
@@ -122,6 +121,7 @@ async def log_api_request(request: Request, db: Session, duration: float, status
             user_agent=request.headers.get("User-Agent"),
             ip_address=request.client.host if request.client else None
         )
+        db.add(request_record)
         db.commit()
     except Exception as e:
         logger.error(f"Failed to log API request: {str(e)}")
