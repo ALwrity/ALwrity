@@ -1,0 +1,70 @@
+{
+  "object": "PostList",
+  "items": [
+    {
+      "provider": "LINKEDIN",
+      "id": "post_short_001",
+      "social_id": "urn:li:activity:7000000000000000001",
+      "share_url": "https://www.linkedin.com/feed/update/urn:li:activity:7000000000000000001",
+      "title": "",
+      "text": "Excited to share our latest product launch!\n\n#innovation #saas",
+      "parsed_datetime": "2025-11-15T10:30:00.000Z",
+      "reaction_counter": 42,
+      "comment_counter": 7,
+      "repost_counter": 3,
+      "impressions_counter": 1200,
+      "is_repost": false,
+      "author": {
+        "public_identifier": "jane-doe",
+        "id": "ACoAABCD1234",
+        "name": "Jane Doe",
+        "is_company": false
+      }
+    },
+    {
+      "provider": "LINKEDIN",
+      "id": "post_article_002",
+      "social_id": "urn:li:activity:7000000000000000002",
+      "share_url": "https://www.linkedin.com/pulse/how-we-scaled-apis-jane-doe",
+      "title": "",
+      "text": "A deep dive into scaling APIs for millions of users.",
+      "parsed_datetime": "2025-10-01T08:00:00.000Z",
+      "reaction_counter": 128,
+      "comment_counter": 19,
+      "repost_counter": 12,
+      "impressions_counter": 5400,
+      "is_repost": false,
+      "article": {
+        "title": "How We Scaled APIs",
+        "subtitle": "Lessons from 8 years of backend engineering",
+        "cover_url": "https://media.licdn.com/example/cover.jpg"
+      },
+      "author": {
+        "public_identifier": "jane-doe",
+        "id": "ACoAABCD1234",
+        "name": "Jane Doe",
+        "is_company": false
+      }
+    },
+    {
+      "provider": "LINKEDIN",
+      "id": "post_repost_003",
+      "social_id": "urn:li:activity:7000000000000000003",
+      "share_url": "https://www.linkedin.com/feed/update/urn:li:activity:7000000000000000003",
+      "text": "",
+      "parsed_datetime": "2025-09-20T14:00:00.000Z",
+      "reaction_counter": 5,
+      "comment_counter": 0,
+      "repost_counter": 0,
+      "impressions_counter": 200,
+      "is_repost": true,
+      "author": {
+        "public_identifier": "jane-doe",
+        "id": "ACoAABCD1234",
+        "name": "Jane Doe",
+        "is_company": false
+      }
+    }
+  ],
+  "cursor": "next_page_cursor_abc"
+}

@@ -250,6 +250,9 @@ gsc_credentials.json
 !backend/tests/
 !backend/tests/**
 !backend/tests/**/test_*.py
+# Re-ignore bytecode caches un-negated by the rules above
+backend/tests/**/__pycache__/
+backend/tests/**/*.pyc
 
 # Documentation build
 docs/_build/
