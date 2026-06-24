@@ -1,20 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
-  Checkbox,
-  FormControlLabel,
-  TextField,
-  Tooltip,
-  Typography,
   Chip,
+  CircularProgress,
+  Typography,
 } from '@mui/material';
 import { LinkedIn as LinkedInIcon } from '@mui/icons-material';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import {
-  applyLinkInFirstComment,
-  buildPublishPayload,
-} from '../utils/firstCommentUtils';
+  getLinkedInSocialErrorMessage,
+  publishLinkedInPost,
+} from '../../../api/linkedinSocial';
 
 interface PublishLinkedInPanelProps {
   draft: string;
@@ -26,31 +24,42 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft }) =>
     provider,
     selectedAccountId,
     selectedTarget,
-    selectedOrgId,
     isLoading,
   } = useLinkedInSocialConnection();
 
-  const [firstComment, setFirstComment] = useState('');
-  const [moveLinksEnabled, setMoveLinksEnabled] = useState(true);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!moveLinksEnabled) return;
-    setFirstComment((prev) => {
-      if (prev.trim()) return prev;
-      const applied = applyLinkInFirstComment(draft, '', true);
-      return applied.firstComment;
-    });
-  }, [draft, moveLinksEnabled]);
+  const trimmedDraft = draft.trim();
+  const isOrgTarget = selectedTarget === 'organization';
+  const canPublish =
+    connected && !!trimmedDraft && !isOrgTarget && !isPublishing && !isLoading;
 
-  const previewPayload = useMemo(
-    () => buildPublishPayload(draft, firstComment, moveLinksEnabled),
-    [draft, firstComment, moveLinksEnabled]
-  );
-
-  const canPublish = connected && !!previewPayload.content.trim();
   const connectionLabel = connected
     ? `Connected via ${provider}`
     : 'Not connected — connect LinkedIn to publish';
+
+  const handlePublish = async () => {
+    if (!canPublish) return;
+
+    setIsPublishing(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const result = await publishLinkedInPost({
+        content: trimmedDraft,
+        account_id: selectedAccountId || undefined,
+      });
+      setSuccessMessage(result.message || 'Published to LinkedIn.');
+    } catch (err) {
+      console.error('[LinkedInPublish] publish failed:', err);
+      setErrorMessage(getLinkedInSocialErrorMessage(err));
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   return (
     <Box
@@ -82,49 +91,42 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft }) =>
           <>
             {' '}
             · Post as {selectedTarget === 'organization' ? 'company page' : 'profile'}
-            {selectedTarget === 'organization' && selectedOrgId ? ` (${selectedOrgId})` : ''}
           </>
         )}
       </Typography>
 
-      <FormControlLabel
-        control={
-          <Checkbox
-            size="small"
-            checked={moveLinksEnabled}
-            onChange={(e) => setMoveLinksEnabled(e.target.checked)}
-          />
-        }
-        label={
-          <Typography variant="body2" sx={{ color: '#334155' }}>
-            Move links from post to first comment (recommended for reach)
-          </Typography>
-        }
-        sx={{ mb: 1 }}
-      />
+      <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1.5 }}>
+        Publishes your full draft text to your LinkedIn personal profile. First comment and
+        media support coming soon.
+      </Typography>
 
-      <TextField
-        fullWidth
-        size="small"
-        label="Link to include in first comment"
-        placeholder="https://example.com/your-article"
-        value={firstComment}
-        onChange={(e) => setFirstComment(e.target.value)}
-        helperText="Zernio posts links in the first comment to avoid LinkedIn reach penalties on link posts."
-        sx={{ mb: 1.5, bgcolor: '#fff' }}
-      />
+      {isOrgTarget && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          Switch to personal profile to publish. Company page posting is not available yet.
+        </Alert>
+      )}
 
-      <Tooltip title="Publishing ships in Phase 2 — payload is prepared with first_comment">
-        <span>
-          <Button
-            variant="contained"
-            disabled={!canPublish}
-            sx={{ bgcolor: '#0A66C2', '&:hover': { bgcolor: '#004182' } }}
-          >
-            Publish to LinkedIn
-          </Button>
-        </span>
-      </Tooltip>
+      {successMessage && (
+        <Alert severity="success" sx={{ mb: 1.5 }}>
+          {successMessage}
+        </Alert>
+      )}
+
+      {errorMessage && (
+        <Alert severity="error" sx={{ mb: 1.5 }}>
+          {errorMessage}
+        </Alert>
+      )}
+
+      <Button
+        variant="contained"
+        disabled={!canPublish}
+        onClick={handlePublish}
+        startIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : undefined}
+        sx={{ bgcolor: '#0A66C2', '&:hover': { bgcolor: '#004182' } }}
+      >
+        {isPublishing ? 'Publishing...' : 'Publish to LinkedIn'}
+      </Button>
     </Box>
   );
 };

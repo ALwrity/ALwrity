@@ -36,10 +36,18 @@ class VideoScriptGenerator:
             # Step 3: Add citations if requested
             citations = []
             source_list = None
-            if request.include_citations and research_sources and self.citation_manager:
-                all_content = f"{content_result['hook']} {' '.join([scene['content'] for scene in content_result['main_content']])} {content_result['conclusion']}"
-                citations = self.citation_manager.extract_citations(all_content)
-                source_list = self.citation_manager.generate_source_list(research_sources)
+            if request.include_citations and research_sources:
+                # Prefer structured citations from LLM json_struct output
+                if content_result.get('citations'):
+                    citations = content_result['citations']
+                    logger.info(f"Using {len(citations)} structured citations from LLM output for video script")
+                elif self.citation_manager:
+                    # Extract citations from all content (backward compat for non-structured mode)
+                    all_content = f"{content_result['hook']} {' '.join([scene['content'] for scene in content_result['main_content']])} {content_result['conclusion']}"
+                    citations = self.citation_manager.extract_citations(all_content)
+                
+                if self.citation_manager:
+                    source_list = self.citation_manager.generate_source_list(research_sources)
             
             # Step 4: Analyze content quality
             quality_metrics = None

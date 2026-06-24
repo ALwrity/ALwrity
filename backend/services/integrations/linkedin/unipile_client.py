@@ -44,6 +44,14 @@ def _auth_headers(api_key: str) -> dict[str, str]:
     }
 
 
+def _post_auth_headers(api_key: str) -> dict[str, str]:
+    """Headers for multipart POST endpoints (Content-Type set by httpx)."""
+    return {
+        "X-API-KEY": api_key,
+        "Accept": "application/json",
+    }
+
+
 def _raise_for_error(response: httpx.Response) -> None:
     """Raise UnipileAPIError for non-success status codes."""
     if response.status_code < 400:
@@ -451,6 +459,53 @@ class UnipileClient:
         except Exception as e:
             logger.error(f"[UnipileClient] Error deleting account {account_id}: {e}")
             return False
+
+    async def create_post(self, account_id: str, text: str) -> dict[str, Any]:
+        """
+        Publish a text-only LinkedIn post via Unipile.
+
+        Args:
+            account_id: Unipile account ID for the connected LinkedIn profile
+            text: Post body text
+
+        Returns:
+            Raw Unipile post response (includes id, social_id, share_url)
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        url = self._get_full_url("/api/v1/posts")
+        # Unipile POST /api/v1/posts requires multipart/form-data (not JSON).
+        # Send only account_id + text — omit attachments / video_thumbnail entirely.
+        form_fields = {
+            "account_id": (None, account_id),
+            "text": (None, text),
+        }
+
+        logger.info(
+            f"[UnipileClient] create_post account_id={account_id} text_len={len(text)}"
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(
+                url,
+                files=form_fields,
+                headers=_post_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        post_id = data.get("id") if isinstance(data, dict) else None
+        social_id = data.get("social_id") if isinstance(data, dict) else None
+        logger.info(
+            f"[UnipileClient] create_post success account_id={account_id} "
+            f"status={response.status_code} post_id={post_id} social_id={social_id}"
+        )
+        return data
 
     async def reconnect_account(
         self,

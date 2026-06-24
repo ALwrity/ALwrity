@@ -277,6 +277,113 @@ class Citation(BaseModel):
     source_index: Optional[int] = Field(None, description="Index of source in research_sources")
 
 
+# Structured output schema for LLM post generation
+class LinkedInPostOutput(BaseModel):
+    """Structured JSON schema enforced on the LLM for grounded LinkedIn post generation."""
+    content: str = Field(..., description="The full post text with [Source N] markers immediately after claims backed by research")
+    hashtags: List[str] = Field(default_factory=list, description="3-5 relevant LinkedIn hashtags extracted from the content")
+    call_to_action: Optional[str] = Field(None, description="The call-to-action sentence from the post, if present")
+    cited_source_indices: List[int] = Field(default_factory=list, description="1-based indices into the research sources array for every [Source N] marker used in content")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "content": "AI adoption surged 40% in enterprises this year [Source 1]. Leaders who invest now gain a competitive edge [Source 2].\n\nWhat's your take? #AI #TechTrends",
+                "hashtags": ["#AI", "#DigitalTransformation", "#TechTrends"],
+                "call_to_action": "What's your take on AI adoption in your industry? Share below!",
+                "cited_source_indices": [1, 2]
+            }
+        }
+
+
+# Structured output schema for LLM article generation
+class LinkedInArticleOutput(BaseModel):
+    """Structured JSON schema enforced on the LLM for grounded LinkedIn article generation."""
+    title: str = Field(..., description="Compelling article headline with [Source N] markers where backed by research")
+    content: str = Field(..., description="Full article body with [Source N] markers immediately after claims backed by research")
+    sections: List[Dict[str, str]] = Field(default_factory=list, description="List of sections each with heading and body")
+    seo_metadata: Optional[Dict[str, Any]] = Field(None, description="SEO keywords and meta description")
+    reading_time: Optional[int] = Field(None, description="Estimated reading time in minutes")
+    cited_source_indices: List[int] = Field(default_factory=list, description="1-based indices into the research sources array for every [Source N] marker used in content")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "The Future of AI in Enterprise: Key Trends for 2026",
+                "content": "Artificial intelligence continues to reshape enterprise operations [Source 1]...",
+                "sections": [{"heading": "Current Landscape", "body": "Enterprises are adopting AI at an unprecedented rate..."}],
+                "seo_metadata": {"keywords": ["AI", "enterprise", "digital transformation"]},
+                "reading_time": 5,
+                "cited_source_indices": [1, 3]
+            }
+        }
+
+
+# Structured output schema for LLM carousel generation
+class CarouselSlideOutput(BaseModel):
+    """A single slide within a LinkedIn carousel."""
+    slide_number: int = Field(..., description="Slide position (1-based)")
+    title: str = Field(..., description="Slide headline")
+    content: str = Field(..., description="Slide body text with [Source N] markers where backed by research")
+    visual_elements: List[str] = Field(default_factory=list, description="Suggested visual elements for this slide")
+    design_notes: Optional[str] = Field(None, description="Design guidance for this slide")
+
+
+class LinkedInCarouselOutput(BaseModel):
+    """Structured JSON schema enforced on the LLM for grounded LinkedIn carousel generation."""
+    title: str = Field(..., description="Carousel overarching title")
+    slides: List[CarouselSlideOutput] = Field(..., description="All content slides")
+    cover_slide: Optional[CarouselSlideOutput] = Field(None, description="Optional cover/intro slide")
+    cta_slide: Optional[CarouselSlideOutput] = Field(None, description="Optional call-to-action closing slide")
+    design_guidelines: Dict[str, str] = Field(default_factory=dict, description="Visual design guidance")
+    cited_source_indices: List[int] = Field(default_factory=list, description="1-based indices into the research sources array for every [Source N] marker used in any slide")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "5 AI Trends Transforming Enterprise",
+                "slides": [
+                    {"slide_number": 1, "title": "AI Adoption Surge", "content": "Enterprise AI adoption grew 40% in 2025 [Source 1]", "visual_elements": ["bar chart"], "design_notes": "Use blue gradient"}
+                ],
+                "cited_source_indices": [1]
+            }
+        }
+
+
+class SceneOutput(BaseModel):
+    """A single scene within a video script."""
+    scene_number: int = Field(..., description="Scene order (1-based)")
+    content: str = Field(..., description="Scene narration/script text with [Source N] markers where backed by research")
+    duration: Optional[str] = Field(None, description="Estimated duration of this scene")
+    visual_notes: Optional[str] = Field(None, description="Visual guidance for this scene")
+
+
+# Structured output schema for LLM video script generation
+class LinkedInVideoScriptOutput(BaseModel):
+    """Structured JSON schema enforced on the LLM for grounded LinkedIn video script generation."""
+    hook: str = Field(..., description="Opening hook (first 3 seconds) with [Source N] markers where backed by research")
+    main_content: List[SceneOutput] = Field(..., description="Main content scenes")
+    conclusion: str = Field(..., description="Closing remarks and call-to-action")
+    captions: Optional[List[str]] = Field(None, description="Optimized caption text for each scene")
+    thumbnail_suggestions: List[str] = Field(default_factory=list, description="Suggested thumbnail ideas")
+    video_description: str = Field(..., description="Post/video description with hashtags")
+    cited_source_indices: List[int] = Field(default_factory=list, description="1-based indices into the research sources array for every [Source N] marker used in any scene")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "hook": "Did you know AI adoption in enterprises surged 40% last year? [Source 1]",
+                "main_content": [
+                    {"scene_number": 1, "content": "Let's break down what this means for your business...", "duration": "15s", "visual_notes": "Talking head with data overlay"}
+                ],
+                "conclusion": "Follow for more AI insights!",
+                "thumbnail_suggestions": ["AI stats overlay on speaker"],
+                "video_description": "AI is transforming enterprise. #AI #TechTrends",
+                "cited_source_indices": [1]
+            }
+        }
+
+
 # Enhanced Post Content Model
 class PostContent(BaseModel):
     """Enhanced model for generated post content with grounding capabilities."""

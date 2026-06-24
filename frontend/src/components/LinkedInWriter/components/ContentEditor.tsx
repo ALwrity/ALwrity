@@ -7,6 +7,7 @@ import {
   ContentPreviewHeaderWithModals,
   ContentDisplayArea
 } from '../../TextEditor';
+import { GroundingDataDisplay } from './GroundingDataDisplay';
 import { readPrefs } from '../utils/linkedInWriterUtils';
 import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
 import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
@@ -429,6 +430,14 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               onTriggerSuggestion={triggerSuggestion}
               onContinueWriting={() => handleManualContinue(draft)}
               onInsertWithPreview={handleInsertAtCaret}
+            />
+
+            {/* Research Sources & Citations Section */}
+            <GroundingDataDisplay
+              researchSources={researchSources || []}
+              citations={citations || []}
+              qualityMetrics={qualityMetrics}
+              groundingEnabled={groundingEnabled || false}
             />
           </div>
         )}

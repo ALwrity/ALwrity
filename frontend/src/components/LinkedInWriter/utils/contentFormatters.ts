@@ -5,52 +5,60 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Build an inline citation badge element
+function citationBadge(num: string): string {
+  return `<span class="liw-cite" data-source-index="${num}">${num}</span>`;
+}
+
 // Format draft content with proper LinkedIn styling and inline citations
 export function formatDraftContent(content: string, citations?: any[], researchSources?: any[]): string {
   if (!content) return '';
   
   let formatted = escapeHtml(content);
   
-  // Insert inline citations if available
-  if (citations && citations.length > 0 && researchSources && researchSources.length > 0) {
-
-    // Create a map of citation references to source numbers
+  // Always convert [Source N] markers when present in content (supports persisted drafts)
+  if (/\[Source \d+\]/.test(formatted)) {
+    // Normalize: [Source N] [M] → badge(N) badge(M) (handles adjacent bare [M] shorthand)
+    formatted = formatted.replace(
+      /\[Source\s+(\d+)\]\s*\[(\d+)\]/g,
+      (_, n1, n2) => `${citationBadge(n1)} ${citationBadge(n2)}`
+    );
+    // Convert remaining [Source N] markers to badges
+    formatted = formatted.replace(
+      /\[Source\s+(\d+)\]/g,
+      (_, n) => citationBadge(n)
+    );
+  } else if (citations && citations.length > 0 && researchSources && researchSources.length > 0) {
+    // Fallback: content has no markers — distribute citations across sentences
     const citationMap = new Map();
-    citations.forEach((citation, index) => {
-      if (citation.reference && citation.reference.startsWith('Source ')) {
-        const sourceNum = citation.reference.replace('Source ', '');
-        citationMap.set(citation.reference, sourceNum);
-      }
-    });
-
-    // Since citation references don't exist in the content text,
-    // we need to insert citations strategically throughout the content
-    const citationEntries = Array.from(citationMap.entries());
-    const totalCitations = citationEntries.length;
-    
-    if (totalCitations > 0) {
-      // Split content into sentences for strategic citation placement
-      const sentences = formatted.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      const sentencesWithCitations: string[] = [];
-      
-      citationEntries.forEach(([reference, sourceNum], index) => {
-        // Distribute citations across sentences
-        const targetSentenceIndex = Math.floor((index / totalCitations) * sentences.length);
-        const targetSentence = sentences[targetSentenceIndex] || sentences[sentences.length - 1];
-        
-        // Add citation to the end of the target sentence using a superscript marker
-        const citeHtml = ` <sup class="liw-cite" data-source-index="${sourceNum}">[${sourceNum}]</sup>`;
-        const sentenceWithCitation = targetSentence.trim() + citeHtml;
-        sentencesWithCitations[targetSentenceIndex] = sentenceWithCitation;
-        
+      citations.forEach((citation) => {
+        if (citation.reference && citation.reference.startsWith('Source ')) {
+          const sourceNum = citation.reference.replace('Source ', '');
+          citationMap.set(citation.reference, sourceNum);
+        }
       });
+
+      const citationEntries = Array.from(citationMap.entries());
+      const totalCitations = citationEntries.length;
       
-      // Reconstruct content with citations
-      formatted = sentences.map((sentence, index) => {
-        return sentencesWithCitations[index] || sentence;
-      }).join('. ') + '.';
+      if (totalCitations > 0) {
+        const sentences = formatted.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const sentencesWithCitations: string[] = [];
+        
+        citationEntries.forEach(([reference, sourceNum], index) => {
+          const targetSentenceIndex = Math.floor((index / totalCitations) * sentences.length);
+          const targetSentence = sentences[targetSentenceIndex] || sentences[sentences.length - 1];
+          
+          const citeHtml = ` ${citationBadge(sourceNum)}`;
+          const sentenceWithCitation = targetSentence.trim() + citeHtml;
+          sentencesWithCitations[targetSentenceIndex] = sentenceWithCitation;
+        });
+        
+        formatted = sentences.map((sentence, index) => {
+          return sentencesWithCitations[index] || sentence;
+        }).join('. ') + '.';
+      }
     }
-  }
   
   // Format hashtags
   formatted = formatted.replace(/#(\w+)/g, '<span style="color: #0a66c2; font-weight: 600;">#$1</span>');

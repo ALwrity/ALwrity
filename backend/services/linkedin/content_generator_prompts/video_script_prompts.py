@@ -39,7 +39,7 @@ class VideoScriptPromptBuilder:
         - Conclusion (Last 5 seconds): Clear call-to-action and engagement prompt
 
         CONTENT REQUIREMENTS:
-        - Start with a surprising statistic, question, or bold statement
+        - Start with a compelling statistic from the research sources, a provocative question, or bold statement
         - Include specific examples and case studies from the industry
         - Use conversational, engaging language that feels natural when spoken
         - Include 2-3 actionable takeaways viewers can implement immediately
@@ -69,6 +69,14 @@ class VideoScriptPromptBuilder:
         - End with clear next steps and hashtag suggestions
 
         KEY INSIGHTS TO COVER: {', '.join(request.key_points) if request.key_points else 'Industry trends, challenges, solutions, and opportunities'}
+
+        CITATION FORMAT:
+        - When you reference a specific data point, statistic, or claim from the research sources above, add [Source N] immediately after the claim, where N is the source number from the RESEARCH CONTEXT.
+        - Example: "Did you know enterprise AI adoption grew 40% last year? [Source 1]"
+        - Only cite sources for factual claims, statistics, data points, and specific findings — not for general industry knowledge.
+        - If you do not cite any sources, return an empty list for cited_source_indices.
+
+        ANTI-HALLUCINATION: Only make claims, statistics, and data points that are directly supported by the RESEARCH CONTEXT section above. Do not invent or fabricate statistics, dates, percentages, or specific findings. If the research does not contain a relevant data point, make a general observation instead of inventing a number.
 
         REMEMBER: This video should provide immediate value while building the creator's authority. Every second should count toward engagement and viewer retention.
         """

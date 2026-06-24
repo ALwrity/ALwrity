@@ -68,7 +68,7 @@ class PostPromptBuilder:
         - Use professional yet conversational language that encourages discussion
 
         ENGAGEMENT STRATEGY:
-        - Include 3-5 highly relevant, trending hashtags (mix of broad and niche)
+        - Include 3-5 highly relevant, industry-specific hashtags (mix of broad and niche)
         - Use line breaks and emojis strategically for readability
         - Encourage comments by asking for opinions or experiences
         - Make it shareable by providing genuine value
@@ -80,6 +80,14 @@ class PostPromptBuilder:
         - Include relevant emojis to enhance visual appeal
         - Break text into digestible paragraphs (2-3 lines max)
         - Leave space for engagement (don't fill the entire character limit)
+
+        CITATION FORMAT:
+        - When you reference a specific data point, statistic, or claim from the research sources above, add [Source N] immediately after the claim, where N is the source number from the RESEARCH CONTEXT.
+        - Example: "According to Gartner [Source 1], AI adoption has increased by 40% year-over-year."
+        - Only cite sources for factual claims, statistics, data points, and specific findings — not for general industry knowledge.
+        - If you do not cite any sources, return an empty list for cited_source_indices.
+
+        ANTI-HALLUCINATION: Only make claims, statistics, and data points that are directly supported by the RESEARCH CONTEXT section above. Do not invent or fabricate statistics, dates, percentages, or specific findings. If the research does not contain a relevant data point, make a general observation instead of inventing a number.
 
         REMEMBER: This post should position the author as a knowledgeable industry expert while being genuinely helpful to the audience.
         """
