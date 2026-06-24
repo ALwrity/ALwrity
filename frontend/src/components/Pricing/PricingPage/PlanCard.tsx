@@ -1,8 +1,11 @@
+/**
+ * DEPRECATED — /pricing uses PricingComparisonGrid only (Jun 26, 2026).
+ * Do not re-enable without syncing limits and copy with pricingGridConfig.ts + API.
+ */
 import React from 'react';
 import {
   Box,
   Card,
-  CardActions,
   CardContent,
   Chip,
   Typography,
@@ -37,6 +40,7 @@ import ImageIcon from '@mui/icons-material/Image';
 import VideoIcon from '@mui/icons-material/VideoLibrary';
 import AudioIcon from '@mui/icons-material/Audiotrack';
 import { useTheme } from '@mui/material/styles';
+import { getPlanPriceDisplay } from '../planPricingDisplay';
 
 interface SubscriptionPlan {
   id: number;
@@ -71,22 +75,27 @@ interface PlanCardProps {
   yearlyBilling: boolean;
   selectedPlanId: number | null;
   subscribing: boolean;
-  canSelectPlan: boolean;
-  unavailableLabel?: string;
-  onSelectPlan: (planId: number) => void;
-  onSubscribe: (planId: number) => void;
+  isSelfServe: boolean;
+  onPlanCtaClick: (planId: number) => void;
   openKnowMoreModal: (title: string, content: React.ReactNode) => void;
 }
+
+const getCtaLabel = (tier: string, isSelfServe: boolean): string => {
+  if (!isSelfServe) {
+    return tier === 'enterprise' ? 'Contact for Enterprise' : 'Contact for Pro';
+  }
+  if (tier === 'free') return 'Start for Free';
+  if (tier === 'basic') return 'Subscribe to Basic';
+  return `Subscribe to ${tier}`;
+};
 
 const PlanCard: React.FC<PlanCardProps> = ({
   plan,
   yearlyBilling,
   selectedPlanId,
   subscribing,
-  canSelectPlan,
-  unavailableLabel,
-  onSelectPlan,
-  onSubscribe,
+  isSelfServe,
+  onPlanCtaClick,
   openKnowMoreModal,
 }) => {
   const theme = useTheme();
@@ -122,6 +131,7 @@ const PlanCard: React.FC<PlanCardProps> = ({
   };
 
   const isSelected = selectedPlanId === plan.id;
+  const priceDisplay = getPlanPriceDisplay(plan, yearlyBilling);
 
   return (
     <Card
@@ -130,14 +140,19 @@ const PlanCard: React.FC<PlanCardProps> = ({
         display: 'flex',
         flexDirection: 'column',
         position: 'relative',
-        border: isSelected ? `2px solid ${theme.palette.primary.main}` : '1px solid #e0e0e0',
+        bgcolor: '#FFFFFF',
+        color: '#1a1a2e',
+        border: isSelected ? '2px solid #6366f1' : '1px solid #E5E7EB',
+        boxShadow: isSelected
+          ? '0 8px 32px rgba(99, 102, 241, 0.18)'
+          : '0 2px 12px rgba(0, 0, 0, 0.06)',
         transform: isSelected ? 'scale(1.02)' : 'scale(1)',
         transition: 'all 0.3s ease-in-out',
       }}
     >
       {plan.tier === 'pro' && (
         <Chip
-          label="Most Popular"
+          label="Popular"
           color="primary"
           size="small"
           sx={{
@@ -149,32 +164,72 @@ const PlanCard: React.FC<PlanCardProps> = ({
         />
       )}
 
-      <CardContent sx={{ flexGrow: 1, textAlign: 'center' }}>
-        <Box sx={{ mb: 2 }}>{getPlanIcon(plan.tier)}</Box>
+      <CardContent sx={{ flexGrow: 1, textAlign: 'center', pt: 3 }}>
+        {/* Row 1: Icon + Plan name */}
+        <Box sx={{ mb: 1.5, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ fontSize: 32 }}>{getPlanIcon(plan.tier)}</Box>
+          <Typography variant="h5" component="h2" fontWeight={700} sx={{ color: '#1a1a2e' }}>
+            {plan.name}
+          </Typography>
+        </Box>
 
-        <Typography variant="h5" component="h2" gutterBottom>
-          {plan.name}
-        </Typography>
-
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+        {/* Row 2: Short description */}
+        <Typography
+          variant="body2"
+          sx={{ mb: 2, color: '#64748b', fontSize: '0.85rem', lineHeight: 1.5, minHeight: { md: 72 } }}
+        >
           {plan.description}
         </Typography>
 
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h3" component="span">
-            ${yearlyBilling ? plan.price_yearly : plan.price_monthly}
+        {/* Row 3: Price */}
+        <Box sx={{ mb: 2 }} aria-live="polite">
+          <Typography variant="h3" component="span" fontWeight={800} sx={{ color: '#1a1a2e' }}>
+            ${priceDisplay.amount}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            /{yearlyBilling ? 'year' : 'month'}
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            /{priceDisplay.periodLabel}
           </Typography>
-          {yearlyBilling && (
-            <Typography variant="caption" color="success.main" sx={{ display: 'block' }}>
-              Save ${(plan.price_monthly * 12 - plan.price_yearly).toFixed(0)} yearly
+          {priceDisplay.billingNote && (
+            <Typography variant="caption" sx={{ display: 'block', color: '#64748b', mt: 0.5 }}>
+              {priceDisplay.billingNote}
+            </Typography>
+          )}
+          {priceDisplay.savingsAmount != null && priceDisplay.savingsAmount > 0 && (
+            <Typography variant="caption" sx={{ display: 'block', color: '#059669', mt: 0.25 }}>
+              Save ${priceDisplay.savingsAmount.toFixed(0)} vs paying monthly
             </Typography>
           )}
         </Box>
 
-        <List dense>
+        {/* Row 4: CTA */}
+        <Button
+          variant={isSelfServe ? 'contained' : 'outlined'}
+          color={getPlanColor(plan.tier)}
+          size="large"
+          fullWidth
+          disabled={subscribing}
+          onClick={() => onPlanCtaClick(plan.id)}
+          sx={{
+            mb: 2.5,
+            py: 1.25,
+            fontWeight: 600,
+            ...(isSelfServe
+              ? {}
+              : {
+                  borderColor: '#1a1a2e',
+                  color: '#1a1a2e',
+                  '&:hover': { borderColor: '#6366f1', bgcolor: 'rgba(99,102,241,0.06)' },
+                }),
+          }}
+        >
+          {subscribing && isSelected ? (
+            <CircularProgress size={22} sx={{ color: isSelfServe ? 'white' : '#6366f1' }} />
+          ) : (
+            getCtaLabel(plan.tier, isSelfServe)
+          )}
+        </Button>
+
+        <List dense sx={{ textAlign: 'left' }}>
           {(plan.tier === 'free' || plan.tier === 'basic') && (
             <>
               <Divider sx={{ my: 1 }} />
@@ -364,7 +419,10 @@ const PlanCard: React.FC<PlanCardProps> = ({
             </>
           )}
 
-          {(plan.tier === 'free' || plan.tier === 'pro' || plan.tier === 'enterprise') &&
+          {(plan.tier === 'free' ||
+            plan.tier === 'basic' ||
+            plan.tier === 'pro' ||
+            plan.tier === 'enterprise') &&
             (
               <>
                 <Divider sx={{ my: 1 }} />
@@ -939,41 +997,6 @@ const PlanCard: React.FC<PlanCardProps> = ({
           )}
         </List>
       </CardContent>
-
-      <CardActions sx={{ justifyContent: 'center', pb: 3, flexDirection: 'column', gap: 1 }}>
-        {!canSelectPlan ? (
-          <Button variant="outlined" size="large" fullWidth disabled sx={{ mb: 1 }}>
-            {unavailableLabel || 'Unavailable'}
-          </Button>
-        ) : (
-          <>
-            <Button
-              variant={isSelected ? 'outlined' : 'contained'}
-              color={getPlanColor(plan.tier)}
-              size="large"
-              fullWidth
-              disabled={subscribing}
-              onClick={() => onSelectPlan(plan.id)}
-              sx={{ mb: 1 }}
-            >
-              {isSelected ? 'Selected' : 'Select Plan'}
-            </Button>
-
-            {isSelected && (
-              <Button
-                variant="contained"
-                color="success"
-                size="large"
-                fullWidth
-                disabled={subscribing}
-                onClick={() => onSubscribe(plan.id)}
-              >
-                {subscribing ? <CircularProgress size={20} /> : `Subscribe to ${plan.name}`}
-              </Button>
-            )}
-          </>
-        )}
-      </CardActions>
     </Card>
   );
 };
