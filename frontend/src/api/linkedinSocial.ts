@@ -258,6 +258,20 @@ export interface LinkedInProfileCompleteResponse {
   ai_profile_intelligence_meta?: LinkedInProfileIntelligenceMeta | null;
 }
 
+export interface LinkedInPublishPostRequest {
+  content: string;
+  account_id?: string;
+}
+
+export interface LinkedInPublishPostResponse {
+  success: boolean;
+  post_id?: string | null;
+  post_urn?: string | null;
+  provider: string;
+  message: string;
+  debug_id: string;
+}
+
 const BASE = '/api/linkedin-social';
 
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
@@ -282,6 +296,14 @@ export async function syncLinkedInAccounts(): Promise<{
 
 export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> {
   const response = await apiClient.post(`${BASE}/disconnect`);
+  return response.data;
+}
+
+/** Publish the LinkedIn Writer draft as a text-only post to the personal profile. */
+export async function publishLinkedInPost(
+  payload: LinkedInPublishPostRequest
+): Promise<LinkedInPublishPostResponse> {
+  const response = await apiClient.post(`${BASE}/posts/publish`, payload);
   return response.data;
 }
 

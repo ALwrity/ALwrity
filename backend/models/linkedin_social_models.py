@@ -275,3 +275,21 @@ class LinkedInProfileCompleteResponse(BaseModel):
     profile_completion: ProfileCompletionResponse
     ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
     ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
+
+
+class LinkedInPublishPostRequest(BaseModel):
+    """Request body for POST /api/linkedin-social/posts/publish."""
+
+    content: str
+    account_id: Optional[str] = None
+
+
+class LinkedInPublishPostResponse(BaseModel):
+    """Response for POST /api/linkedin-social/posts/publish."""
+
+    success: bool
+    post_id: Optional[str] = None
+    post_urn: Optional[str] = None
+    provider: str
+    message: str
+    debug_id: str

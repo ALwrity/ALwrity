@@ -44,6 +44,8 @@ from models.linkedin_social_models import (
     ProfileValidationResponse,
     TopicRecommendationResponse,
     TopicRecommendationsMetaResponse,
+    LinkedInPublishPostRequest,
+    LinkedInPublishPostResponse,
 )
 from services.integrations.linkedin.profile_intelligence_llm import ProfileIntelligenceLLMError
 from services.integrations.linkedin.profile_intelligence_service import (
@@ -102,7 +104,8 @@ from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.profile_service import get_or_fetch_profile
 from services.integrations.linkedin.profile_validation_service import get_or_validate_profile_context
 from services.integrations.linkedin.profile_validation_types import ProfileValidationResult
-from services.integrations.linkedin.types import LinkedInNotConnectedError
+from services.integrations.linkedin.types import CreatePostRequest, LinkedInNotConnectedError
+from services.integrations.linkedin.exceptions import LinkedInDuplicateContentError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
 from services.integrations.linkedin_oauth import LinkedInOAuthService
@@ -1862,6 +1865,135 @@ async def disconnect_linkedin(
     except Exception as e:
         logger.exception(f"[LinkedInConnect] disconnect failed user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/posts/publish", response_model=LinkedInPublishPostResponse)
+async def publish_linkedin_post(
+    body: LinkedInPublishPostRequest,
+    current_user: dict = Depends(get_current_user),
+) -> LinkedInPublishPostResponse:
+    """Publish a text-only post to the user's connected LinkedIn personal profile."""
+    user_id = _user_id(current_user)
+    debug_id = uuid.uuid4().hex[:12]
+    content = (body.content or "").strip()
+    provider = get_linkedin_provider()
+
+    logger.info(
+        "[LinkedInPublish] request user_id={} provider={} content_len={} "
+        "account_id_present={} debug_id={}",
+        user_id,
+        provider.provider_name,
+        len(content),
+        bool(body.account_id),
+        debug_id,
+    )
+
+    if not content:
+        logger.warning("[LinkedInPublish] empty content user_id={} debug_id={}", user_id, debug_id)
+        raise HTTPException(status_code=400, detail="Post content cannot be empty")
+
+    try:
+        creds = _oauth_service.resolve_credentials(user_id)
+        account_id = creds.unipile_account_id or creds.primary_account_id
+        if not account_id:
+            raise LinkedInNotConnectedError("No LinkedIn account connected")
+
+        if body.account_id and body.account_id != account_id:
+            raise ValueError(
+                "Account ID does not match your connected LinkedIn personal profile"
+            )
+
+        request = CreatePostRequest(account_id=account_id, content=content)
+        result = await provider.create_post(user_id, request)
+
+        logger.info(
+            "[LinkedInPublish] success user_id={} post_id={} post_urn={} debug_id={}",
+            user_id,
+            result.post_id,
+            result.post_urn,
+            debug_id,
+        )
+
+        return LinkedInPublishPostResponse(
+            success=True,
+            post_id=result.post_id,
+            post_urn=result.post_urn,
+            provider=provider.provider_name,
+            message="Published to LinkedIn.",
+            debug_id=debug_id,
+        )
+
+    except LinkedInNotConnectedError as exc:
+        logger.warning(
+            "[LinkedInPublish] not connected user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except LinkedInDuplicateContentError as exc:
+        logger.warning(
+            "[LinkedInPublish] duplicate content user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        logger.warning(
+            "[LinkedInPublish] validation failed user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except UnipileAPIError as exc:
+        status = exc.status_code or 502
+        if status == 403:
+            http_status = 403
+            message = "Insufficient permissions to publish to LinkedIn."
+        elif status == 401:
+            http_status = 401
+            message = "LinkedIn account disconnected. Please reconnect and try again."
+        elif status == 400:
+            http_status = 400
+            message = "Invalid publish request. Please check your post and try again."
+        elif status >= 500:
+            http_status = 502
+            message = "LinkedIn publishing service is temporarily unavailable."
+        else:
+            http_status = 502
+            message = "Could not publish to LinkedIn. Please try again."
+        logger.error(
+            "[LinkedInPublish] Unipile error user_id={} debug_id={} status={}: {}",
+            user_id,
+            debug_id,
+            status,
+            exc,
+        )
+        raise HTTPException(status_code=http_status, detail=message) from exc
+    except NotImplementedError as exc:
+        logger.error(
+            "[LinkedInPublish] provider not implemented user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=501,
+            detail="LinkedIn publishing is not available for this provider.",
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "[LinkedInPublish] unexpected error user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not publish to LinkedIn. Please try again.",
+        ) from exc
 
 
 @router.get("/accounts", response_model=LinkedInAccountsListResponse)
