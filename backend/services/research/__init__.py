@@ -25,6 +25,7 @@ Last Updated: June 2026
 from .google_search_service import GoogleSearchService
 from .exa_service import ExaService
 from .exa_content_research import ExaContentResearchProvider, get_exa_content_provider
+from .exa_monitors import ExaMonitorClient, get_exa_monitor_client
 from .tavily_service import TavilyService
 
 # Core Research Engine (v2.0)
@@ -48,6 +49,10 @@ __all__ = [
     # Shared content research provider
     "ExaContentResearchProvider",
     "get_exa_content_provider",
+    
+    # Exa Monitors API client (scheduled recurring searches)
+    "ExaMonitorClient",
+    "get_exa_monitor_client",
     
     # Core Research Engine (v2.0)
     "ResearchEngine",

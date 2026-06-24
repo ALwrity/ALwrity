@@ -397,6 +397,11 @@ Always use the most appropriate tool for the user's request.`.trim();
     return [prefsLine, historyLine, currentDraft, guidance, additional].filter(Boolean).join('\n\n');
   }, [draft, userPreferences, corePersona, platformPersona, summarizeHistory]);
 
+  const handleWatchdogGeneratePost = useCallback((topic: string, contextText: string) => {
+    handleContextChange(contextText);
+    setDraft(`📰 ${topic}\n\n`);
+  }, [handleContextChange, setDraft]);
+
   return (
     <div 
       className={`linkedin-writer ${className}`} 
@@ -416,6 +421,7 @@ Always use the most appropriate tool for the user's request.`.trim();
         onPreferencesChange={handlePreferencesChange}
         hasDraft={!!draft}
         onResetDraft={handleClear}
+        onGeneratePost={handleWatchdogGeneratePost}
       />
 
       {/* Lightweight progress tracker under header */}

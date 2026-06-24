@@ -690,6 +690,10 @@ else:
 
 # Include content assets router (always — core utility, not feature-specific)
 from api.content_assets.router import router as content_assets_router
+
+# Include LinkedIn Industry Watchdog router (always — background service)
+from routers.linkedin_watchdog import router as linkedin_watchdog_router
+app.include_router(linkedin_watchdog_router)
 app.include_router(content_assets_router)
 
 # Include Podcast Maker router (only when podcast feature is enabled)
@@ -833,6 +837,13 @@ async def startup_event():
         if not wix_client_id:
             logger.warning("⚠️ WIX_CLIENT_ID not found in environment - Wix OAuth connection will fail")
 
+        # Start watchdog monitor background poller
+        try:
+            from services.linkedin.watchdog_monitor_scheduler import start_watchdog_poller
+            await start_watchdog_poller()
+        except Exception as poller_err:
+            logger.warning(f"[STARTUP] Watchdog monitor poller not started: {poller_err}")
+
         elapsed = time.time() - startup_start
         logger.info(f"ALwrity backend started successfully in {elapsed:.1f}s")
         
@@ -882,6 +893,22 @@ async def shutdown_event():
         
         # Close database connections
         close_database()
+
+        # Stop watchdog monitor poller
+        try:
+            from services.linkedin.watchdog_monitor_scheduler import stop_watchdog_poller
+            await stop_watchdog_poller()
+        except Exception as poller_err:
+            logger.warning(f"[SHUTDOWN] Watchdog monitor poller stop error: {poller_err}")
+
+        # Close Exa Monitor HTTP client
+        try:
+            from services.research.exa_monitors import get_exa_monitor_client
+            client = get_exa_monitor_client()
+            await client.close()
+        except Exception:
+            pass
+
         logger.info("ALwrity backend shutdown successfully")
     except Exception as e:
         logger.error(f"Error during shutdown: {e}")

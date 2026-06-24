@@ -25,3 +25,7 @@ export { default as ImageGenerationTest } from './ImageGenerationTest';
 export { default as BrainstormFlow } from './BrainstormFlow';
 export { useCopilotActions } from './CopilotActions';
 export { QuickCreate } from './QuickCreate';
+export { WatchdogButton } from './WatchdogButton';
+export { WatchdogDashboard } from './WatchdogDashboard';
+export { WatchdogUpdateCard } from './WatchdogUpdateCard';
+export { WatchdogAddForm } from './WatchdogAddForm';

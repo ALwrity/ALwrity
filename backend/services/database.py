@@ -50,6 +50,8 @@ import models.agent_activity_models
 import models.daily_workflow_models
 # Phase 3.4: SIF indexing watermark table (per-user, per-source content-hash ledger)
 import models.sif_indexing_watermark  # noqa: F401
+# Phase 2.1: Industry Watchdog DB persistence
+from models.linkedin_watchdog_db_models import Base as WatchdogBase
 
 from services.workspace_paths import get_workspace_root, get_user_workspace_dir
 
@@ -610,6 +612,7 @@ def init_user_database(user_id: str):
         UserBusinessInfoBase.metadata.create_all(bind=engine)
         ContentAssetBase.metadata.create_all(bind=engine)
         BingAnalyticsBase.metadata.create_all(bind=engine)
+        WatchdogBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)
         _ensure_task_history_unique_index(engine, user_id)
         # Phase 3.4: ensure the SIF indexing watermark table exists.

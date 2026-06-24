@@ -5,6 +5,7 @@ import { PersonaChip } from '../../TextEditor/ContentPreviewHeaderComponents';
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
 import HeaderControls from '../../shared/HeaderControls';
 import BrainstormFlow from './BrainstormFlow';
+import { WatchdogButton } from './WatchdogButton';
 // Temporary fix: use require for image import
 const alwrityLogo = require('../../../assets/images/alwrity_logo.png');
 
@@ -16,6 +17,7 @@ interface HeaderProps {
   onPreferencesChange: (prefs: Partial<LinkedInPreferences>) => void;
   hasDraft: boolean;
   onResetDraft: () => void;
+  onGeneratePost: (topic: string, context: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,7 +27,8 @@ export const Header: React.FC<HeaderProps> = ({
   onPreferencesModalChange,
   onPreferencesChange,
   hasDraft,
-  onResetDraft
+  onResetDraft,
+  onGeneratePost,
 }) => {
   const navigate = useNavigate();
   const [personaOverride, setPersonaOverride] = useState<any>(null);
@@ -144,6 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Control Buttons */}
           <div style={{ display: 'flex', gap: '12px' }}>
+            <WatchdogButton onGeneratePost={onGeneratePost} />
             {/* Preferences Button */}
             <div 
               style={{ 
