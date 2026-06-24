@@ -36,9 +36,16 @@ from models.linkedin_social_models import (
     ProfileCompletionResponse,
     ProfileIntelligenceMetaResponse,
     ProfileAnalysisErrorResponse,
+    ProfileOptimizationBatchActionResponse,
+    ProfileOptimizationCompleteRequest,
+    ProfileOptimizationDebugResponse,
+    ProfileOptimizationMetaResponse,
+    ProfileOptimizationResponse,
     ProfileValidationResponse,
     TopicRecommendationResponse,
     TopicRecommendationsMetaResponse,
+    LinkedInPublishPostRequest,
+    LinkedInPublishPostResponse,
 )
 from services.integrations.linkedin.profile_intelligence_llm import ProfileIntelligenceLLMError
 from services.integrations.linkedin.profile_intelligence_service import (
@@ -49,9 +56,27 @@ from services.integrations.linkedin.profile_intelligence_service import (
 from services.integrations.linkedin.profile_intelligence_validator import (
     ProfileIntelligenceValidationError,
 )
-from services.integrations.linkedin.topic_recommendation_llm import TopicRecommendationLLMError
+from services.integrations.linkedin.profile_optimization_rubric import (
+    ProfileOptimizationRubricError,
+    detect_profile_optimization_gaps,
+)
+from services.integrations.linkedin.profile_optimization_service import (
+    ProfileOptimizationAcquireMeta,
+    ProfileOptimizationBatchNotReadyError,
+    ProfileOptimizationError,
+    ProfileOptimizationItemNotFoundError,
+    ProfileOptimizationLLMError,
+    ProfileOptimizationNotStoredError,
+    advance_profile_optimization_batch,
+    get_next_profile_optimization_batch,
+    get_or_generate_profile_optimization,
+)
+from services.integrations.linkedin.profile_optimization_validator import (
+    ProfileOptimizationValidationError,
+)
 from services.integrations.linkedin.topic_recommendation_service import (
     TopicRecommendationAcquireMeta,
+    TopicRecommendationLLMError,
     TopicRecommendationError,
     get_or_generate_topic_recommendations,
 )
@@ -79,7 +104,8 @@ from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.profile_service import get_or_fetch_profile
 from services.integrations.linkedin.profile_validation_service import get_or_validate_profile_context
 from services.integrations.linkedin.profile_validation_types import ProfileValidationResult
-from services.integrations.linkedin.types import LinkedInNotConnectedError
+from services.integrations.linkedin.types import CreatePostRequest, LinkedInNotConnectedError
+from services.integrations.linkedin.exceptions import LinkedInDuplicateContentError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.zernio_client import ZernioAPIError
 from services.integrations.linkedin_oauth import LinkedInOAuthService
@@ -94,6 +120,10 @@ _RECOMMENDATIONS_USER_ERROR = (
     "We couldn't load content suggestions right now. Please try again."
 )
 
+_PROFILE_OPTIMIZATION_USER_ERROR = (
+    "We couldn't load profile suggestions right now. Please try again."
+)
+
 _ANALYSIS_PHASE_LABELS: Dict[int, str] = {
     1: "Acquire Profile Data",
     2: "Build Profile Context",
@@ -101,6 +131,7 @@ _ANALYSIS_PHASE_LABELS: Dict[int, str] = {
     4: "Profile Completion",
     5: "AI Profile Intelligence",
     6: "Topic Recommendations",
+    7: "Profile Optimization",
 }
 
 _oauth_service = LinkedInOAuthService()
@@ -494,6 +525,51 @@ def _recommendations_meta_to_response(
     )
 
 
+def _build_profile_optimization_debug_response(
+    user_id: str,
+    profile_context: dict[str, Any],
+    profile_validation: ProfileValidationResult,
+) -> ProfileOptimizationDebugResponse:
+    """
+    Run Phase 7 rubric for dev/manual testing (no LLM).
+
+    Returns empty summary when profile context is unavailable.
+    """
+    logger.info(
+        "[ProfileOptimization] debug rubric start user_id={} is_profile_complete={}",
+        user_id,
+        profile_validation.get("is_profile_complete"),
+    )
+    try:
+        gaps = detect_profile_optimization_gaps(profile_context, profile_validation)
+    except ProfileOptimizationRubricError as exc:
+        logger.exception(
+            "[ProfileOptimization] debug rubric failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        return ProfileOptimizationDebugResponse(detected_gaps_count=0, rule_ids=[])
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] debug rubric unexpected error user_id={}: {}",
+            user_id,
+            exc,
+        )
+        return ProfileOptimizationDebugResponse(detected_gaps_count=0, rule_ids=[])
+
+    rule_ids = [gap.rule_id for gap in gaps]
+    logger.info(
+        "[ProfileOptimization] debug rubric complete user_id={} count={} top_rule_ids={}",
+        user_id,
+        len(gaps),
+        rule_ids[:3],
+    )
+    return ProfileOptimizationDebugResponse(
+        detected_gaps_count=len(gaps),
+        rule_ids=rule_ids,
+    )
+
+
 def _load_topic_recommendations_for_response(
     user_id: str,
     ai_profile_intelligence: dict[str, Any],
@@ -652,6 +728,219 @@ def _load_topic_recommendations_for_response(
     return response_items, _recommendations_meta_to_response(meta), None, None
 
 
+def _optimization_dict_to_response(item: dict[str, Any]) -> ProfileOptimizationResponse:
+    """Map a single profile optimization dict to API response model."""
+    return ProfileOptimizationResponse.model_validate(item)
+
+
+def _profile_optimization_meta_to_response(
+    meta: ProfileOptimizationAcquireMeta,
+) -> Optional[ProfileOptimizationMetaResponse]:
+    """Map orchestrator meta to API response when optimization was acquired."""
+    source = meta.get("source")
+    if source not in ("cache", "generated", "no_gaps", "batch_advanced"):
+        return None
+    return ProfileOptimizationMetaResponse(
+        source=source,  # type: ignore[arg-type]
+        profile_optimization_updated_at=meta.get("profile_optimization_updated_at"),
+        active_batch_index=int(meta.get("active_batch_index") or 0),
+        remaining_in_backlog=int(meta.get("remaining_in_backlog") or 0),
+        message=meta.get("message"),
+    )
+
+
+def _batch_action_response_from_items(
+    items: list[dict[str, Any]],
+    meta: ProfileOptimizationAcquireMeta,
+) -> ProfileOptimizationBatchActionResponse:
+    """Build batch action API response from service-layer items and meta."""
+    meta_response = _profile_optimization_meta_to_response(meta)
+    if meta_response is None:
+        raise ValueError("Invalid profile optimization meta from service")
+    response_items = [_optimization_dict_to_response(item) for item in items]
+    remaining = meta_response.remaining_in_backlog
+    show_next_batch_cta = len(response_items) == 0 and remaining > 0
+    return ProfileOptimizationBatchActionResponse(
+        profile_optimization=response_items,
+        profile_optimization_meta=meta_response,
+        show_next_batch_cta=show_next_batch_cta,
+    )
+
+
+def _load_profile_optimization_for_response(
+    user_id: str,
+    profile_context: dict[str, Any],
+    profile_validation: ProfileValidationResult,
+    ai_profile_intelligence: dict[str, Any],
+    repository: ProfileRepository,
+    *,
+    force_regenerate: bool = False,
+) -> tuple[
+    Optional[List[ProfileOptimizationResponse]],
+    Optional[ProfileOptimizationMetaResponse],
+    Optional[str],
+    Optional[ProfileAnalysisErrorResponse],
+]:
+    """
+    Generate or load profile optimization recommendations for API responses.
+
+    Returns user-facing ``profile_optimization_error`` plus structured ``analysis_error``.
+    """
+    if not profile_validation.get("is_profile_complete"):
+        logger.info(
+            "[ProfileOptimization] API skip — profile incomplete user_id={} missing_fields={}",
+            user_id,
+            profile_validation.get("missing_fields"),
+        )
+        return None, None, None, None
+
+    if not isinstance(ai_profile_intelligence, dict) or not ai_profile_intelligence:
+        logger.info(
+            "[ProfileOptimization] API skip — intelligence missing user_id={}",
+            user_id,
+        )
+        return (
+            None,
+            None,
+            None,
+            _make_analysis_error(
+                7,
+                "missing_intelligence",
+                "Complete profile analysis before generating profile suggestions.",
+                user_id=user_id,
+            ),
+        )
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 7 start user_id={} force_regenerate={}",
+        user_id,
+        force_regenerate,
+    )
+    try:
+        recommendations, meta = get_or_generate_profile_optimization(
+            user_id,
+            profile_context,
+            profile_validation,
+            ai_profile_intelligence,
+            repository=repository,
+            force_regenerate=force_regenerate,
+        )
+    except ProfileOptimizationLLMError as exc:
+        error_kind = getattr(exc, "error_kind", "llm_failure")
+        logger.exception(
+            "[ProfileOptimization] LLM failure user_id={} kind={}: {}",
+            user_id,
+            error_kind,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            error_kind,
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+    except ProfileOptimizationValidationError as exc:
+        validation_code = getattr(exc, "validation_code", "validation_failed")
+        logger.exception(
+            "[ProfileOptimization] validation failure user_id={} code={}: {}",
+            user_id,
+            validation_code,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            validation_code,
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+    except (ProfileOptimizationError, ValueError) as exc:
+        logger.exception(
+            "[ProfileOptimization] orchestration failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "orchestration_failed",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] unexpected failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "unexpected_error",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+
+    meta_response = _profile_optimization_meta_to_response(meta)
+    if meta.get("source") == "no_gaps":
+        logger.info(
+            "[LinkedInAnalysis] Phase 7 complete user_id={} source=no_gaps count=0",
+            user_id,
+        )
+        return [], meta_response, None, None
+
+    if recommendations is None:
+        logger.info(
+            "[ProfileOptimization] API load returned None recommendations user_id={}",
+            user_id,
+        )
+        return None, None, None, None
+
+    if not recommendations:
+        logger.warning(
+            "[ProfileOptimization] API load returned empty recommendations user_id={}",
+            user_id,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "empty_response",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+
+    try:
+        response_items = [
+            _optimization_dict_to_response(item) for item in recommendations
+        ]
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] response mapping failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "response_mapping_failed",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 7 complete user_id={} source={} count={}",
+        user_id,
+        meta.get("source"),
+        len(response_items),
+    )
+    return response_items, meta_response, None, None
+
 
 def _build_profile_completion_payload(
     validation: ProfileValidationResult,
@@ -765,6 +1054,22 @@ async def get_linkedin_profile(
         False,
         description="Force regeneration of topic recommendations (Phase 6)",
     ),
+    include_recommendations: bool = Query(
+        False,
+        description="Load topic recommendations from cache or generate on miss (Phase 6)",
+    ),
+    include_profile_optimization: bool = Query(
+        False,
+        description="Load profile optimization recommendations from cache or generate on miss (Phase 7)",
+    ),
+    refresh_profile_optimization: bool = Query(
+        False,
+        description="Force regeneration of profile optimization (Phase 7)",
+    ),
+    debug_profile_optimization_gaps: bool = Query(
+        False,
+        description="Run Phase 7 rubric only and return detected gap summary (dev testing)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInProfileAcquireResponse:
     """
@@ -773,17 +1078,26 @@ async def get_linkedin_profile(
     Phase 1: cache-first normalized profile from ``linkedin_analysis_context``.
     Phase 2: cache-first ``profile_context`` built from the normalized profile.
     Phase 3/4: ``profile_validation`` and completion questions when incomplete.
-    Phase 5: ``ai_profile_intelligence`` when profile is complete.
-    Phase 6: ``recommendations`` when profile is complete and intelligence exists.
+    Phase 5: ``ai_profile_intelligence`` when profile is complete (cache-first).
+    Phase 6: ``recommendations`` only when ``include_recommendations`` or
+    ``refresh_recommendations`` is true.
+    Phase 7: ``profile_optimization`` only when ``include_profile_optimization`` or
+    ``refresh_profile_optimization`` is true.
     """
     user_id = _user_id(current_user)
     logger.info(
         "[LinkedInAnalysis] pipeline start user_id={} refresh={} refresh_intelligence={} "
-        "refresh_recommendations={}",
+        "refresh_recommendations={} include_recommendations={} "
+        "include_profile_optimization={} refresh_profile_optimization={} "
+        "debug_profile_optimization_gaps={}",
         user_id,
         refresh,
         refresh_intelligence,
         refresh_recommendations,
+        include_recommendations,
+        include_profile_optimization,
+        refresh_profile_optimization,
+        debug_profile_optimization_gaps,
     )
 
     last_completed_phase = 0
@@ -880,7 +1194,14 @@ async def get_linkedin_profile(
     recommendations: Optional[List[TopicRecommendationResponse]] = None
     recommendations_meta: Optional[TopicRecommendationsMetaResponse] = None
     recommendations_error: Optional[str] = None
-    if ai_profile_intelligence is not None:
+    profile_optimization: Optional[List[ProfileOptimizationResponse]] = None
+    profile_optimization_meta: Optional[ProfileOptimizationMetaResponse] = None
+    profile_optimization_error: Optional[str] = None
+    should_load_recommendations = refresh_recommendations or include_recommendations
+    should_load_profile_optimization = (
+        refresh_profile_optimization or include_profile_optimization
+    )
+    if ai_profile_intelligence is not None and should_load_recommendations:
         intelligence_dict = ai_profile_intelligence.model_dump()
         (
             recommendations,
@@ -898,9 +1219,46 @@ async def get_linkedin_profile(
             analysis_error = recommendations_analysis_error
         elif recommendations:
             last_completed_phase = 6
+    elif ai_profile_intelligence is not None and not should_load_recommendations:
+        logger.info(
+            "[TopicRecommendation] GET /profile skipping recommendations — not requested "
+            "user_id={} include_recommendations={} refresh_recommendations={}",
+            user_id,
+            include_recommendations,
+            refresh_recommendations,
+        )
     elif profile_validation.get("is_profile_complete") and intelligence_error is None:
         logger.info(
             "[TopicRecommendation] GET /profile skipping recommendations — no intelligence "
+            "user_id={}",
+            user_id,
+        )
+
+    if ai_profile_intelligence is not None and should_load_profile_optimization:
+        intelligence_dict = ai_profile_intelligence.model_dump()
+        (
+            profile_optimization,
+            profile_optimization_meta,
+            profile_optimization_error,
+            optimization_analysis_error,
+        ) = _load_profile_optimization_for_response(
+            user_id,
+            profile_context,
+            profile_validation,
+            intelligence_dict,
+            repository,
+            force_regenerate=refresh_profile_optimization,
+        )
+        if optimization_analysis_error:
+            analysis_error = optimization_analysis_error
+        elif profile_optimization is not None or (
+            profile_optimization_meta is not None
+            and profile_optimization_meta.source == "no_gaps"
+        ):
+            last_completed_phase = 7
+    elif should_load_profile_optimization:
+        logger.info(
+            "[ProfileOptimization] GET /profile skipping optimization — no intelligence "
             "user_id={}",
             user_id,
         )
@@ -909,7 +1267,8 @@ async def get_linkedin_profile(
         "[LinkedInAnalysis] pipeline complete user_id={} last_completed_phase={} "
         "profile_source={} context_source={} is_profile_complete={} "
         "intelligence_source={} recommendations_source={} recommendations_count={} "
-        "recommendations_error={} analysis_error_phase={}",
+        "recommendations_error={} profile_optimization_source={} "
+        "profile_optimization_count={} profile_optimization_error={} analysis_error_phase={}",
         user_id,
         last_completed_phase,
         meta.get("source"),
@@ -923,8 +1282,20 @@ async def get_linkedin_profile(
         recommendations_meta.source if recommendations_meta else None,
         len(recommendations) if recommendations else 0,
         bool(recommendations_error),
+        profile_optimization_meta.source if profile_optimization_meta else None,
+        len(profile_optimization) if profile_optimization else 0,
+        bool(profile_optimization_error),
         analysis_error.failed_phase if analysis_error else None,
     )
+
+    profile_optimization_debug: Optional[ProfileOptimizationDebugResponse] = None
+    if debug_profile_optimization_gaps:
+        profile_optimization_debug = _build_profile_optimization_debug_response(
+            user_id,
+            profile_context,
+            profile_validation,
+        )
+
     return LinkedInProfileAcquireResponse(
         profile=profile,
         meta=LinkedInProfileMetaResponse(
@@ -944,8 +1315,12 @@ async def get_linkedin_profile(
         recommendations=recommendations,
         recommendations_meta=recommendations_meta,
         recommendations_error=recommendations_error,
+        profile_optimization=profile_optimization,
+        profile_optimization_meta=profile_optimization_meta,
+        profile_optimization_error=profile_optimization_error,
         last_completed_phase=last_completed_phase or None,
         analysis_error=analysis_error,
+        profile_optimization_debug=profile_optimization_debug,
     )
 
 
@@ -1021,6 +1396,159 @@ async def complete_linkedin_profile(
         ai_profile_intelligence=ai_profile_intelligence,
         ai_profile_intelligence_meta=ai_profile_intelligence_meta,
     )
+
+
+@router.post(
+    "/profile/optimization/{recommendation_id}/complete",
+    response_model=ProfileOptimizationBatchActionResponse,
+)
+async def complete_profile_optimization_recommendation(
+    recommendation_id: str,
+    body: ProfileOptimizationCompleteRequest,
+    current_user: dict = Depends(get_current_user),
+) -> ProfileOptimizationBatchActionResponse:
+    """
+    Mark an active profile optimization recommendation done or skipped.
+
+    Removes the item from the active batch and persists progress without calling the LLM.
+    """
+    user_id = _user_id(current_user)
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/{}/complete user_id={} status={}",
+        recommendation_id,
+        user_id,
+        body.status,
+    )
+    repository = ProfileRepository(oauth=_oauth_service)
+    try:
+        items, meta = advance_profile_optimization_batch(
+            user_id,
+            recommendation_id,
+            body.status,
+            repository=repository,
+        )
+    except ProfileOptimizationNotStoredError as exc:
+        logger.warning(
+            "[ProfileOptimization] complete not stored user_id={} recommendation_id={}: {}",
+            user_id,
+            recommendation_id,
+            exc,
+        )
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProfileOptimizationItemNotFoundError as exc:
+        logger.warning(
+            "[ProfileOptimization] complete item not found user_id={} recommendation_id={}: {}",
+            user_id,
+            recommendation_id,
+            exc,
+        )
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProfileOptimizationError as exc:
+        logger.exception(
+            "[ProfileOptimization] complete failed user_id={} recommendation_id={}: {}",
+            user_id,
+            recommendation_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to update profile optimization progress.",
+        ) from exc
+
+    try:
+        response = _batch_action_response_from_items(items, meta)
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] complete response mapping failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to format profile optimization response.",
+        ) from exc
+
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/{}/complete success user_id={} "
+        "active_count={} remaining_in_backlog={} show_next_batch_cta={}",
+        recommendation_id,
+        user_id,
+        len(response.profile_optimization),
+        response.profile_optimization_meta.remaining_in_backlog,
+        response.show_next_batch_cta,
+    )
+    return response
+
+
+@router.post(
+    "/profile/optimization/next-batch",
+    response_model=ProfileOptimizationBatchActionResponse,
+)
+async def load_next_profile_optimization_batch(
+    current_user: dict = Depends(get_current_user),
+) -> ProfileOptimizationBatchActionResponse:
+    """
+    Promote the next five recommendations from backlog after the active batch is cleared.
+
+    Does not call the LLM when backlog items remain.
+    """
+    user_id = _user_id(current_user)
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/next-batch user_id={}",
+        user_id,
+    )
+    repository = ProfileRepository(oauth=_oauth_service)
+    try:
+        items, meta = get_next_profile_optimization_batch(
+            user_id,
+            repository=repository,
+        )
+    except ProfileOptimizationNotStoredError as exc:
+        logger.warning(
+            "[ProfileOptimization] next-batch not stored user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ProfileOptimizationBatchNotReadyError as exc:
+        logger.warning(
+            "[ProfileOptimization] next-batch not ready user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except ProfileOptimizationError as exc:
+        logger.exception(
+            "[ProfileOptimization] next-batch failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to load the next profile optimization batch.",
+        ) from exc
+
+    try:
+        response = _batch_action_response_from_items(items, meta)
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] next-batch response mapping failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to format profile optimization response.",
+        ) from exc
+
+    logger.info(
+        "[ProfileOptimization] POST /profile/optimization/next-batch success user_id={} "
+        "active_count={} remaining_in_backlog={}",
+        user_id,
+        len(response.profile_optimization),
+        response.profile_optimization_meta.remaining_in_backlog,
+    )
+    return response
 
 
 @router.get("/connection/status", response_model=LinkedInConnectionStatusResponse)
@@ -1337,6 +1865,135 @@ async def disconnect_linkedin(
     except Exception as e:
         logger.exception(f"[LinkedInConnect] disconnect failed user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@router.post("/posts/publish", response_model=LinkedInPublishPostResponse)
+async def publish_linkedin_post(
+    body: LinkedInPublishPostRequest,
+    current_user: dict = Depends(get_current_user),
+) -> LinkedInPublishPostResponse:
+    """Publish a text-only post to the user's connected LinkedIn personal profile."""
+    user_id = _user_id(current_user)
+    debug_id = uuid.uuid4().hex[:12]
+    content = (body.content or "").strip()
+    provider = get_linkedin_provider()
+
+    logger.info(
+        "[LinkedInPublish] request user_id={} provider={} content_len={} "
+        "account_id_present={} debug_id={}",
+        user_id,
+        provider.provider_name,
+        len(content),
+        bool(body.account_id),
+        debug_id,
+    )
+
+    if not content:
+        logger.warning("[LinkedInPublish] empty content user_id={} debug_id={}", user_id, debug_id)
+        raise HTTPException(status_code=400, detail="Post content cannot be empty")
+
+    try:
+        creds = _oauth_service.resolve_credentials(user_id)
+        account_id = creds.unipile_account_id or creds.primary_account_id
+        if not account_id:
+            raise LinkedInNotConnectedError("No LinkedIn account connected")
+
+        if body.account_id and body.account_id != account_id:
+            raise ValueError(
+                "Account ID does not match your connected LinkedIn personal profile"
+            )
+
+        request = CreatePostRequest(account_id=account_id, content=content)
+        result = await provider.create_post(user_id, request)
+
+        logger.info(
+            "[LinkedInPublish] success user_id={} post_id={} post_urn={} debug_id={}",
+            user_id,
+            result.post_id,
+            result.post_urn,
+            debug_id,
+        )
+
+        return LinkedInPublishPostResponse(
+            success=True,
+            post_id=result.post_id,
+            post_urn=result.post_urn,
+            provider=provider.provider_name,
+            message="Published to LinkedIn.",
+            debug_id=debug_id,
+        )
+
+    except LinkedInNotConnectedError as exc:
+        logger.warning(
+            "[LinkedInPublish] not connected user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except LinkedInDuplicateContentError as exc:
+        logger.warning(
+            "[LinkedInPublish] duplicate content user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        logger.warning(
+            "[LinkedInPublish] validation failed user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except UnipileAPIError as exc:
+        status = exc.status_code or 502
+        if status == 403:
+            http_status = 403
+            message = "Insufficient permissions to publish to LinkedIn."
+        elif status == 401:
+            http_status = 401
+            message = "LinkedIn account disconnected. Please reconnect and try again."
+        elif status == 400:
+            http_status = 400
+            message = "Invalid publish request. Please check your post and try again."
+        elif status >= 500:
+            http_status = 502
+            message = "LinkedIn publishing service is temporarily unavailable."
+        else:
+            http_status = 502
+            message = "Could not publish to LinkedIn. Please try again."
+        logger.error(
+            "[LinkedInPublish] Unipile error user_id={} debug_id={} status={}: {}",
+            user_id,
+            debug_id,
+            status,
+            exc,
+        )
+        raise HTTPException(status_code=http_status, detail=message) from exc
+    except NotImplementedError as exc:
+        logger.error(
+            "[LinkedInPublish] provider not implemented user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=501,
+            detail="LinkedIn publishing is not available for this provider.",
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "[LinkedInPublish] unexpected error user_id={} debug_id={}: {}",
+            user_id,
+            debug_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Could not publish to LinkedIn. Please try again.",
+        ) from exc
 
 
 @router.get("/accounts", response_model=LinkedInAccountsListResponse)

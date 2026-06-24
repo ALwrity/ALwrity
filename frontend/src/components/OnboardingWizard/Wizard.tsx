@@ -707,10 +707,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     } catch (_e) {}
     
     setProgressState(newProgress);
-    
-    if (nextStep === steps.length - 1) {
-      onComplete?.();
-    }
   }, [activeStep, onComplete, introCompleted]);
 
   const handleBack = useCallback(async () => {

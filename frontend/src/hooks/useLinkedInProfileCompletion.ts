@@ -1,7 +1,8 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   completeLinkedInProfile,
+  getLinkedInProfileFoundation,
   getLinkedInSocialErrorMessage,
   logProfileAnalysisError,
   mapProfileHttpErrorToAnalysisError,
@@ -19,17 +20,13 @@ import {
   getBackendCooldownSecondsRemaining,
   isBackendCooldownActive,
 } from '../api/client';
+import type { FoundationStatus } from '../components/LinkedInWriter/components/ProfileOptimization/LinkedInAdvisorActionsBar';
 
 const LOG_PREFIX = '[LinkedInProfileCompletion]';
 const REC_LOG_PREFIX = '[TopicRecommendations]';
 const TOPIC_LOG_PREFIX = '[TopicSuggestion]';
 
-export type TopicAnalysisState =
-  | 'idle'
-  | 'running'
-  | 'needs_completion'
-  | 'complete'
-  | 'error';
+export type TopicAnalysisState = 'idle' | 'running' | 'complete' | 'error';
 
 const sleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
@@ -43,25 +40,46 @@ async function waitForBackendCooldown(): Promise<void> {
   }
 }
 
-function resolveAnalysisState(
-  data: LinkedInProfileAcquireResponse
-): TopicAnalysisState {
-  if (data.analysis_error) {
+function resolveFoundationStatus(
+  data: LinkedInProfileAcquireResponse,
+  hadError: boolean
+): FoundationStatus {
+  if (hadError) {
     return 'error';
   }
   if (!data.profile_validation?.is_profile_complete) {
     return 'needs_completion';
   }
-  if (data.recommendations_error || !data.recommendations?.length) {
-    return 'error';
-  }
-  return 'complete';
+  return 'ready';
 }
 
-function pickDisplayError(
+function resolveTopicState(data: LinkedInProfileAcquireResponse): TopicAnalysisState {
+  if (data.analysis_error?.failed_phase === 6) {
+    return 'error';
+  }
+  if (data.recommendations_error) {
+    return 'error';
+  }
+  if (data.recommendations?.length) {
+    return 'complete';
+  }
+  return 'error';
+}
+
+function pickFoundationError(
   data: LinkedInProfileAcquireResponse
 ): LinkedInProfileAnalysisError | null {
-  if (data.analysis_error) {
+  if (!data.analysis_error) {
+    return null;
+  }
+  if (data.analysis_error.failed_phase <= 5) {
+    return data.analysis_error;
+  }
+  return null;
+}
+
+function pickTopicError(data: LinkedInProfileAcquireResponse): LinkedInProfileAnalysisError | null {
+  if (data.analysis_error && data.analysis_error.failed_phase === 6) {
     return data.analysis_error;
   }
   if (data.recommendations_error) {
@@ -77,10 +95,11 @@ function pickDisplayError(
 }
 
 export function useLinkedInProfileCompletion() {
-  const [analysisState, setAnalysisState] = useState<TopicAnalysisState>('idle');
-  const [analysisError, setAnalysisError] = useState<LinkedInProfileAnalysisError | null>(
+  const [foundationStatus, setFoundationStatus] = useState<FoundationStatus>('loading');
+  const [foundationError, setFoundationError] = useState<LinkedInProfileAnalysisError | null>(
     null
   );
+  const [lastCompletedPhase, setLastCompletedPhase] = useState<number | null>(null);
   const [profileValidation, setProfileValidation] =
     useState<LinkedInProfileValidation | null>(null);
   const [questions, setQuestions] = useState<LinkedInCompletionQuestion[]>([]);
@@ -88,6 +107,9 @@ export function useLinkedInProfileCompletion() {
     useState<LinkedInAIProfileIntelligence | null>(null);
   const [aiProfileIntelligenceMeta, setAiProfileIntelligenceMeta] =
     useState<LinkedInProfileIntelligenceMeta | null>(null);
+
+  const [topicState, setTopicState] = useState<TopicAnalysisState>('idle');
+  const [topicError, setTopicError] = useState<LinkedInProfileAnalysisError | null>(null);
   const [recommendations, setRecommendations] = useState<LinkedInTopicRecommendation[] | null>(
     null
   );
@@ -95,81 +117,125 @@ export function useLinkedInProfileCompletion() {
     useState<LinkedInTopicRecommendationsMeta | null>(null);
   const [recommendationsError, setRecommendationsError] = useState<string | null>(null);
   const [isRecommendationsExpanded, setIsRecommendationsExpanded] = useState(true);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const analysisAttemptRef = useRef(0);
 
-  const collapseRecommendations = useCallback(() => {
-    console.info(`${REC_LOG_PREFIX} user collapsed topic list`);
-    setIsRecommendationsExpanded(false);
-  }, []);
+  const foundationAttemptRef = useRef(0);
+  const topicAttemptRef = useRef(0);
 
-  const expandRecommendations = useCallback(() => {
-    console.info(`${REC_LOG_PREFIX} user expanded topic list`);
-    setIsRecommendationsExpanded(true);
-  }, []);
-
-  const applyProfileResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
+  const applyFoundationResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
     setProfileValidation(data.profile_validation ?? null);
     setQuestions(data.profile_completion?.questions ?? []);
     setAiProfileIntelligence(data.ai_profile_intelligence ?? null);
     setAiProfileIntelligenceMeta(data.ai_profile_intelligence_meta ?? null);
+    setLastCompletedPhase(data.last_completed_phase ?? null);
+
+    const foundationErr = pickFoundationError(data);
+    setFoundationError(foundationErr);
+    if (foundationErr) {
+      logProfileAnalysisError('foundation load returned error', foundationErr);
+    }
+
+    const nextFoundationStatus = resolveFoundationStatus(data, Boolean(foundationErr));
+    setFoundationStatus(nextFoundationStatus);
+
+    console.info(`${LOG_PREFIX} foundation response applied`, {
+      foundationStatus: nextFoundationStatus,
+      lastCompletedPhase: data.last_completed_phase ?? null,
+      isProfileComplete: data.profile_validation?.is_profile_complete ?? false,
+      hasFoundationError: Boolean(foundationErr),
+    });
+  }, []);
+
+  const applyTopicResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
+    setProfileValidation(data.profile_validation ?? null);
+    setAiProfileIntelligence(data.ai_profile_intelligence ?? null);
+    setAiProfileIntelligenceMeta(data.ai_profile_intelligence_meta ?? null);
+    setLastCompletedPhase(data.last_completed_phase ?? null);
     setRecommendations(data.recommendations ?? null);
     setRecommendationsMeta(data.recommendations_meta ?? null);
     setRecommendationsError(data.recommendations_error ?? null);
 
-    const displayError = pickDisplayError(data);
-    setAnalysisError(displayError);
-
+    const displayError = pickTopicError(data);
+    setTopicError(displayError);
     if (displayError) {
-      logProfileAnalysisError('pipeline returned error', displayError);
+      logProfileAnalysisError('topic analysis returned error', displayError);
     }
 
-    const nextState = resolveAnalysisState(data);
-    setAnalysisState(nextState);
-    if (nextState === 'error' || nextState === 'complete') {
+    const nextTopicState = resolveTopicState(data);
+    setTopicState(nextTopicState);
+    if (nextTopicState === 'complete') {
       setIsRecommendationsExpanded(true);
     }
 
-    console.info(`${TOPIC_LOG_PREFIX} pipeline response applied`, {
-      analysisState: nextState,
-      lastCompletedPhase: data.last_completed_phase ?? null,
-      isProfileComplete: data.profile_validation?.is_profile_complete ?? false,
+    console.info(`${TOPIC_LOG_PREFIX} topic response applied`, {
+      topicState: nextTopicState,
       recommendationCount: data.recommendations?.length ?? 0,
-      hasAnalysisError: Boolean(data.analysis_error),
-      hasRecommendationsError: Boolean(data.recommendations_error),
+      hasTopicError: Boolean(displayError),
     });
   }, []);
 
-  const runTopicAnalysis = useCallback(async () => {
-    const attemptId = ++analysisAttemptRef.current;
-    console.info(`${TOPIC_LOG_PREFIX} user triggered analysis`);
-    setAnalysisState('running');
-    setAnalysisError(null);
-    setRecommendationsError(null);
-    setIsRecommendationsExpanded(true);
+  const loadFoundation = useCallback(async () => {
+    const attemptId = ++foundationAttemptRef.current;
+    console.info(`${LOG_PREFIX} foundation load start`);
+    setFoundationStatus('loading');
+    setFoundationError(null);
 
     try {
       await waitForBackendCooldown();
-      const data = await runLinkedInTopicAnalysis();
-      if (analysisAttemptRef.current !== attemptId) {
+      const data = await getLinkedInProfileFoundation();
+      if (foundationAttemptRef.current !== attemptId) {
         return;
       }
-      applyProfileResponse(data);
+      applyFoundationResponse(data);
     } catch (err) {
-      if (analysisAttemptRef.current !== attemptId) {
+      if (foundationAttemptRef.current !== attemptId) {
         return;
       }
       const mapped = mapProfileHttpErrorToAnalysisError(err);
-      logProfileAnalysisError('HTTP request failed', mapped);
-      setAnalysisError(mapped);
-      setAnalysisState('error');
-      setIsRecommendationsExpanded(true);
-      setRecommendations(null);
-      setRecommendationsMeta(null);
-      setRecommendationsError(mapped.user_message);
+      logProfileAnalysisError('foundation HTTP request failed', mapped);
+      setFoundationError(mapped);
+      setFoundationStatus('error');
+      console.error(`${LOG_PREFIX} foundation load failed`, mapped);
     }
-  }, [applyProfileResponse]);
+  }, [applyFoundationResponse]);
+
+  useEffect(() => {
+    void loadFoundation();
+  }, [loadFoundation]);
+
+  const runTopicAnalysis = useCallback(
+    async (forceRegenerate = false) => {
+      const attemptId = ++topicAttemptRef.current;
+      console.info(`${TOPIC_LOG_PREFIX} user triggered topic analysis`, { forceRegenerate });
+      setTopicState('running');
+      setTopicError(null);
+      setRecommendationsError(null);
+      setIsRecommendationsExpanded(true);
+
+      try {
+        await waitForBackendCooldown();
+        const data = await runLinkedInTopicAnalysis({ forceRegenerate });
+        if (topicAttemptRef.current !== attemptId) {
+          return;
+        }
+        applyTopicResponse(data);
+      } catch (err) {
+        if (topicAttemptRef.current !== attemptId) {
+          return;
+        }
+        const mapped = mapProfileHttpErrorToAnalysisError(err);
+        logProfileAnalysisError('topic HTTP request failed', mapped);
+        setTopicError(mapped);
+        setTopicState('error');
+        setRecommendations(null);
+        setRecommendationsMeta(null);
+        setRecommendationsError(mapped.user_message);
+      }
+    },
+    [applyTopicResponse]
+  );
 
   const submitCompletion = useCallback(
     async (answers: Record<string, string | string[]>) => {
@@ -185,15 +251,17 @@ export function useLinkedInProfileCompletion() {
 
         if (result.profile_validation.is_profile_complete) {
           console.info(
-            `${LOG_PREFIX} profile now complete — continuing topic analysis (Phases 5–6)`
+            `${LOG_PREFIX} profile now complete — reloading foundation only (no Phase 6 auto-run)`
           );
-          await runTopicAnalysis();
+          await loadFoundation();
         } else {
-          setAnalysisState('needs_completion');
+          setFoundationStatus('needs_completion');
+          setTopicState('idle');
           setRecommendations(null);
           setRecommendationsMeta(null);
           setRecommendationsError(null);
-          setAnalysisError(null);
+          setTopicError(null);
+          setFoundationError(null);
         }
 
         console.info(`${LOG_PREFIX} submit complete`, {
@@ -208,18 +276,33 @@ export function useLinkedInProfileCompletion() {
         setIsSubmitting(false);
       }
     },
-    [runTopicAnalysis]
+    [loadFoundation]
   );
 
+  const collapseRecommendations = useCallback(() => {
+    console.info(`${REC_LOG_PREFIX} user collapsed topic list`);
+    setIsRecommendationsExpanded(false);
+  }, []);
+
+  const expandRecommendations = useCallback(() => {
+    console.info(`${REC_LOG_PREFIX} user expanded topic list`);
+    setIsRecommendationsExpanded(true);
+  }, []);
+
   const isProfileComplete = profileValidation?.is_profile_complete ?? false;
-  const isAnalyzing = analysisState === 'running';
-  const hasStartedAnalysis = analysisState !== 'idle';
+  const isAnalyzing = topicState === 'running';
+  const hasTopicResults = topicState === 'complete' || topicState === 'error';
 
   return {
-    analysisState,
-    analysisError,
+    foundationStatus,
+    foundationError,
+    lastCompletedPhase,
+    topicState,
+    topicError,
+    analysisState: topicState,
+    analysisError: topicError ?? foundationError,
     isAnalyzing,
-    hasStartedAnalysis,
+    hasTopicResults,
     profileValidation,
     questions,
     aiProfileIntelligence,
@@ -233,6 +316,7 @@ export function useLinkedInProfileCompletion() {
     isProfileComplete,
     isSubmitting,
     submitError,
+    loadFoundation,
     runTopicAnalysis,
     submitCompletion,
   };

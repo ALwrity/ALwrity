@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
   USER_PREFERENCES: 'alwrity-copilot-user-preferences',
   CONVERSATION_CONTEXT: 'alwrity-copilot-conversation-context',
   DRAFT_CONTENT: 'alwrity-copilot-draft-content',
+  GROUNDING_DATA: 'alwrity-copilot-grounding-data',
   LAST_SESSION: 'alwrity-copilot-last-session'
 };
 
@@ -221,6 +222,36 @@ export class CopilotPersistenceManager {
     }
   }
   
+  // Grounding data persistence (research sources, citations, quality metrics)
+  public saveGroundingData(data: { researchSources?: any[]; citations?: any[]; qualityMetrics?: any; groundingEnabled?: boolean; searchQueries?: string[] }): void {
+    try {
+      const existing = this.loadGroundingData();
+      const updated = { ...existing, ...data, lastUpdated: Date.now() };
+      localStorage.setItem(STORAGE_KEYS.GROUNDING_DATA, JSON.stringify(updated));
+    } catch (error) {
+      console.error('Failed to save grounding data:', error);
+    }
+  }
+
+  public loadGroundingData(): { researchSources: any[]; citations: any[]; qualityMetrics: any; groundingEnabled: boolean; searchQueries: string[] } {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.GROUNDING_DATA);
+      if (stored) {
+        const data = JSON.parse(stored);
+        return {
+          researchSources: data.researchSources || [],
+          citations: data.citations || [],
+          qualityMetrics: data.qualityMetrics || null,
+          groundingEnabled: data.groundingEnabled || false,
+          searchQueries: data.searchQueries || []
+        };
+      }
+    } catch (error) {
+      console.error('Failed to load grounding data:', error);
+    }
+    return { researchSources: [], citations: [], qualityMetrics: null, groundingEnabled: false, searchQueries: [] };
+  }
+
   // Session management
   public saveLastSession(): void {
     try {

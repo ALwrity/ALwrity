@@ -13,6 +13,7 @@ import {
 } from '../utils/storageUtils';
 import { getContextAwareSuggestions, mapPostType, mapTone, mapIndustry, mapSearchEngine, readPrefs } from '../utils/linkedInWriterUtils';
 import { linkedInWriterApi, GroundingLevel } from '../../../services/linkedInWriterApi';
+import { CopilotPersistenceManager } from '../utils/enhancedPersistence';
 
 export function useLinkedInWriter() {
   // Core state
@@ -82,26 +83,26 @@ export function useLinkedInWriter() {
   const generatePost = useCallback(async (params?: any) => {
     const prefs = readPrefs();
     window.dispatchEvent(new CustomEvent('linkedinwriter:loadingStart', { 
-      detail: { action: 'generateLinkedInPost', message: 'Generating LinkedIn post...' } 
+      detail: { action: 'generateLinkedInPost', message: 'Researching and writing your LinkedIn post...' } 
     }));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressInit', { detail: {
       steps: [
-        { id: 'personalize', label: 'Personalizing topic & context' },
-        { id: 'prepare_queries', label: 'Preparing research queries' },
-        { id: 'research', label: 'Conducting research & analysis' },
-        { id: 'grounding', label: 'Applying AI grounding' },
-        { id: 'content_generation', label: 'Generating content' },
-        { id: 'citations', label: 'Extracting citations' },
-        { id: 'quality_analysis', label: 'Quality assessment' },
-        { id: 'finalize', label: 'Finalizing & optimizing' }
+        { id: 'personalize', label: 'Analyzing topic & audience' },
+        { id: 'prepare_queries', label: 'Preparing research strategy' },
+        { id: 'research', label: 'Gathering industry insights' },
+        { id: 'grounding', label: 'Grounding in research data' },
+        { id: 'content_generation', label: 'Writing LinkedIn post' },
+        { id: 'citations', label: 'Attaching source citations' },
+        { id: 'quality_analysis', label: 'Running quality checks' },
+        { id: 'finalize', label: 'Final polish' }
       ]
     }}));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { 
-      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry context, and target audience...' } 
+      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry, and target audience — tailoring the content for LinkedIn engagement...' } 
     }));
 
     // Simulate progress advancement during API call
-    const progressStepIds = ['prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
+    const progressStepIds = ['personalize', 'prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
     let stepIndex = 0;
     const progressInterval = setInterval(() => {
       if (stepIndex < progressStepIds.length) {
@@ -151,7 +152,7 @@ export function useLinkedInWriter() {
           searchQueries: res.data?.search_queries || []
         }}));
         window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: fullContent }));
-        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Content finalized' } }));
+        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Post optimized for LinkedIn engagement' } }));
         window.dispatchEvent(new CustomEvent('linkedinwriter:progressComplete'));
         window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
         trackActionUsage('generateLinkedInPost');
@@ -171,25 +172,25 @@ export function useLinkedInWriter() {
   const generateArticle = useCallback(async (params?: any) => {
     const prefs = readPrefs();
     window.dispatchEvent(new CustomEvent('linkedinwriter:loadingStart', {
-      detail: { action: 'generateLinkedInArticle', message: 'Generating LinkedIn article...' }
+      detail: { action: 'generateLinkedInArticle', message: 'Researching and writing your LinkedIn article...' }
     }));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressInit', { detail: {
       steps: [
-        { id: 'personalize', label: 'Personalizing topic & context' },
-        { id: 'prepare_queries', label: 'Preparing research queries' },
-        { id: 'research', label: 'Conducting research & analysis' },
-        { id: 'grounding', label: 'Applying AI grounding' },
-        { id: 'content_generation', label: 'Generating article content' },
-        { id: 'citations', label: 'Extracting citations' },
-        { id: 'quality_analysis', label: 'Quality assessment' },
-        { id: 'finalize', label: 'Finalizing & optimizing' }
+        { id: 'personalize', label: 'Analyzing topic & audience' },
+        { id: 'prepare_queries', label: 'Preparing research strategy' },
+        { id: 'research', label: 'Gathering industry insights' },
+        { id: 'grounding', label: 'Grounding in research data' },
+        { id: 'content_generation', label: 'Writing article content' },
+        { id: 'citations', label: 'Attaching source citations' },
+        { id: 'quality_analysis', label: 'Running quality checks' },
+        { id: 'finalize', label: 'Final polish' }
       ]
     }}));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', {
-      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry context, and target audience...' }
+      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry, and target audience — tailoring the content for LinkedIn engagement...' }
     }));
 
-    const progressStepIds = ['prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
+    const progressStepIds = ['personalize', 'prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
     let stepIndex = 0;
     const progressInterval = setInterval(() => {
       if (stepIndex < progressStepIds.length) {
@@ -232,7 +233,7 @@ export function useLinkedInWriter() {
           searchQueries: res.data?.search_queries || []
         }}));
         window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: content }));
-        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Article finalized' } }));
+        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Article formatted for LinkedIn publishing' } }));
         window.dispatchEvent(new CustomEvent('linkedinwriter:progressComplete'));
         window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
         trackActionUsage('generateLinkedInArticle');
@@ -253,25 +254,25 @@ export function useLinkedInWriter() {
   const generateCarousel = useCallback(async (params?: any) => {
     const prefs = readPrefs();
     window.dispatchEvent(new CustomEvent('linkedinwriter:loadingStart', {
-      detail: { action: 'generateLinkedInCarousel', message: 'Generating LinkedIn carousel...' }
+      detail: { action: 'generateLinkedInCarousel', message: 'Researching and building your LinkedIn carousel...' }
     }));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressInit', { detail: {
       steps: [
-        { id: 'personalize', label: 'Personalizing topic & context' },
-        { id: 'prepare_queries', label: 'Preparing research queries' },
-        { id: 'research', label: 'Conducting research & analysis' },
-        { id: 'grounding', label: 'Applying AI grounding' },
-        { id: 'content_generation', label: 'Generating carousel slides' },
-        { id: 'citations', label: 'Extracting citations' },
-        { id: 'quality_analysis', label: 'Quality assessment' },
-        { id: 'finalize', label: 'Finalizing & optimizing' }
+        { id: 'personalize', label: 'Analyzing topic & audience' },
+        { id: 'prepare_queries', label: 'Preparing research strategy' },
+        { id: 'research', label: 'Gathering industry insights' },
+        { id: 'grounding', label: 'Grounding in research data' },
+        { id: 'content_generation', label: 'Building carousel slides' },
+        { id: 'citations', label: 'Attaching source citations' },
+        { id: 'quality_analysis', label: 'Running quality checks' },
+        { id: 'finalize', label: 'Final polish' }
       ]
     }}));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', {
-      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry context, and target audience...' }
+      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry, and target audience — tailoring the content for LinkedIn engagement...' }
     }));
 
-    const progressStepIds = ['prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
+    const progressStepIds = ['personalize', 'prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
     let stepIndex = 0;
     const progressInterval = setInterval(() => {
       if (stepIndex < progressStepIds.length) {
@@ -307,7 +308,7 @@ export function useLinkedInWriter() {
           content += `## Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
         });
         window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: content }));
-        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Carousel finalized' } }));
+        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Carousel optimized for mobile viewing' } }));
         window.dispatchEvent(new CustomEvent('linkedinwriter:progressComplete'));
         window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
         trackActionUsage('generateLinkedInCarousel');
@@ -328,25 +329,25 @@ export function useLinkedInWriter() {
   const generateVideoScript = useCallback(async (params?: any) => {
     const prefs = readPrefs();
     window.dispatchEvent(new CustomEvent('linkedinwriter:loadingStart', {
-      detail: { action: 'generateLinkedInVideoScript', message: 'Generating LinkedIn video script...' }
+      detail: { action: 'generateLinkedInVideoScript', message: 'Researching and writing your video script...' }
     }));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressInit', { detail: {
       steps: [
-        { id: 'personalize', label: 'Personalizing topic & context' },
-        { id: 'prepare_queries', label: 'Preparing research queries' },
-        { id: 'research', label: 'Conducting research & analysis' },
-        { id: 'grounding', label: 'Applying AI grounding' },
-        { id: 'content_generation', label: 'Generating video script' },
-        { id: 'citations', label: 'Extracting citations' },
-        { id: 'quality_analysis', label: 'Quality assessment' },
-        { id: 'finalize', label: 'Finalizing & optimizing' }
+        { id: 'personalize', label: 'Analyzing topic & audience' },
+        { id: 'prepare_queries', label: 'Preparing research strategy' },
+        { id: 'research', label: 'Gathering industry insights' },
+        { id: 'grounding', label: 'Grounding in research data' },
+        { id: 'content_generation', label: 'Writing video script' },
+        { id: 'citations', label: 'Attaching source citations' },
+        { id: 'quality_analysis', label: 'Running quality checks' },
+        { id: 'finalize', label: 'Final polish' }
       ]
     }}));
     window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', {
-      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry context, and target audience...' }
+      detail: { id: 'personalize', status: 'active', message: 'Analyzing topic, industry, and target audience — tailoring the content for LinkedIn engagement...' }
     }));
 
-    const progressStepIds = ['prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
+    const progressStepIds = ['personalize', 'prepare_queries', 'research', 'grounding', 'content_generation', 'citations', 'quality_analysis'];
     let stepIndex = 0;
     const progressInterval = setInterval(() => {
       if (stepIndex < progressStepIds.length) {
@@ -388,7 +389,7 @@ export function useLinkedInWriter() {
           content += `## Captions\n${res.data.captions.join('\n')}\n\n`;
         }
         window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: content }));
-        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Video script finalized' } }));
+        window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { detail: { id: 'finalize', status: 'completed', message: 'Script ready for production' } }));
         window.dispatchEvent(new CustomEvent('linkedinwriter:progressComplete'));
         window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
         trackActionUsage('generateLinkedInVideoScript');
@@ -406,7 +407,7 @@ export function useLinkedInWriter() {
     }
   }, []);
 
-  // Initialize chat history and preferences from localStorage
+  // Initialize chat history, preferences, and grounding data from localStorage
   useEffect(() => {
     const loadInitialData = () => {
       try {
@@ -419,11 +420,23 @@ export function useLinkedInWriter() {
         if (savedContext && !context) {
           setContext(savedContext);
         }
+
+        // Load persisted grounding data
+        const persistence = CopilotPersistenceManager.getInstance();
+        const groundingData = persistence.loadGroundingData();
+        if (groundingData.researchSources.length > 0) {
+          setResearchSources(groundingData.researchSources);
+          setCitations(groundingData.citations);
+          setQualityMetrics(groundingData.qualityMetrics);
+          setGroundingEnabled(groundingData.groundingEnabled);
+          setSearchQueries(groundingData.searchQueries);
+        }
         
         console.log('[LinkedIn Writer] Initialized with:', {
           historyCount: history.length,
           preferences: prefs,
-          hasContext: !!savedContext
+          hasContext: !!savedContext,
+          hasGroundingData: groundingData.researchSources.length > 0
         });
       } catch (error) {
         console.warn('[LinkedIn Writer] Failed to initialize from localStorage:', error);
@@ -508,17 +521,7 @@ export function useLinkedInWriter() {
   // Listen for grounding data updates from CopilotKit actions
   useEffect(() => {
     const handleGroundingDataUpdate = (event: CustomEvent) => {
-      console.log('[LinkedIn Writer] Received grounding data event:', event.detail);
-      
       const { researchSources, citations, qualityMetrics, groundingEnabled, searchQueries } = event.detail;
-      
-      console.log('[LinkedIn Writer] Extracted data:', {
-        researchSources: researchSources?.length || 0,
-        citations: citations?.length || 0,
-        qualityMetrics: !!qualityMetrics,
-        groundingEnabled,
-        searchQueries: searchQueries?.length || 0
-      });
       
       setResearchSources(researchSources || []);
       setCitations(citations || []);
@@ -526,11 +529,14 @@ export function useLinkedInWriter() {
       setGroundingEnabled(groundingEnabled || false);
       setSearchQueries(searchQueries || []);
       
-      console.log('[LinkedIn Writer] Grounding data updated:', {
-        sourcesCount: researchSources?.length || 0,
-        citationsCount: citations?.length || 0,
-        hasQualityMetrics: !!qualityMetrics,
-        groundingEnabled
+      // Persist grounding data so it survives page refresh
+      const persistence = CopilotPersistenceManager.getInstance();
+      persistence.saveGroundingData({
+        researchSources: researchSources || [],
+        citations: citations || [],
+        qualityMetrics: qualityMetrics || null,
+        groundingEnabled: groundingEnabled || false,
+        searchQueries: searchQueries || []
       });
     };
 

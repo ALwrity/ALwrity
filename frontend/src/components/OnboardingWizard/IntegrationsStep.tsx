@@ -56,6 +56,32 @@ import { usePlatformConnections } from './common/usePlatformConnections';
 import PlatformAnalytics from '../shared/PlatformAnalytics';
 import { cachedAnalyticsAPI } from '../../api/cachedAnalytics';
 
+// Module-scope constants for the guided walkthrough. Lifted out of
+// the component body so they aren't recreated on every render
+// (which would also tear down + re-set the auto-advance interval
+// on every render — see audit Issue #2).
+const WALKTHROUGH_TITLES: readonly string[] = [
+  'Connect your platforms',
+  'We cache your insights',
+  'Agents analyze weekly',
+  'We propose clear fixes',
+  'You review and publish',
+];
+const WALKTHROUGH_DESCRIPTIONS: readonly string[] = [
+  'Link Google Search Console and Bing to unlock search signals for your site.',
+  'We safely store key metrics so recommendations are quick and quota‑friendly.',
+  'SIF agents look for low‑CTR pages, striking‑distance wins, declines, and overlaps.',
+  'You’ll see simple suggestions: better titles/meta, refreshes, and consolidations.',
+  'Pick what you like and publish; we keep the rhythm going week after week.',
+];
+const WALKTHROUGH_LABELS: readonly string[] = [
+  'Step 1 of 5',
+  'Step 2 of 5',
+  'Step 3 of 5',
+  'Step 4 of 5',
+  'Step 5 of 5',
+];
+
 interface IntegrationsStepProps {
   onContinue: () => void;
   updateHeaderContent: (content: { title: string; description: string }) => void;
@@ -469,28 +495,20 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
   }, [availableSites.length, primarySite, onValidationChange]);
 
   const [walkthroughStep, setWalkthroughStep] = useState<number>(0);
-  const walkthroughTitles: string[] = [
-    'Connect your platforms',
-    'We cache your insights',
-    'Agents analyze weekly',
-    'We propose clear fixes',
-    'You review and publish',
-  ];
-  const walkthroughDescriptions: string[] = [
-    'Link Google Search Console and Bing to unlock search signals for your site.',
-    'We safely store key metrics so recommendations are quick and quota‑friendly.',
-    'SIF agents look for low‑CTR pages, striking‑distance wins, declines, and overlaps.',
-    'You’ll see simple suggestions: better titles/meta, refreshes, and consolidations.',
-    'Pick what you like and publish; we keep the rhythm going week after week.',
-  ];
-  const walkthroughLabels: string[] = ['Step 1 of 5', 'Step 2 of 5', 'Step 3 of 5', 'Step 4 of 5', 'Step 5 of 5'];
+  const [walkthroughPaused, setWalkthroughPaused] = useState<boolean>(false);
 
   useEffect(() => {
+    // Set up the walkthrough auto-advance interval once on mount.
+    // The walkthrough arrays are module-scope constants so we don't
+    // need them in the dep array. The interval is paused while the
+    // user is hovering on the card (so reading is not interrupted),
+    // and re-armed when the user moves the pointer away.
+    if (walkthroughPaused) return;
     const id = setInterval(() => {
-      setWalkthroughStep(prev => (prev + 1) % walkthroughTitles.length);
+      setWalkthroughStep((prev) => (prev + 1) % WALKTHROUGH_TITLES.length);
     }, 4500);
     return () => clearInterval(id);
-  }, [walkthroughTitles.length]);
+  }, [walkthroughPaused]);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', p: { xs: 1, sm: 2, md: 3 } }}>
@@ -953,10 +971,14 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
                       sx={{ bgcolor: '#eef2ff', color: '#111827', fontWeight: 700 }}
                     />
                     <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                      {walkthroughLabels[walkthroughStep]}
+                      {WALKTHROUGH_LABELS[walkthroughStep]}
                     </Typography>
                   </Box>
-                  <Box sx={{ position: 'relative', minHeight: 120 }}>
+                  <Box
+                    sx={{ position: 'relative', minHeight: 120 }}
+                    onMouseEnter={() => setWalkthroughPaused(true)}
+                    onMouseLeave={() => setWalkthroughPaused(false)}
+                  >
                     <motion.div
                       key={`walk-${walkthroughStep}`}
                       initial={{ opacity: 0, y: 12 }}
@@ -966,10 +988,10 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
                     >
                       <Paper elevation={0} sx={{ p: 2, borderRadius: 2, border: '1px dashed #cbd5e1', bgcolor: '#f8fafc' }}>
                         <Typography variant="body2" sx={{ color: '#334155', fontWeight: 600, mb: 0.5 }}>
-                          {walkthroughTitles[walkthroughStep]}
+                          {WALKTHROUGH_TITLES[walkthroughStep]}
                         </Typography>
                         <Typography variant="body2" sx={{ color: '#475569' }}>
-                          {walkthroughDescriptions[walkthroughStep]}
+                          {WALKTHROUGH_DESCRIPTIONS[walkthroughStep]}
                         </Typography>
                       </Paper>
                     </motion.div>

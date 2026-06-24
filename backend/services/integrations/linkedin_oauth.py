@@ -18,10 +18,9 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 from urllib.parse import quote, unquote, urlencode, urlparse
 
 import requests
-from cryptography.fernet import Fernet, InvalidToken
 from loguru import logger
 
-from services.database import get_user_db_path
+from services.integrations.oauth_provider_base import OAuthProviderBase, resolve_encryption_key
 from services.integrations.linkedin.types import (
     LinkedInCredentials,
     LinkedInNotConnectedError,
@@ -54,8 +53,15 @@ def _is_placeholder_backend_url(url: str) -> bool:
     return any(token in normalized for token in _PLACEHOLDER_BACKEND_URL_TOKENS)
 
 
-class LinkedInOAuthService:
-    """Manages LinkedIn Growth Engine credentials (Zernio, Unipile, or native OAuth)."""
+class LinkedInOAuthService(OAuthProviderBase):
+    """Manages LinkedIn Growth Engine credentials (Zernio, Unipile, or native OAuth).
+
+    Inherits Fernet token encryption and per-user DB path resolution from
+    OAuthProviderBase (commits e383d08c / 1ca38b01 / 386f7813). Overrides
+    only the migration method: LinkedIn stores a Zernio API key alongside
+    the LinkedIn access/refresh tokens, so the standard 2-column
+    migration doesn't fit and we use a 3-column variant here.
+    """
 
     _TOKEN_SELECT_COLUMNS = """
         id, user_id, provider_mode, zernio_api_key, zernio_account_id,
@@ -66,54 +72,14 @@ class LinkedInOAuthService:
 
     def __init__(self, db_path: Optional[str] = None):
         self.db_path = db_path
-        self.token_encryption_key = (
-            os.getenv("LINKEDIN_TOKEN_ENCRYPTION_KEY")
-            or os.getenv("OAUTH_TOKEN_ENCRYPTION_KEY")
-        )
+        self.token_encryption_key = resolve_encryption_key("linkedin")
+        # Fail-fast at construction: if the key is missing or invalid,
+        # OAuthProviderBase._initialize_fernet raises ValueError with a
+        # message naming the provider-specific env var. This matches the
+        # cs4 normalization applied to Bing/Wix/WordPress/YouTube in
+        # 386f7813.
         self._fernet = self._initialize_fernet()
         self._migration_done: set[str] = set()
-
-    def _initialize_fernet(self) -> Optional[Fernet]:
-        if not self.token_encryption_key:
-            logger.warning(
-                "LinkedIn token encryption key not configured; "
-                "per-user credential storage will be unavailable."
-            )
-            return None
-        try:
-            return Fernet(self.token_encryption_key.encode("utf-8"))
-        except Exception:
-            logger.error("LinkedIn token encryption key is invalid.")
-            return None
-
-    def _encrypt_token(self, token: Optional[str]) -> Optional[str]:
-        if not token:
-            return None
-        if not self._fernet:
-            raise ValueError(
-                "Token encryption unavailable: set LINKEDIN_TOKEN_ENCRYPTION_KEY "
-                "or OAUTH_TOKEN_ENCRYPTION_KEY"
-            )
-        return self._fernet.encrypt(token.encode("utf-8")).decode("utf-8")
-
-    def _decrypt_token(self, token_blob: Optional[str]) -> Optional[str]:
-        if not token_blob:
-            return None
-        if not self._fernet:
-            raise ValueError("Token decryption unavailable: missing encryption key")
-        try:
-            return self._fernet.decrypt(token_blob.encode("utf-8")).decode("utf-8")
-        except InvalidToken:
-            logger.error("LinkedIn token decryption failed (invalid token blob)")
-            return None
-
-    def _is_likely_encrypted_blob(self, value: Optional[str]) -> bool:
-        return bool(value and value.startswith("gAAAAA"))
-
-    def _get_db_path(self, user_id: str) -> str:
-        if self.db_path:
-            return self.db_path
-        return get_user_db_path(user_id)
 
     def _init_db(self, user_id: str) -> None:
         db_path = self._get_db_path(user_id)
@@ -194,10 +160,12 @@ class LinkedInOAuthService:
                     user_completion_json TEXT,
                     ai_profile_intelligence_json TEXT,
                     topic_recommendations_json TEXT,
+                    profile_optimization_json TEXT,
 
                     profile_context_updated_at TIMESTAMP,
                     ai_intelligence_updated_at TIMESTAMP,
                     recommendations_updated_at TIMESTAMP,
+                    profile_optimization_updated_at TIMESTAMP,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -215,6 +183,16 @@ class LinkedInOAuthService:
                     "ALTER TABLE linkedin_analysis_context "
                     "ADD COLUMN recommendations_updated_at TIMESTAMP"
                 )
+            if "profile_optimization_json" not in analysis_cols:
+                cursor.execute(
+                    "ALTER TABLE linkedin_analysis_context "
+                    "ADD COLUMN profile_optimization_json TEXT"
+                )
+            if "profile_optimization_updated_at" not in analysis_cols:
+                cursor.execute(
+                    "ALTER TABLE linkedin_analysis_context "
+                    "ADD COLUMN profile_optimization_updated_at TIMESTAMP"
+                )
             cursor.execute(
                 """
                 CREATE INDEX IF NOT EXISTS idx_linkedin_analysis_user
@@ -226,7 +204,19 @@ class LinkedInOAuthService:
     def _migrate_plaintext_tokens_if_needed(
         self, conn: sqlite3.Connection, user_id: str
     ) -> None:
-        if not self._fernet or user_id in self._migration_done:
+        """Override of OAuthProviderBase._migrate_plaintext_tokens_if_needed.
+
+        LinkedIn stores three encrypted columns per row (Zernio API key,
+        LinkedIn access token, LinkedIn refresh token), while the base
+        class's migration handles two columns. We keep the 2-column
+        behaviour for access/refresh by calling the base, then do an
+        additional pass for the Zernio API key.
+
+        The per-user gate is honoured via self._migration_done; the base
+        class would skip this user on subsequent calls, so we manage the
+        gate ourselves to keep both passes in lockstep.
+        """
+        if user_id in self._migration_done:
             return
         cursor = conn.cursor()
         cursor.execute(
@@ -511,6 +501,7 @@ class LinkedInOAuthService:
             created_at,
             _updated_at,
             zernio_profile_id,
+            *_rest,  # unipile_account_id, unipile_org_account_id (optional)
         ) = row
         not_expired, expires_dt = self._parse_expires_at(expires_at)
         has_refresh = bool(linkedin_refresh_token)

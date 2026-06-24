@@ -7,6 +7,7 @@ import {
   ContentPreviewHeaderWithModals,
   ContentDisplayArea
 } from '../../TextEditor';
+import { GroundingDataDisplay } from './GroundingDataDisplay';
 import { readPrefs } from '../utils/linkedInWriterUtils';
 import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
 import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
@@ -376,7 +377,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   }, [draft, showPreview, onPreviewToggle]);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
       {/* Predictive Diff Preview */}
       <DiffPreviewModal
         isPreviewing={isPreviewing}
@@ -387,15 +388,14 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       />
 
       {/* Full Width Content Preview */}
-      <div style={{ flex: 1, padding: '24px' }}>
+      <div style={{ flex: 1, padding: '24px', overflow: 'visible' }}>
         {/* Content Preview */}
         {showPreview && (
           <div style={{
             border: '1px solid #e1f5fe',
             borderRadius: '8px',
             background: '#f8fdff',
-            overflow: 'visible',
-            minHeight: '500px'
+            overflow: 'visible'
           }}>
             {/* Content Preview Header */}
             <ContentPreviewHeaderWithModals
@@ -430,6 +430,14 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               onTriggerSuggestion={triggerSuggestion}
               onContinueWriting={() => handleManualContinue(draft)}
               onInsertWithPreview={handleInsertAtCaret}
+            />
+
+            {/* Research Sources & Citations Section */}
+            <GroundingDataDisplay
+              researchSources={researchSources || []}
+              citations={citations || []}
+              qualityMetrics={qualityMetrics}
+              groundingEnabled={groundingEnabled || false}
             />
           </div>
         )}

@@ -7,9 +7,10 @@ content distribution, and publishing patterns for SEO optimization.
 
 import aiohttp
 import asyncio
+import random
 import re
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from loguru import logger
 import xml.etree.ElementTree as ET
@@ -23,7 +24,33 @@ from middleware.logging_middleware import seo_logger
 
 # Global concurrency throttle for sitemap HTTP fetches.
 # Prevents FD exhaustion and rate-limiting from runaway parallel fetches.
-_sitemap_fetch_semaphore = asyncio.Semaphore(15)
+# Reduced from 15 → 4 in the Step 3 retry fix: with idempotency at the
+# API layer (see routers/seo_tools.py) the maximum number of concurrent
+# upstream fetches should be small, otherwise the upstream's
+# rate-limiter (HTTP 429/436) fires and produces the
+# "Connection closed" / "Failed to fetch sitemap" errors that flooded
+# the logs.
+_sitemap_fetch_semaphore = asyncio.Semaphore(4)
+
+# Maximum number of retries for transient HTTP errors (429, 5xx, or
+# network-level disconnects). Each retry uses exponential backoff with
+# jitter so concurrent retry storms don't all wake up at the same time.
+_SITEMAP_MAX_RETRIES = 3
+_SITEMAP_RETRY_BASE_DELAY = 2.0  # seconds
+_SITEMAP_RETRY_MAX_DELAY = 30.0  # seconds
+
+
+def _compute_retry_delay(attempt: int) -> float:
+    """Exponential backoff with full jitter.
+
+    Returns a sleep duration in seconds. ``attempt`` is 0-indexed
+    (0 = first retry, 1 = second, ...).
+    """
+    base = _SITEMAP_RETRY_BASE_DELAY * (2 ** attempt)
+    capped = min(base, _SITEMAP_RETRY_MAX_DELAY)
+    # Full jitter: pick a random value in [0, capped] to spread out
+    # concurrent retries across clients.
+    return random.uniform(0, capped)
 
 class SitemapService:
     """Service for analyzing website sitemaps with AI insights"""
@@ -155,6 +182,89 @@ class SitemapService:
             
             raise
     
+    async def _http_get_with_retry(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        *,
+        max_retries: int = _SITEMAP_MAX_RETRIES,
+    ) -> aiohttp.ClientResponse:
+        """HTTP GET with retry on transient failures.
+
+        Retries on:
+        - HTTP 429 (rate-limited; honour Retry-After if present)
+        - HTTP 5xx (server errors)
+        - aiohttp.ClientConnectionError / ServerDisconnectedError
+          (network-level "Connection closed" that the original
+          implementation was logging as a fatal error)
+
+        Non-retryable statuses (4xx other than 429, e.g. 404, 410) are
+        raised immediately. Each retry uses exponential backoff with
+        full jitter (see ``_compute_retry_delay``) so concurrent
+        retries don't synchronise.
+        """
+        attempt = 0
+        last_exc: Optional[BaseException] = None
+        while attempt <= max_retries:
+            try:
+                async with _sitemap_fetch_semaphore:
+                    response = await session.get(url)
+                    if response.status == 429 or response.status >= 500:
+                        # Rate-limited or transient server error. Honour
+                        # Retry-After if the upstream provides it; cap at
+                        # 30s to avoid blocking the dispatcher forever.
+                        retry_after_raw = response.headers.get("Retry-After")
+                        retry_after: Optional[float] = None
+                        if retry_after_raw:
+                            try:
+                                retry_after = float(retry_after_raw)
+                            except (TypeError, ValueError):
+                                retry_after = None
+                        # We must release the response before sleeping,
+                        # otherwise the connection sits idle.
+                        response.release()
+                        last_exc = aiohttp.ClientResponseError(
+                            request_info=response.request_info,
+                            history=response.history,
+                            status=response.status,
+                            message=response.reason or "",
+                            headers=response.headers,
+                        )
+                        delay = (
+                            min(retry_after, _SITEMAP_RETRY_MAX_DELAY)
+                            if retry_after is not None
+                            else _compute_retry_delay(attempt)
+                        )
+                        if attempt < max_retries:
+                            logger.warning(
+                                f"⏳ [RETRY] Sitemap fetch {url} returned HTTP {response.status}; "
+                                f"backing off {delay:.1f}s (attempt {attempt + 1}/{max_retries})"
+                            )
+                            await asyncio.sleep(delay)
+                            attempt += 1
+                            continue
+                        raise last_exc
+                    return response
+            except (aiohttp.ClientConnectionError, aiohttp.ServerDisconnectedError, asyncio.TimeoutError) as exc:
+                # Network-level failure (server hung up, read timeout).
+                # The original code logged this as "Connection closed"
+                # and gave up; with retries we have a real chance to
+                # recover from a transient blip.
+                last_exc = exc
+                if attempt < max_retries:
+                    delay = _compute_retry_delay(attempt)
+                    logger.warning(
+                        f"⏳ [RETRY] Sitemap fetch {url} failed with {type(exc).__name__}: {exc}; "
+                        f"backing off {delay:.1f}s (attempt {attempt + 1}/{max_retries})"
+                    )
+                    await asyncio.sleep(delay)
+                    attempt += 1
+                    continue
+                raise
+        # Should be unreachable; the loop either returns or raises.
+        assert last_exc is not None
+        raise last_exc
+
     async def _fetch_sitemap_data(self, sitemap_url: str, depth: int = 0, session: aiohttp.ClientSession = None) -> Dict[str, Any]:
         """Fetch and parse sitemap data"""
         
@@ -179,10 +289,12 @@ class SitemapService:
             MAX_SITEMAP_SIZE = 10 * 1024 * 1024 
             
             try:
-                async with _sitemap_fetch_semaphore:
-                    async with session.get(sitemap_url) as response:
-                        if response.status != 200:
-                            raise Exception(f"Failed to fetch sitemap: HTTP {response.status}")
+                response = await self._http_get_with_retry(session, sitemap_url)
+                try:
+                    if response.status != 200:
+                        # _http_get_with_retry already retried 5xx/429.
+                        # Anything else is treated as a definitive error.
+                        raise Exception(f"Failed to fetch sitemap: HTTP {response.status}")
                     
                     # Check Content-Type header
                     content_type = response.headers.get("Content-Type", "").lower()
@@ -290,6 +402,14 @@ class SitemapService:
                         "sitemaps": sitemaps,
                         "total_urls": len(urls)
                     }
+                finally:
+                    # Make sure the response is released even if the
+                    # parsing above raises — otherwise the connection
+                    # pool sits on a dead socket.
+                    try:
+                        response.close()
+                    except Exception:
+                        pass
             except Exception as e:
                  # Re-raise to be caught by outer try/except
                  raise e

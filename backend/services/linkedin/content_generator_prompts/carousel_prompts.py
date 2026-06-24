@@ -58,6 +58,14 @@ class CarouselPromptBuilder:
 
         KEY INSIGHTS TO COVER: {', '.join(request.key_points) if request.key_points else 'Industry trends, challenges, solutions, and opportunities'}
 
+        CITATION FORMAT:
+        - When you reference a specific data point, statistic, or claim from the research sources above, add [Source N] immediately after the claim, where N is the source number from the RESEARCH CONTEXT.
+        - Example: "Enterprise AI adoption grew 40% year-over-year [Source 1]."
+        - Only cite sources for factual claims, statistics, data points, and specific findings — not for general industry knowledge.
+        - If you do not cite any sources, return an empty list for cited_source_indices.
+
+        ANTI-HALLUCINATION: Only make claims, statistics, and data points that are directly supported by the RESEARCH CONTEXT section above. Do not invent or fabricate statistics, dates, percentages, or specific findings. If the research does not contain a relevant data point, make a general observation instead of inventing a number.
+
         REMEMBER: Each slide should be visually appealing, informative, and encourage the viewer to continue reading. The carousel should provide immediate value while building anticipation for the next slide.
         """
         return prompt.strip()

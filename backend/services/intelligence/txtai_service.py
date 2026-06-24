@@ -286,6 +286,30 @@ class TxtaiIntelligenceService:
         message = str(error)
         return "nprobe" in message and "IndexIDMap" in message
 
+    # Phase 5 / Issue #8: explicit guard for missing txtai. The
+    # previous inline check on ``TXTAI_AVAILABLE`` was buried in
+    # ``_initialize_embeddings`` and a misconfigured deployment
+    # would silently fall back to no-op rather than fail fast, which
+    # is what the user explicitly asked for in the content-strategy
+    # P0 work. Promote the check to a method so every public
+    # operation (``index_content`` / ``delete_content`` /
+    # ``reindex_all``) starts with the same explicit guard and the
+    # call site doesn't have to import ``TXTAI_AVAILABLE`` directly.
+    def _require_txtai_available(self) -> None:
+        if not TXTAI_AVAILABLE:
+            message = (
+                "txtai is not available. Please install with: "
+                "pip install txtai[pipeline,similarity]"
+            )
+            logger.error(message)
+            if self.fail_fast:
+                raise RuntimeError(message)
+            # The historical fail-soft path: return None (no exception)
+            # and let the caller fall through to the "not initialized"
+            # branch. The fail-fast branch above is the new default.
+            return
+        return
+
     def _mark_ann_incompatible(self):
         """Disable ANN-dependent code paths after FAISS nprobe incompatibility is observed."""
         if not self._disable_ann_queries:

@@ -166,14 +166,72 @@ class TopicRecommendationsMetaResponse(BaseModel):
     recommendations_updated_at: Optional[str] = None
 
 
-class ProfileAnalysisErrorResponse(BaseModel):
-    """Structured failure from the LinkedIn analysis pipeline (Phases 1–6)."""
+class ProfileOptimizationResponse(BaseModel):
+    """Phase 7 single profile optimization recommendation."""
 
-    failed_phase: int = Field(..., ge=1, le=6)
+    id: str
+    profile_section: Literal[
+        "headline",
+        "summary",
+        "profile_photo",
+        "custom_url",
+        "experience",
+        "skills",
+        "recommendations",
+        "education",
+        "certifications",
+        "featured",
+    ]
+    issue: str
+    why_it_matters: str
+    current_state_summary: str
+    recommended_action: str
+    suggested_copy: str = ""
+    impact: Literal["High", "Medium", "Low"]
+    effort: Literal["Low", "Medium", "High"]
+    best_practice_ref: str = ""
+    completion_criteria: str = ""
+
+
+class ProfileOptimizationMetaResponse(BaseModel):
+    """Phase 7 profile optimization acquisition metadata."""
+
+    source: Literal["cache", "generated", "no_gaps", "batch_advanced"]
+    profile_optimization_updated_at: Optional[str] = None
+    active_batch_index: int = Field(default=0, ge=0)
+    remaining_in_backlog: int = Field(default=0, ge=0)
+    message: Optional[str] = None
+
+
+class ProfileOptimizationCompleteRequest(BaseModel):
+    """Request body for marking a profile optimization recommendation complete."""
+
+    status: Literal["done", "skipped"] = "done"
+
+
+class ProfileOptimizationBatchActionResponse(BaseModel):
+    """Response after completing an item or loading the next optimization batch."""
+
+    profile_optimization: List[ProfileOptimizationResponse] = Field(default_factory=list)
+    profile_optimization_meta: ProfileOptimizationMetaResponse
+    show_next_batch_cta: bool = False
+
+
+class ProfileAnalysisErrorResponse(BaseModel):
+    """Structured failure from the LinkedIn analysis pipeline (Phases 1–7)."""
+
+    failed_phase: int = Field(..., ge=1, le=7)
     phase_label: str
     error_code: str
     user_message: str
     debug_message: Optional[str] = None
+
+
+class ProfileOptimizationDebugResponse(BaseModel):
+    """Dev-only rubric output for Step 1 manual testing (no LLM)."""
+
+    detected_gaps_count: int = Field(ge=0)
+    rule_ids: List[str] = Field(default_factory=list)
 
 
 class LinkedInProfileAcquireResponse(BaseModel):
@@ -190,13 +248,17 @@ class LinkedInProfileAcquireResponse(BaseModel):
     recommendations: Optional[List[TopicRecommendationResponse]] = None
     recommendations_meta: Optional[TopicRecommendationsMetaResponse] = None
     recommendations_error: Optional[str] = None
+    profile_optimization: Optional[List[ProfileOptimizationResponse]] = None
+    profile_optimization_meta: Optional[ProfileOptimizationMetaResponse] = None
+    profile_optimization_error: Optional[str] = None
     last_completed_phase: Optional[int] = Field(
         None,
         ge=1,
-        le=6,
+        le=7,
         description="Highest pipeline phase that completed successfully in this request",
     )
     analysis_error: Optional[ProfileAnalysisErrorResponse] = None
+    profile_optimization_debug: Optional[ProfileOptimizationDebugResponse] = None
 
 
 class LinkedInProfileCompleteRequest(BaseModel):
@@ -213,3 +275,21 @@ class LinkedInProfileCompleteResponse(BaseModel):
     profile_completion: ProfileCompletionResponse
     ai_profile_intelligence: Optional[AIProfileIntelligenceResponse] = None
     ai_profile_intelligence_meta: Optional[ProfileIntelligenceMetaResponse] = None
+
+
+class LinkedInPublishPostRequest(BaseModel):
+    """Request body for POST /api/linkedin-social/posts/publish."""
+
+    content: str
+    account_id: Optional[str] = None
+
+
+class LinkedInPublishPostResponse(BaseModel):
+    """Response for POST /api/linkedin-social/posts/publish."""
+
+    success: bool
+    post_id: Optional[str] = None
+    post_urn: Optional[str] = None
+    provider: str
+    message: str
+    debug_id: str

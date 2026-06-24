@@ -26,6 +26,7 @@ from services.integrations.linkedin.types import (
     ProfileAggregation,
     ReplyResult,
 )
+from services.integrations.linkedin.publish_preflight import run_publish_preflight
 from services.integrations.linkedin.unipile_client import (
     UnipileClient,
     UnipileAPIError,
@@ -596,15 +597,62 @@ class UnipileProvider:
         self, user_id: str, request: CreatePostRequest
     ) -> CreatePostResult:
         """
-        Create a LinkedIn post.
+        Publish a text-only post to the user's connected LinkedIn personal profile.
 
-        Phase 1: Not implemented. Raises NotImplementedError.
-        Phase 4: Will implement publishing.
+        v1: personal profile only; no first comment, media, or organization posting.
         """
-        logger.warning(
-            f"[UnipileProvider] create_post called but not implemented (Phase 1)"
+        logger.info(
+            f"[UnipileProvider] create_post user_id={user_id} "
+            f"content_len={len(request.content or '')}"
         )
-        raise NotImplementedError(_PUBLISHING_NOT_IMPLEMENTED)
+
+        creds = self._oauth.resolve_credentials(user_id)
+        if creds.provider_mode != "unipile" or not creds.unipile_account_id:
+            raise LinkedInNotConnectedError("Unipile LinkedIn account not connected")
+
+        account_id = creds.unipile_account_id
+        if request.account_id and request.account_id != account_id:
+            raise ValueError(
+                "Account ID does not match your connected LinkedIn personal profile"
+            )
+
+        if request.organization_urn:
+            raise ValueError(
+                "Organization posting is not supported yet. Switch to personal profile."
+            )
+
+        text = (request.content or "").strip()
+        if not text:
+            raise ValueError("Post content cannot be empty")
+
+        publish_request = CreatePostRequest(account_id=account_id, content=text)
+        await run_publish_preflight(user_id, publish_request)
+
+        try:
+            raw = await self._client.create_post(account_id, text)
+        except UnipileAPIError as exc:
+            logger.error(
+                f"[UnipileProvider] create_post Unipile error user_id={user_id} "
+                f"account_id={account_id} status={exc.status_code}: {exc}"
+            )
+            raise
+
+        post_id = raw.get("id") if isinstance(raw, dict) else None
+        post_urn = None
+        if isinstance(raw, dict):
+            post_urn = raw.get("social_id") or raw.get("urn") or post_id
+
+        logger.info(
+            f"[UnipileProvider] create_post success user_id={user_id} "
+            f"post_id={post_id} post_urn={post_urn}"
+        )
+
+        return CreatePostResult(
+            success=True,
+            post_id=str(post_id) if post_id else None,
+            post_urn=str(post_urn) if post_urn else None,
+            raw=raw if isinstance(raw, dict) else {},
+        )
 
     async def upload_media(
         self,

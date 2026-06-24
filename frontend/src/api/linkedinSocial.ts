@@ -175,13 +175,50 @@ export interface LinkedInTopicRecommendationsMeta {
   recommendations_updated_at?: string | null;
 }
 
-/** Structured failure from the LinkedIn analysis pipeline (Phases 1–6). */
+/** Phase 7 — single profile optimization recommendation. */
+export interface LinkedInProfileOptimizationItem {
+  id: string;
+  profile_section: string;
+  issue: string;
+  why_it_matters: string;
+  current_state_summary: string;
+  recommended_action: string;
+  suggested_copy?: string;
+  impact: 'High' | 'Medium' | 'Low';
+  effort: 'Low' | 'Medium' | 'High';
+  best_practice_ref?: string;
+  completion_criteria?: string;
+}
+
+/** Phase 7 — profile optimization cache/generation metadata. */
+export interface LinkedInProfileOptimizationMeta {
+  source: 'cache' | 'generated' | 'no_gaps' | 'batch_advanced';
+  profile_optimization_updated_at?: string | null;
+  active_batch_index?: number;
+  remaining_in_backlog?: number;
+  message?: string | null;
+}
+
+/** Phase 7 — response after marking an item complete or loading the next batch. */
+export interface LinkedInProfileOptimizationBatchActionResponse {
+  profile_optimization: LinkedInProfileOptimizationItem[];
+  profile_optimization_meta: LinkedInProfileOptimizationMeta;
+  show_next_batch_cta: boolean;
+}
+
+/** Structured failure from the LinkedIn analysis pipeline (Phases 1–7). */
 export interface LinkedInProfileAnalysisError {
   failed_phase: number;
   phase_label: string;
   error_code: string;
   user_message: string;
   debug_message?: string | null;
+}
+
+/** Phase 7 dev rubric output (Step 1 — no LLM). */
+export interface LinkedInProfileOptimizationDebug {
+  detected_gaps_count: number;
+  rule_ids: string[];
 }
 
 export interface LinkedInProfileAcquireResponse {
@@ -205,8 +242,12 @@ export interface LinkedInProfileAcquireResponse {
   recommendations?: LinkedInTopicRecommendation[] | null;
   recommendations_meta?: LinkedInTopicRecommendationsMeta | null;
   recommendations_error?: string | null;
+  profile_optimization?: LinkedInProfileOptimizationItem[] | null;
+  profile_optimization_meta?: LinkedInProfileOptimizationMeta | null;
+  profile_optimization_error?: string | null;
   last_completed_phase?: number | null;
   analysis_error?: LinkedInProfileAnalysisError | null;
+  profile_optimization_debug?: LinkedInProfileOptimizationDebug | null;
 }
 
 export interface LinkedInProfileCompleteResponse {
@@ -215,6 +256,20 @@ export interface LinkedInProfileCompleteResponse {
   profile_completion: LinkedInProfileCompletion;
   ai_profile_intelligence?: LinkedInAIProfileIntelligence | null;
   ai_profile_intelligence_meta?: LinkedInProfileIntelligenceMeta | null;
+}
+
+export interface LinkedInPublishPostRequest {
+  content: string;
+  account_id?: string;
+}
+
+export interface LinkedInPublishPostResponse {
+  success: boolean;
+  post_id?: string | null;
+  post_urn?: string | null;
+  provider: string;
+  message: string;
+  debug_id: string;
 }
 
 const BASE = '/api/linkedin-social';
@@ -241,6 +296,14 @@ export async function syncLinkedInAccounts(): Promise<{
 
 export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> {
   const response = await apiClient.post(`${BASE}/disconnect`);
+  return response.data;
+}
+
+/** Publish the LinkedIn Writer draft as a text-only post to the personal profile. */
+export async function publishLinkedInPost(
+  payload: LinkedInPublishPostRequest
+): Promise<LinkedInPublishPostResponse> {
+  const response = await apiClient.post(`${BASE}/posts/publish`, payload);
   return response.data;
 }
 
@@ -355,26 +418,54 @@ export async function getLinkedInPersonalAnalytics(
   return response.data;
 }
 
-/** Normalized profile, context, validation, completion, intelligence, and recommendations (Phases 1–6). */
+/** Options for GET /api/linkedin-social/profile pipeline phases. */
+export interface LinkedInProfileRequestOptions {
+  refresh?: boolean;
+  refreshIntelligence?: boolean;
+  includeRecommendations?: boolean;
+  refreshRecommendations?: boolean;
+  includeProfileOptimization?: boolean;
+  refreshProfileOptimization?: boolean;
+  debugProfileOptimizationGaps?: boolean;
+}
+
+/** Normalized profile, context, validation, completion, intelligence, and optional advisors. */
 export async function getLinkedInProfile(
-  refresh = false,
-  refreshIntelligence = false,
-  refreshRecommendations = false
+  options: LinkedInProfileRequestOptions = {}
 ): Promise<LinkedInProfileAcquireResponse> {
   const params: Record<string, boolean> = {};
-  if (refresh) {
+  if (options.refresh) {
     params.refresh = true;
   }
-  if (refreshIntelligence) {
+  if (options.refreshIntelligence) {
     params.refresh_intelligence = true;
   }
-  if (refreshRecommendations) {
+  if (options.includeRecommendations) {
+    params.include_recommendations = true;
+  }
+  if (options.refreshRecommendations) {
     params.refresh_recommendations = true;
   }
+  if (options.includeProfileOptimization) {
+    params.include_profile_optimization = true;
+  }
+  if (options.refreshProfileOptimization) {
+    params.refresh_profile_optimization = true;
+  }
+  if (options.debugProfileOptimizationGaps) {
+    params.debug_profile_optimization_gaps = true;
+  }
 
-  // Phases 5–6 run Gemini LLM calls; full pipeline can exceed the 60s default timeout.
-  const client =
-    refreshIntelligence || refreshRecommendations ? longRunningApiClient : apiClient;
+  const needsLongRunningClient =
+    options.refreshIntelligence ||
+    options.refreshRecommendations ||
+    options.includeRecommendations ||
+    options.refreshProfileOptimization ||
+    options.includeProfileOptimization;
+
+  const client = needsLongRunningClient ? longRunningApiClient : apiClient;
+
+  console.info('[LinkedInProfile] GET /profile', params);
 
   const response = await client.get(`${BASE}/profile`, {
     params: Object.keys(params).length > 0 ? params : undefined,
@@ -382,10 +473,98 @@ export async function getLinkedInProfile(
   return response.data;
 }
 
-/** Run the full LinkedIn analysis pipeline (Phases 1–6) for topic suggestions. */
-export async function runLinkedInTopicAnalysis(): Promise<LinkedInProfileAcquireResponse> {
-  console.info('[TopicSuggestion] starting full analysis pipeline (Phases 1–6)');
-  return getLinkedInProfile(true, true, true);
+/** Phases 1–5 only — foundation load on LinkedIn Writer mount (no Phase 6/7). */
+export async function getLinkedInProfileFoundation(
+  refresh = false,
+  refreshIntelligence = false
+): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[LinkedInProfileCompletion] loading foundation (Phases 1–5)', {
+    refresh,
+    refreshIntelligence,
+  });
+  return getLinkedInProfile({ refresh, refreshIntelligence });
+}
+
+export interface RunLinkedInTopicAnalysisOptions {
+  refresh?: boolean;
+  refreshIntelligence?: boolean;
+  /** Bypass topic recommendation cache and force Phase 6 LLM regen. */
+  forceRegenerate?: boolean;
+}
+
+/** Topic advisor (Phase 6) — cache-first unless forceRegenerate. */
+export async function runLinkedInTopicAnalysis(
+  options: RunLinkedInTopicAnalysisOptions = {}
+): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[TopicSuggestion] loading topic recommendations (Phase 6)', options);
+  return getLinkedInProfile({
+    refresh: options.refresh ?? false,
+    refreshIntelligence: options.refreshIntelligence ?? false,
+    includeRecommendations: true,
+    refreshRecommendations: options.forceRegenerate ?? false,
+  });
+}
+
+/** Profile advisor (Phase 7) — cache-first unless forceRegenerate. */
+export async function runLinkedInProfileOptimization(
+  options: { forceRegenerate?: boolean; refreshIntelligence?: boolean } = {}
+): Promise<LinkedInProfileAcquireResponse> {
+  console.info('[ProfileOptimization] loading profile optimization (Phase 7)', options);
+  return getLinkedInProfile({
+    refreshIntelligence: options.refreshIntelligence ?? false,
+    includeProfileOptimization: true,
+    refreshProfileOptimization: options.forceRegenerate ?? false,
+  });
+}
+
+/** Mark a profile optimization recommendation done or skipped (Phase 7 batch progression). */
+export async function completeProfileOptimizationRecommendation(
+  recommendationId: string,
+  status: 'done' | 'skipped' = 'done'
+): Promise<LinkedInProfileOptimizationBatchActionResponse> {
+  console.info('[ProfileOptimization] marking recommendation complete', {
+    recommendationId,
+    status,
+  });
+  try {
+    const response = await apiClient.post(
+      `${BASE}/profile/optimization/${encodeURIComponent(recommendationId)}/complete`,
+      { status }
+    );
+    console.info('[ProfileOptimization] recommendation marked complete', {
+      recommendationId,
+      activeCount: response.data.profile_optimization?.length ?? 0,
+      remainingInBacklog: response.data.profile_optimization_meta?.remaining_in_backlog ?? 0,
+      showNextBatchCta: response.data.show_next_batch_cta,
+    });
+    return response.data;
+  } catch (err) {
+    console.error('[ProfileOptimization] complete recommendation failed', {
+      recommendationId,
+      status,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
+/** Load the next five recommendations from server backlog without LLM (Phase 7). */
+export async function loadNextProfileOptimizationBatch(): Promise<LinkedInProfileOptimizationBatchActionResponse> {
+  console.info('[ProfileOptimization] loading next optimization batch');
+  try {
+    const response = await apiClient.post(`${BASE}/profile/optimization/next-batch`);
+    console.info('[ProfileOptimization] next batch loaded', {
+      activeCount: response.data.profile_optimization?.length ?? 0,
+      remainingInBacklog: response.data.profile_optimization_meta?.remaining_in_backlog ?? 0,
+      batchIndex: response.data.profile_optimization_meta?.active_batch_index ?? 0,
+    });
+    return response.data;
+  } catch (err) {
+    console.error('[ProfileOptimization] load next batch failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 const _PHASE_LABELS: Record<number, string> = {
@@ -395,6 +574,7 @@ const _PHASE_LABELS: Record<number, string> = {
   4: 'Profile Completion',
   5: 'AI Profile Intelligence',
   6: 'Topic Recommendations',
+  7: 'Profile Optimization',
 };
 
 /** Map HTTP failures from GET /profile to a structured analysis error for debugging. */
@@ -473,7 +653,9 @@ export function logProfileAnalysisError(
   context: string,
   error: LinkedInProfileAnalysisError
 ): void {
-  console.error(`[TopicSuggestion] ${context}`, {
+  const prefix =
+    error.failed_phase === 7 ? '[ProfileOptimization]' : '[TopicSuggestion]';
+  console.error(`${prefix} ${context}`, {
     phase: error.failed_phase,
     phaseLabel: error.phase_label,
     errorCode: error.error_code,
