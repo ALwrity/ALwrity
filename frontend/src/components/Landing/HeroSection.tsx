@@ -380,7 +380,7 @@ const HeroSection: React.FC = () => {
                       textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
                     }}
                   >
-                    Bring Your Own Keys • No vendor lock-in • Enterprise security
+                    AI Marketing OS • No vendor lock-in • Enterprise security
                   </Typography>
 
                   <Grid

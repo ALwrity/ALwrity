@@ -1,5 +1,5 @@
-import React, { Suspense, lazy } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { Suspense, lazy, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
 import usePerformanceMonitor from '../../hooks/usePerformanceMonitor';
 import {
@@ -39,6 +39,7 @@ import {
   landingSectionHeaderGap,
   landingCardHoverSx,
 } from './landingStyles';
+import { parseLandingHash, scrollToLandingSectionWithRetry, isLandingMarketingPath } from '../../utils/landingNavigation';
 
 const PRICING_TEASER_PLANS = [
   {
@@ -77,13 +78,13 @@ const PRICING_TEASER_PLANS = [
       'Higher AI usage limits',
       'Team collaboration features',
       'Scheduler & remarketing',
-      'BYOK for all providers',
+      'Fact-checked AI content with source verification',
     ],
   },
   {
     name: 'Enterprise',
-    price: 'Custom',
-    period: '',
+    price: '$199',
+    period: '/mo',
     highlight: false,
     features: [
       'Dedicated account manager',
@@ -133,10 +134,18 @@ const IntroducingAlwrity = lazy(() => import('./IntroducingAlwrity'));
 const Landing: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const { openSignIn } = useClerk();
   
   // Monitor performance
   usePerformanceMonitor('Landing');
+
+  useEffect(() => {
+    if (!isLandingMarketingPath(location.pathname)) return undefined;
+    const section = parseLandingHash(location.hash);
+    if (!section) return undefined;
+    return scrollToLandingSectionWithRetry(section);
+  }, [location.pathname, location.hash]);
 
   // Optimized Framer Motion variants for better performance
 

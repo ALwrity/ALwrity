@@ -12,6 +12,7 @@ import { ConditionalCopilotKit, AuthenticatedCopilotWrapper } from './components
 import Landing from './components/Landing/Landing';
 import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
+import PricingPage from './components/Pricing/PricingPage';
 
 // ─── Lazy loaded route components ───────────────────────────────────────────
 // Default exports
@@ -25,7 +26,6 @@ const BlogWriter = React.lazy(() => import('./components/BlogWriter/BlogWriter')
 const StoryWriter = React.lazy(() => import('./components/StoryWriter/StoryWriter'));
 const YouTubeCreator = React.lazy(() => import('./components/YouTubeCreator/YouTubeCreator'));
 const PodcastDashboard = React.lazy(() => import('./components/PodcastMaker/PodcastDashboard'));
-const PricingPage = React.lazy(() => import('./components/Pricing/PricingPage'));
 const PrivacyPolicyPage = React.lazy(() => import('./components/Landing/PrivacyPolicyPage'));
 const TermsOfServicePage = React.lazy(() => import('./components/Landing/TermsOfServicePage'));
 const CodeOfConductPage = React.lazy(() => import('./components/Landing/CodeOfConductPage'));
@@ -187,6 +187,7 @@ const App: React.FC = () => {
             <Suspense fallback={<LazyLoadingFallback />}>
               <Routes>
                     <Route path="/" element={<RootRoute />} />
+                    <Route path="/home" element={<Landing />} />
                     <Route 
                       path="/onboarding" 
                       element={

@@ -1,12 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Container,
   Typography,
   Button,
-  Grid,
-  Switch,
-  FormControlLabel,
   Alert,
   CircularProgress,
   Dialog,
@@ -17,61 +14,130 @@ import {
   Fade,
   Backdrop,
   Snackbar,
+  Stack,
+  Tooltip,
+  Link,
+  Chip,
 } from '@mui/material';
 import Warning from '@mui/icons-material/Warning';
-import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../../api/client';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useClerk } from '@clerk/clerk-react';
+import { apiClient, getApiUrl } from '../../api/client';
 import { saveNavigationState, restoreNavigationState, saveCurrentPhaseForTool } from '../../utils/navigationState';
 import { getEnabledFeatures, getDefaultLandingRoute } from '../../utils/demoMode';
-import PlanCard from './PricingPage/PlanCard';
+import PricingPageLayout from './PricingPageLayout';
+import PricingComparisonGrid from './PricingComparisonGrid';
+import PricingJsonLd from './PricingJsonLd';
+import { pricingLightAlertSx } from './pricingAlertStyles';
+import type { SubscriptionPlan } from './pricingTypes';
+import {
+  landingSectionTitleSx,
+} from '../Landing/landingStyles';
 
-export interface SubscriptionPlan {
-  id: number;
-  name: string;
-  tier: string;
-  price_monthly: number;
-  price_yearly: number;
-  description: string;
-  features: string[];
-  limits: {
-    gemini_calls: number;
-    openai_calls: number;
-    anthropic_calls: number;
-    mistral_calls: number;
-    tavily_calls: number;
-    serper_calls: number;
-    metaphor_calls: number;
-    firecrawl_calls: number;
-    stability_calls: number;
-    monthly_cost: number;
-    image_edit_calls?: number;
-    video_calls?: number;
-    audio_calls?: number;
-    ai_text_generation_calls_limit?: number;
-    exa_calls?: number;
-    wavespeed_calls?: number;
-  };
-}
+export type { SubscriptionPlan };
+
+const PENDING_PLAN_KEY = 'pricing_pending_plan_id';
+
+const TRANSPARENT_PRICING_TOOLTIP =
+  'Transparent pricing structured to satisfy your content appetite and scale seamlessly with your audience. Perfect for Content Creators, Marketers, Solopreneurs & Startups.';
+
+const ALL_PLANS_TOOLTIP =
+  'All plans unlock all ALwrity tools and core AI features. Limits reset monthly, and you\'re protected by automatic cost caps.';
+
+const pageHeader = (
+  <Box
+    sx={{
+      textAlign: 'center',
+      maxWidth: 1100,
+      mx: 'auto',
+      mb: { xs: 4, md: 5 },
+      px: { xs: 1, md: 0 },
+    }}
+  >
+    <Typography
+      variant="h2"
+      component="h1"
+      sx={{
+        ...landingSectionTitleSx,
+        color: '#1a1a2e',
+        mb: 0,
+        fontSize: { xs: '1.65rem', sm: '2rem', md: '2.5rem' },
+      }}
+    >
+      ALwrity Pricing — Plans Built for Your Creative Footprint
+    </Typography>
+
+    <Stack
+      direction="row"
+      alignItems="center"
+      justifyContent="center"
+      flexWrap="wrap"
+      useFlexGap
+      spacing={1.5}
+      sx={{ mt: { xs: 3, md: 3.5 }, mb: { xs: 1, md: 1.5 }, gap: { xs: 1.25, md: 1.5 }, rowGap: 1.25 }}
+    >
+      <Tooltip
+        title={<Typography sx={{ fontSize: '0.85rem', lineHeight: 1.55 }}>{TRANSPARENT_PRICING_TOOLTIP}</Typography>}
+        arrow
+        placement="bottom"
+        enterTouchDelay={0}
+      >
+        <Chip
+          icon={<Box component="span" sx={{ fontSize: '0.9rem', ml: 0.5 }}>💡</Box>}
+          label="Transparent pricing"
+          size="small"
+          clickable
+          component="span"
+          sx={{
+            height: 28,
+            fontWeight: 600,
+            fontSize: '0.75rem',
+            bgcolor: 'rgba(143, 203, 219, 0.12)',
+            color: '#5BA8BC',
+            border: '1px solid rgba(143, 203, 219, 0.45)',
+            cursor: 'help',
+            '& .MuiChip-icon': { ml: 0.75 },
+            '&:hover': { bgcolor: 'rgba(143, 203, 219, 0.22)' },
+          }}
+        />
+      </Tooltip>
+
+      <Tooltip
+        title={<Typography sx={{ fontSize: '0.85rem', lineHeight: 1.55 }}>{ALL_PLANS_TOOLTIP}</Typography>}
+        arrow
+        placement="bottom"
+        enterTouchDelay={0}
+      >
+        <Chip
+          icon={<Box component="span" sx={{ fontSize: '0.9rem', ml: 0.5 }}>⚡</Box>}
+          label="All plans included"
+          size="small"
+          clickable
+          component="span"
+          sx={{
+            height: 28,
+            fontWeight: 600,
+            fontSize: '0.75rem',
+            bgcolor: 'rgba(239, 136, 190, 0.1)',
+            color: '#D45A96',
+            border: '1px solid rgba(239, 136, 190, 0.4)',
+            cursor: 'help',
+            '& .MuiChip-icon': { ml: 0.75 },
+            '&:hover': { bgcolor: 'rgba(239, 136, 190, 0.18)' },
+          }}
+        />
+      </Tooltip>
+    </Stack>
+  </Box>
+);
 
 const PricingPage: React.FC = () => {
   const pricingMode = (process.env.REACT_APP_PRICING_MODE || 'alpha').toLowerCase();
   const isAlphaMode = pricingMode === 'alpha';
-  const tierPolicyByMode: Record<string, { visible: string[]; selectable: string[]; unavailableLabels: Record<string, string> }> = {
-    alpha: {
-      visible: ['free', 'basic', 'pro', 'enterprise'],
-      selectable: ['free', 'basic'],
-      unavailableLabels: { pro: 'Coming Soon', enterprise: 'Contact Sales' },
-    },
-    demo: {
-      visible: ['free', 'basic', 'pro', 'enterprise'],
-      selectable: ['free', 'basic', 'pro'],
-      unavailableLabels: { enterprise: 'Contact Sales' },
-    },
-    production: {
-      visible: ['free', 'basic', 'pro', 'enterprise'],
-      selectable: ['free', 'basic', 'pro'],
-      unavailableLabels: { enterprise: 'Contact Sales' },
-    },
+  const tierPolicyByMode: Record<string, { visible: string[]; selectable: string[] }> = {
+    alpha: { visible: ['free', 'basic', 'pro', 'enterprise'], selectable: ['free', 'basic'] },
+    demo: { visible: ['free', 'basic', 'pro', 'enterprise'], selectable: ['free', 'basic', 'pro'] },
+    production: { visible: ['free', 'basic', 'pro', 'enterprise'], selectable: ['free', 'basic', 'pro'] },
   };
   const activeTierPolicy = tierPolicyByMode[pricingMode] || tierPolicyByMode.alpha;
 
@@ -80,6 +146,9 @@ const PricingPage: React.FC = () => {
   );
   const stripePublishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { openSignIn } = useClerk();
+
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,15 +157,21 @@ const PricingPage: React.FC = () => {
   const [subscribing, setSubscribing] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [showSignInPrompt, setShowSignInPrompt] = useState(false);
-  const [successSnackbar, setSuccessSnackbar] = useState({ open: false, message: '', countdown: 3 });
-  const [knowMoreModal, setKnowMoreModal] = useState<{ open: boolean; title: string; content: React.ReactNode }>({
+  const [pendingPlanId, setPendingPlanId] = useState<number | null>(null);
+  const [inquiryModal, setInquiryModal] = useState<{ open: boolean; tier: string; planName: string }>({
     open: false,
-    title: '',
-    content: null
+    tier: '',
+    planName: '',
   });
+  const [successSnackbar, setSuccessSnackbar] = useState({ open: false, message: '', countdown: 3 });
+  const [checkoutCancelled, setCheckoutCancelled] = useState(false);
 
-  useEffect(() => {
-    fetchPlans();
+  const pendingPlan = pendingPlanId ? plans.find((p) => p.id === pendingPlanId) : null;
+  const isPendingFreePlan = pendingPlan?.tier === 'free';
+
+  const isSignedIn = useCallback((): boolean => {
+    const userId = localStorage.getItem('user_id');
+    return Boolean(userId && userId !== 'anonymous');
   }, []);
 
   const isFeatureLimitedMode = (): boolean => {
@@ -119,41 +194,47 @@ const PricingPage: React.FC = () => {
 
   const redirectAfterSubscription = () => {
     if (isFeatureLimitedMode()) {
-      const route = getDefaultLandingRoute();
-      navigate(route);
+      navigate(getDefaultLandingRoute());
       return;
     }
 
-    // Try to restore navigation state (saved before redirect to pricing)
     const navState = restoreNavigationState();
     if (navState?.path && navState.path !== '/pricing' && navState.path !== '/onboarding') {
-      console.log('[PricingPage] Redirecting to saved navigation state:', navState.path);
       navigate(navState.path);
       return;
     }
 
-    // Fallback: try legacy referrer
     const referrer = sessionStorage.getItem('subscription_referrer');
     if (referrer && referrer !== '/pricing') {
       navigate(referrer);
       return;
     }
 
-    // Final fallback
     const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
-    if (onboardingComplete) {
-      navigate('/dashboard');
-    } else {
-      navigate('/onboarding');
-    }
+    navigate(onboardingComplete ? '/dashboard' : '/onboarding');
   };
 
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/subscription/plans');
-      // Filter out legacy alpha-named plans and enforce tier visibility policy.
-      const filteredPlans = response.data.data.plans.filter(
+      setError(null);
+
+      let responseData: { data?: { plans: SubscriptionPlan[] } };
+      try {
+        const response = await apiClient.get('/api/subscription/plans');
+        responseData = response.data;
+      } catch (apiErr) {
+        const base = getApiUrl();
+        const res = await fetch(`${base}/api/subscription/plans`, {
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) {
+          throw apiErr;
+        }
+        responseData = await res.json();
+      }
+
+      const filteredPlans = (responseData.data?.plans ?? []).filter(
         (plan: SubscriptionPlan) =>
           !plan.name.toLowerCase().includes('alpha') &&
           activeTierPolicy.visible.includes(plan.tier)
@@ -161,103 +242,120 @@ const PricingPage: React.FC = () => {
       setPlans(filteredPlans);
     } catch (err) {
       console.error('Error fetching plans:', err);
-      setError('Failed to load subscription plans');
+      setError(
+        "We couldn't load plans right now. Please try again or email info@alwrity.com"
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSubscribe = async (planId: number) => {
-    console.log('[PricingPage] handleSubscribe called', { planId });
-    
-    const plan = plans.find(p => p.id === planId);
-    if (!plan) {
-      console.error('[PricingPage] ❌ Plan not found for ID:', planId);
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  useEffect(() => {
+    if (searchParams.get('subscription') === 'cancel') {
+      setCheckoutCancelled(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete('subscription');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const activateFreePlan = async (planId: number) => {
+    const userId = localStorage.getItem('user_id') || 'anonymous';
+    setSubscribing(true);
+    try {
+      await apiClient.post(`/api/subscription/subscribe/${userId}`, {
+        plan_id: planId,
+        billing_cycle: yearlyBilling ? 'yearly' : 'monthly',
+      });
+      window.dispatchEvent(new CustomEvent('subscription-updated'));
+      redirectAfterSubscription();
+    } catch (err) {
+      console.error('Error subscribing:', err);
+      setError('Failed to process subscription');
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loading || plans.length === 0 || !isSignedIn()) return;
+
+    const stored = sessionStorage.getItem(PENDING_PLAN_KEY);
+    if (!stored) return;
+
+    const planId = Number(stored);
+    const plan = plans.find((p) => p.id === planId);
+    if (!plan) return;
+
+    sessionStorage.removeItem(PENDING_PLAN_KEY);
+    setSelectedPlan(planId);
+
+    if (plan.tier === 'free') {
+      void activateFreePlan(planId);
+    } else if (plan.tier === 'basic') {
+      setPaymentModalOpen(true);
+    }
+  }, [loading, plans, isSignedIn]);
+
+  const handlePlanCtaClick = async (planId: number) => {
+    const plan = plans.find((p) => p.id === planId);
+    if (!plan) return;
+
+    setSelectedPlan(planId);
+
+    if (plan.tier === 'pro' || plan.tier === 'enterprise') {
+      setInquiryModal({ open: true, tier: plan.tier, planName: plan.name });
       return;
     }
 
-    console.log('[PricingPage] Selected plan:', { id: plan.id, name: plan.name, tier: plan.tier });
-
-    // Get user_id from localStorage (set by Clerk auth)
-    const userId = localStorage.getItem('user_id');
-    
-    // Check if user is signed in
-    if (!userId || userId === 'anonymous' || userId === '') {
-      // User not signed in, show sign-in prompt
-      console.warn('[PricingPage] User not signed in, showing prompt');
+    if (!isSignedIn()) {
+      setPendingPlanId(planId);
+      sessionStorage.setItem(PENDING_PLAN_KEY, String(planId));
+      sessionStorage.setItem('subscription_referrer', '/pricing');
       setShowSignInPrompt(true);
       return;
     }
 
-    if (!activeTierPolicy.selectable.includes(plan.tier)) {
-      console.error('[PricingPage] Plan tier not available:', plan.tier);
-      setError(
-        isAlphaMode
-          ? 'This plan is not available during alpha testing'
-          : 'This plan is currently not available for self-serve checkout'
-      );
+    if (plan.tier === 'free') {
+      await activateFreePlan(planId);
       return;
     }
 
-    if (plan.tier === 'free') {
-      console.log('[PricingPage] Processing Free plan subscription directly');
-      // For free plan, just create subscription
-      try {
-        setSubscribing(true);
-        const userId = localStorage.getItem('user_id') || 'anonymous';
-
-        await apiClient.post(`/api/subscription/subscribe/${userId}`, {
-          plan_id: planId,
-          billing_cycle: yearlyBilling ? 'yearly' : 'monthly'
-        });
-
-        // Refresh subscription status
-        window.dispatchEvent(new CustomEvent('subscription-updated'));
-
-        redirectAfterSubscription();
-      } catch (err) {
-        console.error('Error subscribing:', err);
-        setError('Failed to process subscription');
-      } finally {
-        setSubscribing(false);
-      }
-    } else {
-      // For Basic plan, show payment modal
-      console.log('[PricingPage] Opening payment modal for Basic plan', { planId, planName: plan.name });
-      setSelectedPlan(planId);  // ✅ Set selected plan before opening modal
+    if (plan.tier === 'basic') {
       setPaymentModalOpen(true);
     }
   };
 
   const handlePaymentConfirm = async () => {
-    console.log('[PricingPage] handlePaymentConfirm called', { selectedPlan, yearlyBilling });
-    
     if (!selectedPlan) {
-      console.error('[PricingPage] ❌ No selectedPlan set - cannot proceed with subscription');
       setError('No plan selected. Please select a plan and try again.');
       return;
     }
 
-    // Get selected plan details
-    const plan = plans.find(p => p.id === selectedPlan);
+    const plan = plans.find((p) => p.id === selectedPlan);
     if (!plan) return;
+
+    if (!isSignedIn()) {
+      setPendingPlanId(selectedPlan);
+      setPaymentModalOpen(false);
+      sessionStorage.setItem('subscription_referrer', '/pricing');
+      setShowSignInPrompt(true);
+      return;
+    }
 
     try {
       setSubscribing(true);
       const userId = localStorage.getItem('user_id') || 'anonymous';
 
-      // Check if Stripe is configured
       if (stripePublishableKey) {
-        console.log('[PricingPage] Initiating Stripe Checkout');
-
-        // Save current navigation state so we can return here after payment
-        // If we're already on /pricing, don't overwrite — the caller (e.g., SubscriptionGuard,
-        // UserBadge, PreflightBlockDialog) already saved the original page's state.
         if (window.location.pathname !== '/pricing') {
           saveNavigationState(window.location.pathname);
         }
 
-        // Include return_to in success_url so InitialRouteHandler can restore navigation
         const returnTo = window.location.pathname !== '/pricing' ? window.location.pathname : '';
         const successUrlBase = isFeatureLimitedMode()
           ? `${window.location.origin}${getDefaultLandingRoute()}`
@@ -285,93 +383,41 @@ const PricingPage: React.FC = () => {
         throw new Error(
           'Stripe checkout is required but REACT_APP_STRIPE_PUBLISHABLE_KEY is not configured.'
         );
-      } else {
-        // Stripe not configured - warn in feature-limited mode
-        if (isFeatureLimitedMode()) {
-          console.warn('[PricingPage] ⚠️ FEATURE-LIMITED MODE WARNING: Stripe is not configured. Using legacy subscription API.');
-        }
       }
-
-      console.log('[PricingPage] Making legacy subscription API call:', {
-        url: `/api/subscription/subscribe/${userId}`,
-        plan_id: selectedPlan,
-        billing_cycle: yearlyBilling ? 'yearly' : 'monthly',
-        userId
-      });
 
       const response = await apiClient.post(`/api/subscription/subscribe/${userId}`, {
         plan_id: selectedPlan,
-        billing_cycle: yearlyBilling ? 'yearly' : 'monthly'
+        billing_cycle: yearlyBilling ? 'yearly' : 'monthly',
       });
 
-      console.log('[PricingPage] ✅ Subscription renewed successfully:', response.data);
-
-      // Refresh subscription status immediately
       window.dispatchEvent(new CustomEvent('subscription-updated'));
-      
-      // Also trigger user authenticated event to refresh subscription context
       window.dispatchEvent(new CustomEvent('user-authenticated'));
-
       setPaymentModalOpen(false);
 
-      // Get plan name for success message
-      const planName = plans.find(p => p.id === selectedPlan)?.name || 'subscription';
-      
-      // Show success message with countdown
-      setSuccessSnackbar({ 
-        open: true, 
+      const planName = plans.find((p) => p.id === selectedPlan)?.name || 'subscription';
+      setSuccessSnackbar({
+        open: true,
         message: `🎉 ${planName} plan activated! Your usage limits have been reset. Returning to your work in 3 seconds...`,
-        countdown: 3 
+        countdown: 3,
       });
 
-      // Countdown timer
-      let countdown = 3;
-      const countdownInterval = setInterval(() => {
-        countdown -= 1;
-        if (countdown > 0) {
-          setSuccessSnackbar(prev => ({ 
-            ...prev, 
-            message: `🎉 ${planName} plan activated! Your usage limits have been reset. Returning to your work in ${countdown} second${countdown !== 1 ? 's' : ''}...`,
-            countdown 
-          }));
-        } else {
-          clearInterval(countdownInterval);
-        }
-      }, 1000);
-
-      // Auto-redirect after 3 seconds
       setTimeout(() => {
-        clearInterval(countdownInterval);
-        
-        // In feature-limited mode, route users to the feature's landing page.
         if (isFeatureLimitedMode()) {
           navigate(getDefaultLandingRoute());
         } else {
           const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
-
           if (onboardingComplete) {
-          // Restore navigation state (path, phase, tool) if available
-          const navState = restoreNavigationState();
-          
-          if (navState && navState.path && navState.path !== '/pricing') {
-            // Restore phase if applicable (e.g., Blog Writer)
-            if (navState.tool === 'blog-writer' && navState.phase) {
-              saveCurrentPhaseForTool('blog-writer', navState.phase);
-              console.log('[PricingPage] Restored Blog Writer phase:', navState.phase);
-            }
-            
-            console.log('[PricingPage] Redirecting to saved navigation state:', navState);
-            navigate(navState.path);
-          } else {
-            // Fallback: try legacy referrer
-            const referrer = sessionStorage.getItem('subscription_referrer');
-            if (referrer && referrer !== '/pricing') {
-              navigate(referrer);
+            const navState = restoreNavigationState();
+            if (navState?.path && navState.path !== '/pricing') {
+              if (navState.tool === 'blog-writer' && navState.phase) {
+                saveCurrentPhaseForTool('blog-writer', navState.phase);
+              }
+              navigate(navState.path);
             } else {
-              navigate('/dashboard');
+              const referrer = sessionStorage.getItem('subscription_referrer');
+              navigate(referrer && referrer !== '/pricing' ? referrer : '/dashboard');
             }
-          }
-        } else {
+          } else {
             navigate('/onboarding');
           }
         }
@@ -386,170 +432,146 @@ const PricingPage: React.FC = () => {
     }
   };
 
-  const openKnowMoreModal = (title: string, content: React.ReactNode) => {
-    setKnowMoreModal({
-      open: true,
-      title,
-      content
-    });
+  const handleSignIn = () => {
+    setShowSignInPrompt(false);
+    openSignIn({ forceRedirectUrl: '/pricing' });
   };
 
-  if (loading) {
-    return (
-      <Container maxWidth="lg" sx={{ py: 8, textAlign: 'center' }}>
-        <CircularProgress size={60} />
-        <Typography variant="h6" sx={{ mt: 2 }}>
-          Loading subscription plans...
-        </Typography>
-      </Container>
-    );
-  }
+  const renderBody = () => {
+    if (loading) {
+      return (
+        <Box sx={{ textAlign: 'center', py: 8 }}>
+          <CircularProgress size={60} sx={{ color: '#6366f1' }} />
+          <Typography variant="h6" sx={{ mt: 2, color: '#64748b' }}>
+            Loading subscription plans...
+          </Typography>
+        </Box>
+      );
+    }
 
-  if (error) {
+    if (error && plans.length === 0) {
+      return (
+        <Box sx={{ py: 4 }}>
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+          <Button variant="contained" onClick={fetchPlans}>
+            Try Again
+          </Button>
+        </Box>
+      );
+    }
+
+    if (plans.length === 0) {
+      return (
+        <Box sx={{ py: 4 }}>
+          <Alert severity="info" sx={{ ...pricingLightAlertSx, mb: 3 }}>
+            We couldn&apos;t load plans right now. Please try again or email info@alwrity.com
+          </Alert>
+          <Button variant="contained" onClick={fetchPlans}>
+            Try Again
+          </Button>
+        </Box>
+      );
+    }
+
     return (
-      <Container maxWidth="lg" sx={{ py: 8 }}>
-        <Alert severity="error" sx={{ mb: 4 }}>
-          {error}
-        </Alert>
-        <Button variant="contained" onClick={fetchPlans}>
-          Try Again
-        </Button>
-      </Container>
+      <>
+        {checkoutCancelled && (
+          <Alert
+            severity="info"
+            sx={{ ...pricingLightAlertSx, mb: 3 }}
+            onClose={() => setCheckoutCancelled(false)}
+          >
+            Hi, Checkout was cancelled. Your plan was not changed. Try again.
+          </Alert>
+        )}
+        {error && (
+          <Alert severity="warning" sx={{ mb: 3 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
+        <PricingComparisonGrid
+          plans={plans}
+          yearlyBilling={yearlyBilling}
+          onYearlyBillingChange={setYearlyBilling}
+          selectedPlanId={selectedPlan}
+          subscribing={subscribing}
+          isSelfServeForTier={(tier) => activeTierPolicy.selectable.includes(tier)}
+          onPlanCtaClick={handlePlanCtaClick}
+        />
+
+        <Box sx={{ textAlign: 'center', mt: 5 }}>
+          <Typography variant="body2" sx={{ color: '#64748b' }}>
+            Need a custom plan?{' '}
+            <Link href="mailto:info@alwrity.com" sx={{ color: '#6366f1', fontWeight: 600 }}>
+              Email us at info@alwrity.com
+            </Link>
+          </Typography>
+        </Box>
+      </>
     );
-  }
+  };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 8 }}>
-      <Box sx={{ textAlign: 'center', mb: 6 }}>
-        <Typography variant="h3" component="h1" gutterBottom>
-          Choose Your Plan
-        </Typography>
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
-          Select the perfect plan for your AI content creation needs
-        </Typography>
-        <Alert severity="info" sx={{ maxWidth: 800, mx: 'auto', mb: 4, textAlign: 'left' }}>
-          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-            💡 Perfect for Content Creators, Marketers, Solopreneurs & Startups
-          </Typography>
-          <Typography variant="caption">
-            All plans include access to every ALwrity tool. Limits reset monthly, and you're protected by automatic cost caps.
-            {yearlyBilling && ' Save 20% with yearly billing!'}
-          </Typography>
-        </Alert>
+    <PricingPageLayout>
+      <PricingJsonLd plans={plans} />
+      <Container maxWidth="xl">
+        {pageHeader}
+        {renderBody()}
+      </Container>
 
-        {/* Billing Toggle */}
-        <FormControlLabel
-          control={
-            <Switch
-              checked={yearlyBilling}
-              onChange={(e) => setYearlyBilling(e.target.checked)}
-              color="primary"
-            />
-          }
-          label={yearlyBilling ? "Yearly Billing (Save 20%)" : "Monthly Billing"}
-          sx={{ mb: 2 }}
-        />
-      </Box>
-
-      <Grid container spacing={4} justifyContent="center">
-        {plans.map((plan) => (
-          <Grid item key={plan.id} xs={12} sm={6} md={3}>
-            <PlanCard
-              plan={plan}
-              yearlyBilling={yearlyBilling}
-              selectedPlanId={selectedPlan}
-              subscribing={subscribing}
-              canSelectPlan={activeTierPolicy.selectable.includes(plan.tier)}
-              unavailableLabel={activeTierPolicy.unavailableLabels[plan.tier]}
-              onSelectPlan={setSelectedPlan}
-              onSubscribe={handleSubscribe}
-              openKnowMoreModal={openKnowMoreModal}
-            />
-          </Grid>
-        ))}
-      </Grid>
-
-      <Box sx={{ textAlign: 'center', mt: 6 }}>
-        <Typography variant="body2" color="text.secondary">
-          All plans include our core AI content creation features.
-          <br />
-          Need a custom plan? <Button variant="text" size="small">Contact us</Button>
-        </Typography>
-      </Box>
-
-      {/* Payment Modal */}
       <Modal
         open={paymentModalOpen}
         onClose={() => setPaymentModalOpen(false)}
         closeAfterTransition
         BackdropComponent={Backdrop}
-        BackdropProps={{
-          timeout: 500,
-        }}
+        BackdropProps={{ timeout: 500 }}
       >
         <Fade in={paymentModalOpen}>
-          <Box sx={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: 450,
-            bgcolor: 'background.paper',
-            border: '2px solid #000',
-            boxShadow: 24,
-            p: 4,
-            borderRadius: 2,
-          }}>
-            <Typography variant="h6" component="h2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: { xs: 'calc(100% - 32px)', sm: 450 },
+              maxWidth: 450,
+              bgcolor: '#FFFFFF',
+              color: '#1a1a2e',
+              border: '1px solid #E5E7EB',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+              p: { xs: 3, sm: 4 },
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h6" component="h2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1, color: '#1a1a2e' }}>
               <Warning sx={{ color: 'warning.main' }} />
               {isAlphaMode ? 'Alpha Testing Subscription' : 'Confirm Subscription'}
             </Typography>
 
             {isAlphaMode ? (
               <>
-                <Alert severity="warning" sx={{ mb: 2 }}>
+                <Alert severity="info" sx={{ ...pricingLightAlertSx, mb: 2 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                    ⚠️ Alpha Testing Mode - No Payment Required
+                    Alpha Testing Mode — No Payment Required
                   </Typography>
                   <Typography variant="caption" sx={{ display: 'block' }}>
                     Payment integration is coming soon. For now, subscriptions are activated without charge.
                   </Typography>
                 </Alert>
-
-                <Typography variant="body1" sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 2, color: '#374151' }}>
                   Thank you for participating in our alpha testing! We&apos;re crediting this plan to your account.
                 </Typography>
-
-                <Box sx={{
-                  p: 2,
-                  mb: 3,
-                  bgcolor: 'info.lighter',
-                  borderRadius: 1,
-                  border: '1px solid',
-                  borderColor: 'info.light'
-                }}>
-                  <Typography variant="body2" color="info.dark">
-                    <strong>Coming in Production:</strong>
-                  </Typography>
-                  <Typography variant="caption" color="info.dark" sx={{ display: 'block', mt: 0.5 }}>
-                    • Secure Stripe/PayPal payment processing<br />
-                    • Automatic renewal management<br />
-                    • Payment verification & receipts<br />
-                    • Upgrade/downgrade options
-                  </Typography>
-                </Box>
               </>
             ) : (
-              <Typography variant="body1" sx={{ mb: 3 }}>
+              <Typography variant="body1" sx={{ mb: 3, color: '#374151' }}>
                 Please confirm to continue with your selected subscription plan.
               </Typography>
             )}
-            
-            {/* Note: Current behavior allows renewal without payment verification */}
-            {/* This is intentional for alpha testing but will be secured in production */}
-            
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-              <Button onClick={() => setPaymentModalOpen(false)} variant="outlined">
+
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2, flexWrap: 'wrap' }}>
+              <Button onClick={() => setPaymentModalOpen(false)} variant="outlined" sx={{ textTransform: 'none' }}>
                 Cancel
               </Button>
               <Button
@@ -557,10 +579,8 @@ const PricingPage: React.FC = () => {
                 onClick={handlePaymentConfirm}
                 disabled={subscribing}
                 sx={{
+                  textTransform: 'none',
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-                  }
                 }}
               >
                 {subscribing ? <CircularProgress size={20} sx={{ color: 'white' }} /> : 'Confirm Subscription'}
@@ -570,87 +590,106 @@ const PricingPage: React.FC = () => {
         </Fade>
       </Modal>
 
-      {/* Know More Modal */}
       <Dialog
-        open={knowMoreModal.open}
-        onClose={() => setKnowMoreModal({ open: false, title: '', content: null })}
-        maxWidth="md"
+        open={inquiryModal.open}
+        onClose={() => setInquiryModal({ open: false, tier: '', planName: '' })}
+        maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#FFFFFF',
+            color: '#1a1a2e',
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+          },
+        }}
       >
-        <DialogTitle>{knowMoreModal.title}</DialogTitle>
+        <DialogTitle sx={{ color: '#1a1a2e', fontWeight: 700, pb: 1 }}>
+          Thank you for your interest!
+        </DialogTitle>
         <DialogContent>
-          {knowMoreModal.content}
+          <Typography variant="body1" sx={{ mb: 2, color: '#374151', lineHeight: 1.6 }}>
+            We&apos;re excited you&apos;re considering ALwrity {inquiryModal.planName}. Please connect with us at{' '}
+            <Link href="mailto:info@alwrity.com" sx={{ color: '#6366f1', fontWeight: 600 }}>
+              info@alwrity.com
+            </Link>{' '}
+            and our team will help you find the right fit.
+          </Typography>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setKnowMoreModal({ open: false, title: '', content: null })}>
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 0 }}>
+          <Button
+            onClick={() => setInquiryModal({ open: false, tier: '', planName: '' })}
+            sx={{ color: '#64748b', textTransform: 'none' }}
+          >
             Close
+          </Button>
+          <Button
+            variant="contained"
+            href="mailto:info@alwrity.com"
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              bgcolor: '#6366f1',
+              '&:hover': { bgcolor: '#4f46e5' },
+            }}
+          >
+            Email info@alwrity.com
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Sign In Prompt Modal */}
       <Dialog
         open={showSignInPrompt}
         onClose={() => setShowSignInPrompt(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#FFFFFF',
+            color: '#1a1a2e',
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+          },
+        }}
       >
-        <DialogTitle>Sign In Required</DialogTitle>
+        <DialogTitle sx={{ color: '#1a1a2e', fontWeight: 700 }}>Sign In Required</DialogTitle>
         <DialogContent>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Please sign in to subscribe to a plan and start using ALwrity.
+          <Typography variant="body1" sx={{ mb: 2, color: '#374151', lineHeight: 1.6 }}>
+            {isPendingFreePlan
+              ? 'Please sign in to activate your free plan and start using ALwrity. You can browse all plans without signing in.'
+              : 'Please sign in to subscribe to a plan and start using ALwrity. You can browse all plans without signing in.'}
           </Typography>
-          <Typography variant="body2" color="text.secondary">
-            If you don't have an account, signing in will automatically create one for you.
-          </Typography>
+          {pendingPlanId && !isPendingFreePlan && (
+            <Typography variant="body2" sx={{ color: '#64748b' }}>
+              Your selected plan will be ready after you sign in.
+            </Typography>
+          )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowSignInPrompt(false)}>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setShowSignInPrompt(false)} sx={{ color: '#64748b', textTransform: 'none' }}>
             Cancel
           </Button>
-          <Button 
-            variant="contained" 
-            onClick={() => {
-              // Redirect to landing page which has sign-in
-              window.location.href = '/';
-            }}
-          >
+          <Button variant="contained" onClick={handleSignIn} sx={{ textTransform: 'none', fontWeight: 600 }}>
             Sign In
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Success Snackbar */}
       <Snackbar
         open={successSnackbar.open}
         autoHideDuration={3000}
         onClose={() => setSuccessSnackbar({ open: false, message: '', countdown: 0 })}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
-        sx={{ 
-          top: { xs: 16, sm: 24 },
-          '& .MuiSnackbarContent-root': {
-            minWidth: { xs: '90vw', sm: '500px' }
-          }
-        }}
       >
-        <Alert 
-          severity="success" 
+        <Alert
+          severity="success"
           variant="filled"
           onClose={() => setSuccessSnackbar({ open: false, message: '', countdown: 0 })}
-          sx={{ 
-            width: '100%',
-            fontSize: '1rem',
-            alignItems: 'center',
-            boxShadow: '0 8px 24px rgba(76, 175, 80, 0.4)',
-            '& .MuiAlert-icon': {
-              fontSize: '2rem'
-            }
-          }}
         >
           {successSnackbar.message}
         </Alert>
       </Snackbar>
-    </Container>
+    </PricingPageLayout>
   );
 };
 
