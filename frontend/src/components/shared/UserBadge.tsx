@@ -144,14 +144,18 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
     try {
       onboardingCache.clearCache();
     } catch (_) {}
-    const lsKeys = ['onboarding_step_data', 'onboarding_active_step', 'onboarding_data', 'onboarding_intro_completed', 'website_url'];
+    const lsKeys = [
+      'onboarding_step_data', 'onboarding_active_step', 'onboarding_data',
+      'onboarding_intro_completed', 'website_url', 'website_analysis_data',
+      'onboarding_complete', 'primary_website',
+    ];
     lsKeys.forEach(k => localStorage.removeItem(k));
     sessionStorage.removeItem('onboarding_init');
     if (signOutAfterReset) {
       try { await signOut(); } catch (_) {}
     }
     setIsResetting(false);
-    window.location.assign(signOutAfterReset ? '/' : '/onboarding');
+    window.location.href = signOutAfterReset ? '/' : '/onboarding';
   };
 
   return (

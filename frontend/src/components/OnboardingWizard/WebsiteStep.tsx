@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import BusinessDescriptionStep from './BusinessDescriptionStep';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Button,
@@ -17,12 +16,14 @@ import {
 import {
   Analytics as AnalyticsIcon,
   History as HistoryIcon,
-  Business as BusinessIcon
+  Business as BusinessIcon,
+  LinkedIn as LinkedInIcon
 } from '@mui/icons-material';
 
 // Extracted components
-import { AnalysisResultsDisplay, AnalysisProgressDisplay } from './WebsiteStep/components';
+import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
+import LinkedInPlatformCard from './common/LinkedInPlatformCard';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -35,7 +36,6 @@ import {
   performAnalysis,
   fetchLastAnalysis
 } from './WebsiteStep/utils';
-import { onboardingCache, WebsiteIntakeCache } from '../../services/onboardingCache';
 
 interface WebsiteStepProps {
   onContinue: (stepData?: any) => void;
@@ -80,7 +80,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [useAnalysisForGenAI, setUseAnalysisForGenAI] = useState(true);
   const [domainName, setDomainName] = useState<string>('');
   const [hasCheckedExisting, setHasCheckedExisting] = useState(false);
-  const [showBusinessForm, setShowBusinessForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'website' | 'linkedin'>('website');
+  const [integrationData, setIntegrationData] = useState<any>(null);
+  const [linkedinConnected, setLinkedinConnected] = useState(false);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
     { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
@@ -102,13 +104,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
 
   // Notify parent when validation state changes
   useEffect(() => {
-    const isValid = !!(website.trim() && analysis);
-    console.log('WebsiteStep: Validation check:', { website: website.trim(), analysis: !!analysis, isValid });
+    const hasWebsiteAnalysis = !!(website.trim() && analysis);
+    const isValid = hasWebsiteAnalysis || linkedinConnected;
+    console.log('WebsiteStep: Validation check:', { website: website.trim(), analysis: !!analysis, linkedinConnected, isValid });
     if (onValidationChange) {
       console.log('WebsiteStep: Calling onValidationChange with:', isValid);
       onValidationChange(isValid);
     }
-  }, [website, analysis, onValidationChange]);
+  }, [website, analysis, linkedinConnected, onValidationChange]);
 
   useEffect(() => {
     // Prefill from last session analysis on mount
@@ -352,6 +355,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
     setAnalysis(updatedAnalysis);
   };
 
+  const handleIntegrationChange = (data: any) => {
+    setIntegrationData(data);
+  };
+
+  const handleLinkedInPlatformsChange = useCallback((platforms: string[]) => {
+    setLinkedinConnected(platforms.includes('linkedin'));
+  }, []);
+
   // Register data collector so the Wizard footer button is the single gate to step 3
   useEffect(() => {
     if (onDataReady) {
@@ -363,45 +374,26 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           analysis,
           crawlResult,
           useAnalysisForGenAI,
+          integrations: integrationData,
+          linkedinConnected,
         };
       });
     }
-  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI]);
+  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, linkedinConnected]);
 
-  // Conditional rendering for business description form - now handled inline via toggle
-  /*
-  if (showBusinessForm) {
-    return (
-      <BusinessDescriptionStep
-        onBack={() => {
-          console.log('⬅️ Going back to website form...');
-          setShowBusinessForm(false);
-        }}
-        onContinue={(businessData: any) => {
-          console.log('➡️ Business info completed, proceeding to next step...');
-          
-          // Prepare step data combining website and business data
-          const stepData = {
-            website: fixUrlFormat(website),
-            domainName: domainName,
-            analysis: analysis,
-            useAnalysisForGenAI: useAnalysisForGenAI,
-            businessData: businessData
-          };
-          
-          // Store in localStorage for Step 3 (Competitor Analysis)
-          const fixedUrl = fixUrlFormat(website);
-          if (fixedUrl) {
-            localStorage.setItem('website_url', fixedUrl);
-            localStorage.setItem('website_analysis_data', JSON.stringify(analysis));
-          }
-          
-          onContinue(stepData);
-        }}
-      />
-    );
-  }
-  */
+  const hasWebsiteAnalysis = !!(website.trim() && analysis);
+
+  const statusBulb = (active: boolean) => ({
+    width: 10,
+    height: 10,
+    borderRadius: '50%',
+    bgcolor: active ? '#22c55e' : '#ef4444',
+    boxShadow: active
+      ? '0 0 6px rgba(34,197,94,0.6), 0 0 12px rgba(34,197,94,0.3)'
+      : '0 0 6px rgba(239,68,68,0.6), 0 0 12px rgba(239,68,68,0.3)',
+    transition: 'all 0.3s ease',
+    flexShrink: 0,
+  });
 
   return (
     <Box sx={{ 
@@ -423,180 +415,232 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
-          Let AI Learn Your Brand Voice
+          Let ALwrity Learn Your Brand
         </Typography>
       </Box>
 
-      {/* Input Card */}
-      <Paper elevation={0} sx={{
-        mb: 2,
-        p: 2.5,
-        borderRadius: 3,
-        border: '1px solid #E5E7EB',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
-      }}>
-        <Box sx={{ position: 'relative' }}>
-          <TextField
-            label="Your website URL (e.g., www.example.com)"
-            value={website}
-            onChange={e => setWebsite(e.target.value)}
-            fullWidth
-            placeholder="Enter your URL to instantly capture your brand voice."
-            disabled={loading}
-            InputLabelProps={{ shrink: true }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: 2,
-                bgcolor: '#F9FAFB',
-                pr: '136px',
-                '& fieldset': { borderColor: '#E5E7EB' },
-                '&:hover fieldset': { borderColor: '#7C3AED' },
-                '&.Mui-focused fieldset': { borderColor: '#7C3AED', borderWidth: 2 },
-              },
-              '& .MuiInputLabel-root': {
-                color: '#6B7280',
-                fontWeight: 500,
-                '&.Mui-focused': { color: '#7C3AED' },
-              },
-            }}
-          />
-          <Button
-            variant="contained"
-            onClick={handleAnalyze}
-            disabled={!website || loading}
-            startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AnalyticsIcon />}
-            sx={{
-              position: 'absolute',
-              right: 6,
-              top: 6,
-              bottom: 6,
-              borderRadius: '10px',
-              textTransform: 'none',
-              px: 2.5,
-              py: 0,
-              bgcolor: '#7C3AED',
-              color: '#FFFFFF',
-              fontWeight: 600,
-              fontSize: '0.875rem',
-              boxShadow: 'none',
-              zIndex: 1,
-              '&:hover': {
-                bgcolor: '#6D28D9',
-                boxShadow: 'none',
-              },
-              '&.Mui-disabled': {
-                bgcolor: '#A78BFA',
-                color: 'rgba(255,255,255,0.85)',
-              },
-            }}
-          >
-            {loading ? 'Analyzing...' : 'Analyze'}
-          </Button>
-        </Box>
-      </Paper>
-
-      {/* No Website Option */}
-      <Box sx={{ textAlign: 'center', mb: 3 }}>
-        {!showBusinessForm ? (
-          <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5, fontSize: '0.85rem' }}>
-              Don't have a live website yet?
-            </Typography>
-            <Button
-              onClick={() => {
-                console.log('🔄 Expanding business description form...');
-                setShowBusinessForm(true);
-              }}
-              startIcon={<BusinessIcon />}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 500,
-                color: '#7C3AED',
-                fontSize: '0.9rem',
-                '&:hover': { bgcolor: 'transparent', color: '#6D28D9' },
-              }}
-            >
-              Describe your business manually instead
-            </Button>
-          </>
-        ) : (
-          <Box sx={{
-            textAlign: 'left',
-            animation: 'fadeIn 0.5s ease-out'
-          }}>
-             <BusinessDescriptionStep
-                onBack={() => {
-                  console.log('⬅️ Collapsing business form...');
-                  setShowBusinessForm(false);
-                }}
-                onContinue={(businessData: any) => {
-                  console.log('➡️ Business info completed, proceeding to next step...');
-
-                  // Prepare step data combining website and business data
-                  const stepData = {
-                    website: fixUrlFormat(website),
-                    domainName: domainName,
-                    analysis: analysis,
-                    useAnalysisForGenAI: useAnalysisForGenAI,
-                    businessData: businessData
-                  };
-
-                  const cachedIntake = onboardingCache.getStepData(2) as WebsiteIntakeCache | undefined;
-                  onboardingCache.saveStepData(2, {
-                    ...cachedIntake,
-                    website: fixUrlFormat(website),
-                    analysis: analysis,
-                    businessInfo: businessData,
-                    hasWebsite: false
-                  });
-
-                  // Store in localStorage for Step 3 (Competitor Analysis)
-                  const fixedUrl = fixUrlFormat(website);
-                  if (fixedUrl) {
-                    localStorage.setItem('website_url', fixedUrl);
-                    localStorage.setItem('website_analysis_data', JSON.stringify(analysis));
-                  }
-
-                  onContinue(stepData);
-                }}
-              />
-          </Box>
-        )}
+      {/* Tab Bar */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
+        <Button
+          onClick={() => setActiveTab('website')}
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            py: 1.5,
+            px: 2,
+            borderRadius: 2,
+            textTransform: 'none',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            bgcolor: activeTab === 'website' ? '#7C3AED' : '#F3F4F6',
+            color: activeTab === 'website' ? '#FFFFFF' : '#374151',
+            '&:hover': {
+              bgcolor: activeTab === 'website' ? '#6D28D9' : '#E5E7EB',
+            },
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <Box sx={statusBulb(hasWebsiteAnalysis)} />
+          <AnalyticsIcon sx={{ fontSize: 18 }} />
+          Website Analysis
+        </Button>
+        <Button
+          onClick={() => setActiveTab('linkedin')}
+          sx={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            py: 1.5,
+            px: 2,
+            borderRadius: 2,
+            textTransform: 'none',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            bgcolor: activeTab === 'linkedin' ? '#0A66C2' : '#F3F4F6',
+            color: activeTab === 'linkedin' ? '#FFFFFF' : '#374151',
+            '&:hover': {
+              bgcolor: activeTab === 'linkedin' ? '#004182' : '#E5E7EB',
+            },
+            transition: 'all 0.2s ease',
+          }}
+        >
+          <Box sx={statusBulb(linkedinConnected)} />
+          <LinkedInIcon sx={{ fontSize: 18 }} />
+          LinkedIn
+        </Button>
       </Box>
 
-      {error && (
-        <Alert 
-          severity="error" 
-          sx={{ mb: 3 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => setShowBusinessForm(true)}>
-              ENTER MANUALLY
-            </Button>
-          }
-        >
-          {error}
-        </Alert>
-      )}
+      {/* Website Tab Content */}
+      {activeTab === 'website' && (
+        <>
+          {/* Input Card */}
+          <Paper elevation={0} sx={{
+            mb: 2,
+            p: 2.5,
+            borderRadius: 3,
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          }}>
+            <Box sx={{ position: 'relative' }}>
+              <TextField
+                label="Your website URL (e.g., www.example.com)"
+                value={website}
+                onChange={e => setWebsite(e.target.value)}
+                fullWidth
+                placeholder="Enter your URL to instantly capture your brand voice."
+                disabled={loading}
+                InputLabelProps={{ shrink: true }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: 2,
+                    bgcolor: '#F9FAFB',
+                    pr: '136px',
+                    '& fieldset': { borderColor: '#E5E7EB' },
+                    '&:hover fieldset': { borderColor: '#7C3AED' },
+                    '&.Mui-focused fieldset': { borderColor: '#7C3AED', borderWidth: 2 },
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#6B7280',
+                    fontWeight: 500,
+                    '&.Mui-focused': { color: '#7C3AED' },
+                  },
+                }}
+              />
+              <Button
+                variant="contained"
+                onClick={handleAnalyze}
+                disabled={!website || loading}
+                startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AnalyticsIcon />}
+                sx={{
+                  position: 'absolute',
+                  right: 6,
+                  top: 6,
+                  bottom: 6,
+                  borderRadius: '10px',
+                  textTransform: 'none',
+                  px: 2.5,
+                  py: 0,
+                  bgcolor: '#7C3AED',
+                  color: '#FFFFFF',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  boxShadow: 'none',
+                  zIndex: 1,
+                  '&:hover': {
+                    bgcolor: '#6D28D9',
+                    boxShadow: 'none',
+                  },
+                  '&.Mui-disabled': {
+                    bgcolor: '#A78BFA',
+                    color: 'rgba(255,255,255,0.85)',
+                  },
+                }}
+              >
+                {loading ? 'Analyzing...' : 'Analyze'}
+              </Button>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, pt: 1.5, borderTop: '1px solid #F3F4F6' }}>
+              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+                Connect Website Platforms
+              </Typography>
+              <Button
+                disabled
+                size="small"
+                startIcon={<BusinessIcon />}
+                sx={{
+                  textTransform: 'none',
+                  fontSize: '0.75rem',
+                  color: '#94a3b8',
+                  fontWeight: 500,
+                  borderRadius: '8px',
+                }}
+              >
+                Business details — Coming soon
+              </Button>
+            </Box>
+          </Paper>
 
-      {success && (
-        <Alert severity="success" sx={{ mb: 3 }}>
-          {success}
-        </Alert>
-      )}
+          {error && (
+            <Alert 
+              severity="error" 
+              sx={{ mb: 3 }}
+              action={
+                <Button color="inherit" size="small" disabled>
+                  ENTER MANUALLY — COMING SOON
+                </Button>
+              }
+            >
+              {error}
+            </Alert>
+          )}
 
-      {analysis && (
-        <Box sx={{ animation: 'fadeIn 0.8s ease-in' }}>
-          <AnalysisResultsDisplay
-            analysis={analysis}
-            crawlResult={crawlResult}
-            domainName={domainName}
-            useAnalysisForGenAI={useAnalysisForGenAI}
-            onUseAnalysisChange={setUseAnalysisForGenAI}
-            onAnalysisUpdate={handleAnalysisUpdate}
-            warning={analysisWarning || undefined}
-            onSave={() => saveAnalysis(analysis)}
+          {success && (
+            <Alert severity="success" sx={{ mb: 3 }}>
+              {success}
+            </Alert>
+          )}
+
+          {analysis && (
+            <Box sx={{ animation: 'fadeIn 0.8s ease-in', mb: 3 }}>
+              <AnalysisResultsDisplay
+                analysis={analysis}
+                crawlResult={crawlResult}
+                domainName={domainName}
+                useAnalysisForGenAI={useAnalysisForGenAI}
+                onUseAnalysisChange={setUseAnalysisForGenAI}
+                onAnalysisUpdate={handleAnalysisUpdate}
+                warning={analysisWarning || undefined}
+                onSave={() => saveAnalysis(analysis)}
+              />
+            </Box>
+          )}
+
+          <WebsiteIntegrationsSection
+            websiteUrl={website}
+            onIntegrationChange={handleIntegrationChange}
           />
-        </Box>
+        </>
+      )}
+
+      {/* LinkedIn Tab Content */}
+      {activeTab === 'linkedin' && (
+        <Paper
+          elevation={0}
+          sx={{
+            p: 2.5,
+            borderRadius: 3,
+            border: '1px solid #E5E7EB',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+            <Box
+              sx={{
+                color: '#0A66C2',
+                bgcolor: '#ffffff',
+                p: 0.5,
+                borderRadius: 1,
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+              }}
+            >
+              <LinkedInIcon fontSize="small" />
+            </Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+              LinkedIn
+            </Typography>
+          </Box>
+          <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+            Connect your LinkedIn profile for professional content publishing.
+          </Typography>
+          <LinkedInPlatformCard
+            connectedPlatforms={linkedinConnected ? ['linkedin'] : []}
+            setConnectedPlatforms={handleLinkedInPlatformsChange}
+          />
+        </Paper>
       )}
 
       {/* Analysis Progress Modal */}
