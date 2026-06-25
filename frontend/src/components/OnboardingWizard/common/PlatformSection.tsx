@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -47,6 +47,7 @@ interface PlatformSectionProps {
   onDisconnect?: (platformId: string) => void;
   setConnectedPlatforms?: (platforms: string[]) => void;
   fadeTimeout?: number;
+  filterPlatformIds?: string[];
 }
 
 const PlatformSection: React.FC<PlatformSectionProps> = ({
@@ -59,7 +60,8 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
   onConnect,
   onDisconnect,
   setConnectedPlatforms,
-  fadeTimeout = 800
+  fadeTimeout = 800,
+  filterPlatformIds,
 }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -91,10 +93,20 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
     }
   };
 
-  const platformsWithStatus = platforms.map(platform => ({
-    ...platform,
-    status: connectedPlatforms.includes(platform.id) ? 'connected' : platform.status
-  }));
+  const visiblePlatforms = useMemo(
+    () => filterPlatformIds
+      ? platforms.filter(p => filterPlatformIds.includes(p.id))
+      : platforms,
+    [platforms, filterPlatformIds],
+  );
+
+  const platformsWithStatus = useMemo(
+    () => visiblePlatforms.map(platform => ({
+      ...platform,
+      status: connectedPlatforms.includes(platform.id) ? 'connected' : platform.status,
+    })),
+    [visiblePlatforms, connectedPlatforms],
+  );
 
   return (
     <Box sx={{ mb: 4 }}>
