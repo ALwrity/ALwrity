@@ -10,6 +10,8 @@ import React, { useEffect, useState } from 'react';
 
 import {
 
+  Avatar,
+
   Box,
 
   Card,
@@ -83,6 +85,14 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
     hasPerUserToken,
 
     accountName,
+
+    displayName,
+
+    avatarUrl,
+
+    primaryProfile,
+
+    profileLoadWarning,
 
     accounts,
 
@@ -288,11 +298,75 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
         <Box mt={1} display="flex" flexDirection="column" gap={1.5}>
 
-          {accountName && (
+          <Box display="flex" alignItems="center" gap={1.5} mb={1}>
 
-            <Typography variant="caption" sx={{ color: '#334155' }}>
+            {avatarUrl ? (
 
-              {accountName}
+              <Avatar src={avatarUrl} alt={displayName} sx={{ width: 40, height: 40 }} />
+
+            ) : (
+
+              <Box
+
+                sx={{
+
+                  width: 40,
+
+                  height: 40,
+
+                  borderRadius: '50%',
+
+                  bgcolor: '#0A66C2',
+
+                  display: 'flex',
+
+                  alignItems: 'center',
+
+                  justifyContent: 'center',
+
+                  color: '#fff',
+
+                  fontSize: 16,
+
+                  fontWeight: 700,
+
+                }}
+
+              >
+
+                {(displayName || accountName || 'L')[0]}
+
+              </Box>
+
+            )}
+
+            <Box>
+
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', lineHeight: 1.3 }}>
+
+                {displayName || accountName || 'LinkedIn account'}
+
+              </Typography>
+
+              {primaryProfile?.accountTypeLabel && (
+
+                <Typography variant="caption" sx={{ color: '#64748b' }}>
+
+                  {primaryProfile.accountTypeLabel}
+
+                </Typography>
+
+              )}
+
+            </Box>
+
+          </Box>
+
+          {profileLoadWarning && (
+
+            <Typography variant="caption" sx={{ color: '#b91c1c', display: 'block', mb: 1 }}>
+
+              {profileLoadWarning}
 
             </Typography>
 

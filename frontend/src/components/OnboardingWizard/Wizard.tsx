@@ -88,8 +88,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     trace(`Wizard: Validating step ${step} with data:`, data);
     
     switch (step) {
-      case 0: // Website Analysis
-        return !!(data && (data.website || data.website_url));
+      case 0: // Website Analysis — website URL or LinkedIn connection is sufficient
+        return !!(data && (data.website || data.website_url || data?.integrations?.connectedPlatforms?.includes('linkedin')));
       
       case 1: // Competitor Analysis
         return !!(data && (data.competitors || data.researchSummary || data.sitemapAnalysis));
@@ -577,7 +577,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     const hasCoreStepData = currentStepData && typeof currentStepData === 'object' && (
       currentStepData.website || 
       currentStepData.businessData || 
-      currentStepData.linkedinConnected ||
       currentStepData.competitors ||
       currentStepData.researchSummary ||
       currentStepData.sitemapAnalysis ||
