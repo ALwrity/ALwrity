@@ -16,6 +16,7 @@ from ..onboarding.api_key_manager import APIKeyManager
 from .gemini_provider import gemini_text_response, gemini_structured_json_response
 from .huggingface_provider import huggingface_text_response, huggingface_structured_json_response
 from .tenant_provider_config import tenant_provider_config_resolver
+from .litellm_provider import litellm_text_response, litellm_structured_json_response
 
 
 HF_MODEL_MAPPING = {
@@ -109,6 +110,9 @@ def llm_text_gen(
             elif primary_provider in ['openai', 'gpt']:
                 gpt_provider = "openai"
                 model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+            elif primary_provider == 'litellm':
+                gpt_provider = "litellm"
+                model = os.getenv('LITELLM_MODEL', 'openai/gpt-4o')
             else:
                 logger.warning(f"[llm_text_gen] Unknown GPT_PROVIDER: {primary_provider}, using auto-select")
                 gpt_provider = None
@@ -126,6 +130,9 @@ def llm_text_gen(
             elif preferred_provider in ['hf_response_api', 'huggingface', 'hf']:
                 gpt_provider = "huggingface"
                 model = "openai/gpt-oss-120b:cerebras"
+            elif preferred_provider == 'litellm':
+                gpt_provider = "litellm"
+                model = os.getenv('LITELLM_MODEL', 'openai/gpt-4o')
             else:
                 gpt_provider = None
                 model = None
@@ -170,6 +177,8 @@ def llm_text_gen(
             available_providers.append("huggingface")
         if api_key_manager.get_api_key("wavespeed"):
             available_providers.append("wavespeed")
+        if os.getenv("LITELLM_API_KEY") or os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_API_KEY"):
+            available_providers.append("litellm")
         
         logger.warning(
             f"[llm_text_gen][{flow_tag}] Provider preflight: env_provider='{env_provider or 'auto'}', "
@@ -221,7 +230,10 @@ def llm_text_gen(
         elif gpt_provider == "openai":
             provider_enum = APIProvider.OPENAI
             actual_provider_name = "openai"
-        
+        elif gpt_provider == "litellm":
+            provider_enum = APIProvider.OPENAI
+            actual_provider_name = "litellm"
+
         if not provider_enum:
             # For unknown providers, try to proceed without subscription tracking
             logger.warning(f"[llm_text_gen] Unknown provider {gpt_provider}, proceeding without subscription check")
@@ -406,9 +418,27 @@ def llm_text_gen(
                 api_took_ms = (time.time() - t1) * 1000
                 total_ms = (time.time() - t0) * 1000
                 logger.warning(f"[llm_text_gen][{flow_tag}] wavespeed: user={user_id} import_took={(t1-t0)*1000:.0f}ms api_took={api_took_ms:.0f}ms total={total_ms:.0f}ms")
+            elif gpt_provider == "litellm":
+                if json_struct:
+                    response_text = litellm_structured_json_response(
+                        prompt=prompt,
+                        schema=json_struct,
+                        model=model or "openai/gpt-4o",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_instructions
+                    )
+                else:
+                    response_text = litellm_text_response(
+                        prompt=prompt,
+                        model=model or "openai/gpt-4o",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_instructions
+                    )
             else:
                 logger.error(f"[llm_text_gen] Unknown provider: {gpt_provider}")
-                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed")
+                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed, litellm")
             
             # TRACK USAGE after successful API call
             if response_text:
