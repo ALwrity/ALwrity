@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import type { NetworkSuggestionItem } from '../../../../services/linkedInGrowthApi';
 import { DataSourceBadge } from './DataSourceBadge';
 import { EmptyState } from './EmptyState';
-import { cardBase, headerRow, primaryBtn, secondaryBtn, rowBase, colors } from './styles';
+import { cardBase, headerRow, primaryBtn, secondaryBtn, rowBase, CONFIDENCE_COLORS, colors } from './styles';
 
 interface NetworkSuggestionCardProps {
   suggestions: NetworkSuggestionItem[];
@@ -111,6 +111,16 @@ const PersonRow: React.FC<PersonRowProps> = React.memo(({
             · {person.title} @ {person.company}
           </span>
         </div>
+        <span
+          style={{
+            background: (CONFIDENCE_COLORS[person.confidence] || CONFIDENCE_COLORS.medium).bg,
+            color: (CONFIDENCE_COLORS[person.confidence] || CONFIDENCE_COLORS.medium).text,
+            padding: '1px 5px', borderRadius: 3, fontWeight: 600, fontSize: 10,
+            marginLeft: 'auto',
+          }}
+        >
+          {person.confidence} priority
+        </span>
       </div>
 
       <div

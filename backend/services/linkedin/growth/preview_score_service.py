@@ -22,13 +22,7 @@ class PreviewScoreService:
         """Score a post draft across multiple quality dimensions."""
         result = await self._llm_score_post(request, user_id)
         if result is None:
-            return PostPreviewScoreResponse(
-                overall_score=50,
-                dimensions=[],
-                top_improvement="Could not analyze post. Try again with more content.",
-                data_source_summary="AI-based analysis of your post content.",
-                generated_at=datetime.now(timezone.utc),
-            )
+            raise RuntimeError("Preview score LLM generation returned no result")
 
         dimensions = [PostPreviewDimension(**d) for d in result.get("dimensions", [])]
         return PostPreviewScoreResponse(
@@ -73,7 +67,7 @@ class PreviewScoreService:
 
         prompt = (
             f"Post content:\n{request.content}\n\n"
-            f"Context: {request.context or 'No additional context provided.'}\n"
+            f"Context: {request.context or ''}\n"
             f"Word count: {len(request.content.split())}\n\n"
             "Score this LinkedIn post. Return JSON with 'dimensions' array of "
             "exactly 6 items, 'overall_score' (integer), and 'top_improvement' (string)."

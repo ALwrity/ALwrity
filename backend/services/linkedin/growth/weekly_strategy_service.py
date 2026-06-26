@@ -28,25 +28,20 @@ class WeeklyStrategyService:
         return self._exa_provider
 
     def _resolve_industry_and_title(self, user_id: str) -> tuple[str, str]:
-        industry = "Technology"
-        title = "professional"
-        try:
-            repo = self._get_profile_repo()
-            context = repo.get_profile_context(user_id)
-            if context and isinstance(context, dict):
-                ind = context.get("industry", "").strip()
-                if ind:
-                    industry = ind
-                t = (
-                    context.get("professional_information", {})
-                    .get("title", "")
-                    .strip()
-                )
-                if t:
-                    title = t
-        except Exception as exc:
-            logger.debug("[WeeklyStrategy] Could not load profile context: {}", exc)
-        return industry, title
+        repo = self._get_profile_repo()
+        context = repo.get_profile_context(user_id)
+        if not context or not isinstance(context, dict):
+            raise ValueError("Could not resolve profile context")
+
+        industry = context.get("industry", "").strip()
+        title = (
+            context.get("professional_information", {})
+            .get("title", "")
+            .strip()
+        ) if isinstance(context.get("professional_information"), dict) else ""
+        if not industry:
+            raise ValueError("Could not resolve user industry from profile context")
+        return industry, title or ""
 
     def _week_start(self) -> str:
         """Return Monday of the current week as ISO date."""
@@ -213,14 +208,4 @@ class WeeklyStrategyService:
         if result is not None:
             return result
 
-        return WeeklyStrategyResponse(
-            theme="Build your authority",
-            week_of=self._week_start(),
-            daily_posts=[],
-            key_topics=[],
-            focus_area="Content consistency",
-            data_source_summary=(
-                f"Based on your LinkedIn profile ({title} in {industry})"
-            ),
-            generated_at=datetime.now(timezone.utc),
-        )
+        raise RuntimeError("LLM strategy generation returned no result")

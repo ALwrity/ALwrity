@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import type { EngagementOpportunityItem } from '../../../../services/linkedInGrowthApi';
 import { DataSourceBadge } from './DataSourceBadge';
 import { EmptyState } from './EmptyState';
-import { cardBase, headerRow, primaryBtn, greenBtn, secondaryBtn, rowBase, colors } from './styles';
+import { cardBase, headerRow, primaryBtn, greenBtn, secondaryBtn, rowBase, CONFIDENCE_COLORS, colors } from './styles';
 
 interface EngagementCardProps {
   opportunities: EngagementOpportunityItem[];
@@ -110,8 +110,18 @@ const EngagementRow: React.FC<EngagementRowProps> = React.memo(({
         <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, lineHeight: 1.4 }}>
           📢 {item.title}
         </div>
-        <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+        <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
           by {item.author} ({item.author_context})
+          <span
+            style={{
+              background: (CONFIDENCE_COLORS[item.confidence] || CONFIDENCE_COLORS.medium).bg,
+              color: (CONFIDENCE_COLORS[item.confidence] || CONFIDENCE_COLORS.medium).text,
+              padding: '1px 5px', borderRadius: 3, fontWeight: 600, fontSize: 10,
+              display: 'inline-block',
+            }}
+          >
+            {item.confidence} priority
+          </span>
         </div>
       </div>
 

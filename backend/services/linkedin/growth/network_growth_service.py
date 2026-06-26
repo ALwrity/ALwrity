@@ -35,23 +35,23 @@ class NetworkGrowthService:
 
     def _resolve_profile(self, user_id: str) -> Dict[str, Any]:
         """Resolve the user's profile context."""
-        result = {"industry": "Technology", "title": "Professional", "headline": ""}
-        try:
-            repo = self._get_profile_repo()
-            context = repo.get_profile_context(user_id)
-            if context and isinstance(context, dict):
-                result["industry"] = context.get("industry", "").strip() or "Technology"
-                headline = ""
-                personal = context.get("personal_information", {})
-                professional = context.get("professional_information", {})
-                if isinstance(personal, dict):
-                    result["headline"] = personal.get("headline", "") or ""
-                if isinstance(professional, dict):
-                    result["title"] = professional.get("title", "") or "Professional"
-                logger.info("[NetworkGrowth] Resolved profile: industry={} title={}",
-                            result["industry"], result["title"])
-        except Exception as exc:
-            logger.debug("[NetworkGrowth] Could not load profile context: {}", exc)
+        repo = self._get_profile_repo()
+        context = repo.get_profile_context(user_id)
+        if not context or not isinstance(context, dict):
+            raise ValueError("Could not resolve profile context")
+
+        industry = context.get("industry", "").strip()
+        if not industry:
+            raise ValueError("Could not resolve user industry from profile context")
+
+        personal = context.get("personal_information", {}) or {}
+        professional = context.get("professional_information", {}) or {}
+        result = {
+            "industry": industry,
+            "title": (professional.get("title", "") if isinstance(professional, dict) else "") or "",
+            "headline": (personal.get("headline", "") if isinstance(personal, dict) else "") or "",
+        }
+        logger.info("[NetworkGrowth] Resolved profile: industry={} title={}", result["industry"], result["title"])
         return result
 
     async def _search_people(

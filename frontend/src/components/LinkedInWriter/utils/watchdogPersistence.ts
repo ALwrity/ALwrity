@@ -13,6 +13,7 @@ const KEYS = {
   PEOPLE: `${STORAGE_PREFIX}people`,
   UPDATES: `${STORAGE_PREFIX}updates`,
   LAST_REFRESH: `${STORAGE_PREFIX}last-refresh`,
+  POLL_INTERVAL: `${STORAGE_PREFIX}poll-interval`,
 } as const;
 
 function safeGet<T>(key: string, fallback: T): T {
@@ -118,6 +119,16 @@ export class WatchdogPersistenceManager {
       people: this.loadPeople(),
       updates: this.loadUpdates(),
     };
+  }
+
+  // ── Poll interval ─────────────────────────────────────────────
+
+  savePollInterval(ms: number): void {
+    safeSet(KEYS.POLL_INTERVAL, ms);
+  }
+
+  loadPollInterval(): number | null {
+    return safeGet<number | null>(KEYS.POLL_INTERVAL, null);
   }
 
   clearAll(): void {

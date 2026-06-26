@@ -75,7 +75,7 @@ async def get_trending_topics(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_trending_topics failed: {}", e)
+        logger.error("[Growth] get_trending_topics failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -98,7 +98,7 @@ async def get_network_suggestions(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_network_suggestions failed: {}", e)
+        logger.error("[Growth] get_network_suggestions failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -122,7 +122,7 @@ async def get_engagement_opportunities(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_engagement_opportunities failed: {}", e)
+        logger.error("[Growth] get_engagement_opportunities failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -147,7 +147,7 @@ async def get_preview_score(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_preview_score failed: {}", e)
+        logger.error("[Growth] get_preview_score failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -171,7 +171,7 @@ async def get_viral_analysis(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_viral_analysis failed: {}", e)
+        logger.error("[Growth] get_viral_analysis failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -195,7 +195,7 @@ async def get_weekly_strategy(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_weekly_strategy failed: {}", e)
+        logger.error("[Growth] get_weekly_strategy failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -219,7 +219,7 @@ async def get_content_gaps(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_content_gaps failed: {}", e)
+        logger.error("[Growth] get_content_gaps failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -243,7 +243,7 @@ async def get_brand_scorecard(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] get_brand_scorecard failed: {}", e)
+        logger.error("[Growth] get_brand_scorecard failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -268,5 +268,5 @@ async def analyze_all_growth(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("[Growth] analyze_all_growth failed: {}", e)
+        logger.error("[Growth] analyze_all_growth failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

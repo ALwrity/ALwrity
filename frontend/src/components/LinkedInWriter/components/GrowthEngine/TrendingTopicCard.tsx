@@ -2,7 +2,7 @@ import React from 'react';
 import type { TrendingTopicItem } from '../../../../services/linkedInGrowthApi';
 import { DataSourceBadge } from './DataSourceBadge';
 import { EmptyState } from './EmptyState';
-import { cardBase, headerRow, dismissBtn, roundBtn, colors } from './styles';
+import { cardBase, headerRow, dismissBtn, roundBtn, CONFIDENCE_COLORS, colors } from './styles';
 
 interface TrendingTopicCardProps {
   industry: string;
@@ -61,9 +61,19 @@ export const TrendingTopicCard: React.FC<TrendingTopicCardProps> = React.memo(({
             <div style={{ fontWeight: 700, fontSize: 13, color: colors.textDark, marginBottom: 2 }}>
               {t.topic}
             </div>
-            <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 8, lineHeight: 1.4 }}>
+            <div style={{ fontSize: 11, color: colors.textSecondary, marginBottom: 6, lineHeight: 1.4 }}>
               {t.why_now}
             </div>
+            <span
+              style={{
+                background: (CONFIDENCE_COLORS[t.confidence] || CONFIDENCE_COLORS.medium).bg,
+                color: (CONFIDENCE_COLORS[t.confidence] || CONFIDENCE_COLORS.medium).text,
+                padding: '1px 6px', borderRadius: 3, fontWeight: 600, fontSize: 10,
+                marginBottom: 8, display: 'inline-block',
+              }}
+            >
+              {t.confidence} priority
+            </span>
             <button
               onClick={() => onPostAbout(t.topic, t.suggested_hook)}
               style={roundBtn}

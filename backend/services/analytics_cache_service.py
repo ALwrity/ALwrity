@@ -124,6 +124,48 @@ class AnalyticsCacheService:
         self.stats['invalidations'] += len(keys_to_delete)
         return len(keys_to_delete)
 
+    # ------------------------------------------------------------------
+    # raw-key methods (for services that manage their own keys)
+    # ------------------------------------------------------------------
+    def raw_get(self, key: str) -> Optional[Any]:
+        """Get a cached value by raw key (no prefix/user_id/kwargs)."""
+        entry = self.cache.get(key)
+        if entry is None:
+            self.stats['misses'] += 1
+            return None
+        if self._is_expired(entry):
+            del self.cache[key]
+            self.stats['misses'] += 1
+            return None
+        self.stats['hits'] += 1
+        return entry['data']
+
+    def raw_set(self, key: str, value: Any, ttl_seconds: int = 300) -> None:
+        """Store a value by raw key with the given TTL."""
+        self.cache[key] = {
+            'data': value,
+            'timestamp': time.time(),
+            'ttl': ttl_seconds,
+            'created_at': datetime.now().isoformat(),
+        }
+        self.stats['sets'] += 1
+
+    def raw_delete(self, key: str) -> bool:
+        """Delete a single entry by raw key. Returns True if deleted."""
+        if key in self.cache:
+            del self.cache[key]
+            return True
+        return False
+
+    def raw_invalidate_prefix(self, prefix: str) -> int:
+        """Delete all entries whose key starts with *prefix*. Returns count."""
+        keys = [k for k in self.cache if k.startswith(prefix)]
+        for k in keys:
+            del self.cache[k]
+        if keys:
+            self.stats['invalidations'] += len(keys)
+        return len(keys)
+
     def cleanup_expired(self) -> int:
         """Remove expired entries from cache"""
         keys_to_delete = []

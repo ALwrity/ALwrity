@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import os
 from typing import Dict, Any, Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -24,7 +25,15 @@ def _resolve_user_id(current_user: Dict[str, Any]) -> str:
 
 
 def _build_webhook_url(request: Request) -> str:
-    """Construct the webhook URL from the incoming request base."""
+    """Construct the webhook URL from the incoming request base.
+
+    Respects the EXA_WEBHOOK_BASE_URL env var so deployments can
+    override with a public HTTPS endpoint (required by Exa's API).
+    Falls back to the incoming request's base URL.
+    """
+    api_url = os.getenv("REACT_APP_API_URL")
+    if api_url:
+        return api_url.rstrip("/") + "/api/linkedin/watchdog/webhook"
     base = str(request.base_url).rstrip("/")
     return f"{base}/api/linkedin/watchdog/webhook"
 

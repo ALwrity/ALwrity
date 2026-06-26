@@ -5,12 +5,23 @@ import { WatchdogUpdateCard } from './WatchdogUpdateCard';
 import { WatchdogAddForm } from './WatchdogAddForm';
 import { ConfirmDialog } from './ConfirmDialog';
 import { getLinkedInProfile } from '../../../api/linkedinSocial';
+import { type LinkedInPreferences } from '../utils/storageUtils';
 
 type Tab = 'industry' | 'company' | 'person';
 
+const POLL_INTERVAL_OPTIONS = [
+  { label: 'Every 30 min', ms: 1_800_000 },
+  { label: 'Every 1 hour', ms: 3_600_000 },
+  { label: 'Every 6 hours', ms: 21_600_000 },
+  { label: 'Manual only', ms: 0 },
+] as const;
+
+const DEFAULT_POLL_INTERVAL_MS = 21_600_000; // 6 hours — matches backend
+
 interface WatchdogDashboardProps {
   onClose: () => void;
-  onGeneratePost: (topic: string, context: string) => void;
+  generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  userPreferences: LinkedInPreferences;
   onUnreadChanged: (count: number) => void;
 }
 
@@ -54,7 +65,8 @@ const tabLabels: Record<Tab, string> = {
 
 export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
   onClose,
-  onGeneratePost,
+  generatePost,
+  userPreferences,
   onUnreadChanged,
 }) => {
   const [tab, setTab] = useState<Tab>('industry');
@@ -75,6 +87,17 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
   const [confirmDelete, setConfirmDelete] = useState<{ category: string; id: string; name: string } | null>(null);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
+  const [pollIntervalMs, setPollIntervalMs] = useState<number>(
+    persistence.loadPollInterval() ?? DEFAULT_POLL_INTERVAL_MS
+  );
+  const [showPollMenu, setShowPollMenu] = useState(false);
+  const [creationModal, setCreationModal] = useState<{
+    visible: boolean;
+    topic: string;
+    context: string;
+    loading: boolean;
+    error: string;
+  }>({ visible: false, topic: '', context: '', loading: false, error: '' });
   const prevUnreadRef = useRef(0);
   const isFirstAutoRefresh = useRef(true);
 
@@ -122,8 +145,9 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
     fetchFromApi();
   }, [loadFromLocal, fetchFromApi]);
 
-  // Auto-refresh while dashboard is open
+  // Auto-refresh while dashboard is open (respects user-configured interval)
   useEffect(() => {
+    if (pollIntervalMs === 0) return;
     const interval = setInterval(async () => {
       try {
         const updatesRes = await linkedInWatchdogApi.getUpdates();
@@ -142,9 +166,9 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
         setLastRefresh(now);
         persistence.saveLastRefresh(now);
       } catch { /* ignore */ }
-    }, 30_000);
+    }, pollIntervalMs);
     return () => clearInterval(interval);
-  }, [onUnreadChanged]);
+  }, [onUnreadChanged, pollIntervalMs]);
 
   // Auto-dismiss toast
   useEffect(() => {
@@ -251,12 +275,35 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
   };
 
   const handleGeneratePost = (update: WatchdogUpdate) => {
-    onGeneratePost(
-      update.title,
-      `Topic: ${update.title}\nSummary: ${update.summary}\nSource: ${update.url}`
-    );
-    onClose();
+    setCreationModal({
+      visible: true,
+      topic: update.title,
+      context: `Topic: ${update.title}\nSummary: ${update.summary}\nSource: ${update.url}`,
+      loading: false,
+      error: '',
+    });
   };
+
+  const handleGenerateInModal = useCallback(async () => {
+    setCreationModal((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const result = await generatePost({
+        topic: creationModal.topic,
+        context: creationModal.context,
+        ...userPreferences,
+      });
+      if (result.success) {
+        setCreationModal({ visible: false, topic: '', context: '', loading: false, error: '' });
+      } else {
+        setCreationModal((prev) => ({ ...prev, loading: false, error: result.error || 'Generation failed' }));
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Generation failed';
+      setCreationModal((prev) => ({ ...prev, loading: false, error: msg }));
+    }
+  }, [generatePost, creationModal.topic, creationModal.context, userPreferences]);
+
+  const pollLabel = POLL_INTERVAL_OPTIONS.find((o) => o.ms === pollIntervalMs)?.label || 'Manual';
 
   const handlePersonalize = async () => {
     setPersonalizing(true);
@@ -335,12 +382,60 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
             <span style={{ fontSize: 20 }}>🔍</span>
             <span style={{ fontWeight: 700, fontSize: 16 }}>Industry Watchdog</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {lastRefresh && (
               <span style={{ fontSize: 11, opacity: 0.7 }}>
                 {new Date(lastRefresh).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
+            {/* Poll interval selector */}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowPollMenu((p) => !p)}
+                title="Auto-refresh interval"
+                style={{
+                  padding: '4px 8px',
+                  background: 'rgba(255,255,255,0.15)',
+                  color: '#fff',
+                  border: '1px solid rgba(255,255,255,0.25)',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 11,
+                  fontWeight: 600,
+                }}
+              >
+                ⏱ {pollLabel}
+              </button>
+              {showPollMenu && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: 4,
+                  background: '#fff', borderRadius: 8, boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                  border: '1px solid #e5e7eb', zIndex: 10, minWidth: 150, overflow: 'hidden',
+                }}>
+                  {POLL_INTERVAL_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.ms}
+                      onClick={() => {
+                        setPollIntervalMs(opt.ms);
+                        persistence.savePollInterval(opt.ms);
+                        setShowPollMenu(false);
+                      }}
+                      style={{
+                        display: 'block', width: '100%', padding: '8px 14px',
+                        background: pollIntervalMs === opt.ms ? '#eff6ff' : '#fff',
+                        color: pollIntervalMs === opt.ms ? '#0a66c2' : '#374151',
+                        border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: pollIntervalMs === opt.ms ? 700 : 500,
+                        textAlign: 'left',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = pollIntervalMs === opt.ms ? '#eff6ff' : '#fff'; }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -566,35 +661,77 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
               onCancel={() => setShowAddForm(false)}
             />
           ) : watchedItems.length === 0 && filteredUpdates.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 20px', color: '#9ca3af' }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>📡</div>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#6b7280', marginBottom: 8 }}>
-                No {tabLabels[tab].toLowerCase()} watched yet
+            <div style={{ padding: '32px 20px' }}>
+
+              {/* ── Hero section ── */}
+              <div style={{ textAlign: 'center', marginBottom: 28 }}>
+                <div style={{ fontSize: 40, marginBottom: 10 }}>🔍</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: '#111827', marginBottom: 6 }}>
+                  Welcome to Industry Watchdog
+                </div>
+                <div style={{ fontSize: 14, color: '#6b7280', maxWidth: 440, margin: '0 auto', lineHeight: 1.6 }}>
+                  Never miss a trend. We monitor the web for news about industries, companies,
+                  and people you care about — so you can turn breaking stories into LinkedIn posts
+                  in one click.
+                </div>
               </div>
-              <div style={{ fontSize: 13, marginBottom: 20 }}>
-                Add industries, companies, or people to monitor and get notified about the latest news.
+
+              {/* ── How it works (3 steps) ── */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16,
+                maxWidth: 620, margin: '0 auto 28px',
+              }}>
+                {[
+                  { step: '1', icon: '➕', title: 'Add what matters',
+                    desc: 'Pick industries, companies, or people relevant to your niche.' },
+                  { step: '2', icon: '📡', title: 'We monitor 24/7',
+                    desc: 'AI-powered web searches find relevant articles and news automatically.' },
+                  { step: '3', icon: '✍️', title: 'Post in one click',
+                    desc: 'Turn any update into a LinkedIn post with a single click.' },
+                ].map(({ step, icon, title, desc }) => (
+                  <div key={step} style={{
+                    background: '#f9fafb', borderRadius: 12, padding: '18px 14px',
+                    textAlign: 'center', border: '1px solid #e5e7eb',
+                  }}>
+                    <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700, color: '#0a66c2',
+                      marginBottom: 3,
+                    }}>
+                      Step {step}
+                    </div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', marginBottom: 4 }}>
+                      {title}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.4 }}>
+                      {desc}
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              {/* ── Action buttons ── */}
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={() => setShowAddForm(true)}
                   style={{
-                    padding: '10px 20px',
+                    padding: '10px 22px',
                     background: '#0a66c2',
                     color: '#fff',
                     border: 'none',
                     borderRadius: 8,
                     cursor: 'pointer',
                     fontSize: 14,
-                    fontWeight: 600,
+                    fontWeight: 700,
                   }}
                 >
-                  + Add {tab === 'industry' ? 'Industry' : tab === 'company' ? 'Company' : 'Person'}
+                  + Add {tab === 'industry' ? 'an Industry' : tab === 'company' ? 'a Company' : 'a Person'}
                 </button>
                 <button
                   onClick={handlePersonalize}
                   disabled={personalizing}
                   style={{
-                    padding: '10px 20px',
+                    padding: '10px 22px',
                     background: personalizing ? '#e5e7eb' : '#fff',
                     color: personalizing ? '#9ca3af' : '#0a66c2',
                     border: '1px solid #0a66c2',
@@ -604,8 +741,18 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
                     fontWeight: 600,
                   }}
                 >
-                  {personalizing ? 'Loading...' : 'Personalize from LinkedIn Profile'}
+                  {personalizing ? 'Loading...' : '🎯 Auto-add from LinkedIn Profile'}
                 </button>
+              </div>
+
+              {/* ── Tip ── */}
+              <div style={{
+                marginTop: 24, padding: '12px 16px', background: '#fffbeb',
+                border: '1px solid #fde68a', borderRadius: 8, maxWidth: 500,
+                margin: '24px auto 0', fontSize: 12, color: '#92400e', lineHeight: 1.5,
+              }}>
+                💡 <strong>Pro tip:</strong> Click "Auto-add from LinkedIn Profile" to instantly
+                start monitoring your industry and company — no typing required.
               </div>
             </div>
           ) : (
@@ -701,8 +848,14 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {filteredUpdates.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: '24px', color: '#9ca3af', fontSize: 13 }}>
-                    No recent updates. Click "Refresh" to check for new content.
+                  <div style={{ textAlign: 'center', padding: '24px' }}>
+                    <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 4 }}>
+                      No recent updates found.
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af' }}>
+                      New articles are checked automatically every few hours.
+                      Click <strong>Refresh</strong> to check now.
+                    </div>
                   </div>
                 )}
                 {filteredUpdates.map((update) => (
@@ -714,9 +867,149 @@ export const WatchdogDashboard: React.FC<WatchdogDashboardProps> = ({
                   />
                 ))}
               </div>
+
+              {/* ── What is this? footer ── */}
+              {(watchedItems.length > 0 || filteredUpdates.length > 0) && (
+                <div style={{
+                  marginTop: 20, padding: '12px 16px', background: '#f0f7ff',
+                  border: '1px solid #dbeafe', borderRadius: 8, fontSize: 12, color: '#1e40af',
+                  lineHeight: 1.6,
+                }}>
+                  <strong>📡 About the Watchdog</strong> — We monitor the web using AI-powered
+                  searches for each item you add. When new articles are found, they appear here.
+                  Click <strong>"Generate Post"</strong> on any update to turn it into a
+                  LinkedIn post with one click.
+                </div>
+              )}
             </>
           )}
         </div>
+        {/* ── Post creation modal ── */}
+        {creationModal.visible && (
+          <div
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 10020, padding: 20,
+            }}
+            onClick={() => { if (!creationModal.loading) setCreationModal((p) => ({ ...p, visible: false })); }}
+          >
+            <div
+              style={{
+                background: 'white', width: 520, maxWidth: '100%', borderRadius: 16,
+                boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{
+                padding: 16, borderBottom: '1px solid #e5e7eb',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>
+                  📝 Generate Post from Watchdog Update
+                </div>
+                <button
+                  onClick={() => setCreationModal((p) => ({ ...p, visible: false }))}
+                  disabled={creationModal.loading}
+                  style={{
+                    background: 'none', border: 'none', fontSize: 20, cursor: creationModal.loading ? 'not-allowed' : 'pointer',
+                    color: '#6b7280', padding: '4px 8px', borderRadius: 6, opacity: creationModal.loading ? 0.4 : 1,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div style={{ padding: 16, maxHeight: '60vh', overflow: 'auto' }}>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>
+                    Topic
+                  </label>
+                  <input
+                    value={creationModal.topic}
+                    onChange={(e) => setCreationModal((p) => ({ ...p, topic: e.target.value }))}
+                    placeholder="Post topic"
+                    disabled={creationModal.loading}
+                    style={{
+                      width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                      fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                      opacity: creationModal.loading ? 0.6 : 1,
+                    }}
+                  />
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>
+                    Context
+                  </label>
+                  <textarea
+                    value={creationModal.context}
+                    onChange={(e) => setCreationModal((p) => ({ ...p, context: e.target.value }))}
+                    placeholder="Additional context for the post"
+                    rows={3}
+                    disabled={creationModal.loading}
+                    style={{
+                      width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                      fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit',
+                      boxSizing: 'border-box', opacity: creationModal.loading ? 0.6 : 1,
+                    }}
+                  />
+                </div>
+                {creationModal.error && (
+                  <div style={{
+                    padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca',
+                    borderRadius: 8, fontSize: 13, color: '#991b1b', marginBottom: 14,
+                  }}>
+                    {creationModal.error}
+                  </div>
+                )}
+              </div>
+
+              <div style={{
+                padding: '12px 16px', borderTop: '1px solid #e5e7eb',
+                display: 'flex', justifyContent: 'flex-end', gap: 8,
+              }}>
+                <button
+                  onClick={() => setCreationModal((p) => ({ ...p, visible: false }))}
+                  disabled={creationModal.loading}
+                  style={{
+                    padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8,
+                    background: 'white', cursor: creationModal.loading ? 'not-allowed' : 'pointer',
+                    fontSize: 14, fontWeight: 600, opacity: creationModal.loading ? 0.5 : 1,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateInModal}
+                  disabled={creationModal.loading || !creationModal.topic.trim()}
+                  style={{
+                    padding: '10px 24px', border: 'none', borderRadius: 8,
+                    background: creationModal.loading || !creationModal.topic.trim() ? '#9ca3af' : '#0a66c2',
+                    color: 'white', cursor: creationModal.loading || !creationModal.topic.trim() ? 'not-allowed' : 'pointer',
+                    fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8,
+                    opacity: creationModal.loading || !creationModal.topic.trim() ? 0.7 : 1,
+                  }}
+                >
+                  {creationModal.loading && (
+                    <div style={{
+                      width: 14, height: 14, borderRadius: '50%',
+                      border: '2px solid white', borderTopColor: 'transparent',
+                      animation: 'watchdogSpin 0.8s linear infinite',
+                    }} />
+                  )}
+                  {creationModal.loading ? 'Generating...' : 'Generate Post'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        <style>{`
+          @keyframes watchdogSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
+
         {/* ── Confirm delete dialog ── */}
         <ConfirmDialog
           open={!!confirmDelete}

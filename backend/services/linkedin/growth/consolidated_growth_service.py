@@ -1,5 +1,5 @@
 import asyncio
-import logging
+
 from datetime import datetime
 from typing import Optional
 
@@ -20,14 +20,12 @@ from models.linkedin_growth_models import (
     ViralPattern,
     WeeklyStrategyResponse,
 )
+from loguru import logger
 from pydantic import BaseModel, Field
 from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.llm_providers.main_text_generation import llm_text_gen
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
-
-logger = logging.getLogger(__name__)
-
 
 class ConsolidatedLLMData(BaseModel):
     """Compact data model matching what the single LLM prompt returns."""
@@ -117,8 +115,8 @@ SECTIONS (all required, return the exact schema fields):
 6. **Content Gaps** (2 items): gap_topic, why_gap (1 sentence), why_it_matters (1 sentence), suggested_angle (1 sentence).
 7. **Brand Scorecard** (5 dimensions): Profile Completeness, Content Consistency, Authority Signals, Network Quality, Brand Clarity. Score each 0-100, give 1-sentence feedback each. Include overall_score and top_recommendation.
 
-For ALL items: include data_source_detail ("Profile + industry analysis") and confidence ("high"/"medium"/"low").
-For ALL data_source_summary fields: "Based on your LinkedIn profile and current industry trends."
+For ALL items: include data_source_detail (brief source attribution) and confidence ("high"/"medium"/"low").
+For ALL data_source_summary fields: generate a 1-sentence transparency note specific to that section.
 """
 
 
@@ -165,13 +163,11 @@ class ConsolidatedGrowthService:
                     growth_cache.set(llm_cache_key, raw, ttl_seconds=3600)
             except Exception as e:
                 logger.error(f"[ConsolidatedGrowth] LLM call failed: {e}")
-                now = datetime.now()
-                return ConsolidatedGrowthResponse(generated_at=now)
+                raise RuntimeError(f"Consolidated LLM call failed: {e}") from e
 
         if not raw:
             logger.warning("[ConsolidatedGrowth] LLM returned empty data")
-            now = datetime.now()
-            return ConsolidatedGrowthResponse(generated_at=now)
+            raise RuntimeError("Consolidated LLM call returned empty data")
 
         if isinstance(raw, str):
             import json as _json
@@ -179,8 +175,7 @@ class ConsolidatedGrowthService:
 
         if not isinstance(raw, dict):
             logger.warning("[ConsolidatedGrowth] LLM returned unexpected type: {}", type(raw))
-            now = datetime.now()
-            return ConsolidatedGrowthResponse(generated_at=now)
+            raise RuntimeError(f"Consolidated LLM returned unexpected type: {type(raw)}")
 
         now = datetime.now()
 

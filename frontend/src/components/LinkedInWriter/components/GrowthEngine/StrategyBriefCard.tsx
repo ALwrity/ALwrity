@@ -2,7 +2,7 @@ import React from 'react';
 import type { DailyPostIdea } from '../../../../services/linkedInGrowthApi';
 import { DataSourceBadge } from './DataSourceBadge';
 import { EmptyState } from './EmptyState';
-import { cardBase, headerRow, dismissBtn, primaryBtn, rowBase, colors } from './styles';
+import { cardBase, headerRow, dismissBtn, primaryBtn, rowBase, CONFIDENCE_COLORS, colors } from './styles';
 
 interface StrategyBriefCardProps {
   theme: string;
@@ -168,7 +168,7 @@ const DayRow: React.FC<DayRowProps> = React.memo(({ post, theme, onGeneratePost 
 
   return (
     <div style={rowBase}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 700, fontSize: 13, color: colors.textDark, minWidth: 50 }}>
           {post.day}
         </span>
@@ -183,6 +183,15 @@ const DayRow: React.FC<DayRowProps> = React.memo(({ post, theme, onGeneratePost 
           }}
         >
           {emoji} {post.content_type}
+        </span>
+        <span
+          style={{
+            background: (CONFIDENCE_COLORS[post.confidence] || CONFIDENCE_COLORS.medium).bg,
+            color: (CONFIDENCE_COLORS[post.confidence] || CONFIDENCE_COLORS.medium).text,
+            padding: '1px 5px', borderRadius: 3, fontWeight: 600, fontSize: 10,
+          }}
+        >
+          {post.confidence} priority
         </span>
       </div>
 

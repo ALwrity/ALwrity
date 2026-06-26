@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { linkedInWatchdogApi } from '../../../services/linkedInWatchdogApi';
 import { WatchdogDashboard } from './WatchdogDashboard';
+import { type LinkedInPreferences } from '../utils/storageUtils';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
 
 interface WatchdogButtonProps {
-  onGeneratePost: (topic: string, context: string) => void;
+  generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  userPreferences: LinkedInPreferences;
 }
 
 function loadUnreadCount(): number {
@@ -19,7 +21,7 @@ function loadUnreadCount(): number {
   return 0;
 }
 
-export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ onGeneratePost }) => {
+export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ generatePost, userPreferences }) => {
   const [open, setOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(loadUnreadCount);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -100,7 +102,8 @@ export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ onGeneratePost }
       {open && (
         <WatchdogDashboard
           onClose={handleClose}
-          onGeneratePost={onGeneratePost}
+          generatePost={generatePost}
+          userPreferences={userPreferences}
           onUnreadChanged={setUnreadCount}
         />
       )}

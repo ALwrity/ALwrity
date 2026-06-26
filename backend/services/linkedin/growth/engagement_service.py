@@ -34,16 +34,13 @@ class EngagementService:
         return self._exa_provider
 
     def _resolve_industry(self, user_id: str) -> str:
-        try:
-            repo = self._get_profile_repo()
-            context = repo.get_profile_context(user_id)
-            if context and isinstance(context, dict):
-                industry = context.get("industry", "").strip()
-                if industry:
-                    return industry
-        except Exception as exc:
-            logger.debug("[Engagement] Could not load profile context: {}", exc)
-        return "Technology"
+        repo = self._get_profile_repo()
+        context = repo.get_profile_context(user_id)
+        if context and isinstance(context, dict):
+            industry = context.get("industry", "").strip()
+            if industry:
+                return industry
+        raise ValueError("Could not resolve user industry from profile context")
 
     async def _search_posts(
         self, industry: str, user_id: str
@@ -91,7 +88,7 @@ class EngagementService:
         for i, a in enumerate(articles[:8], 1):
             title = a.get("title", "Untitled")
             snippet = (a.get("text") or a.get("snippet") or "")[:250]
-            author = a.get("author") or "Unknown author"
+            author = a.get("author") or ""
             articles_text += f'{i}. "{title}" by {author}\n   {snippet}\n\n'
 
         system_prompt = (

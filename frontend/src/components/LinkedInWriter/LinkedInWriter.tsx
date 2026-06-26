@@ -8,7 +8,7 @@ import './styles/alwrity-copilot.css';
 import RegisterLinkedInActions from './RegisterLinkedInActions';
 import RegisterLinkedInEditActions from './RegisterLinkedInEditActions';
 import RegisterLinkedInActionsEnhanced from './RegisterLinkedInActionsEnhanced';
-import { Header, ContentEditor, LoadingIndicator, WelcomeMessage, ProgressTracker, type ProgressStep } from './components';
+import { Header, ContentEditor, LoadingIndicator, WelcomeMessage, ProgressTracker, GrowthEnginePanel, type ProgressStep } from './components';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
@@ -148,6 +148,9 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Growth Engine toggle ──
+  const [showGrowthEngine, setShowGrowthEngine] = useState(false);
 
   // ── Save to Asset Library (podcast-maker pattern: save only, stay on page) ──
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -397,11 +400,6 @@ Always use the most appropriate tool for the user's request.`.trim();
     return [prefsLine, historyLine, currentDraft, guidance, additional].filter(Boolean).join('\n\n');
   }, [draft, userPreferences, corePersona, platformPersona, summarizeHistory]);
 
-  const handleWatchdogGeneratePost = useCallback((topic: string, contextText: string) => {
-    handleContextChange(contextText);
-    setDraft(`📰 ${topic}\n\n`);
-  }, [handleContextChange, setDraft]);
-
   return (
     <div 
       className={`linkedin-writer ${className}`} 
@@ -421,7 +419,7 @@ Always use the most appropriate tool for the user's request.`.trim();
         onPreferencesChange={handlePreferencesChange}
         hasDraft={!!draft}
         onResetDraft={handleClear}
-        onGeneratePost={handleWatchdogGeneratePost}
+        generatePost={generatePost}
       />
 
       {/* Lightweight progress tracker under header */}
@@ -437,10 +435,35 @@ Always use the most appropriate tool for the user's request.`.trim();
         <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
       </div>
 
-
-
-      {/* Debug: Enhanced Persistence Test Buttons (remove in production) */}
-
+      {/* Tab bar: Editor / Growth Engine */}
+      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+        <button
+          onClick={() => setShowGrowthEngine(false)}
+          style={{
+            flex: 1, padding: '10px 16px', border: 'none', cursor: 'pointer', fontWeight: 500,
+            fontSize: 14, color: showGrowthEngine ? '#6b7280' : '#111827',
+            backgroundColor: showGrowthEngine ? '#f9fafb' : '#ffffff',
+            borderBottom: showGrowthEngine ? '2px solid transparent' : '2px solid #0a66c2',
+            transition: 'all 150ms ease',
+          }}
+          aria-label="Switch to Editor tab"
+        >
+          Editor
+        </button>
+        <button
+          onClick={() => setShowGrowthEngine(true)}
+          style={{
+            flex: 1, padding: '10px 16px', border: 'none', cursor: 'pointer', fontWeight: 500,
+            fontSize: 14, color: showGrowthEngine ? '#111827' : '#6b7280',
+            backgroundColor: showGrowthEngine ? '#ffffff' : '#f9fafb',
+            borderBottom: showGrowthEngine ? '2px solid #0a66c2' : '2px solid transparent',
+            transition: 'all 150ms ease',
+          }}
+          aria-label="Switch to Growth Engine tab"
+        >
+          Growth Engine
+        </button>
+      </div>
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
@@ -452,7 +475,11 @@ Always use the most appropriate tool for the user's request.`.trim();
         />
 
           {/* Content Area */}
-        {draft || isGenerating ? (<>
+        {showGrowthEngine ? (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <GrowthEnginePanel generatePost={generatePost} userPreferences={userPreferences} />
+          </div>
+        ) : draft || isGenerating ? (<>
           {/* Editor Panel - Show when there's content or generating */}
           <ContentEditor
             isPreviewing={isPreviewing}

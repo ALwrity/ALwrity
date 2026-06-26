@@ -20,9 +20,11 @@ import { BrandScorecard } from './BrandScorecard';
 import { EmptyState } from './EmptyState';
 import ComponentErrorBoundary from '../../../../components/shared/ComponentErrorBoundary';
 import { colors, primaryBtn } from './styles';
+import { type LinkedInPreferences } from '../../utils/storageUtils';
 
 interface GrowthEnginePanelProps {
-  onGeneratePost: (params?: { topic?: string; context?: string }) => Promise<{ success: boolean; data?: any; error?: string }>;
+  generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  userPreferences: LinkedInPreferences;
 }
 
 type PanelState = 'idle' | 'loading' | 'loaded' | 'error';
@@ -30,13 +32,21 @@ type PanelState = 'idle' | 'loading' | 'loaded' | 'error';
 type RefreshKey = 'trending' | 'network' | 'engagement' | 'viral' | 'strategy' | 'gaps' | 'brand';
 
 export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
-  onGeneratePost,
+  generatePost,
+  userPreferences,
 }) => {
   const [consolidated, setConsolidated] = useState<ConsolidatedGrowthResponse | null>(null);
   const [panelState, setPanelState] = useState<PanelState>('idle');
   const [errorMsg, setErrorMsg] = useState('');
   const [refreshing, setRefreshing] = useState<Set<RefreshKey>>(new Set());
   const [tick, setTick] = useState(0);
+  const [creationModal, setCreationModal] = useState<{
+    visible: boolean;
+    topic: string;
+    context: string;
+    loading: boolean;
+    error: string;
+  }>({ visible: false, topic: '', context: '', loading: false, error: '' });
 
   const mountedRef = useRef(true);
   const fetchedRef = useRef(false);
@@ -171,9 +181,101 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
     }
   }, [persistToSession]);
 
+  const openPostModal = useCallback((topic: string, context: string) => {
+    setCreationModal({ visible: true, topic, context, loading: false, error: '' });
+  }, []);
+
+  const findBestPick = useCallback((): { topic: string; context: string } | null => {
+    const c = consolidated;
+    if (!c) return null;
+
+    const CARD_PRIORITY: Record<string, number> = {
+      trending: 0.5, strategy: 0.4, engagement: 0.3, gaps: 0.2, viral: 0.1, network: 0,
+    };
+    const SCORE: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+    interface Candidate { topic: string; context: string; score: number }
+
+    const candidates: Candidate[] = [];
+
+    if (c.trending?.trending_topics) {
+      for (const item of c.trending.trending_topics) {
+        candidates.push({
+          topic: item.topic,
+          context: `Topic: ${item.topic}\nSuggested hook: ${item.suggested_hook}`,
+          score: (SCORE[item.confidence] || 1) + CARD_PRIORITY.trending,
+        });
+      }
+    }
+    if (c.engagement_opportunities?.opportunities) {
+      for (const item of c.engagement_opportunities.opportunities) {
+        candidates.push({
+          topic: item.title,
+          context: `Engaging with: "${item.title}" by ${item.author}. Suggested comment: ${item.suggested_comment}`,
+          score: (SCORE[item.confidence] || 1) + CARD_PRIORITY.engagement,
+        });
+      }
+    }
+    if (c.content_gaps?.gaps) {
+      for (const gap of c.content_gaps.gaps) {
+        candidates.push({
+          topic: gap.gap_topic,
+          context: `Content gap: ${gap.gap_topic}. Suggested angle: ${gap.suggested_angle}`,
+          score: (SCORE[gap.confidence] || 1) + CARD_PRIORITY.gaps,
+        });
+      }
+    }
+    if (c.weekly_strategy?.daily_posts) {
+      for (const post of c.weekly_strategy.daily_posts) {
+        candidates.push({
+          topic: post.headline,
+          context: `Weekly strategy: ${post.day} - ${post.content_type} post. Theme: "${c.weekly_strategy.theme}". Hook: ${post.hook}`,
+          score: (SCORE[post.confidence] || 1) + CARD_PRIORITY.strategy,
+        });
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates[0];
+  }, [consolidated]);
+
+  const handleBestPick = useCallback(() => {
+    const best = findBestPick();
+    if (best) openPostModal(best.topic, best.context);
+  }, [findBestPick, openPostModal]);
+
+  const bestPickAvailable = useCallback(() => {
+    return findBestPick() !== null;
+  }, [findBestPick]);
+
   const handlePostAbout = useCallback((topic: string, hook: string) => {
-    onGeneratePost({ topic, context: `Topic: ${topic}\nSuggested hook: ${hook}` });
-  }, [onGeneratePost]);
+    openPostModal(topic, `Topic: ${topic}\nSuggested hook: ${hook}`);
+  }, [openPostModal]);
+
+  const handleOpenModalFromCard = useCallback((params?: { topic?: string; context?: string }) => {
+    openPostModal(params?.topic || '', params?.context || '');
+    return Promise.resolve({ success: true as const });
+  }, [openPostModal]);
+
+  const handleGenerateInModal = useCallback(async () => {
+    setCreationModal((prev) => ({ ...prev, loading: true, error: '' }));
+    try {
+      const result = await generatePost({
+        topic: creationModal.topic,
+        context: creationModal.context,
+        ...userPreferences,
+      });
+      if (result.success) {
+        setCreationModal({ visible: false, topic: '', context: '', loading: false, error: '' });
+      } else {
+        setCreationModal((prev) => ({ ...prev, loading: false, error: result.error || 'Generation failed' }));
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Generation failed';
+      setCreationModal((prev) => ({ ...prev, loading: false, error: msg }));
+    }
+  }, [generatePost, creationModal.topic, creationModal.context, userPreferences]);
 
   // ------------------------------------------------------------------
   // Idle state — user hasn't triggered any analysis yet
@@ -405,12 +507,29 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
       }}
     >
       <div style={{ marginBottom: 4 }}>
-        <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: colors.textDark }}>
-          Growth Engine
-        </h2>
-        <p style={{ margin: '4px 0 0', fontSize: 13, color: colors.textSecondary }}>
-          AI-powered insights. Refresh individual cards to get fresh AI-generated recommendations.
-        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: colors.textDark }}>
+              Growth Engine
+            </h2>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: colors.textSecondary }}>
+              AI-powered insights. Refresh individual cards to get fresh AI-generated recommendations.
+            </p>
+          </div>
+          {bestPickAvailable() && (
+            <button
+              onClick={handleBestPick}
+              style={{
+                ...primaryBtn,
+                padding: '8px 18px', fontSize: 13, borderRadius: 8,
+                whiteSpace: 'nowrap', marginLeft: 16,
+              }}
+              aria-label="Generate the best post based on all insights"
+            >
+              🎯 Generate Best Post
+            </button>
+          )}
+        </div>
       </div>
 
       {isStale && (
@@ -497,7 +616,7 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
               <EngagementCard
                 opportunities={engagement_opportunities.opportunities}
                 dataSourceSummary={engagement_opportunities.data_source_summary}
-                onGeneratePost={onGeneratePost}
+                onGeneratePost={handleOpenModalFromCard}
               />
             </div>
           ))}
@@ -542,7 +661,7 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
                 keyTopics={weekly_strategy.key_topics}
                 focusArea={weekly_strategy.focus_area}
                 dataSourceSummary={weekly_strategy.data_source_summary}
-                onGeneratePost={onGeneratePost}
+                onGeneratePost={handleOpenModalFromCard}
               />
             </div>
           ))}
@@ -562,7 +681,7 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
               <ContentGapCard
                 gaps={content_gaps.gaps}
                 dataSourceSummary={content_gaps.data_source_summary}
-                onGeneratePost={onGeneratePost}
+                onGeneratePost={handleOpenModalFromCard}
               />
             </div>
           ))}
@@ -598,6 +717,126 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
       )}
 
       <style>{spinKeyframes}</style>
+
+      {/* ── Post creation modal ── */}
+      {creationModal.visible && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 10020, padding: 20,
+          }}
+          onClick={() => { if (!creationModal.loading) setCreationModal((p) => ({ ...p, visible: false })); }}
+        >
+          <div
+            style={{
+              background: 'white', width: 520, maxWidth: '100%', borderRadius: 16,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{
+              padding: 16, borderBottom: '1px solid #e5e7eb',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>
+                📝 Generate Post from Insight
+              </div>
+              <button
+                onClick={() => setCreationModal((p) => ({ ...p, visible: false }))}
+                disabled={creationModal.loading}
+                style={{
+                  background: 'none', border: 'none', fontSize: 20, cursor: creationModal.loading ? 'not-allowed' : 'pointer',
+                  color: '#6b7280', padding: '4px 8px', borderRadius: 6, opacity: creationModal.loading ? 0.4 : 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 16, maxHeight: '60vh', overflow: 'auto' }}>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>
+                  Topic
+                </label>
+                <input
+                  value={creationModal.topic}
+                  onChange={(e) => setCreationModal((p) => ({ ...p, topic: e.target.value }))}
+                  placeholder="Post topic"
+                  disabled={creationModal.loading}
+                  style={{
+                    width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                    fontSize: 14, outline: 'none', boxSizing: 'border-box',
+                    opacity: creationModal.loading ? 0.6 : 1,
+                  }}
+                />
+              </div>
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>
+                  Context
+                </label>
+                <textarea
+                  value={creationModal.context}
+                  onChange={(e) => setCreationModal((p) => ({ ...p, context: e.target.value }))}
+                  placeholder="Additional context for the post"
+                  rows={3}
+                  disabled={creationModal.loading}
+                  style={{
+                    width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                    fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit',
+                    boxSizing: 'border-box', opacity: creationModal.loading ? 0.6 : 1,
+                  }}
+                />
+              </div>
+              {creationModal.error && (
+                <div style={{
+                  padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca',
+                  borderRadius: 8, fontSize: 13, color: '#991b1b', marginBottom: 14,
+                }}>
+                  {creationModal.error}
+                </div>
+              )}
+            </div>
+
+            <div style={{
+              padding: '12px 16px', borderTop: '1px solid #e5e7eb',
+              display: 'flex', justifyContent: 'flex-end', gap: 8,
+            }}>
+              <button
+                onClick={() => setCreationModal((p) => ({ ...p, visible: false }))}
+                disabled={creationModal.loading}
+                style={{
+                  padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8,
+                  background: 'white', cursor: creationModal.loading ? 'not-allowed' : 'pointer',
+                  fontSize: 14, fontWeight: 600, opacity: creationModal.loading ? 0.5 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerateInModal}
+                disabled={creationModal.loading || !creationModal.topic.trim()}
+                style={{
+                  padding: '10px 24px', border: 'none', borderRadius: 8,
+                  background: creationModal.loading || !creationModal.topic.trim() ? '#9ca3af' : colors.primary,
+                  color: 'white', cursor: creationModal.loading || !creationModal.topic.trim() ? 'not-allowed' : 'pointer',
+                  fontSize: 14, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8,
+                  opacity: creationModal.loading || !creationModal.topic.trim() ? 0.7 : 1,
+                }}
+              >
+                {creationModal.loading && (
+                  <div style={{
+                    width: 14, height: 14, borderRadius: '50%',
+                    border: '2px solid white', borderTopColor: 'transparent',
+                    animation: 'gs-spin 0.8s linear infinite',
+                  }} />
+                )}
+                {creationModal.loading ? 'Generating...' : 'Generate Post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

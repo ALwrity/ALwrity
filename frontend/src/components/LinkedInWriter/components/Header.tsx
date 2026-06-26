@@ -17,7 +17,7 @@ interface HeaderProps {
   onPreferencesChange: (prefs: Partial<LinkedInPreferences>) => void;
   hasDraft: boolean;
   onResetDraft: () => void;
-  onGeneratePost: (topic: string, context: string) => void;
+  generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -28,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({
   onPreferencesChange,
   hasDraft,
   onResetDraft,
-  onGeneratePost,
+  generatePost,
 }) => {
   const navigate = useNavigate();
   const [personaOverride, setPersonaOverride] = useState<any>(null);
@@ -147,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({
           
           {/* Control Buttons */}
           <div style={{ display: 'flex', gap: '12px' }}>
-            <WatchdogButton onGeneratePost={onGeneratePost} />
+            <WatchdogButton generatePost={generatePost} userPreferences={userPreferences} />
             {/* Preferences Button */}
             <div 
               style={{ 

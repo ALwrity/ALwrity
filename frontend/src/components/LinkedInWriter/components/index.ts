@@ -21,6 +21,9 @@ export { default as ImageGenerationTest } from './ImageGenerationTest';
 
 // Persona Integration Components - Now integrated into main LinkedInWriter
 
+// LinkedIn Growth Engine
+export { GrowthEnginePanel } from './GrowthEngine';
+
 // Refactored Components
 export { default as BrainstormFlow } from './BrainstormFlow';
 export { useCopilotActions } from './CopilotActions';

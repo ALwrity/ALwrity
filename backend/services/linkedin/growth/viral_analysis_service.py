@@ -28,16 +28,13 @@ class ViralAnalysisService:
         return self._exa_provider
 
     def _resolve_industry(self, user_id: str) -> str:
-        try:
-            repo = self._get_profile_repo()
-            context = repo.get_profile_context(user_id)
-            if context and isinstance(context, dict):
-                industry = context.get("industry", "").strip()
-                if industry:
-                    return industry
-        except Exception as exc:
-            logger.debug("[ViralAnalysis] Could not load profile context: {}", exc)
-        return "Technology"
+        repo = self._get_profile_repo()
+        context = repo.get_profile_context(user_id)
+        if context and isinstance(context, dict):
+            industry = context.get("industry", "").strip()
+            if industry:
+                return industry
+        raise ValueError("Could not resolve user industry from profile context")
 
     async def _search_viral_content(self, industry: str, user_id: str) -> List[Dict[str, Any]]:
         """Search Exa for high-engagement LinkedIn posts in this industry."""
@@ -84,7 +81,7 @@ class ViralAnalysisService:
         for i, a in enumerate(articles[:10], 1):
             title = a.get("title", "Untitled")
             snippet = (a.get("text") or a.get("snippet") or "")[:300]
-            author = a.get("author") or "Unknown"
+            author = a.get("author") or ""
             articles_text += f'{i}. "{title}" by {author}\n   {snippet}\n\n'
 
         system_prompt = (

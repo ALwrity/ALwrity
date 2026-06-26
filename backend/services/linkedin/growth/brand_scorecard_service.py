@@ -21,20 +21,17 @@ class BrandScorecardService:
 
     def _get_context(self, user_id: str) -> dict:
         """Get all available profile context for scoring."""
-        try:
-            repo = self._get_profile_repo()
-            ctx = repo.get_profile_context(user_id)
-            if ctx and isinstance(ctx, dict):
-                return ctx
-        except Exception as exc:
-            logger.debug("[BrandScorecard] Could not load profile context: {}", exc)
-        return {}
+        repo = self._get_profile_repo()
+        ctx = repo.get_profile_context(user_id)
+        if ctx and isinstance(ctx, dict):
+            return ctx
+        raise ValueError("Could not load profile context")
 
     def _profile_summary(self, ctx: dict) -> str:
         """Build a human-readable summary of profile data."""
         parts = []
-        pi = ctx.get("personal_information", {}) or {}
-        pr = ctx.get("professional_information", {}) or {}
+        pi = ctx.get("personal_information", {})
+        pr = ctx.get("professional_information", {})
 
         headline = pi.get("headline", "")
         if headline:
@@ -48,7 +45,7 @@ class BrandScorecardService:
         if title:
             parts.append(f"Title: {title}")
 
-        geo = pi.get("geo", {}) or {}
+        geo = pi.get("geo", {})
         location = geo.get("full", geo.get("city", ""))
         if location:
             parts.append(f"Location: {location}")
@@ -65,13 +62,7 @@ class BrandScorecardService:
 
         result = await self._llm_score_brand(profile_text, user_id)
         if result is None:
-            return BrandScorecardResponse(
-                overall_score=50,
-                dimensions=[],
-                top_recommendation="Connect your LinkedIn account to get your brand scorecard.",
-                data_source_summary="Based on limited profile data. Connect LinkedIn for a full analysis.",
-                generated_at=datetime.now(timezone.utc),
-            )
+            raise RuntimeError("Brand scorecard LLM generation returned no result")
 
         dimensions = [BrandDimension(**d) for d in result.get("dimensions", [])]
         return BrandScorecardResponse(

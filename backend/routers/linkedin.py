@@ -342,6 +342,7 @@ async def generate_article(
             except Exception as track_error:
                 logger.error(f"Failed to track LinkedIn article asset: {track_error}")
         
+        duration = time.time() - start_time
         logger.info(f"Successfully generated LinkedIn article in {duration:.2f} seconds")
         return response
         
@@ -453,6 +454,7 @@ async def generate_carousel(
             except Exception as track_error:
                 logger.error(f"Failed to track LinkedIn carousel asset: {track_error}")
         
+        duration = time.time() - start_time
         logger.info(f"Successfully generated LinkedIn carousel in {duration:.2f} seconds")
         return response
         

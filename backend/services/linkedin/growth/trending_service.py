@@ -35,36 +35,15 @@ class TrendingService:
 
     def _resolve_industry(self, user_id: str) -> str:
         """Resolve the user's industry from profile context or persona."""
-        try:
-            repo = self._get_profile_repo()
-            context = repo.get_profile_context(user_id)
-            if context and isinstance(context, dict):
-                industry = context.get("industry", "").strip()
-                if industry:
-                    logger.info("[TrendingService] Resolved industry from profile context: {}", industry)
-                    return industry
-        except Exception as exc:
-            logger.debug("[TrendingService] Could not load profile context: {}", exc)
+        repo = self._get_profile_repo()
+        context = repo.get_profile_context(user_id)
+        if context and isinstance(context, dict):
+            industry = context.get("industry", "").strip()
+            if industry:
+                logger.info("[TrendingService] Resolved industry from profile context: {}", industry)
+                return industry
 
-        try:
-            from services.persona_analysis_service import PersonaAnalysisService
-            persona = PersonaAnalysisService()
-            data = persona.get_user_persona(user_id)
-            if data and isinstance(data, dict):
-                industry = (
-                    data.get("industry")
-                    or data.get("target_industry")
-                    or (data.get("audience_intel") or {}).get("industry_focus")
-                    or ""
-                )
-                if isinstance(industry, str) and industry.strip():
-                    logger.info("[TrendingService] Resolved industry from persona: {}", industry.strip())
-                    return industry.strip()
-        except Exception as exc:
-            logger.debug("[TrendingService] Could not load persona: {}", exc)
-
-        logger.info("[TrendingService] No industry found, defaulting to Technology")
-        return "Technology"
+        raise ValueError("Could not resolve user industry from profile or persona")
 
     def _build_search_query(self, industry: str) -> str:
         return f"{industry} trends insights news {datetime.now().year}"
