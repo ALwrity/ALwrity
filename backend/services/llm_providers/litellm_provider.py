@@ -25,7 +25,7 @@ Usage:
 import json
 import re
 import time as _time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from loguru import logger as _fallback_logger
 
