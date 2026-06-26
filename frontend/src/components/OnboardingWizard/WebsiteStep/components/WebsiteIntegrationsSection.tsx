@@ -44,6 +44,8 @@ interface IntegrationData {
 interface WebsiteIntegrationsSectionProps {
   websiteUrl: string;
   onIntegrationChange: (data: IntegrationData) => void;
+  connectedPlatforms: string[];
+  setConnectedPlatforms: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const WALKTHROUGH_TITLES: readonly string[] = [
@@ -71,8 +73,10 @@ const WALKTHROUGH_LABELS: readonly string[] = [
 const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   websiteUrl,
   onIntegrationChange,
+  connectedPlatforms,
+  setConnectedPlatforms,
 }) => {
-  const { gscSites, connectedPlatforms, setConnectedPlatforms, handleGSCConnect } = useGSCConnection();
+  const { gscSites, connectedPlatforms: gscInternalPlatforms, handleGSCConnect } = useGSCConnection();
   const { isLoading, showToast, setShowToast, toastMessage, handleConnect } = usePlatformConnections();
   const { connected: wordpressConnected, sites: wordpressSites } = useWordPressOAuth();
   const { connected: bingConnected, sites: bingSites, connect: connectBing, refreshStatus: refreshBingStatus } = useBingOAuth();
@@ -84,18 +88,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     cachedAnalyticsAPI.invalidateAll();
   }, []);
 
-  useEffect(() => {
-    if (wordpressConnected && wordpressSites.length > 0) {
-      if (!connectedPlatforms.includes('wordpress')) {
-        setConnectedPlatforms([...connectedPlatforms, 'wordpress']);
-        invalidateAnalyticsCache();
-      }
-    } else if (!wordpressConnected && connectedPlatforms.includes('wordpress')) {
-      setConnectedPlatforms(connectedPlatforms.filter(p => p !== 'wordpress'));
-      invalidateAnalyticsCache();
-    }
-  }, [wordpressConnected, wordpressSites, connectedPlatforms, setConnectedPlatforms, invalidateAnalyticsCache]);
-
+  // Refresh Bing status on mount
   useEffect(() => {
     (async () => {
       try {
@@ -106,17 +99,37 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     })();
   }, [refreshBingStatus]);
 
+  // Consolidate platform sync: WordPress, Bing, and GSC all follow the same pattern
   useEffect(() => {
-    if (bingConnected && bingSites.length > 0) {
-      if (!connectedPlatforms.includes('bing')) {
-        setConnectedPlatforms([...connectedPlatforms, 'bing']);
-        invalidateAnalyticsCache();
+    const updated = [...connectedPlatforms];
+    let changed = false;
+
+    const sync = (platformId: string, isConnected: boolean, hasSites: boolean) => {
+      if (isConnected && hasSites) {
+        if (!updated.includes(platformId)) {
+          updated.push(platformId);
+          changed = true;
+        }
+      } else if (!isConnected && updated.includes(platformId)) {
+        updated.splice(updated.indexOf(platformId), 1);
+        changed = true;
       }
-    } else if (!bingConnected && connectedPlatforms.includes('bing')) {
-      setConnectedPlatforms(connectedPlatforms.filter(p => p !== 'bing'));
+    };
+
+    sync('wordpress', wordpressConnected, wordpressSites.length > 0);
+    sync('bing', bingConnected, bingSites.length > 0);
+    sync('gsc', gscInternalPlatforms.includes('gsc'), true);
+
+    if (changed) {
+      setConnectedPlatforms(updated);
       invalidateAnalyticsCache();
     }
-  }, [bingConnected, bingSites, connectedPlatforms, setConnectedPlatforms, invalidateAnalyticsCache]);
+  }, [
+    wordpressConnected, wordpressSites,
+    bingConnected, bingSites,
+    gscInternalPlatforms,
+    connectedPlatforms, setConnectedPlatforms, invalidateAnalyticsCache,
+  ]);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);

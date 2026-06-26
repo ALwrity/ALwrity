@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -23,7 +23,7 @@ import {
 // Extracted components
 import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
-import LinkedInPlatformCard from './common/LinkedInPlatformCard';
+import PlatformSection from './common/PlatformSection';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -82,7 +82,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [hasCheckedExisting, setHasCheckedExisting] = useState(false);
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin'>('website');
   const [integrationData, setIntegrationData] = useState<any>(null);
-  const [linkedinConnected, setLinkedinConnected] = useState(false);
+  const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+
+  const linkedinConnected = connectedPlatforms.includes('linkedin');
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
     { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
@@ -359,27 +361,26 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
     setIntegrationData(data);
   };
 
-  const handleLinkedInPlatformsChange = useCallback((platforms: string[]) => {
-    setLinkedinConnected(platforms.includes('linkedin'));
-  }, []);
-
   // Register data collector so the Wizard footer button is the single gate to step 3
   useEffect(() => {
     if (onDataReady) {
       onDataReady(() => {
         const fixedUrl = fixUrlFormat(website);
+        const integrationsPayload = integrationData || {
+          connectedPlatforms,
+          updatedAt: new Date().toISOString(),
+        };
         return {
           website: fixedUrl || website,
           domainName,
           analysis,
           crawlResult,
           useAnalysisForGenAI,
-          integrations: integrationData,
-          linkedinConnected,
+          integrations: integrationsPayload,
         };
       });
     }
-  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, linkedinConnected]);
+  }, [onDataReady, website, domainName, analysis, crawlResult, useAnalysisForGenAI, integrationData, connectedPlatforms]);
 
   const hasWebsiteAnalysis = !!(website.trim() && analysis);
 
@@ -601,6 +602,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           <WebsiteIntegrationsSection
             websiteUrl={website}
             onIntegrationChange={handleIntegrationChange}
+            connectedPlatforms={connectedPlatforms}
+            setConnectedPlatforms={setConnectedPlatforms}
           />
         </>
       )}
@@ -616,29 +619,28 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-            <Box
-              sx={{
-                color: '#0A66C2',
-                bgcolor: '#ffffff',
-                p: 0.5,
-                borderRadius: 1,
-                border: '1px solid #e2e8f0',
-                display: 'flex',
-              }}
-            >
-              <LinkedInIcon fontSize="small" />
-            </Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
-              LinkedIn
-            </Typography>
-          </Box>
-          <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
-            Connect your LinkedIn profile for professional content publishing.
-          </Typography>
-          <LinkedInPlatformCard
-            connectedPlatforms={linkedinConnected ? ['linkedin'] : []}
-            setConnectedPlatforms={handleLinkedInPlatformsChange}
+          <PlatformSection
+            title="LinkedIn"
+            description="Connect your LinkedIn profile for professional content publishing."
+            platforms={[
+              {
+                id: 'linkedin',
+                name: 'LinkedIn',
+                description: 'Connect your LinkedIn profile for professional content publishing',
+                icon: <LinkedInIcon />,
+                category: 'social',
+                status: 'available',
+                features: ['Professional posting', 'Network insights', 'Content optimization'],
+                benefits: ['LinkedIn article publishing', 'Professional network analytics', 'B2B content insights'],
+                isEnabled: true,
+              },
+            ]}
+            filterPlatformIds={['linkedin']}
+            connectedPlatforms={connectedPlatforms}
+            gscSites={null}
+            isLoading={false}
+            onConnect={() => {}}
+            setConnectedPlatforms={setConnectedPlatforms}
           />
         </Paper>
       )}

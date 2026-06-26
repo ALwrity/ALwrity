@@ -25,7 +25,6 @@ import {
   Facebook as FacebookIcon,
   Twitter as TwitterIcon,
   Instagram as InstagramIcon,
-  LinkedIn as LinkedInIcon,
   YouTube as YouTubeIcon,
   VideoLibrary as TikTokIcon,
   Pinterest as PinterestIcon,
@@ -211,17 +210,6 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
       features: ['Auto-tweeting', 'Trend analysis', 'Engagement tracking'],
       benefits: ['Automated Twitter posts', 'Trend monitoring', 'Audience insights'],
       isEnabled: false
-    },
-    {
-      id: 'linkedin',
-      name: 'LinkedIn',
-      description: 'Connect your LinkedIn profile for professional content publishing',
-      icon: <LinkedInIcon />,
-      category: 'social',
-      status: 'available',
-      features: ['Professional posting', 'Network insights', 'Content optimization'],
-      benefits: ['LinkedIn article publishing', 'Professional network analytics', 'B2B content insights'],
-      isEnabled: true
     },
     {
       id: 'instagram',
@@ -439,7 +427,6 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
     const socialIntegrations = {
       facebook: connectedPlatforms.includes('facebook'),
       twitter: connectedPlatforms.includes('twitter'),
-      linkedin: connectedPlatforms.includes('linkedin'),
       instagram: connectedPlatforms.includes('instagram'),
       youtube: connectedPlatforms.includes('youtube'),
       tiktok: connectedPlatforms.includes('tiktok'),
