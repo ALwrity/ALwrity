@@ -1,17 +1,30 @@
 import React, { useCallback, useEffect } from 'react';
 import { usePostAnalytics } from '../../hooks/usePostAnalytics';
+import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
 import { EmptyState, IdleState, RefreshBar } from './EmptyState';
 import { ErrorState } from './ErrorState';
 import { LoadingState } from './LoadingState';
 import { PostCard } from './PostCard';
-import { colors, panelContainer, primaryBtn } from './styles';
+import { EngagementSummary } from './EngagementSummary';
+import { colors, panelContainer, primaryBtn, secondaryBtn } from './styles';
 
 interface PostAnalyticsPanelProps {
   isActive: boolean;
+  onGenerateSimilarPost?: (prompt: string) => void;
 }
 
-export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({ isActive }) => {
-  const { data, panelState, errorMessage, fetchPosts } = usePostAnalytics();
+export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
+  isActive,
+  onGenerateSimilarPost,
+}) => {
+  const {
+    data,
+    panelState,
+    errorMessage,
+    fetchPosts,
+    loadMorePosts,
+    refreshPosts,
+  } = usePostAnalytics();
   const isLoading = panelState === 'loading';
   const showSkeleton = isLoading && !data;
 
@@ -22,8 +35,36 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({ isActive
   }, [isActive, panelState, fetchPosts]);
 
   const handleFetch = useCallback(() => {
-    void fetchPosts();
-  }, [fetchPosts]);
+    void refreshPosts();
+  }, [refreshPosts]);
+
+  const handleLoadMore = useCallback(() => {
+    void loadMorePosts();
+  }, [loadMorePosts]);
+
+  const handleGenerateSimilar = useCallback(
+    (post: LinkedInPost) => {
+      if (!onGenerateSimilarPost) return;
+
+      // Create a prompt based on the post
+      const prompt = `Generate a LinkedIn post similar to this one, but with fresh angles and updated insights. Keep the tone and style consistent.
+
+Original post:
+"""
+${post.text}
+"""
+
+Key elements to preserve:
+- Tone: ${post.is_repost ? 'Shared/Repost style' : 'Original content'}
+- Engagement: ${post.engagement.reactions} reactions, ${post.engagement.comments} comments
+- Style: Professional LinkedIn post
+
+Create a new post that captures the same essence but with different examples, updated data, or a fresh perspective.`;
+
+      onGenerateSimilarPost(prompt);
+    },
+    [onGenerateSimilarPost]
+  );
 
   if (!isActive) {
     return null;
@@ -74,7 +115,9 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({ isActive
       )}
 
       {data && panelState !== 'idle' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {data.posts.length > 0 && <EngagementSummary posts={data.posts} />}
+
           <RefreshBar
             postCount={data.posts.length}
             hasMore={data.has_more}
@@ -95,8 +138,29 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({ isActive
           {data.posts.length > 0 && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {data.posts.map((post) => (
-                <PostCard key={post.id} post={post} />
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  onGenerateSimilar={onGenerateSimilarPost ? handleGenerateSimilar : undefined}
+                />
               ))}
+
+              {data.has_more && (
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  disabled={isLoading}
+                  style={{
+                    ...secondaryBtn,
+                    alignSelf: 'center',
+                    marginTop: 8,
+                    opacity: isLoading ? 0.7 : 1,
+                    cursor: isLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {isLoading ? 'Loading…' : 'Load More Posts'}
+                </button>
+              )}
             </div>
           )}
         </div>

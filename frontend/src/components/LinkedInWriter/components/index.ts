@@ -24,6 +24,14 @@ export { default as ImageGenerationTest } from './ImageGenerationTest';
 // LinkedIn Growth Engine
 export { GrowthEnginePanel } from './GrowthEngine';
 
+// Post Analytics
+export { PostAnalyticsPanel } from './PostAnalytics';
+export { EngagementSummary } from './PostAnalytics';
+
+// Tab navigation
+export { LinkedInWriterTabBar } from './LinkedInWriterTabBar';
+export type { LinkedInWriterTab } from './LinkedInWriterTabBar';
+
 // Refactored Components
 export { default as BrainstormFlow } from './BrainstormFlow';
 export { useCopilotActions } from './CopilotActions';

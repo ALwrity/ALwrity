@@ -8,7 +8,18 @@ import './styles/alwrity-copilot.css';
 import RegisterLinkedInActions from './RegisterLinkedInActions';
 import RegisterLinkedInEditActions from './RegisterLinkedInEditActions';
 import RegisterLinkedInActionsEnhanced from './RegisterLinkedInActionsEnhanced';
-import { Header, ContentEditor, LoadingIndicator, WelcomeMessage, ProgressTracker, GrowthEnginePanel, type ProgressStep } from './components';
+import {
+  Header,
+  ContentEditor,
+  LoadingIndicator,
+  WelcomeMessage,
+  ProgressTracker,
+  GrowthEnginePanel,
+  PostAnalyticsPanel,
+  LinkedInWriterTabBar,
+  type ProgressStep,
+  type LinkedInWriterTab,
+} from './components';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
@@ -149,8 +160,16 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Growth Engine toggle ──
-  const [showGrowthEngine, setShowGrowthEngine] = useState(false);
+  // ── Tab navigation ──
+  const [activeTab, setActiveTab] = useState<LinkedInWriterTab>('editor');
+
+  // ── Generate similar post handler ──
+  const handleGenerateSimilarPost = useCallback((prompt: string) => {
+    // Switch to editor tab and set context
+    setActiveTab('editor');
+    handleContextChange(prompt);
+    // Optionally trigger generation immediately or let user review
+  }, [handleContextChange]);
 
   // ── Save to Asset Library (podcast-maker pattern: save only, stay on page) ──
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -435,35 +454,7 @@ Always use the most appropriate tool for the user's request.`.trim();
         <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
       </div>
 
-      {/* Tab bar: Editor / Growth Engine */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
-        <button
-          onClick={() => setShowGrowthEngine(false)}
-          style={{
-            flex: 1, padding: '10px 16px', border: 'none', cursor: 'pointer', fontWeight: 500,
-            fontSize: 14, color: showGrowthEngine ? '#6b7280' : '#111827',
-            backgroundColor: showGrowthEngine ? '#f9fafb' : '#ffffff',
-            borderBottom: showGrowthEngine ? '2px solid transparent' : '2px solid #0a66c2',
-            transition: 'all 150ms ease',
-          }}
-          aria-label="Switch to Editor tab"
-        >
-          Editor
-        </button>
-        <button
-          onClick={() => setShowGrowthEngine(true)}
-          style={{
-            flex: 1, padding: '10px 16px', border: 'none', cursor: 'pointer', fontWeight: 500,
-            fontSize: 14, color: showGrowthEngine ? '#111827' : '#6b7280',
-            backgroundColor: showGrowthEngine ? '#ffffff' : '#f9fafb',
-            borderBottom: showGrowthEngine ? '2px solid #0a66c2' : '2px solid transparent',
-            transition: 'all 150ms ease',
-          }}
-          aria-label="Switch to Growth Engine tab"
-        >
-          Growth Engine
-        </button>
-      </div>
+      <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
@@ -475,9 +466,16 @@ Always use the most appropriate tool for the user's request.`.trim();
         />
 
           {/* Content Area */}
-        {showGrowthEngine ? (
+        {activeTab === 'growth' ? (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <GrowthEnginePanel generatePost={generatePost} userPreferences={userPreferences} />
+          </div>
+        ) : activeTab === 'analytics' ? (
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            <PostAnalyticsPanel
+              isActive={activeTab === 'analytics'}
+              onGenerateSimilarPost={handleGenerateSimilarPost}
+            />
           </div>
         ) : draft || isGenerating ? (<>
           {/* Editor Panel - Show when there's content or generating */}

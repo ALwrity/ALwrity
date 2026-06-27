@@ -30,9 +30,16 @@ DEFAULT_UNIPILE_DSN = "api30.unipile.com:16037"
 class UnipileAPIError(RuntimeError):
     """Raised when the Unipile API returns an error response."""
 
-    def __init__(self, message: str, *, status_code: Optional[int] = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: Optional[int] = None,
+        error_type: Optional[str] = None,
+    ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.error_type = error_type
 
 
 def _auth_headers(api_key: str) -> dict[str, str]:
@@ -52,13 +59,38 @@ def _post_auth_headers(api_key: str) -> dict[str, str]:
     }
 
 
+def _parse_unipile_error_body(response: httpx.Response) -> tuple[str, Optional[str]]:
+    """Build a safe error message and optional Unipile error type from a failed response."""
+    try:
+        body = response.json()
+        if isinstance(body, dict):
+            error_type = body.get("type")
+            title = body.get("title", "")
+            detail = body.get("detail", "")
+            if isinstance(error_type, str):
+                parts = [f"Unipile API HTTP {response.status_code}: {error_type}"]
+                if title:
+                    parts.append(str(title))
+                if detail:
+                    parts.append(str(detail))
+                return " - ".join(parts), error_type
+    except Exception:
+        pass
+    return (
+        f"Unipile API returned HTTP {response.status_code}: {response.text}",
+        None,
+    )
+
+
 def _raise_for_error(response: httpx.Response) -> None:
     """Raise UnipileAPIError for non-success status codes."""
     if response.status_code < 400:
         return
+    message, error_type = _parse_unipile_error_body(response)
     raise UnipileAPIError(
-        f"Unipile API returned HTTP {response.status_code}: {response.text}",
+        message,
         status_code=response.status_code,
+        error_type=error_type,
     )
 
 
@@ -101,6 +133,30 @@ def profile_identifier_from_owner(owner: dict[str, Any]) -> Optional[str]:
         value = owner.get(key)
         if isinstance(value, str) and value.strip():
             return value.strip()
+    return None
+
+
+def personal_profile_provider_id_from_owner(owner: dict[str, Any]) -> Optional[str]:
+    """
+    Extract LinkedIn provider internal id for ``GET /api/v1/users/{identifier}/posts``.
+
+    Unipile expects the provider internal id for personal profile posts (typically
+    ``ACo...`` or ``ADo...``), not the vanity ``public_identifier`` slug.
+    """
+    if not isinstance(owner, dict):
+        return None
+
+    provider_id = owner.get("provider_id")
+    if isinstance(provider_id, str) and provider_id.strip():
+        return provider_id.strip()
+
+    for key in ("id", "linkedin_id"):
+        value = owner.get(key)
+        if isinstance(value, str) and value.strip():
+            candidate = value.strip()
+            if candidate.startswith(("ACo", "ADo")):
+                return candidate
+
     return None
 
 
@@ -579,3 +635,73 @@ class UnipileClient:
         logger.info(f"[UnipileClient] Reconnection link created for account={account_id}")
 
         return HostedAuthLinkResult(auth_url=auth_url, expires_at=expires_at)
+
+    async def get_user_posts(
+        self,
+        account_id: str,
+        identifier: str,
+        cursor: Optional[str] = None,
+        limit: int = 20,
+        *,
+        is_company: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Fetch LinkedIn posts for a user via Unipile ``GET /api/v1/users/{identifier}/posts``.
+
+        Args:
+            account_id: Unipile account ID for the connected LinkedIn personal profile
+            identifier: LinkedIn provider internal id (``ACo...`` / ``ADo...`` for users)
+            cursor: Optional pagination cursor from a previous response
+            limit: Number of posts to fetch (1-100)
+            is_company: When ``False`` (default), fetch personal profile posts only
+
+        Returns:
+            Raw Unipile PostList response dict
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        safe_limit = max(1, min(limit, 100))
+        encoded_identifier = quote(identifier, safe="")
+        url = self._get_full_url(f"/api/v1/users/{encoded_identifier}/posts")
+        params: dict[str, str | int | bool] = {
+            "account_id": account_id,
+            "limit": safe_limit,
+            "is_company": is_company,
+        }
+        if cursor:
+            params["cursor"] = cursor
+
+        logger.info(
+            f"[UnipileClient] get_user_posts account_id={account_id} "
+            f"identifier={identifier} limit={safe_limit} is_company={is_company} "
+            f"cursor={'set' if cursor else 'none'}"
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(
+                url,
+                params=params,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        item_count = 0
+        next_cursor = None
+        if isinstance(data, dict):
+            items = data.get("items")
+            if isinstance(items, list):
+                item_count = len(items)
+            next_cursor = data.get("cursor")
+
+        logger.info(
+            f"[UnipileClient] get_user_posts success account_id={account_id} "
+            f"identifier={identifier} items={item_count} "
+            f"next_cursor={'set' if next_cursor else 'none'}"
+        )
+        return data

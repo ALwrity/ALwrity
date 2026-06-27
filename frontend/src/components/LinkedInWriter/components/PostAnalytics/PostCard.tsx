@@ -6,6 +6,7 @@ const PREVIEW_CHAR_LIMIT = 280;
 
 interface PostCardProps {
   post: LinkedInPost;
+  onGenerateSimilar?: (post: LinkedInPost) => void;
 }
 
 function formatMetric(value: number): string {
@@ -18,7 +19,7 @@ function formatMetric(value: number): string {
   return String(value);
 }
 
-export const PostCard: React.FC<PostCardProps> = React.memo(({ post }) => {
+export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateSimilar }) => {
   const [expanded, setExpanded] = useState(false);
 
   const { previewText, isTruncated } = useMemo(() => {
@@ -174,21 +175,41 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({ post }) => {
         <MetricPill label="Eng. rate" value={`${engagementRatePct}%`} highlight />
       </div>
 
-      {post.share_url && (
-        <a
-          href={post.share_url}
-          target="_blank"
-          rel="noreferrer"
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: colors.primary,
-            textDecoration: 'none',
-          }}
-        >
-          View on LinkedIn →
-        </a>
-      )}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
+        {post.share_url && (
+          <a
+            href={post.share_url}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: colors.primary,
+              textDecoration: 'none',
+            }}
+          >
+            View on LinkedIn →
+          </a>
+        )}
+        {onGenerateSimilar && (
+          <button
+            type="button"
+            onClick={() => onGenerateSimilar(post)}
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: colors.primary,
+              background: 'transparent',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            ✨ Generate Similar Post
+          </button>
+        )}
+      </div>
     </article>
   );
 });
