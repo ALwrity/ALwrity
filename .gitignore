@@ -284,3 +284,9 @@ validate_implementation.py
 
 # Camera selfie implementation (not needed)
 CAMERA_SELFIE_IMPLEMENTATION.md
+__pycache__/
+*.pyc
+.DS_Store
+node_modules/
+dist/
+.env
