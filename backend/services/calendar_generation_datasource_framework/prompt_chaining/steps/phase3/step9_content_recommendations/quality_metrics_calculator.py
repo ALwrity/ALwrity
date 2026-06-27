@@ -8,18 +8,7 @@ It ensures quality validation, scoring, and optimization recommendations.
 import asyncio
 from typing import Dict, Any, List, Optional
 from loguru import logger
-import sys
-import os
-
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-try:
-    from content_gap_analyzer.ai_engine_service import AIEngineService
-except ImportError:
-    raise ImportError("Required AI services not available. Cannot proceed without real AI services.")
+from services.content_gap_analyzer.ai_engine_service import AIEngineService
 
 
 class QualityMetricsCalculator:

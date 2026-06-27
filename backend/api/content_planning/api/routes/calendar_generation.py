@@ -451,12 +451,8 @@ async def cancel_calendar_generation(
         # Initialize service with database session for active strategy access
         calendar_service = CalendarGenerationService(db)
         
-        # Cancel orchestrator session
-        if session_id in calendar_service.orchestrator_sessions:
-            calendar_service.orchestrator_sessions[session_id]["status"] = "cancelled"
-            success = True
-        else:
-            success = False
+        # Cancel orchestrator session (persists to DB)
+        success = calendar_service.cancel_orchestrator_session(session_id)
         
         if not success:
             raise HTTPException(status_code=404, detail="Session not found")

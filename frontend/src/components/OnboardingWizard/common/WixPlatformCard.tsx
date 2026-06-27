@@ -76,12 +76,12 @@ const WixPlatformCard: React.FC<WixPlatformCardProps> = ({
         display: 'flex',
         flexDirection: 'column',
         p: 2,
-        borderColor: isConnected ? '#4ade80' : '#e2e8f0',
-        backgroundColor: isConnected ? '#f0fdf4' : '#ffffff',
+        borderColor: isConnected ? '#2563EB' : '#CBD5E1',
+        backgroundColor: isConnected ? '#DBEAFE' : '#EFF6FF',
         transition: 'all 0.2s ease',
         '&:hover': {
-          borderColor: isConnected ? '#22c55e' : '#cbd5e1',
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+          borderColor: isConnected ? '#1D4ED8' : '#94A3B8',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
         }
       }}
     >
@@ -89,21 +89,21 @@ const WixPlatformCard: React.FC<WixPlatformCardProps> = ({
         <Box display="flex" alignItems="center" gap={1.5}>
           <Box 
             sx={{ 
-              color: '#000000', // Wix brand black
-              bgcolor: '#ffffff',
+              color: '#000000',
+              bgcolor: '#FFFFFF',
               p: 0.5,
               borderRadius: 1,
-              border: '1px solid #e2e8f0',
+              border: '1px solid #CBD5E1',
               display: 'flex'
             }}
           >
             <WixIcon fontSize="small" />
           </Box>
           <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', lineHeight: 1.2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1E293B', lineHeight: 1.2 }}>
               Wix
             </Typography>
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
               Website & Blog
             </Typography>
           </Box>
@@ -112,18 +112,18 @@ const WixPlatformCard: React.FC<WixPlatformCardProps> = ({
           <CircularProgress size={16} sx={{ color: '#64748b' }} />
         ) : isConnected ? (
           <Tooltip title="Connected">
-            <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 20 }} />
+            <CheckCircleIcon sx={{ color: '#3B82F6', fontSize: 20 }} />
           </Tooltip>
         ) : (
-          <Chip label="Connect" size="small" onClick={handleWixConnect} clickable sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600, bgcolor: '#000000', color: 'white', '&:hover': { bgcolor: '#333333' } }} />
+          <Chip label="Connect" size="small" onClick={handleWixConnect} clickable sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600, background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)', color: 'white', '&:hover': { background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)' } }} />
         )}
       </Box>
 
       {isConnected && site ? (
-        <Box mt={1} p={1} bgcolor="rgba(255,255,255,0.6)" borderRadius={1} border="1px solid rgba(0,0,0,0.05)">
+        <Box mt={1} p={1} bgcolor="#DBEAFE" borderRadius={1} border="1px solid #93C5FD">
           <Box display="flex" alignItems="center" gap={1} mb={0.5}>
             <LinkIcon sx={{ fontSize: 14, color: '#64748b' }} />
-            <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: '#1E293B', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {site.blog_url.replace(/^https?:\/\//, '')}
             </Typography>
             <IconButton size="small" href={site.blog_url} target="_blank" sx={{ p: 0.5, ml: 'auto' }}>
@@ -132,7 +132,7 @@ const WixPlatformCard: React.FC<WixPlatformCardProps> = ({
           </Box>
         </Box>
       ) : (
-        <Typography variant="caption" sx={{ color: '#64748b', mt: 1, lineHeight: 1.4 }}>
+        <Typography variant="caption" sx={{ color: '#64748B', mt: 1, lineHeight: 1.4 }}>
           Connect to auto-publish content and track analytics directly from your dashboard.
         </Typography>
       )}

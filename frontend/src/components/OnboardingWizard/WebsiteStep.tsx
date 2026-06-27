@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
 import {
   Box,
   Button,
@@ -24,6 +25,7 @@ import {
 import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
 import PlatformSection from './common/PlatformSection';
+import EmailSection from './common/EmailSection';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -83,6 +85,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin'>('website');
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+  const { user } = useUser();
+  const [email, setEmail] = useState<string>('');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
@@ -103,6 +107,16 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
       description: 'Let Alwrity analyze your website to understand your brand voice, writing style, and content characteristics. This helps us generate content that matches your existing tone and resonates with your audience.'
     });
   }, [updateHeaderContent]);
+
+  // Get user email from Clerk
+  useEffect(() => {
+    if (user) {
+      const primaryEmail = user.primaryEmailAddress?.emailAddress;
+      const firstEmail = user.emailAddresses?.[0]?.emailAddress;
+      const resolvedEmail = primaryEmail || firstEmail || '';
+      if (resolvedEmail) setEmail(resolvedEmail);
+    }
+  }, [user]);
 
   // Notify parent when validation state changes
   useEffect(() => {
@@ -377,6 +391,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           crawlResult,
           useAnalysisForGenAI,
           integrations: integrationsPayload,
+          email,
         };
       });
     }
@@ -412,13 +427,16 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
         <Typography variant="h4" sx={{
           fontWeight: 700,
           mb: 1,
-          background: 'linear-gradient(45deg, #2563EB 30%, #7C3AED 90%)',
+          background: 'linear-gradient(135deg, #60A5FA 0%, #3B82F6 50%, #1D4ED8 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}>
           Let ALwrity Learn Your Brand
         </Typography>
       </Box>
+
+      {/* Email Section */}
+      <EmailSection email={email} onEmailChange={setEmail} />
 
       {/* Tab Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3 }}>
@@ -435,10 +453,10 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             textTransform: 'none',
             fontWeight: 700,
             fontSize: '0.875rem',
-            bgcolor: activeTab === 'website' ? '#7C3AED' : '#F3F4F6',
-            color: activeTab === 'website' ? '#FFFFFF' : '#374151',
+            bgcolor: activeTab === 'website' ? '#2563EB' : '#E2E8F0',
+            color: activeTab === 'website' ? '#FFFFFF' : '#475569',
             '&:hover': {
-              bgcolor: activeTab === 'website' ? '#6D28D9' : '#E5E7EB',
+              bgcolor: activeTab === 'website' ? '#1D4ED8' : '#CBD5E1',
             },
             transition: 'all 0.2s ease',
           }}
@@ -460,10 +478,10 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             textTransform: 'none',
             fontWeight: 700,
             fontSize: '0.875rem',
-            bgcolor: activeTab === 'linkedin' ? '#0A66C2' : '#F3F4F6',
-            color: activeTab === 'linkedin' ? '#FFFFFF' : '#374151',
+            bgcolor: activeTab === 'linkedin' ? '#0A66C2' : '#E2E8F0',
+            color: activeTab === 'linkedin' ? '#FFFFFF' : '#475569',
             '&:hover': {
-              bgcolor: activeTab === 'linkedin' ? '#004182' : '#E5E7EB',
+              bgcolor: activeTab === 'linkedin' ? '#004182' : '#CBD5E1',
             },
             transition: 'all 0.2s ease',
           }}
@@ -482,8 +500,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             mb: 2,
             p: 2.5,
             borderRadius: 3,
-            border: '1px solid #E5E7EB',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+            border: '1px solid #CBD5E1',
+            bgcolor: '#EFF6FF',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 0 0 1px rgba(59, 130, 246, 0.05)',
           }}>
             <Box sx={{ position: 'relative' }}>
               <TextField
@@ -497,16 +516,19 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     borderRadius: 2,
-                    bgcolor: '#F9FAFB',
+                    bgcolor: '#F8FAFC',
                     pr: '136px',
-                    '& fieldset': { borderColor: '#E5E7EB' },
-                    '&:hover fieldset': { borderColor: '#7C3AED' },
-                    '&.Mui-focused fieldset': { borderColor: '#7C3AED', borderWidth: 2 },
+                    '& fieldset': { borderColor: '#E2E8F0' },
+                    '&:hover fieldset': { borderColor: '#3B82F6' },
+                    '&.Mui-focused fieldset': { borderColor: '#3B82F6', borderWidth: 2 },
                   },
                   '& .MuiInputLabel-root': {
-                    color: '#6B7280',
+                    color: '#64748B',
                     fontWeight: 500,
-                    '&.Mui-focused': { color: '#7C3AED' },
+                    '&.Mui-focused': { color: '#2563EB' },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#1E293B',
                   },
                 }}
               />
@@ -515,36 +537,36 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                 onClick={handleAnalyze}
                 disabled={!website || loading}
                 startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <AnalyticsIcon />}
-                sx={{
-                  position: 'absolute',
-                  right: 6,
-                  top: 6,
-                  bottom: 6,
-                  borderRadius: '10px',
-                  textTransform: 'none',
-                  px: 2.5,
-                  py: 0,
-                  bgcolor: '#7C3AED',
-                  color: '#FFFFFF',
-                  fontWeight: 600,
-                  fontSize: '0.875rem',
-                  boxShadow: 'none',
-                  zIndex: 1,
-                  '&:hover': {
-                    bgcolor: '#6D28D9',
-                    boxShadow: 'none',
-                  },
-                  '&.Mui-disabled': {
-                    bgcolor: '#A78BFA',
-                    color: 'rgba(255,255,255,0.85)',
-                  },
-                }}
+                  sx={{
+                    position: 'absolute',
+                    right: 6,
+                    top: 6,
+                    bottom: 6,
+                    borderRadius: '10px',
+                    textTransform: 'none',
+                    px: 2.5,
+                    py: 0,
+                    background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                    color: '#FFFFFF',
+                    fontWeight: 600,
+                    fontSize: '0.875rem',
+                    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+                    zIndex: 1,
+                    '&:hover': {
+                      background: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
+                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                    },
+                    '&.Mui-disabled': {
+                      background: 'rgba(59, 130, 246, 0.3)',
+                      color: 'rgba(255,255,255,0.5)',
+                    },
+                  }}
               >
                 {loading ? 'Analyzing...' : 'Analyze'}
               </Button>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, pt: 1.5, borderTop: '1px solid #F3F4F6' }}>
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, pt: 1.5, borderTop: '1px solid #CBD5E1' }}>
+              <Typography variant="caption" sx={{ color: '#2563EB', fontWeight: 600 }}>
                 Connect Website Platforms
               </Typography>
               <Button
@@ -554,7 +576,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                 sx={{
                   textTransform: 'none',
                   fontSize: '0.75rem',
-                  color: '#94a3b8',
+                  color: '#94A3B8',
                   fontWeight: 500,
                   borderRadius: '8px',
                 }}
@@ -615,7 +637,8 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           sx={{
             p: 2.5,
             borderRadius: 3,
-            border: '1px solid #E5E7EB',
+            border: '1px solid #CBD5E1',
+            bgcolor: '#EFF6FF',
             boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
           }}
         >
@@ -654,8 +677,9 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
         PaperProps={{
           sx: {
             borderRadius: 3,
-            boxShadow: '0 20px 60px rgba(16,24,40,0.12)',
-            bgcolor: '#F9FAFB',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
+            bgcolor: '#EFF6FF',
+            border: '1px solid #CBD5E1',
           }
         }}
       >
@@ -670,41 +694,47 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
         onClose={() => setShowConfirmationDialog(false)}
         maxWidth="sm"
         fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#EFF6FF',
+            border: '1px solid #CBD5E1',
+          }
+        }}
       >
         <DialogTitle>
           <Box display="flex" alignItems="center" gap={1}>
-            <HistoryIcon color="primary" />
-            Previous Analysis Found
+            <HistoryIcon sx={{ color: '#2563EB' }} />
+            <Typography sx={{ color: '#1E293B', fontWeight: 600 }}>Previous Analysis Found</Typography>
           </Box>
         </DialogTitle>
         <DialogContent>
-          <DialogContentText>
+          <DialogContentText sx={{ color: '#475569' }}>
             We found a previous analysis for this website from{' '}
             {existingAnalysis?.analysis_date ? 
               new Date(existingAnalysis.analysis_date).toLocaleDateString() : 
               'a previous session'
             }.
           </DialogContentText>
-          <DialogContentText sx={{ mt: 2 }}>
+          <DialogContentText sx={{ mt: 2, color: '#475569' }}>
             Would you like to load the previous analysis or perform a new one?
           </DialogContentText>
           {existingAnalysis?.summary && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
-              <Typography variant="subtitle2" gutterBottom>
+            <Box sx={{ mt: 2, p: 2, bgcolor: '#EFF6FF', borderRadius: 1, border: '1px solid #BFDBFE' }}>
+              <Typography variant="subtitle2" gutterBottom sx={{ color: '#1E40AF' }}>
                 Previous Analysis Summary:
               </Typography>
               {existingAnalysis.summary.writing_style?.tone && (
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" sx={{ color: '#1E293B' }}>
                   Tone: {existingAnalysis.summary.writing_style.tone}
                 </Typography>
               )}
               {existingAnalysis.summary.target_audience?.expertise_level && (
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" sx={{ color: '#1E293B' }}>
                   Target Audience: {existingAnalysis.summary.target_audience.expertise_level}
                 </Typography>
               )}
               {existingAnalysis.summary.content_type?.primary_type && (
-                <Typography variant="body2" color="textSecondary">
+                <Typography variant="body2" sx={{ color: '#1E293B' }}>
                   Content Type: {existingAnalysis.summary.content_type.primary_type}
                 </Typography>
               )}
@@ -712,13 +742,15 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowConfirmationDialog(false)}>
+          <Button onClick={() => setShowConfirmationDialog(false)} sx={{ color: '#64748B' }}>
             Cancel
           </Button>
-          <Button onClick={handleLoadExistingConfirm} variant="outlined" startIcon={<HistoryIcon />}>
+          <Button onClick={handleLoadExistingConfirm} variant="outlined" startIcon={<HistoryIcon />}
+            sx={{ borderColor: '#BFDBFE', color: '#2563EB', '&:hover': { borderColor: '#3B82F6', backgroundColor: '#EFF6FF' } }}>
             Load Previous
           </Button>
-          <Button onClick={handleNewAnalysis} variant="contained" startIcon={<AnalyticsIcon />}>
+          <Button onClick={handleNewAnalysis} variant="contained" startIcon={<AnalyticsIcon />}
+            sx={{ background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)', boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)', '&:hover': { background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)', boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)' } }}>
             New Analysis
           </Button>
         </DialogActions>

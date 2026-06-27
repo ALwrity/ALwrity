@@ -97,12 +97,12 @@ const WordPressOAuthPlatformCard: React.FC<WordPressOAuthPlatformCardProps> = ({
           display: 'flex',
           flexDirection: 'column',
           p: 2,
-          borderColor: isConnected ? '#4ade80' : '#e2e8f0',
-          backgroundColor: isConnected ? '#f0fdf4' : '#ffffff',
+          borderColor: isConnected ? '#2563EB' : '#CBD5E1',
+          backgroundColor: isConnected ? '#DBEAFE' : '#EFF6FF',
           transition: 'all 0.2s ease',
           '&:hover': {
-            borderColor: isConnected ? '#22c55e' : '#cbd5e1',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)'
+            borderColor: isConnected ? '#1D4ED8' : '#94A3B8',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)'
           }
         }}
       >
@@ -110,21 +110,21 @@ const WordPressOAuthPlatformCard: React.FC<WordPressOAuthPlatformCardProps> = ({
           <Box display="flex" alignItems="center" gap={1.5}>
             <Box 
               sx={{ 
-                color: '#21759b', // WordPress blue
-                bgcolor: '#ffffff',
+                color: '#21759b',
+                bgcolor: '#FFFFFF',
                 p: 0.5,
                 borderRadius: 1,
-                border: '1px solid #e2e8f0',
+                border: '1px solid #CBD5E1',
                 display: 'flex'
               }}
             >
               <WordPressIcon fontSize="small" />
             </Box>
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', lineHeight: 1.2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1E293B', lineHeight: 1.2 }}>
                 WordPress
               </Typography>
-              <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+              <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
                 WP.com / Jetpack
               </Typography>
             </Box>
@@ -133,44 +133,45 @@ const WordPressOAuthPlatformCard: React.FC<WordPressOAuthPlatformCardProps> = ({
             <CircularProgress size={16} sx={{ color: '#64748b' }} />
           ) : isConnected ? (
             <Tooltip title="Connected">
-              <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 20 }} onClick={() => setShowSitesDialog(true)} style={{ cursor: 'pointer' }} />
+              <CheckCircleIcon sx={{ color: '#3B82F6', fontSize: 20 }} onClick={() => setShowSitesDialog(true)} style={{ cursor: 'pointer' }} />
             </Tooltip>
           ) : (
             <Chip label="Connect" size="small" onClick={handleConnect} clickable sx={{ height: 24, fontSize: '0.75rem', fontWeight: 600, bgcolor: '#21759b', color: 'white', '&:hover': { bgcolor: '#1a5c7a' } }} />
           )}
         </Box>
 
-        {isConnected && site ? (
-          <Box mt={1} p={1} bgcolor="rgba(255,255,255,0.6)" borderRadius={1} border="1px solid rgba(0,0,0,0.05)">
+          {isConnected && site ? (
+            <Box mt={1} p={1} bgcolor="#DBEAFE" borderRadius={1} border="1px solid #93C5FD">
             <Box display="flex" alignItems="center" gap={1} mb={0.5}>
               <LinkIcon sx={{ fontSize: 14, color: '#64748b' }} />
-              <Typography variant="caption" sx={{ fontWeight: 600, color: '#334155', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#1E293B', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {(site.blog_url || '').replace(/^https?:\/\//, '') || 'WordPress Site'}
               </Typography>
               <IconButton size="small" href={site.blog_url} target="_blank" sx={{ p: 0.5, ml: 'auto' }}>
                 <OpenInNewIcon sx={{ fontSize: 12, color: '#94a3b8' }} />
               </IconButton>
             </Box>
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', fontSize: '0.7rem' }}>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block', fontSize: '0.7rem' }}>
               {totalSites > 1 ? `+${totalSites - 1} other sites` : 'OAuth Connected'}
             </Typography>
           </Box>
         ) : (
-          <Typography variant="caption" sx={{ color: '#64748b', mt: 1, lineHeight: 1.4 }}>
+          <Typography variant="caption" sx={{ color: '#64748B', mt: 1, lineHeight: 1.4 }}>
             Connect your WordPress sites securely via official OAuth integration.
           </Typography>
         )}
       </Card>
 
       {/* Sites Dialog */}
-      <Dialog open={showSitesDialog} onClose={() => setShowSitesDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Connected WordPress Sites</DialogTitle>
+      <Dialog open={showSitesDialog} onClose={() => setShowSitesDialog(false)} maxWidth="sm" fullWidth
+        PaperProps={{ sx: { bgcolor: '#EFF6FF', border: '1px solid #CBD5E1' } }}>
+        <DialogTitle sx={{ color: '#1E293B' }}>Connected WordPress Sites</DialogTitle>
         <DialogContent>
           {sites.map((site) => (
-            <Box key={site.id} display="flex" alignItems="center" justifyContent="space-between" p={2} borderBottom="1px solid #e2e8f0">
+            <Box key={site.id} display="flex" alignItems="center" justifyContent="space-between" p={2} borderBottom="1px solid #CBD5E1">
               <Box>
-                <Typography variant="subtitle2">{site.blog_url}</Typography>
-                <Typography variant="caption" color="textSecondary">ID: {site.blog_id}</Typography>
+                <Typography variant="subtitle2" sx={{ color: '#1E293B' }}>{site.blog_url}</Typography>
+                <Typography variant="caption" sx={{ color: '#64748B' }}>ID: {site.blog_id}</Typography>
               </Box>
               <IconButton onClick={() => handleDisconnectSite(site.id)} color="error" size="small">
                 <DeleteIcon />
@@ -179,7 +180,7 @@ const WordPressOAuthPlatformCard: React.FC<WordPressOAuthPlatformCardProps> = ({
           ))}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowSitesDialog(false)}>Close</Button>
+          <Button onClick={() => setShowSitesDialog(false)} sx={{ color: '#64748B' }}>Close</Button>
         </DialogActions>
       </Dialog>
     </>

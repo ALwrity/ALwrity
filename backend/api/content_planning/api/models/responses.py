@@ -21,6 +21,7 @@ class ContentStrategyResponse(BaseModel):
 # Calendar Event Response Models
 class CalendarEventResponse(BaseModel):
     id: int
+    user_id: str
     strategy_id: int
     title: str
     description: str
@@ -35,7 +36,7 @@ class CalendarEventResponse(BaseModel):
 # Content Gap Analysis Response Models
 class ContentGapAnalysisResponse(BaseModel):
     id: int
-    user_id: int
+    user_id: str
     website_url: str
     competitor_urls: List[str]
     target_keywords: Optional[List[str]] = None
@@ -64,7 +65,7 @@ class AIAnalyticsResponse(BaseModel):
 
 # Calendar Generation Response Models
 class CalendarGenerationResponse(BaseModel):
-    user_id: int
+    user_id: str
     strategy_id: Optional[int]
     calendar_type: str
     industry: str
@@ -89,7 +90,7 @@ class CalendarGenerationResponse(BaseModel):
     ai_confidence: float
 
 class ContentOptimizationResponse(BaseModel):
-    user_id: int
+    user_id: str
     event_id: Optional[int]
     original_content: Dict[str, Any]
     optimized_content: Dict[str, Any]
@@ -104,7 +105,7 @@ class ContentOptimizationResponse(BaseModel):
     created_at: datetime
 
 class PerformancePredictionResponse(BaseModel):
-    user_id: int
+    user_id: str
     strategy_id: Optional[int]
     content_type: str
     platform: str
@@ -117,7 +118,7 @@ class PerformancePredictionResponse(BaseModel):
     created_at: datetime
 
 class ContentRepurposingResponse(BaseModel):
-    user_id: int
+    user_id: str
     strategy_id: Optional[int]
     original_content: Dict[str, Any]
     platform_adaptations: List[Dict[str, Any]]
@@ -127,7 +128,7 @@ class ContentRepurposingResponse(BaseModel):
     created_at: datetime
 
 class TrendingTopicsResponse(BaseModel):
-    user_id: int
+    user_id: str
     industry: str
     trending_topics: List[Dict[str, Any]]
     gap_relevance_scores: Dict[str, float]

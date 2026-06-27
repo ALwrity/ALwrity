@@ -28,9 +28,14 @@ class AIAnalysisDBService:
         personalized_data: Optional[Dict[str, Any]] = None,
         processing_time: Optional[float] = None,
         strategy_id: Optional[int] = None,
-        ai_service_status: str = "operational"
+        ai_service_status: str = "operational",
+        db: Optional[Session] = None
     ) -> AIAnalysisResult:
         """Store AI analysis result in the database."""
+        session = db or self.db
+        if session is None:
+            logger.error("No database session available for storing AI analysis result")
+            raise RuntimeError("Database session required")
         try:
             logger.info(f"Storing AI analysis result for user {user_id}, type: {analysis_type}")
             
@@ -49,16 +54,16 @@ class AIAnalysisDBService:
                 updated_at=datetime.utcnow()
             )
             
-            self.db.add(ai_result)
-            self.db.commit()
-            self.db.refresh(ai_result)
+            session.add(ai_result)
+            session.commit()
+            session.refresh(ai_result)
             
             logger.info(f"✅ AI analysis result stored successfully: {ai_result.id}")
             return ai_result
             
         except Exception as e:
             logger.error(f"❌ Error storing AI analysis result: {str(e)}")
-            self.db.rollback()
+            session.rollback()
             raise
     
     async def get_latest_ai_analysis(
@@ -66,16 +71,21 @@ class AIAnalysisDBService:
         user_id: int, 
         analysis_type: str, 
         strategy_id: Optional[int] = None,
-        max_age_hours: int = 24
+        max_age_hours: int = 24,
+        db: Optional[Session] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Get the latest AI analysis result with detailed logging.
         """
+        session = db or self.db
+        if session is None:
+            logger.error("No database session available for retrieving AI analysis")
+            return None
         try:
             logger.info(f"🔍 Retrieving latest AI analysis for user {user_id}, type: {analysis_type}")
             
             # Build query
-            query = self.db.query(AIAnalysisResult).filter(
+            query = session.query(AIAnalysisResult).filter(
                 AIAnalysisResult.user_id == user_id,
                 AIAnalysisResult.analysis_type == analysis_type
             )
@@ -218,26 +228,31 @@ class AIAnalysisDBService:
     
     async def delete_old_ai_analyses(
         self,
-        days_old: int = 30
+        days_old: int = 30,
+        db: Optional[Session] = None
     ) -> int:
         """Delete AI analysis results older than specified days."""
+        session = db or self.db
+        if session is None:
+            logger.error("No database session available for deleting old AI analyses")
+            return 0
         try:
             logger.info(f"Cleaning up AI analysis results older than {days_old} days")
             
             cutoff_date = datetime.utcnow() - timedelta(days=days_old)
             
-            deleted_count = self.db.query(AIAnalysisResult).filter(
+            deleted_count = session.query(AIAnalysisResult).filter(
                 AIAnalysisResult.created_at < cutoff_date
             ).delete()
             
-            self.db.commit()
+            session.commit()
             
             logger.info(f"✅ Deleted {deleted_count} old AI analysis results")
             return deleted_count
             
         except Exception as e:
             logger.error(f"❌ Error deleting old AI analyses: {str(e)}")
-            self.db.rollback()
+            session.rollback()
             return 0
     
     async def get_analysis_statistics(

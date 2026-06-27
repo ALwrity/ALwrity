@@ -1,22 +1,12 @@
 import asyncio
 from typing import Dict, Any, List, Optional
 from loguru import logger
-import sys
-import os
 from datetime import datetime, timedelta
 import json
 
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-try:
-    from content_gap_analyzer.ai_engine_service import AIEngineService
-    from content_gap_analyzer.keyword_researcher import KeywordResearcher
-    from content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
-except ImportError:
-    raise ImportError("Required AI services not available. Cannot proceed without real AI services.")
+from services.content_gap_analyzer.ai_engine_service import AIEngineService
+from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
+from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
 
 
 class CalendarAssemblyEngine:
@@ -349,7 +339,7 @@ class CalendarAssemblyEngine:
             start_of_year = datetime(date_obj.year, 1, 1)
             week_number = ((date_obj - start_of_year).days // 7) + 1
             return week_number
-        except:
+        except (ValueError, TypeError):
             return 1
 
     async def _apply_final_optimizations(self, populated_calendar: Dict[str, Any], structured_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -383,10 +373,10 @@ class CalendarAssemblyEngine:
             if day.get("quality_metrics", {}).get("overall_score"):
                 quality_scores.append(day["quality_metrics"]["overall_score"])
 
-        overall_quality_score = sum(quality_scores) / len(quality_scores) if quality_scores else 0.85
+        overall_quality_score = sum(quality_scores) / len(quality_scores) if quality_scores else None
 
         # Get strategy alignment score from Step 11
-        strategy_alignment_score = structured_data.get("strategy_alignment", {}).get("alignment_scores", {}).get("overall_alignment", 0.85)
+        strategy_alignment_score = structured_data.get("strategy_alignment", {}).get("alignment_scores", {}).get("overall_alignment")
 
         # Calculate performance prediction
         performance_prediction = {

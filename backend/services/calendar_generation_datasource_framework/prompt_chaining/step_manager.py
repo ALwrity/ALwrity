@@ -24,16 +24,22 @@ class StepManager:
     - Error recovery and retry logic
     """
     
-    def __init__(self):
-        """Initialize the step manager."""
+    def __init__(self, default_timeout: int = 120):
+        """Initialize the step manager.
+
+        Args:
+            default_timeout: Default timeout in seconds for each step execution.
+        """
         self.steps: Dict[str, PromptStep] = {}
         self.step_dependencies: Dict[str, List[str]] = {}
         self.execution_order: List[str] = []
         self.step_states: Dict[str, Dict[str, Any]] = {}
+        self.step_timeouts: Dict[str, int] = {}
+        self.default_timeout = default_timeout
         
         logger.info("🎯 Step Manager initialized")
     
-    def register_step(self, step_name: str, step: PromptStep, dependencies: Optional[List[str]] = None):
+    def register_step(self, step_name: str, step: PromptStep, dependencies: Optional[List[str]] = None, timeout: Optional[int] = None):
         """
         Register a step with the manager.
         
@@ -41,9 +47,11 @@ class StepManager:
             step_name: Unique name for the step
             step: Step instance
             dependencies: List of step names this step depends on
+            timeout: Per-step timeout in seconds (overrides default)
         """
         self.steps[step_name] = step
         self.step_dependencies[step_name] = dependencies or []
+        self.step_timeouts[step_name] = timeout or self.default_timeout
         self.step_states[step_name] = {
             "status": "registered",
             "registered_at": datetime.now().isoformat(),
@@ -173,8 +181,9 @@ class StepManager:
             state["execution_count"] += 1
             state["last_execution"] = datetime.now().isoformat()
             
-            # Execute step
-            result = await step.run(context)
+            # Execute step with per-step timeout
+            timeout = self.step_timeouts.get(step_name, self.default_timeout)
+            result = await asyncio.wait_for(step.run(context), timeout=timeout)
             
             # Update state based on result
             if result.get("status") == "completed":
@@ -188,6 +197,11 @@ class StepManager:
             logger.info(f"✅ Step {step_name} executed successfully")
             return result
             
+        except asyncio.TimeoutError:
+            state["status"] = "timeout"
+            state["error_count"] += 1
+            logger.error(f"⏰ Step {step_name} timed out after {self.step_timeouts.get(step_name, self.default_timeout)}s")
+            raise TimeoutError(f"Step {step_name} timed out after {self.step_timeouts.get(step_name, self.default_timeout)}s")
         except Exception as e:
             state["status"] = "error"
             state["error_count"] += 1

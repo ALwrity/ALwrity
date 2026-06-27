@@ -8,23 +8,13 @@ It integrates performance analysis, content quality optimization, engagement opt
 import asyncio
 from typing import Dict, Any, List, Optional
 from loguru import logger
-import sys
-import os
 
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-try:
-    from ...base_step import PromptStep
-    from .performance_analyzer import PerformanceAnalyzer
-    from .content_quality_optimizer import ContentQualityOptimizer
-    from .engagement_optimizer import EngagementOptimizer
-    from .roi_optimizer import ROIOptimizer
-    from .performance_predictor import PerformancePredictor
-except ImportError:
-    raise ImportError("Required Step 10 modules not available. Cannot proceed without modular components.")
+from ...base_step import PromptStep
+from .performance_analyzer import PerformanceAnalyzer
+from .content_quality_optimizer import ContentQualityOptimizer
+from .engagement_optimizer import EngagementOptimizer
+from .roi_optimizer import ROIOptimizer
+from .performance_predictor import PerformancePredictor
 
 
 class PerformanceOptimizationStep(PromptStep):

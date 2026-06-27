@@ -13,7 +13,7 @@ import time
 from services.content_planning_db import ContentPlanningDBService
 from services.ai_analysis_db_service import AIAnalysisDBService
 from services.ai_analytics_service import AIAnalyticsService
-from services.database import SessionLocal
+from services.database import SessionLocal, get_session_for_user
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
 
 # Import utilities
@@ -141,40 +141,37 @@ class ContentPlanningAIAnalyticsService:
     
     async def get_ai_analytics(self, user_id: Optional[int] = None, strategy_id: Optional[int] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """Get AI analytics with real personalized insights - FORCE FRESH AI GENERATION."""
+        if not user_id:
+            raise ValueError("user_id is required for AI analytics")
+        if not strategy_id:
+            raise ValueError("strategy_id is required for AI analytics (use ActiveStrategy to get the current strategy)")
+        logger.info(f"🚀 Starting AI analytics for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
+        start_time = time.time()
+        current_user_id = user_id
+
+        ai_db_session = get_session_for_user(str(current_user_id)) if current_user_id else SessionLocal()
         try:
-            logger.info(f"🚀 Starting AI analytics for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
-            start_time = time.time()
-            
-            # Use user_id or default to 1
-            current_user_id = user_id or 1
-            
-            # 🚨 CRITICAL: Always force fresh AI generation for refresh operations
             if force_refresh:
                 logger.info(f"🔄 FORCE REFRESH: Deleting all cached AI analysis for user {current_user_id}")
                 try:
-                    await self.ai_analysis_db_service.delete_old_ai_analyses(days_old=0)
+                    await self.ai_analysis_db_service.delete_old_ai_analyses(days_old=0, db=ai_db_session)
                     logger.info(f"✅ Deleted all cached AI analysis for user {current_user_id}")
                 except Exception as e:
                     logger.warning(f"⚠️ Failed to delete cached analysis: {str(e)}")
-            
-            # 🚨 CRITICAL: Skip database check for refresh operations to ensure fresh AI generation
+
             if not force_refresh:
-                # Only check database for non-refresh operations
                 logger.info(f"🔍 Checking database for existing AI analysis for user {current_user_id}")
                 existing_analysis = await self.ai_analysis_db_service.get_latest_ai_analysis(
                     user_id=current_user_id,
                     analysis_type="comprehensive_analysis",
                     strategy_id=strategy_id,
-                    max_age_hours=1  # 🚨 CRITICAL: Reduced from 24 hours to 1 hour to minimize stale data
+                    max_age_hours=1,
+                    db=ai_db_session
                 )
-                
+
                 if existing_analysis:
                     cache_age_hours = (datetime.utcnow() - existing_analysis.get('created_at', datetime.utcnow())).total_seconds() / 3600
-                    logger.info(f"✅ Found existing AI analysis in database: {existing_analysis.get('id', 'unknown')} (age: {cache_age_hours:.1f} hours)")
-                    
-                    # Return cached results only if very recent (less than 1 hour)
                     if cache_age_hours < 1:
-                        logger.info(f"📋 Using cached AI analysis (age: {cache_age_hours:.1f} hours)")
                         return {
                             "insights": existing_analysis.get('insights', []),
                             "recommendations": existing_analysis.get('recommendations', []),
@@ -188,55 +185,38 @@ class ContentPlanningAIAnalyticsService:
                             "cache_age_hours": cache_age_hours,
                             "user_profile": existing_analysis.get('personalized_data_used', {})
                         }
-                    else:
-                        logger.info(f"🔄 Cached analysis too old ({cache_age_hours:.1f} hours) - generating fresh AI analysis")
-            
-            # 🚨 CRITICAL: Always run fresh AI analysis for refresh operations
+
             logger.info(f"🔄 Running FRESH AI analysis for user {current_user_id} (force_refresh: {force_refresh})")
-            
-            # Get personalized inputs from onboarding data (SSOT)
+
             db = SessionLocal()
             try:
                 personalized_inputs = await self.onboarding_integration_service.process_onboarding_data(str(current_user_id), db)
             finally:
                 db.close()
-            
+
             logger.info(f"📊 Using personalized inputs: {len(personalized_inputs)} data points")
-            
-            # Generate real AI insights using personalized data
-            logger.info("🔍 Generating performance analysis...")
+
             performance_analysis = await self.ai_analytics_service.analyze_performance_trends(
-                user_id=current_user_id,
-                strategy_id=strategy_id or 1
+                user_id=current_user_id, strategy_id=strategy_id
             )
-            
-            logger.info("🧠 Generating strategic intelligence...")
             strategic_intelligence = await self.ai_analytics_service.generate_strategic_intelligence(
-                user_id=current_user_id,
-                strategy_id=strategy_id or 1
+                user_id=current_user_id, strategy_id=strategy_id
             )
-            
-            logger.info("📈 Analyzing content evolution...")
             evolution_analysis = await self.ai_analytics_service.analyze_content_evolution(
-                user_id=current_user_id,
-                strategy_id=strategy_id or 1
+                user_id=current_user_id, strategy_id=strategy_id
             )
-            
-            # Combine all insights
+
             insights = []
             recommendations = []
-            
             if performance_analysis:
                 insights.extend(performance_analysis.get('insights', []))
             if strategic_intelligence:
                 insights.extend(strategic_intelligence.get('insights', []))
             if evolution_analysis:
                 insights.extend(evolution_analysis.get('insights', []))
-            
+
             total_time = time.time() - start_time
-            logger.info(f"🎉 AI analytics completed in {total_time:.2f}s: {len(insights)} insights, {len(recommendations)} recommendations")
-            
-            # Store results in database
+
             try:
                 await self.ai_analysis_db_service.store_ai_analysis_result(
                     user_id=current_user_id,
@@ -247,12 +227,13 @@ class ContentPlanningAIAnalyticsService:
                     personalized_data=personalized_inputs,
                     processing_time=total_time,
                     strategy_id=strategy_id,
-                    ai_service_status="operational" if len(insights) > 0 else "fallback"
+                    ai_service_status="operational" if len(insights) > 0 else "fallback",
+                    db=ai_db_session
                 )
                 logger.info(f"💾 AI analysis results stored in database for user {current_user_id}")
             except Exception as e:
                 logger.error(f"❌ Failed to store AI analysis in database: {str(e)}")
-            
+
             return {
                 "insights": insights,
                 "recommendations": recommendations,
@@ -274,6 +255,8 @@ class ContentPlanningAIAnalyticsService:
         except Exception as e:
             logger.error(f"❌ Error generating AI analytics: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "get_ai_analytics")
+        finally:
+            ai_db_session.close()
     
     async def get_user_ai_analysis_results(self, user_id: int, analysis_type: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
         """Get AI analysis results for a specific user."""

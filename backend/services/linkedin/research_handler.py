@@ -45,13 +45,14 @@ class ResearchHandler:
             logger.info(f"ResearchHandler: search_engine='{search_engine}' (type: {type(search_engine)})")
             
             research_start = datetime.now()
-            research_sources = await self.linkedin_service._conduct_research(
+            sources = await self.linkedin_service._conduct_research(
                 topic=request.topic,
                 industry=request.industry,
                 search_engine=search_engine,
                 max_results=max_results,
                 user_id=user_id
             )
+            research_sources = sources if sources is not None else []
             research_time = (datetime.now() - research_start).total_seconds()
             logger.info(f"Research completed in {research_time:.2f}s, found {len(research_sources)} sources")
         

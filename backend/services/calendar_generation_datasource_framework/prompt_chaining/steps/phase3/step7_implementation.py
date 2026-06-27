@@ -12,113 +12,12 @@ from datetime import datetime, timedelta
 from loguru import logger
 
 from ..base_step import PromptStep
-import sys
-import os
-
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-try:
-    from calendar_generation_datasource_framework.data_processing import (
-        ComprehensiveUserDataProcessor,
-        StrategyDataProcessor,
-        GapAnalysisDataProcessor
-    )
-    from content_gap_analyzer.ai_engine_service import AIEngineService
-    from content_gap_analyzer.keyword_researcher import KeywordResearcher
-    from content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
-except ImportError:
-    # Fallback for testing environments - create mock classes
-    class ComprehensiveUserDataProcessor:
-        async def get_comprehensive_user_data(self, user_id, strategy_id):
-            return {
-                "user_id": user_id,
-                "strategy_id": strategy_id,
-                "industry": "technology",
-                "onboarding_data": {},
-                "strategy_data": {},
-                "gap_analysis": {},
-                "ai_analysis": {},
-                "performance_data": {},
-                "competitor_data": {}
-            }
-    
-    class AIEngineService:
-        async def generate_content_recommendations(self, analysis_data):
-            """Mock implementation with correct method signature"""
-            logger.info("📋 Using mock content recommendations for theme generation")
-            return [
-                {
-                    'type': 'content_creation',
-                    'title': 'Weekly Theme: AI Implementation Guide',
-                    'description': 'Comprehensive guide on AI implementation for businesses',
-                    'priority': 'high',
-                    'estimated_impact': 'High engagement and lead generation',
-                    'implementation_time': '1 week',
-                    'ai_confidence': 0.92,
-                    'content_suggestions': [
-                        'Step-by-step AI implementation tutorial',
-                        'Best practices for AI adoption',
-                        'Common pitfalls to avoid',
-                        'Success case studies'
-                    ]
-                },
-                {
-                    'type': 'content_creation',
-                    'title': 'Weekly Theme: Digital Transformation Journey',
-                    'description': 'Navigating the digital transformation process',
-                    'priority': 'high',
-                    'estimated_impact': 'Thought leadership and brand authority',
-                    'implementation_time': '1 week',
-                    'ai_confidence': 0.89,
-                    'content_suggestions': [
-                        'Digital transformation roadmap',
-                        'Technology adoption strategies',
-                        'Change management insights',
-                        'ROI measurement frameworks'
-                    ]
-                },
-                {
-                    'type': 'content_creation',
-                    'title': 'Weekly Theme: Innovation and Tech Trends',
-                    'description': 'Exploring emerging technologies and innovation',
-                    'priority': 'medium',
-                    'estimated_impact': 'Industry relevance and engagement',
-                    'implementation_time': '1 week',
-                    'ai_confidence': 0.87,
-                    'content_suggestions': [
-                        'Emerging technology analysis',
-                        'Innovation case studies',
-                        'Future trend predictions',
-                        'Technology adoption insights'
-                    ]
-                },
-                {
-                    'type': 'content_creation',
-                    'title': 'Weekly Theme: Business Strategy and Growth',
-                    'description': 'Strategic business insights and growth strategies',
-                    'priority': 'medium',
-                    'estimated_impact': 'Business value and strategic alignment',
-                    'implementation_time': '1 week',
-                    'ai_confidence': 0.85,
-                    'content_suggestions': [
-                        'Strategic planning frameworks',
-                        'Growth strategy development',
-                        'Business model innovation',
-                        'Performance optimization'
-                    ]
-                }
-            ]
-    
-    class KeywordResearcher:
-        async def get_keywords(self, topic):
-            return ["keyword1", "keyword2", "keyword3"]
-    
-    class CompetitorAnalyzer:
-        async def analyze_competitors(self, industry):
-            return {"competitors": ["comp1", "comp2"], "insights": ["insight1", "insight2"]}
+from services.calendar_generation_datasource_framework.data_processing.comprehensive_user_data import ComprehensiveUserDataProcessor
+from services.calendar_generation_datasource_framework.data_processing.strategy_data import StrategyDataProcessor
+from services.calendar_generation_datasource_framework.data_processing.gap_analysis_data import GapAnalysisDataProcessor
+from services.content_gap_analyzer.ai_engine_service import AIEngineService
+from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
+from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
 
 
 class WeeklyThemeDevelopmentStep(PromptStep):

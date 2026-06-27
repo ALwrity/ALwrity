@@ -1,19 +1,9 @@
 import asyncio
 from typing import Dict, Any, List, Optional
 from loguru import logger
-import sys
-import os
 
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-try:
-    from ...base_step import PromptStep
-    from .calendar_assembly_engine import CalendarAssemblyEngine
-except ImportError:
-    raise ImportError("Required Step 12 modules not available. Cannot proceed without modular components.")
+from ...base_step import PromptStep
+from .calendar_assembly_engine import CalendarAssemblyEngine
 
 
 class FinalCalendarAssemblyStep(PromptStep):
@@ -90,10 +80,10 @@ class FinalCalendarAssemblyStep(PromptStep):
                 "completion_status": "completed",
                 "completion_timestamp": self._get_current_timestamp(),
                 "quality_metrics": {
-                    "overall_quality_score": final_calendar.get("quality_score", 0.85),
-                    "strategy_alignment_score": final_calendar.get("strategy_alignment_score", 0.85),
-                    "assembly_confidence": final_calendar.get("assembly_metadata", {}).get("assembly_confidence", 0.9),
-                    "integration_completeness": final_calendar.get("assembly_metadata", {}).get("integration_completeness", 11)
+                    "overall_quality_score": final_calendar.get("quality_score"),
+                    "strategy_alignment_score": final_calendar.get("strategy_alignment_score"),
+                    "assembly_confidence": final_calendar.get("assembly_metadata", {}).get("assembly_confidence"),
+                    "integration_completeness": final_calendar.get("assembly_metadata", {}).get("integration_completeness")
                 },
                 "calendar_summary": {
                     "calendar_id": final_calendar.get("calendar_id"),
@@ -185,8 +175,8 @@ class FinalCalendarAssemblyStep(PromptStep):
                 "Performance-driven recommendations"
             ],
             "quality_indicators": {
-                "strategy_alignment": final_calendar.get("strategy_alignment_score", 0.85),
-                "content_quality": final_calendar.get("quality_score", 0.85),
+                "strategy_alignment": final_calendar.get("strategy_alignment_score"),
+                "content_quality": final_calendar.get("quality_score"),
                 "platform_coverage": len(final_calendar.get("calendar_structure", {}).get("integration_metadata", {}).get("platforms_covered", [])),
                 "theme_variety": len(final_calendar.get("calendar_structure", {}).get("integration_metadata", {}).get("themes_covered", []))
             }

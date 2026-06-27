@@ -11,31 +11,12 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from services.calendar_generation_datasource_framework.prompt_chaining.steps.base_step import PromptStep
-import sys
-import os
-
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-# Import data processing modules
-try:
-    from services.calendar_generation_datasource_framework.data_processing.comprehensive_user_data import ComprehensiveUserDataProcessor
-    from services.calendar_generation_datasource_framework.data_processing.strategy_data import StrategyDataProcessor
-    from services.calendar_generation_datasource_framework.data_processing.gap_analysis_data import GapAnalysisDataProcessor
-    from services.content_gap_analyzer.ai_engine_service import AIEngineService
-    from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
-    from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
-except ImportError as e:
-    # Fallback imports for testing
-    logger.warning(f"⚠️ Step 4: Import failed: {e}")
-    ComprehensiveUserDataProcessor = None
-    StrategyDataProcessor = None
-    GapAnalysisDataProcessor = None
-    AIEngineService = None
-    KeywordResearcher = None
-    CompetitorAnalyzer = None
+from services.calendar_generation_datasource_framework.data_processing.comprehensive_user_data import ComprehensiveUserDataProcessor
+from services.calendar_generation_datasource_framework.data_processing.strategy_data import StrategyDataProcessor
+from services.calendar_generation_datasource_framework.data_processing.gap_analysis_data import GapAnalysisDataProcessor
+from services.content_gap_analyzer.ai_engine_service import AIEngineService
+from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
+from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
 
 
 class CalendarFrameworkStep(PromptStep):
@@ -54,25 +35,8 @@ class CalendarFrameworkStep(PromptStep):
     
     def __init__(self):
         super().__init__("Calendar Framework & Timeline", 4)
-        
-        # Debug imports
-        logger.info(f"🔍 Step 4: ComprehensiveUserDataProcessor available: {ComprehensiveUserDataProcessor is not None}")
-        logger.info(f"🔍 Step 4: AIEngineService available: {AIEngineService is not None}")
-        
-        # Initialize services if available
-        if AIEngineService:
-            self.ai_engine = AIEngineService()
-            logger.info("✅ Step 4: AIEngineService initialized")
-        else:
-            self.ai_engine = None
-            logger.warning("⚠️ Step 4: AIEngineService not available")
-            
-        if ComprehensiveUserDataProcessor:
-            self.comprehensive_user_processor = ComprehensiveUserDataProcessor()
-            logger.info("✅ Step 4: ComprehensiveUserDataProcessor initialized")
-        else:
-            self.comprehensive_user_processor = None
-            logger.error("❌ Step 4: ComprehensiveUserDataProcessor not available")
+        self.ai_engine = AIEngineService()
+        self.comprehensive_user_processor = ComprehensiveUserDataProcessor()
         
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
         """Execute calendar framework and timeline step."""
@@ -88,12 +52,7 @@ class CalendarFrameworkStep(PromptStep):
             business_size = context.get("business_size", "sme")
             
             # Get comprehensive user data
-            if self.comprehensive_user_processor:
-                user_data = await self.comprehensive_user_processor.get_comprehensive_user_data(user_id, strategy_id)
-            else:
-                # Fail gracefully - no fallback data
-                logger.error("❌ ComprehensiveUserDataProcessor not available - Step 4 cannot proceed")
-                raise RuntimeError("Required service ComprehensiveUserDataProcessor is not available. Step 4 cannot execute without real user data.")
+            user_data = await self.comprehensive_user_processor.get_comprehensive_user_data(user_id, strategy_id)
             
             # Step 4.1: Calendar Structure Analysis
             calendar_structure = await self._analyze_calendar_structure(
@@ -118,6 +77,11 @@ class CalendarFrameworkStep(PromptStep):
             # Calculate execution time
             execution_time = time.time() - start_time
             
+            # Calculate quality score from sub-metrics
+            duration_accuracy = duration_control.get("accuracy_score", 0)
+            alignment_score = strategic_alignment.get("alignment_score", 0)
+            quality_score = (duration_accuracy + alignment_score) / 2
+
             # Generate step results
             step_results = {
                 "stepNumber": 4,
@@ -128,7 +92,7 @@ class CalendarFrameworkStep(PromptStep):
                     "durationControl": duration_control,
                     "strategicAlignment": strategic_alignment
                 },
-                "qualityScore": 0.82,  # Pre-calculated quality score
+                "qualityScore": quality_score,
                 "executionTime": f"{execution_time:.1f}s",
                 "dataSourcesUsed": ["Calendar Configuration", "Timeline Optimization", "Strategic Alignment"],
                 "insights": [
@@ -285,39 +249,14 @@ class CalendarFrameworkStep(PromptStep):
             business_goals = strategy_data.get("business_goals", [])
             business_objectives = strategy_data.get("business_objectives", [])
             
-            # Use fallback business goals if not available
-            if not business_goals:
-                logger.warning("⚠️ No business goals found, using fallback goals")
-                business_goals = [
-                    "Increase brand awareness",
-                    "Generate qualified leads", 
-                    "Establish thought leadership",
-                    "Drive website traffic",
-                    "Improve customer engagement"
-                ]
-            
             # Get content pillars
             content_pillars = strategy_data.get("content_pillars", [])
             
-            # Use fallback content pillars if not available
-            if not content_pillars:
-                logger.warning("⚠️ No content pillars found, using fallback pillars")
-                content_pillars = [
-                    "AI and Machine Learning",
-                    "Digital Transformation",
-                    "Innovation and Technology Trends",
-                    "Business Strategy and Growth"
-                ]
-            
             # Calculate alignment score based on how well the calendar supports business goals
             total_goals = len(business_goals)
-            supported_goals = 0
+            supported_goals = total_goals if calendar_structure and timeline_config and total_goals > 0 else 0
             
-            # Simple alignment check - if we have a calendar structure and timeline, we support the goals
-            if calendar_structure and timeline_config:
-                supported_goals = total_goals  # Assume all goals are supported if we have a valid calendar
-            
-            alignment_score = supported_goals / total_goals if total_goals > 0 else 0.8  # Default to 0.8 if no goals
+            alignment_score = supported_goals / total_goals if total_goals > 0 else 0.0
             
             return {
                 "alignment_score": alignment_score,

@@ -152,11 +152,17 @@ async def get_ai_analytics(
     """Get AI analytics with real personalized insights - Database first approach."""
     try:
         user_id = current_user.get("user_id") or current_user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User ID required")
+        if not strategy_id:
+            raise HTTPException(status_code=400, detail="strategy_id query parameter is required")
         logger.info(f"🚀 Starting AI analytics for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
         
         result = await ai_analytics_service.get_ai_analytics(user_id, strategy_id, force_refresh)
         return result
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"❌ Error generating AI analytics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error generating AI analytics: {str(e)}")

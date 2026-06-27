@@ -55,25 +55,25 @@ const PlatformCard: React.FC<PlatformCardProps> = ({ id, name, description, icon
     <Card 
       sx={{ 
         height: '100%',
-        border: status === 'connected' ? '2px solid #10b981' : '1px solid #e2e8f0',
-        backgroundColor: status === 'connected' ? '#f0fdf4' : '#ffffff',
+        border: status === 'connected' ? '2px solid #2563EB' : '1px solid #CBD5E1',
+        backgroundColor: status === 'connected' ? '#DBEAFE' : '#EFF6FF',
         transition: 'all 0.2s ease',
         '&:hover': {
-          boxShadow: isEnabled ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none',
+          boxShadow: isEnabled ? '0 4px 12px rgba(0, 0, 0, 0.08)' : 'none',
           transform: isEnabled ? 'translateY(-2px)' : 'none'
         }
       }}
     >
       <CardContent sx={{ p: 3 }}>
         <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
-          <Box sx={{ color: status === 'connected' ? '#10b981' : '#64748b' }}>
+          <Box sx={{ color: status === 'connected' ? '#2563EB' : '#64748b' }}>
             {icon}
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: '#1E293B' }}>
               {name}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b' }}>
+            <Typography variant="body2" sx={{ color: '#64748B' }}>
               {description}
             </Typography>
           </Box>
@@ -81,7 +81,16 @@ const PlatformCard: React.FC<PlatformCardProps> = ({ id, name, description, icon
             icon={getStatusIcon(status)}
             label={getStatusText(status)}
             color={getStatusColor(status) as any}
-            size="small"
+            size="medium"
+            sx={status === 'connected' ? {
+              fontWeight: 700,
+              fontSize: '0.8rem',
+              height: 30,
+              background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+              color: '#FFFFFF',
+              '& .MuiChip-icon': { color: '#FFFFFF' },
+              boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
+            } : {}}
           />
         </Stack>
 
@@ -91,15 +100,15 @@ const PlatformCard: React.FC<PlatformCardProps> = ({ id, name, description, icon
               key={index}
               label={feature}
               size="small"
-              icon={<CheckIcon sx={{ fontSize: 14, color: '#10b981' }} />}
+              icon={<CheckIcon sx={{ fontSize: 14, color: '#2563EB' }} />}
               sx={{
-                backgroundColor: '#f0fdf4',
-                color: '#0c4a6e',
-                border: '1px solid #10b981',
+                backgroundColor: '#EFF6FF',
+                color: '#1E40AF',
+                border: '1px solid #BFDBFE',
                 fontSize: '0.75rem',
                 height: 24,
                 '&:hover': {
-                  backgroundColor: '#dcfce7',
+                  backgroundColor: '#DBEAFE',
                 }
               }}
             />
@@ -116,14 +125,24 @@ const PlatformCard: React.FC<PlatformCardProps> = ({ id, name, description, icon
           sx={{
             textTransform: 'none',
             fontWeight: 600,
-            ...(status === 'connected' && {
-              borderColor: '#10b981',
-              color: '#10b981',
-              '&:hover': {
-                backgroundColor: '#10b981',
-                color: 'white'
-              }
-            })
+            ...(status === 'connected'
+              ? {
+                  borderColor: '#BFDBFE',
+                  color: '#2563EB',
+                  '&:hover': {
+                    backgroundColor: '#EFF6FF',
+                    borderColor: '#3B82F6',
+                  }
+                }
+              : {
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)',
+                    boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
+                  }
+                }
+            )
           }}
         >
           {status === 'connected' ? 'Connected' : status === 'coming_soon' ? 'Coming Soon' : 'Connect'}

@@ -3,7 +3,7 @@ Enhanced Calendar Models for AI-Powered Content Planning
 Defines additional database schema for intelligent calendar generation and optimization.
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey, Boolean, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -52,7 +52,7 @@ class AICalendarRecommendation(Base):
     
     id = Column(Integer, primary_key=True)
     strategy_id = Column(Integer, ForeignKey("content_strategies.id"), nullable=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(String(255), nullable=False, index=True)
     recommendation_type = Column(String(50), nullable=False)  # calendar_generation, content_optimization, performance_analysis
     content_suggestions = Column(JSON, nullable=True)  # Suggested content topics and themes
     optimal_timing = Column(JSON, nullable=True)  # Recommended posting times
@@ -140,7 +140,7 @@ class ContentTrendAnalysis(Base):
     __tablename__ = "content_trend_analysis"
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(String(255), nullable=False, index=True)
     strategy_id = Column(Integer, ForeignKey("content_strategies.id"), nullable=True)
     industry = Column(String(100), nullable=False)
     trending_topics = Column(JSON, nullable=True)  # Trending topics in the industry
@@ -183,7 +183,7 @@ class ContentOptimization(Base):
     
     id = Column(Integer, primary_key=True)
     event_id = Column(Integer, ForeignKey("calendar_events.id"), nullable=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(String(255), nullable=False, index=True)
     original_content = Column(JSON, nullable=True)  # Original content details
     optimized_content = Column(JSON, nullable=True)  # Optimized content suggestions
     platform_adaptations = Column(JSON, nullable=True)  # Platform-specific adaptations
@@ -226,7 +226,7 @@ class CalendarGenerationSession(Base):
     __tablename__ = "calendar_generation_sessions"
     
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, nullable=False)
+    user_id = Column(String(255), nullable=False, index=True)
     strategy_id = Column(Integer, ForeignKey("content_strategies.id"), nullable=True)
     session_type = Column(String(50), nullable=False)  # monthly, weekly, custom
     generation_params = Column(JSON, nullable=True)  # Parameters used for generation

@@ -60,27 +60,22 @@ class GapAnalysisService:
     
     async def get_gap_analyses(self, user_id: Optional[Any] = None, strategy_id: Optional[int] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """Get content gap analysis with real AI insights - Database first approach."""
+        current_user_id = user_id or "1"
+        ai_db = get_session_for_user(str(current_user_id))
         try:
             logger.info(f"🚀 Starting content gap analysis for user: {user_id}, strategy: {strategy_id}, force_refresh: {force_refresh}")
-            
-            # Use user_id or default to 1
-            current_user_id = user_id or "1"
-            
-            # Skip database check if force_refresh is True
+
             if not force_refresh:
-                # First, try to get existing gap analysis from database
                 logger.info(f"🔍 Checking database for existing gap analysis for user {current_user_id}")
                 existing_analysis = await self.ai_analysis_db_service.get_latest_ai_analysis(
                     user_id=current_user_id,
                     analysis_type="gap_analysis",
                     strategy_id=strategy_id,
-                    max_age_hours=24  # Use cached results up to 24 hours old
+                    max_age_hours=24,
+                    db=ai_db
                 )
-                
+
                 if existing_analysis:
-                    logger.info(f"✅ Found existing gap analysis in database: {existing_analysis.get('id', 'unknown')}")
-                    
-                    # Return cached results
                     return {
                         "gap_analyses": [{"recommendations": existing_analysis.get('recommendations', [])}],
                         "total_gaps": len(existing_analysis.get('recommendations', [])),
@@ -90,25 +85,18 @@ class GapAnalysisService:
                         "data_source": "database_cache",
                         "cache_age_hours": (datetime.utcnow() - existing_analysis.get('created_at', datetime.utcnow())).total_seconds() / 3600
                     }
-            
-            # No recent analysis found or force refresh requested, run new AI analysis
+
             logger.info(f"🔄 Running new gap analysis for user {current_user_id} (force_refresh: {force_refresh})")
-            
-            # Get personalized inputs from onboarding data (SSOT)
+
             db = get_session_for_user(str(current_user_id))
             try:
                 personalized_inputs = await self.onboarding_integration_service.process_onboarding_data(str(current_user_id), db)
             finally:
                 db.close()
-            
-            logger.info(f"📊 Using personalized inputs: {len(personalized_inputs)} data points")
-            
-            # Generate real AI-powered gap analysis
+
             gap_analysis = await self.ai_engine_service.generate_content_recommendations(personalized_inputs, user_id=str(current_user_id))
-            
             logger.info(f"✅ AI gap analysis completed: {len(gap_analysis)} recommendations")
-            
-            # Store results in database
+
             try:
                 await self.ai_analysis_db_service.store_ai_analysis_result(
                     user_id=current_user_id,
@@ -117,7 +105,8 @@ class GapAnalysisService:
                     recommendations=gap_analysis,
                     personalized_data=personalized_inputs,
                     strategy_id=strategy_id,
-                    ai_service_status="operational"
+                    ai_service_status="operational",
+                    db=ai_db
                 )
                 logger.info(f"💾 Gap analysis results stored in database for user {current_user_id}")
             except Exception as e:
@@ -135,6 +124,8 @@ class GapAnalysisService:
         except Exception as e:
             logger.error(f"❌ Error generating content gap analysis: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "get_gap_analyses")
+        finally:
+            ai_db.close()
     
     async def get_gap_analysis_by_id(self, analysis_id: int, db: Session) -> Dict[str, Any]:
         """Get a specific content gap analysis by ID."""

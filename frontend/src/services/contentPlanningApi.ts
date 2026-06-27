@@ -1,5 +1,23 @@
 import { apiClient, aiApiClient } from '../api/client';
 
+// Runtime validation helper for API responses
+type ShapeSchema = Record<string, 'string' | 'number' | 'boolean' | 'object' | 'array' | 'undefined'>;
+
+function validateApiResponse<T>(response: T, schema: ShapeSchema, context: string): T {
+  if (typeof response !== 'object' || response === null) {
+    console.warn(`[validateApiResponse] ${context}: response is not an object`, response);
+    return response;
+  }
+  for (const [field, expectedType] of Object.entries(schema)) {
+    const value = (response as any)[field];
+    const actualType = Array.isArray(value) ? 'array' : typeof value;
+    if (actualType === 'undefined' && expectedType !== 'undefined') {
+      console.warn(`[validateApiResponse] ${context}: missing field "${field}" (expected ${expectedType})`);
+    }
+  }
+  return response;
+}
+
 // Types
 export interface ContentStrategyCreate {
   name: string;
@@ -475,21 +493,35 @@ class ContentPlanningAPI {
   async optimizeContent(request: ContentOptimizationRequest): Promise<ContentOptimizationResponse> {
     return this.handleRequest(async () => {
       const response = await apiClient.post(`${this.baseURL}/calendar-generation/optimize-content`, request);
-      return response.data;
+      return validateApiResponse(response.data, {
+        optimization_score: 'number',
+        platform_adaptations: 'array',
+        visual_recommendations: 'array',
+        created_at: 'string',
+      }, 'optimizeContent');
     });
   }
 
   async predictPerformance(request: PerformancePredictionRequest): Promise<PerformancePredictionResponse> {
     return this.handleRequest(async () => {
       const response = await apiClient.post(`${this.baseURL}/calendar-generation/performance-predictions`, request);
-      return response.data;
+      return validateApiResponse(response.data, {
+        predicted_engagement_rate: 'number',
+        predicted_reach: 'number',
+        confidence_score: 'number',
+        recommendations: 'array',
+      }, 'predictPerformance');
     });
   }
 
   async repurposeContent(request: ContentRepurposingRequest): Promise<ContentRepurposingResponse> {
     return this.handleRequest(async () => {
       const response = await apiClient.post(`${this.baseURL}/calendar-generation/repurpose-content`, request);
-      return response.data;
+      return validateApiResponse(response.data, {
+        platform_adaptations: 'array',
+        transformations: 'array',
+        implementation_tips: 'array',
+      }, 'repurposeContent');
     });
   }
 
@@ -501,7 +533,11 @@ class ContentPlanningAPI {
           limit: request.limit || 10
         }
       });
-      return response.data;
+      return validateApiResponse(response.data, {
+        trending_topics: 'array',
+        gap_relevance_scores: 'object',
+        audience_alignment_scores: 'object',
+      }, 'getTrendingTopics');
     });
   }
 
@@ -517,7 +553,13 @@ class ContentPlanningAPI {
   async generateComprehensiveCalendar(config: any): Promise<any> {
     return this.handleRequest(async () => {
       const response = await apiClient.post(`${this.baseURL}/calendar-generation/generate-calendar`, config);
-      return response.data;
+      return validateApiResponse(response.data, {
+        content_pillars: 'array',
+        daily_schedule: 'array',
+        weekly_themes: 'array',
+        platform_strategies: 'object',
+        processing_time: 'number',
+      }, 'generateComprehensiveCalendar');
     });
   }
 

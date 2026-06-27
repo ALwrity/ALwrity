@@ -165,34 +165,26 @@ async def handle_bing_callback(
             from services.platform_insights_monitoring_service import create_platform_insights_task
             from services.database import get_session_for_user
             
-            # Get user_id from Bing OAuth service state lookup
-            import sqlite3
-            with sqlite3.connect(oauth_service.db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute('SELECT user_id FROM bing_oauth_states WHERE state = ?', (state,))
-                result_db = cursor.fetchone()
-                if result_db:
-                    user_id = result_db[0]
-                    db = get_session_for_user(user_id)
-                    try:
-                        # Don't fetch site_url here - it requires API calls
-                        # The executor will fetch it when the task runs (weekly)
-                        # Create insights task without site_url to avoid API calls
-                        task_result = create_platform_insights_task(
-                            user_id=user_id,
-                            platform='bing',
-                            site_url=None,  # Will be fetched by executor when task runs
-                            db=db
-                        )
-                        
-                        if task_result.get('success'):
-                            logger.info(f"Created Bing insights task for user {user_id}")
-                        else:
-                            logger.warning(f"Failed to create Bing insights task: {task_result.get('error')}")
-                    finally:
-                        db.close()
+            # Extract user_id from state (format: user_id:random_token)
+            state_parts = state.split(':', 1)
+            if len(state_parts) == 2:
+                user_id = state_parts[0]
+                db = get_session_for_user(user_id)
+                try:
+                    task_result = create_platform_insights_task(
+                        user_id=user_id,
+                        platform='bing',
+                        site_url=None,
+                        db=db
+                    )
+                    
+                    if task_result.get('success'):
+                        logger.info(f"Created Bing insights task for user {user_id}")
+                    else:
+                        logger.warning(f"Failed to create Bing insights task: {task_result.get('error')}")
+                finally:
+                    db.close()
         except Exception as e:
-            # Non-critical: log but don't fail OAuth callback
             logger.warning(f"Failed to create Bing insights task after OAuth: {e}")
         
         # Return success page with postMessage script

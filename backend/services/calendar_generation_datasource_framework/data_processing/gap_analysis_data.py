@@ -45,8 +45,8 @@ class GapAnalysisDataProcessor:
             if not gap_analyses:
                 raise ValueError(f"No gap analysis data found for user_id: {user_id}")
             
-            # Get the latest gap analysis (highest ID)
-            latest_analysis = max(gap_analyses, key=lambda x: x.id) if gap_analyses else None
+            # Get the latest gap analysis (highest ID) — safe against empty sequence
+            latest_analysis = max(gap_analyses, key=lambda x: x.id, default=None)
             
             if not latest_analysis:
                 raise ValueError(f"No gap analysis results found for user_id: {user_id}")

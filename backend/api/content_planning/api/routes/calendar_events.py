@@ -43,6 +43,8 @@ async def create_calendar_event(
     """Create a new calendar event."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Creating calendar event: {event.title} for user: {clerk_user_id}")
         
         event_data = event.dict()
@@ -63,14 +65,18 @@ async def get_calendar_events(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get calendar events, optionally filtered by strategy."""
+    """Get calendar events, optionally filtered by strategy, scoped to the current user."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Fetching calendar events for user: {clerk_user_id}")
         
-        events = await calendar_service.get_calendar_events(strategy_id, db)
+        events = await calendar_service.get_calendar_events(strategy_id, user_id=clerk_user_id, db=db)
         return [CalendarEventResponse(**event) for event in events]
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting calendar events: {str(e)}")
         raise ContentPlanningErrorHandler.handle_general_error(e, "get_calendar_events")
@@ -81,12 +87,14 @@ async def get_calendar_event(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get a specific calendar event by ID."""
+    """Get a specific calendar event by ID, scoped to the current user."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Fetching calendar event: {event_id} for user: {clerk_user_id}")
         
-        event = await calendar_service.get_calendar_event_by_id(event_id, db)
+        event = await calendar_service.get_calendar_event_by_id(event_id, db, user_id=clerk_user_id)
         return CalendarEventResponse(**event)
         
     except HTTPException:
@@ -102,12 +110,14 @@ async def update_calendar_event(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update a calendar event."""
+    """Update a calendar event, scoped to the current user."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Updating calendar event: {event_id} for user: {clerk_user_id}")
         
-        updated_event = await calendar_service.update_calendar_event(event_id, update_data, db)
+        updated_event = await calendar_service.update_calendar_event(event_id, update_data, db, user_id=clerk_user_id)
         return CalendarEventResponse(**updated_event)
         
     except HTTPException:
@@ -122,12 +132,14 @@ async def delete_calendar_event(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a calendar event."""
+    """Delete a calendar event, scoped to the current user."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Deleting calendar event: {event_id} for user: {clerk_user_id}")
         
-        deleted = await calendar_service.delete_calendar_event(event_id, db)
+        deleted = await calendar_service.delete_calendar_event(event_id, db, user_id=clerk_user_id)
         
         if deleted:
             return {"message": f"Calendar event {event_id} deleted successfully"}
@@ -149,9 +161,12 @@ async def schedule_calendar_event(
     """Schedule a calendar event with conflict checking."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Scheduling calendar event: {event.title} for user: {clerk_user_id}")
         
         event_data = event.dict()
+        event_data['user_id'] = clerk_user_id
         result = await calendar_service.schedule_event(event_data, db)
         return result
         
@@ -166,13 +181,15 @@ async def get_strategy_events(
     current_user: Dict[str, Any] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get calendar events for a specific strategy."""
+    """Get calendar events for a specific strategy, scoped to the current user."""
     try:
         clerk_user_id = str(current_user.get('id', ''))
+        if not clerk_user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
         logger.info(f"Fetching events for strategy: {strategy_id} for user: {clerk_user_id}")
         
         if status:
-            events = await calendar_service.get_events_by_status(strategy_id, status, db)
+            events = await calendar_service.get_events_by_status(strategy_id, status, db, user_id=clerk_user_id)
             return {
                 'strategy_id': strategy_id,
                 'status': status,
@@ -180,7 +197,7 @@ async def get_strategy_events(
                 'events': events
             }
         else:
-            result = await calendar_service.get_strategy_events(strategy_id, db)
+            result = await calendar_service.get_strategy_events(strategy_id, db, user_id=clerk_user_id)
             return result
         
     except Exception as e:

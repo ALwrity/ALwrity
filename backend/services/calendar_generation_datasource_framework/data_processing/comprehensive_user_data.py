@@ -80,8 +80,10 @@ class ComprehensiveUserDataProcessor:
             
             # Get AI analysis results from the working endpoint
             try:
+                if not strategy_id:
+                    raise ValueError("strategy_id is required for AI analysis in comprehensive user data")
                 ai_analytics = AIAnalyticsService()
-                ai_analysis_results = await ai_analytics.generate_strategic_intelligence(strategy_id or 1)
+                ai_analysis_results = await ai_analytics.generate_strategic_intelligence(user_id=user_id, strategy_id=strategy_id)
                 
                 if not ai_analysis_results:
                     raise ValueError("AI analysis service returned no results")

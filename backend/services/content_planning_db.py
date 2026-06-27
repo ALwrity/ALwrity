@@ -99,27 +99,43 @@ class ContentPlanningDBService:
             self.logger.error(f"Error creating calendar event: {str(e)}")
             return None
     
-    async def get_calendar_event(self, event_id: int) -> Optional[CalendarEvent]:
-        """Get calendar event by ID."""
+    async def get_calendar_event(self, event_id: int, user_id: Optional[str] = None) -> Optional[CalendarEvent]:
+        """Get calendar event by ID, optionally scoped to a user."""
         try:
-            return self.db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
+            query = self.db.query(CalendarEvent).filter(CalendarEvent.id == event_id)
+            if user_id:
+                query = query.filter(CalendarEvent.user_id == user_id)
+            return query.first()
         except SQLAlchemyError as e:
             self.logger.error(f"Error getting calendar event: {str(e)}")
             return None
     
-    async def get_strategy_calendar_events(self, strategy_id: int) -> List[CalendarEvent]:
-        """Get all calendar events for a strategy."""
+    async def get_strategy_calendar_events(self, strategy_id: int, user_id: Optional[str] = None) -> List[CalendarEvent]:
+        """Get all calendar events for a strategy, optionally scoped to a user."""
         try:
-            return self.db.query(CalendarEvent).filter(CalendarEvent.strategy_id == strategy_id).all()
+            query = self.db.query(CalendarEvent).filter(CalendarEvent.strategy_id == strategy_id)
+            if user_id:
+                query = query.filter(CalendarEvent.user_id == user_id)
+            return query.all()
         except SQLAlchemyError as e:
             self.logger.error(f"Error getting strategy calendar events: {str(e)}")
             return []
     
-    async def update_calendar_event(self, event_id: int, update_data: Dict[str, Any]) -> Optional[CalendarEvent]:
-        """Update calendar event."""
+    async def get_user_calendar_events(self, user_id: str) -> List[CalendarEvent]:
+        """Get all calendar events for a user."""
         try:
-            event = await self.get_calendar_event(event_id)
+            return self.db.query(CalendarEvent).filter(CalendarEvent.user_id == user_id).all()
+        except SQLAlchemyError as e:
+            self.logger.error(f"Error getting user calendar events: {str(e)}")
+            return []
+    
+    async def update_calendar_event(self, event_id: int, update_data: Dict[str, Any], user_id: Optional[str] = None) -> Optional[CalendarEvent]:
+        """Update calendar event, optionally scoped to a user."""
+        try:
+            event = await self.get_calendar_event(event_id, user_id=user_id)
             if event:
+                # Prevent ownership transfer via update
+                update_data.pop('user_id', None)
                 for key, value in update_data.items():
                     setattr(event, key, value)
                 event.updated_at = datetime.utcnow()
@@ -132,10 +148,10 @@ class ContentPlanningDBService:
             self.logger.error(f"Error updating calendar event: {str(e)}")
             return None
     
-    async def delete_calendar_event(self, event_id: int) -> bool:
-        """Delete calendar event."""
+    async def delete_calendar_event(self, event_id: int, user_id: Optional[str] = None) -> bool:
+        """Delete calendar event, optionally scoped to a user."""
         try:
-            event = await self.get_calendar_event(event_id)
+            event = await self.get_calendar_event(event_id, user_id=user_id)
             if event:
                 self.db.delete(event)
                 self.db.commit()
