@@ -123,6 +123,12 @@ async def manual_trigger_task(
         from services.scheduler.core.task_execution_handler import execute_task_async
         scheduler = get_scheduler()
 
+        if not scheduler.is_running:
+            return ManualTriggerResponse(
+                success=False,
+                message="Scheduler is not running — cannot execute tasks"
+            )
+
         task = None
         if task_type == "oauth_token_monitoring":
             task = db.query(OAuthTokenMonitoringTask).filter(

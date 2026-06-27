@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from services.database import get_all_user_ids, get_session_for_user
 from utils.logger_utils import get_service_logger
 from .stale_task_recovery import recover_stale_tasks
+from .settings import SchedulerSettings
 
 if TYPE_CHECKING:
     from .scheduler import TaskScheduler
@@ -159,7 +160,7 @@ async def check_and_execute_due_tasks(scheduler: 'TaskScheduler'):
                 last_check = _load_last_check_for_user(db, user_id)
                 if last_check is not None:
                     LAST_SEMANTIC_CHECKS[user_id] = last_check
-            should_run_semantic = not last_check or (now - last_check).total_seconds() > 86400  # 24h
+            should_run_semantic = not last_check or (now - last_check).total_seconds() > scheduler.settings.semantic_check_interval_seconds
 
             if should_run_semantic:
                 try:

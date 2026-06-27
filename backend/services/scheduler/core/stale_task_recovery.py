@@ -4,7 +4,7 @@ Detects and resets tasks stuck in 'running' status after process crashes,
 preventing them from staying in limbo forever.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from loguru import logger
@@ -18,9 +18,19 @@ from models.website_analysis_monitoring_models import (
     MarketTrendsTask,
     WebsiteAnalysisTask,
 )
+from .settings import SchedulerSettings
 
-# How long a task can stay in 'running' status before being considered stale
-STALE_TASK_TTL_MINUTES = 120  # 2 hours
+_settings_cache: Optional[SchedulerSettings] = None
+
+
+def _get_stale_ttl() -> int:
+    global _settings_cache
+    if _settings_cache is None:
+        _settings_cache = SchedulerSettings.from_env()
+    return _settings_cache.stale_task_ttl_minutes
+
+
+STALE_TASK_TTL_MINUTES = _get_stale_ttl()
 
 
 def _recover_stale_tasks_for_model(

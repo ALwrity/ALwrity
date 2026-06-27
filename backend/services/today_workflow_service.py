@@ -144,11 +144,13 @@ _CONTENT_ACTION_URL = {
     "facebook_post": "/facebook-writer",
     "seo_page": "/seo-dashboard",
     "video": "/video-writer",
+    "podcast": "/podcast-writer",
 }
 
 _CONTENT_ESTIMATED_TIME = {
     "blog_post": 45, "linkedin_post": 20, "facebook_post": 15,
-    "twitter_post": 10, "instagram_post": 15, "seo_page": 30, "video": 60,
+    "twitter_post": 10, "instagram_post": 15, "seo_page": 30,
+    "video": 60, "podcast": 60,
 }
 
 # Generic fallback URL for any calendar event whose content_type / platform
@@ -169,6 +171,32 @@ def _resolve_calendar_action_url(content_type: str, platform: str) -> str:
         content_type, platform, _GENERIC_FALLBACK_ACTION_URL,
     )
     return _GENERIC_FALLBACK_ACTION_URL
+
+
+async def _is_semantically_duplicate_with_calendar(
+    agent_title: str, calendar_titles: set[str], svc: Any = None
+) -> bool:
+    """Check if an agent task title is semantically similar to any calendar
+    event title using txtai similarity. Falls back to exact substring match
+    if txtai is unavailable or errors.
+    """
+    if not agent_title or not calendar_titles:
+        return False
+    if agent_title in calendar_titles:
+        return True
+    if svc is not None:
+        for ct in calendar_titles:
+            try:
+                similarity = await svc.get_similarity(agent_title, ct)
+                if similarity >= 0.85:
+                    return True
+            except Exception:
+                pass
+    agent_lower = agent_title.lower()
+    for ct in calendar_titles:
+        if agent_lower in ct.lower() or ct.lower() in agent_lower:
+            return True
+    return False
 
 
 def _resolve_calendar_estimated_time(content_type: str) -> int:
@@ -1011,7 +1039,7 @@ async def get_or_create_daily_workflow_plan(
     calendar_plan = _generate_calendar_event_plan(date_str, grounding)
     calendar_task_titles = {t.get("title") for t in calendar_plan.get("tasks", []) if t.get("title")}
 
-    # Step 2: Agent committee → proposals for plan + analyze + engage + publish + remarket
+    # Step 2: Agent committee → proposals across all pillars (including generate)
     agent_plan_data = await generate_agent_enhanced_plan(db, user_id, date_str, grounding=grounding, strict_contextuality=False)
     # ``fallback_used`` is set by the committee function when the
     # orchestrator raises or is uninitialised. Surface it here so
@@ -1023,29 +1051,41 @@ async def get_or_create_daily_workflow_plan(
     # proposals survived dedup). Pass it through to the plan row.
     committee_polled_count = int(agent_plan_data.get("committee_agent_count", 0) or 0)
 
-    # Filter agent proposals: keep only non-generate pillars, dedup by title
-    committee_pillars = {"plan", "analyze", "engage", "publish", "remarket"}
+    # Filter agent proposals: keep all valid pillars (including generate),
+    # dedup semantically against calendar events, mark source.
+    committee_pillars = set(PILLAR_IDS)
+    # Initialize txtai once for semantic dedup
+    try:
+        from services.intelligence.txtai_service import TxtaiIntelligenceService
+        _txtai_svc = TxtaiIntelligenceService(user_id=user_id)
+    except Exception:
+        _txtai_svc = None
     filtered_agent_tasks = []
     for t in agent_plan_data.get("tasks", []):
         pillar_id = t.get("pillarId")
         if pillar_id not in committee_pillars:
-            # 'generate' is owned by calendar events; anything outside PILLAR_IDS
-            # is invalid and we log a warning so the agent is debuggable.
-            if pillar_id not in PILLAR_IDS:
-                agent = None
-                metadata = t.get("metadata")
-                if isinstance(metadata, dict):
-                    agent = metadata.get("source_agent")
-                logger.warning(
-                    f"Dropping agent task with invalid pillar_id={pillar_id!r} "
-                    f"from agent {agent or 'unknown'}: title={t.get('title', '')!r}"
-                )
+            agent = None
+            metadata = t.get("metadata")
+            if isinstance(metadata, dict):
+                agent = metadata.get("source_agent")
+            logger.warning(
+                f"Dropping agent task with invalid pillar_id={pillar_id!r} "
+                f"from agent {agent or 'unknown'}: title={t.get('title', '')!r}"
+            )
             continue
-        if t.get("title") in calendar_task_titles:
+        # Semantic dedup against calendar event titles
+        title = (t.get("title") or "").strip()
+        if title and await _is_semantically_duplicate_with_calendar(title, calendar_task_titles, _txtai_svc):
             continue
+        # Mark source so frontend can show "AI-suggested" badge
+        task_meta = t.get("metadata")
+        if isinstance(task_meta, dict):
+            task_meta["source"] = "agent_generated"
+        elif task_meta is None:
+            t["metadata"] = {"source": "agent_generated"}
         filtered_agent_tasks.append(t)
 
-    # Step 3: Merge — calendar wins for generate, agents fill other pillars
+    # Step 3: Merge — calendar events + agent proposals
     all_tasks = calendar_plan.get("tasks", []) + filtered_agent_tasks
     calendar_source = bool(calendar_plan.get("tasks"))
 

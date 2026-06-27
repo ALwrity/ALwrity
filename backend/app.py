@@ -807,7 +807,12 @@ async def startup_event():
         # Start task scheduler only in full mode
         if _is_full_mode():
             from services.scheduler import get_scheduler
-            await get_scheduler().start()
+            scheduler = get_scheduler()
+            health = await scheduler.health_check()
+            if not health["healthy"]:
+                await scheduler.start()
+            else:
+                logger.info("[SCHEDULER] Already healthy on startup, skipping start")
         else:
             logger.info(f"[FEATURE-MODE] Skipping scheduler startup (features: {enabled_features})")
 
@@ -889,7 +894,9 @@ async def shutdown_event():
     try:
         # Stop task scheduler
         from services.scheduler import get_scheduler
-        await get_scheduler().stop()
+        scheduler = get_scheduler()
+        if scheduler.is_running:
+            await scheduler.stop()
         
         # Close database connections
         close_database()

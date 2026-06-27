@@ -39,6 +39,9 @@ def schedule_website_analysis_task_creation(user_id: str, delay_minutes: int = 5
     from services.scheduler import get_scheduler
 
     scheduler = get_scheduler()
+    if not scheduler.is_running:
+        logger.warning(f"[SCHEDULER] Scheduler not running — website analysis task for {user_id} will not execute until started")
+
     run_date = datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
     job_id = f"website_analysis_tasks_{user_id}"
 

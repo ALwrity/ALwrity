@@ -147,6 +147,9 @@ async def manual_refresh_token(
         
         # Get scheduler and executor
         scheduler = get_scheduler()
+        if not scheduler.is_running:
+            logger.warning("[SCHEDULER] Scheduler not running — token refresh will execute directly but scheduler loop is inactive")
+
         try:
             executor = scheduler.registry.get_executor('oauth_token_monitoring')
         except ValueError:

@@ -21,6 +21,7 @@ from .exception_handler import (
     SchedulerExceptionHandler, SchedulerException, TaskExecutionError, DatabaseError,
     TaskLoaderError, SchedulerConfigError
 )
+from .settings import SchedulerSettings
 
 from services.database import get_all_user_ids, get_session_for_user
 from utils.logger_utils import get_service_logger
@@ -61,32 +62,26 @@ class TaskScheduler:
     
     def __init__(
         self,
-        check_interval_minutes: int = 15,
-        max_concurrent_executions: int = 10,
-        enable_retries: bool = True,
-        max_retries: int = 3
+        check_interval_minutes: Optional[int] = None,
+        max_concurrent_executions: Optional[int] = None,
+        enable_retries: Optional[bool] = None,
+        max_retries: Optional[int] = None,
+        settings: Optional[SchedulerSettings] = None,
     ):
-        """
-        Initialize the task scheduler.
-        
-        Args:
-            check_interval_minutes: How often to check for due tasks
-            max_concurrent_executions: Maximum concurrent task executions
-            enable_retries: Whether to retry failed tasks
-            max_retries: Maximum retry attempts
-        """
-        self.check_interval_minutes = check_interval_minutes
-        self.max_concurrent_executions = max_concurrent_executions
-        self.enable_retries = enable_retries
-        self.max_retries = max_retries
+        self.settings = settings if settings is not None else SchedulerSettings.from_env()
+
+        self.check_interval_minutes = check_interval_minutes or self.settings.check_interval_minutes
+        self.max_concurrent_executions = max_concurrent_executions or self.settings.max_concurrent_executions
+        self.enable_retries = enable_retries if enable_retries is not None else self.settings.enable_retries
+        self.max_retries = max_retries or self.settings.max_retries
         
         # Initialize APScheduler
         self.scheduler = AsyncIOScheduler(
             timezone='UTC',
             job_defaults={
                 'coalesce': True,
-                'max_instances': 1,
-                'misfire_grace_time': 3600  # 1 hour grace period for missed jobs
+                'max_instances': self.settings.max_instances_per_job,
+                'misfire_grace_time': self.settings.misfire_grace_time_seconds
             }
         )
         
@@ -103,9 +98,9 @@ class TaskScheduler:
         self.exception_handler = SchedulerExceptionHandler()
         
         # Intelligent scheduling configuration
-        self.min_check_interval_minutes = 15  # Check every 15min when active strategies exist
-        self.max_check_interval_minutes = 60  # Check every 60min when no active strategies
-        self.current_check_interval_minutes = check_interval_minutes  # Current interval
+        self.min_check_interval_minutes = self.settings.min_check_interval_minutes
+        self.max_check_interval_minutes = self.settings.max_check_interval_minutes
+        self.current_check_interval_minutes = self.check_interval_minutes
         
         # Statistics
         self.stats = {
@@ -122,13 +117,14 @@ class TaskScheduler:
         }
         
         self._running = False
+        self._lock = asyncio.Lock()
 
         # Local Desktop App: Always leader, no advisory locks needed
-        self._leader_lock_key = int(os.getenv("SCHEDULER_LEADER_LOCK_KEY", "84321017"))
-        self._leadership_check_interval_seconds = int(os.getenv("SCHEDULER_LEADERSHIP_CHECK_INTERVAL", "15"))
+        self._leader_lock_key = self.settings.leader_lock_key
+        self._leadership_check_interval_seconds = self.settings.leadership_check_interval_seconds
         self._leader_session = None
-        self._is_leader = True  # Always leader in local desktop app
-        self._execution_enabled = True # Always enabled
+        self._is_leader = True
+        self._execution_enabled = True
         self._leader_since = datetime.utcnow().isoformat()
         self._last_leadership_check = None
         self._last_leadership_error = None
@@ -136,7 +132,7 @@ class TaskScheduler:
 
         # Execution lease registry (prevents duplicate redispatch across check cycles)
         self._task_leases: Dict[str, str] = {}
-        self._task_lease_ttl_seconds = int(os.getenv("SCHEDULER_TASK_LEASE_TTL_SECONDS", "900"))
+        self._task_lease_ttl_seconds = self.settings.get_task_lease_ttl()
     
     def _get_trigger_for_interval(self, interval_minutes: int):
         """
@@ -313,270 +309,220 @@ class TaskScheduler:
 
     async def start(self):
         """Start the scheduler with intelligent interval adjustment."""
-        if self._running:
-            logger.warning("Scheduler is already running")
-            return
-        
-        try:
-            # Determine initial check interval based on active strategies
-            initial_interval = await determine_optimal_interval(
-                self,
-                self.min_check_interval_minutes,
-                self.max_check_interval_minutes
-            )
-            self.current_check_interval_minutes = initial_interval
-            
-            self.scheduler.start()
-            self._running = True
+        async with self._lock:
+            if self._running:
+                logger.warning("Scheduler is already running")
+                return
 
-            # Leadership monitor runs on all replicas; only leader executes due-task loop.
-            self.scheduler.add_job(
-                self._leadership_tick,
-                trigger=IntervalTrigger(seconds=self._leadership_check_interval_seconds),
-                id='leadership_monitor',
-                replace_existing=True,
-                max_instances=1,
-                coalesce=True
-            )
+            apscheduler_started = False
+            try:
+                initial_interval = await determine_optimal_interval(
+                    self,
+                    self.min_check_interval_minutes,
+                    self.max_check_interval_minutes
+                )
+                self.current_check_interval_minutes = initial_interval
 
-            # Initial leader election
-            await self._leadership_tick()
-            
-            # Check for and execute any missed jobs that are still within grace period
-            await self._execute_missed_jobs()
-            
-            # Restore one-time persona generation jobs for users who completed onboarding
-            await restore_persona_jobs(self)
-            
-            # Restore/create missing OAuth token monitoring tasks for connected platforms
-            total_oauth_tasks = await restore_oauth_monitoring_tasks(self)
-            oauth_tasks_count = total_oauth_tasks
-            
-            # Restore/create missing website analysis tasks for users who completed onboarding
-            website_analysis_tasks_count = await restore_website_analysis_tasks(self)
-            
-            # Restore/create missing platform insights tasks for users with connected GSC/Bing
-            platform_insights_tasks_count = await restore_platform_insights_tasks(self)
-            
-            # Restore/create missing Advertools intelligence tasks
-            advertools_tasks_count = await restore_advertools_tasks(self)
-            
-            # Validate and rebuild cumulative stats if needed
-            await self._validate_and_rebuild_cumulative_stats()
-            
-            # Get all scheduled APScheduler jobs (including one-time tasks)
-            all_jobs = self.scheduler.get_jobs()
-            registered_types = self.registry.get_registered_types()
-            active_strategies = self.stats.get('active_strategies_count', 0)
-            
-            # Calculate job counts
-            apscheduler_recurring = 1  # check_due_tasks
-            apscheduler_one_time = len(all_jobs) - 1
-            total_recurring = apscheduler_recurring + oauth_tasks_count + website_analysis_tasks_count + platform_insights_tasks_count + advertools_tasks_count
-            total_jobs = len(all_jobs) + oauth_tasks_count + website_analysis_tasks_count + platform_insights_tasks_count + advertools_tasks_count
-            
-            # Build comprehensive startup log message
-            recurring_breakdown = f"check_due_tasks: {apscheduler_recurring}"
-            if oauth_tasks_count > 0:
-                recurring_breakdown += f", OAuth monitoring: {oauth_tasks_count}"
-            if website_analysis_tasks_count > 0:
-                recurring_breakdown += f", Website analysis: {website_analysis_tasks_count}"
-            if platform_insights_tasks_count > 0:
-                recurring_breakdown += f", Platform insights: {platform_insights_tasks_count}"
-            if advertools_tasks_count > 0:
-                recurring_breakdown += f", Advertools: {advertools_tasks_count}"
-            
-            startup_lines = [
-                f"[Scheduler] TaskScheduler Started",
-                f"   ├─ Check Interval: {initial_interval} minutes",
-                f"   ├─ Registered Task Types: {len(registered_types)} ({', '.join(registered_types) if registered_types else 'none'})",
-                f"   ├─ Active Strategies: {active_strategies}",
-                f"   ├─ Total Scheduled Jobs: {total_jobs}",
-                f"   ├─ Recurring Jobs: {total_recurring} ({recurring_breakdown})",
-                f"   └─ One-Time Jobs: {apscheduler_one_time}"
-            ]
-            
-            # Add APScheduler job details
-            if all_jobs:
-                for idx, job in enumerate(all_jobs):
-                    is_last = idx == len(all_jobs) - 1 and oauth_tasks_count == 0 and website_analysis_tasks_count == 0 and platform_insights_tasks_count == 0
-                    prefix = "   └─" if is_last else "   ├─"
-                    next_run = job.next_run_time
-                    trigger_type = type(job.trigger).__name__
-                    
-                    # Try to extract user_id from job ID or kwargs for context
-                    user_context = ""
-                    user_id_from_job = None
-                    
-                    # First try to get from kwargs
-                    if hasattr(job, 'kwargs') and job.kwargs and job.kwargs.get('user_id'):
-                        user_id_from_job = job.kwargs.get('user_id')
-                    # Otherwise, try to extract from job ID (e.g., "research_persona_user_123..." or "research_persona_user123")
-                    elif job.id and ('research_persona_' in job.id or 'facebook_persona_' in job.id):
-                        # Job ID format: research_persona_{user_id} or facebook_persona_{user_id}
-                        # where user_id is Clerk format (e.g., "user_33Gz1FPI86VDXhRY8QN4ragRFGN")
-                        if job.id.startswith('research_persona_'):
-                            user_id_from_job = job.id.replace('research_persona_', '')
-                        elif job.id.startswith('facebook_persona_'):
-                            user_id_from_job = job.id.replace('facebook_persona_', '')
-                        else:
-                            # Fallback: try to extract from parts (old format with timestamp)
-                            parts = job.id.split('_')
-                            if len(parts) >= 3:
-                                user_id_from_job = parts[2]  # Extract user_id from job ID
-                    
-                    if user_id_from_job:
-                        try:
-                            db = get_session_for_user(user_id_from_job)
-                            if db:
-                                user_job_store = get_user_job_store_name(user_id_from_job, db)
-                                if user_job_store == 'default':
-                                    logger.debug(
-                                        f"[Scheduler] Job store extraction returned 'default' for user {user_id_from_job}. "
-                                        f"This may indicate no onboarding data or website URL not found."
-                                    )
-                                user_context = f" | User: {user_id_from_job} | Store: {user_job_store}"
-                                db.close()
+                self.scheduler.start()
+                apscheduler_started = True
+
+                self.scheduler.add_job(
+                    self._leadership_tick,
+                    trigger=IntervalTrigger(seconds=self._leadership_check_interval_seconds),
+                    id='leadership_monitor',
+                    replace_existing=True,
+                    max_instances=1,
+                    coalesce=True
+                )
+
+                await self._leadership_tick()
+                await self._execute_missed_jobs()
+                await restore_persona_jobs(self)
+
+                total_oauth_tasks = await restore_oauth_monitoring_tasks(self)
+                oauth_tasks_count = total_oauth_tasks
+                website_analysis_tasks_count = await restore_website_analysis_tasks(self)
+                platform_insights_tasks_count = await restore_platform_insights_tasks(self)
+                advertools_tasks_count = await restore_advertools_tasks(self)
+
+                await self._validate_and_rebuild_cumulative_stats()
+
+                self._running = True
+
+                all_jobs = self.scheduler.get_jobs()
+                registered_types = self.registry.get_registered_types()
+                active_strategies = self.stats.get('active_strategies_count', 0)
+
+                apscheduler_recurring = 1
+                apscheduler_one_time = len(all_jobs) - 1
+                total_recurring = apscheduler_recurring + oauth_tasks_count + website_analysis_tasks_count + platform_insights_tasks_count + advertools_tasks_count
+                total_jobs = len(all_jobs) + oauth_tasks_count + website_analysis_tasks_count + platform_insights_tasks_count + advertools_tasks_count
+
+                startup_lines = [
+                    f"[Scheduler] TaskScheduler Started",
+                    f"   ├─ Check Interval: {initial_interval} minutes",
+                    f"   ├─ Registered Task Types: {len(registered_types)} ({', '.join(registered_types) if registered_types else 'none'})",
+                    f"   ├─ Active Strategies: {active_strategies}",
+                    f"   ├─ Total Scheduled Jobs: {total_jobs}",
+                    f"   ├─ Recurring Jobs: {total_recurring} ({'check_due_tasks: 1' + (f', OAuth monitoring: {oauth_tasks_count}' if oauth_tasks_count > 0 else '') + (f', Website analysis: {website_analysis_tasks_count}' if website_analysis_tasks_count > 0 else '') + (f', Platform insights: {platform_insights_tasks_count}' if platform_insights_tasks_count > 0 else '') + (f', Advertools: {advertools_tasks_count}' if advertools_tasks_count > 0 else '')})",
+                    f"   └─ One-Time Jobs: {apscheduler_one_time}"
+                ]
+
+                if all_jobs:
+                    for idx, job in enumerate(all_jobs):
+                        is_last = idx == len(all_jobs) - 1 and oauth_tasks_count == 0 and website_analysis_tasks_count == 0 and platform_insights_tasks_count == 0
+                        prefix = "   └─" if is_last else "   ├─"
+                        next_run = job.next_run_time
+                        trigger_type = type(job.trigger).__name__
+                        user_context = ""
+                        user_id_from_job = None
+
+                        if hasattr(job, 'kwargs') and job.kwargs and job.kwargs.get('user_id'):
+                            user_id_from_job = job.kwargs.get('user_id')
+                        elif job.id and ('research_persona_' in job.id or 'facebook_persona_' in job.id):
+                            if job.id.startswith('research_persona_'):
+                                user_id_from_job = job.id.replace('research_persona_', '')
+                            elif job.id.startswith('facebook_persona_'):
+                                user_id_from_job = job.id.replace('facebook_persona_', '')
                             else:
-                                user_context = f" | User: {user_id_from_job} | DB: Not Found"
-                        except Exception as e:
-                            logger.warning(
-                                f"[Scheduler] Could not extract job store name for user {user_id_from_job}: {e}. "
-                                f"Error type: {type(e).__name__}"
-                            )
-                            user_context = f" | User: {user_id_from_job}"
-                    
-                    startup_lines.append(f"{prefix} Job: {job.id} | Trigger: {trigger_type} | Next Run: {next_run}{user_context}")
-            
-            # Add Advertools tasks details
-            if advertools_tasks_count > 0:
-                try:
-                    user_ids = get_all_user_ids()
-                    for user_id in user_ids:
-                        try:
-                            db = get_session_for_user(user_id)
-                            if db:
-                                from models.advertools_monitoring_models import AdvertoolsTask
-                                advertools_tasks = db.query(AdvertoolsTask).all()
-                                
-                                for idx, task in enumerate(advertools_tasks):
-                                    is_last = idx == len(advertools_tasks) - 1 and len(all_jobs) == 0 and total_oauth_tasks == 0 and website_analysis_tasks_count == 0 and platform_insights_tasks_count == 0 and user_id == user_ids[-1]
-                                    prefix = "   ├─"
-                                    
-                                    try:
-                                        user_job_store = get_user_job_store_name(task.user_id, db)
-                                    except Exception as e:
-                                        logger.debug(f"Could not extract job store name for user {task.user_id}: {e}")
-                                        user_job_store = 'default'
-                                    
-                                    next_check = task.next_execution.isoformat() if task.next_execution else 'Not scheduled'
-                                    task_type = task.payload.get('type') if task.payload else 'unknown'
-                                    status_indicator = "✅" if task.status == 'active' else f"[{task.status}]"
-                                    
-                                    startup_lines.append(
-                                        f"{prefix} Job: advertools_{task_type}_{task.user_id}_{task.id} | "
-                                        f"Trigger: CronTrigger (Weekly) | Next Run: {next_check} | "
-                                        f"User: {task.user_id} | Store: {user_job_store} | Type: {task_type} {status_indicator}"
-                                    )
-                                db.close()
-                        except Exception as e:
-                            logger.warning(f"Error checking Advertools tasks for user {user_id}: {e}")
-                except Exception as e:
-                    logger.debug(f"Could not get Advertools task details: {e}")
+                                parts = job.id.split('_')
+                                if len(parts) >= 3:
+                                    user_id_from_job = parts[2]
 
-            # Log comprehensive startup information in single message
-            logger.warning("\n".join(startup_lines))
-            
-            # Save scheduler start event to database
-            # Disabled in multi-tenant mode as there is no global DB
-            # try:
-            #     db = get_db_session()
-            #     if db:
-            #         event_log = SchedulerEventLog(...)
-            #         db.add(event_log)
-            #         db.commit()
-            #         db.close()
-            # except Exception as e:
-            #     logger.warning(f"Failed to save scheduler start event log: {e}")
-            
-        except Exception as e:
-            logger.error(f"Failed to start scheduler: {e}")
-            raise
-    
-    
+                        if user_id_from_job:
+                            try:
+                                db = get_session_for_user(user_id_from_job)
+                                if db:
+                                    user_job_store = get_user_job_store_name(user_id_from_job, db)
+                                    if user_job_store == 'default':
+                                        logger.debug(
+                                            f"[Scheduler] Job store extraction returned 'default' for user {user_id_from_job}. "
+                                            f"This may indicate no onboarding data or website URL not found."
+                                        )
+                                    user_context = f" | User: {user_id_from_job} | Store: {user_job_store}"
+                                    db.close()
+                                else:
+                                    user_context = f" | User: {user_id_from_job} | DB: Not Found"
+                            except Exception as e:
+                                logger.warning(
+                                    f"[Scheduler] Could not extract job store name for user {user_id_from_job}: {e}. "
+                                    f"Error type: {type(e).__name__}"
+                                )
+                                user_context = f" | User: {user_id_from_job}"
+
+                        startup_lines.append(f"{prefix} Job: {job.id} | Trigger: {trigger_type} | Next Run: {next_run}{user_context}")
+
+                if advertools_tasks_count > 0:
+                    try:
+                        user_ids = get_all_user_ids()
+                        for user_id in user_ids:
+                            try:
+                                db = get_session_for_user(user_id)
+                                if db:
+                                    from models.advertools_monitoring_models import AdvertoolsTask
+                                    advertools_tasks = db.query(AdvertoolsTask).all()
+                                    for idx, task in enumerate(advertools_tasks):
+                                        is_last = idx == len(advertools_tasks) - 1 and len(all_jobs) == 0 and total_oauth_tasks == 0 and website_analysis_tasks_count == 0 and platform_insights_tasks_count == 0 and user_id == user_ids[-1]
+                                        prefix = "   ├─"
+                                        try:
+                                            user_job_store = get_user_job_store_name(task.user_id, db)
+                                        except Exception as e:
+                                            logger.debug(f"Could not extract job store name for user {task.user_id}: {e}")
+                                            user_job_store = 'default'
+                                        next_check = task.next_execution.isoformat() if task.next_execution else 'Not scheduled'
+                                        task_type = task.payload.get('type') if task.payload else 'unknown'
+                                        status_indicator = "active" if task.status == 'active' else task.status
+                                        startup_lines.append(
+                                            f"{prefix} Job: advertools_{task_type}_{task.user_id}_{task.id} | "
+                                            f"Trigger: CronTrigger (Weekly) | Next Run: {next_check} | "
+                                            f"User: {task.user_id} | Store: {user_job_store} | Type: {task_type} | Status: {status_indicator}"
+                                        )
+                                    db.close()
+                            except Exception as e:
+                                logger.warning(f"Error checking Advertools tasks for user {user_id}: {e}")
+                    except Exception as e:
+                        logger.debug(f"Could not get Advertools task details: {e}")
+
+                logger.warning("\n".join(startup_lines))
+
+            except Exception as e:
+                self._running = False
+                if apscheduler_started:
+                    try:
+                        self.scheduler.shutdown(wait=False)
+                    except Exception:
+                        pass
+                logger.error(f"Failed to start scheduler: {e}")
+                raise
+
+
+    @property
+    def is_running(self) -> bool:
+        """Check if the scheduler is currently running."""
+        return self._running
+
+    async def health_check(self) -> Dict[str, Any]:
+        """Return scheduler health status."""
+        return {
+            "healthy": self._running and self.scheduler.running,
+            "running": self._running,
+            "scheduler_running": self.scheduler.running,
+            "active_executions": len(self.active_executions),
+        }
+
     async def stop(self):
         """Stop the scheduler gracefully."""
-        if not self._running:
-            return
-        
-        try:
-            # Cancel all active executions
-            for task_id, execution_task in self.active_executions.items():
-                execution_task.cancel()
-            
-            # Wait for active executions to complete (with timeout)
-            if self.active_executions:
-                await asyncio.wait(
-                    self.active_executions.values(),
-                    timeout=30
-                )
-            
-            # Get final job count before shutdown
-            all_jobs_before = self.scheduler.get_jobs()
+        async with self._lock:
+            if not self._running:
+                return
 
-            # Release leadership lock and stop leadership monitor
             try:
-                if self.scheduler.get_job('leadership_monitor') is not None:
-                    self.scheduler.remove_job('leadership_monitor')
-            except Exception:
-                pass
-            self._release_leadership()
+                # Cancel all active executions
+                for task_id, execution_task in self.active_executions.items():
+                    execution_task.cancel()
 
-            # Shutdown scheduler
-            self.scheduler.shutdown(wait=True)
-            self._running = False
-            
-            # Log comprehensive shutdown information (use WARNING level for visibility)
-            total_checks = self.stats.get('total_checks', 0)
-            total_executed = self.stats.get('tasks_executed', 0)
-            total_failed = self.stats.get('tasks_failed', 0)
-            
-            shutdown_message = (
-                f"[Scheduler] 🛑 Task Scheduler Stopped\n"
-                f"   ├─ Total Check Cycles: {total_checks}\n"
-                f"   ├─ Total Tasks Executed: {total_executed}\n"
-                f"   ├─ Total Tasks Failed: {total_failed}\n"
-                f"   ├─ Jobs Cancelled: {len(all_jobs_before)}\n"
-                f"   └─ Shutdown: Graceful"
-            )
-            logger.warning(shutdown_message)
-            
-            # Save scheduler stop event to database
-            # Disabled in multi-tenant mode as there is no global DB
-            # try:
-            #     db = get_db_session()
-            #     if db:
-            #         event_log = SchedulerEventLog(
-            #             event_type='stop',
-            #             event_date=datetime.utcnow(),
-            #             check_interval_minutes=self.current_check_interval_minutes,
-            #             event_data={
-            #                 'total_checks': total_checks,
-            #                 'total_executed': total_executed,
-            #                 'total_failed': total_failed,
-            #                 'jobs_cancelled': len(all_jobs_before)
-            #             }
-            #         )
-            #         db.add(event_log)
-            #         db.commit()
-            #         db.close()
-            # except Exception as e:
-            #     logger.warning(f"Failed to save scheduler stop event log: {e}")
-            
-        except Exception as e:
-            logger.error(f"Error stopping scheduler: {e}")
-            raise
-    
+                # Wait for active executions to complete (with timeout)
+                if self.active_executions:
+                    await asyncio.wait(
+                        self.active_executions.values(),
+                        timeout=self.settings.shutdown_timeout_seconds
+                    )
+
+                # Get final job count before shutdown
+                all_jobs_before = self.scheduler.get_jobs()
+
+                # Release leadership lock and stop leadership monitor
+                try:
+                    if self.scheduler.get_job('leadership_monitor') is not None:
+                        self.scheduler.remove_job('leadership_monitor')
+                except Exception:
+                    pass
+                self._release_leadership()
+
+                # Shutdown scheduler
+                self.scheduler.shutdown(wait=True)
+
+                # Log comprehensive shutdown information
+                total_checks = self.stats.get('total_checks', 0)
+                total_executed = self.stats.get('tasks_executed', 0)
+                total_failed = self.stats.get('tasks_failed', 0)
+
+                shutdown_message = (
+                    f"[Scheduler] Task Scheduler Stopped\n"
+                    f"   ├─ Total Check Cycles: {total_checks}\n"
+                    f"   ├─ Total Tasks Executed: {total_executed}\n"
+                    f"   ├─ Total Tasks Failed: {total_failed}\n"
+                    f"   ├─ Jobs Cancelled: {len(all_jobs_before)}\n"
+                    f"   └─ Shutdown: Graceful"
+                )
+                logger.warning(shutdown_message)
+
+            except Exception as e:
+                logger.error(f"Error stopping scheduler: {e}")
+                raise
+            finally:
+                self._running = False
+
     async def _check_and_execute_due_tasks(self):
         """
         Main scheduler loop: check for due tasks and execute them.
@@ -605,7 +551,7 @@ class TaskScheduler:
                         # Job's scheduled time has passed
                         time_since_scheduled = (now - job.next_run_time).total_seconds()
                         # Check if still within grace period (1 hour = 3600 seconds)
-                        if time_since_scheduled <= 3600:
+                        if time_since_scheduled <= self.settings.missed_job_grace_seconds:
                             missed_jobs.append(job)
             
             if missed_jobs:
@@ -827,7 +773,7 @@ class TaskScheduler:
                 id=job_id,
                 kwargs=kwargs or {},
                 replace_existing=replace_existing,
-                misfire_grace_time=3600  # 1 hour grace period
+                misfire_grace_time=self.settings.one_time_misfire_grace_seconds
             )
             logger.info(f"Scheduled one-time task {job_id} at {run_date}")
             return job_id

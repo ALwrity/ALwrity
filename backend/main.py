@@ -588,7 +588,12 @@ async def startup_event():
         
         # Start task scheduler
         from services.scheduler import get_scheduler
-        await get_scheduler().start()
+        scheduler = get_scheduler()
+        health = await scheduler.health_check()
+        if not health["healthy"]:
+            await scheduler.start()
+        else:
+            logger.info("[SCHEDULER] Already healthy on startup, skipping start")
         
         # Check Wix API key configuration
         wix_api_key = os.getenv('WIX_API_KEY')
@@ -608,7 +613,9 @@ async def shutdown_event():
     try:
         # Stop task scheduler
         from services.scheduler import get_scheduler
-        await get_scheduler().stop()
+        scheduler = get_scheduler()
+        if scheduler.is_running:
+            await scheduler.stop()
         
         # Close database connections
         close_database()

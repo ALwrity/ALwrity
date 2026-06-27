@@ -71,6 +71,8 @@ class OnboardingControlService:
             try:
                 from services.scheduler import get_scheduler
                 scheduler = get_scheduler()
+                if not scheduler.is_running:
+                    logger.warning(f"[SCHEDULER] Scheduler not running — job removal for {user_id} may not persist")
                 # One-shot persona jobs
                 for job_id_suffix in ["research_persona", "facebook_persona"]:
                     job_id = f"{job_id_suffix}_{user_id}"

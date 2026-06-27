@@ -93,7 +93,9 @@ def schedule_research_persona_generation(user_id: str, delay_minutes: int = 20) 
         from services.scheduler import get_scheduler
         
         scheduler = get_scheduler()
-        
+        if not scheduler.is_running:
+            logger.warning(f"[SCHEDULER] Scheduler not running — research persona job for {user_id} will not execute until started")
+
         # Calculate run date (current time + delay) - ensure UTC timezone-aware
         run_date = datetime.now(timezone.utc) + timedelta(minutes=delay_minutes)
         

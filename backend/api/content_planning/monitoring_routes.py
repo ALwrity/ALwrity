@@ -68,6 +68,8 @@ async def activate_strategy_with_monitoring(
         try:
             from services.scheduler import get_scheduler
             scheduler = get_scheduler()
+            if not scheduler.is_running:
+                logger.warning("[SCHEDULER] Scheduler not running — interval adjustment stored but will not take effect until started")
             await scheduler.trigger_interval_adjustment()
             logger.info(f"Triggered scheduler interval adjustment after strategy {strategy_id} activation")
         except Exception as e:

@@ -253,6 +253,9 @@ async def get_scheduler_dashboard(
     try:
         scheduler = get_scheduler()
 
+        if not scheduler.is_running:
+            logger.warning("[DASHBOARD] Scheduler is not running — stats may be stale")
+
         # Get user_id from current_user (Clerk format)
         user_id_str = str(current_user.get('id', '')) if current_user else None
 
@@ -951,6 +954,10 @@ async def get_scheduler_jobs(
     """Get detailed information about all scheduled jobs."""
     try:
         scheduler = get_scheduler()
+
+        if not scheduler.is_running:
+            logger.warning("[DASHBOARD] Scheduler is not running — job list may be empty")
+
         all_jobs = scheduler.scheduler.get_jobs()
 
         formatted_jobs = []

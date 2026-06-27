@@ -10,6 +10,7 @@ from enum import Enum
 import json
 
 from utils.logger_utils import get_service_logger
+from .settings import SchedulerSettings
 
 logger = get_service_logger("failure_detection")
 
@@ -51,15 +52,26 @@ class FailurePattern:
 
 class FailureDetectionService:
     """Service for detecting failure patterns in task execution logs."""
-    
-    # Cool-off thresholds
-    CONSECUTIVE_FAILURE_THRESHOLD = 3  # 3 consecutive failures
-    RECENT_FAILURE_THRESHOLD = 5  # 5 failures in last 7 days
-    COOL_OFF_PERIOD_DAYS = 7  # Cool-off period after marking for intervention
-    
-    def __init__(self, db: Session):
+
+    def __init__(self, db: Session, settings: Optional[SchedulerSettings] = None):
         self.db = db
         self.logger = logger
+        self.settings = settings if settings is not None else SchedulerSettings.from_env()
+
+    @property
+    def CONSECUTIVE_FAILURE_THRESHOLD(self) -> int:
+        return self.settings.failure_consecutive_threshold
+
+    @property
+    def RECENT_FAILURE_THRESHOLD(self) -> int:
+        return self.settings.failure_recent_threshold
+
+    @property
+    def COOL_OFF_PERIOD_DAYS(self) -> int:
+        return self.settings.failure_cool_off_days
+
+    def _get_lookback_days(self) -> int:
+        return self.settings.failure_lookback_days
     
     def analyze_task_failures(
         self,
@@ -87,7 +99,7 @@ class FailureDetectionService:
             
             # Analyze failure patterns
             consecutive_failures = self._count_consecutive_failures(execution_logs)
-            recent_failures = self._count_recent_failures(execution_logs, days=7)
+            recent_failures = self._count_recent_failures(execution_logs, days=self._get_lookback_days())
             failure_reason = self._classify_failure_reason(execution_logs)
             error_patterns = self._extract_error_patterns(execution_logs)
             last_failure_time = self._get_last_failure_time(execution_logs)
@@ -210,7 +222,7 @@ class FailureDetectionService:
     def _classify_failure_reason(self, logs: List[Dict[str, Any]]) -> FailureReason:
         """Classify the primary failure reason from error messages."""
         # Check most recent failures first
-        recent_failures = [log for log in logs if log["status"] == "failed"][:5]
+        recent_failures = [log for log in logs if log["status"] == "failed"][:self.settings.failure_analysis_max_logs]
         
         for log in recent_failures:
             error_message = (log.get("error_message") or "").lower()
@@ -251,17 +263,17 @@ class FailureDetectionService:
     def _extract_error_patterns(self, logs: List[Dict[str, Any]]) -> List[str]:
         """Extract common error patterns from failure logs."""
         patterns = []
-        recent_failures = [log for log in logs if log["status"] == "failed"][:5]
+        recent_failures = [log for log in logs if log["status"] == "failed"][:self.settings.failure_pattern_max_logs]
         
         for log in recent_failures:
             error_message = log.get("error_message") or ""
             if error_message:
                 # Extract key phrases (first 100 chars)
-                pattern = error_message[:100].strip()
+                pattern = error_message[:self.settings.failure_pattern_truncate_length].strip()
                 if pattern and pattern not in patterns:
                     patterns.append(pattern)
         
-        return patterns[:3]  # Return top 3 patterns
+        return patterns[:self.settings.failure_pattern_max_count]
     
     def _get_last_failure_time(self, logs: List[Dict[str, Any]]) -> Optional[datetime]:
         """Get the timestamp of the most recent failure."""

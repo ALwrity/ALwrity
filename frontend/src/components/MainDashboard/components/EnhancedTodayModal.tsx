@@ -481,6 +481,28 @@ const getTaskStatus = (task: TodayTask) => {
                         </Box>
                       )}
 
+                      {/* AI-Suggested Badge */}
+                      {task.metadata?.source === 'agent_generated' && (
+                        <Box sx={{ 
+                          mt: 1.5, 
+                          mb: 1.5,
+                          p: 1.5, 
+                          bgcolor: '#f3e8ff', 
+                          borderRadius: 2,
+                          border: '1px solid #d4bfff',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 1.5
+                        }}>
+                          <AlwrityIcon sx={{ fontSize: 16, color: '#7c3aed', mt: 0.3 }} />
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: '#6d28d9' }}>
+                              AI-suggested
+                            </Typography>
+                          </Box>
+                        </Box>
+                      )}
+
                       {/* Agent Reasoning Section */}
                       {task.metadata?.source_agent && (
                         <Box sx={{ 
