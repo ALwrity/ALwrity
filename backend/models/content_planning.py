@@ -3,7 +3,7 @@ Content Planning Database Models
 Defines the database schema for content strategy, calendar events, and analytics.
 """
 
-from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -52,6 +52,7 @@ class CalendarEvent(Base):
     __tablename__ = "calendar_events"
     
     id = Column(Integer, primary_key=True)
+    user_id = Column(String(255), nullable=False, index=True)  # Clerk user ID
     strategy_id = Column(Integer, ForeignKey("content_strategies.id"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
@@ -63,10 +64,14 @@ class CalendarEvent(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    __table_args__ = (
+        Index('idx_calendar_user_status_date', 'user_id', 'status', 'scheduled_date'),
+    )
+    
     # Relationships
     strategy = relationship("ContentStrategy", back_populates="calendar_events")
     analytics = relationship("ContentAnalytics", back_populates="event")
-    
+
     def __repr__(self):
         return f"<CalendarEvent(id={self.id}, title='{self.title}', status='{self.status}')>"
     
@@ -74,6 +79,7 @@ class CalendarEvent(Base):
         """Convert model to dictionary."""
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'strategy_id': self.strategy_id,
             'title': self.title,
             'description': self.description,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -7,16 +7,25 @@ import {
   AccordionDetails,
   Snackbar,
   Fade,
-  Paper,
   Chip,
+  Paper,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
+  FormControl,
+  Card,
+  CardContent,
+  Alert,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
   Google as GoogleIcon,
   Analytics as AnalyticsIcon,
+  LinkedIn as LinkedInIcon,
   Web as WordPressIcon,
   Web as WixIcon,
   CheckCircle as CheckCircleIcon,
+  Lightbulb as LightbulbIcon,
 } from '@mui/icons-material';
 import PlatformSection from '../../common/PlatformSection';
 import { usePlatformConnections } from '../../common/usePlatformConnections';
@@ -37,6 +46,7 @@ interface IntegrationData {
     gsc: { connected: boolean; sites: { siteUrl: string }[] };
     bing: { connected: boolean; sites: { siteUrl: string }[] };
   };
+  socialPlatforms?: Record<string, boolean>;
   connectedPlatforms: string[];
   updatedAt: string;
 }
@@ -47,28 +57,6 @@ interface WebsiteIntegrationsSectionProps {
   connectedPlatforms: string[];
   setConnectedPlatforms: React.Dispatch<React.SetStateAction<string[]>>;
 }
-
-const WALKTHROUGH_TITLES: readonly string[] = [
-  'Connect your platforms',
-  'We cache your insights',
-  'Agents analyze weekly',
-  'We propose clear fixes',
-  'You review and publish',
-];
-const WALKTHROUGH_DESCRIPTIONS: readonly string[] = [
-  'Link Google Search Console and Bing to unlock search signals for your site.',
-  'We safely store key metrics so recommendations are quick and quota-friendly.',
-  'SIF agents look for low-CTR pages, striking-distance wins, declines, and overlaps.',
-  'You will see simple suggestions: better titles/meta, refreshes, and consolidations.',
-  'Pick what you like and publish; we keep the rhythm going week after week.',
-];
-const WALKTHROUGH_LABELS: readonly string[] = [
-  'Step 1 of 5',
-  'Step 2 of 5',
-  'Step 3 of 5',
-  'Step 4 of 5',
-  'Step 5 of 5',
-];
 
 const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   websiteUrl,
@@ -81,8 +69,8 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   const { connected: wordpressConnected, sites: wordpressSites } = useWordPressOAuth();
   const { connected: bingConnected, sites: bingSites, connect: connectBing, refreshStatus: refreshBingStatus } = useBingOAuth();
   const { connected: wixConnected, sites: wixSites } = useWixConnection();
-  const [walkthroughStep, setWalkthroughStep] = useState<number>(0);
-  const [walkthroughPaused, setWalkthroughPaused] = useState<boolean>(false);
+
+  const [primarySite, setPrimarySite] = useState<string>('');
 
   const invalidateAnalyticsCache = useCallback(() => {
     cachedAnalyticsAPI.invalidateAll();
@@ -157,6 +145,9 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
       } catch (error) {
         console.error('Bing connection failed:', error);
       }
+    } else if (platformId === 'linkedin') {
+      // LinkedInPlatformCard manages its own OAuth internally — no-op here
+      console.log('LinkedIn connection handled by card component');
     } else {
       await handleConnect(platformId);
     }
@@ -210,18 +201,55 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
       oauthUrl: '/bing/auth/url',
       isEnabled: true,
     },
+    {
+      id: 'linkedin',
+      name: 'LinkedIn',
+      description: 'Connect LinkedIn for professional content publishing',
+      icon: <LinkedInIcon />,
+      category: 'analytics' as const,
+      status: 'available' as const,
+      features: ['Professional publishing', 'Company pages', 'Audience targeting'],
+      benefits: ['Post to LinkedIn directly', 'Manage company pages', 'Target professional audience'],
+      oauthUrl: '/api/linkedin/connect',
+      isEnabled: true,
+    },
   ], []);
 
   const websitePlatforms = integrations.filter(p => p.category === 'website');
   const analyticsPlatforms = integrations.filter(p => p.category === 'analytics');
 
+  const availableSites = useMemo(() => {
+    const sites: { url: string; source: string; name: string }[] = [];
+    if (wixConnected && wixSites.length > 0) {
+      sites.push(...wixSites.map(s => ({ url: s.blog_url, source: 'Wix', name: 'Wix Site' })));
+    }
+    if (wordpressConnected && wordpressSites.length > 0) {
+      sites.push(...wordpressSites.map(s => ({ url: s.blog_url, source: 'WordPress', name: 'WordPress Site' })));
+    }
+    return sites;
+  }, [wixConnected, wixSites, wordpressConnected, wordpressSites]);
+
+  // Default to first site
+  useEffect(() => {
+    if (availableSites.length > 0 && !primarySite) {
+      setPrimarySite(availableSites[0].url);
+    }
+  }, [availableSites, primarySite]);
+
+  // Save primary site when selected
+  useEffect(() => {
+    if (primarySite) {
+      localStorage.setItem('primary_website', primarySite);
+    }
+  }, [primarySite]);
+
   useEffect(() => {
     const data: IntegrationData = {
-      primaryWebsite: null,
+      primaryWebsite: primarySite || null,
       websitePlatforms: {
         wix: wixConnected ? wixSites.map(s => ({ url: s.blog_url, name: 'Wix Site' })) : [],
         wordpress: wordpressConnected ? wordpressSites.map(s => ({ url: s.blog_url, name: 'WordPress Site' })) : [],
-        primaryWebsite: null,
+        primaryWebsite: primarySite || null,
       },
       analyticsPlatforms: {
         gsc: {
@@ -233,25 +261,21 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
           sites: (bingSites || []).map((site: any) => ({ siteUrl: site.siteUrl || site.site_url || '' })),
         },
       },
+      socialPlatforms: {
+        linkedin: connectedPlatforms.includes('linkedin'),
+      },
       connectedPlatforms,
       updatedAt: new Date().toISOString(),
     };
     onIntegrationChange(data);
   }, [
     onIntegrationChange,
+    primarySite,
     wixConnected, wixSites,
     wordpressConnected, wordpressSites,
     gscSites, bingConnected, bingSites,
     connectedPlatforms,
   ]);
-
-  useEffect(() => {
-    if (walkthroughPaused) return;
-    const id = setInterval(() => {
-      setWalkthroughStep((prev) => (prev + 1) % WALKTHROUGH_TITLES.length);
-    }, 4500);
-    return () => clearInterval(id);
-  }, [walkthroughPaused]);
 
   return (
     <Box sx={{ mt: 3, animation: 'fadeIn 0.6s ease-out' }}>
@@ -259,8 +283,9 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
         defaultExpanded={false}
         sx={{
           borderRadius: 3,
-          border: '1px solid #E5E7EB',
+          border: '1px solid #CBD5E1',
           boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          bgcolor: '#EFF6FF',
           '&:before': { display: 'none' },
           '&.Mui-expanded': { margin: 0, mb: 2 },
         }}
@@ -269,30 +294,39 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
           expandIcon={<ExpandMoreIcon />}
           sx={{
             borderRadius: 3,
-            bgcolor: '#F9FAFB',
+            bgcolor: '#EFF6FF',
             '&.Mui-expanded': {
-              borderBottom: '1px solid #E5E7EB',
+              borderBottom: '1px solid #CBD5E1',
               borderBottomLeftRadius: 0,
               borderBottomRightRadius: 0,
             },
           }}
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <CheckCircleIcon sx={{ color: connectedPlatforms.length > 0 ? '#22c55e' : '#94a3b8' }} />
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+            <CheckCircleIcon sx={{ color: connectedPlatforms.length > 0 ? '#2563EB' : '#94A3B8' }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
               Connect Website Platforms
             </Typography>
             {connectedPlatforms.length > 0 && (
               <Chip
-                label={`${connectedPlatforms.length} connected`}
-                size="small"
-                sx={{ bgcolor: '#dcfce7', color: '#15803d', fontWeight: 600, fontSize: '0.75rem' }}
+                icon={<CheckCircleIcon sx={{ fontSize: 18, color: '#FFFFFF' }} />}
+                label={`${connectedPlatforms.length} Connected`}
+                sx={{
+                  background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                  color: '#FFFFFF',
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  height: 30,
+                  px: 1,
+                  '& .MuiChip-icon': { ml: 0.5 },
+                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.35)',
+                }}
               />
             )}
           </Box>
         </AccordionSummary>
         <AccordionDetails sx={{ p: 2.5 }}>
-          <Typography variant="body2" sx={{ color: '#64748b', mb: 2 }}>
+          <Typography variant="body2" sx={{ color: '#64748B', mb: 2 }}>
             Connect your website and analytics platforms to enable AI-powered content publishing and insights.
             All connections are optional.
           </Typography>
@@ -328,35 +362,115 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
               />
             </div>
           </Fade>
-
-          <Paper
-            elevation={0}
-            sx={{
-              mt: 2,
-              p: 2,
-              borderRadius: 2,
-              border: '1px dashed #cbd5e1',
-              bgcolor: '#f8fafc',
-            }}
-          >
-            <Box
-              sx={{ position: 'relative', minHeight: 80 }}
-              onMouseEnter={() => setWalkthroughPaused(true)}
-              onMouseLeave={() => setWalkthroughPaused(false)}
-            >
-              <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600, display: 'block', mb: 1 }}>
-                {WALKTHROUGH_LABELS[walkthroughStep]}
-              </Typography>
-              <Typography variant="subtitle2" sx={{ color: '#334155', fontWeight: 600, mb: 0.5 }}>
-                {WALKTHROUGH_TITLES[walkthroughStep]}
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#475569' }}>
-                {WALKTHROUGH_DESCRIPTIONS[walkthroughStep]}
-              </Typography>
-            </Box>
-          </Paper>
         </AccordionDetails>
       </Accordion>
+
+      {/* Primary Site Selection */}
+      {availableSites.length > 0 && (
+        <Fade in timeout={900}>
+          <Box sx={{ mt: 3 }}>
+            <Paper 
+              elevation={2} 
+              sx={{ 
+                p: 3, 
+                borderRadius: 2,
+                background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
+                border: '1px solid',
+                borderColor: primarySite ? '#86efac' : '#e2e8f0'
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Box 
+                    sx={{ 
+                      width: 40, 
+                      height: 40, 
+                      borderRadius: '50%', 
+                      bgcolor: primarySite ? '#dcfce7' : '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mr: 2
+                    }}
+                  >
+                    <LightbulbIcon sx={{ color: primarySite ? '#22c55e' : '#94a3b8' }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                      Primary Website Selection
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#64748b' }}>
+                      Select your primary website for content publishing
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      bgcolor: primarySite ? '#22c55e' : '#ef4444',
+                      boxShadow: primarySite ? '0 0 0 4px #dcfce7' : '0 0 0 4px #fee2e2'
+                    }}
+                  />
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: primarySite ? '#15803d' : '#b91c1c' }}>
+                    {primarySite ? 'Primary Set' : 'Selection Required'}
+                  </Typography>
+                </Box>
+              </Box>
+
+              <FormControl component="fieldset" sx={{ width: '100%', mt: 1 }}>
+                <RadioGroup
+                  value={primarySite}
+                  onChange={(e) => setPrimarySite(e.target.value)}
+                >
+                  {availableSites.map((site, index) => (
+                    <Card 
+                      key={index} 
+                      variant="outlined" 
+                      sx={{ 
+                        mb: 1.5, 
+                        borderColor: primarySite === site.url ? '#22c55e' : '#e2e8f0',
+                        bgcolor: primarySite === site.url ? '#f0fdf4' : '#ffffff',
+                        transition: 'all 0.2s',
+                        '&:hover': { borderColor: '#22c55e' }
+                      }}
+                    >
+                      <CardContent sx={{ p: '12px !important', '&:last-child': { pb: '12px !important' } }}>
+                        <FormControlLabel
+                          value={site.url}
+                          control={<Radio size="small" sx={{ color: primarySite === site.url ? '#22c55e' : undefined, '&.Mui-checked': { color: '#22c55e' } }} />}
+                          label={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
+                                {site.url ? site.url.replace(/^https?:\/\//, '') : 'No URL'}
+                              </Typography>
+                              <Chip 
+                                label={site.source} 
+                                size="small" 
+                                sx={{ 
+                                  height: 20, 
+                                  fontSize: '0.65rem', 
+                                  fontWeight: 600,
+                                  bgcolor: site.source === 'Wix' ? '#000000' : '#21759b',
+                                  color: '#ffffff'
+                                }} 
+                              />
+                            </Box>
+                          }
+                          sx={{ width: '100%', m: 0 }}
+                        />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </RadioGroup>
+              </FormControl>
+            </Paper>
+          </Box>
+        </Fade>
+      )}
 
       <Snackbar
         open={showToast}
@@ -366,7 +480,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         sx={{
           '& .MuiSnackbarContent-root': {
-            backgroundColor: '#10b981',
+            backgroundColor: '#2563EB',
             color: 'white',
             fontWeight: 600,
           },

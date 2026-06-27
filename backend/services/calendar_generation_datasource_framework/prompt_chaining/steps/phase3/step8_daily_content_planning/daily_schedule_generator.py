@@ -14,23 +14,9 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
 from loguru import logger
 
-import sys
-import os
-
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-# Import real AI services - NO FALLBACKS
-try:
-    from services.content_gap_analyzer.ai_engine_service import AIEngineService
-    from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
-    from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
-    logger.info("✅ Using real AI services")
-except ImportError as e:
-    logger.error(f"❌ Failed to import real AI services: {str(e)}")
-    raise Exception(f"Real AI services required but not available: {str(e)}")
+from services.content_gap_analyzer.ai_engine_service import AIEngineService
+from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
+from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
 
 
 class DailyScheduleGenerator:

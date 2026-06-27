@@ -566,6 +566,12 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     loadData();
   }, [rangeDays]);
 
+  // Reload data when platforms change after initial mount
+  useEffect(() => {
+    if (!dataLoadedRef.current) return;
+    loadData();
+  }, [platforms]);
+
   // Auto-compute refresh queue only when background jobs/advanced insights are enabled
   useEffect(() => {
     if (!dataLoadedRef.current) return;

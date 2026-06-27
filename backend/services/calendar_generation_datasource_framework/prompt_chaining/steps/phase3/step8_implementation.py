@@ -5,59 +5,41 @@ This step creates detailed daily content schedule based on weekly themes.
 It ensures platform optimization, content uniqueness, and timeline coordination.
 """
 
+import time
 from typing import Dict, Any, List, Optional
 from loguru import logger
 from ..base_step import PromptStep
 
-# Import the main Step 8 implementation
 from .step8_daily_content_planning.step8_main import DailyContentPlanningStep as MainDailyContentPlanningStep
 
 
 class DailyContentPlanningStep(PromptStep):
-    """
-    Step 8: Daily Content Planning - Real Implementation
-    
-    This step creates detailed daily content schedule based on weekly themes.
-    It ensures platform optimization, content uniqueness, and timeline coordination.
-    
-    Features:
-    - Modular architecture with specialized components
-    - Platform-specific content optimization
-    - Timeline coordination and conflict resolution
-    - Content uniqueness validation and duplicate prevention
-    - Comprehensive quality metrics and insights
-    - Real AI service integration without fallbacks
-    """
     
     def __init__(self):
-        """Initialize Step 8 with real implementation."""
         super().__init__("Daily Content Planning", 8)
-        
-        # Initialize the main implementation
         self.main_implementation = MainDailyContentPlanningStep()
-        
-        logger.info("🎯 Step 8: Daily Content Planning initialized with REAL IMPLEMENTATION")
     
     async def execute(self, context: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute Step 8 with real implementation."""
         try:
-            logger.info("🚀 Executing Step 8: Daily Content Planning")
+            logger.info("Executing Step 8: Daily Content Planning")
+            start_time = time.time()
             
-            # Call the main implementation
             result = await self.main_implementation.execute(context, {})
             
-            # Transform result to match base step format
+            execution_time = time.time() - start_time
+            quality_score = result.get("step_metadata", {}).get("overall_quality_score", 0.0)
+            
             return {
                 "stepNumber": 8,
                 "stepName": "Daily Content Planning",
                 "status": "completed",
                 "results": result,
-                "qualityScore": 0.9,
-                "executionTime": "1.0s"
+                "qualityScore": quality_score,
+                "executionTime": f"{execution_time:.1f}s"
             }
             
         except Exception as e:
-            logger.error(f"❌ Step 8 execution failed: {str(e)}")
+            logger.error(f"Step 8 execution failed: {str(e)}")
             return {
                 "stepNumber": 8,
                 "stepName": "Daily Content Planning",

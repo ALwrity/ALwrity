@@ -742,9 +742,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       <IntegrationsStep 
         key="integrations" 
         onContinue={handleNext} 
-        updateHeaderContent={updateHeaderContent} 
-        onValidationChange={(isValid: boolean) => handleStepValidationChange(3, isValid)}
-        onDataChange={handleStepDataChange}
+        updateHeaderContent={updateHeaderContent}
       />,
       <FinalStep key="final" onContinue={handleComplete} updateHeaderContent={updateHeaderContent} />
     ];

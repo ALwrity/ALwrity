@@ -41,6 +41,8 @@ class CalendarGenerationService:
             self.orchestrator = PromptChainOrchestrator(db_session=db_session)
             # Use global session store to persist across requests
             self.orchestrator_sessions = _global_orchestrator_sessions
+            # Load any active sessions from database into memory
+            self._load_sessions_from_db()
             logger.info("✅ 12-step orchestrator initialized successfully with database session")
         except Exception as e:
             logger.error(f"❌ Failed to initialize orchestrator: {e}")
@@ -400,6 +402,7 @@ class CalendarGenerationService:
             }
             
             logger.info(f"✅ Orchestrator session {session_id} initialized for user {user_id}")
+            self._persist_session_to_db(session_id)
             return True
             
         except Exception as e:
@@ -430,6 +433,19 @@ class CalendarGenerationService:
                 if session_id in self.orchestrator_sessions:
                     del self.orchestrator_sessions[session_id]
                     logger.info(f"🧹 Cleaned up old session: {session_id}")
+            
+            # Also clean up from DB
+            if self.db_session:
+                try:
+                    self.db_session.query(CalendarGenerationSession).filter(
+                        CalendarGenerationSession.generation_status.in_(["completed", "error", "cancelled"])
+                    ).filter(
+                        CalendarGenerationSession.created_at < datetime.utcnow()  # placeholder
+                    ).delete()
+                    self.db_session.commit()
+                except Exception as db_e:
+                    self.db_session.rollback()
+                    logger.error(f"❌ Error cleaning up sessions from DB: {db_e}")
                 
         except Exception as e:
             logger.error(f"❌ Error cleaning up old sessions: {e}")
@@ -446,6 +462,98 @@ class CalendarGenerationService:
             logger.error(f"❌ Error getting active session for user: {e}")
             return None
     
+    def _persist_session_to_db(self, session_id: str) -> None:
+        """Persist session state to database so it survives restarts."""
+        try:
+            session = self.orchestrator_sessions.get(session_id)
+            if not session or not self.db_session:
+                return
+            
+            user_id = session.get("user_id", "")
+            request_data = session.get("request_data", {})
+            
+            existing = self.db_session.query(CalendarGenerationSession).filter(
+                CalendarGenerationSession.generation_params["session_id"].as_string() == session_id
+            ).first()
+            
+            if not existing:
+                existing = CalendarGenerationSession(
+                    user_id=user_id,
+                    strategy_id=request_data.get("strategy_id"),
+                    session_type=request_data.get("calendar_type", "monthly"),
+                    generation_params={"session_id": session_id},
+                    generation_status=session.get("status", "processing"),
+                )
+                self.db_session.add(existing)
+                self.db_session.flush()
+            
+            # Update with current state
+            existing.generation_status = session.get("status", "processing")
+            existing.generation_params = {
+                "session_id": session_id,
+                "progress": session.get("progress", {}),
+                "request_data": request_data,
+                "status": session.get("status"),
+                "error": session.get("error"),
+            }
+            
+            # If completed, populate result fields
+            if session.get("status") == "completed":
+                result = session.get("result", {})
+                existing.generated_calendar = result
+                existing.ai_insights = result.get("ai_insights") if isinstance(result, dict) else None
+                existing.performance_predictions = result.get("performance_predictions") if isinstance(result, dict) else None
+                existing.content_themes = result.get("weekly_themes") if isinstance(result, dict) else None
+                existing.generation_status = "completed"
+                existing.processing_time = session.get("processing_time")
+            
+            self.db_session.commit()
+            
+        except Exception as e:
+            if self.db_session:
+                self.db_session.rollback()
+            logger.error(f"❌ Error persisting session {session_id} to DB: {e}")
+
+    def _load_sessions_from_db(self) -> None:
+        """Load active sessions from database into the in-memory store."""
+        try:
+            if not self.db_session:
+                return
+            
+            active_sessions = self.db_session.query(CalendarGenerationSession).filter(
+                CalendarGenerationSession.generation_status.in_(["processing", "running", "initializing"])
+            ).all()
+            
+            for db_session_record in active_sessions:
+                params = db_session_record.generation_params or {}
+                session_id = params.get("session_id", f"db-session-{db_session_record.id}")
+                
+                if session_id in self.orchestrator_sessions:
+                    continue
+                
+                self.orchestrator_sessions[session_id] = {
+                    "request_data": params.get("request_data", {}),
+                    "user_id": db_session_record.user_id,
+                    "status": db_session_record.generation_status,
+                    "start_time": db_session_record.created_at or datetime.now(),
+                    "progress": params.get("progress", {
+                        "current_step": 0,
+                        "overall_progress": 0,
+                        "step_results": {},
+                        "quality_scores": {},
+                        "errors": [],
+                        "warnings": []
+                    }),
+                    "error": params.get("error"),
+                }
+                logger.info(f"🔄 Restored session {session_id} for user {db_session_record.user_id}")
+            
+            if active_sessions:
+                logger.info(f"✅ Restored {len(active_sessions)} active sessions from database")
+                
+        except Exception as e:
+            logger.error(f"❌ Error loading sessions from DB: {e}")
+
     async def start_orchestrator_generation(self, session_id: str, request_data: Dict[str, Any]) -> None:
         """Start the 12-step calendar generation process."""
         try:
@@ -460,6 +568,7 @@ class CalendarGenerationService:
             
             # Update session status
             session["status"] = "running"
+            self._persist_session_to_db(session_id)
             
             # Start the 12-step process
             user_id = request_data.get("user_id")
@@ -479,6 +588,7 @@ class CalendarGenerationService:
             session["status"] = "completed"
             session["result"] = result
             session["end_time"] = datetime.now()
+            self._persist_session_to_db(session_id)
             
             logger.info(f"✅ Orchestrator generation completed for session {session_id}")
             
@@ -487,7 +597,23 @@ class CalendarGenerationService:
             if session_id in self.orchestrator_sessions:
                 self.orchestrator_sessions[session_id]["status"] = "error"
                 self.orchestrator_sessions[session_id]["error"] = str(e)
+                self._persist_session_to_db(session_id)
     
+    def cancel_orchestrator_session(self, session_id: str) -> bool:
+        """Cancel an ongoing orchestrator session and persist to DB."""
+        try:
+            session = self.orchestrator_sessions.get(session_id)
+            if not session:
+                logger.warning(f"❌ Session {session_id} not found for cancellation")
+                return False
+            session["status"] = "cancelled"
+            self._persist_session_to_db(session_id)
+            logger.info(f"✅ Session {session_id} cancelled")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error cancelling session {session_id}: {e}")
+            return False
+
     def get_orchestrator_progress(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get progress for an orchestrator session."""
         try:
@@ -545,6 +671,7 @@ class CalendarGenerationService:
                 session["last_updated"] = datetime.now().isoformat()
                 
                 logger.info(f"📊 Updated progress for session {session_id}: step {current_step}/{total_steps} (step progress: {step_progress}%)")
+                self._persist_session_to_db(session_id)
                 
         except Exception as e:
             logger.error(f"❌ Error updating session progress: {e}")
@@ -581,29 +708,33 @@ class CalendarGenerationService:
             if not daily_schedule and "step_results" in calendar_data:
                  daily_schedule = calendar_data.get("step_results", {}).get("step_08", {}).get("daily_schedule", [])
 
-            for day in daily_schedule:
-                content_items = day.get("content_items", [])
-                for item in content_items:
-                    # Parse date
-                    date_str = day.get("date")
-                    scheduled_date = datetime.utcnow()
-                    if date_str:
-                        try:
-                            scheduled_date = datetime.fromisoformat(date_str)
-                        except:
-                            pass
+            # Skip calendar event creation when no valid strategy_id (FK constraint)
+            if not strategy_id:
+                logger.warning(f"⚠️ No strategy_id provided — skipping CalendarEvent creation for session {session_id}")
+            else:
+                for day in daily_schedule:
+                    content_items = day.get("content_items", [])
+                    for item in content_items:
+                        date_str = day.get("date")
+                        scheduled_date = datetime.utcnow()
+                        if date_str:
+                            try:
+                                scheduled_date = datetime.fromisoformat(date_str)
+                            except:
+                                pass
 
-                    event = CalendarEvent(
-                        strategy_id=strategy_id if strategy_id else 0, # Fallback if no strategy
-                        title=item.get("title", "Untitled Event"),
-                        description=item.get("description"),
-                        content_type=item.get("type", "social_post"),
-                        platform=item.get("platform", "generic"),
-                        scheduled_date=scheduled_date,
-                        status="draft",
-                        ai_recommendations=item
-                    )
-                    self.db_session.add(event)
+                        event = CalendarEvent(
+                            user_id=user_id,
+                            strategy_id=strategy_id,
+                            title=item.get("title", "Untitled Event"),
+                            description=item.get("description"),
+                            content_type=item.get("type", "social_post"),
+                            platform=item.get("platform", "generic"),
+                            scheduled_date=scheduled_date,
+                            status="draft",
+                            ai_recommendations=item
+                        )
+                        self.db_session.add(event)
 
             self.db_session.commit()
             logger.info(f"✅ Calendar saved to database for user {user_id}")

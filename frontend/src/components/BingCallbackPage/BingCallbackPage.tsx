@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Box, CircularProgress, Typography, Alert } from '@mui/material';
+import { getApiBaseUrl } from '../../utils/apiUrl';
 
 const BingCallbackPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
@@ -10,43 +11,20 @@ const BingCallbackPage: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
         const state = params.get('state');
-        const error = params.get('error');
-        
-        if (error) {
-          throw new Error(`OAuth error: ${error}`);
+        const errorParam = params.get('error');
+
+        if (errorParam) {
+          throw new Error(`OAuth error: ${errorParam}`);
         }
-        
+
         if (!code || !state) {
           throw new Error('Missing OAuth parameters');
         }
 
-        try {
-          // Call backend to complete token exchange
-          await fetch(`/bing/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`, {
-            method: 'GET',
-            credentials: 'include'
-          });
-        } catch (e) {
-          // Continue; backend HTML callback may already be handled in popup
-        }
-
-        // Notify opener and close if this is a popup window
-        try {
-          (window.opener || window.parent)?.postMessage({ type: 'BING_OAUTH_SUCCESS', success: true }, '*');
-          if (window.opener) {
-            window.close();
-            return;
-          }
-        } catch {}
-
-        // Fallback: redirect back to onboarding
-        window.location.replace('/onboarding?step=5');
+        const baseUrl = getApiBaseUrl();
+        window.location.href = `${baseUrl}/bing/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`;
       } catch (e: any) {
         setError(e?.message || 'OAuth callback failed');
-        try {
-          (window.opener || window.parent)?.postMessage({ type: 'BING_OAUTH_ERROR', success: false, error: e?.message || 'OAuth callback failed' }, '*');
-          if (window.opener) window.close();
-        } catch {}
       }
     };
     run();

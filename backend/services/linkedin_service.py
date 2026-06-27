@@ -578,7 +578,7 @@ class LinkedInService:
                 # Fallback to Tavily
                 search_engine_lower = "tavily"
             
-            elif search_engine_lower == "tavily":
+            if search_engine_lower == "tavily":
                 from services.research.tavily_service import TavilyService
                 
                 tavily_service = TavilyService()

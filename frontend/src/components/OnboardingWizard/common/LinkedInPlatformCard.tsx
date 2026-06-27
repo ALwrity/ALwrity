@@ -208,17 +208,17 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
         p: 2,
 
-        borderColor: connected ? '#4ade80' : '#e2e8f0',
+        borderColor: connected ? '#2563EB' : '#CBD5E1',
 
-        backgroundColor: connected ? '#f0fdf4' : '#ffffff',
+        backgroundColor: connected ? '#DBEAFE' : '#EFF6FF',
 
         transition: 'all 0.2s ease',
 
         '&:hover': {
 
-          borderColor: connected ? '#22c55e' : '#cbd5e1',
+          borderColor: connected ? '#1D4ED8' : '#94A3B8',
 
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
 
         },
 
@@ -236,13 +236,13 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
               color: '#0A66C2',
 
-              bgcolor: '#ffffff',
+              bgcolor: '#FFFFFF',
 
               p: 0.5,
 
               borderRadius: 1,
 
-              border: '1px solid #e2e8f0',
+              border: '1px solid #CBD5E1',
 
               display: 'flex',
 
@@ -256,13 +256,13 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
           <Box>
 
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', lineHeight: 1.2 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1E293B', lineHeight: 1.2 }}>
 
               LinkedIn
 
             </Typography>
 
-            <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>
+            <Typography variant="caption" sx={{ color: '#64748B', display: 'block' }}>
 
               Professional publishing
 
@@ -280,13 +280,13 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
           <Tooltip title={`Connected via ${provider}`}>
 
-            <CheckCircleIcon sx={{ color: '#22c55e', fontSize: 20 }} />
+            <CheckCircleIcon sx={{ color: '#3B82F6', fontSize: 20 }} />
 
           </Tooltip>
 
         ) : (
 
-          <Chip label="Not connected" size="small" sx={{ height: 24, fontSize: '0.75rem' }} />
+          <Chip label="Not connected" size="small" sx={{ height: 24, fontSize: '0.75rem', color: '#94A3B8', bgcolor: '#F1F5F9' }} />
 
         )}
 
@@ -342,7 +342,7 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
             <Box>
 
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1e293b', lineHeight: 1.3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1E293B', lineHeight: 1.3 }}>
 
                 {displayName || accountName || 'LinkedIn account'}
 
@@ -350,7 +350,7 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
               {primaryProfile?.accountTypeLabel && (
 
-                <Typography variant="caption" sx={{ color: '#64748b' }}>
+                <Typography variant="caption" sx={{ color: '#64748B' }}>
 
                   {primaryProfile.accountTypeLabel}
 
@@ -514,7 +514,7 @@ const LinkedInPlatformCard: React.FC<LinkedInPlatformCardProps> = ({
 
         <Box mt={1} display="flex" flexDirection="column" gap={1}>
 
-          <Typography variant="caption" sx={{ color: '#64748b', lineHeight: 1.45 }}>
+          <Typography variant="caption" sx={{ color: '#64748B', lineHeight: 1.45 }}>
 
             Sign in with LinkedIn in a popup. Choose your personal profile when asked to post as yourself and on company pages you manage.
 

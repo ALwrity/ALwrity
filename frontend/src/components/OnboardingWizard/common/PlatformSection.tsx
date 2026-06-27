@@ -110,10 +110,10 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
 
   return (
     <Box sx={{ mb: 4 }}>
-      <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b', mb: 2 }}>
+      <Typography variant="h6" sx={{ fontWeight: 600, color: '#1E293B', mb: 2 }}>
         {title}
       </Typography>
-      <Typography variant="body2" sx={{ color: '#64748b', mb: 3 }}>
+      <Typography variant="body2" sx={{ color: '#64748B', mb: 3 }}>
         {description}
       </Typography>
       
@@ -159,12 +159,12 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
               <Card 
                 sx={{
                   height: '100%',
-                  border: '1px solid #e2e8f0',
-                  backgroundColor: '#ffffff',
+                  border: '1px solid #CBD5E1',
+                  backgroundColor: '#EFF6FF',
                   transition: 'all 0.2s ease',
                   opacity: platform.isEnabled ? 1 : 0.6,
                   '&:hover': {
-                    boxShadow: platform.isEnabled ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
                     transform: platform.isEnabled ? 'translateY(-2px)' : 'none'
                   }
                 }}
@@ -175,10 +175,10 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
                       {platform.icon}
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
                         {platform.name}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
+                      <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.875rem' }}>
                         {platform.description}
                       </Typography>
                     </Box>
@@ -198,8 +198,8 @@ const PlatformSection: React.FC<PlatformSectionProps> = ({
                     sx={{
                       textTransform: 'none',
                       fontWeight: 600,
-                      borderColor: '#e2e8f0',
-                      color: '#64748b'
+                      borderColor: '#E2E8F0',
+                      color: '#94A3B8'
                     }}
                   >
                     Coming Soon

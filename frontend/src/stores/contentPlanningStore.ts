@@ -282,6 +282,7 @@ interface ContentPlanningStore {
   setCalendarGenerationLoading: (loading: boolean) => void;
   setCalendarGenerationError: (error: string | null) => void;
   clearCalendarGenerationData: () => void;
+  setGeneratedCalendar: (calendar: GeneratedCalendar | null) => void;
 }
 
 // Store implementation
@@ -745,6 +746,8 @@ export const useContentPlanningStore = create<ContentPlanningStore>((set, get) =
     }
   },
   
+  setGeneratedCalendar: (calendar) => set({ generatedCalendar: calendar }),
+
   setCalendarGenerationLoading: (loading) => set({ calendarGenerationLoading: loading }),
   setCalendarGenerationError: (error) => set({ calendarGenerationError: error }),
   clearCalendarGenerationData: () => set({ generatedCalendar: null, contentOptimization: null, performancePrediction: null, contentRepurposing: null, trendingTopics: null }),

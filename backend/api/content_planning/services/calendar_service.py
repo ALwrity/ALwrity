@@ -40,17 +40,18 @@ class CalendarService:
             logger.error(f"Error creating calendar event: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "create_calendar_event")
     
-    async def get_calendar_events(self, strategy_id: Optional[int] = None, db: Session = None) -> List[Dict[str, Any]]:
-        """Get calendar events, optionally filtered by strategy."""
+    async def get_calendar_events(self, strategy_id: Optional[int] = None, user_id: Optional[str] = None, db: Session = None) -> List[Dict[str, Any]]:
+        """Get calendar events, optionally filtered by strategy and scoped to user."""
         try:
             logger.info("Fetching calendar events")
             
             db_service = ContentPlanningDBService(db)
             
             if strategy_id:
-                events = await db_service.get_strategy_calendar_events(strategy_id)
+                events = await db_service.get_strategy_calendar_events(strategy_id, user_id=user_id)
+            elif user_id:
+                events = await db_service.get_user_calendar_events(user_id)
             else:
-                # TODO: Implement get_all_calendar_events method
                 events = []
             
             return [event.to_dict() for event in events]
@@ -59,13 +60,13 @@ class CalendarService:
             logger.error(f"Error getting calendar events: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "get_calendar_events")
     
-    async def get_calendar_event_by_id(self, event_id: int, db: Session) -> Dict[str, Any]:
-        """Get a specific calendar event by ID."""
+    async def get_calendar_event_by_id(self, event_id: int, db: Session, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get a specific calendar event by ID, optionally scoped to a user."""
         try:
             logger.info(f"Fetching calendar event: {event_id}")
             
             db_service = ContentPlanningDBService(db)
-            event = await db_service.get_calendar_event(event_id)
+            event = await db_service.get_calendar_event(event_id, user_id=user_id)
             
             if event:
                 return event.to_dict()
@@ -76,18 +77,15 @@ class CalendarService:
             logger.error(f"Error getting calendar event: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "get_calendar_event_by_id")
     
-    async def update_calendar_event(self, event_id: int, update_data: Dict[str, Any], db: Session) -> Dict[str, Any]:
-        """Update a calendar event."""
+    async def update_calendar_event(self, event_id: int, update_data: Dict[str, Any], db: Session, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Update a calendar event, scoped to a user."""
         try:
             logger.info(f"Updating calendar event: {event_id}")
 
             db_service = ContentPlanningDBService(db)
-            updated_event = await db_service.update_calendar_event(event_id, update_data)
+            updated_event = await db_service.update_calendar_event(event_id, update_data, user_id=user_id)
 
             if updated_event:
-                # M1: reverse-sync calendar status change to any workflow tasks
-                # that sourced from this event. Errors here must not break the
-                # calendar update — workflow sync is a side effect.
                 try:
                     from services.today_workflow_service import sync_workflow_tasks_from_calendar_event
                     from models.content_planning import ContentStrategy
@@ -113,37 +111,37 @@ class CalendarService:
             logger.error(f"Error updating calendar event: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "update_calendar_event")
 
-    async def delete_calendar_event(self, event_id: int, db: Session) -> bool:
-        """Delete a calendar event."""
+    async def delete_calendar_event(self, event_id: int, db: Session, user_id: Optional[str] = None) -> bool:
+        """Delete a calendar event, scoped to a user."""
         try:
             logger.info(f"Deleting calendar event: {event_id}")
 
-            # Capture user_id + status BEFORE delete for the reverse-sync
-            from models.content_planning import ContentStrategy, CalendarEvent as _CalEv
-            pre_event = (
-                db.query(_CalEv)
-                .join(ContentStrategy, _CalEv.strategy_id == ContentStrategy.id)
-                .filter(_CalEv.id == event_id)
+            db_service = ContentPlanningDBService(db)
+            event = await db_service.get_calendar_event(event_id, user_id=user_id)
+            if not event:
+                raise ContentPlanningErrorHandler.handle_not_found_error("Calendar event", event_id)
+
+            strategy_user_id = None
+            from models.content_planning import ContentStrategy
+            strategy = (
+                db.query(ContentStrategy)
+                .filter(ContentStrategy.id == event.strategy_id)
                 .first()
             )
-            pre_strategy = pre_event.strategy if pre_event else None
+            if strategy is not None:
+                strategy_user_id = str(strategy.user_id)
 
-            db_service = ContentPlanningDBService(db)
-            deleted = await db_service.delete_calendar_event(event_id)
+            deleted = await db_service.delete_calendar_event(event_id, user_id=user_id)
 
             if deleted:
-                # M1: treat deletion as cancellation for any workflow tasks
-                # sourced from this event, so the today-workflow view stays
-                # coherent. Errors here are non-blocking.
-                if pre_event is not None and pre_strategy is not None:
+                if strategy_user_id:
                     try:
                         from services.today_workflow_service import sync_workflow_tasks_from_calendar_event
-                        # Synthesize a transient event-like object with status="cancelled"
                         class _CancelledSentinel:
-                            id = pre_event.id
+                            id = event.id
                             status = "cancelled"
                         sync_workflow_tasks_from_calendar_event(
-                            db, str(pre_strategy.user_id), _CancelledSentinel(),
+                            db, strategy_user_id, _CancelledSentinel(),
                         )
                     except Exception as sync_err:
                         logger.warning(
@@ -158,13 +156,15 @@ class CalendarService:
             logger.error(f"Error deleting calendar event: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "delete_calendar_event")
     
-    async def get_events_by_status(self, strategy_id: int, status: str, db: Session) -> List[Dict[str, Any]]:
-        """Get calendar events by status for a specific strategy."""
+    async def get_events_by_status(self, strategy_id: int, status: str, db: Session, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get calendar events by status for a specific strategy, scoped to a user."""
         try:
             logger.info(f"Fetching events for strategy {strategy_id} with status {status}")
             
             db_service = ContentPlanningDBService(db)
             events = await db_service.get_events_by_status(strategy_id, status)
+            if user_id:
+                events = [e for e in events if e.user_id == user_id]
             
             return [event.to_dict() for event in events]
             
@@ -172,13 +172,13 @@ class CalendarService:
             logger.error(f"Error getting events by status: {str(e)}")
             raise ContentPlanningErrorHandler.handle_general_error(e, "get_events_by_status")
     
-    async def get_strategy_events(self, strategy_id: int, db: Session) -> Dict[str, Any]:
-        """Get calendar events for a specific strategy."""
+    async def get_strategy_events(self, strategy_id: int, db: Session, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Get calendar events for a specific strategy, scoped to a user."""
         try:
             logger.info(f"Fetching events for strategy: {strategy_id}")
             
             db_service = ContentPlanningDBService(db)
-            events = await db_service.get_strategy_calendar_events(strategy_id)
+            events = await db_service.get_strategy_calendar_events(strategy_id, user_id=user_id)
             
             return {
                 'strategy_id': strategy_id,
@@ -210,11 +210,18 @@ class CalendarService:
             # Create the event
             created_event = await self.create_calendar_event(event_data, db)
             
-            return {
-                "status": "success",
-                "message": "Calendar event scheduled successfully",
-                "event": created_event
-            }
+            if created_event:
+                return {
+                    "status": "success",
+                    "message": "Calendar event scheduled successfully",
+                    "event": created_event
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": "Failed to create calendar event",
+                    "event_data": event_data
+                }
             
         except Exception as e:
             logger.error(f"Error scheduling calendar event: {str(e)}")
@@ -223,9 +230,48 @@ class CalendarService:
     async def _check_scheduling_conflicts(self, event_data: Dict[str, Any], db: Session) -> List[Dict[str, Any]]:
         """Check for scheduling conflicts with existing events."""
         try:
-            # This is a placeholder for conflict checking logic
-            # In a real implementation, you would check for overlapping times, etc.
-            return []
+            from models.content_planning import CalendarEvent as CalEvent
+            from sqlalchemy import cast, Date
+
+            scheduled_date = event_data.get("scheduled_date")
+            strategy_id = event_data.get("strategy_id")
+            platform = event_data.get("platform", "")
+            content_type = event_data.get("content_type", "")
+
+            if not scheduled_date or not strategy_id:
+                return []
+
+            conflicts = []
+            # Same day + same platform conflict
+            existing = db.query(CalEvent).filter(
+                CalEvent.strategy_id == strategy_id,
+                cast(CalEvent.scheduled_date, Date) == cast(scheduled_date, Date),
+                CalEvent.platform == platform
+            ).all()
+            for ev in existing:
+                conflicts.append({
+                    "type": "platform_double_booking",
+                    "message": f"Already have '{ev.title}' on {platform} this day",
+                    "conflicting_event_id": ev.id,
+                    "conflicting_title": ev.title
+                })
+
+            # Same day + same content type conflict
+            existing_type = db.query(CalEvent).filter(
+                CalEvent.strategy_id == strategy_id,
+                cast(CalEvent.scheduled_date, Date) == cast(scheduled_date, Date),
+                CalEvent.content_type == content_type
+            ).all()
+            for ev in existing_type:
+                if ev.id not in {c["conflicting_event_id"] for c in conflicts}:
+                    conflicts.append({
+                        "type": "content_type_double_booking",
+                        "message": f"Already have '{ev.title}' with type {content_type} this day",
+                        "conflicting_event_id": ev.id,
+                        "conflicting_title": ev.title
+                    })
+
+            return conflicts
             
         except Exception as e:
             logger.error(f"Error checking scheduling conflicts: {str(e)}")

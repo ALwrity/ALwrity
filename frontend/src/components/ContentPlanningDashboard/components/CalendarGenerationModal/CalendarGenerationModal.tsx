@@ -686,14 +686,49 @@ const CalendarGenerationModal: React.FC<CalendarGenerationModalProps> = ({
               <Button
                 variant="contained"
                 onClick={() => {
-                  // Handle completion
                   console.log('Calendar generation completed');
+                  const step12Result = currentProgress.stepResults[12];
+                  const step12Data = step12Result?.results || {};
                   onComplete({
-                    calendar: {} as any,
+                    calendar: {
+                      id: sessionId,
+                      title: step12Data?.title || 'Generated Calendar',
+                      description: step12Data?.description || '',
+                      startDate: step12Data?.start_date || '',
+                      endDate: step12Data?.end_date || '',
+                      content: step12Data?.daily_schedule?.map?.((item: any, i: number) => ({
+                        id: item.id || `event_${i}`,
+                        title: item.title || '',
+                        description: item.description || '',
+                        contentType: item.content_type || item.contentType || 'post',
+                        platform: item.platform || '',
+                        scheduledDate: item.scheduled_date || item.date || '',
+                        theme: item.theme || '',
+                        keywords: item.keywords || []
+                      })) || [],
+                      themes: currentProgress.stepResults[7]?.data?.themes?.map?.((t: any, i: number) => ({
+                        id: t.id || `theme_${i}`,
+                        name: t.name || '',
+                        description: t.description || '',
+                        weekNumber: t.week_number || i + 1,
+                        contentTypes: t.content_types || []
+                      })) || [],
+                      platforms: step12Data?.platform_strategies?.map?.((p: any, i: number) => ({
+                        id: p.id || `platform_${i}`,
+                        name: p.name || p.platform || '',
+                        contentCount: p.content_count || 0,
+                        postingSchedule: p.schedule || []
+                      })) || []
+                    },
                     qualityScores: currentProgress.qualityScores,
-                    insights: {} as any,
-                    recommendations: {} as any,
-                    exportData: {} as any
+                    insights: step12Data?.insights || {},
+                    recommendations: step12Data?.recommendations || {},
+                    exportData: {
+                      calendarJson: JSON.stringify(step12Data),
+                      insightsCsv: '',
+                      recommendationsPdf: '',
+                      qualityReport: ''
+                    }
                   });
                 }}
               >

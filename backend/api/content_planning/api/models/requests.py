@@ -16,7 +16,7 @@ class ContentStrategyRequest(BaseModel):
     competitor_urls: Optional[List[str]] = None
 
 class ContentStrategyCreate(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     name: str
     industry: str
     target_audience: Dict[str, Any]
@@ -35,7 +35,7 @@ class CalendarEventCreate(BaseModel):
 
 # Content Gap Analysis Request Models
 class ContentGapAnalysisCreate(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     website_url: str
     competitor_urls: List[str]
     target_keywords: Optional[List[str]] = None
@@ -69,7 +69,7 @@ class StrategicIntelligenceRequest(BaseModel):
 
 # Calendar Generation Request Models
 class CalendarGenerationRequest(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     strategy_id: Optional[int] = None
     calendar_type: str = Field("monthly", description="Type of calendar: monthly, weekly, custom")
     industry: Optional[str] = None
@@ -77,7 +77,7 @@ class CalendarGenerationRequest(BaseModel):
     force_refresh: bool = Field(False, description="Force refresh calendar generation")
 
 class ContentOptimizationRequest(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     event_id: Optional[int] = None
     title: str
     description: str
@@ -86,19 +86,19 @@ class ContentOptimizationRequest(BaseModel):
     original_content: Optional[Dict[str, Any]] = None
 
 class PerformancePredictionRequest(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     strategy_id: Optional[int] = None
     content_type: str
     platform: str
     content_data: Dict[str, Any]
 
 class ContentRepurposingRequest(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     strategy_id: Optional[int] = None
     original_content: Dict[str, Any]
     target_platforms: List[str]
 
 class TrendingTopicsRequest(BaseModel):
-    user_id: int
+    user_id: Optional[str] = None
     industry: str
     limit: int = Field(10, description="Number of trending topics to return") 

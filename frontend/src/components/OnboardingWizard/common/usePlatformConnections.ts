@@ -56,6 +56,18 @@ export const usePlatformConnections = () => {
         setToastMessage('LinkedIn connection failed. Please try again.');
         setShowToast(true);
       }
+      if (event.data.type === 'BING_OAUTH_SUCCESS') {
+        setConnectedPlatforms(prev => {
+          if (prev.includes('bing')) return prev;
+          return [...prev, 'bing'];
+        });
+        setToastMessage('Bing Webmaster Tools connected successfully!');
+        setShowToast(true);
+      }
+      if (event.data.type === 'BING_OAUTH_ERROR') {
+        setToastMessage('Bing Webmaster Tools connection failed. Please try again.');
+        setShowToast(true);
+      }
     };
     window.addEventListener('message', handler);
     return () => window.removeEventListener('message', handler);

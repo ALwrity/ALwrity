@@ -324,6 +324,7 @@ const CalendarConfigurationStep: React.FC<CalendarConfigurationStepProps> = ({
     { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
     { value: 'Europe/London', label: 'London (GMT/BST)' },
     { value: 'Europe/Paris', label: 'Paris (CET/CEST)' },
+    { value: 'Asia/Kolkata', label: 'India Standard Time (IST)' },
     { value: 'Asia/Tokyo', label: 'Tokyo (JST)' },
     { value: 'Asia/Shanghai', label: 'Shanghai (CST)' },
     { value: 'Australia/Sydney', label: 'Sydney (AEST/AEDT)' }

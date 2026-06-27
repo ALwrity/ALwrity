@@ -384,6 +384,89 @@ def _ensure_onboarding_session_payload_column(engine, user_id: str) -> None:
         logger.error(f"Failed onboarding_sessions payload schema migration for user {user_id}: {e}")
 
 
+def _ensure_calendar_events_user_id_column(engine, user_id: str) -> None:
+    """Backfill user_id column for calendar_events table."""
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='calendar_events'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_cols = {
+                row[1] for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(calendar_events)"
+                ).fetchall()
+            }
+
+            if "user_id" not in existing_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE calendar_events ADD COLUMN user_id VARCHAR(255) NOT NULL DEFAULT ''"
+                )
+                conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_calendar_events_user_id ON calendar_events (user_id)"
+                )
+                logger.warning(
+                    f"Auto-migrated calendar_events column 'user_id' for user {user_id}"
+                )
+    except Exception as e:
+        logger.error(f"Failed calendar_events user_id schema migration for user {user_id}: {e}")
+
+def _ensure_enhanced_calendar_user_id_type(engine, user_id: str) -> None:
+    """Migrate user_id from INTEGER to VARCHAR(255) in enhanced calendar tables."""
+    from backend.models.enhanced_calendar_models import Base as EnhancedBase
+
+    tables = [
+        "ai_calendar_recommendations",
+        "content_trend_analysis",
+        "content_optimizations",
+        "calendar_generation_sessions",
+    ]
+    for table in tables:
+        try:
+            with engine.connect() as conn:
+                exists = conn.exec_driver_sql(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table,)
+                ).fetchone()
+                if not exists:
+                    continue
+
+                col_info = conn.exec_driver_sql(
+                    f"PRAGMA table_info({table})"
+                ).fetchall()
+                col_map = {row[1]: row[2] for row in col_info}
+
+                if col_map.get("user_id", "").upper().startswith("VARCHAR"):
+                    continue
+
+                if "user_id" not in col_map:
+                    continue
+
+                conn.exec_driver_sql(
+                    f"CREATE TABLE {table}_backup AS SELECT * FROM {table}"
+                )
+                col_names = ", ".join(f'"{c}"' for c in col_map.keys())
+                cast_select = ", ".join(
+                    f"CAST(user_id AS TEXT)" if c == "user_id" else f'"{c}"'
+                    for c in col_map.keys()
+                )
+                conn.exec_driver_sql(f"DROP TABLE {table}")
+                EnhancedBase.metadata.create_all(conn)
+                conn.exec_driver_sql(
+                    f"INSERT INTO {table} ({col_names}) "
+                    f"SELECT {cast_select} FROM {table}_backup"
+                )
+                conn.exec_driver_sql(f"DROP TABLE {table}_backup")
+                conn.commit()
+
+                logger.info(
+                    f"Migrated {table}.user_id from INTEGER to VARCHAR for user {user_id}"
+                )
+        except Exception as e:
+            logger.error(f"Failed {table} user_id type migration for user {user_id}: {e}")
+
+
 def _sanitize_user_id(user_id: str) -> str:
     """Sanitize user_id to be safe for filesystem."""
     return "".join(c for c in user_id if c.isalnum() or c in ('-', '_'))
@@ -605,12 +688,16 @@ def init_user_database(user_id: str):
         _ensure_scheduler_task_columns(engine, user_id)
         _ensure_onboarding_data_integration_columns(engine, user_id)
         _ensure_onboarding_session_payload_column(engine, user_id)
+        _ensure_calendar_events_user_id_column(engine, user_id)
         MonitoringBase.metadata.create_all(bind=engine)
         APIMonitoringBase.metadata.create_all(bind=engine)
         PersonaBase.metadata.create_all(bind=engine)
         SubscriptionBase.metadata.create_all(bind=engine)
         UserBusinessInfoBase.metadata.create_all(bind=engine)
         ContentAssetBase.metadata.create_all(bind=engine)
+        from backend.models.enhanced_calendar_models import Base as EnhancedCalendarBase
+        EnhancedCalendarBase.metadata.create_all(bind=engine)
+        _ensure_enhanced_calendar_user_id_type(engine, user_id)
         BingAnalyticsBase.metadata.create_all(bind=engine)
         WatchdogBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)

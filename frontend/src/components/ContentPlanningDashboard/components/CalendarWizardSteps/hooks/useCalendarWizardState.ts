@@ -246,6 +246,7 @@ const getValidTimezone = (userTimezone: string): string => {
     'America/Los_Angeles',
     'Europe/London',
     'Europe/Paris',
+    'Asia/Kolkata',
     'Asia/Tokyo',
     'Asia/Shanghai',
     'Australia/Sydney'
@@ -258,9 +259,7 @@ const getValidTimezone = (userTimezone: string): string => {
   
   // Otherwise, try to map common timezones to our valid options
   const timezoneMap: { [key: string]: string } = {
-    'Asia/Calcutta': 'Asia/Tokyo', // Map IST to JST as closest option
-    'Asia/Kolkata': 'Asia/Tokyo',  // Alternative IST name
-    'Asia/Colombo': 'Asia/Tokyo',  // Sri Lanka time
+    'Asia/Colombo': 'Asia/Kolkata',  // Sri Lanka time → IST (same UTC+5:30)
     'Asia/Dhaka': 'Asia/Tokyo',    // Bangladesh time
     'Asia/Karachi': 'Asia/Tokyo',  // Pakistan time
     'UTC': 'Europe/London',        // UTC to GMT

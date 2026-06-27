@@ -32,23 +32,7 @@ services_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 if services_dir not in sys.path:
     sys.path.insert(0, services_dir)
 
-try:
-    from calendar_generation_datasource_framework.data_processing import ComprehensiveUserDataProcessor
-except ImportError:
-    # Fallback for testing environments - create mock class
-    class ComprehensiveUserDataProcessor:
-        async def get_comprehensive_user_data(self, user_id, strategy_id):
-            return {
-                "user_id": user_id,
-                "strategy_id": strategy_id,
-                "industry": "technology",
-                "onboarding_data": {},
-                "strategy_data": {},
-                "gap_analysis": {},
-                "ai_analysis": {},
-                "performance_data": {},
-                "competitor_data": {}
-            }
+from calendar_generation_datasource_framework.data_processing import ComprehensiveUserDataProcessor
 
 
 class PromptChainOrchestrator:
@@ -465,14 +449,14 @@ class PromptChainOrchestrator:
                 "content_pillars": step_results.get("step_05", {}).get("content_pillars", []),
                 "platform_strategies": step_results.get("step_06", {}).get("platform_strategies", {}),
                 "content_mix": step_results.get("step_05", {}).get("content_mix", {}),
-                "ai_confidence": 0.95,  # High confidence with 12-step process
-                "quality_score": 0.94,  # Enterprise-level quality
+                "ai_confidence": 0.95,
+                "quality_score": self._calculate_overall_quality_score(context.get("quality_scores", {})),
                 "step_results_summary": {
-                    step_name: {
+                    step_key: {
                         "status": "completed",
-                        "quality_score": 0.9
+                        "quality_score": context.get("quality_scores", {}).get(step_key, 0.0)
                     }
-                    for step_name in self.steps.keys()
+                    for step_key in self.steps
                 }
             }
             
@@ -483,8 +467,11 @@ class PromptChainOrchestrator:
             logger.error(f"❌ Error generating final calendar: {str(e)}")
             raise
     
+    def _calculate_overall_quality_score(self, quality_scores: Dict[str, float]) -> float:
+        scores = [s for s in quality_scores.values() if s > 0.0]
+        return sum(scores) / len(scores) if scores else 0.0
+
     async def get_progress(self) -> Dict[str, Any]:
-        """Get current progress of the 12-step process."""
         return self.progress_tracker.get_progress()
     
     async def get_health_status(self) -> Dict[str, Any]:

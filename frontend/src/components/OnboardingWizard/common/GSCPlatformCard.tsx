@@ -51,11 +51,11 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
     <Card 
       sx={{
         height: '100%',
-        border: '1px solid #e2e8f0',
-        backgroundColor: '#ffffff',
+        border: '1px solid #CBD5E1',
+        backgroundColor: '#EFF6FF',
         transition: 'all 0.2s ease',
         '&:hover': {
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)',
           transform: 'translateY(-2px)'
         }
       }}
@@ -67,10 +67,10 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
             {platform.icon}
           </Box>
           <Box sx={{ flex: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1e293b' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
               {platform.name}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#64748b', fontSize: '0.875rem' }}>
+            <Typography variant="body2" sx={{ color: '#64748B', fontSize: '0.875rem' }}>
               {platform.description}
             </Typography>
           </Box>
@@ -85,7 +85,7 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
         {/* Connected Sites Display */}
         {platform.status === 'connected' && gscSites && gscSites.length > 0 && (
           <Box mb={2}>
-            <Typography variant="body2" sx={{ fontWeight: 500, color: '#1e293b', mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 500, color: '#1E293B', mb: 1 }}>
               Connected Sites:
             </Typography>
             {gscSites.map((site, index) => (
@@ -93,9 +93,9 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
                 key={index}
                 sx={{
                   p: 1.5,
-                  border: '1px solid #e2e8f0',
+                  border: '1px solid #CBD5E1',
                   borderRadius: 1,
-                  backgroundColor: '#f8fafc',
+                  backgroundColor: '#F8FAFC',
                   fontSize: '0.875rem',
                   color: '#475569',
                   fontFamily: 'monospace',
@@ -116,10 +116,10 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
               size="small" 
               variant="outlined" 
               sx={{ 
-                color: '#475569',
-                borderColor: '#e2e8f0',
+                color: '#64748B',
+                borderColor: '#E2E8F0',
                 '&:hover': {
-                  backgroundColor: '#f8fafc'
+                  backgroundColor: '#F8FAFC'
                 }
               }} 
             />
@@ -128,10 +128,10 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
               size="small" 
               variant="outlined" 
               sx={{ 
-                color: '#475569',
-                borderColor: '#e2e8f0',
+                color: '#64748B',
+                borderColor: '#E2E8F0',
                 '&:hover': {
-                  backgroundColor: '#f8fafc'
+                  backgroundColor: '#F8FAFC'
                 }
               }} 
             />
@@ -140,10 +140,10 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
               size="small" 
               variant="outlined" 
               sx={{ 
-                color: '#475569',
-                borderColor: '#e2e8f0',
+                color: '#64748B',
+                borderColor: '#E2E8F0',
                 '&:hover': {
-                  backgroundColor: '#f8fafc'
+                  backgroundColor: '#F8FAFC'
                 }
               }} 
             />
@@ -161,9 +161,13 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
                 sx={{
                   textTransform: 'none',
                   fontWeight: 600,
-                  borderColor: '#e2e8f0',
-                  color: '#64748b',
-                  flex: 1
+                  borderColor: '#BFDBFE',
+                  color: '#2563EB',
+                  flex: 1,
+                  '&:hover': {
+                    backgroundColor: '#EFF6FF',
+                    borderColor: '#3B82F6'
+                  }
                 }}
               >
                 Reconnect
@@ -173,7 +177,7 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
                   onClick={handleRefresh} 
                   disabled={isLoading}
                   size="small"
-                  sx={{ color: '#64748b' }}
+                  sx={{ color: '#64748b', '&:hover': { color: '#2563EB' } }}
                 >
                   <RefreshIcon />
                 </IconButton>
@@ -188,7 +192,13 @@ const GSCPlatformCard: React.FC<GSCPlatformCardProps> = ({
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
-                flex: 1
+                flex: 1,
+                background: 'linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)',
+                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%)',
+                  boxShadow: '0 6px 20px rgba(37, 99, 235, 0.4)',
+                }
               }}
             >
               Connect GSC

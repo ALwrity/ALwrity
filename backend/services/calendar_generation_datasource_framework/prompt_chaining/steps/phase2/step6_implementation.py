@@ -11,32 +11,14 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from services.calendar_generation_datasource_framework.prompt_chaining.steps.base_step import PromptStep
-import sys
-import os
-
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
-
-# Import data processing modules
-try:
-    from calendar_generation_datasource_framework.data_processing import (
-        ComprehensiveUserDataProcessor,
-        StrategyDataProcessor,
-        GapAnalysisDataProcessor
-    )
-    from services.content_gap_analyzer.ai_engine_service import AIEngineService
-    from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
-    from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
-except ImportError:
-    # Fallback imports for testing
-    ComprehensiveUserDataProcessor = None
-    StrategyDataProcessor = None
-    GapAnalysisDataProcessor = None
-    AIEngineService = None
-    KeywordResearcher = None
-    CompetitorAnalyzer = None
+from services.calendar_generation_datasource_framework.data_processing import (
+    ComprehensiveUserDataProcessor,
+    StrategyDataProcessor,
+    GapAnalysisDataProcessor,
+)
+from services.content_gap_analyzer.ai_engine_service import AIEngineService
+from services.content_gap_analyzer.keyword_researcher import KeywordResearcher
+from services.content_gap_analyzer.competitor_analyzer import CompetitorAnalyzer
 
 
 class PlatformSpecificStrategyStep(PromptStep):

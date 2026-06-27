@@ -18,13 +18,6 @@ from typing import Dict, Any, List, Optional
 from loguru import logger
 
 from services.calendar_generation_datasource_framework.prompt_chaining.steps.base_step import PromptStep
-import sys
-import os
-
-# Add the services directory to the path for proper imports
-services_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-if services_dir not in sys.path:
-    sys.path.insert(0, services_dir)
 
 # Import real data processing classes - NO FALLBACKS
 from services.calendar_generation_datasource_framework.data_processing import (
