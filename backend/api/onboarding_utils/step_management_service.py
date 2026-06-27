@@ -675,10 +675,11 @@ class StepManagementService:
 
             # Step-specific side effects: save data to DB
             if step_number == 1 and request_data:
-                # Step 1: Save API keys
                 step_data = request_data.get('data') or request_data
                 logger.info(f" Step 1: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
                 logger.info(f" Step 1: Extracted step_data keys: {list(step_data.keys()) if step_data else 'None'}")
+
+                # Save API keys (legacy step 1)
                 api_keys = step_data.get('api_keys', {})
                 logger.info(f" Step 1: API keys found: {list(api_keys.keys()) if api_keys else 'None'}")
                 if api_keys:
@@ -694,6 +695,32 @@ class StepManagementService:
                                     status_code=500,
                                     detail=f"Failed to save API key for {provider}. Onboarding cannot proceed until this is resolved."
                                 ) from e
+
+                # Save integrations data (website platforms, analytics, social, primary site)
+                integrations = step_data.get('integrations')
+                if integrations and isinstance(integrations, dict):
+                    try:
+                        logger.info(f" Step 1: Saving integrations data for user {user_id}")
+                        session = self._get_or_create_session(user_id, db)
+                        if session.platform_integrations:
+                            pi = session.platform_integrations
+                        else:
+                            pi = PlatformIntegration(session_id=session.id)
+                            db.add(pi)
+                        pi.primary_website = integrations.get("primaryWebsite")
+                        pi.website_platforms = integrations.get("websitePlatforms", {})
+                        pi.analytics_platforms = integrations.get("analyticsPlatforms", {})
+                        pi.social_platforms = integrations.get("socialPlatforms", {})
+                        pi.connected_platforms = integrations.get("connectedPlatforms", [])
+                        db.commit()
+                        logger.info(f" Step 1: Integrations data persisted for user {user_id}")
+                    except Exception as e:
+                        logger.error(f" Step 1: Failed to save integrations data: {str(e)}")
+                        db.rollback()
+                        raise HTTPException(
+                            status_code=500,
+                            detail="Failed to save integrations data. Onboarding cannot proceed until this is resolved."
+                        ) from e
 
             # Step 2: Save website analysis data
             elif step_number == 2 and request_data:
