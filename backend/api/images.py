@@ -1028,12 +1028,21 @@ async def serve_image_studio_image(
             raise HTTPException(status_code=403, detail="Access denied: image not found in your library")
         
         # Determine if it's an edited image or regular image
+        # Validate user-controlled path input before filesystem path construction
+        image_filename_path = Path(image_filename)
+        if image_filename_path.is_absolute() or any(part in ("", ".", "..") for part in image_filename_path.parts):
+            raise HTTPException(status_code=403, detail="Access denied: Invalid image path")
+
         base_dir = Path(__file__).parent.parent
         image_studio_dir = (base_dir / "image_studio_images").resolve()
         
         if image_filename.startswith("edited/"):
             # Remove "edited/" prefix and serve from edited directory
             actual_filename = image_filename.replace("edited/", "", 1)
+            actual_filename_path = Path(actual_filename)
+            if actual_filename_path.is_absolute() or any(part in ("", ".", "..") for part in actual_filename_path.parts):
+                raise HTTPException(status_code=403, detail="Access denied: Invalid image path")
+
             image_path = (image_studio_dir / "edited" / actual_filename).resolve()
             base_subdir = (image_studio_dir / "edited").resolve()
         else:
