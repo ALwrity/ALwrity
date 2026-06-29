@@ -697,6 +697,39 @@ class BaseALwrityAgent(ABC):
                     "action_id": action.action_id,
                     "agent_id": self.agent_id,
                 }
+
+            capability_decision = self._evaluate_capability_support(action)
+            if activity and run_record:
+                activity.log_event(
+                    event_type="decision",
+                    severity="info" if capability_decision.get("supported", False) else "warning",
+                    message=capability_decision.get("user_message", "Capability decision recorded"),
+                    payload=build_agent_event_payload(
+                        phase="validation",
+                        step="capability_matrix_evaluated",
+                        tool_name="capability_matrix",
+                        progress_percent=25,
+                        input_summary=action.action_type,
+                        output_summary="Supported action" if capability_decision.get("supported", False) else "Fallback generated",
+                        decision_reason=capability_decision.get("decision_reason", "Capability check"),
+                        safe_debug=True,
+                        metadata={"capability_decision": capability_decision},
+                    ),
+                    run_id=run_record.id,
+                    agent_type=self.agent_type,
+                )
+
+            if not capability_decision.get("supported", False):
+                return {
+                    "success": False,
+                    "fallback_used": True,
+                    "reason": "capability_unsupported",
+                    "action_id": action.action_id,
+                    "agent_id": self.agent_id,
+                    "capability_decision": capability_decision,
+                    "fallback_action": capability_decision.get("fallback_action"),
+                    "user_message": capability_decision.get("user_message"),
+                }
             
             # 2. Create rollback checkpoint
             try:
@@ -912,6 +945,83 @@ class BaseALwrityAgent(ABC):
         Please execute this action and provide a detailed response.
         Consider user goals, safety constraints, and potential impacts.
         """
+
+    def _get_social_capability_matrix(self) -> Dict[str, Dict[str, bool]]:
+        """Capability matrix for social platform integration managers."""
+        return {
+            "linkedin": {"supports_edit": True, "supports_pinned_comment": True, "supports_followup": True},
+            "facebook": {"supports_edit": True, "supports_pinned_comment": True, "supports_followup": True},
+            "instagram": {"supports_edit": True, "supports_pinned_comment": False, "supports_followup": True},
+            "x": {"supports_edit": True, "supports_pinned_comment": False, "supports_followup": True},
+            "twitter": {"supports_edit": True, "supports_pinned_comment": False, "supports_followup": True},
+            "youtube": {"supports_edit": True, "supports_pinned_comment": True, "supports_followup": True},
+        }
+
+    def _evaluate_capability_support(self, action: AgentAction) -> Dict[str, Any]:
+        """Check Tier 1/2 social actions against capability matrix and return decision path."""
+        platform = str(action.parameters.get("platform", "")).strip().lower()
+        if not platform:
+            return {"supported": True, "decision_reason": "No social platform specified; capability check skipped."}
+
+        matrix = self._get_social_capability_matrix()
+        platform_caps = matrix.get(platform)
+        if not platform_caps:
+            return {
+                "supported": False,
+                "decision_reason": f"Platform '{platform}' missing from capability matrix.",
+                "fallback_action": self._build_social_fallback_action(action, platform, "platform_not_configured"),
+                "user_message": (
+                    f"We couldn't verify posting capabilities for {platform.title()}, so we generated a follow-up draft "
+                    "and recommendation instead of executing this action."
+                ),
+            }
+
+        action_tier = str(action.parameters.get("action_tier", "")).strip().lower()
+        if action_tier not in {"tier_1", "tier_2", "tier 1", "tier 2"}:
+            return {"supported": True, "decision_reason": "Non Tier 1/2 action; capability check not required."}
+
+        action_type = action.action_type.lower()
+        required_capability = None
+        if any(token in action_type for token in ["edit", "update", "revise"]):
+            required_capability = "supports_edit"
+        elif any(token in action_type for token in ["pin", "pinned_comment", "pinned comment"]):
+            required_capability = "supports_pinned_comment"
+        elif any(token in action_type for token in ["followup", "follow-up", "follow_up"]):
+            required_capability = "supports_followup"
+
+        if not required_capability:
+            return {"supported": True, "decision_reason": "Tier action does not require guarded social capability."}
+
+        supported = bool(platform_caps.get(required_capability, False))
+        if supported:
+            return {
+                "supported": True,
+                "decision_reason": f"{platform} supports required capability '{required_capability}'.",
+                "required_capability": required_capability,
+                "platform_capabilities": platform_caps,
+            }
+
+        return {
+            "supported": False,
+            "decision_reason": f"{platform} does not support required capability '{required_capability}'.",
+            "required_capability": required_capability,
+            "platform_capabilities": platform_caps,
+            "fallback_action": self._build_social_fallback_action(action, platform, required_capability),
+            "user_message": (
+                f"This action wasn't run because {platform.title()} does not support {required_capability}. "
+                "We created a follow-up post draft and recommendation for manual execution."
+            ),
+        }
+
+    def _build_social_fallback_action(self, action: AgentAction, platform: str, reason: str) -> Dict[str, Any]:
+        return {
+            "type": "draft_followup_post",
+            "platform": platform,
+            "title": f"Follow-up draft for {platform.title()}",
+            "draft": f"Follow-up for original action '{action.action_type}' on {action.target_resource}.",
+            "recommendation": "Review and publish manually, then notify the team.",
+            "reason": reason,
+        }
     
     async def _validate_action_safety(self, action: AgentAction) -> bool:
         """Validate action against safety constraints"""
