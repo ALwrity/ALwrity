@@ -198,6 +198,7 @@ class BaseALwrityAgent(ABC):
         
         # Initialize txtai agent if available
         self.txtai_agent = None
+        self._txtai_agent_init_future = None
         self.llm = llm  # Ensure llm is set if provided, regardless of txtai availability
 
         # Wrap LLM with tracking if it exists
@@ -245,22 +246,27 @@ class BaseALwrityAgent(ABC):
                                  loop = None
                              
                              if loop and loop.is_running():
-                                 # We are already in a loop (e.g. server), we can't block.
-                                 # This is a design flaw in initializing async agents in __init__.
-                                 # We will defer initialization or use a sync wrapper if possible.
-                                 logger.warning(f"Cannot await async _create_txtai_agent for {agent_type} in __init__ within running loop. Initializing via create_task (agent may not be ready immediately).")
-                                 
-                                 # Create a task to initialize it
-                                 async def async_init():
-                                     try:
-                                         self.txtai_agent = await self._create_txtai_agent()
-                                         logger.info(f"Async initialized txtai agent for {agent_type} - {self.agent_id}")
-                                     except Exception as e:
-                                         logger.error(f"Async initialization failed for {agent_type}: {e}")
-                                         
-                                 loop.create_task(async_init())
-                                 # Temporarily set to None or a placeholder, but we can't set it to the result yet
-                                 self.txtai_agent = None 
+                                  logger.warning(
+                                      f"Cannot await async _create_txtai_agent for {agent_type} "
+                                      f"in __init__ within running loop. Deferring initialization."
+                                  )
+
+                                  async def _deferred_init():
+                                      try:
+                                          self.txtai_agent = await self._create_txtai_agent()
+                                          if self.txtai_agent:
+                                              logger.info(
+                                                  f"Async initialized txtai agent for "
+                                                  f"{agent_type} - {self.agent_id}"
+                                              )
+                                      except Exception as e:
+                                          logger.error(
+                                              f"Deferred txtai agent init failed for "
+                                              f"{agent_type}: {e}"
+                                          )
+
+                                  self._txtai_agent_init_future = loop.create_task(_deferred_init())
+                                  self.txtai_agent = None
                              else:
                                  # No running loop, we can run_until_complete
                                  if not loop:
@@ -280,8 +286,8 @@ class BaseALwrityAgent(ABC):
                          
                     if self.txtai_agent:
                         logger.info(f"Initialized txtai agent for {agent_type} - {self.agent_id}")
-                    else:
-                        raise RuntimeError(f"txtai agent creation returned None for {agent_type}")
+                    elif self._txtai_agent_init_future is None:
+                        logger.warning(f"txtai agent creation returned None for {agent_type} — continuing without agent")
                 except Exception as inner_e:
                     logger.error(f"Could not initialize specific txtai agent for {agent_type}: {inner_e}")
                     # Fail fast: Re-raise exception
@@ -551,8 +557,11 @@ class BaseALwrityAgent(ABC):
                 activity = None
                 run_record = None
 
+            if not self.txtai_agent:
+                if self._txtai_agent_init_future is not None:
+                    await self._txtai_agent_init_future
+
             if self.txtai_agent:
-                # Check if txtai_agent has run method (e.g. if it's my fallback agent)
                 if hasattr(self.txtai_agent, 'run'):
                     if asyncio.iscoroutinefunction(self.txtai_agent.run):
                         result = await self.txtai_agent.run(prompt)
@@ -561,8 +570,7 @@ class BaseALwrityAgent(ABC):
                 else:
                     loop = asyncio.get_event_loop()
                     result = await loop.run_in_executor(None, self.txtai_agent, prompt)
-            
-            if not self.txtai_agent:
+            else:
                 raise RuntimeError(f"Agent {self.agent_id} not initialized (txtai_agent missing)")
 
             if activity and run_record:

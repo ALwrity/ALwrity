@@ -282,8 +282,17 @@ class TaskScheduler:
                 if expiry > now:
                     return False
             except Exception:
-                # Corrupted lease value: overwrite safely
                 pass
+
+        # Prevent unbounded growth: evict expired entries when dict exceeds cap
+        if task_key not in self._task_leases and len(self._task_leases) > 25000:
+            now_iso = now.isoformat()
+            stale = [
+                k for k, v in self._task_leases.items()
+                if v < now_iso
+            ]
+            for k in stale[:1000]:
+                del self._task_leases[k]
 
         expiry = now + timedelta(seconds=self._task_lease_ttl_seconds)
         self._task_leases[task_key] = expiry.isoformat()
@@ -719,6 +728,7 @@ class TaskScheduler:
         if not user_id:
             return
         per_user = self.stats.setdefault("per_user_stats", {})
+        is_new = user_id not in per_user
         user_stats = per_user.setdefault(
             user_id,
             {
@@ -732,6 +742,11 @@ class TaskScheduler:
         else:
             user_stats["tasks_failed"] += 1
         user_stats["last_update"] = datetime.utcnow().isoformat()
+
+        # Prevent unbounded memory growth: evict oldest entry if dict exceeds cap
+        if is_new and len(per_user) > 10000:
+            oldest = min(per_user, key=lambda uid: per_user[uid].get("last_update") or "")
+            del per_user[oldest]
 
     def get_stats(self, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Return a composite stats dict for the dashboard.
