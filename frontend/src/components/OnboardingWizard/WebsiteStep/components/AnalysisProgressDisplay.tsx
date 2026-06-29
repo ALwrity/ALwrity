@@ -229,7 +229,7 @@ const AnalysisProgressDisplay: React.FC<AnalysisProgressDisplayProps> = ({
             }}
           />
           <Typography variant="caption" sx={{ color: '#166534', fontWeight: 500, lineHeight: 1.4 }}>
-            Deep analysis started in background — SEO audit, market trends, and competitive intelligence
+            Deep analysis started in background — SEO audit, market trends, competitive intelligence, and website content indexing for AI insights
             are now running while you continue setup. Check back on your dashboard for results.
           </Typography>
         </Box>

@@ -55,6 +55,10 @@ class CompetitorDiscoveryResponse(BaseModel):
     analysis_timestamp: Optional[str] = None
     api_cost: Optional[float] = None
     error: Optional[str] = None
+    # SIF-enhanced semantic intelligence fields
+    semantic_insights: Optional[Dict[str, Any]] = None
+    content_analysis: Optional[Dict[str, Any]] = None
+    strategic_recommendations: Optional[List[Dict[str, Any]]] = None
 
 class ResearchDataRequest(BaseModel):
     """Request model for retrieving research data."""
@@ -280,6 +284,24 @@ async def discover_competitors(
         if result["success"]:
             logger.info(f"✅ Successfully discovered {result['total_competitors']} competitors for user {clerk_user_id}")
             
+            # SIF-enhanced semantic intelligence (best-effort, non-blocking)
+            sif_insights = None
+            sif_content = None
+            sif_recommendations = None
+            try:
+                from services.sif_onboarding_service import enhance_step3_with_semantic_intelligence
+                sif_result = await enhance_step3_with_semantic_intelligence(
+                    user_id=clerk_user_id,
+                    website_url=request.user_url,
+                    business_info={"description": request.industry_context or "", "industry": request.industry_context or ""}
+                )
+                sif_insights = sif_result.get("semantic_insights")
+                sif_content = sif_result.get("content_analysis")
+                sif_recommendations = sif_insights.get("strategic_recommendations") if sif_insights else None
+                logger.info(f"[SIF] Step 3 enhanced with semantic intelligence for {clerk_user_id}")
+            except Exception as e:
+                logger.warning(f"[SIF] Step 3 enhancement failed (non-blocking): {e}")
+            
             return CompetitorDiscoveryResponse(
                 success=True,
                 message=f"Successfully discovered {result['total_competitors']} competitors and social media accounts",
@@ -292,7 +314,10 @@ async def discover_competitors(
                 total_competitors=result["total_competitors"],
                 industry_context=result["industry_context"],
                 analysis_timestamp=result["analysis_timestamp"],
-                api_cost=result["api_cost"]
+                api_cost=result["api_cost"],
+                semantic_insights=sif_insights,
+                content_analysis=sif_content,
+                strategic_recommendations=sif_recommendations
             )
         else:
             logger.error(f"❌ Competitor discovery failed for user {clerk_user_id}: {result.get('error')}")

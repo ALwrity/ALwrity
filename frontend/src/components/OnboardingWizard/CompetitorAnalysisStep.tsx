@@ -86,6 +86,9 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [socialMediaAccounts, setSocialMediaAccounts] = useState<any>({});
   const [, setSocialMediaCitations] = useState<any[]>([]);
   const [researchSummary, setResearchSummary] = useState<ResearchSummary | null>(null);
+  const [sifInsights, setSifInsights] = useState<any>(null);
+  const [sifContentAnalysis, setSifContentAnalysis] = useState<any>(null);
+  const [sifRecommendations, setSifRecommendations] = useState<any[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showHighlightsModal, setShowHighlightsModal] = useState(false);
@@ -190,6 +193,9 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
             setSocialMediaAccounts(parsedData.social_media_accounts || {});
             setSocialMediaCitations(parsedData.social_media_citations || []);
             setResearchSummary(parsedData.research_summary || null);
+            setSifInsights(parsedData.semantic_insights || null);
+            setSifContentAnalysis(parsedData.content_analysis || null);
+            setSifRecommendations(parsedData.strategic_recommendations || null);
             setSitemapAnalysis(parsedData.sitemap_analysis || null);
             setUsingCachedData(true);
             
@@ -347,10 +353,24 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         setSocialMediaAccounts(mergedAccounts);
         setSocialMediaCitations(analysisData.social_media_citations);
         setResearchSummary(analysisData.research_summary);
+
+        // SIF-enhanced semantic intelligence insights
+        const sifInsightsData = result.semantic_insights || null;
+        const sifContentData = result.content_analysis || null;
+        const sifRecommendationsData = result.strategic_recommendations || null;
+        setSifInsights(sifInsightsData);
+        setSifContentAnalysis(sifContentData);
+        setSifRecommendations(sifRecommendationsData);
         
         // Cache the analysis results with merged data
         try {
-          localStorage.setItem('competitor_analysis_data', JSON.stringify({ ...analysisData, social_media_accounts: mergedAccounts }));
+          localStorage.setItem('competitor_analysis_data', JSON.stringify({
+            ...analysisData,
+            social_media_accounts: mergedAccounts,
+            semantic_insights: sifInsightsData,
+            content_analysis: sifContentData,
+            strategic_recommendations: sifRecommendationsData
+          }));
           localStorage.setItem('competitor_analysis_url', finalUserUrl);
           localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
           console.log('CompetitorAnalysisStep: Cached competitor analysis for future use');
@@ -788,6 +808,168 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onRemoveCompetitor={handleRemoveCompetitor}
         onAddCompetitor={handleAddCompetitor}
       />
+
+      {/* SIF Semantic Intelligence Section */}
+      {sifInsights && (
+        <Box mt={6} mb={4}>
+          <Typography variant="h5" fontWeight={600} sx={{ color: '#1a202c !important', display: 'flex', alignItems: 'center', mb: 3 }}>
+            <AutoFixHighIcon sx={{ mr: 1, color: '#7C3AED' }} />
+            AI Semantic Insights
+          </Typography>
+          <Grid container spacing={3}>
+            {/* Content Pillars */}
+            {sifInsights.content_pillars?.length > 0 && (
+              <Grid item xs={12} md={4}>
+                <Card sx={{ height: '100%', bgcolor: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#5b21b6', mb: 1 }}>
+                      Your Content Pillars
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#7c3aed', mb: 1.5, display: 'block' }}>
+                      Topics your site strongly covers — your competitive strengths.
+                    </Typography>
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      {sifInsights.content_pillars.slice(0, 5).map((pillar: any, i: number) => (
+                        <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: 'white', borderColor: '#ddd6fe' }}>
+                          <Typography variant="body2" fontWeight={500} color="#4c1d95">
+                            {pillar.name || pillar.topic || pillar.title || `Pillar ${i + 1}`}
+                          </Typography>
+                          {pillar.confidence && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                              <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#e9d5ff' }}>
+                                <Box sx={{ width: `${Math.round(pillar.confidence * 100)}%`, height: 4, borderRadius: 2, bgcolor: '#7c3aed' }} />
+                              </Box>
+                              <Typography variant="caption" color="#6b7280">{Math.round(pillar.confidence * 100)}%</Typography>
+                            </Box>
+                          )}
+                        </Paper>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Semantic Gaps */}
+            {sifInsights.semantic_gaps?.length > 0 && (
+              <Grid item xs={12} md={4}>
+                <Card sx={{ height: '100%', bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#92400e', mb: 1 }}>
+                      Content Gaps & Opportunities
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#b45309', mb: 1.5, display: 'block' }}>
+                      Topics competitors cover that you don't — prime content opportunities.
+                    </Typography>
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      {sifInsights.semantic_gaps.slice(0, 5).map((gap: any, i: number) => (
+                        <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: 'white', borderColor: '#fde68a' }}>
+                          <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                            <Typography variant="body2" fontWeight={500} color="#92400e">
+                              {gap.topic || gap.gap || `Gap ${i + 1}`}
+                            </Typography>
+                            {gap.priority && (
+                              <Chip
+                                label={gap.priority}
+                                size="small"
+                                sx={{
+                                  fontSize: '0.65rem',
+                                  fontWeight: 600,
+                                  bgcolor: gap.priority === 'high' ? '#fef2f2' : '#fffbeb',
+                                  color: gap.priority === 'high' ? '#991b1b' : '#92400e',
+                                  border: `1px solid ${gap.priority === 'high' ? '#fecaca' : '#fde68a'}`
+                                }}
+                              />
+                            )}
+                          </Box>
+                          {gap.reason && (
+                            <Typography variant="caption" color="#78716c" sx={{ mt: 0.5, display: 'block' }}>
+                              {gap.reason}
+                            </Typography>
+                          )}
+                          {gap.confidence && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                              <Box sx={{ flex: 1, height: 4, borderRadius: 2, bgcolor: '#fef3c7' }}>
+                                <Box sx={{ width: `${Math.round(gap.confidence * 100)}%`, height: 4, borderRadius: 2, bgcolor: '#d97706' }} />
+                              </Box>
+                              <Typography variant="caption" color="#6b7280">{Math.round(gap.confidence * 100)}%</Typography>
+                            </Box>
+                          )}
+                        </Paper>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+
+            {/* Strategic Recommendations */}
+            {sifRecommendations && sifRecommendations.length > 0 && (
+              <Grid item xs={12} md={4}>
+                <Card sx={{ height: '100%', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+                  <CardContent>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ color: '#166534', mb: 1 }}>
+                      Recommended Actions
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: '#16a34a', mb: 1.5, display: 'block' }}>
+                      Prioritized steps to strengthen your content strategy.
+                    </Typography>
+                    <Box display="flex" flexDirection="column" gap={1}>
+                      {sifRecommendations.slice(0, 5).map((rec: any, i: number) => (
+                        <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: 'white', borderColor: '#bbf7d0' }}>
+                          <Box display="flex" alignItems="flex-start" gap={1}>
+                            <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#22c55e', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0, mt: 0.25 }}>
+                              {i + 1}
+                            </Box>
+                            <Box>
+                              <Typography variant="body2" fontWeight={500} color="#166534">
+                                {rec.title || `Recommendation ${i + 1}`}
+                              </Typography>
+                              {rec.description && (
+                                <Typography variant="caption" color="#6b7280" sx={{ mt: 0.25, display: 'block' }}>
+                                  {rec.description}
+                                </Typography>
+                              )}
+                              {rec.action_items?.length > 0 && (
+                                <Box component="ul" sx={{ mt: 0.5, mb: 0, pl: 1.5 }}>
+                                  {rec.action_items.slice(0, 3).map((action: string, j: number) => (
+                                    <Box component="li" key={j} sx={{ typography: 'caption', color: '#78716c', '&::marker': { color: '#86efac' } }}>
+                                      {action}
+                                    </Box>
+                                  ))}
+                                </Box>
+                              )}
+                            </Box>
+                          </Box>
+                          {rec.priority && (
+                            <Chip
+                              label={rec.priority}
+                              size="small"
+                              sx={{ mt: 0.5, fontSize: '0.65rem', fontWeight: 600, bgcolor: rec.priority === 'high' ? '#fef2f2' : rec.priority === 'medium' ? '#fffbeb' : '#f0fdf4', color: rec.priority === 'high' ? '#991b1b' : rec.priority === 'medium' ? '#92400e' : '#166534' }}
+                            />
+                          )}
+                        </Paper>
+                      ))}
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Grid>
+            )}
+          </Grid>
+
+          {/* Content Analysis Stats Footer */}
+          {sifContentAnalysis && (
+            <Box mt={2} sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+              {sifContentAnalysis.user_pages_analyzed > 0 && (
+                <Chip icon={<AutoFixHighIcon fontSize="small" />} label={`${sifContentAnalysis.user_pages_analyzed} user pages analyzed`} size="small" variant="outlined" sx={{ color: '#6b7280', borderColor: '#d1d5db' }} />
+              )}
+              {sifContentAnalysis.competitor_pages_analyzed > 0 && (
+                <Chip icon={<SearchIcon fontSize="small" />} label={`${sifContentAnalysis.competitor_pages_analyzed} competitor pages analyzed`} size="small" variant="outlined" sx={{ color: '#6b7280', borderColor: '#d1d5db' }} />
+              )}
+            </Box>
+          )}
+        </Box>
+      )}
 
       {/* Strategic Content Opportunities Section */}
       {(sitemapAnalysis || isAnalyzingSitemap) && (
