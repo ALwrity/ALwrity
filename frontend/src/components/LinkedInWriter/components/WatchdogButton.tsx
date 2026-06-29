@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { linkedInWatchdogApi } from '../../../services/linkedInWatchdogApi';
 import { WatchdogDashboard } from './WatchdogDashboard';
 import { type LinkedInPreferences } from '../utils/storageUtils';
@@ -26,7 +27,6 @@ export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ generatePost, us
   const [unreadCount, setUnreadCount] = useState(loadUnreadCount);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Poll for new updates in the background
   useEffect(() => {
     const poll = async () => {
       try {
@@ -45,6 +45,12 @@ export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ generatePost, us
     };
   }, []);
 
+  useEffect(() => {
+    const onOpenWatchdog = () => setOpen(true);
+    window.addEventListener('linkedinwriter:openWatchdog', onOpenWatchdog);
+    return () => window.removeEventListener('linkedinwriter:openWatchdog', onOpenWatchdog);
+  }, []);
+
   const handleClose = () => {
     setOpen(false);
     setUnreadCount(loadUnreadCount());
@@ -61,18 +67,18 @@ export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ generatePost, us
           alignItems: 'center',
           gap: 6,
           padding: '8px 14px',
-          background: 'rgba(255, 255, 255, 0.15)',
-          color: '#fff',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          background: '#ffffff',
+          color: '#0a66c2',
+          border: '1px solid rgba(10, 102, 194, 0.35)',
           borderRadius: 24,
           cursor: 'pointer',
           fontSize: 13,
           fontWeight: 600,
-          backdropFilter: 'blur(10px)',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
           transition: 'all 0.2s ease',
         }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.25)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255, 255, 255, 0.15)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = '#ffffff'; }}
       >
         <span role="img" aria-label="watchdog">🔍</span>
         <span>Watchdog</span>
@@ -99,14 +105,16 @@ export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ generatePost, us
         )}
       </button>
 
-      {open && (
-        <WatchdogDashboard
-          onClose={handleClose}
-          generatePost={generatePost}
-          userPreferences={userPreferences}
-          onUnreadChanged={setUnreadCount}
-        />
-      )}
+      {open &&
+        createPortal(
+          <WatchdogDashboard
+            onClose={handleClose}
+            generatePost={generatePost}
+            userPreferences={userPreferences}
+            onUnreadChanged={setUnreadCount}
+          />,
+          document.body
+        )}
     </>
   );
 };

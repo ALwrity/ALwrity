@@ -107,6 +107,10 @@ from services.integrations.linkedin.profile_validation_types import ProfileValid
 from services.integrations.linkedin.types import CreatePostRequest, LinkedInNotConnectedError
 from services.integrations.linkedin.exceptions import LinkedInDuplicateContentError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
+from services.integrations.linkedin.unipile_health import (
+    check_unipile_health,
+    get_cached_unipile_health,
+)
 from services.integrations.linkedin.zernio_client import ZernioAPIError
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.integrations.oauth_callback_utils import (
@@ -1586,6 +1590,34 @@ async def get_connection_status(
 
     status["organizations"] = organizations
     return LinkedInConnectionStatusResponse(**status)
+
+
+@router.get("/unipile/health")
+async def get_unipile_health(
+    refresh: bool = Query(
+        False,
+        description="When true, re-run the Unipile API credential probe instead of returning the cached startup result.",
+    ),
+) -> Dict[str, Any]:
+    """
+    Report Unipile configuration and credential validity for LinkedIn Connect.
+
+    Safe for pre-connect diagnostics: never returns the API key value.
+    """
+    if refresh:
+        result = await check_unipile_health(probe_api=True)
+    else:
+        result = get_cached_unipile_health()
+        if result is None:
+            result = await check_unipile_health(probe_api=True)
+
+    if result.get("healthy"):
+        return result
+
+    raise HTTPException(
+        status_code=503,
+        detail=result,
+    )
 
 
 @router.get("/auth/url")
