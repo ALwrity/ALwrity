@@ -3,6 +3,7 @@ Step Management Service
 Handles onboarding step operations and progress tracking.
 """
 
+import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from fastapi import HTTPException
@@ -736,8 +737,13 @@ class StepManagementService:
                             # Schedule background tasks for Step 2 (non-blocking)
                             website_url = website_data.get('website') or website_data.get('website_url')
                             if website_url:
-                                from api.onboarding_utils.onboarding_task_scheduler import schedule_step2_tasks
+                                from api.onboarding_utils.onboarding_task_scheduler import schedule_step2_tasks, _immediate_sif_index
                                 schedule_step2_tasks(user_id, db, website_url)
+                                # Fire immediate SIF indexing (best-effort, non-blocking)
+                                try:
+                                    asyncio.create_task(_immediate_sif_index(user_id, website_url))
+                                except Exception:
+                                    logger.warning("[SIF] Failed to fire immediate indexing task")
                     except Exception as e:
                         logger.error(f" BLOCKING ERROR: Failed to save website analysis: {str(e)}")
                         raise HTTPException(
