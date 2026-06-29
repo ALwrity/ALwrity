@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { keyframes } from '@emotion/react';
 import {
   Box,
   Card,
@@ -6,7 +7,6 @@ import {
   Typography,
   Grid,
   Chip,
-  LinearProgress,
   Alert,
   CircularProgress,
   IconButton,
@@ -14,18 +14,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Tooltip,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Stack,
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import MouseOutlined from '@mui/icons-material/MouseOutlined';
@@ -46,182 +34,20 @@ import TopPagesInsightsPanel from './TopPagesInsightsPanel';
 import GscSuggestionsPanel from './GscSuggestionsPanel';
 import RefreshQueuePanel from './RefreshQueuePanel';
 import ChipLegend from './ChipLegend';
-import { apiClient } from '../../api/client';
-import {
-  LazyBarChart,
-  LazyLineChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Bar,
-  Line,
-  ChartLoadingFallback,
-} from '../../utils/lazyRecharts';
+import CannibalizationAlertsPanel from './CannibalizationAlertsPanel';
+import SummaryCharts from './SummaryCharts';
+import ContentBriefDialog from './ContentBriefDialog';
+import AIInsightsPanel from './AIInsightsPanel';
+import BingToolbar from './BingToolbar';
+import MetricsCard from './MetricsCard';
 
-interface CannibalizationPage {
-  page: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-}
+const shimmerBg = keyframes`
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+`;
 
-interface CannibalizationAlert {
-  query: string;
-  total_clicks: number;
-  recommended_target_page?: string;
-  pages?: CannibalizationPage[];
-}
-
-interface CannibalizationAlertsPanelProps {
-  alerts: CannibalizationAlert[];
-  formatNumber: (n: number) => string;
-  isValidHttpUrl: (url: string) => boolean;
-  onOpenBrief: (page: string, query: string, totalClicks: number) => void;
-}
-
-const CannibalizationAlertsPanel: React.FC<CannibalizationAlertsPanelProps> = ({
-  alerts,
-  formatNumber,
-  isValidHttpUrl,
-  onOpenBrief,
-}) => {
-  return (
-    <Card sx={{ mt: 2, bgcolor: '#ffffff !important', color: '#1f2937 !important', border: '1px solid #e5e7eb !important', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1) !important' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1">Cannibalization Alerts</Typography>
-            <Tooltip title="The same search query points to multiple pages on your site, splitting clicks. Choose one target page and consolidate overlapping pages or add internal links.">
-              <Info fontSize="small" color="action" />
-            </Tooltip>
-          </Box>
-          <Typography variant="caption" color="text.secondary">Queries competing across pages</Typography>
-        </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          “No cannibalization” is normal for tightly targeted sites or low‑traffic windows. For demos we can relax sensitivity.
-        </Typography>
-        <ChipLegend
-          items={[
-            {
-              label: 'Competing page',
-              icon: <MouseOutlined fontSize="small" />,
-              tooltip: 'Each chip is a page that shares the same query. Text shows URL • clicks • impressions • CTR.',
-              sx: {
-                backgroundImage: 'linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%)',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                fontWeight: 700,
-              },
-            },
-            {
-              label: 'Higher CTR',
-              tooltip: 'Greener backgrounds mean this page converts searchers relatively well.',
-              sx: {
-                backgroundImage: 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)',
-                color: '#065f46',
-                border: '1px solid #86efac',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                fontWeight: 700,
-              },
-            },
-            {
-              label: 'Weaker CTR',
-              tooltip: 'Redder backgrounds flag pages that may need consolidation or updates.',
-              sx: {
-                backgroundImage: 'linear-gradient(135deg, #fee2e2 0%, #fff1f2 100%)',
-                color: '#7f1d1d',
-                border: '1px solid #fecdd3',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                fontWeight: 700,
-              },
-            },
-          ]}
-        />
-        {(!alerts || alerts.length === 0) ? (
-          <Alert severity="info">No cannibalization detected for this window.</Alert>
-        ) : (
-          <List dense>
-            {alerts.slice(0, 10).map((a, idx) => (
-              <ListItem key={`${a.query}-${idx}`} sx={{ px: 0, alignItems: 'flex-start' }}>
-                <ListItemText
-                  primary={a.query}
-                  secondary={
-                    <Box sx={{ mt: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: '#6b7280', display: 'block', mb: 0.5 }}>
-                        Total clicks: {formatNumber(a.total_clicks || 0)} • Target: {a.recommended_target_page || 'N/A'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {(a.pages || []).map((p, i) => {
-                          const clicks = Number(p.clicks || 0);
-                          const impressions = Number(p.impressions || 0);
-                          const ctr = Number(p.ctr || 0);
-                          const ctrColor = ctr >= 3 ? '#065f46' : ctr >= 1 ? '#92400e' : '#7f1d1d';
-                          const ctrBg = ctr >= 3
-                            ? 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)'
-                            : ctr >= 1
-                            ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)'
-                            : 'linear-gradient(135deg, #fee2e2 0%, #fff1f2 100%)';
-                          const label = `${String(p.page || '').replace(/^https?:\/\//, '').slice(0, 40)} • ${formatNumber(clicks)}c/${formatNumber(impressions)}i • ${ctr.toFixed(1)}%`;
-                          return (
-                            <Tooltip
-                              key={`${p.page}-${i}`}
-                              title={`Clicks ${clicks}, impressions ${impressions}, CTR ${ctr.toFixed(1)}% for this page`}
-                            >
-                              <Chip
-                                label={label}
-                                size="small"
-                                sx={{
-                                  backgroundImage: ctrBg,
-                                  color: ctrColor,
-                                  border: '1px solid rgba(0,0,0,0.06)',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                  fontWeight: 700,
-                                  maxWidth: 260,
-                                }}
-                              />
-                            </Tooltip>
-                          );
-                        })}
-                      </Box>
-                    </Box>
-                  }
-                  primaryTypographyProps={{ variant: 'body2' }}
-                />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  sx={{ mr: 1, textTransform: 'none' }}
-                  disabled={!a.recommended_target_page || !isValidHttpUrl(String(a.recommended_target_page))}
-                  onClick={() => {
-                    if (a.recommended_target_page && isValidHttpUrl(String(a.recommended_target_page))) {
-                      window.open(String(a.recommended_target_page), '_blank');
-                    }
-                  }}
-                >
-                  Open Target Page
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  sx={{ textTransform: 'none' }}
-                  onClick={() => {
-                    const page = String(a.recommended_target_page || '');
-                    onOpenBrief(page, a.query, a.total_clicks || 0);
-                  }}
-                >
-                  Create Brief
-                </Button>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
+// CannibalizationPage, CannibalizationAlert, CannibalizationAlertsPanelProps, CannibalizationAlertsPanel moved to CannibalizationAlertsPanel.tsx
 
 interface PlatformAnalyticsComponentProps {
   platforms?: string[];
@@ -262,7 +88,6 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiInsights, setAiInsights] = useState<any | null>(null);
   const [resyncAttempted, setResyncAttempted] = useState<boolean>(false);
-  const [bingCollecting, setBingCollecting] = useState<boolean>(false);
   const [bingCollectMsg, setBingCollectMsg] = useState<string | null>(null);
   const [bingSiteUrl, setBingSiteUrl] = useState<string>('');
   const [showLegend, setShowLegend] = useState<boolean>(false);
@@ -451,6 +276,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       const prevQueries = (prevGSC?.metrics as any)?.top_queries || [];
       const prevMap: Record<string, { clicks: number; impressions: number }> = {};
       prevQueries.forEach((q: any) => {
+        if (!q) return;
         const key = String(q.query || '').toLowerCase();
         prevMap[key] = { clicks: Number(q.clicks || 0), impressions: Number(q.impressions || 0) };
       });
@@ -461,6 +287,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       const dropClicksThresh = -riseClicksThresh;
       const dropImprThresh = -riseImprThresh;
       currQueries.forEach((q: any) => {
+        if (!q) return;
         const key = String(q.query || '').toLowerCase();
         const prev = prevMap[key] || { clicks: 0, impressions: 0 };
         const deltaClicks = Number(q.clicks || 0) - prev.clicks;
@@ -478,6 +305,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       if (rising.length === 0 && declining.length === 0) {
         const deltas: Array<{ query: string; deltaClicks: number; deltaImpressions: number; score: number }> = [];
         currQueries.forEach((q: any) => {
+          if (!q) return;
           const key = String(q.query || '').toLowerCase();
           const prev = prevMap[key] || { clicks: 0, impressions: 0 };
           const dC = Number(q.clicks || 0) - prev.clicks;
@@ -737,253 +565,25 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     });
   }, [summary, computedSummary, analyticsData, priorityPlatform, platformStatus]);
 
-  const renderMetricsCard = (platform: string, data: PlatformAnalyticsType) => {
-    const metrics = data.metrics;
-    
-    return (
-      <Card key={platform} sx={{ height: '100%', bgcolor: '#ffffff', color: '#1f2937', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {getPlatformIcon(platform)}
-              <Typography variant="h6" component="div">
-                {platform.toUpperCase()}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {getStatusIcon(data.status)}
-              <Chip 
-                label={data.status} 
-                color={getStatusColor(data.status) as any}
-                size="small"
-              />
-              {platform === 'bing' && (
-                <>
-                  <TextField
-                    size="small"
-                    placeholder="https://www.example.com/"
-                    value={bingSiteUrl}
-                    onChange={(e) => setBingSiteUrl(e.target.value)}
-                    sx={{ minWidth: 280 }}
-                    label="Bing Site URL"
-                  />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={bingCollecting}
-                  onClick={async () => {
-                    try {
-                      setBingCollectMsg(null);
-                      setBingCollecting(true);
-                      // Derive a site URL from platform status first, then metrics fallback
-                      const bingStatus = platformStatus?.['bing'];
-                      const statusSites: any[] = Array.isArray(bingStatus?.sites) ? bingStatus!.sites : [];
-                      const metricsSites: any[] = Array.isArray((data as any)?.metrics?.sites) ? (data as any).metrics.sites : [];
-                      const candidates = [...statusSites, ...metricsSites];
-                      let siteUrl: string =
-                        (candidates.find(s => typeof s?.Url === 'string')?.Url) ||
-                        (candidates.find(s => typeof s?.url === 'string')?.url) ||
-                        '';
-                      // If user entered a site URL, prefer it
-                      if (bingSiteUrl && typeof bingSiteUrl === 'string') {
-                        siteUrl = bingSiteUrl.trim();
-                      }
-                      if (!siteUrl) {
-                        setBingCollectMsg('No Bing site found to collect.');
-                        return;
-                      }
-                      await apiClient.post('/bing-analytics/collect-data', null, {
-                        params: { site_url: siteUrl, days_back: Math.max(7, Math.min(90, rangeDays)) }
-                      });
-                      setBingCollectMsg('Bing storage refresh started…');
-                      // Soft refresh after a short delay to reflect any quick writes
-                      setTimeout(() => {
-                        forceRefresh().catch(() => {});
-                      }, 3500);
-                    } catch (e: any) {
-                      setBingCollectMsg(e?.message || 'Failed to start Bing collection');
-                    } finally {
-                      setBingCollecting(false);
-                    }
-                  }}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {bingCollecting ? 'Refreshing…' : 'Refresh Bing Storage'}
-                </Button>
-                </>
-              )}
-            </Box>
-          </Box>
-
-          {data.status === 'success' && (
-            <>
-              <Grid container spacing={2}>
-                {metrics.total_clicks !== undefined && (
-                  <Grid item xs={6}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <MouseOutlined color="primary" sx={{ fontSize: 32, mb: 1 }} />
-                      <Typography variant="h4" color="primary">
-                        {formatNumber(metrics.total_clicks)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                        Clicks
-                      </Typography>
-                    </Box>
-                  </Grid>
-                )}
-                
-                {metrics.total_impressions !== undefined && (
-                  <Grid item xs={6}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Visibility color="secondary" sx={{ fontSize: 32, mb: 1 }} />
-                      <Typography variant="h4" color="secondary">
-                        {formatNumber(metrics.total_impressions)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                        Impressions
-                      </Typography>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-
-              {metrics.avg_ctr !== undefined && (
-                <Box sx={{ mt: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">CTR</Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {metrics.avg_ctr}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={Math.min(metrics.avg_ctr * 10, 100)} 
-                    sx={{ height: 8, borderRadius: 4 }}
-                  />
-                </Box>
-              )}
-
-              {metrics.avg_position !== undefined && (
-                <Box sx={{ mt: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">Avg Position</Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {metrics.avg_position.toFixed(1)}
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={Math.max(0, 100 - (metrics.avg_position - 1) * 5)} 
-                    color="secondary"
-                    sx={{ height: 6, borderRadius: 4 }}
-                  />
-                </Box>
-              )}
-
-              {metrics.top_queries && metrics.top_queries.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Top Queries
-                  </Typography>
-                  <List dense>
-                    {metrics.top_queries.slice(0, 3).map((q: any, index: number) => {
-                      const clicks = Number(q.clicks || 0);
-                      const impressions = Number(q.impressions || 0);
-                      const ctr = Number(q.ctr || 0);
-                      const ctrColor = ctr >= 3 ? '#065f46' : ctr >= 1 ? '#92400e' : '#7f1d1d';
-                      const ctrBg = ctr >= 3 ? 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)' : ctr >= 1 ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fff1f2 100%)';
-                      const risingSet = new Set((refreshQueue?.risingQueries || []).map(r => String(r.query || '').toLowerCase()));
-                      const isTrending = risingSet.has(String(q.query || '').toLowerCase());
-                      return (
-                        <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
-                          <Paper elevation={0} sx={{ px: 1, py: 0.75, width: '100%', borderRadius: 2, border: '1px solid #e5e7eb', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
-                          <ListItemIcon sx={{ minWidth: 28 }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                              {index + 1}
-                            </Typography>
-                          </ListItemIcon>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, width: '100%', justifyContent: 'space-between' }}>
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                              <Tooltip title={`${q.query}`}>
-                                <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {q.query}
-                                </Typography>
-                              </Tooltip>
-                              {isTrending && (
-                                <Chip
-                                  icon={<TrendingUp fontSize="small" />}
-                                  label="Trending"
-                                  size="small"
-                                  sx={{ mt: 0.5, backgroundImage: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)', color: '#065f46', border: '1px solid #a7f3d0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)', fontWeight: 700 }}
-                                />
-                              )}
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexShrink: 0 }}>
-                              <Tooltip title="Total clicks across the selected date range. Higher is better.">
-                                <Chip icon={<MouseOutlined fontSize="small" />} label={`${formatNumber(clicks)}`} size="small" sx={{ backgroundImage: 'linear-gradient(135deg, #dbeafe 0%, #eef2ff 100%)', color: '#1e3a8a', border: '1px solid #c7d2fe', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', fontWeight: 700 }} />
-                              </Tooltip>
-                              <Tooltip title="Total impressions across the selected date range. Indicates visibility in search results.">
-                                <Chip icon={<Visibility fontSize="small" />} label={`${formatNumber(impressions)}`} size="small" sx={{ backgroundImage: 'linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%)', color: '#0f172a', border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', fontWeight: 700 }} />
-                              </Tooltip>
-                              <Tooltip title="Click-through rate. Higher indicates titles/meta attract clicks for given impressions.">
-                                <Chip label={`${ctr.toFixed(1)}%`} size="small" sx={{ backgroundImage: ctrBg, color: ctrColor, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)', fontWeight: 700 }} />
-                              </Tooltip>
-                            </Box>
-                          </Box>
-                          </Paper>
-                        </ListItem>
-                      );
-                    })}
-                  </List>
-                </Box>
-              )}
-            </>
-          )}
-
-          {data.status === 'error' && (
-            <Box sx={{ mt: 1 }}>
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {data.error_message || 'Failed to load analytics data'}
-              </Alert>
-              {platform === 'bing' && bingCollectMsg && (
-                <Alert severity="info" sx={{ mb: 2 }}>{bingCollectMsg}</Alert>
-              )}
-              {onReconnect && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={() => onReconnect(platform)}
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderColor: '#f44336',
-                    color: '#f44336',
-                    '&:hover': {
-                      borderColor: '#d32f2f',
-                      backgroundColor: 'rgba(244, 67, 54, 0.04)'
-                    }
-                  }}
-                >
-                  Reconnect {platform.toUpperCase()}
-                </Button>
-              )}
-            </Box>
-          )}
-
-          {data.status === 'partial' && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              {data.error_message || 'Limited analytics data available'}
-            </Alert>
-          )}
-
-          <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#6b7280' }}>
-            Last updated: {data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never'}
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  };
+  const renderMetricsCard = (platform: string, data: PlatformAnalyticsType) => (
+    <MetricsCard
+      platform={platform}
+      data={data}
+      formatNumber={formatNumber}
+      getPlatformIcon={getPlatformIcon}
+      getStatusColor={getStatusColor}
+      getStatusIcon={getStatusIcon}
+      bingSiteUrl={bingSiteUrl}
+      onBingSiteUrlChange={setBingSiteUrl}
+      bingCollectMsg={bingCollectMsg}
+      onBingCollectMsgChange={setBingCollectMsg}
+      rangeDays={rangeDays}
+      bingStatus={platformStatus?.['bing']}
+      onForceRefresh={forceRefresh}
+      onReconnect={onReconnect}
+      risingQueries={refreshQueue?.risingQueries || []}
+    />
+  );
 
   const renderSummaryCard = () => {
     if (!summary) return null;
@@ -1140,123 +740,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
             </Alert>
           )}
 
-          {(topPagesChart.length > 0 || ctrPositionData.length > 0) && (
-            <Box sx={{ mt: 2.5 }}>
-              <Grid container spacing={2}>
-                {topPagesChart.length > 0 && (
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.25 }}>Top pages impact</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                      Where most of your clicks are concentrated in this window.
-                    </Typography>
-                    <Box sx={{ height: 180, bgcolor: '#020617', borderRadius: 2, p: 1.5, border: '1px solid rgba(148, 163, 184, 0.4)' }}>
-                      <Suspense fallback={<ChartLoadingFallback />}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LazyBarChart
-                            data={topPagesChart}
-                            layout="vertical"
-                            margin={{ top: 8, right: 12, bottom: 8, left: 0 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.25} />
-                            <XAxis type="number" hide />
-                            <YAxis
-                              type="category"
-                              dataKey="label"
-                              width={130}
-                              tick={{ fill: '#e5e7eb', fontSize: 11 }}
-                            />
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: '#020617',
-                                borderRadius: 8,
-                                border: '1px solid #4b5563',
-                                padding: 8,
-                              }}
-                              formatter={(value: any, name: any, props: any) => {
-                                if (name === 'clicks') {
-                                  return [formatNumber(Number(value || 0)), 'Clicks'];
-                                }
-                                if (name === 'impressions') {
-                                  return [formatNumber(Number(value || 0)), 'Impressions'];
-                                }
-                                if (name === 'ctr') {
-                                  return [`${Number(value || 0).toFixed(2)}%`, 'CTR'];
-                                }
-                                return [value, name];
-                              }}
-                              labelFormatter={(label: any, payload: any) => {
-                                const full = payload && payload[0] && (payload[0].payload as any)?.fullUrl;
-                                return full || String(label || '');
-                              }}
-                            />
-                            <Bar dataKey="clicks" fill="#38bdf8" radius={[0, 6, 6, 0]} />
-                          </LazyBarChart>
-                        </ResponsiveContainer>
-                      </Suspense>
-                    </Box>
-                  </Grid>
-                )}
-                {ctrPositionData.length > 0 && (
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.25 }}>CTR vs average position</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                      How click‑through rate changes as your queries move up and down.
-                    </Typography>
-                    <Box sx={{ height: 180, bgcolor: '#020617', borderRadius: 2, p: 1.5, border: '1px solid rgba(148, 163, 184, 0.4)' }}>
-                      <Suspense fallback={<ChartLoadingFallback />}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LazyLineChart
-                            data={ctrPositionData}
-                            margin={{ top: 8, right: 12, bottom: 8, left: -10 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.25} />
-                            <XAxis
-                              type="number"
-                              dataKey="position"
-                              domain={[1, 'dataMax']}
-                              tick={{ fill: '#e5e7eb', fontSize: 11 }}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              tick={{ fill: '#e5e7eb', fontSize: 11 }}
-                              tickFormatter={(v) => `${v}%`}
-                              tickLine={false}
-                            />
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: '#020617',
-                                borderRadius: 8,
-                                border: '1px solid #4b5563',
-                                padding: 8,
-                              }}
-                              formatter={(value: any, name: any, props: any) => {
-                                if (name === 'ctr') {
-                                  return [`${Number(value || 0).toFixed(2)}%`, 'CTR'];
-                                }
-                                return [value, name];
-                              }}
-                              labelFormatter={(label: any, payload: any) => {
-                                const q = payload && payload[0] && (payload[0].payload as any)?.query;
-                                return `Position ${label}${q ? ` • ${q}` : ''}`;
-                              }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="ctr"
-                              stroke="#a855f7"
-                              strokeWidth={2.2}
-                              dot={{ r: 3, fill: '#a855f7', strokeWidth: 0 }}
-                              activeDot={{ r: 5 }}
-                            />
-                          </LazyLineChart>
-                        </ResponsiveContainer>
-                      </Suspense>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-            </Box>
-          )}
+          <SummaryCharts
+            topPagesChart={topPagesChart}
+            ctrPositionData={ctrPositionData}
+            formatNumber={formatNumber}
+          />
 
           <Box
             sx={{
@@ -1283,12 +771,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
                 color: '#f9fafb',
                 boxShadow: '0 0 18px rgba(34, 197, 94, 0.45)',
                 transition: 'transform 0.15s ease-out, box-shadow 0.15s ease-out, background-position 0.3s ease-out',
-                '@keyframes shimmerLegend': {
-                  '0%': { backgroundPosition: '0% 50%' },
-                  '50%': { backgroundPosition: '100% 50%' },
-                  '100%': { backgroundPosition: '0% 50%' },
-                },
-                animation: 'shimmerLegend 7s ease infinite',
+                animation: `${shimmerBg} 7s ease infinite`,
                 '&:hover': {
                   boxShadow: '0 0 26px rgba(34, 197, 94, 0.85)',
                   transform: 'translateY(-1px)',
@@ -1335,12 +818,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
                 color: '#f9fafb',
                 boxShadow: '0 0 22px rgba(129, 140, 248, 0.6)',
                 transition: 'transform 0.15s ease-out, box-shadow 0.15s ease-out, background-position 0.3s ease-out',
-                '@keyframes shimmerAI': {
-                  '0%': { backgroundPosition: '0% 50%' },
-                  '50%': { backgroundPosition: '100% 50%' },
-                  '100%': { backgroundPosition: '0% 50%' },
-                },
-                animation: 'shimmerAI 6s ease infinite',
+                animation: `${shimmerBg} 6s ease infinite`,
                 '&:hover': {
                   boxShadow: '0 0 30px rgba(129, 140, 248, 0.95)',
                   transform: 'translateY(-1px)',
@@ -1403,44 +881,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
             </Box>
           )}
 
-          {(aiError || aiInsights) && (
-            <Box sx={{ mt: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Typography variant="subtitle2">AI Insights</Typography>
-                <Tooltip title="Summarizes all panels into simple recommendations for creators.">
-                  <Info fontSize="small" color="action" />
-                </Tooltip>
-              </Box>
-              {aiError && <Alert severity="error" sx={{ mb: 1 }}>{aiError}</Alert>}
-              {aiInsights && (
-                <Box>
-                  <Typography variant="body2" sx={{ mb: 1 }}>{aiInsights.quick_summary}</Typography>
-                  {Array.isArray(aiInsights.prioritized_findings) && aiInsights.prioritized_findings.length > 0 && (
-                    <List dense>
-                      {aiInsights.prioritized_findings.slice(0, 3).map((f: any, i: number) => (
-                        <ListItem key={`ai-find-${i}`} sx={{ px: 0, alignItems: 'flex-start' }}>
-                          <ListItemText
-                            primary={f.title}
-                            secondary={
-                              <Box sx={{ mt: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>{f.evidence}</Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
-                                  {(f.actions || []).slice(0, 2).map((a: string, idx: number) => (
-                                    <Chip key={`act-${idx}`} label={a} size="small" />
-                                  ))}
-                                </Box>
-                              </Box>
-                            }
-                            primaryTypographyProps={{ variant: 'body2' }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
-                </Box>
-              )}
-            </Box>
-          )}
+          <AIInsightsPanel aiError={aiError} aiInsights={aiInsights} />
         </CardContent>
       </Card>
     );
@@ -1499,57 +940,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         );
       })()}
 
-      <Dialog open={briefOpen} onClose={() => setBriefOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Create Content Brief</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField
-              label="Page URL"
-              value={briefData?.page || ''}
-              InputProps={{ readOnly: true }}
-              fullWidth
-              size="small"
-            />
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>Recent queries pointing to this page</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {(briefData?.queries || []).slice(0, 10).map((q, i) => (
-                  <Chip
-                    key={`${q.query}-${i}`}
-                    label={`${q.query} • ${q.clicks}c/${q.impressions}i • ${q.ctr.toFixed(1)}%`}
-                    size="small"
-                  />
-                ))}
-                {(briefData?.queries || []).length === 0 && (
-                  <Typography variant="caption" color="text.secondary">No query mappings available for this window.</Typography>
-                )}
-              </Box>
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBriefOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              try {
-                const prefill = {
-                  page: briefData?.page || '',
-                  queries: briefData?.queries || [],
-                  created_at: new Date().toISOString(),
-                  source: 'platform_analytics_top_pages',
-                };
-                localStorage.setItem('alwrity_brief_prefill', JSON.stringify(prefill));
-              } catch {}
-              setBriefOpen(false);
-              // Optional: navigate to writer; keeping simple and non-disruptive
-              // window.location.href = '/blog-writer';
-            }}
-          >
-            Start Brief
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <ContentBriefDialog
+        open={briefOpen}
+        onClose={() => setBriefOpen(false)}
+        briefData={briefData}
+      />
 
       {showBackgroundJobs && (
         <RefreshQueuePanel
