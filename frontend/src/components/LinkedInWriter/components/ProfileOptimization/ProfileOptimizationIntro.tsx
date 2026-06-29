@@ -70,7 +70,7 @@ export const ProfileOptimizationIntro: React.FC<ProfileOptimizationIntroProps> =
               boxShadow: '0 4px 15px rgba(10, 102, 194, 0.35)',
             }}
           >
-            Improve My Profile
+            Optimise Profile
           </button>
         )
       )}

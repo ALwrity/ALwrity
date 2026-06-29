@@ -140,12 +140,19 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
-  const locationState = location.state as { 
-    calendarTopic?: string; 
+  const locationState = location.state as {
+    calendarTopic?: string;
     calendarDescription?: string;
     calendarEventId?: string;
     workflowTaskId?: string;
   } | null;
+
+  useEffect(() => {
+    document.title = 'LinkedIn Studio | ALwrity';
+    return () => {
+      document.title = 'ALwrity — AI Digital Marketing Operating System';
+    };
+  }, []);
 
   // Pre-fill context from calendar event on mount
   useEffect(() => {
@@ -162,6 +169,17 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
 
   // ── Tab navigation ──
   const [activeTab, setActiveTab] = useState<LinkedInWriterTab>('editor');
+
+  useEffect(() => {
+    const onSwitchTab = (event: Event) => {
+      const tab = (event as CustomEvent<{ tab?: LinkedInWriterTab }>).detail?.tab;
+      if (tab === 'editor' || tab === 'growth' || tab === 'analytics') {
+        setActiveTab(tab);
+      }
+    };
+    window.addEventListener('linkedinwriter:switchTab', onSwitchTab);
+    return () => window.removeEventListener('linkedinwriter:switchTab', onSwitchTab);
+  }, []);
 
   // ── Generate similar post handler ──
   const handleGenerateSimilarPost = useCallback((prompt: string) => {
@@ -457,7 +475,7 @@ Always use the most appropriate tool for the user's request.`.trim();
       <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
         {/* Loading Indicator */}
         <LoadingIndicator
           isGenerating={isGenerating}

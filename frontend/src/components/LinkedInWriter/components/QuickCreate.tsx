@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { LinkedInPreferences } from '../utils/storageUtils';
+
+export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
 
 interface QuickCreateProps {
   onGeneratePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
@@ -7,9 +9,11 @@ interface QuickCreateProps {
   onGenerateCarousel: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   onGenerateVideoScript: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   userPreferences: LinkedInPreferences;
+  /** Hide inline grid — modals only (opened via workflow / events) */
+  variant?: 'default' | 'hidden';
 }
 
-type ContentType = 'post' | 'article' | 'carousel' | 'video_script';
+type ContentType = QuickCreateContentType;
 
 const CONTENT_TYPES: { type: ContentType; label: string; icon: string; description: string; color: string }[] = [
   { type: 'post', label: 'Post', icon: '📝', description: 'Professional LinkedIn post with engagement hooks', color: '#0a66c2' },
@@ -41,29 +45,64 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   onGenerateArticle,
   onGenerateCarousel,
   onGenerateVideoScript,
-  userPreferences
+  userPreferences,
+  variant = 'default',
 }) => {
   const [selectedType, setSelectedType] = useState<ContentType | null>(null);
   const [formData, setFormData] = useState(defaultForm);
   const [generating, setGenerating] = useState(false);
+  const [topicError, setTopicError] = useState<string | null>(null);
 
-  const openModal = (type: ContentType) => {
+  const openModal = useCallback((type: ContentType) => {
     setFormData({
       ...defaultForm,
       industry: userPreferences?.industry || '',
       tone: userPreferences?.tone || 'Professional',
-      target_audience: userPreferences?.target_audience || ''
+      target_audience: userPreferences?.target_audience || '',
     });
     setSelectedType(type);
-  };
+  }, [userPreferences]);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setSelectedType(null);
     setFormData(defaultForm);
-  };
+    setTopicError(null);
+  }, []);
+
+  useEffect(() => {
+    const onOpenQuickCreate = (event: Event) => {
+      const type = (event as CustomEvent<{ type?: string }>).detail?.type;
+      if (
+        type === 'post' ||
+        type === 'article' ||
+        type === 'carousel' ||
+        type === 'video_script'
+      ) {
+        openModal(type);
+      }
+    };
+    window.addEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
+    return () => window.removeEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
+  }, [openModal]);
+
+  useEffect(() => {
+    if (!selectedType) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeModal();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedType, closeModal]);
 
   const handleGenerate = async () => {
     if (!selectedType || generating) return;
+    if (!formData.topic.trim()) {
+      setTopicError('Please enter a topic to continue.');
+      return;
+    }
+    setTopicError(null);
     setGenerating(true);
     const params = { ...formData };
     try {
@@ -81,6 +120,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   };
 
   const setField = (field: string, value: any) => {
+    if (field === 'topic' && topicError) {
+      setTopicError(null);
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -95,8 +137,11 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             value={formData.topic}
             onChange={e => setField('topic', e.target.value)}
             placeholder={`e.g., ${selectedType === 'video_script' ? 'Networking tips' : 'AI trends in ' + (formData.industry || 'Technology')}`}
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
           />
+          {topicError && (
+            <p style={{ margin: '6px 0 0', color: '#b91c1c', fontSize: 12 }}>{topicError}</p>
+          )}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
           <div>
@@ -235,43 +280,49 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData]);
+  }, [selectedType, formData, topicError]);
+
+  const showInlineGrid = variant === 'default';
 
   return (
-    <div style={{ width: '100%', marginTop: 8 }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, textAlign: 'center' }}>Quick Create</div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-        {CONTENT_TYPES.map(({ type, label, icon, description, color }) => (
-          <button
-            key={type}
-            onClick={() => openModal(type)}
-            style={{
-              padding: '14px 10px',
-              border: '1px solid #e5e7eb',
-              borderRadius: 12,
-              background: 'white',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              textAlign: 'center',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = color;
-              e.currentTarget.style.boxShadow = `0 4px 12px ${color}20`;
-              e.currentTarget.style.transform = 'translateY(-2px)';
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = '#e5e7eb';
-              e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
-              e.currentTarget.style.transform = 'translateY(0)';
-            }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{label}</div>
-            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, lineHeight: '1.3' }}>{description}</div>
-          </button>
-        ))}
-      </div>
+    <div style={{ width: '100%', marginTop: showInlineGrid ? 8 : 0 }}>
+      {showInlineGrid && (
+        <>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, textAlign: 'center' }}>Quick Create</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+            {CONTENT_TYPES.map(({ type, label, icon, description, color }) => (
+              <button
+                key={type}
+                onClick={() => openModal(type)}
+                style={{
+                  padding: '14px 10px',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 12,
+                  background: 'white',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  textAlign: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = color;
+                  e.currentTarget.style.boxShadow = `0 4px 12px ${color}20`;
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{label}</div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, lineHeight: '1.3' }}>{description}</div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Generation Modal */}
       {selectedType && (
@@ -288,20 +339,20 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               <button onClick={closeModal} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>Cancel</button>
               <button
                 onClick={handleGenerate}
-                disabled={generating || !formData.topic.trim()}
+                disabled={generating}
                 style={{
                   padding: '10px 24px',
                   border: 'none',
                   borderRadius: 8,
                   background: generating ? '#9ca3af' : CONTENT_TYPES.find(c => c.type === selectedType)?.color || '#0a66c2',
                   color: 'white',
-                  cursor: generating || !formData.topic.trim() ? 'not-allowed' : 'pointer',
+                  cursor: generating ? 'not-allowed' : 'pointer',
                   fontSize: 14,
                   fontWeight: 700,
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  opacity: generating || !formData.topic.trim() ? 0.7 : 1
+                  opacity: generating ? 0.7 : 1
                 }}
               >
                 {generating && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />}

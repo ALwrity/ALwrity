@@ -8,7 +8,7 @@ interface LinkedInWriterTabBarProps {
 }
 
 const TABS: { id: LinkedInWriterTab; label: string; ariaLabel: string }[] = [
-  { id: 'editor', label: 'Editor', ariaLabel: 'Switch to Editor tab' },
+  { id: 'editor', label: 'Dashboard', ariaLabel: 'Switch to Dashboard tab' },
   { id: 'growth', label: 'Growth Engine', ariaLabel: 'Switch to Growth Engine tab' },
   { id: 'analytics', label: 'Post Analytics', ariaLabel: 'Switch to Post Analytics tab' },
 ];
@@ -17,7 +17,11 @@ export const LinkedInWriterTabBar: React.FC<LinkedInWriterTabBarProps> = ({
   activeTab,
   onTabChange,
 }) => (
-  <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}>
+  <div
+    role="tablist"
+    aria-label="LinkedIn Studio sections"
+    style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb' }}
+  >
     {TABS.map((tab) => {
       const isActive = activeTab === tab.id;
       return (

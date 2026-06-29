@@ -115,7 +115,7 @@ export const LinkedInAdvisorActionsBar: React.FC<LinkedInAdvisorActionsBarProps>
               opacity: advisorsDisabled ? 0.75 : 1,
             }}
           >
-            Improve My Profile
+            Optimise Profile
           </button>
 
           <button

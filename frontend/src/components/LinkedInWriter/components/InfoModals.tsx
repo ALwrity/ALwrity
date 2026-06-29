@@ -8,6 +8,7 @@ interface InfoModalsProps {
   onCloseAssistiveModal: () => void;
   onCloseFactCheckModal: () => void;
   onOpenCopilot: () => void;
+  onStartQuickCreatePost?: () => void;
 }
 
 export const InfoModals: React.FC<InfoModalsProps> = ({
@@ -17,25 +18,27 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
   onCloseCopilotModal,
   onCloseAssistiveModal,
   onCloseFactCheckModal,
-  onOpenCopilot
+  onOpenCopilot,
+  onStartQuickCreatePost,
 }) => {
+  const infoModalOverlayStyle = {
+    position: 'fixed' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 11000,
+    backdropFilter: 'blur(5px)',
+  };
   return (
     <>
       {/* Copilot Modal */}
       {showCopilotModal && (
-        <div style={{ 
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(5px)'
-        }}>
+        <div style={infoModalOverlayStyle}>
           <div style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
             backdropFilter: 'blur(20px)',
@@ -73,7 +76,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
             
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ margin: '0 0 16px 0', color: '#1a202c', fontSize: '24px', fontWeight: '700' }}>
-                ALwrity Copilot
+                ALwrity Co-Pilot
               </h2>
               <p style={{ margin: '0 0 20px 0', color: '#4a5568', fontSize: '16px' }}>
                 Your comprehensive AI writing assistant
@@ -89,7 +92,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                 <div style={{ textAlign: 'center' }}>
                   <img 
                     src="/Alwrity-copilot1.png" 
-                    alt="ALwrity Copilot Interface"
+                    alt="ALwrity Co-Pilot Interface"
                     style={{
                       width: '100%',
                       maxWidth: '250px',
@@ -111,7 +114,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                 <div style={{ textAlign: 'center' }}>
                   <img 
                     src="/Alwrity-copilot2.png" 
-                    alt="ALwrity Copilot Features"
+                    alt="ALwrity Co-Pilot Features"
                     style={{
                       width: '100%',
                       maxWidth: '250px',
@@ -135,10 +138,10 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
 
             <div style={{ textAlign: 'left' }}>
               <h3 style={{ color: '#2d3748', fontSize: '18px', fontWeight: '600', marginBottom: '12px' }}>
-                What is ALwrity Copilot?
+                What is ALwrity Co-Pilot?
               </h3>
               <p style={{ color: '#4a5568', lineHeight: '1.6', marginBottom: '20px' }}>
-                ALwrity Copilot is an advanced AI assistant that provides comprehensive support for all your content creation needs. 
+                ALwrity Co-Pilot is an advanced AI assistant that provides comprehensive support for all your content creation needs.
                 It combines multiple AI capabilities to help you create, edit, and optimize content across various formats.
               </p>
 
@@ -158,7 +161,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                 How to Use:
               </h3>
               <p style={{ color: '#4a5568', lineHeight: '1.6', marginBottom: '20px' }}>
-                Click the ALwrity Copilot icon in the bottom-right corner of your screen to open the chat interface. 
+                Click the ALwrity Co-Pilot icon in the bottom-right corner of your screen to open the chat interface.
                 You can then ask for help with any content creation task, and the AI will guide you through the process.
               </p>
 
@@ -188,7 +191,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                Open ALwrity Copilot
+                Open ALwrity Co-Pilot
               </button>
             </div>
           </div>
@@ -197,19 +200,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
 
       {/* Assistive Research Modal */}
       {showAssistiveModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(5px)'
-        }}>
+        <div style={infoModalOverlayStyle}>
           <div style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
             backdropFilter: 'blur(20px)',
@@ -287,7 +278,13 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
               </p>
 
               <button
-                onClick={onCloseAssistiveModal}
+                onClick={() => {
+                  if (onStartQuickCreatePost) {
+                    onStartQuickCreatePost();
+                  } else {
+                    onCloseAssistiveModal();
+                  }
+                }}
                 style={{
                   background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
                   border: 'none',
@@ -309,7 +306,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                Got it, let's start writing!
+                Start a new post →
               </button>
             </div>
           </div>
@@ -318,19 +315,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
 
       {/* Fact Check Modal */}
       {showFactCheckModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          backdropFilter: 'blur(5px)'
-        }}>
+        <div style={infoModalOverlayStyle}>
           <div style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
             backdropFilter: 'blur(20px)',
@@ -460,7 +445,13 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
               </ul>
 
               <button
-                onClick={onCloseFactCheckModal}
+                onClick={() => {
+                  if (onStartQuickCreatePost) {
+                    onStartQuickCreatePost();
+                  } else {
+                    onCloseFactCheckModal();
+                  }
+                }}
                 style={{
                   background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   border: 'none',
@@ -482,7 +473,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                   e.currentTarget.style.boxShadow = 'none';
                 }}
               >
-                Got it, let's start fact-checking!
+                Create a post to fact-check →
               </button>
             </div>
           </div>

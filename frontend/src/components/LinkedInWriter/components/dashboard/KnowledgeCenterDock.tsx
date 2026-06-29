@@ -1,0 +1,233 @@
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  KNOWLEDGE_CENTER_FEATURES,
+  type KnowledgeCenterFeature,
+} from './knowledgeCenterFeatures';
+import { FRAME_COLOR } from './dashboardWorkflowConfig';
+
+export type KnowledgeCenterAction =
+  | 'factCheck'
+  | 'googleGround'
+  | 'persona'
+  | 'assistive'
+  | 'copilot'
+  | 'multimodal';
+
+interface KnowledgeCenterDockProps {
+  onFeatureAction: (action: KnowledgeCenterAction) => void;
+  onExpandedChange?: (expanded: boolean) => void;
+  variant?: 'main' | 'rail';
+}
+
+export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
+  onFeatureAction,
+  onExpandedChange,
+  variant = 'main',
+}) => {
+  const [expanded, setExpanded] = useState(false);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [gridPos, setGridPos] = useState<{ bottom: number; right: number; width: number } | null>(
+    null
+  );
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const isRail = variant === 'rail';
+
+  useEffect(() => {
+    onExpandedChange?.(expanded);
+  }, [expanded, onExpandedChange]);
+
+  const updateGridPosition = useCallback(() => {
+    const el = anchorRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const width = Math.min(720, window.innerWidth - 32);
+    const right = Math.max(16, window.innerWidth - rect.right);
+    setGridPos({
+      bottom: window.innerHeight - rect.top + 8,
+      right,
+      width,
+    });
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!isRail || !expanded) {
+      setGridPos(null);
+      return;
+    }
+    updateGridPosition();
+    window.addEventListener('resize', updateGridPosition);
+    window.addEventListener('scroll', updateGridPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateGridPosition);
+      window.removeEventListener('scroll', updateGridPosition, true);
+    };
+  }, [isRail, expanded, updateGridPosition]);
+
+  const handleFeatureClick = (feature: KnowledgeCenterFeature) => {
+    onFeatureAction(feature.action);
+    setExpanded(false);
+  };
+
+  const gridContent = (
+    <div
+      className="linkedin-knowledge-center-grid"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+        gap: 8,
+        padding: 10,
+        background: '#ffffff',
+        border: `2px solid ${FRAME_COLOR}`,
+        borderRadius: 14,
+        boxShadow: '0 12px 40px rgba(10, 102, 194, 0.18)',
+        width: '100%',
+        boxSizing: 'border-box',
+      }}
+    >
+      {KNOWLEDGE_CENTER_FEATURES.map((feature) => {
+        const isHovered = hoveredId === feature.id;
+        return (
+          <button
+            key={feature.id}
+            type="button"
+            onClick={() => handleFeatureClick(feature)}
+            onMouseEnter={() => setHoveredId(feature.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 4,
+              padding: '8px 6px',
+              background: '#ffffff',
+              border: `2px solid ${FRAME_COLOR}`,
+              borderRadius: 10,
+              cursor: 'pointer',
+              textAlign: 'center',
+              minWidth: 0,
+              transform: isHovered ? 'translateY(-2px) scale(1.02)' : 'none',
+              boxShadow: isHovered
+                ? `0 6px 18px ${feature.accent}33`
+                : '0 2px 6px rgba(0,0,0,0.04)',
+              transition: 'transform 160ms ease, box-shadow 160ms ease',
+            }}
+          >
+            {feature.image ? (
+              <img
+                src={feature.image}
+                alt={feature.title}
+                style={{ width: 38, height: 28, objectFit: 'contain' }}
+              />
+            ) : (
+              <span style={{ fontSize: 22 }} aria-hidden>
+                {feature.icon}
+              </span>
+            )}
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: feature.accent,
+                lineHeight: 1.2,
+              }}
+            >
+              {feature.title}
+            </span>
+            <span
+              style={{
+                fontSize: 9,
+                color: '#64748b',
+                lineHeight: 1.3,
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}
+            >
+              {feature.description}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const triggerButton = (
+    <button
+      type="button"
+      onClick={() => setExpanded((open) => !open)}
+      aria-expanded={expanded}
+      style={{
+        padding: isRail ? '8px 10px' : '8px 14px',
+        width: isRail ? '100%' : undefined,
+        background: '#ffffff',
+        border: `2px solid ${FRAME_COLOR}`,
+        borderRadius: expanded && !isRail ? '12px 12px 0 0' : 10,
+        boxShadow: '0 4px 16px rgba(10, 102, 194, 0.12)',
+        fontSize: isRail ? 10 : 11,
+        fontWeight: 700,
+        color: '#0a66c2',
+        cursor: 'pointer',
+        textTransform: 'uppercase',
+        letterSpacing: '0.04em',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      Knowledge center
+    </button>
+  );
+
+  const portaledGrid =
+    isRail &&
+    expanded &&
+    gridPos &&
+    typeof document !== 'undefined' &&
+    createPortal(
+      <div
+        className="linkedin-knowledge-center-portal"
+        style={{
+          position: 'fixed',
+          bottom: gridPos.bottom,
+          right: gridPos.right,
+          width: gridPos.width,
+          zIndex: 12000,
+          pointerEvents: 'auto',
+        }}
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+      >
+        {gridContent}
+      </div>,
+      document.body
+    );
+
+  if (isRail) {
+    return (
+      <>
+        {portaledGrid}
+        <div
+          ref={anchorRef}
+          className="linkedin-knowledge-center-rail"
+          onMouseEnter={() => setExpanded(true)}
+          onMouseLeave={() => setExpanded(false)}
+        >
+          {triggerButton}
+        </div>
+      </>
+    );
+  }
+
+  return (
+    <div className="linkedin-knowledge-center-dock">
+      <div
+        className="linkedin-knowledge-center-dock-inner"
+        onMouseEnter={() => setExpanded(true)}
+        onMouseLeave={() => setExpanded(false)}
+      >
+        {expanded && <div style={{ marginBottom: 8 }}>{gridContent}</div>}
+        {triggerButton}
+      </div>
+    </div>
+  );
+};
