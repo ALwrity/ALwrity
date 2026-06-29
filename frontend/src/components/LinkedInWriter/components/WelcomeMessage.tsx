@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { LinkedInConnectionPlaceholder } from './LinkedInConnectionPlaceholder';
+import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction, CONNECT_WELCOME_DISMISSED_KEY } from './LinkedInConnectionPlaceholder';
 import { InfoModals } from './InfoModals';
 import { QuickCreate } from './QuickCreate';
 import { LinkedInPreferences } from '../utils/storageUtils';
@@ -43,7 +43,22 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [workflowModal, setWorkflowModal] = useState<WorkflowModalId | null>(null);
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
-  const { connected, connectWithOAuth } = useLinkedInSocialConnection();
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const social = useLinkedInSocialConnection();
+  const { connected, connectWithOAuth, disconnect } = social;
+
+  const handleDisconnect = useCallback(async () => {
+    if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
+      return;
+    }
+    setIsDisconnecting(true);
+    try {
+      await disconnect();
+      sessionStorage.removeItem(CONNECT_WELCOME_DISMISSED_KEY);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  }, [disconnect]);
 
   useEffect(() => {
     document.body.classList.add('linkedin-dashboard-view');
@@ -175,12 +190,27 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          padding: '4px 8px 0',
+          padding: '0 8px 0',
           color: '#666',
         }}
       >
-        <LinkedInDashboardHero onWorkflowCardAction={handleWorkflowCardAction}>
-          <LinkedInConnectionPlaceholder centered />
+        <LinkedInDashboardHero
+          onWorkflowCardAction={handleWorkflowCardAction}
+          planAnchorSlot={
+            <LinkedInPlanConnectAction
+              social={social}
+              isDisconnecting={isDisconnecting}
+              onDisconnect={handleDisconnect}
+            />
+          }
+        >
+          <LinkedInConnectionPlaceholder
+            centered
+            splitConnectAction
+            socialConnection={social}
+            isDisconnecting={isDisconnecting}
+            onDisconnect={handleDisconnect}
+          />
         </LinkedInDashboardHero>
 
         <QuickCreate

@@ -7,6 +7,14 @@ import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 import { DashboardActionModal } from './dashboard/DashboardActionModal';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
 
+export type LinkedInSocialConnectionState = ReturnType<typeof useLinkedInSocialConnection>;
+
+export interface LinkedInPlanConnectActionProps {
+  social: LinkedInSocialConnectionState;
+  isDisconnecting?: boolean;
+  onDisconnect: () => Promise<void>;
+}
+
 export const CONNECT_WELCOME_DISMISSED_KEY = 'linkedin_connect_welcome_dismissed';
 
 const CONNECT_BUTTON_STYLE: React.CSSProperties = {
@@ -47,7 +55,8 @@ const DisconnectedState: React.FC<{
   statusError: string | null;
   onConnect: () => void;
   centered?: boolean;
-}> = ({ isConnecting, connectError, statusError, onConnect, centered = false }) => {
+  splitConnectAction?: boolean;
+}> = ({ isConnecting, connectError, statusError, onConnect, centered = false, splitConnectAction = false }) => {
   const buttonLabel = isConnecting ? 'Connecting...' : 'Connect LinkedIn';
   const displayStatusError = connectError ? null : statusError;
   const activeError = connectError || displayStatusError;
@@ -122,8 +131,8 @@ const DisconnectedState: React.FC<{
             alignItems: 'center',
             justifyContent: 'center',
             gap: 8,
-            marginBottom: 4,
-            transform: 'translateY(-10px)',
+            marginBottom: 0,
+            transform: 'translateY(0)',
           }}
         >
           <div style={{ position: 'relative' }}>
@@ -144,29 +153,31 @@ const DisconnectedState: React.FC<{
             </div>
           </div>
 
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 12,
-              flexWrap: 'nowrap',
-              justifyContent: 'center',
-              zIndex: 6,
-            }}
-          >
-            <button
-              type="button"
-              onClick={onConnect}
-              disabled={isConnecting}
+          {!splitConnectAction && (
+            <div
               style={{
-                ...CONNECT_BUTTON_STYLE,
-                cursor: isConnecting ? 'default' : 'pointer',
-                opacity: isConnecting ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'nowrap',
+                justifyContent: 'center',
+                zIndex: 6,
               }}
             >
-              {buttonLabel}
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={onConnect}
+                disabled={isConnecting}
+                style={{
+                  ...CONNECT_BUTTON_STYLE,
+                  cursor: isConnecting ? 'default' : 'pointer',
+                  opacity: isConnecting ? 0.7 : 1,
+                }}
+              >
+                {buttonLabel}
+              </button>
+            </div>
+          )}
         </div>
       </>
     );
@@ -284,9 +295,123 @@ const ConnectionLoadingState: React.FC<{ centered?: boolean }> = ({ centered = f
   </div>
 );
 
-export const LinkedInConnectionPlaceholder: React.FC<{ centered?: boolean }> = ({
-  centered = false,
+export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps> = ({
+  social,
+  isDisconnecting = false,
+  onDisconnect,
 }) => {
+  const {
+    connected,
+    isLoading,
+    isConnecting,
+    connectError,
+    disconnectError,
+    error,
+    connectWithOAuth,
+  } = social;
+  const modalError = connected ? disconnectError : connectError || error;
+  const { showErrorModal, dismissError } = useDismissibleError(modalError);
+
+  const handleConnect = () => {
+    void connectWithOAuth();
+  };
+
+  if (isLoading) {
+    return (
+      <button
+        type="button"
+        disabled
+        aria-busy="true"
+        style={{
+          ...CONNECT_BUTTON_STYLE,
+          opacity: 0.82,
+          cursor: 'default',
+        }}
+      >
+        Checking connection...
+      </button>
+    );
+  }
+
+  if (connected) {
+    return (
+      <>
+        <DashboardSimpleErrorModal
+          open={showErrorModal}
+          title="Disconnect failed"
+          message={disconnectError ?? ''}
+          onClose={dismissError}
+        />
+        <button
+          type="button"
+          onClick={() => void onDisconnect()}
+          disabled={isDisconnecting}
+          title={isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
+          aria-label={isDisconnecting ? 'Disconnecting LinkedIn' : 'Disconnect LinkedIn'}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '10px 24px',
+            borderRadius: 10,
+            border: '2px solid #fecaca',
+            backgroundColor: '#fff',
+            color: '#b91c1c',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: isDisconnecting ? 'default' : 'pointer',
+            opacity: isDisconnecting ? 0.7 : 1,
+            boxShadow: '0 4px 14px rgba(185, 28, 28, 0.12)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <DashboardSimpleErrorModal
+        open={showErrorModal}
+        title={connectError ? 'LinkedIn connection error' : 'LinkedIn error'}
+        message={modalError ?? ''}
+        onClose={dismissError}
+        onRetry={modalError ? handleConnect : undefined}
+        isRetrying={isConnecting}
+      />
+      <button
+        type="button"
+        onClick={handleConnect}
+        disabled={isConnecting}
+        style={{
+          ...CONNECT_BUTTON_STYLE,
+          cursor: isConnecting ? 'default' : 'pointer',
+          opacity: isConnecting ? 0.7 : 1,
+          boxShadow: '0 6px 20px rgba(10, 102, 194, 0.35)',
+        }}
+      >
+        {isConnecting ? 'Connecting...' : 'Connect LinkedIn'}
+      </button>
+    </>
+  );
+};
+
+export const LinkedInConnectionPlaceholder: React.FC<{
+  centered?: boolean;
+  splitConnectAction?: boolean;
+  socialConnection?: LinkedInSocialConnectionState;
+  isDisconnecting?: boolean;
+  onDisconnect?: () => Promise<void>;
+}> = ({
+  centered = false,
+  splitConnectAction = false,
+  socialConnection,
+  isDisconnecting: isDisconnectingProp = false,
+  onDisconnect: onDisconnectProp,
+}) => {
+  const internalSocial = useLinkedInSocialConnection();
   const {
     connected,
     isLoading,
@@ -298,24 +423,29 @@ export const LinkedInConnectionPlaceholder: React.FC<{ centered?: boolean }> = (
     avatarUrl,
     connectWithOAuth,
     disconnect,
-  } = useLinkedInSocialConnection();
+  } = socialConnection ?? internalSocial;
 
-  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isDisconnectingLocal, setIsDisconnectingLocal] = useState(false);
+  const isDisconnecting = isDisconnectingProp || isDisconnectingLocal;
 
   const handleConnect = async () => {
     await connectWithOAuth();
   };
 
   const handleDisconnect = async () => {
+    if (onDisconnectProp) {
+      await onDisconnectProp();
+      return;
+    }
     if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
       return;
     }
-    setIsDisconnecting(true);
+    setIsDisconnectingLocal(true);
     try {
       await disconnect();
       sessionStorage.removeItem(CONNECT_WELCOME_DISMISSED_KEY);
     } finally {
-      setIsDisconnecting(false);
+      setIsDisconnectingLocal(false);
     }
   };
 
@@ -334,6 +464,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{ centered?: boolean }> = (
         onDisconnect={showDisconnect ? handleDisconnect : undefined}
         isDisconnecting={isDisconnecting}
         disconnectError={disconnectError}
+        hideDisconnectButton={centered && splitConnectAction}
       />
     );
   }
@@ -341,6 +472,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{ centered?: boolean }> = (
   return (
     <DisconnectedState
       centered={centered}
+      splitConnectAction={splitConnectAction}
       isConnecting={isConnecting}
       connectError={connectError}
       statusError={error}

@@ -80,7 +80,8 @@ export const useLinkedInSocialConnection = () => {
 
   const [selectedOrgId, setSelectedOrgId] = useState<string>('');
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isProfileLoading, setIsProfileLoading] = useState(false);
 
   const [isConnecting, setIsConnecting] = useState(false);
 
@@ -187,6 +188,8 @@ export const useLinkedInSocialConnection = () => {
 
       setIsLoading(false);
 
+      setIsProfileLoading(false);
+
       return;
 
     }
@@ -201,11 +204,19 @@ export const useLinkedInSocialConnection = () => {
 
       setIsLoading(false);
 
+      setIsProfileLoading(false);
+
       return;
 
     }
 
 
+
+    setIsLoading(false);
+
+    setIsProfileLoading(true);
+
+    try {
 
     let accountList: LinkedInAccount[] = [];
 
@@ -335,9 +346,11 @@ export const useLinkedInSocialConnection = () => {
 
     }
 
+    } finally {
 
+      setIsProfileLoading(false);
 
-    setIsLoading(false);
+    }
 
   }, [loadOrganizations]);
 
@@ -589,6 +602,8 @@ export const useLinkedInSocialConnection = () => {
     selectedOrgId,
 
     isLoading,
+
+    isProfileLoading,
 
     isConnecting,
 

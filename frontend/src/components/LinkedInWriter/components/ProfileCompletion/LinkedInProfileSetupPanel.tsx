@@ -26,6 +26,7 @@ interface LinkedInProfileSetupPanelProps {
   isDisconnecting?: boolean;
   disconnectError?: string | null;
   centered?: boolean;
+  hideDisconnectButton?: boolean;
 }
 
 export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps> = ({
@@ -35,6 +36,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   isDisconnecting = false,
   disconnectError,
   centered = false,
+  hideDisconnectButton = false,
 }) => {
   const {
     foundationStatus,
@@ -235,6 +237,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         strengthLabel={strengthLabel}
         isOptimiseDisabled={isOptimizationDisabled || foundationStatus !== 'ready'}
         isOptimiseLoading={isOptimizationLoading}
+        hideDisconnectButton={hideDisconnectButton}
       />
 
       {showAdvisorBar && (

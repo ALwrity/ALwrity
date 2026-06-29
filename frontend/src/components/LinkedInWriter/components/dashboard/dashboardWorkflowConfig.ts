@@ -17,19 +17,23 @@ export interface DashboardWorkflowCard {
   endAngle: number;
 }
 
-/**
- * Six wedges forming a 3/4 pie (270°) around the center profile.
- * Bottom ~90° is open for the avatar hub. Order: Plan (bottom-left) → Remarket (bottom-right).
- */
-export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = [
+/** Uniform gap between adjacent wedges (degrees). */
+export const WEDGE_PANEL_GAP_DEG = 2.4;
+
+export const WORKFLOW_WEDGE_COUNT = 6;
+export const WORKFLOW_ARC_SPAN_DEG = 360;
+export const WORKFLOW_WEDGE_SLICE_DEG = WORKFLOW_ARC_SPAN_DEG / WORKFLOW_WEDGE_COUNT;
+
+/** First wedge (Plan) centered at bottom; remaining cards follow clockwise. */
+export const WORKFLOW_FIRST_WEDGE_CENTER_DEG = 270;
+
+const CARD_DEFS: Omit<DashboardWorkflowCard, 'startAngle' | 'endAngle'>[] = [
   {
     id: 'plan',
     title: 'Plan',
     description: 'Brainstorming, industry watchdog, and content strategy',
     icon: '📅',
     accent: '#6366f1',
-    startAngle: 225,
-    endAngle: 180,
   },
   {
     id: 'create',
@@ -37,8 +41,6 @@ export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = [
     description: 'Post, article, video, and carousel content',
     icon: '✍️',
     accent: '#ec4899',
-    startAngle: 180,
-    endAngle: 135,
   },
   {
     id: 'publish',
@@ -46,8 +48,6 @@ export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = [
     description: 'Save drafts and schedule on your content calendar',
     icon: '📤',
     accent: '#0ea5e9',
-    startAngle: 135,
-    endAngle: 87,
   },
   {
     id: 'analysis',
@@ -55,8 +55,6 @@ export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = [
     description: 'Profile, existing content, and SEO insights',
     icon: '📊',
     accent: '#8b5cf6',
-    startAngle: 87,
-    endAngle: 42,
   },
   {
     id: 'engagement',
@@ -64,8 +62,6 @@ export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = [
     description: 'Growth engine to enhance reach and interaction',
     icon: '📈',
     accent: '#10b981',
-    startAngle: 42,
-    endAngle: 10,
   },
   {
     id: 'remarket',
@@ -73,15 +69,20 @@ export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = [
     description: 'Refresh and improve high-performing content',
     icon: '♻️',
     accent: '#f59e0b',
-    startAngle: 10,
-    endAngle: -45,
   },
 ];
 
+export function wedgeAnglesForIndex(index: number): Pick<DashboardWorkflowCard, 'startAngle' | 'endAngle'> {
+  const center = WORKFLOW_FIRST_WEDGE_CENTER_DEG - index * WORKFLOW_WEDGE_SLICE_DEG;
+  const half = WORKFLOW_WEDGE_SLICE_DEG / 2;
+  return { startAngle: center + half, endAngle: center - half };
+}
+
+/** Six equal wedges forming a full 360° ring around the profile hub. */
+export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = CARD_DEFS.map((card, index) => ({
+  ...card,
+  ...wedgeAnglesForIndex(index),
+}));
+
 export const FRAME_COLOR = '#BCE0FD';
 
-/** Total arc span in degrees (3/4 circle). */
-export const WORKFLOW_ARC_SPAN_DEG = 270;
-
-/** Bottom opening where the profile hub sits (degrees). */
-export const WORKFLOW_BOTTOM_GAP_DEG = 90;

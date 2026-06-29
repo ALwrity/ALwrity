@@ -15,6 +15,7 @@ interface LinkedInConnectedProfileCardProps {
   strengthLabel?: string;
   isOptimiseDisabled?: boolean;
   isOptimiseLoading?: boolean;
+  hideDisconnectButton?: boolean;
 }
 
 const AVATAR_SIZE = 48;
@@ -33,9 +34,10 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
   strengthLabel = '',
   isOptimiseDisabled = false,
   isOptimiseLoading = false,
+  hideDisconnectButton = false,
 }) => {
   const initials = getInitials(displayName);
-  const showDisconnect = Boolean(onDisconnect);
+  const showDisconnect = Boolean(onDisconnect) && !hideDisconnectButton;
   const avatarSize = centered ? CENTERED_AVATAR_SIZE : AVATAR_SIZE;
   const [dismissedDisconnectError, setDismissedDisconnectError] = useState<string | null>(null);
 
@@ -70,8 +72,8 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
           alignItems: 'center',
           justifyContent: 'center',
           gap: 8,
-          marginBottom: 4,
-          transform: 'translateY(-10px)',
+          marginBottom: 0,
+          transform: 'translateY(0)',
         }}
       >
         <div

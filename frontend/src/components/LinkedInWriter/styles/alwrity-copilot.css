@@ -526,12 +526,19 @@
   position: relative;
   isolation: isolate;
   padding-bottom: 0;
+  padding-top: 0;
 }
 
 .linkedin-dashboard-hero {
   z-index: 1;
   flex: 1;
-  min-height: 280px;
+  min-height: 240px;
+  justify-content: flex-start !important;
+  padding-top: 0 !important;
+}
+
+.linkedin-dashboard-plan-anchor {
+  filter: drop-shadow(0 4px 12px rgba(10, 102, 194, 0.12));
 }
 
 .linkedin-dashboard-hero-hub {

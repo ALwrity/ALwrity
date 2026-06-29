@@ -1,15 +1,17 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DashboardRadialWorkflow } from './DashboardRadialWorkflow';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
-import { computeRadialLayout } from './dashboardRadialLayout';
+import { computeRadialLayout, layoutYToPixel, PLAN_CONNECT_UI_LIFT_PX } from './dashboardRadialLayout';
 
 interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
+  planAnchorSlot?: React.ReactNode;
   onWorkflowCardAction: (cardId: DashboardWorkflowCardId) => void;
 }
 
 export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
   children,
+  planAnchorSlot,
   onWorkflowCardAction,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +44,8 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     () => computeRadialLayout(containerWidth, containerHeight),
     [containerWidth, containerHeight]
   );
+  const hubTop = layoutYToPixel(layout.centerY + layout.hubOffsetY, layout.viewBoxY);
+  const planAnchorTop = layoutYToPixel(layout.planAnchorY, layout.viewBoxY);
 
   return (
     <div
@@ -50,14 +54,15 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
       style={{
         width: '100%',
         flex: 1,
-        minHeight: 280,
+        minHeight: 240,
         flexShrink: 1,
         display: 'flex',
         flexDirection: 'column',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         alignItems: 'center',
         overflow: 'visible',
         position: 'relative',
+        paddingTop: 0,
       }}
     >
       <div
@@ -75,11 +80,11 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
           style={{
             position: 'absolute',
             left: '50%',
-            top: layout.centerY + layout.hubOffsetY,
+            top: hubTop,
             transform: 'translate(-50%, -50%)',
             zIndex: 10,
             width: '100%',
-            maxWidth: Math.max(220, layout.innerR * 2.4),
+            maxWidth: Math.max(220, layout.innerR * 2),
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
@@ -100,6 +105,24 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
             {children}
           </div>
         </div>
+        {planAnchorSlot && (
+          <div
+            className="linkedin-dashboard-plan-anchor"
+            style={{
+              position: 'absolute',
+              left: layout.planAnchorX,
+              top: planAnchorTop,
+              transform: `translate(-50%, ${-PLAN_CONNECT_UI_LIFT_PX}px)`,
+              zIndex: 20,
+              pointerEvents: 'auto',
+              display: 'flex',
+              justifyContent: 'center',
+              minWidth: 220,
+            }}
+          >
+            {planAnchorSlot}
+          </div>
+        )}
       </div>
     </div>
   );
