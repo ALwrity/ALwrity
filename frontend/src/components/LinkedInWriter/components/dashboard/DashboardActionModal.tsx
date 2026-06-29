@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import { createPortal } from 'react-dom';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 
@@ -8,6 +8,9 @@ interface DashboardActionModalProps {
   onClose: () => void;
   children: React.ReactNode;
   maxWidth?: number;
+  maxHeight?: string;
+  zIndex?: number;
+  disableClose?: boolean;
 }
 
 export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
@@ -16,8 +19,15 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   onClose,
   children,
   maxWidth = 720,
+  maxHeight = 'min(90vh, 640px)',
+  zIndex = 11000,
+  disableClose = false,
 }) => {
   if (!open) return null;
+
+  const handleBackdropClose = () => {
+    if (!disableClose) onClose();
+  };
 
   return createPortal(
     <div
@@ -27,21 +37,21 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 11000,
+        zIndex,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         background: 'rgba(15, 23, 42, 0.45)',
         padding: 24,
       }}
-      onClick={onClose}
+      onClick={handleBackdropClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
           maxWidth,
-          maxHeight: 'min(90vh, 640px)',
+          maxHeight,
           display: 'flex',
           flexDirection: 'column',
           background: '#ffffff',
@@ -69,22 +79,24 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
           >
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              lineHeight: 1,
-              cursor: 'pointer',
-              color: '#475569',
-              padding: 4,
-            }}
-          >
-            ✕
-          </button>
+          {!disableClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                fontSize: 22,
+                lineHeight: 1,
+                cursor: 'pointer',
+                color: '#475569',
+                padding: 4,
+              }}
+            >
+              ✕
+            </button>
+          )}
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>
       </div>

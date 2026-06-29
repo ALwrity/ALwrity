@@ -15,6 +15,7 @@ import {
   getProfileStrengthLabel,
 } from '../dashboard/ProfileAnalysisReadyModal';
 import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
+import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
 
 const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed';
@@ -89,14 +90,17 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   };
 
   const handleGetTopicIdeas = () => {
+    setIsTopicPanelOpen(true);
     void runTopicAnalysis(false);
   };
 
   const handleRetryTopic = () => {
+    setIsTopicPanelOpen(true);
     void runTopicAnalysis(false);
   };
 
   const handleRefreshRecommendations = () => {
+    setIsTopicPanelOpen(true);
     void runTopicAnalysis(true);
   };
 
@@ -126,7 +130,18 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   );
 
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
   const [dismissedErrorKey, setDismissedErrorKey] = useState<string | null>(null);
+
+  const closeTopicPanel = () => {
+    setIsTopicPanelOpen(false);
+    collapseRecommendations();
+  };
+
+  const showTopicModal =
+    centered &&
+    isTopicPanelOpen &&
+    (topicState === 'running' || topicState === 'complete');
 
   const dashboardErrorConfig = useMemo(
     () =>
@@ -178,7 +193,14 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   );
 
   useEffect(() => {
+    if (topicState === 'error') {
+      setIsTopicPanelOpen(false);
+    }
+  }, [topicState]);
+
+  useEffect(() => {
     const onGetTopicIdeas = () => {
+      setIsTopicPanelOpen(true);
       void runTopicAnalysis(false);
     };
     const onOpenOptimise = () => {
@@ -424,12 +446,36 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         />
       )}
 
-      {topicState === 'complete' && (
+      {showTopicModal && (
+        <DashboardActionModal
+          open
+          title={isAnalyzing ? 'Generating topic ideas…' : 'Topic ideas'}
+          onClose={closeTopicPanel}
+          maxWidth={640}
+          maxHeight="min(90vh, 720px)"
+          zIndex={12100}
+          disableClose={isAnalyzing}
+        >
+          <TopicRecommendationsPanel
+            recommendations={recommendations}
+            recommendationsMeta={recommendationsMeta}
+            recommendationsError={null}
+            analysisError={null}
+            isExpanded
+            isRefreshing={isAnalyzing}
+            variant="modal"
+            onRefresh={handleRefreshRecommendations}
+            onRetry={handleRetryTopic}
+          />
+        </DashboardActionModal>
+      )}
+
+      {!centered && topicState === 'complete' && (
         <TopicRecommendationsPanel
           recommendations={recommendations}
           recommendationsMeta={recommendationsMeta}
-          recommendationsError={centered ? null : recommendationsError}
-          analysisError={centered ? null : topicError}
+          recommendationsError={recommendationsError}
+          analysisError={topicError}
           isExpanded={isRecommendationsExpanded}
           isRefreshing={isAnalyzing}
           onCollapse={collapseRecommendations}

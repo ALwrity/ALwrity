@@ -22,6 +22,8 @@ interface TopicRecommendationsPanelProps {
   onExpand?: () => void;
   onRefresh?: () => void;
   onRetry?: () => void;
+  /** When embedded in a dashboard modal, strip outer card chrome and collapsed summary. */
+  variant?: 'standalone' | 'modal';
 }
 
 const SKELETON_CARD_STYLE: React.CSSProperties = {
@@ -72,7 +74,9 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
   onExpand,
   onRefresh,
   onRetry,
+  variant = 'standalone',
 }) => {
+  const isModal = variant === 'modal';
   const updatedLabel = formatRelativeUpdatedAt(
     recommendationsMeta?.recommendations_updated_at
   );
@@ -85,7 +89,7 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
   const showRecommendationCards =
     !showSkeleton && !showError && recommendations && recommendations.length > 0;
 
-  if (!isExpanded && showRecommendationCards && onExpand) {
+  if (!isModal && !isExpanded && showRecommendationCards && onExpand) {
     return (
       <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
         <div
@@ -110,61 +114,73 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
     );
   }
 
+  const wrapperStyle: React.CSSProperties = isModal
+    ? { width: '100%' }
+    : { ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 };
+
+  const innerStyle: React.CSSProperties = isModal
+    ? { minHeight: 'unset', padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }
+    : {
+        ...linkedInPlaceholderCardStyles.inner,
+        minHeight: 'unset',
+        padding: '20px 24px',
+      };
+
   return (
-    <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
-      <div
-        style={{
-          ...linkedInPlaceholderCardStyles.inner,
-          minHeight: 'unset',
-          padding: '20px 24px',
-        }}
-      >
-        <div style={panelBackgroundGlowStyle} />
+    <div style={wrapperStyle}>
+      <div style={innerStyle}>
+        {!isModal && <div style={panelBackgroundGlowStyle} />}
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 12,
-              marginBottom: 16,
-            }}
-          >
-            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: '#1e293b',
-                }}
-              >
-                What to write next
-              </h3>
-              <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
-                Five ideas tailored to your profile
-              </p>
-              {updatedLabel && (
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
-                  {updatedLabel}
+          {!isModal && (
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                alignItems: 'flex-start',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 16,
+              }}
+            >
+              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    fontWeight: 700,
+                    color: '#1e293b',
+                  }}
+                >
+                  What to write next
+                </h3>
+                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
+                  Five ideas tailored to your profile
                 </p>
+                {updatedLabel && (
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                    {updatedLabel}
+                  </p>
+                )}
+              </div>
+
+              {showRecommendationCards && onCollapse && (
+                <button
+                  type="button"
+                  onClick={onCollapse}
+                  aria-expanded
+                  aria-controls="topic-recommendations-list"
+                  style={hideTopicsButtonStyle}
+                >
+                  Hide topics
+                </button>
               )}
             </div>
+          )}
 
-            {showRecommendationCards && onCollapse && (
-              <button
-                type="button"
-                onClick={onCollapse}
-                aria-expanded
-                aria-controls="topic-recommendations-list"
-                style={hideTopicsButtonStyle}
-              >
-                Hide topics
-              </button>
-            )}
-          </div>
+          {isModal && updatedLabel && (
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#94a3b8' }}>{updatedLabel}</p>
+          )}
 
           {showSkeleton && (
             <>
