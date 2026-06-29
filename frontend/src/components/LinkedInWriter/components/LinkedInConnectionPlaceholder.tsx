@@ -295,6 +295,12 @@ const ConnectionLoadingState: React.FC<{ centered?: boolean }> = ({ centered = f
   </div>
 );
 
+const ConnectTourAnchor: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div data-tour="li-connect-action" style={{ display: 'inline-flex' }}>
+    {children}
+  </div>
+);
+
 export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps> = ({
   social,
   isDisconnecting = false,
@@ -318,18 +324,20 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
 
   if (isLoading) {
     return (
-      <button
-        type="button"
-        disabled
-        aria-busy="true"
-        style={{
-          ...CONNECT_BUTTON_STYLE,
-          opacity: 0.82,
-          cursor: 'default',
-        }}
-      >
-        Checking connection...
-      </button>
+      <ConnectTourAnchor>
+        <button
+          type="button"
+          disabled
+          aria-busy="true"
+          style={{
+            ...CONNECT_BUTTON_STYLE,
+            opacity: 0.82,
+            cursor: 'default',
+          }}
+        >
+          Checking connection...
+        </button>
+      </ConnectTourAnchor>
     );
   }
 
@@ -342,31 +350,33 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
           message={disconnectError ?? ''}
           onClose={dismissError}
         />
-        <button
-          type="button"
-          onClick={() => void onDisconnect()}
-          disabled={isDisconnecting}
-          title={isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
-          aria-label={isDisconnecting ? 'Disconnecting LinkedIn' : 'Disconnect LinkedIn'}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '10px 24px',
-            borderRadius: 10,
-            border: '2px solid #fecaca',
-            backgroundColor: '#fff',
-            color: '#b91c1c',
-            fontSize: 14,
-            fontWeight: 700,
-            cursor: isDisconnecting ? 'default' : 'pointer',
-            opacity: isDisconnecting ? 0.7 : 1,
-            boxShadow: '0 4px 14px rgba(185, 28, 28, 0.12)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
-        </button>
+        <ConnectTourAnchor>
+          <button
+            type="button"
+            onClick={() => void onDisconnect()}
+            disabled={isDisconnecting}
+            title={isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
+            aria-label={isDisconnecting ? 'Disconnecting LinkedIn' : 'Disconnect LinkedIn'}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '10px 24px',
+              borderRadius: 10,
+              border: '2px solid #fecaca',
+              backgroundColor: '#fff',
+              color: '#b91c1c',
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: isDisconnecting ? 'default' : 'pointer',
+              opacity: isDisconnecting ? 0.7 : 1,
+              boxShadow: '0 4px 14px rgba(185, 28, 28, 0.12)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
+          </button>
+        </ConnectTourAnchor>
       </>
     );
   }
@@ -381,19 +391,21 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
         onRetry={modalError ? handleConnect : undefined}
         isRetrying={isConnecting}
       />
-      <button
-        type="button"
-        onClick={handleConnect}
-        disabled={isConnecting}
-        style={{
-          ...CONNECT_BUTTON_STYLE,
-          cursor: isConnecting ? 'default' : 'pointer',
-          opacity: isConnecting ? 0.7 : 1,
-          boxShadow: '0 6px 20px rgba(10, 102, 194, 0.35)',
-        }}
-      >
-        {isConnecting ? 'Connecting...' : 'Connect LinkedIn'}
-      </button>
+      <ConnectTourAnchor>
+        <button
+          type="button"
+          onClick={handleConnect}
+          disabled={isConnecting}
+          style={{
+            ...CONNECT_BUTTON_STYLE,
+            cursor: isConnecting ? 'default' : 'pointer',
+            opacity: isConnecting ? 0.7 : 1,
+            boxShadow: '0 6px 20px rgba(10, 102, 194, 0.35)',
+          }}
+        >
+          {isConnecting ? 'Connecting...' : 'Connect LinkedIn'}
+        </button>
+      </ConnectTourAnchor>
     </>
   );
 };
