@@ -16,6 +16,8 @@ import {
   type WorkflowModalId,
 } from './dashboard/WorkflowActionModals';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
+import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
+import { LINKEDIN_STUDIO_TOUR_SEEN_KEY } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 
 interface WelcomeMessageProps {
@@ -44,8 +46,9 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [runStudioTour, setRunStudioTour] = useState(false);
   const social = useLinkedInSocialConnection();
-  const { connected, connectWithOAuth, disconnect } = social;
+  const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
 
   const handleDisconnect = useCallback(async () => {
     if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
@@ -70,6 +73,20 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     window.addEventListener('linkedinwriter:openWatchdog', onOpenWatchdog);
     return () => window.removeEventListener('linkedinwriter:openWatchdog', onOpenWatchdog);
   }, []);
+
+  useEffect(() => {
+    const onStartTour = () => setRunStudioTour(true);
+    window.addEventListener('linkedinwriter:startStudioTour', onStartTour);
+    return () => window.removeEventListener('linkedinwriter:startStudioTour', onStartTour);
+  }, []);
+
+  useEffect(() => {
+    if (isSocialLoading) return;
+    if (localStorage.getItem(LINKEDIN_STUDIO_TOUR_SEEN_KEY)) return;
+
+    const timer = window.setTimeout(() => setRunStudioTour(true), 800);
+    return () => window.clearTimeout(timer);
+  }, [isSocialLoading]);
 
   useEffect(() => {
     const requireConnection = (event: Event) => {
@@ -194,6 +211,18 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           color: '#666',
         }}
       >
+        <button
+          type="button"
+          className="linkedin-studio-tour-trigger"
+          data-tour="li-tour-trigger"
+          onClick={() => setRunStudioTour(true)}
+          aria-label="How to use LinkedIn Studio — start guided tour"
+          title="How to use LinkedIn Studio"
+        >
+          <span aria-hidden>?</span>
+          <span className="linkedin-studio-tour-trigger-label">Tour</span>
+        </button>
+
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
           planAnchorSlot={
@@ -278,6 +307,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         message={copilotError ?? ''}
         onClose={() => setCopilotError(null)}
       />
+
+      <LinkedInStudioTour run={runStudioTour} onRunChange={setRunStudioTour} />
     </div>
   );
 };

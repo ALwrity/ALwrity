@@ -189,6 +189,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
       <g
         key={card.id}
         className="workflow-wedge"
+        data-tour={`li-wedge-${card.id}`}
         transform={wedgeTransform(
           centerX,
           centerY,

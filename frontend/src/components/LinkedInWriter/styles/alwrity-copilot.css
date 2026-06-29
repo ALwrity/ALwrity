@@ -529,6 +529,63 @@
   padding-top: 0;
 }
 
+.linkedin-studio-tour-trigger {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 12;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 2px solid #bce0fd;
+  background: #ffffff;
+  color: #0a66c2;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(10, 102, 194, 0.12);
+  transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.linkedin-studio-tour-trigger:hover {
+  background: #eff6ff;
+  box-shadow: 0 4px 14px rgba(10, 102, 194, 0.18);
+  transform: translateY(-1px);
+}
+
+.linkedin-studio-tour-trigger span[aria-hidden] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #0a66c2;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.linkedin-studio-tour-trigger-label {
+  letter-spacing: 0.01em;
+}
+
+@media (max-width: 640px) {
+  .linkedin-studio-tour-trigger-label {
+    display: none;
+  }
+
+  .linkedin-studio-tour-trigger {
+    padding: 6px 8px;
+  }
+}
+
+.linkedin-tour-lifecycle-spotlight {
+  box-sizing: border-box;
+}
+
 .linkedin-dashboard-hero {
   z-index: 1;
   flex: 1;

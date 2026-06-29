@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DashboardRadialWorkflow } from './DashboardRadialWorkflow';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
-import { computeRadialLayout, layoutYToPixel, PLAN_CONNECT_UI_LIFT_PX } from './dashboardRadialLayout';
+import { computeRadialLayout, layoutYToPixel, PLAN_CONNECT_UI_LIFT_PX, ringSpotlightDiameter } from './dashboardRadialLayout';
 
 interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
@@ -46,6 +46,8 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
   );
   const hubTop = layoutYToPixel(layout.centerY + layout.hubOffsetY, layout.viewBoxY);
   const planAnchorTop = layoutYToPixel(layout.planAnchorY, layout.viewBoxY);
+  const ringCenterTop = layoutYToPixel(layout.centerY, layout.viewBoxY);
+  const lifecycleSpotlightSize = ringSpotlightDiameter(layout.outerR);
 
   return (
     <div
@@ -75,6 +77,22 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         }}
       >
         <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
+
+        {/* Invisible tour anchors — tight bounds for Joyride spotlight */}
+        <div
+          data-tour="li-content-lifecycle"
+          className="linkedin-tour-lifecycle-spotlight"
+          aria-hidden
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: ringCenterTop,
+            width: lifecycleSpotlightSize,
+            height: lifecycleSpotlightSize,
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+          }}
+        />
         <div
           className="linkedin-dashboard-hero-hub"
           style={{

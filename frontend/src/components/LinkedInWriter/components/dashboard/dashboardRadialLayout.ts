@@ -190,3 +190,13 @@ export function computeRadialLayout(containerWidth: number, maxHeight?: number):
 export function layoutYToPixel(y: number, viewBoxY: number): number {
   return y - viewBoxY;
 }
+
+/** Outer visual radius of the wedge ring (includes convex bulge). */
+export function ringOuterVisualRadius(outerR: number): number {
+  return outerR * (1 + OUTER_BULGE_FACTOR);
+}
+
+/** Square spotlight diameter that bounds the six workflow wedges only. */
+export function ringSpotlightDiameter(outerR: number): number {
+  return Math.round(ringOuterVisualRadius(outerR) * 2 + 4);
+}
