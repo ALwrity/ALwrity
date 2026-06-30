@@ -1,5 +1,7 @@
-import React, { useCallback, useState } from 'react';
-import { Collapse, IconButton, Tooltip } from '@mui/material';
+import React, { useCallback, useMemo, useState } from 'react';
+import { Collapse, Tooltip } from '@mui/material';
+import CheckBoxIcon from '@mui/icons-material/CheckBox';
+import CheckBoxOutlineBlankIcon from '@mui/icons-material/CheckBoxOutlineBlank';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -20,6 +22,8 @@ interface ProfileOptimizationCardProps {
   onMarkDone?: (recommendationId: string) => void;
   onSkip?: (recommendationId: string) => void;
   isMarking?: boolean;
+  /** Feature 2 — Human-readable effort time label (e.g., "Takes ~5 minutes"). */
+  showEffortTimeLabel?: string;
 }
 
 const LOG_PREFIX = '[ProfileOptimizationCard]';
@@ -80,15 +84,50 @@ async function copySuggestedCopy(text: string, recommendationId: string): Promis
   }
 }
 
+/**
+ * Feature 4 — Parse completion criteria into checklist items.
+ * Handles: comma lists, semicolon lists, numbered items (1. 2. 3.),
+ * bullet points (- * •), and "and/or" separators.
+ */
+function parseCompletionCriteria(criteria: string): string[] {
+  if (!criteria || typeof criteria !== 'string') return [];
+  
+  // Split by common delimiters
+  const items = criteria
+    .split(/;|\n|(?:\d+\.)|(?:[-*•]\s)/)
+    .map(item => item.trim())
+    .filter(item => item.length > 0);
+  
+  // If we got multiple items, return them
+  if (items.length > 1) return items;
+  
+  // Try splitting by " and " or ", and "
+  const andSplit = criteria.split(/,\s+and\s+|\s+and\s+/i);
+  if (andSplit.length > 1) return andSplit.map(s => s.trim()).filter(s => s.length > 0);
+  
+  // Single item - return as-is
+  return [criteria];
+}
+
 export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = ({
   recommendation,
   index,
   onMarkDone,
   onSkip,
   isMarking = false,
+  showEffortTimeLabel,
 }) => {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  
+  // Feature 4 — Completion criteria checklist state
+  const criteriaItems = useMemo(
+    () => parseCompletionCriteria(recommendation.completion_criteria || ''),
+    [recommendation.completion_criteria]
+  );
+  const [checkedCriteria, setCheckedCriteria] = useState<Set<number>>(new Set());
+  const checkedCount = checkedCriteria.size;
+  const totalCriteria = criteriaItems.length;
 
   const handleCopy = useCallback(async () => {
     if (!recommendation.suggested_copy) {
@@ -128,18 +167,31 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
           {index + 1}
         </span>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            <span style={sectionBadgeStyle()}>
-              {formatProfileSection(recommendation.profile_section)}
-            </span>
-            <span style={impactBadgeStyle(recommendation.impact)}>
-              {formatOptimizationImpact(recommendation.impact)}
-            </span>
-            <span style={effortBadgeStyle(recommendation.effort)}>
-              {formatOptimizationEffort(recommendation.effort)}
-            </span>
-          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10, alignItems: 'center' }}>
+              <span style={sectionBadgeStyle()}>
+                {formatProfileSection(recommendation.profile_section)}
+              </span>
+              <span style={impactBadgeStyle(recommendation.impact)}>
+                {formatOptimizationImpact(recommendation.impact)}
+              </span>
+              <span style={effortBadgeStyle(recommendation.effort)}>
+                {formatOptimizationEffort(recommendation.effort)}
+              </span>
+              {/* Feature 2 — Effort time label for SME-grade prioritization */}
+              {showEffortTimeLabel && (
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: '#64748b',
+                    fontWeight: 500,
+                    marginLeft: 'auto',
+                  }}
+                >
+                  {showEffortTimeLabel}
+                </span>
+              )}
+            </div>
 
           <h4
             id={`profile-opt-title-${recommendation.id}`}
@@ -149,20 +201,88 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
           </h4>
 
           {!isDetailsExpanded && (
-            <p
-              style={{
-                margin: '0 0 4px',
-                fontSize: 14,
-                color: '#475569',
-                lineHeight: 1.55,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {recommendation.why_it_matters}
-            </p>
+            <>
+              <p
+                style={{
+                  margin: '0 0 4px',
+                  fontSize: 14,
+                  color: '#475569',
+                  lineHeight: 1.55,
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
+              >
+                {recommendation.why_it_matters}
+              </p>
+
+              {/* Feature 1 — One-Click AI Copy (collapsed preview) */}
+              {recommendation.suggested_copy && (
+                <div
+                  style={{
+                    margin: '10px 0',
+                    padding: '10px 12px',
+                    borderRadius: 8,
+                    backgroundColor: '#f0f9ff',
+                    border: '1px solid #bae6fd',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        color: '#1e293b',
+                        lineHeight: 1.5,
+                        flex: 1,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      "{recommendation.suggested_copy.slice(0, 120)}
+                      {recommendation.suggested_copy.length > 120 ? '…' : ''}"
+                    </p>
+                    <Tooltip title={copyTooltip} arrow placement="top">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void handleCopy();
+                        }}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                          padding: '6px 12px',
+                          borderRadius: 6,
+                          border: '1px solid #0ea5e9',
+                          backgroundColor: copyState === 'copied' ? '#ecfdf5' : '#fff',
+                          color: copyState === 'copied' ? '#047857' : '#0284c7',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        <ContentCopyIcon sx={{ fontSize: 14 }} />
+                        {copyState === 'copied' ? 'Copied!' : 'Use This'}
+                      </button>
+                    </Tooltip>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           <button
@@ -211,59 +331,198 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
                     }}
                   >
                     <p style={{ ...SECTION_LABEL_STYLE, margin: 0 }}>Suggested copy</p>
-                    <Tooltip title={copyTooltip} arrow placement="top">
-                      <IconButton
-                        size="small"
-                        onClick={() => {
-                          void handleCopy();
-                        }}
-                        aria-label="Copy suggested copy to clipboard"
-                        sx={{
-                          color: copyState === 'copied' ? '#047857' : '#0A66C2',
-                        }}
-                      >
-                        <ContentCopyIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </Tooltip>
                   </div>
                   <p
                     style={{
-                      margin: '0 0 14px',
-                      padding: '10px 12px',
+                      margin: '0 0 10px',
+                      padding: '12px 14px',
                       borderRadius: 8,
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0',
-                      fontSize: 13,
+                      backgroundColor: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      fontSize: 14,
                       color: '#1e293b',
-                      lineHeight: 1.55,
+                      lineHeight: 1.6,
                       whiteSpace: 'pre-wrap',
                     }}
                   >
                     {recommendation.suggested_copy}
                   </p>
+                  <Tooltip title={copyTooltip} arrow placement="top">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleCopy();
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '8px 16px',
+                        borderRadius: 8,
+                        border: '1px solid #0ea5e9',
+                        backgroundColor: copyState === 'copied' ? '#ecfdf5' : '#fff',
+                        color: copyState === 'copied' ? '#047857' : '#0284c7',
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        marginBottom: 14,
+                      }}
+                    >
+                      <ContentCopyIcon sx={{ fontSize: 16 }} />
+                      {copyState === 'copied' ? 'Copied to clipboard!' : 'Copy to clipboard'}
+                    </button>
+                  </Tooltip>
                 </>
               )}
 
-              {recommendation.completion_criteria && (
+              {/* Feature 4 — Completion Criteria as Definition of Done Checklist */}
+              {criteriaItems.length > 0 && (
+                <>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <p style={{ ...SECTION_LABEL_STYLE, margin: 0 }}>Definition of done</p>
+                    <span
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        backgroundColor: checkedCount === totalCriteria ? '#ecfdf5' : '#f1f5f9',
+                        color: checkedCount === totalCriteria ? '#047857' : '#64748b',
+                        fontSize: 12,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {checkedCount === totalCriteria
+                        ? '✓ All criteria met'
+                        : `${checkedCount} of ${totalCriteria} done`}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 8,
+                      backgroundColor: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      marginBottom: 14,
+                    }}
+                  >
+                    {criteriaItems.map((item, idx) => {
+                      const isChecked = checkedCriteria.has(idx);
+                      return (
+                        <label
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'flex-start',
+                            gap: 10,
+                            padding: '8px 0',
+                            cursor: 'pointer',
+                            borderBottom:
+                              idx < criteriaItems.length - 1 ? '1px solid #e2e8f0' : 'none',
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setCheckedCriteria(prev => {
+                                const next = new Set(prev);
+                                if (next.has(idx)) {
+                                  next.delete(idx);
+                                } else {
+                                  next.add(idx);
+                                }
+                                return next;
+                              });
+                            }}
+                            style={{
+                              margin: 0,
+                              width: 18,
+                              height: 18,
+                              cursor: 'pointer',
+                              accentColor: '#0A66C2',
+                              flexShrink: 0,
+                              marginTop: 2,
+                            }}
+                          />
+                          <span
+                            style={{
+                              fontSize: 13,
+                              color: isChecked ? '#94a3b8' : '#334155',
+                              lineHeight: 1.5,
+                              textDecoration: isChecked ? 'line-through' : 'none',
+                              transition: 'all 150ms ease',
+                            }}
+                          >
+                            {item}
+                          </span>
+                          {isChecked && (
+                            <CheckBoxIcon
+                              sx={{
+                                fontSize: 16,
+                                color: '#10b981',
+                                flexShrink: 0,
+                                marginLeft: 'auto',
+                              }}
+                            />
+                          )}
+                          {!isChecked && (
+                            <CheckBoxOutlineBlankIcon
+                              sx={{
+                                fontSize: 16,
+                                color: '#cbd5e1',
+                                flexShrink: 0,
+                                marginLeft: 'auto',
+                              }}
+                            />
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {recommendation.best_practice_ref && (
+                    <p
+                      style={{
+                        margin: '0 0 4px',
+                        fontSize: 12,
+                        color: '#94a3b8',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Based on: {recommendation.best_practice_ref}
+                    </p>
+                  )}
+                </>
+              )}
+
+              {/* Fallback for raw completion_criteria if parsing fails */}
+              {recommendation.completion_criteria && criteriaItems.length === 0 && (
                 <>
                   <p style={SECTION_LABEL_STYLE}>Done when</p>
                   <p style={{ ...SECTION_BODY_STYLE, marginBottom: 0 }}>
                     {recommendation.completion_criteria}
                   </p>
+                  {recommendation.best_practice_ref && (
+                    <p
+                      style={{
+                        margin: '12px 0 0',
+                        fontSize: 12,
+                        color: '#94a3b8',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      Based on: {recommendation.best_practice_ref}
+                    </p>
+                  )}
                 </>
-              )}
-
-              {recommendation.best_practice_ref && (
-                <p
-                  style={{
-                    margin: '12px 0 0',
-                    fontSize: 12,
-                    color: '#94a3b8',
-                    lineHeight: 1.45,
-                  }}
-                >
-                  Based on: {recommendation.best_practice_ref}
-                </p>
               )}
             </div>
           </Collapse>

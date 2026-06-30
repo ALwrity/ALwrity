@@ -350,6 +350,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 showNextBatchCta={showNextBatchCta}
                 isLoadingNextBatch={isLoadingNextBatch}
                 markingRecommendationId={markingRecommendationId}
+                aiProfileIntelligence={aiProfileIntelligence}
+                profileStrengthPercent={profileStrengthPercent}
                 onCollapse={closeOptimizationPanel}
                 onExpand={expandOptimization}
                 onRefresh={() => {
@@ -383,6 +385,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           showNextBatchCta={showNextBatchCta}
           isLoadingNextBatch={isLoadingNextBatch}
           markingRecommendationId={markingRecommendationId}
+          aiProfileIntelligence={aiProfileIntelligence}
+          profileStrengthPercent={profileStrengthPercent}
           onCollapse={collapseOptimization}
           onExpand={expandOptimization}
           onRefresh={() => {
