@@ -11,8 +11,7 @@ interface LinkedInConnectedProfileCardProps {
   disconnectError?: string | null;
   centered?: boolean;
   onOptimiseProfile?: () => void;
-  profileStrengthPercent?: number | null;
-  strengthLabel?: string;
+  strengthTooltip?: string;
   isOptimiseDisabled?: boolean;
   isOptimiseLoading?: boolean;
   hideDisconnectButton?: boolean;
@@ -30,8 +29,7 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
   disconnectError,
   centered = false,
   onOptimiseProfile,
-  profileStrengthPercent = null,
-  strengthLabel = '',
+  strengthTooltip = '',
   isOptimiseDisabled = false,
   isOptimiseLoading = false,
   hideDisconnectButton = false,
@@ -161,7 +159,11 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
               className="linkedin-profile-optimise-btn"
               onClick={onOptimiseProfile}
               disabled={isOptimiseDisabled || isOptimiseLoading}
-              title={isOptimiseLoading ? 'Optimising profile...' : 'Optimise profile'}
+              title={
+                isOptimiseLoading
+                  ? 'Optimising profile...'
+                  : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
+              }
               aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
               style={{
                 position: 'absolute',

@@ -21,6 +21,10 @@ import {
   isBackendCooldownActive,
 } from '../api/client';
 import type { FoundationStatus } from '../components/LinkedInWriter/components/ProfileOptimization/LinkedInAdvisorActionsBar';
+import {
+  PROFILE_STRENGTH_UPDATED_EVENT,
+  type ProfileStrengthUpdatedDetail,
+} from '../components/LinkedInWriter/utils/profileStrengthEvents';
 
 const LOG_PREFIX = '[LinkedInProfileCompletion]';
 const REC_LOG_PREFIX = '[TopicRecommendations]';
@@ -123,6 +127,17 @@ export function useLinkedInProfileCompletion() {
 
   const foundationAttemptRef = useRef(0);
   const topicAttemptRef = useRef(0);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<ProfileStrengthUpdatedDetail>).detail;
+      if (detail?.profileValidation) {
+        setProfileValidation(detail.profileValidation);
+      }
+    };
+    window.addEventListener(PROFILE_STRENGTH_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(PROFILE_STRENGTH_UPDATED_EVENT, handler);
+  }, []);
 
   const applyFoundationResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
     setProfileValidation(data.profile_validation ?? null);

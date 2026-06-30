@@ -102,7 +102,10 @@ from services.integrations.linkedin.profile_completion_service import (
 from services.integrations.linkedin.profile_context_patcher import ProfileCompletionPatchError
 from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.integrations.linkedin.profile_service import get_or_fetch_profile
-from services.integrations.linkedin.profile_validation_service import get_or_validate_profile_context
+from services.integrations.linkedin.profile_validation_service import (
+    get_or_validate_profile_context,
+    refresh_validation_with_optimization_progress,
+)
 from services.integrations.linkedin.profile_validation_types import ProfileValidationResult
 from services.integrations.linkedin.types import CreatePostRequest, LinkedInNotConnectedError
 from services.integrations.linkedin.exceptions import LinkedInDuplicateContentError
@@ -325,6 +328,17 @@ def _validation_result_to_response(
         completeness_score=int(validation.get("completeness_score") or 0),
         missing_fields=list(validation.get("missing_fields") or []),
         optional_missing_fields=list(validation.get("optional_missing_fields") or []),
+        optimization_score=(
+            int(validation["optimization_score"])
+            if validation.get("optimization_score") is not None
+            else None
+        ),
+        optimization_gaps_count=(
+            int(validation["optimization_gaps_count"])
+            if validation.get("optimization_gaps_count") is not None
+            else None
+        ),
+        score_basis=validation.get("score_basis"),
     )
 
 
@@ -756,6 +770,8 @@ def _profile_optimization_meta_to_response(
 def _batch_action_response_from_items(
     items: list[dict[str, Any]],
     meta: ProfileOptimizationAcquireMeta,
+    *,
+    profile_validation: ProfileValidationResult | None = None,
 ) -> ProfileOptimizationBatchActionResponse:
     """Build batch action API response from service-layer items and meta."""
     meta_response = _profile_optimization_meta_to_response(meta)
@@ -764,10 +780,16 @@ def _batch_action_response_from_items(
     response_items = [_optimization_dict_to_response(item) for item in items]
     remaining = meta_response.remaining_in_backlog
     show_next_batch_cta = len(response_items) == 0 and remaining > 0
+    validation_response = (
+        _validation_result_to_response(profile_validation)
+        if profile_validation
+        else None
+    )
     return ProfileOptimizationBatchActionResponse(
         profile_optimization=response_items,
         profile_optimization_meta=meta_response,
         show_next_batch_cta=show_next_batch_cta,
+        profile_validation=validation_response,
     )
 
 
@@ -1460,7 +1482,23 @@ async def complete_profile_optimization_recommendation(
         ) from exc
 
     try:
-        response = _batch_action_response_from_items(items, meta)
+        stored = repository.get_profile_optimization(user_id)
+        completed_ids: list[str] = []
+        if stored and isinstance(stored.get("meta"), dict):
+            raw_completed = stored["meta"].get("completed_ids")
+            if isinstance(raw_completed, list):
+                completed_ids = [str(item) for item in raw_completed if item]
+
+        updated_validation = refresh_validation_with_optimization_progress(
+            user_id,
+            completed_ids,
+            repository=repository,
+        )
+        response = _batch_action_response_from_items(
+            items,
+            meta,
+            profile_validation=updated_validation,
+        )
     except Exception as exc:
         logger.exception(
             "[ProfileOptimization] complete response mapping failed user_id={}: {}",
@@ -1474,12 +1512,17 @@ async def complete_profile_optimization_recommendation(
 
     logger.info(
         "[ProfileOptimization] POST /profile/optimization/{}/complete success user_id={} "
-        "active_count={} remaining_in_backlog={} show_next_batch_cta={}",
+        "active_count={} remaining_in_backlog={} show_next_batch_cta={} optimization_score={}",
         recommendation_id,
         user_id,
         len(response.profile_optimization),
         response.profile_optimization_meta.remaining_in_backlog,
         response.show_next_batch_cta,
+        (
+            response.profile_validation.optimization_score
+            if response.profile_validation
+            else None
+        ),
     )
     return response
 
@@ -1620,6 +1663,10 @@ async def get_unipile_health(
 @router.get("/auth/url")
 async def get_authorization_url(
     state: Optional[str] = None,
+    callback_base: Optional[str] = Query(
+        None,
+        description="Optional backend base URL for OAuth redirect (localhost dev)",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, str]:
     """Return OAuth authorization URL for Zernio, Unipile, or native LinkedIn connect."""
@@ -1627,7 +1674,12 @@ async def get_authorization_url(
     logger.info(f"[LinkedInConnect] auth URL requested user_id={user_id}")
     try:
         oauth_state = state or str(uuid.uuid4())
-        payload = await _oauth_service.generate_authorization_url(user_id, oauth_state)
+        validated_callback_base = _oauth_service.validate_callback_base(callback_base)
+        payload = await _oauth_service.generate_authorization_url(
+            user_id,
+            oauth_state,
+            callback_base=validated_callback_base,
+        )
         logger.info(
             f"[LinkedInConnect] auth URL generated user_id={user_id} provider={payload.get('provider')}"
         )

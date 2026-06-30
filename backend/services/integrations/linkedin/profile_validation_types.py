@@ -39,6 +39,10 @@ class ProfileValidationResult(TypedDict, total=False):
     completeness_score: int
     missing_fields: list[str]
     optional_missing_fields: list[str]
+    # Rubric-based LinkedIn best-practice score (Phase A — content quality heuristics).
+    optimization_score: int
+    optimization_gaps_count: int
+    score_basis: Literal["rubric", "completeness_fallback"]
 
 
 def is_field_empty(value: Any) -> bool:

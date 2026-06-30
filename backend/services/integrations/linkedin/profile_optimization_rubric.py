@@ -17,7 +17,10 @@ from services.integrations.linkedin.profile_optimization_types import (
     ProfileSection,
     gap_severity_rank,
 )
-from services.integrations.linkedin.profile_validation_types import is_field_empty
+from services.integrations.linkedin.profile_validation_types import (
+    ProfileValidationResult,
+    is_field_empty,
+)
 
 _LOG_PREFIX = "[ProfileOptimization]"
 
@@ -445,3 +448,101 @@ def _field_to_section(field_key: str) -> ProfileSection:
         "profile_picture": "profile_photo",
     }
     return mapping.get(field_key, "headline")
+
+
+# Penalty weights for rubric-based profile strength (Phase A — no LLM).
+_SEVERITY_PENALTY: dict[str, int] = {"High": 10, "Medium": 5, "Low": 2}
+
+
+def compute_profile_optimization_score(gaps: list[DetectedGap]) -> int:
+    """
+    Derive a 0–100 optimization score from detected rubric gaps.
+
+    Starts at 100 and subtracts severity-weighted penalties (floor 0).
+    """
+    penalty = sum(_SEVERITY_PENALTY.get(gap.severity, 0) for gap in gaps)
+    return max(0, 100 - penalty)
+
+
+def enrich_profile_validation_strength(
+    profile_context: dict[str, Any],
+    validation: ProfileValidationResult,
+) -> ProfileValidationResult:
+    """
+    Attach rubric-based optimization score to Phase 3 validation.
+
+    Evaluates content quality heuristics (headline depth, summary length,
+    skills count, etc.) — not merely field presence.
+    """
+    try:
+        gaps = detect_profile_optimization_gaps(profile_context, validation)
+    except ProfileOptimizationRubricError as exc:
+        logger.warning(
+            "{} enrich_profile_validation_strength rubric failed: {}",
+            _LOG_PREFIX,
+            exc,
+        )
+        fallback = int(validation.get("completeness_score") or 0)
+        return {
+            **validation,
+            "optimization_score": fallback,
+            "optimization_gaps_count": 0,
+            "score_basis": "completeness_fallback",
+        }
+
+    score = compute_profile_optimization_score(gaps)
+    enriched: ProfileValidationResult = {
+        **validation,
+        "optimization_score": score,
+        "optimization_gaps_count": len(gaps),
+        "score_basis": "rubric",
+    }
+    logger.info(
+        "{} enrich_profile_validation_strength score={} gaps={}",
+        _LOG_PREFIX,
+        score,
+        len(gaps),
+    )
+    return enriched
+
+
+# Phase B — reward marking optimization backlog items done/skipped (capped boost).
+_PROGRESS_BOOST_PER_ITEM = 3
+_MAX_PROGRESS_BOOST = 15
+
+
+def apply_optimization_progress_boost(base_score: int, completed_count: int) -> int:
+    """Add up to +15 points for completed optimization items (3 per item)."""
+    if completed_count <= 0:
+        return max(0, min(100, base_score))
+    boost = min(_MAX_PROGRESS_BOOST, completed_count * _PROGRESS_BOOST_PER_ITEM)
+    return min(100, base_score + boost)
+
+
+def enrich_validation_with_progress_boost(
+    profile_context: dict[str, Any],
+    validation: ProfileValidationResult,
+    completed_ids: list[str],
+) -> ProfileValidationResult:
+    """
+    Recompute rubric score and apply progress boost from completed Phase 7 items.
+
+    Profile content is unchanged when items are marked done/skipped; the boost
+    reflects user progress through the optimization backlog.
+    """
+    enriched = enrich_profile_validation_strength(profile_context, validation)
+    base_score = int(enriched.get("optimization_score") or 0)
+    count = len(completed_ids) if isinstance(completed_ids, list) else 0
+    boosted = apply_optimization_progress_boost(base_score, count)
+    progress_boost = boosted - base_score
+    enriched["optimization_score"] = boosted
+    if progress_boost > 0:
+        enriched["score_basis"] = "rubric_with_progress"
+    logger.info(
+        "{} enrich_validation_with_progress_boost base={} completed={} boosted={}",
+        _LOG_PREFIX,
+        base_score,
+        count,
+        boosted,
+    )
+    return enriched

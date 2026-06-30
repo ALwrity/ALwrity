@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from services.integrations.linkedin.profile_optimization_rubric import (
+    apply_optimization_progress_boost,
+    compute_profile_optimization_score,
     detect_profile_optimization_gaps,
+    enrich_profile_validation_strength,
+    enrich_validation_with_progress_boost,
 )
 
 
@@ -127,3 +131,61 @@ def test_gaps_sorted_by_severity() -> None:
     assert len(severities) >= 2
     for index in range(len(severities) - 1):
         assert rank[severities[index]] <= rank[severities[index + 1]]
+
+
+def test_strong_profile_scores_high() -> None:
+    gaps = detect_profile_optimization_gaps(_base_context(), _complete_validation())
+    score = compute_profile_optimization_score(gaps)
+    assert score >= 85
+
+
+def test_title_only_headline_scores_lower_than_strong() -> None:
+    strong_gaps = detect_profile_optimization_gaps(_base_context(), _complete_validation())
+    weak_context = _base_context(
+        personal_information={
+            "headline": "Software Engineer",
+            "about": _base_context()["personal_information"]["about"],
+        }
+    )
+    weak_gaps = detect_profile_optimization_gaps(weak_context, _complete_validation())
+    assert compute_profile_optimization_score(weak_gaps) < compute_profile_optimization_score(
+        strong_gaps
+    )
+
+
+def test_enrich_validation_attaches_rubric_score() -> None:
+    validation = _complete_validation()
+    enriched = enrich_profile_validation_strength(_base_context(), validation)
+    assert enriched["score_basis"] == "rubric"
+    assert isinstance(enriched["optimization_score"], int)
+    assert 0 <= enriched["optimization_score"] <= 100
+    assert enriched["optimization_gaps_count"] == len(
+        detect_profile_optimization_gaps(_base_context(), validation)
+    )
+    assert enriched["completeness_score"] == 100
+    assert enriched["optimization_score"] < 100 or enriched["optimization_gaps_count"] == 0
+
+
+def test_apply_optimization_progress_boost_caps_at_fifteen() -> None:
+    assert apply_optimization_progress_boost(60, 0) == 60
+    assert apply_optimization_progress_boost(60, 1) == 63
+    assert apply_optimization_progress_boost(60, 5) == 75
+    assert apply_optimization_progress_boost(60, 10) == 75
+    assert apply_optimization_progress_boost(90, 10) == 100
+
+
+def test_enrich_validation_with_progress_boost_increments_score() -> None:
+    validation = _complete_validation()
+    context = _base_context(
+        personal_information={
+            "headline": "Software Engineer",
+            "about": _base_context()["personal_information"]["about"],
+        }
+    )
+    base = enrich_profile_validation_strength(context, validation)
+    boosted = enrich_validation_with_progress_boost(context, validation, ["a", "b", "c"])
+    assert boosted["optimization_score"] == apply_optimization_progress_boost(
+        int(base["optimization_score"] or 0),
+        3,
+    )
+    assert boosted["score_basis"] == "rubric_with_progress"

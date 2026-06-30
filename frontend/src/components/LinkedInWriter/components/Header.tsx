@@ -6,8 +6,17 @@ import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformP
 import HeaderControls from '../../shared/HeaderControls';
 import BrainstormFlow from './BrainstormFlow';
 import { OptimiseProfileControl } from './dashboard/OptimiseProfileControl';
-import { getProfileStrengthLabel } from './dashboard/ProfileAnalysisReadyModal';
+import {
+  getDisplayProfileStrengthPercent,
+  getProfileStrengthDisplayLabel,
+  getProfileStrengthTooltip,
+} from '../utils/profileStrengthUtils';
+import {
+  PROFILE_STRENGTH_UPDATED_EVENT,
+  type ProfileStrengthUpdatedDetail,
+} from '../utils/profileStrengthEvents';
 import { getLinkedInProfileFoundation } from '../../../api/linkedinSocial';
+import type { LinkedInProfileValidation } from '../../../api/linkedinSocial';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 
 const NAV_BG = '#BCE0FD';
@@ -44,6 +53,9 @@ export const Header: React.FC<HeaderProps> = ({
   } | null>(null);
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
   const [profileStrengthPercent, setProfileStrengthPercent] = useState<number | null>(null);
+  const [profileValidation, setProfileValidation] = useState<LinkedInProfileValidation | null>(
+    null
+  );
   const [profileStrengthLoading, setProfileStrengthLoading] = useState(false);
   const { corePersona, platformPersona } = usePlatformPersonaContext();
   
@@ -153,6 +165,7 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     if (!connected) {
       setProfileStrengthPercent(null);
+      setProfileValidation(null);
       setProfileStrengthLoading(false);
       return;
     }
@@ -163,12 +176,14 @@ export const Header: React.FC<HeaderProps> = ({
     getLinkedInProfileFoundation()
       .then((data) => {
         if (!cancelled) {
-          setProfileStrengthPercent(data.profile_validation?.completeness_score ?? null);
+          setProfileValidation(data.profile_validation ?? null);
+          setProfileStrengthPercent(getDisplayProfileStrengthPercent(data.profile_validation));
         }
       })
       .catch(() => {
         if (!cancelled) {
           setProfileStrengthPercent(null);
+          setProfileValidation(null);
         }
       })
       .finally(() => {
@@ -181,6 +196,18 @@ export const Header: React.FC<HeaderProps> = ({
       cancelled = true;
     };
   }, [connected]);
+
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent<ProfileStrengthUpdatedDetail>).detail;
+      if (detail?.profileValidation) {
+        setProfileValidation(detail.profileValidation);
+        setProfileStrengthPercent(getDisplayProfileStrengthPercent(detail.profileValidation));
+      }
+    };
+    window.addEventListener(PROFILE_STRENGTH_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(PROFILE_STRENGTH_UPDATED_EVENT, handler);
+  }, []);
 
   const handlePersonaUpdate = (personaData: any) => {
     console.log('Persona updated in LinkedIn writer:', personaData);
@@ -202,8 +229,8 @@ export const Header: React.FC<HeaderProps> = ({
     window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
   };
 
-  const strengthLabel =
-    profileStrengthPercent != null ? getProfileStrengthLabel(profileStrengthPercent) : '';
+  const strengthLabel = getProfileStrengthDisplayLabel(profileValidation, profileStrengthPercent);
+  const strengthTooltip = getProfileStrengthTooltip(profileValidation);
 
   const togglePreferencesPanel = () => {
     onPreferencesModalChange(!showPreferencesModal);
@@ -280,6 +307,7 @@ export const Header: React.FC<HeaderProps> = ({
             onOptimiseProfile={handleOpenOptimiseProfile}
             profileStrengthPercent={connected ? profileStrengthPercent : null}
             strengthLabel={strengthLabel}
+            strengthTooltip={connected ? strengthTooltip : undefined}
             isLoading={profileStrengthLoading}
             variant="ticker"
           />

@@ -12,8 +12,12 @@ import { ProfileCompletionForm } from './ProfileCompletionForm';
 import {
   ProfileAnalysisReadyModal,
   buildProfileActionPoints,
-  getProfileStrengthLabel,
 } from '../dashboard/ProfileAnalysisReadyModal';
+import {
+  getDisplayProfileStrengthPercent,
+  getProfileStrengthDisplayLabel,
+  getProfileStrengthTooltip,
+} from '../../utils/profileStrengthUtils';
 import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
@@ -115,16 +119,17 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       foundationStatus === 'needs_completion' ||
       (foundationStatus === 'error' && !questions.length));
 
-  const profileStrengthPercent = profileValidation?.completeness_score ?? null;
-  const strengthLabel =
-    profileStrengthPercent != null ? getProfileStrengthLabel(profileStrengthPercent) : '';
+  const profileStrengthPercent = getDisplayProfileStrengthPercent(profileValidation);
+  const strengthLabel = getProfileStrengthDisplayLabel(profileValidation, profileStrengthPercent);
+  const strengthTooltip = getProfileStrengthTooltip(profileValidation);
 
   const actionPoints = useMemo(
     () =>
       buildProfileActionPoints(
         profileValidation?.missing_fields,
         profileValidation?.optional_missing_fields,
-        aiProfileIntelligence?.writing_opportunities
+        aiProfileIntelligence?.writing_opportunities,
+        profileValidation?.optimization_gaps_count
       ),
     [profileValidation, aiProfileIntelligence]
   );
@@ -230,6 +235,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         open={showAnalysisModal}
         profileStrengthPercent={profileStrengthPercent ?? 0}
         strengthLabel={strengthLabel}
+        strengthTooltip={strengthTooltip}
+        isProfileComplete={profileValidation?.is_profile_complete ?? false}
         actionPoints={actionPoints}
         onOptimiseProfile={handleOptimiseFromModal}
         onDismiss={dismissAnalysisModal}
@@ -255,8 +262,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         disconnectError={disconnectError}
         centered={centered}
         onOptimiseProfile={centered ? handleImproveProfile : undefined}
-        profileStrengthPercent={centered ? profileStrengthPercent : null}
-        strengthLabel={strengthLabel}
+        strengthTooltip={centered ? strengthTooltip : undefined}
         isOptimiseDisabled={isOptimizationDisabled || foundationStatus !== 'ready'}
         isOptimiseLoading={isOptimizationLoading}
         hideDisconnectButton={hideDisconnectButton}

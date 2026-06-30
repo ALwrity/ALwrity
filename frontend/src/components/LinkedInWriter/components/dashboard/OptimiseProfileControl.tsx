@@ -2,9 +2,10 @@ import React from 'react';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckIcon from '@mui/icons-material/Check';
 import StarIcon from '@mui/icons-material/Star';
+import { getProfileStrengthSegmentFillCount } from '../../utils/profileStrengthUtils';
 
-/** Matches Connect / Disconnect pill button height */
-export const PROFILE_ACTION_BTN_HEIGHT = 44;
+/** Larger button size for better visibility in the header nav */
+export const PROFILE_ACTION_BTN_HEIGHT = 64;
 
 const SEGMENT_COLORS = [
   '#4338ca',
@@ -19,15 +20,24 @@ const SEGMENT_COLORS = [
 interface ProfileStrengthTickerProps {
   percent: number;
   strengthLabel?: string;
+  strengthTooltip?: string;
 }
 
-function ProfileStrengthTicker({ percent, strengthLabel }: ProfileStrengthTickerProps) {
+function ProfileStrengthTicker({ percent, strengthLabel, strengthTooltip }: ProfileStrengthTickerProps) {
   const segments = 7;
   const clamped = Math.max(0, Math.min(100, percent));
-  const filledCount = Math.round((clamped / 100) * segments);
+  const filledCount = getProfileStrengthSegmentFillCount(clamped, segments);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+    <div
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}
+      title={strengthTooltip}
+      aria-label={
+        strengthTooltip
+          ? `${clamped}% profile strength. ${strengthTooltip}`
+          : `${clamped}% profile strength${strengthLabel ? `. ${strengthLabel}` : ''}`
+      }
+    >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{clamped}%</span>
         {strengthLabel && (
@@ -105,6 +115,7 @@ interface OptimiseProfileControlProps {
   onOptimiseProfile: () => void;
   profileStrengthPercent?: number | null;
   strengthLabel?: string;
+  strengthTooltip?: string;
   isDisabled?: boolean;
   isLoading?: boolean;
   variant?: 'ticker' | 'capsule';
@@ -114,6 +125,7 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
   onOptimiseProfile,
   profileStrengthPercent = null,
   strengthLabel = '',
+  strengthTooltip = '',
   isDisabled = false,
   isLoading = false,
   variant = 'ticker',
@@ -127,6 +139,7 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
         type="button"
         onClick={onOptimiseProfile}
         disabled={disabled}
+        title={strengthTooltip || label}
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -180,6 +193,7 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
         onClick={onOptimiseProfile}
         disabled={disabled}
         aria-label={label}
+        title={strengthTooltip || label}
         style={{
           width: btnSize,
           height: btnSize,
@@ -188,9 +202,9 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
           border: '2px solid #0a66c2',
           background: '#ffffff',
           color: '#0f172a',
-          fontSize: 8,
+          fontSize: 11,
           fontWeight: 700,
-          lineHeight: 1.1,
+          lineHeight: 1.2,
           cursor: disabled ? 'not-allowed' : 'pointer',
           opacity: disabled ? 0.65 : 1,
           display: 'flex',
@@ -198,8 +212,8 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
           alignItems: 'center',
           justifyContent: 'center',
           textAlign: 'center',
-          padding: 4,
-          boxShadow: '0 2px 6px rgba(10, 102, 194, 0.12)',
+          padding: 8,
+          boxShadow: '0 3px 10px rgba(10, 102, 194, 0.18)',
         }}
       >
         {isLoading ? (
@@ -213,7 +227,11 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
       </button>
 
       {profileStrengthPercent != null && (
-        <ProfileStrengthTicker percent={profileStrengthPercent} strengthLabel={strengthLabel} />
+        <ProfileStrengthTicker
+          percent={profileStrengthPercent}
+          strengthLabel={strengthLabel}
+          strengthTooltip={strengthTooltip}
+        />
       )}
     </div>
   );
