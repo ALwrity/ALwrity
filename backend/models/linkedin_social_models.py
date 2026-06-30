@@ -109,6 +109,15 @@ class ProfileValidationResponse(BaseModel):
     completeness_score: int
     missing_fields: List[str] = Field(default_factory=list)
     optional_missing_fields: List[str] = Field(default_factory=list)
+    optimization_score: Optional[int] = Field(
+        default=None,
+        description="Rubric-based LinkedIn best-practice score (0–100)",
+    )
+    optimization_gaps_count: Optional[int] = Field(
+        default=None,
+        description="Count of rubric gaps used to compute optimization_score",
+    )
+    score_basis: Optional[Literal["rubric", "rubric_with_progress", "completeness_fallback"]] = None
 
 
 class CompletionQuestionResponse(BaseModel):
@@ -215,6 +224,7 @@ class ProfileOptimizationBatchActionResponse(BaseModel):
     profile_optimization: List[ProfileOptimizationResponse] = Field(default_factory=list)
     profile_optimization_meta: ProfileOptimizationMetaResponse
     show_next_batch_cta: bool = False
+    profile_validation: Optional[ProfileValidationResponse] = None
 
 
 class ProfileAnalysisErrorResponse(BaseModel):

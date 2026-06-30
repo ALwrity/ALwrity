@@ -3,7 +3,8 @@
  * Separate from linkedInWriterApi.ts (content generation).
  */
 
-import { apiClient, ConnectionError, longRunningApiClient, NetworkError, RequestTimeoutError } from './client';
+import { apiClient, aiApiClient, ConnectionError, NetworkError, RequestTimeoutError } from './client';
+import { getApiBaseUrl } from '../utils/apiUrl';
 
 export interface LinkedInConnectionStatus {
   connected: boolean;
@@ -118,6 +119,10 @@ export interface LinkedInProfileValidation {
   completeness_score: number;
   missing_fields: string[];
   optional_missing_fields: string[];
+  /** Rubric-based best-practice score (0–100), when available from Phase 3 enrichment. */
+  optimization_score?: number | null;
+  optimization_gaps_count?: number | null;
+  score_basis?: 'rubric' | 'rubric_with_progress' | 'completeness_fallback' | null;
 }
 
 export type LinkedInCompletionInputType = 'text' | 'textarea' | 'tags';
@@ -204,6 +209,7 @@ export interface LinkedInProfileOptimizationBatchActionResponse {
   profile_optimization: LinkedInProfileOptimizationItem[];
   profile_optimization_meta: LinkedInProfileOptimizationMeta;
   show_next_batch_cta: boolean;
+  profile_validation?: LinkedInProfileValidation | null;
 }
 
 /** Structured failure from the LinkedIn analysis pipeline (Phases 1–7). */
@@ -274,14 +280,29 @@ export interface LinkedInPublishPostResponse {
 
 const BASE = '/api/linkedin-social';
 
+/** Profile Phases 5–7 can run multiple LLM calls in one GET /profile request. */
+const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 300_000;
+
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
   const response = await apiClient.get(`${BASE}/connection/status`);
   return response.data;
 }
 
 export async function getLinkedInAuthUrl(state?: string): Promise<LinkedInAuthUrlResponse> {
+  const params: Record<string, string> = {};
+  if (state) {
+    params.state = state;
+  }
+  // Tell backend to use localhost callback when frontend runs on localhost
+  // (avoids stale ngrok URLs in backend .env during local dev).
+  if (typeof window !== 'undefined') {
+    const { hostname } = window.location;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      params.callback_base = getApiBaseUrl();
+    }
+  }
   const response = await apiClient.get(`${BASE}/auth/url`, {
-    params: state ? { state } : undefined,
+    params: Object.keys(params).length ? params : undefined,
   });
   return response.data;
 }
@@ -456,19 +477,20 @@ export async function getLinkedInProfile(
     params.debug_profile_optimization_gaps = true;
   }
 
-  const needsLongRunningClient =
+  const needsAiClient =
     options.refreshIntelligence ||
     options.refreshRecommendations ||
     options.includeRecommendations ||
     options.refreshProfileOptimization ||
     options.includeProfileOptimization;
 
-  const client = needsLongRunningClient ? longRunningApiClient : apiClient;
+  const client = needsAiClient ? aiApiClient : apiClient;
 
   console.info('[LinkedInProfile] GET /profile', params);
 
   const response = await client.get(`${BASE}/profile`, {
     params: Object.keys(params).length > 0 ? params : undefined,
+    ...(needsAiClient ? { timeout: LINKEDIN_PROFILE_AI_TIMEOUT_MS } : {}),
   });
   return response.data;
 }

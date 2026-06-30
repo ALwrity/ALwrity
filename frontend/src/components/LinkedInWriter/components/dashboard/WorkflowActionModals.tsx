@@ -128,12 +128,12 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             justifyContent: 'center',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: 140 }}>
+          <div style={{ width: 140, flexShrink: 0 }}>
             <DashboardToolTile
               title="Get Topic Ideas"
+              description="AI-powered topic suggestions based on your profile"
               icon="💡"
               accent="#0a66c2"
-              variant="pill"
               onClick={openTopicIdeas}
             />
           </div>

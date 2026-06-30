@@ -11,6 +11,7 @@ import {
   type LinkedInProfileOptimizationItem,
   type LinkedInProfileOptimizationMeta,
 } from '../api/linkedinSocial';
+import { dispatchProfileStrengthUpdated } from '../components/LinkedInWriter/utils/profileStrengthEvents';
 
 const LOG_PREFIX = '[ProfileOptimization]';
 
@@ -46,11 +47,15 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setShowNextBatchCta(Boolean(data.show_next_batch_cta));
       setPanelState('complete');
       setIsOptimizationExpanded(true);
+      if (data.profile_validation) {
+        dispatchProfileStrengthUpdated(data.profile_validation);
+      }
       console.info(`${LOG_PREFIX} batch action applied`, {
         activeCount: data.profile_optimization.length,
         remainingInBacklog: data.profile_optimization_meta.remaining_in_backlog ?? 0,
         showNextBatchCta: data.show_next_batch_cta,
         batchIndex: data.profile_optimization_meta.active_batch_index ?? 0,
+        optimizationScore: data.profile_validation?.optimization_score ?? null,
       });
     },
     []

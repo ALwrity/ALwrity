@@ -2,25 +2,30 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { OptimiseProfileControl } from './OptimiseProfileControl';
+import { getProfileStrengthLabel as getProfileStrengthLabelImpl } from '../../utils/profileStrengthUtils';
 
 interface ProfileAnalysisReadyModalProps {
   open: boolean;
   profileStrengthPercent: number;
   strengthLabel: string;
+  strengthTooltip?: string;
   actionPoints: string[];
   onOptimiseProfile: () => void;
   onDismiss: () => void;
   isOptimiseDisabled?: boolean;
+  isProfileComplete?: boolean;
 }
 
 export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps> = ({
   open,
   profileStrengthPercent,
   strengthLabel,
+  strengthTooltip = '',
   actionPoints,
   onOptimiseProfile,
   onDismiss,
   isOptimiseDisabled = false,
+  isProfileComplete = true,
 }) => {
   if (!open) return null;
 
@@ -91,14 +96,21 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
         </div>
 
         <div style={{ padding: '22px 24px' }}>
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+            {isProfileComplete
+              ? 'Your score reflects LinkedIn best-practice checks — headline depth, summary, skills, photo, and more.'
+              : 'Finish required profile fields to unlock your full optimization score.'}
+          </p>
+
           <div
             style={{
               display: 'flex',
               alignItems: 'baseline',
               gap: 8,
-              marginBottom: 16,
+              marginBottom: strengthTooltip ? 8 : 16,
               flexWrap: 'wrap',
             }}
+            title={strengthTooltip}
           >
             <span style={{ fontSize: 14, color: '#64748b', fontWeight: 600 }}>Profile strength</span>
             <span style={{ fontSize: 28, fontWeight: 800, color: '#059669' }}>
@@ -106,6 +118,12 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
             </span>
             <span style={{ fontSize: 13, color: '#475569' }}>{strengthLabel}</span>
           </div>
+
+          {strengthTooltip && (
+            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#94a3b8', lineHeight: 1.45 }}>
+              {strengthTooltip}
+            </p>
+          )}
 
           {actionPoints.length > 0 && (
             <>
@@ -135,6 +153,7 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
               onOptimiseProfile={onOptimiseProfile}
               profileStrengthPercent={profileStrengthPercent}
               strengthLabel={strengthLabel}
+              strengthTooltip={strengthTooltip}
               isDisabled={isOptimiseDisabled}
               variant="capsule"
             />
@@ -164,15 +183,14 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
 };
 
 export function getProfileStrengthLabel(percent: number): string {
-  if (percent >= 85) return 'Well optimised';
-  if (percent >= 65) return 'Optimised (Needs more info)';
-  return 'Needs improvement';
+  return getProfileStrengthLabelImpl(percent);
 }
 
 export function buildProfileActionPoints(
   missingFields: string[] = [],
   optionalMissing: string[] = [],
-  fallbackTips: string[] = []
+  fallbackTips: string[] = [],
+  optimizationGapsCount?: number | null
 ): string[] {
   const formatField = (field: string) =>
     field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -183,6 +201,16 @@ export function buildProfileActionPoints(
 
   if (combined.length > 0) return combined.slice(0, 4);
   if (fallbackTips.length > 0) return fallbackTips.slice(0, 4);
+
+  if ((optimizationGapsCount ?? 0) > 0) {
+    const gapLabel = optimizationGapsCount === 1 ? 'area' : 'areas';
+    return [
+      `${optimizationGapsCount} improvement ${gapLabel} found from LinkedIn best practices`,
+      'Open Optimise Profile for step-by-step suggestions',
+      'Strengthen your headline for clearer positioning',
+      'Expand your About section with outcomes and keywords',
+    ].slice(0, 4);
+  }
 
   return [
     'Strengthen your headline for clearer positioning',
