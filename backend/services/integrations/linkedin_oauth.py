@@ -1082,9 +1082,8 @@ class LinkedInOAuthService(OAuthProviderBase):
         """
         Best-effort sync from Unipile when credentials exist remotely but not in ALwrity.
 
-        Matches accounts by hosted-auth ``name`` (ALwrity user id). If no match is found
-        but running LinkedIn accounts exist on Unipile, links the most recently created
-        account as a recovery path for failed callback redirects.
+        Matches accounts by hosted-auth ``name`` (ALwrity user id) or account detail
+        fields. Returns False if no match is found — user must complete OAuth flow.
         """
         if os.getenv("LINKEDIN_PROVIDER", "zernio").lower() != "unipile":
             return False
@@ -1164,24 +1163,11 @@ class LinkedInOAuthService(OAuthProviderBase):
                         status="success",
                     )
 
-        candidates.sort(
-            key=lambda item: str(item.get("created_at") or item.get("created_on") or ""),
-            reverse=True,
+        logger.info(
+            f"[LinkedInConnect] Unipile sync found no matching account for user_id={user_id} "
+            f"(total_candidates={len(candidates)}); user must complete OAuth flow"
         )
-        latest_account_id = _account_id(candidates[0])
-        if not latest_account_id:
-            return False
-
-        logger.warning(
-            f"[LinkedInConnect] Unipile sync recovery linking latest account "
-            f"account_id={latest_account_id} to user_id={user_id} "
-            f"(remote_count={len(candidates)})"
-        )
-        return await self.handle_unipile_callback(
-            user_id=user_id,
-            account_id=latest_account_id,
-            status="success",
-        )
+        return False
 
     def _get_redirect_uri(self) -> str:
         configured = os.getenv("LINKEDIN_SOCIAL_REDIRECT_URI")

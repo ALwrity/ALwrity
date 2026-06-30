@@ -1566,9 +1566,6 @@ async def get_connection_status(
         if status.get("provider") == "zernio":
             _oauth_service.try_sync_zernio_accounts(user_id)
             status = _oauth_service.get_connection_status(user_id)
-    elif status.get("provider") == "unipile":
-        if await _oauth_service.try_sync_unipile_accounts(user_id):
-            status = _oauth_service.get_connection_status(user_id)
 
     organizations: List[Dict[str, Any]] = []
     if status.get("connected") and status.get("accounts"):
