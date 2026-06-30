@@ -87,7 +87,8 @@ class SitemapService:
         analyze_content_trends: bool = True,
         analyze_publishing_patterns: bool = True,
         include_ai_insights: bool = True,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        max_urls: Optional[int] = None
     ) -> Dict[str, Any]:
         """
         Analyze website sitemap for structure and patterns
@@ -96,6 +97,8 @@ class SitemapService:
             sitemap_url: URL of the sitemap to analyze
             analyze_content_trends: Whether to analyze content trends
             analyze_publishing_patterns: Whether to analyze publishing patterns
+            max_urls: Maximum number of URLs to collect from the sitemap (helps
+                      avoid parsing the entire sitemap when only a subset is needed)
             
         Returns:
             Dictionary containing sitemap analysis and AI insights
@@ -109,7 +112,7 @@ class SitemapService:
             logger.info(f"Analyzing sitemap: {sitemap_url}")
             
             # Fetch and parse sitemap data
-            sitemap_data = await self._fetch_sitemap_data(sitemap_url)
+            sitemap_data = await self._fetch_sitemap_data(sitemap_url, max_urls=max_urls)
             
             if not sitemap_data:
                 raise Exception("Failed to fetch sitemap data")
@@ -265,7 +268,7 @@ class SitemapService:
         assert last_exc is not None
         raise last_exc
 
-    async def _fetch_sitemap_data(self, sitemap_url: str, depth: int = 0, session: aiohttp.ClientSession = None) -> Dict[str, Any]:
+    async def _fetch_sitemap_data(self, sitemap_url: str, depth: int = 0, session: aiohttp.ClientSession = None, max_urls: Optional[int] = None) -> Dict[str, Any]:
         """Fetch and parse sitemap data"""
         
         # Reduced max depth from 3 to 2 to prevent infinite recursion/hanging on massive sites
@@ -367,8 +370,14 @@ class SitemapService:
                         # Fetch and parse nested sitemaps in parallel
                         nested_tasks = []
                         # Reduced nested limit from 10 to 5 to prevent fan-out explosion
-                        for nested_url in sitemaps[:5]: 
-                            nested_tasks.append(self._fetch_sitemap_data(nested_url, depth + 1, session))
+                        # If max_urls is set, we may need fewer nested sitemaps
+                        nested_limit = 5
+                        if max_urls is not None:
+                            # Only fetch enough sitemaps to cover max_urls (estimate ~10 URLs each)
+                            nested_limit = min(5, max(1, (max_urls + 9) // 10))
+                        for nested_url in sitemaps[:nested_limit]: 
+                            remaining = max_urls - len(urls) if max_urls is not None else None
+                            nested_tasks.append(self._fetch_sitemap_data(nested_url, depth + 1, session, max_urls=remaining))
                         
                         if nested_tasks:
                             nested_results = await asyncio.gather(*nested_tasks, return_exceptions=True)
@@ -377,13 +386,18 @@ class SitemapService:
                                     logger.warning(f"Failed to fetch nested sitemap: {res}")
                                 elif isinstance(res, dict):
                                     urls.extend(res.get("urls", []))
+                                    if max_urls is not None and len(urls) >= max_urls:
+                                        urls = urls[:max_urls]
+                                        break
                     
                     else:
                         # Regular sitemap with URLs
                         # Limit to first 10k URLs per sitemap file to prevent memory issues
+                        # If max_urls is set, use it instead (but cap at 10k to prevent abuse)
+                        per_file_limit = min(max_urls, 10000) if max_urls is not None else 10000
                         url_count = 0
                         for url_element in root:
-                            if url_count >= 10000:
+                            if url_count >= per_file_limit:
                                 break
                                 
                             if url_element.tag.endswith('url'):
