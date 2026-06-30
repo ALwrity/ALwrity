@@ -458,7 +458,6 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
   const isStale = oldestMs > 0 && (Date.now() - oldestMs) > 30 * 60 * 1000;
 
   const formatTimeAgo = (dateStr: string | null | undefined): string => {
-    void tick; // reference tick to ensure re-render when interval fires
     if (!dateStr) return '';
     const ms = Date.now() - new Date(dateStr).getTime();
     const min = Math.floor(ms / 60000);

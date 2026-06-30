@@ -56,7 +56,7 @@ interface BackgroundJobManagerProps {
 }
 
 const BackgroundJobManager: React.FC<BackgroundJobManagerProps> = ({
-  siteUrl = 'https://www.alwrity.com/',
+  siteUrl,
   days = 30,
   onJobCompleted,
 }) => {
@@ -85,6 +85,10 @@ const BackgroundJobManager: React.FC<BackgroundJobManagerProps> = ({
 
   // Create Bing comprehensive insights job
   const createComprehensiveInsightsJob = async () => {
+    if (!siteUrl) {
+      alert('Cannot create job: no site URL configured');
+      return;
+    }
     setLoading(true);
     try {
       const response = await apiClient.post(
@@ -111,6 +115,10 @@ const BackgroundJobManager: React.FC<BackgroundJobManagerProps> = ({
 
   // Create Bing data collection job
   const createDataCollectionJob = async () => {
+    if (!siteUrl) {
+      alert('Cannot create job: no site URL configured');
+      return;
+    }
     setLoading(true);
     try {
       const response = await apiClient.post(
