@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth } from '@clerk/clerk-react';
 
 import {
 
@@ -36,11 +37,12 @@ export type LinkedInPostTarget = 'profile' | 'organization';
 
 
 
-const STORAGE_ACCOUNT = 'linkedin_social_selected_account';
+const storageKey = (key: string, userId: string): string =>
+  `linkedin_social_${key}_${userId}`;
 
-const STORAGE_TARGET = 'linkedin_social_selected_target';
-
-const STORAGE_ORG = 'linkedin_social_selected_org';
+const LEGACY_STORAGE_ACCOUNT = 'linkedin_social_selected_account';
+const LEGACY_STORAGE_TARGET = 'linkedin_social_selected_target';
+const LEGACY_STORAGE_ORG = 'linkedin_social_selected_org';
 
 
 
@@ -67,6 +69,8 @@ function statusAccountsToLinkedInAccounts(
 
 
 export const useLinkedInSocialConnection = () => {
+  const { userId } = useAuth();
+  const uid = userId || '';
 
   const [status, setStatus] = useState<LinkedInConnectionStatus | null>(null);
 
@@ -248,13 +252,17 @@ export const useLinkedInSocialConnection = () => {
 
 
 
-    const storedAccount = localStorage.getItem(STORAGE_ACCOUNT) || '';
+    const storedAccount = uid
+      ? (localStorage.getItem(storageKey('selected_account', uid)) || '')
+      : (localStorage.getItem(LEGACY_STORAGE_ACCOUNT) || '');
 
-    const storedTarget =
+    const storedTarget = uid
+      ? (localStorage.getItem(storageKey('selected_target', uid)) as LinkedInPostTarget) || 'profile'
+      : (localStorage.getItem(LEGACY_STORAGE_TARGET) as LinkedInPostTarget) || 'profile';
 
-      (localStorage.getItem(STORAGE_TARGET) as LinkedInPostTarget) || 'profile';
-
-    const storedOrg = localStorage.getItem(STORAGE_ORG) || '';
+    const storedOrg = uid
+      ? localStorage.getItem(storageKey('selected_org', uid)) || ''
+      : localStorage.getItem(LEGACY_STORAGE_ORG) || '';
 
 
 
@@ -352,7 +360,7 @@ export const useLinkedInSocialConnection = () => {
 
     }
 
-  }, [loadOrganizations]);
+  }, [loadOrganizations, uid]);
 
 
 
@@ -361,6 +369,14 @@ export const useLinkedInSocialConnection = () => {
     checkStatus();
 
   }, [checkStatus]);
+
+  useEffect(() => {
+    if (uid) {
+      localStorage.removeItem(LEGACY_STORAGE_ACCOUNT);
+      localStorage.removeItem(LEGACY_STORAGE_TARGET);
+      localStorage.removeItem(LEGACY_STORAGE_ORG);
+    }
+  }, [uid]);
 
 
 
@@ -386,13 +402,17 @@ export const useLinkedInSocialConnection = () => {
 
       setSelectedAccountId(accountId);
 
-      localStorage.setItem(STORAGE_ACCOUNT, accountId);
+      if (uid) {
+        localStorage.setItem(storageKey('selected_account', uid), accountId);
+      } else {
+        localStorage.setItem(LEGACY_STORAGE_ACCOUNT, accountId);
+      }
 
       await loadOrganizations(accountId);
 
     },
 
-    [loadOrganizations]
+    [loadOrganizations, uid]
 
   );
 
@@ -402,9 +422,13 @@ export const useLinkedInSocialConnection = () => {
 
     setSelectedTarget(target);
 
-    localStorage.setItem(STORAGE_TARGET, target);
+    if (uid) {
+      localStorage.setItem(storageKey('selected_target', uid), target);
+    } else {
+      localStorage.setItem(LEGACY_STORAGE_TARGET, target);
+    }
 
-  }, []);
+  }, [uid]);
 
 
 
@@ -412,19 +436,29 @@ export const useLinkedInSocialConnection = () => {
 
     setSelectedOrgId(orgId);
 
-    localStorage.setItem(STORAGE_ORG, orgId);
+    if (uid) {
+      localStorage.setItem(storageKey('selected_org', uid), orgId);
+    } else {
+      localStorage.setItem(LEGACY_STORAGE_ORG, orgId);
+    }
 
-  }, []);
+  }, [uid]);
 
 
 
   const clearSelectionStorage = useCallback(() => {
 
-    localStorage.removeItem(STORAGE_ACCOUNT);
+    localStorage.removeItem(LEGACY_STORAGE_ACCOUNT);
 
-    localStorage.removeItem(STORAGE_TARGET);
+    localStorage.removeItem(LEGACY_STORAGE_TARGET);
 
-    localStorage.removeItem(STORAGE_ORG);
+    localStorage.removeItem(LEGACY_STORAGE_ORG);
+
+    if (uid) {
+      localStorage.removeItem(storageKey('selected_account', uid));
+      localStorage.removeItem(storageKey('selected_target', uid));
+      localStorage.removeItem(storageKey('selected_org', uid));
+    }
 
     setSelectedAccountId('');
 
@@ -432,7 +466,7 @@ export const useLinkedInSocialConnection = () => {
 
     setSelectedOrgId('');
 
-  }, []);
+  }, [uid]);
 
 
 

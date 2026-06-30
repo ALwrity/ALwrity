@@ -201,11 +201,8 @@ class YouTubeOAuthService(OAuthProviderBase):
                 return {"success": False, "error": "Invalid state format"}
 
             user_id = state.split(":")[0]
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
-
-            if not os.path.exists(db_path):
-                logger.error(f"YouTube OAuth: user DB not found for {user_id}")
-                return {"success": False, "error": "User database not found"}
 
             # Verify state
             with sqlite3.connect(db_path) as conn:
@@ -339,9 +336,8 @@ class YouTubeOAuthService(OAuthProviderBase):
             google.oauth2.credentials.Credentials or None
         """
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
-            if not os.path.exists(db_path):
-                return None
 
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
@@ -422,9 +418,8 @@ class YouTubeOAuthService(OAuthProviderBase):
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
         """Get YouTube connection status for a user."""
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
-            if not os.path.exists(db_path):
-                return {"connected": False, "channels": []}
 
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()

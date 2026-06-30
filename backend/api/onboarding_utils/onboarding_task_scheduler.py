@@ -5,6 +5,7 @@ and onboarding_completion_service.py (Step 6).
 All scheduling is non-blocking -- step completion never fails on scheduling errors.
 """
 
+import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
@@ -258,6 +259,21 @@ def schedule_step4_tasks(user_id: str, db: Optional[Session] = None):
             _record_task_in_session(db, user_id, "facebook_persona", step=4)
     except Exception as e:
         logger.warning(f"[onboarding_step4] Non-blocking: failed to schedule Facebook persona: {e}")
+
+
+async def _immediate_sif_index(user_id: str, website_url: str):
+    """Fire SIFIntegrationService.sync_user_website_content() right now.
+
+    Best-effort immediate indexing — if it fails, the scheduler's
+    SIFIndexingTask (created by schedule_step2_tasks) still picks it up later.
+    """
+    from services.intelligence.sif_integration import SIFIntegrationService
+    try:
+        sif = SIFIntegrationService(user_id)
+        await sif.sync_user_website_content(website_url)
+        logger.success(f"[SIF] Immediate indexing done for {website_url}")
+    except Exception:
+        logger.warning(f"[SIF] Immediate indexing failed — scheduler still has it")
 
 
 def schedule_step5_tasks(user_id: str, db: Session):

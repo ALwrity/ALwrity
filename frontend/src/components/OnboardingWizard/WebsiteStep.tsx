@@ -12,7 +12,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  DialogContentText
+  DialogContentText,
+  Fade
 } from '@mui/material';
 import {
   Analytics as AnalyticsIcon,
@@ -26,6 +27,7 @@ import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSec
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
 import PlatformSection from './common/PlatformSection';
 import EmailSection from './common/EmailSection';
+import PlatformAnalytics from '../shared/PlatformAnalytics';
 
 // Import API client for saving
 import { apiClient } from '../../api/client';
@@ -627,6 +629,18 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             connectedPlatforms={connectedPlatforms}
             setConnectedPlatforms={setConnectedPlatforms}
           />
+
+          {(connectedPlatforms.includes('gsc') || connectedPlatforms.includes('bing')) && (
+            <Fade in timeout={800}>
+              <Box sx={{ mt: 3 }}>
+                <PlatformAnalytics
+                  platforms={['gsc', 'bing']}
+                  showSummary
+                  refreshInterval={0}
+                />
+              </Box>
+            </Fade>
+          )}
         </>
       )}
 

@@ -17,8 +17,8 @@ from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("deep_competitor_analysis_executor")
 
-DEEP_COMPETITOR_TIMEOUT_SECONDS = 300  # 5-minute hard timeout
-DEEP_COMPETITOR_MAX_COMPETITORS = 10   # cap to reduce API pressure
+DEEP_COMPETITOR_TIMEOUT_SECONDS = 600  # 10-minute hard timeout (was 300)
+DEEP_COMPETITOR_MAX_COMPETITORS = 3    # cap to reduce LLM pressure (was 10)
 
 
 class DeepCompetitorAnalysisExecutor(TaskExecutor):
