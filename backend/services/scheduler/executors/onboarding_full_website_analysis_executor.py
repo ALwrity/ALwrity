@@ -2,7 +2,7 @@ import asyncio
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Set
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
 import aiohttp
 from bs4 import BeautifulSoup
@@ -25,6 +25,7 @@ from services.seo_analyzer.analyzers import (
     AccessibilityAnalyzer,
     UserExperienceAnalyzer
 )
+from services.seo_tools.sitemap_service import SitemapService
 
 
 class OnboardingFullWebsiteAnalysisExecutor(TaskExecutor):
@@ -152,93 +153,38 @@ class OnboardingFullWebsiteAnalysisExecutor(TaskExecutor):
 
     async def _discover_urls(self, website_url: str, max_urls: int) -> List[str]:
         base = self._normalize_url(website_url)
-        parsed = urlparse(base)
-        root = f"{parsed.scheme}://{parsed.netloc}"
 
-        sitemap_urls: List[str] = []
+        sitemap_service = SitemapService()
+        sitemap_url = await sitemap_service.discover_sitemap_url(base)
+        if not sitemap_url:
+            return [base]
 
-        robots = await self._fetch_text(urljoin(root, "/robots.txt"))
-        if robots:
-            for line in robots.splitlines():
-                if line.lower().startswith("sitemap:"):
-                    sitemap_urls.append(line.split(":", 1)[1].strip())
-
-        if not sitemap_urls:
-            candidates = [
-                urljoin(root, "/sitemap.xml"),
-                urljoin(root, "/sitemap_index.xml"),
-                urljoin(root, "/wp-sitemap.xml"),
-            ]
-            sitemap_urls.extend(candidates)
+        sitemap_data = await sitemap_service.analyze_sitemap(
+            sitemap_url,
+            analyze_content_trends=False,
+            analyze_publishing_patterns=False,
+            include_ai_insights=False,
+            max_urls=max_urls
+        )
 
         discovered: List[str] = []
         seen: Set[str] = set()
 
-        for sm in sitemap_urls:
-            if len(discovered) >= max_urls:
-                break
-            urls_from_sm = await self._parse_sitemap(sm, max_urls=max_urls - len(discovered))
-            for u in urls_from_sm:
-                n = self._normalize_url(u)
-                if n not in seen and self._same_site(root, n):
-                    seen.add(n)
-                    discovered.append(n)
-                    if len(discovered) >= max_urls:
-                        break
+        for u in sitemap_data.get("urls", []):
+            loc = (u.get("loc") or "").strip()
+            if not loc:
+                continue
+            n = self._normalize_url(loc)
+            if n not in seen and self._same_site(base, n):
+                seen.add(n)
+                discovered.append(n)
+                if len(discovered) >= max_urls:
+                    break
 
         if not discovered:
             discovered.append(base)
 
         return discovered
-
-    async def _parse_sitemap(self, sitemap_url: str, max_urls: int) -> List[str]:
-        xml_text = await self._fetch_text(sitemap_url)
-        if not xml_text:
-            return []
-
-        try:
-            import xml.etree.ElementTree as ET
-            root = ET.fromstring(xml_text)
-        except Exception:
-            return []
-
-        ns = ""
-        if root.tag.startswith("{"):
-            ns = root.tag.split("}", 1)[0] + "}"
-
-        urls: List[str] = []
-
-        if root.tag.endswith("sitemapindex"):
-            locs = root.findall(f".//{ns}sitemap/{ns}loc")
-            for loc in locs:
-                if len(urls) >= max_urls:
-                    break
-                child_url = (loc.text or "").strip()
-                if not child_url:
-                    continue
-                child_urls = await self._parse_sitemap(child_url, max_urls=max_urls - len(urls))
-                urls.extend(child_urls)
-        else:
-            locs = root.findall(f".//{ns}url/{ns}loc")
-            for loc in locs:
-                if len(urls) >= max_urls:
-                    break
-                u = (loc.text or "").strip()
-                if u:
-                    urls.append(u)
-
-        return urls
-
-    async def _fetch_text(self, url: str) -> Optional[str]:
-        try:
-            timeout = aiohttp.ClientTimeout(total=self.http_timeout_seconds)
-            async with aiohttp.ClientSession(timeout=timeout) as session:
-                async with session.get(url, allow_redirects=True, headers={"User-Agent": "ALwrity-SEO-Audit/1.0"}) as resp:
-                    if resp.status >= 400:
-                        return None
-                    return await resp.text(errors="ignore")
-        except Exception:
-            return None
 
     async def _audit_urls(self, user_id: str, website_url: str, urls: List[str], db: Session) -> Dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=self.http_timeout_seconds)
