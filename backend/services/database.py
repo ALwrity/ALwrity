@@ -415,7 +415,7 @@ def _ensure_calendar_events_user_id_column(engine, user_id: str) -> None:
 
 def _ensure_enhanced_calendar_user_id_type(engine, user_id: str) -> None:
     """Migrate user_id from INTEGER to VARCHAR(255) in enhanced calendar tables."""
-    from models.enhanced_calendar_models import Base as EnhancedBase
+    from backend.models.enhanced_calendar_models import Base as EnhancedBase
 
     tables = [
         "ai_calendar_recommendations",
@@ -695,17 +695,8 @@ def init_user_database(user_id: str):
         SubscriptionBase.metadata.create_all(bind=engine)
         UserBusinessInfoBase.metadata.create_all(bind=engine)
         ContentAssetBase.metadata.create_all(bind=engine)
-        from models.enhanced_calendar_models import Base as EnhancedCalendarBase
-        # Create each table individually to avoid cross-metadata FK validation.
-        # Referenced tables (content_strategies, calendar_events) are already
-        # created above by ContentPlanningBase.metadata.create_all.
-        for table in EnhancedCalendarBase.metadata.sorted_tables:
-            try:
-                table.create(bind=engine, checkfirst=True)
-            except Exception as table_err:
-                logger.warning(
-                    f"Could not create table {table.name}: {table_err}"
-                )
+        from backend.models.enhanced_calendar_models import Base as EnhancedCalendarBase
+        EnhancedCalendarBase.metadata.create_all(bind=engine)
         _ensure_enhanced_calendar_user_id_type(engine, user_id)
         BingAnalyticsBase.metadata.create_all(bind=engine)
         WatchdogBase.metadata.create_all(bind=engine)

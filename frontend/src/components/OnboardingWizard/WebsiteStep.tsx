@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import {
   Box,
@@ -12,8 +12,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  DialogContentText,
-  Fade
+  DialogContentText
 } from '@mui/material';
 import {
   Analytics as AnalyticsIcon,
@@ -91,6 +90,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [email, setEmail] = useState<string>('');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
+  const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
     { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
@@ -631,15 +631,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           />
 
           {(connectedPlatforms.includes('gsc') || connectedPlatforms.includes('bing')) && (
-            <Fade in timeout={800}>
-              <Box sx={{ mt: 3 }}>
-                <PlatformAnalytics
-                  platforms={['gsc', 'bing']}
-                  showSummary
-                  refreshInterval={0}
-                />
-              </Box>
-            </Fade>
+            <Box sx={{ mt: 3 }}>
+              <PlatformAnalytics
+                platforms={analyticsPlatforms}
+                showSummary
+                refreshInterval={0}
+                siteUrl={website}
+              />
+            </Box>
           )}
         </>
       )}

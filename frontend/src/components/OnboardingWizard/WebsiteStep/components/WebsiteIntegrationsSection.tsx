@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -87,9 +87,14 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     })();
   }, [refreshBingStatus]);
 
+  // Use ref for connectedPlatforms to avoid re-running effect when we update it
+  const connectedRef = useRef(connectedPlatforms);
+  connectedRef.current = connectedPlatforms;
+
   // Consolidate platform sync: WordPress, Bing, and GSC all follow the same pattern
   useEffect(() => {
-    const updated = [...connectedPlatforms];
+    const prev = connectedRef.current;
+    const updated = [...prev];
     let changed = false;
 
     const sync = (platformId: string, isConnected: boolean, hasSites: boolean) => {
@@ -116,7 +121,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     wordpressConnected, wordpressSites,
     bingConnected, bingSites,
     gscInternalPlatforms,
-    connectedPlatforms, setConnectedPlatforms, invalidateAnalyticsCache,
+    setConnectedPlatforms, invalidateAnalyticsCache,
   ]);
 
   useEffect(() => {
