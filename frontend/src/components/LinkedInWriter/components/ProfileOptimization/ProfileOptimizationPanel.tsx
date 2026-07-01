@@ -98,20 +98,6 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   onSkip,
   onLoadNextBatch,
 }) => {
-  if (!isOpen) {
-    return null;
-  }
-
-  const updatedLabel = formatRelativeUpdatedAt(
-    optimizationMeta?.profile_optimization_updated_at
-  );
-  const recommendationCount = recommendations?.length ?? 0;
-  const showSkeleton = isLoading && !recommendations?.length;
-  const showCards = !showSkeleton && recommendations && recommendations.length > 0;
-  const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
-  const showNextBatchBanner =
-    !showSkeleton && !showCards && !showNoGaps && showNextBatchCta && Boolean(onLoadNextBatch);
-
   const activeSectionKeys = React.useMemo(() => {
     if (!recommendations) {
       return null;
@@ -129,6 +115,20 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     }
     return map;
   }, [recommendations]);
+
+  if (!isOpen) {
+    return null;
+  }
+
+  const updatedLabel = formatRelativeUpdatedAt(
+    optimizationMeta?.profile_optimization_updated_at
+  );
+  const recommendationCount = recommendations?.length ?? 0;
+  const showSkeleton = isLoading && !recommendations?.length;
+  const showCards = !showSkeleton && recommendations && recommendations.length > 0;
+  const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
+  const showNextBatchBanner =
+    !showSkeleton && !showCards && !showNoGaps && showNextBatchCta && Boolean(onLoadNextBatch);
 
   const showSectionScores = Boolean(sectionScores) && (showCards || showNextBatchBanner);
 
