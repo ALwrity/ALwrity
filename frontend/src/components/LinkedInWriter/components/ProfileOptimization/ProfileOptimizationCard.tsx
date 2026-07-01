@@ -3,6 +3,7 @@ import { Collapse, IconButton, Tooltip } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
 import type { LinkedInProfileOptimizationItem } from '../../../../api/linkedinSocial';
 import {
@@ -20,6 +21,7 @@ interface ProfileOptimizationCardProps {
   onMarkDone?: (recommendationId: string) => void;
   onSkip?: (recommendationId: string) => void;
   isMarking?: boolean;
+  publicIdentifier?: string | null;
 }
 
 const LOG_PREFIX = '[ProfileOptimizationCard]';
@@ -80,12 +82,47 @@ async function copySuggestedCopy(text: string, recommendationId: string): Promis
   }
 }
 
+type ProfileSection = LinkedInProfileOptimizationItem['profile_section'];
+
+function getLinkedInEditorUrl(
+  profileSection: ProfileSection,
+  publicIdentifier: string | null | undefined
+): string | null {
+  if (!publicIdentifier) return null;
+  const base = `https://www.linkedin.com/in/${publicIdentifier}`;
+  switch (profileSection) {
+    case 'headline':
+      return `${base}/edit/intro/headline/`;
+    case 'summary':
+      return `${base}/edit/intro/summary/`;
+    case 'profile_photo':
+      return `${base}/edit/intro/photo/`;
+    case 'custom_url':
+      return `${base}/edit/intro/contact-info/`;
+    case 'experience':
+      return `${base}/edit/experience/`;
+    case 'skills':
+      return `${base}/detail/skills/`;
+    case 'recommendations':
+      return `${base}/detail/recent-activity/`;
+    case 'education':
+      return `${base}/edit/education/`;
+    case 'certifications':
+      return `${base}/detail/certifications/`;
+    case 'featured':
+      return `${base}/detail/featured/`;
+    default:
+      return `${base}/edit/intro/`;
+  }
+}
+
 export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = ({
   recommendation,
   index,
   onMarkDone,
   onSkip,
   isMarking = false,
+  publicIdentifier = null,
 }) => {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
@@ -105,6 +142,8 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
       : copyState === 'failed'
         ? 'Copy failed — try again'
         : 'Copy suggested text';
+
+  const editorUrl = getLinkedInEditorUrl(recommendation.profile_section, publicIdentifier);
 
   return (
     <article style={CARD_STYLE} aria-labelledby={`profile-opt-title-${recommendation.id}`}>
@@ -279,6 +318,31 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
                 borderTop: '1px solid #e2e8f0',
               }}
             >
+              {editorUrl && (
+                <a
+                  href={editorUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open ${formatProfileSection(recommendation.profile_section)} editor on LinkedIn`}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: '1px solid #0A66C2',
+                    backgroundColor: '#fff',
+                    color: '#0A66C2',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    textDecoration: 'none',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    cursor: 'pointer',
+                  }}
+                >
+                  <OpenInNewIcon sx={{ fontSize: 16 }} />
+                  Edit on LinkedIn
+                </a>
+              )}
               {onMarkDone && (
                 <button
                   type="button"

@@ -117,6 +117,13 @@ class ProfileValidationResponse(BaseModel):
         default=None,
         description="Count of rubric gaps used to compute optimization_score",
     )
+    section_scores: Optional[Dict[str, int]] = Field(
+        default=None,
+        description=(
+            "Per-section 0–100 rubric scores keyed by section name "
+            "(headline, summary, skills, etc.)."
+        ),
+    )
     score_basis: Optional[Literal["rubric", "rubric_with_progress", "completeness_fallback"]] = None
 
 
