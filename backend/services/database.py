@@ -415,7 +415,7 @@ def _ensure_calendar_events_user_id_column(engine, user_id: str) -> None:
 
 def _ensure_enhanced_calendar_user_id_type(engine, user_id: str) -> None:
     """Migrate user_id from INTEGER to VARCHAR(255) in enhanced calendar tables."""
-    from backend.models.enhanced_calendar_models import Base as EnhancedBase
+    from models.enhanced_calendar_models import Base as EnhancedBase
 
     tables = [
         "ai_calendar_recommendations",
@@ -695,7 +695,7 @@ def init_user_database(user_id: str):
         SubscriptionBase.metadata.create_all(bind=engine)
         UserBusinessInfoBase.metadata.create_all(bind=engine)
         ContentAssetBase.metadata.create_all(bind=engine)
-        from backend.models.enhanced_calendar_models import Base as EnhancedCalendarBase
+        from models.enhanced_calendar_models import Base as EnhancedCalendarBase
         EnhancedCalendarBase.metadata.create_all(bind=engine)
         _ensure_enhanced_calendar_user_id_type(engine, user_id)
         BingAnalyticsBase.metadata.create_all(bind=engine)
