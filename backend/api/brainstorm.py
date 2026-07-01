@@ -4,12 +4,16 @@ single grounded search to surface topic ideas. Built for reusability across
 editors. Uses the existing Gemini provider modules.
 """
 
-from fastapi import APIRouter, HTTPException
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from loguru import logger
 
 from services.llm_providers.gemini_provider import gemini_structured_json_response
+from middleware.auth_middleware import get_current_user
+from services.database import get_session_for_user
+from models.linkedin_brainstorm_saved_ideas_db_models import BrainstormSavedIdeaDB
 
 try:
     from services.llm_providers.gemini_grounded_provider import GeminiGroundedProvider
@@ -291,5 +295,213 @@ Return JSON with an array named ideas where each item has:
     except Exception as e:
         logger.error(f"Error generating brainstorm ideas: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── Saved ideas (per-user library) ───────────────────────────────────
+# A persistent place for users to keep Brainstorm prompts they want to
+# come back to. Distinct from the 1-hour sessionStorage cache that
+# BrainstormFlow uses for in-flight runs. Inspired by the
+# open-core/HITL goal: an idea the user wants to keep shouldn't be
+# thrown away when the tab closes.
+
+
+class SavedIdeaCreate(BaseModel):
+    """Payload for POST /api/brainstorm/saved-ideas."""
+
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    rationale: Optional[str] = Field(default=None, max_length=2000)
+    tags: Optional[str] = Field(default="", max_length=512)
+    source_seed: Optional[str] = Field(default=None, max_length=2000)
+
+
+class SavedIdeaUpdate(BaseModel):
+    """Payload for PATCH /api/brainstorm/saved-ideas/{idea_id}."""
+
+    prompt: Optional[str] = Field(default=None, min_length=1, max_length=4000)
+    rationale: Optional[str] = Field(default=None, max_length=2000)
+    tags: Optional[str] = Field(default=None, max_length=512)
+
+
+class SavedIdeaResponse(BaseModel):
+    """Wire format for a single saved idea."""
+
+    id: str
+    prompt: str
+    rationale: Optional[str] = None
+    tags: Optional[str] = ""
+    source_seed: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class SavedIdeasListResponse(BaseModel):
+    """Wire format for GET /api/brainstorm/saved-ideas."""
+
+    ideas: List[SavedIdeaResponse]
+    total: int
+
+
+def _resolve_user_id(current_user: Dict[str, Any]) -> str:
+    """Resolve the canonical user id from a Clerk user dict.
+
+    Matches the pattern in routers/linkedin_watchdog.py so the
+    two features share an identity model.
+    """
+    return (
+        current_user.get("id")
+        or current_user.get("clerk_user_id")
+        or current_user.get("user_id")
+        or "default"
+    )
+
+
+def _idea_to_response(row: BrainstormSavedIdeaDB) -> SavedIdeaResponse:
+    return SavedIdeaResponse(
+        id=row.id,
+        prompt=row.prompt,
+        rationale=row.rationale,
+        tags=row.tags or "",
+        source_seed=row.source_seed,
+        created_at=row.created_at.isoformat() if row.created_at else "",
+        updated_at=row.updated_at.isoformat() if row.updated_at else "",
+    )
+
+
+@router.get("/saved-ideas", response_model=SavedIdeasListResponse)
+async def list_saved_ideas(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    limit: int = 50,
+    offset: int = 0,
+):
+    """List the current user's saved brainstorm ideas (most recent first)."""
+    user_id = _resolve_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    try:
+        q = (
+            db.query(BrainstormSavedIdeaDB)
+            .filter(BrainstormSavedIdeaDB.user_id == user_id)
+            .order_by(BrainstormSavedIdeaDB.created_at.desc())
+        )
+        total = q.count()
+        rows = q.offset(max(0, offset)).limit(max(1, min(100, limit))).all()
+        return SavedIdeasListResponse(
+            ideas=[_idea_to_response(r) for r in rows],
+            total=total,
+        )
+    except Exception as e:
+        logger.error(f"Error listing saved ideas for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.post("/saved-ideas", response_model=SavedIdeaResponse, status_code=201)
+async def create_saved_idea(
+    req: SavedIdeaCreate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Persist a brainstorm idea to the user's library."""
+    user_id = _resolve_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    try:
+        row = BrainstormSavedIdeaDB(
+            id=f"idea_{uuid.uuid4().hex[:24]}",
+            user_id=user_id,
+            prompt=req.prompt.strip(),
+            rationale=(req.rationale or "").strip() or None,
+            tags=(req.tags or "").strip(),
+            source_seed=(req.source_seed or "").strip() or None,
+        )
+        db.add(row)
+        db.commit()
+        db.refresh(row)
+        logger.info(
+            f"[Brainstorm] user {user_id} saved idea {row.id} "
+            f"(prompt_len={len(row.prompt)})"
+        )
+        return _idea_to_response(row)
+    except Exception as e:
+        logger.error(f"Error creating saved idea for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.patch("/saved-ideas/{idea_id}", response_model=SavedIdeaResponse)
+async def update_saved_idea(
+    idea_id: str,
+    req: SavedIdeaUpdate,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Update a saved idea (e.g. edit the prompt, add tags)."""
+    user_id = _resolve_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    try:
+        row = (
+            db.query(BrainstormSavedIdeaDB)
+            .filter(
+                BrainstormSavedIdeaDB.id == idea_id,
+                BrainstormSavedIdeaDB.user_id == user_id,
+            )
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Saved idea not found")
+        if req.prompt is not None:
+            row.prompt = req.prompt.strip()
+        if req.rationale is not None:
+            row.rationale = req.rationale.strip() or None
+        if req.tags is not None:
+            row.tags = req.tags.strip()
+        db.commit()
+        db.refresh(row)
+        return _idea_to_response(row)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating saved idea {idea_id} for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+@router.delete("/saved-ideas/{idea_id}", status_code=204)
+async def delete_saved_idea(
+    idea_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Remove a saved idea from the user's library."""
+    user_id = _resolve_user_id(current_user)
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database unavailable")
+    try:
+        row = (
+            db.query(BrainstormSavedIdeaDB)
+            .filter(
+                BrainstormSavedIdeaDB.id == idea_id,
+                BrainstormSavedIdeaDB.user_id == user_id,
+            )
+            .first()
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail="Saved idea not found")
+        db.delete(row)
+        db.commit()
+        logger.info(f"[Brainstorm] user {user_id} deleted idea {idea_id}")
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting saved idea {idea_id} for {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
