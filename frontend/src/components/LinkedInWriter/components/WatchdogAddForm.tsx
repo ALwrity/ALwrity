@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { linkedInWatchdogApi } from '../../../services/linkedInWatchdogApi';
 
 type AddType = 'industry' | 'company' | 'person';
@@ -8,6 +8,20 @@ interface WatchdogAddFormProps {
   onSave: () => void;
   onCancel: () => void;
 }
+
+interface ExaSuggestion {
+  id: string;
+  title: string;
+  url: string;
+  text: string;
+  industry: string | null;
+  position: string | null;
+  company: string | null;
+}
+
+const DEBOUNCE_MS = 350;
+const MIN_QUERY_LEN = 2;
+const MAX_SUGGESTIONS = 6;
 
 export const WatchdogAddForm: React.FC<WatchdogAddFormProps> = ({
   initialType = 'industry',
@@ -24,6 +38,189 @@ export const WatchdogAddForm: React.FC<WatchdogAddFormProps> = ({
   const [searchQueries, setSearchQueries] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Exa discovery state ──────────────────────────────────────────
+  const [suggestions, setSuggestions] = useState<ExaSuggestion[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState<string | null>(null);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeIndex, setActiveIndex] = useState<number>(-1);
+  const [userTyped, setUserTyped] = useState(false);
+  const debounceRef = useRef<number | null>(null);
+  const suggestionsSeqRef = useRef<number>(0);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Reset suggestion state when switching types — different vertical.
+  useEffect(() => {
+    setSuggestions([]);
+    setSuggestionsError(null);
+    setShowSuggestions(false);
+    setActiveIndex(-1);
+    setUserTyped(false);
+  }, [type]);
+
+  // Click outside the suggestion container dismisses the dropdown.
+  useEffect(() => {
+    if (!showSuggestions) return;
+    const onDocClick = (e: MouseEvent) => {
+      const el = containerRef.current;
+      if (el && e.target instanceof Node && !el.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [showSuggestions]);
+
+  const extractIndustry = (entry: any): string | null => {
+    const entities = Array.isArray(entry?.entities) ? entry.entities : [];
+    for (const e of entities) {
+      const props = e?.properties || {};
+      const v = props.industry || props.industries || props.sector;
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return null;
+  };
+
+  const extractPosition = (entry: any): string | null => {
+    const entities = Array.isArray(entry?.entities) ? entry.entities : [];
+    for (const e of entities) {
+      const props = e?.properties || {};
+      const v = props.position || props.title || props.role || props.jobTitle;
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return null;
+  };
+
+  const extractCompany = (entry: any): string | null => {
+    const entities = Array.isArray(entry?.entities) ? entry.entities : [];
+    for (const e of entities) {
+      const props = e?.properties || {};
+      const v = props.company || props.employer || props.organization;
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return null;
+  };
+
+  const buildSuggestions = (entries: any[]): ExaSuggestion[] => {
+    const out: ExaSuggestion[] = [];
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      const title = String(entry?.title || '').trim();
+      const url = String(entry?.url || '').trim();
+      if (!title && !url) continue;
+      const key = title.toLowerCase() + '|' + url;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: key,
+        title: title || url,
+        url,
+        text: String(entry?.text || '').trim(),
+        industry: extractIndustry(entry),
+        position: extractPosition(entry),
+        company: extractCompany(entry),
+      });
+      if (out.length >= MAX_SUGGESTIONS) break;
+    }
+    return out;
+  };
+
+  // Debounced search-as-you-type. Only fires for company / person.
+  useEffect(() => {
+    if (type !== 'company' && type !== 'person') return;
+    if (!userTyped) return;
+    const q = name.trim();
+    if (q.length < MIN_QUERY_LEN) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      setSuggestionsError(null);
+      setShowSuggestions(false);
+      return;
+    }
+    if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    const seq = ++suggestionsSeqRef.current;
+    debounceRef.current = window.setTimeout(async () => {
+      setSuggestionsLoading(true);
+      setSuggestionsError(null);
+      setShowSuggestions(true);
+      setActiveIndex(-1);
+      try {
+        const res =
+          type === 'company'
+            ? await linkedInWatchdogApi.discoverCompanies({ query: q, num_results: MAX_SUGGESTIONS })
+            : await linkedInWatchdogApi.discoverPeople({ query: q, num_results: MAX_SUGGESTIONS });
+        if (seq !== suggestionsSeqRef.current) return; // stale
+        if (!res?.success) {
+          setSuggestions([]);
+          setSuggestionsError('Could not search Exa — try again in a moment.');
+          return;
+        }
+        const built = buildSuggestions(res.results || []);
+        setSuggestions(built);
+        if (built.length === 0) {
+          setSuggestionsError('No matches found. Type the full name manually.');
+        }
+      } catch (e: any) {
+        if (seq !== suggestionsSeqRef.current) return;
+        setSuggestions([]);
+        // Subscription-limit (429) carries a friendly message.
+        const detail = e?.response?.data?.detail;
+        const msg =
+          (typeof detail === 'object' && detail?.message) ||
+          e?.message ||
+          'Search failed.';
+        setSuggestionsError(msg);
+      } finally {
+        if (seq === suggestionsSeqRef.current) {
+          setSuggestionsLoading(false);
+        }
+      }
+    }, DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) window.clearTimeout(debounceRef.current);
+    };
+    // We intentionally exclude `name` from deps; the debounce reads the
+    // latest value through `name` at call time and `userTyped` triggers
+    // a fresh effect run on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userTyped, type]);
+
+  const applySuggestion = (s: ExaSuggestion) => {
+    setName(s.title);
+    if (type === 'company') {
+      if (s.url) setUrl(s.url);
+      if (s.industry) setIndustryTag(s.industry);
+    } else if (type === 'person') {
+      if (s.position) setTitle(s.position);
+      if (s.company) setCompany(s.company);
+      // Only set linkedin_url if the suggestion URL is a LinkedIn profile.
+      if (s.url && /linkedin\.com\/in\//i.test(s.url)) {
+        setLinkedinUrl(s.url);
+      }
+    }
+    setShowSuggestions(false);
+    setActiveIndex(-1);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, -1));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      applySuggestion(suggestions[activeIndex]);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setActiveIndex(-1);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!name.trim()) return;
@@ -61,6 +258,9 @@ export const WatchdogAddForm: React.FC<WatchdogAddFormProps> = ({
     }
   };
 
+  const showSearchEnabled = type === 'company' || type === 'person';
+  const dropdownId = `watchdog-add-suggestions-${type}`;
+
   return (
     <div style={{ padding: 20 }}>
       <div style={{ marginBottom: 16 }}>
@@ -88,12 +288,32 @@ export const WatchdogAddForm: React.FC<WatchdogAddFormProps> = ({
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Name *</div>
+        <div ref={containerRef} style={{ position: 'relative' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+            Name *
+            {showSearchEnabled && (
+              <span style={{ fontWeight: 400, color: '#9ca3af', marginLeft: 6 }}>
+                (type to search Exa)
+              </span>
+            )}
+          </div>
           <input
+            ref={inputRef}
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => {
+              setName(e.target.value);
+              setUserTyped(true);
+            }}
+            onFocus={() => {
+              if (suggestions.length > 0) setShowSuggestions(true);
+            }}
+            onKeyDown={handleNameKeyDown}
             placeholder={type === 'industry' ? 'e.g. AI in Healthcare' : type === 'company' ? 'e.g. Anthropic' : 'e.g. Dario Amodei'}
+            autoComplete="off"
+            role="combobox"
+            aria-expanded={showSuggestions && suggestions.length > 0}
+            aria-controls={dropdownId}
+            aria-autocomplete="list"
             style={{
               width: '100%',
               padding: '8px 10px',
@@ -103,6 +323,126 @@ export const WatchdogAddForm: React.FC<WatchdogAddFormProps> = ({
               boxSizing: 'border-box',
             }}
           />
+          {showSearchEnabled && showSuggestions && (
+            <div
+              id={dropdownId}
+              role="listbox"
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                marginTop: 4,
+                background: '#ffffff',
+                border: '1px solid #cbd5e1',
+                borderRadius: 8,
+                boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+                maxHeight: 320,
+                overflowY: 'auto',
+                zIndex: 20,
+              }}
+            >
+              {suggestionsLoading && (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    fontSize: 12,
+                    color: '#64748b',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      border: '2px solid #0a66c2',
+                      borderTopColor: 'transparent',
+                      animation: 'spin 0.8s linear infinite',
+                    }}
+                    aria-hidden
+                  />
+                  Searching Exa…
+                </div>
+              )}
+              {!suggestionsLoading && suggestionsError && (
+                <div
+                  style={{
+                    padding: '10px 12px',
+                    fontSize: 12,
+                    color: '#b91c1c',
+                  }}
+                >
+                  {suggestionsError}
+                </div>
+              )}
+              {!suggestionsLoading && !suggestionsError && suggestions.length === 0 && (
+                <div style={{ padding: '10px 12px', fontSize: 12, color: '#64748b' }}>
+                  No matches — type the full name manually.
+                </div>
+              )}
+              {!suggestionsLoading &&
+                suggestions.map((s, i) => {
+                  const isActive = i === activeIndex;
+                  const subtitle =
+                    type === 'company'
+                      ? [s.industry, s.url && hostnameOf(s.url)]
+                          .filter(Boolean)
+                          .join(' · ')
+                      : [s.position, s.company].filter(Boolean).join(' · ');
+                  return (
+                    <div
+                      key={s.id}
+                      role="option"
+                      aria-selected={isActive}
+                      onMouseDown={(e) => {
+                        // mousedown so the input doesn't lose focus first.
+                        e.preventDefault();
+                        applySuggestion(s);
+                      }}
+                      onMouseEnter={() => setActiveIndex(i)}
+                      style={{
+                        padding: '8px 12px',
+                        background: isActive ? '#eff6ff' : '#ffffff',
+                        borderBottom:
+                          i < suggestions.length - 1 ? '1px solid #f1f5f9' : 'none',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: '#0f172a',
+                          lineHeight: 1.3,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {s.title}
+                      </div>
+                      {subtitle && (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: '#64748b',
+                            marginTop: 2,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {subtitle}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
 
         {type === 'company' && (
@@ -243,3 +583,11 @@ export const WatchdogAddForm: React.FC<WatchdogAddFormProps> = ({
     </div>
   );
 };
+
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
