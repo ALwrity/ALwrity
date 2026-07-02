@@ -4,11 +4,12 @@ Defines additional database schema for intelligent calendar generation and optim
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey, Boolean, Index
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-Base = declarative_base()
+# Share metadata with content_planning so FK targets (content_strategies,
+# calendar_events) resolve during per-user SQLite initialization.
+from models.content_planning import Base
 
 class ContentCalendarTemplate(Base):
     """Template for industry-specific content calendars."""

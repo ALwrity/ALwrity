@@ -51,7 +51,7 @@ export const ProfileOptimizationIntro: React.FC<ProfileOptimizationIntroProps> =
           }}
         >
           <CircularProgress size={22} sx={{ color: '#0A66C2' }} />
-          Analyzing your profile for optimization opportunities…
+          Analysing your profile for optimisation opportunities…
         </div>
       ) : (
         onRunOptimization && (

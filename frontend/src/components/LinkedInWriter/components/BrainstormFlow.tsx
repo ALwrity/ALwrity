@@ -696,7 +696,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
         open={myIdeasOpen}
         onClose={() => setMyIdeasOpen(false)}
         onAfterDelete={() => void refreshSavedCount()}
-        onUseInCopilot={(prompt) => {
+        onUseInCopilot={(prompt: string) => {
           window.dispatchEvent(
             new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } })
           );

@@ -152,8 +152,13 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   };
 
   const handleWorkflowCardAction = (cardId: DashboardWorkflowCardId) => {
+    if (cardId === 'engagement') {
+      setWorkflowModal('engagement');
+      return;
+    }
+
     if (cardId === 'remarket') {
-      openAnalyticsTab();
+      setWorkflowModal('remarket');
       return;
     }
 

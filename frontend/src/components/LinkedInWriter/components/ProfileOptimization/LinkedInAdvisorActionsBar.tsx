@@ -96,7 +96,7 @@ export const LinkedInAdvisorActionsBar: React.FC<LinkedInAdvisorActionsBarProps>
             title={
               isOptimizationDisabled
                 ? 'Complete your profile first'
-                : 'Get personalized profile optimization suggestions'
+                : 'Get personalised profile optimisation suggestions'
             }
             style={{
               background: advisorsDisabled

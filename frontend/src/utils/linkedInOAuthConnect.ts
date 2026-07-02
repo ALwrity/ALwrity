@@ -47,6 +47,9 @@ function isTrustedOAuthMessageOrigin(origin: string, trusted: string[]): boolean
   }
   try {
     const host = new URL(origin).hostname.toLowerCase();
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return true;
+    }
     return host.endsWith('.ngrok-free.app') || host.endsWith('.ngrok-free.dev');
   } catch {
     return false;

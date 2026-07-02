@@ -323,6 +323,14 @@ def _validation_result_to_response(
     validation: ProfileValidationResult,
 ) -> ProfileValidationResponse:
     """Map Phase 3 validation dict to API response model."""
+    raw_section_scores = validation.get("section_scores")
+    section_scores: Optional[Dict[str, int]] = None
+    if isinstance(raw_section_scores, dict):
+        section_scores = {
+            str(key): int(value)
+            for key, value in raw_section_scores.items()
+            if isinstance(value, (int, float))
+        }
     return ProfileValidationResponse(
         is_profile_complete=bool(validation.get("is_profile_complete")),
         completeness_score=int(validation.get("completeness_score") or 0),
@@ -338,6 +346,7 @@ def _validation_result_to_response(
             if validation.get("optimization_gaps_count") is not None
             else None
         ),
+        section_scores=section_scores,
         score_basis=validation.get("score_basis"),
     )
 

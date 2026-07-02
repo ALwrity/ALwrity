@@ -3,7 +3,12 @@ import {
   Avatar, Box, Menu, MenuItem, Typography, Tooltip, Chip, Divider, IconButton, CircularProgress,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button, Checkbox, FormControlLabel,
 } from '@mui/material';
-import { DeleteForever as DeleteForeverIcon } from '@mui/icons-material';
+import {
+  DeleteForever as DeleteForeverIcon,
+  ExpandMore as ExpandMoreIcon,
+  ChevronRight as ChevronRightIcon,
+  Refresh as RefreshIcon,
+} from '@mui/icons-material';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import SystemStatusIndicator from '../ContentPlanningDashboard/components/SystemStatusIndicator';
@@ -16,11 +21,28 @@ import {
 } from '../../api/client';
 import { saveNavigationState } from '../../utils/navigationState';
 import { onboardingCache } from '../../services/onboardingCache';
-import { Refresh as RefreshIcon } from '@mui/icons-material';
+import type { LinkedInProfileValidation, LinkedInAIProfileIntelligence } from '../../api/linkedinSocial';
+import { LinkedInIdentitySection, LinkedInOpportunitySection } from './LinkedInNavSection';
+import {
+  PROFILE_STRENGTH_UPDATED_EVENT,
+  LINKEDIN_PERSONA_UPDATED_EVENT,
+  LINKEDIN_PRIORITY_ACTION_EVENT,
+  readCachedPriorityAction,
+  type ProfileStrengthUpdatedDetail,
+  type LinkedInPersonaSnapshot,
+  type PriorityActionSnapshot,
+} from '../LinkedInWriter/utils/profileStrengthEvents';
 
 interface UserBadgeProps {
   colorMode?: 'light' | 'dark';
 }
+
+/** LinkedIn Studio keyboard shortcuts surfaced in the nav menu Quick Launch section. */
+const QUICK_LAUNCH_SHORTCUTS = [
+  { key: 'B', label: 'Brainstorm Ideas',  event: 'linkedinwriter:openBrainstorm'      },
+  { key: 'O', label: 'Optimise Profile',  event: 'linkedinwriter:openOptimiseProfile' },
+  { key: 'P', label: 'Content Persona',   event: 'linkedinwriter:openPreferences'     },
+] as const;
 
 const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
   const { user, isSignedIn } = useUser();
@@ -32,6 +54,12 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [signOutAfterReset, setSignOutAfterReset] = useState(true);
+  const [linkedInProfileValidation, setLinkedInProfileValidation] = useState<LinkedInProfileValidation | null>(null);
+  const [linkedInAIIntelligence, setLinkedInAIIntelligence] = useState<LinkedInAIProfileIntelligence | null>(null);
+  const [personaSnapshot, setPersonaSnapshot] = useState<LinkedInPersonaSnapshot | null>(null);
+  // Seed from sessionStorage so the card is visible immediately if this session already loaded optimization data.
+  const [priorityAction, setPriorityAction] = useState<PriorityActionSnapshot | null>(readCachedPriorityAction);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const open = Boolean(anchorEl);
 
   const initials = React.useMemo(() => {
@@ -72,6 +100,61 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
     return () => clearInterval(interval);
   }, []);
 
+  // Listen for LinkedIn profile updates dispatched from LinkedIn Studio.
+  // Fired by Header.tsx on initial load (carries both validation + AI intelligence)
+  // and by useLinkedInProfileOptimization after any batch action (carries validation only).
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const { profileValidation, aiProfileIntelligence } =
+        (event as CustomEvent<ProfileStrengthUpdatedDetail>).detail ?? {};
+      if (profileValidation) setLinkedInProfileValidation(profileValidation);
+      if (aiProfileIntelligence !== undefined) setLinkedInAIIntelligence(aiProfileIntelligence ?? null);
+    };
+    window.addEventListener(PROFILE_STRENGTH_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(PROFILE_STRENGTH_UPDATED_EVENT, handler);
+  }, []);
+
+  // Listen for persona updates dispatched by Header.tsx when the PlatformPersonaContext loads.
+  // UserBadge cannot call usePlatformPersonaContext() directly — it lives outside the provider.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const snapshot = (event as CustomEvent<LinkedInPersonaSnapshot>).detail;
+      if (snapshot?.personaName) setPersonaSnapshot(snapshot);
+    };
+    window.addEventListener(LINKEDIN_PERSONA_UPDATED_EVENT, handler);
+    return () => window.removeEventListener(LINKEDIN_PERSONA_UPDATED_EVENT, handler);
+  }, []);
+
+  // Listen for priority action updates dispatched by useLinkedInProfileOptimization when
+  // Phase 7 optimization items are loaded or updated (item completed / next batch loaded).
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const action = (event as CustomEvent<PriorityActionSnapshot | null>).detail;
+      setPriorityAction(action ?? null);
+    };
+    window.addEventListener(LINKEDIN_PRIORITY_ACTION_EVENT, handler);
+    return () => window.removeEventListener(LINKEDIN_PRIORITY_ACTION_EVENT, handler);
+  }, []);
+
+  // Quick Launch keyboard shortcuts — only active while the nav menu is open.
+  // Skips when the user's focus is inside an input/textarea/select to avoid conflicts.
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+      const shortcut = QUICK_LAUNCH_SHORTCUTS.find(
+        (s) => s.key.toLowerCase() === e.key.toLowerCase()
+      );
+      if (!shortcut) return;
+      e.preventDefault();
+      handleClose();
+      window.dispatchEvent(new CustomEvent(shortcut.event));
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!isSignedIn) return null;
 
   // Get status bulb color
@@ -111,7 +194,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
   };
 
   const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
-  const handleClose = () => setAnchorEl(null);
+  const handleClose = () => { setAnchorEl(null); setShowAdvanced(false); };
 
   const handleRefreshPlan = async () => {
     setIsRefreshing(true);
@@ -230,6 +313,9 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
         onClose={handleClose} 
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} 
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        MenuListProps={{
+          sx: { py: 0, px: 0 },
+        }}
         PaperProps={{
           sx: {
             minWidth: 340,
@@ -244,7 +330,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
         }}
       >
         {/* User Info Header */}
-        <Box sx={{ px: 2.5, py: 2, bgcolor: '#f8f9fb', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
+        <Box sx={{ px: 2.5, pt: 1.25, pb: 1, bgcolor: '#f8f9fb', borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.9rem' }}>
             {user?.fullName || user?.username || 'User'}
           </Typography>
@@ -252,7 +338,14 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
             {user?.primaryEmailAddress?.emailAddress}
           </Typography>
         </Box>
-        
+
+        {/* LinkedIn Identity Mirror Card + Active Persona Chip */}
+        <LinkedInIdentitySection
+          aiIntelligence={linkedInAIIntelligence}
+          personaSnapshot={personaSnapshot}
+          onClose={handleClose}
+        />
+
         {/* Subscription Info */}
         <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#f8f9fb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box>
@@ -309,6 +402,15 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
         </Box>
         
         <Divider sx={{ mx: 2 }} />
+
+        {/* LinkedIn Opportunity Score + #1 Today Priority Action */}
+        <LinkedInOpportunitySection
+          profileValidation={linkedInProfileValidation}
+          priorityAction={priorityAction}
+          onClose={handleClose}
+        />
+
+        <Divider sx={{ mx: 2 }} />
         
         {/* Usage Dashboard */}
         <Box 
@@ -341,14 +443,158 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
 
         <Divider sx={{ mx: 2 }} />
 
-        <MenuItem
-          onClick={() => setResetDialogOpen(true)}
-          disabled={isResetting}
-          sx={{ mx: 1, borderRadius: 1, color: '#dc2626', '&:hover': { bgcolor: '#fef2f2' } }}
-        >
-          <DeleteForeverIcon sx={{ fontSize: 18, mr: 1 }} />
-          {isResetting ? 'Resetting...' : 'Reset Onboarding'}
-        </MenuItem>
+        {/* Quick Launch — keyboard shortcuts for the most-used LinkedIn Studio actions */}
+        <Box sx={{ px: 2.5, py: 1.25 }} onClick={(e) => e.stopPropagation()}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+            <Typography sx={{ fontSize: 12, lineHeight: 1 }} aria-hidden>⌨️</Typography>
+            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Quick Launch
+            </Typography>
+            <Typography sx={{ fontSize: '0.6rem', color: '#9ca3af', ml: 'auto', fontStyle: 'italic' }}>
+              LinkedIn Studio only
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.375 }}>
+            {QUICK_LAUNCH_SHORTCUTS.map(({ key, label, event: evtName }) => (
+              <Box
+                key={key}
+                component="button"
+                onClick={() => {
+                  handleClose();
+                  window.dispatchEvent(new CustomEvent(evtName));
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  width: '100%',
+                  px: 1,
+                  py: 0.5,
+                  background: 'none',
+                  border: 'none',
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  '&:hover': { bgcolor: '#f3f4f6' },
+                  '&:hover .ql-label': { color: '#111827' },
+                }}
+              >
+                {/* Key badge */}
+                <Box
+                  component="span"
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 20,
+                    height: 20,
+                    borderRadius: 0.75,
+                    border: '1px solid #d1d5db',
+                    bgcolor: '#f9fafb',
+                    boxShadow: '0 1px 0 #d1d5db',
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    color: '#374151',
+                    fontFamily: 'monospace',
+                    flexShrink: 0,
+                  }}
+                >
+                  {key}
+                </Box>
+                <Typography
+                  className="ql-label"
+                  sx={{ fontSize: '0.75rem', color: '#4b5563', fontWeight: 500, transition: 'color 0.15s' }}
+                >
+                  {label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Box>
+
+        <Divider sx={{ mx: 2 }} />
+
+        {/* Advanced — collapsed by default to protect against accidental destructive actions */}
+        <Box sx={{ mx: 1, mb: 0.5 }}>
+          <Box
+            component="button"
+            onClick={(e) => { e.stopPropagation(); setShowAdvanced((v) => !v); }}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+              width: '100%',
+              px: 1.5,
+              py: 0.75,
+              background: 'none',
+              border: 'none',
+              borderRadius: 1,
+              cursor: 'pointer',
+              color: '#9ca3af',
+              fontSize: '0.7rem',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              textAlign: 'left',
+              '&:hover': { bgcolor: '#f3f4f6', color: '#6b7280' },
+            }}
+            aria-expanded={showAdvanced}
+            aria-controls="advanced-settings-panel"
+          >
+            {showAdvanced ? (
+              <ExpandMoreIcon sx={{ fontSize: 14 }} />
+            ) : (
+              <ChevronRightIcon sx={{ fontSize: 14 }} />
+            )}
+            Advanced
+          </Box>
+
+          {showAdvanced && (
+            <Box
+              id="advanced-settings-panel"
+              sx={{
+                mt: 0.5,
+                mx: 0.5,
+                p: 1.5,
+                borderRadius: 1.5,
+                border: '1px solid #fee2e2',
+                bgcolor: '#fff5f5',
+              }}
+            >
+              <Typography sx={{ fontSize: '0.68rem', color: '#b91c1c', fontWeight: 600, mb: 0.5 }}>
+                Danger Zone
+              </Typography>
+              <Typography sx={{ fontSize: '0.68rem', color: '#6b7280', mb: 1.25, lineHeight: 1.45 }}>
+                This permanently deletes all your onboarding data, persona configs, and platform integrations. This action cannot be undone.
+              </Typography>
+              <Box
+                component="button"
+                onClick={(e) => { e.stopPropagation(); setResetDialogOpen(true); }}
+                disabled={isResetting}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.75,
+                  width: '100%',
+                  px: 1.5,
+                  py: 0.875,
+                  background: 'none',
+                  border: '1px solid #fca5a5',
+                  borderRadius: 1,
+                  cursor: isResetting ? 'not-allowed' : 'pointer',
+                  color: '#dc2626',
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  opacity: isResetting ? 0.6 : 1,
+                  '&:hover:not(:disabled)': { bgcolor: '#fee2e2', borderColor: '#ef4444' },
+                }}
+              >
+                <DeleteForeverIcon sx={{ fontSize: 15 }} />
+                {isResetting ? 'Resetting…' : 'Reset Onboarding'}
+              </Box>
+            </Box>
+          )}
+        </Box>
       </Menu>
 
       {/* Reset Onboarding Confirmation Dialog */}

@@ -556,12 +556,9 @@ class SIFIntegrationService:
         merged["document_count"] = len(merged["documents"])
         return merged
 
-    async def index_market_trends_run(self, trends_result: Dict[str, Any], run_id: str) -> bool:
+    async def index_market_trends_run(self, trends_result: Dict[str, Any], run_id: str) -> None:
         """
         Index a market-trends run into the SIF index.
-
-        Returns:
-            True (always returns True on success; raises on failure).
 
         Raises:
             SIFEmbeddingFailed: If the underlying ``intelligence_service.index_content``
@@ -604,7 +601,6 @@ class SIFIntegrationService:
                 ]
             )
             _sif_metrics_inc("sif_sync_total", "market_trends_success")
-            return True
         except Exception as e:
             logger.error(f"Failed to index market trends run: {e}", exc_info=True)
             _sif_metrics_inc("sif_sync_total", "market_trends_error")
@@ -629,7 +625,7 @@ class SIFIntegrationService:
                 db = get_session_for_user(self.user_id)
                 close_db = True
             if not db:
-                return False
+                return
 
             items_to_index = []
 
@@ -764,10 +760,8 @@ class SIFIntegrationService:
 
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
-                _sif_metrics_inc("sif_sync_total", "content_strategy_success")
-                return True
             _sif_metrics_inc("sif_sync_total", "content_strategy_success")
-            return False
+            return
         except Exception as e:
             logger.error(f"Failed to sync content strategy dashboard to SIF: {e}", exc_info=True)
             from .sif_errors import SIFEmbeddingFailed
@@ -782,13 +776,10 @@ class SIFIntegrationService:
             if close_db and db:
                 db.close()
     
-    async def sync_onboarding_data_to_sif(self) -> bool:
+    async def sync_onboarding_data_to_sif(self) -> None:
         """
         Embeds existing onboarding data (WebsiteAnalysis, CompetitorAnalysis) into the SIF index.
         This ensures agents can query this data semantically without direct DB access.
-
-        Returns:
-            True if at least one item was indexed; False if there was nothing to sync.
 
         Raises:
             SIFEmbeddingFailed: If the underlying intelligence_service
@@ -800,7 +791,7 @@ class SIFIntegrationService:
             logger.info(f"Syncing onboarding data to SIF for user {self.user_id}")
             db = get_session_for_user(self.user_id)
             if not db:
-                return False
+                return
 
             items_to_index = []
 
@@ -867,12 +858,9 @@ class SIFIntegrationService:
                     await self.sync_content_strategy_dashboard_to_sif(db=db)
                 except Exception:
                     pass
-                _sif_metrics_inc("sif_sync_total", "onboarding_success")
-                return True
             else:
                 logger.info("No onboarding data found to sync")
-                _sif_metrics_inc("sif_sync_total", "onboarding_success")
-                return False
+            _sif_metrics_inc("sif_sync_total", "onboarding_success")
 
         except Exception as e:
             logger.error(f"Failed to sync onboarding data to SIF: {e}", exc_info=True)
@@ -1024,16 +1012,13 @@ class SIFIntegrationService:
             if db:
                 db.close()
 
-    async def sync_user_website_content(self, website_url: str) -> bool:
+    async def sync_user_website_content(self, website_url: str) -> None:
         """
         Harvests and indexes user website content using incremental upsert strategy.
         This ensures that:
         1. New content is added to the index.
         2. Existing content is updated (refreshed).
         3. Only recent/relevant pages are processed (snapshot approach).
-
-        Returns:
-            True if content was harvested and indexed; False if no content was found.
 
         Raises:
             SIFEmbeddingFailed: If the underlying intelligence_service
@@ -1050,8 +1035,7 @@ class SIFIntegrationService:
             
             if not harvested_pages:
                 logger.warning(f"No content harvested from {website_url}")
-                _sif_metrics_inc("sif_sync_total", "website_content_success")
-                return False
+                return
                 
             logger.info(f"Harvested {len(harvested_pages)} pages from {website_url}")
             
@@ -1081,6 +1065,11 @@ class SIFIntegrationService:
                     }
                 }
                 
+                # ID format: "user_content_{url_hash}" or just URL if safe?
+                # Txtai usually handles string IDs. Let's use a consistent prefix.
+                # But wait, existing logic in SIFOnboardingIntegration uses URL as ID?
+                # "user_items = [(page['url'], ...)]"
+                # Yes, it uses URL directly.
                 items_to_index.append((url, text_content, metadata))
             
             # 3. Index (Upsert)
@@ -1088,7 +1077,7 @@ class SIFIntegrationService:
                 await self.intelligence_service.index_content(items_to_index)
                 logger.info(f"Successfully synced {len(items_to_index)} pages to SIF index")
             _sif_metrics_inc("sif_sync_total", "website_content_success")
-            return True
+            return
 
         except Exception as e:
             logger.error(f"Failed to sync user website content: {e}", exc_info=True)

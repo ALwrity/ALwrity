@@ -63,6 +63,21 @@ _CREDENTIAL_INDUSTRIES = (
 
 _TITLE_ONLY_MAX_WORDS = 5
 
+# Canonical sections displayed in the per-section score breakdown.
+# Order matters — this is the order the UI renders them in.
+PROFILE_SECTIONS: tuple[str, ...] = (
+    "profile_photo",
+    "headline",
+    "custom_url",
+    "summary",
+    "experience",
+    "skills",
+    "recommendations",
+    "education",
+    "certifications",
+    "featured",
+)
+
 
 class ProfileOptimizationRubricError(Exception):
     """Raised when rubric inputs are invalid."""
@@ -464,6 +479,25 @@ def compute_profile_optimization_score(gaps: list[DetectedGap]) -> int:
     return max(0, 100 - penalty)
 
 
+def compute_section_scores(gaps: list[DetectedGap]) -> dict[str, int]:
+    """
+    Compute 0–100 score per profile section from detected rubric gaps.
+
+    Each section starts at 100, then severity-weighted penalties are
+    subtracted per gap in that section (floor 0). Sections with no
+    detected gaps default to 100. Output is keyed by section name and
+    always contains all :data:`PROFILE_SECTIONS`.
+    """
+    scores: dict[str, int] = {section: 100 for section in PROFILE_SECTIONS}
+    for gap in gaps:
+        section = gap.section
+        if section not in scores:
+            # Unknown section — start at 100 then apply penalty
+            scores[section] = 100
+        scores[section] = max(0, scores[section] - _SEVERITY_PENALTY.get(gap.severity, 0))
+    return scores
+
+
 def enrich_profile_validation_strength(
     profile_context: dict[str, Any],
     validation: ProfileValidationResult,
@@ -487,14 +521,17 @@ def enrich_profile_validation_strength(
             **validation,
             "optimization_score": fallback,
             "optimization_gaps_count": 0,
+            "section_scores": {section: fallback for section in PROFILE_SECTIONS},
             "score_basis": "completeness_fallback",
         }
 
     score = compute_profile_optimization_score(gaps)
+    section_scores = compute_section_scores(gaps)
     enriched: ProfileValidationResult = {
         **validation,
         "optimization_score": score,
         "optimization_gaps_count": len(gaps),
+        "section_scores": section_scores,
         "score_basis": "rubric",
     }
     logger.info(
