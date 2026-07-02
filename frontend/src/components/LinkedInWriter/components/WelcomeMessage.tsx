@@ -150,7 +150,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     }
 
     if (cardId === 'remarket') {
-      openAnalyticsTab();
+      setWorkflowModal('remarket');
       return;
     }
 
