@@ -145,9 +145,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
   const handleWorkflowCardAction = (cardId: DashboardWorkflowCardId) => {
     if (cardId === 'engagement') {
-      window.dispatchEvent(
-        new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })
-      );
+      setWorkflowModal('engagement');
       return;
     }
 
