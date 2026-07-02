@@ -17,11 +17,19 @@ import {
   PostPulseModal,
   NetworkAdvisorModal,
 } from './EngagementWedgeModals';
+import {
+  RepurposeLabModal,
+  FormatTransformerModal,
+  ContentRefreshModal,
+  StaleReviverModal,
+  PerfToPlanModal,
+} from './RemarkWedgeModals';
 
 type AnalysisSub = 'snapshot' | 'post_today' | 'brand_score' | 'weekly_plan' | 'viral' | null;
 type EngagementSub = 'booster' | 'comment' | 'opportunities' | 'pulse' | 'network' | null;
+type RemarkSub = 'repurpose' | 'transformer' | 'refresh' | 'reviver' | 'perf_plan' | null;
 
-export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis' | 'engagement';
+export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis' | 'engagement' | 'remarket';
 
 interface WorkflowActionModalsProps {
   activeModal: WorkflowModalId | null;
@@ -42,6 +50,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const navigate = useNavigate();
   const [analysisSub, setAnalysisSub]     = useState<AnalysisSub>(null);
   const [engagementSub, setEngagementSub] = useState<EngagementSub>(null);
+  const [remarkSub, setRemarkSub]         = useState<RemarkSub>(null);
 
   // ── shared dispatchers ─────────────────────────────────────────────────────
   const dispatch = (evt: string, detail?: Record<string, unknown>) => {
@@ -163,10 +172,64 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <OpportunitiesModal     open={engagementSub === 'opportunities'} onClose={() => setEngagementSub(null)} />
       <PostPulseModal         open={engagementSub === 'pulse'}         onClose={() => setEngagementSub(null)} />
       <NetworkAdvisorModal    open={engagementSub === 'network'}       onClose={() => setEngagementSub(null)} />
+
+      {/* ── Remarket ── */}
+      <DashboardActionModal open={activeModal === 'remarket'} title="Remarket" onClose={onClose} maxWidth={680}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <DashboardToolTile
+            title="Repurpose Lab"
+            description="Top 3 posts by engagement — instantly repurpose into any format"
+            icon="♻️"
+            accent="#f59e0b"
+            onClick={() => { onClose(); setRemarkSub('repurpose'); }}
+          />
+          <DashboardToolTile
+            title="Format Transformer"
+            description="Turn your current draft into an Article, Carousel, or Video Script"
+            icon="🔄"
+            accent="#8b5cf6"
+            onClick={() => { onClose(); setRemarkSub('transformer'); }}
+          />
+          <DashboardToolTile
+            title="Content Refresh"
+            description="Apply 7 AI transforms to any of your recent posts in one click"
+            icon="✨"
+            accent="#059669"
+            onClick={() => { onClose(); setRemarkSub('refresh'); }}
+          />
+          <DashboardToolTile
+            title="Stale Reviver"
+            description="Buried high-performing gems — expand, optimise & repost"
+            icon="🌱"
+            accent="#dc2626"
+            onClick={() => { onClose(); setRemarkSub('reviver'); }}
+          />
+          <DashboardToolTile
+            title="Perf → Plan"
+            description="Extract winning topics from top posts, generate 5 remix ideas"
+            icon="📈"
+            accent="#0a66c2"
+            onClick={() => { onClose(); setRemarkSub('perf_plan'); }}
+          />
+          <DashboardToolTile
+            title="Post Analytics"
+            description="Full post performance dashboard with engagement breakdown"
+            icon="📊"
+            accent="#6366f1"
+            onClick={openContentAnalytics}
+          />
+        </div>
+      </DashboardActionModal>
+
+      <RepurposeLabModal     open={remarkSub === 'repurpose'}   onClose={() => setRemarkSub(null)} />
+      <FormatTransformerModal open={remarkSub === 'transformer'} onClose={() => setRemarkSub(null)} />
+      <ContentRefreshModal   open={remarkSub === 'refresh'}     onClose={() => setRemarkSub(null)} />
+      <StaleReviverModal     open={remarkSub === 'reviver'}     onClose={() => setRemarkSub(null)} />
+      <PerfToPlanModal       open={remarkSub === 'perf_plan'}   onClose={() => setRemarkSub(null)} />
     </>
   );
 };
 
 export function isWorkflowModalId(cardId: DashboardWorkflowCardId): cardId is WorkflowModalId {
-  return ['plan', 'create', 'publish', 'analysis', 'engagement'].includes(cardId);
+  return ['plan', 'create', 'publish', 'analysis', 'engagement', 'remarket'].includes(cardId);
 }
