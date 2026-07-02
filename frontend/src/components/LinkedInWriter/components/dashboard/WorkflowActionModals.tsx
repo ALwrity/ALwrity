@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardActionModal } from './DashboardActionModal';
 import { DashboardToolTile } from './DashboardToolTile';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
+import {
+  DraftLibraryModal,
+  QualityCheckModal,
+  TimingAdvisorModal,
+  ScheduleQuickModal,
+  PublishNowModal,
+} from './PublishWedgeModals';
+
+type PublishSub = 'drafts' | 'quality' | 'timing' | 'schedule' | 'publish_now' | null;
 
 export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis';
 
@@ -47,6 +56,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   onClose,
 }) => {
   const navigate = useNavigate();
+  const [publishSub, setPublishSub] = useState<PublishSub>(null);
+  const [timingPrefill, setTimingPrefill] = useState<{ date: string; time: string } | null>(null);
 
   const openBrainstorm = () => {
     onClose();
@@ -68,11 +79,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const openTopicIdeas = () => {
     onClose();
     window.dispatchEvent(new CustomEvent('linkedinwriter:getTopicIdeas'));
-  };
-
-  const openDrafts = () => {
-    onClose();
-    navigate('/asset-library?source_module=linkedin_writer');
   };
 
   const openCalendar = () => {
@@ -151,24 +157,71 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         </div>
       </DashboardActionModal>
 
-      <DashboardActionModal open={activeModal === 'publish'} title="Publish" onClose={onClose} maxWidth={520}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+      <DashboardActionModal open={activeModal === 'publish'} title="Publish" onClose={onClose} maxWidth={640}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           <DashboardToolTile
-            title="Draft"
-            description="Open your saved LinkedIn posts and drafts"
+            title="My Drafts"
+            description="Browse and restore your saved LinkedIn posts"
             icon="📁"
             accent="#0a66c2"
-            onClick={openDrafts}
+            onClick={() => { onClose(); setPublishSub('drafts'); }}
+          />
+          <DashboardToolTile
+            title="Quality Check"
+            description="Score your post across 6 dimensions before publishing"
+            icon="📊"
+            accent="#8b5cf6"
+            onClick={() => { onClose(); setPublishSub('quality'); }}
+          />
+          <DashboardToolTile
+            title="Best Time to Post"
+            description="Industry-keyed optimal LinkedIn posting windows"
+            icon="⏰"
+            accent="#0ea5e9"
+            onClick={() => { onClose(); setPublishSub('timing'); }}
+          />
+          <DashboardToolTile
+            title="Schedule Post"
+            description="Add to your content calendar without leaving the studio"
+            icon="📅"
+            accent="#10b981"
+            onClick={() => { onClose(); setPublishSub('schedule'); }}
+          />
+          <DashboardToolTile
+            title="Publish to LinkedIn"
+            description="Publish your draft directly with a 3-step pre-flight check"
+            icon="🚀"
+            accent="#dc2626"
+            onClick={() => { onClose(); setPublishSub('publish_now'); }}
           />
           <DashboardToolTile
             title="Content Calendar"
-            description="Content scheduled to be published"
-            icon="📅"
-            accent="#10b981"
+            description="Full calendar view of all scheduled content"
+            icon="🗓️"
+            accent="#f59e0b"
             onClick={openCalendar}
           />
         </div>
       </DashboardActionModal>
+
+      {/* Publish sub-modals */}
+      <DraftLibraryModal open={publishSub === 'drafts'} onClose={() => setPublishSub(null)} />
+      <QualityCheckModal open={publishSub === 'quality'} onClose={() => setPublishSub(null)} />
+      <TimingAdvisorModal
+        open={publishSub === 'timing'}
+        onClose={() => setPublishSub(null)}
+        onScheduleSlot={(date, time) => {
+          setTimingPrefill({ date, time });
+          setPublishSub('schedule');
+        }}
+      />
+      <ScheduleQuickModal
+        open={publishSub === 'schedule'}
+        onClose={() => { setPublishSub(null); setTimingPrefill(null); }}
+        prefillDate={timingPrefill?.date}
+        prefillTime={timingPrefill?.time}
+      />
+      <PublishNowModal open={publishSub === 'publish_now'} onClose={() => setPublishSub(null)} />
 
       <DashboardActionModal open={activeModal === 'analysis'} title="Analysis" onClose={onClose} maxWidth={640}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
