@@ -10,7 +10,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { apiClient } from '../../../api/client';
+import { apiClient } from '../../../../api/client';
 
 export interface SavedBrainstormIdea {
   id: string;

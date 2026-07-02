@@ -139,6 +139,10 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     getStorageStats
   } = useCopilotPersistence();
   
+  // Save-to-asset-library state
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
   const locationState = location.state as {

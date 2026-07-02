@@ -516,7 +516,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                               e.stopPropagation();
                               void handleSaveIdea(i);
                             }}
-                            disabled={isSaved || isSavingThis === i}
+                            disabled={isSaved || isSavingThis}
                             title={isSaved ? 'Already saved' : 'Save to My Ideas'}
                             style={{
                               alignSelf: 'flex-start',

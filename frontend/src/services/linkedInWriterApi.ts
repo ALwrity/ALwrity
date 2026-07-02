@@ -331,6 +331,11 @@ export const linkedInWriterApi = {
   fetchVideoBlobUrl: fetchLinkedInVideoBlobUrl,
   pollVideoTask: pollLinkedInVideoTask,
   mapVideoMotion: mapMotionToApi,
+
+  async generateFromUrl(params: GenerateFromUrlRequest): Promise<GenerateFromUrlResponse> {
+    const { data } = await aiApiClient.post('/api/linkedin/generate-from-url', params);
+    return data;
+  },
 };
 
 // ── Asset Library Save ────────────────────────────────────────────────
