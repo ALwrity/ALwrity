@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
 import { apiClient } from '../../../api/client';
 import '../../../types/linkedinWriterEvents';
-import MySavedIdeas, { type SavedBrainstormIdea } from './MySavedIdeas';
+import MySavedIdeas, { type SavedBrainstormIdea } from './Brainstorm/MySavedIdeas';
 
 // Define the cache data type
 interface BrainstormCacheData {
