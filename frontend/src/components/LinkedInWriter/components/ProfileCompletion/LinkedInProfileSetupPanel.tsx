@@ -59,12 +59,16 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     collapseRecommendations,
     expandRecommendations,
     isProfileComplete,
+    profile,
     profileValidation,
     aiProfileIntelligence,
     loadFoundation,
     runTopicAnalysis,
     submitCompletion,
   } = useLinkedInProfileCompletion();
+
+  const publicIdentifier =
+    typeof profile?.public_identifier === 'string' ? profile.public_identifier : null;
 
   const {
     optimizationPanelState,
@@ -82,6 +86,10 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     expandOptimization,
     retryOptimization,
     refreshOptimization,
+    recheckProfile,
+    recheckDelta,
+    dismissRecheckDelta,
+    isRechecking,
     markOptimizationItemComplete,
     loadNextOptimizationBatch,
     markingRecommendationId,
@@ -350,6 +358,14 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 showNextBatchCta={showNextBatchCta}
                 isLoadingNextBatch={isLoadingNextBatch}
                 markingRecommendationId={markingRecommendationId}
+                publicIdentifier={publicIdentifier}
+                sectionScores={profileValidation?.section_scores ?? null}
+                recheckDelta={recheckDelta}
+                isRechecking={isRechecking}
+                onRecheckProfile={() => {
+                  void recheckProfile();
+                }}
+                onDismissRecheckDelta={dismissRecheckDelta}
                 onCollapse={closeOptimizationPanel}
                 onExpand={expandOptimization}
                 onRefresh={() => {
@@ -383,6 +399,14 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           showNextBatchCta={showNextBatchCta}
           isLoadingNextBatch={isLoadingNextBatch}
           markingRecommendationId={markingRecommendationId}
+          publicIdentifier={publicIdentifier}
+          sectionScores={profileValidation?.section_scores ?? null}
+          recheckDelta={recheckDelta}
+          isRechecking={isRechecking}
+          onRecheckProfile={() => {
+            void recheckProfile();
+          }}
+          onDismissRecheckDelta={dismissRecheckDelta}
           onCollapse={collapseOptimization}
           onExpand={expandOptimization}
           onRefresh={() => {

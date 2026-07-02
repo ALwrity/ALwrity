@@ -9,6 +9,7 @@ import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
 import { formatRelativeUpdatedAt } from '../TopicRecommendations/topicRecommendationLabels';
 import { ProfileOptimizationCard } from './ProfileOptimizationCard';
 import { ProfileOptimizationSummaryBar } from './ProfileOptimizationSummaryBar';
+import { SectionScoresPanel } from './SectionScoresPanel';
 
 interface ProfileOptimizationPanelProps {
   isOpen: boolean;
@@ -21,6 +22,12 @@ interface ProfileOptimizationPanelProps {
   showNextBatchCta?: boolean;
   isLoadingNextBatch?: boolean;
   markingRecommendationId?: string | null;
+  publicIdentifier?: string | null;
+  sectionScores?: Record<string, number> | null;
+  recheckDelta?: { previous: number; current: number } | null;
+  isRechecking?: boolean;
+  onRecheckProfile?: () => void;
+  onDismissRecheckDelta?: () => void;
   onCollapse?: () => void;
   onExpand?: () => void;
   onRefresh?: () => void;
@@ -78,6 +85,12 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   showNextBatchCta = false,
   isLoadingNextBatch = false,
   markingRecommendationId = null,
+  publicIdentifier = null,
+  sectionScores = null,
+  recheckDelta = null,
+  isRechecking = false,
+  onRecheckProfile,
+  onDismissRecheckDelta,
   onCollapse,
   onExpand,
   onRefresh,
@@ -85,6 +98,24 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   onSkip,
   onLoadNextBatch,
 }) => {
+  const activeSectionKeys = React.useMemo(() => {
+    if (!recommendations) {
+      return null;
+    }
+    return new Set(recommendations.map((item) => item.profile_section));
+  }, [recommendations]);
+
+  const activeSectionCount = React.useMemo(() => {
+    if (!recommendations) {
+      return null;
+    }
+    const map = new Map<string, number>();
+    for (const item of recommendations) {
+      map.set(item.profile_section, (map.get(item.profile_section) ?? 0) + 1);
+    }
+    return map;
+  }, [recommendations]);
+
   if (!isOpen) {
     return null;
   }
@@ -98,6 +129,8 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
   const showNextBatchBanner =
     !showSkeleton && !showCards && !showNoGaps && showNextBatchCta && Boolean(onLoadNextBatch);
+
+  const showSectionScores = Boolean(sectionScores) && (showCards || showNextBatchBanner);
 
   if (!isExpanded && (showCards || showNextBatchBanner) && onExpand) {
     return (
@@ -294,6 +327,116 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
             </div>
           )}
 
+          {showSectionScores && sectionScores && (
+            <SectionScoresPanel
+              scores={sectionScores}
+              activeSectionKeys={activeSectionKeys}
+              activeSectionCount={activeSectionCount}
+            />
+          )}
+
+          {showCards && onRecheckProfile && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 14px',
+                borderRadius: 10,
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                flexWrap: 'wrap',
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: '#475569',
+                  lineHeight: 1.4,
+                  flex: '1 1 200px',
+                }}
+              >
+                Applied changes on LinkedIn? Re-check your live profile to verify your real score.
+              </p>
+              <button
+                type="button"
+                onClick={onRecheckProfile}
+                disabled={isRechecking}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #0A66C2',
+                  backgroundColor: isRechecking ? '#cbd5e1' : '#fff',
+                  color: isRechecking ? '#64748b' : '#0A66C2',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: isRechecking ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {isRechecking ? 'Re-checking…' : '🔄 Re-check my profile'}
+              </button>
+            </div>
+          )}
+
+          {recheckDelta && onDismissRecheckDelta && (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                padding: '12px 14px',
+                borderRadius: 10,
+                backgroundColor: recheckDelta.current > recheckDelta.previous ? '#ecfdf5' : '#fef3c7',
+                border: recheckDelta.current > recheckDelta.previous
+                  ? '1px solid #6ee7b7'
+                  : '1px solid #fcd34d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: recheckDelta.current > recheckDelta.previous ? '#065f46' : '#92400e',
+                  lineHeight: 1.45,
+                  flex: 1,
+                }}
+              >
+                {recheckDelta.current > recheckDelta.previous
+                  ? `✅ Real score improved: ${recheckDelta.previous} → ${recheckDelta.current} (+${
+                      recheckDelta.current - recheckDelta.previous
+                    } from your live LinkedIn changes).`
+                  : recheckDelta.current < recheckDelta.previous
+                    ? `Real score changed: ${recheckDelta.previous} → ${recheckDelta.current} (${recheckDelta.current - recheckDelta.previous}). The rubric re-evaluated against your current LinkedIn profile.`
+                    : `Score unchanged at ${recheckDelta.current}. The rubric didn't detect new gaps based on your live LinkedIn profile.`}
+              </p>
+              <button
+                type="button"
+                onClick={onDismissRecheckDelta}
+                aria-label="Dismiss re-check result"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+
           {showCards && (
             <div
               id="profile-optimization-list"
@@ -307,6 +450,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   onMarkDone={onMarkDone}
                   onSkip={onSkip}
                   isMarking={markingRecommendationId === item.id}
+                  publicIdentifier={publicIdentifier}
                 />
               ))}
             </div>

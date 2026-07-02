@@ -42,7 +42,11 @@ class ProfileValidationResult(TypedDict, total=False):
     # Rubric-based LinkedIn best-practice score (Phase A — content quality heuristics).
     optimization_score: int
     optimization_gaps_count: int
-    score_basis: Literal["rubric", "completeness_fallback"]
+    # Per-section 0–100 rubric scores, keyed by section name
+    # (e.g. ``headline``, ``summary``, ``skills``). Always includes all
+    # :data:`backend.services.integrations.linkedin.profile_optimization_rubric.PROFILE_SECTIONS`.
+    section_scores: dict[str, int]
+    score_basis: Literal["rubric", "rubric_with_progress", "completeness_fallback"]
 
 
 def is_field_empty(value: Any) -> bool:

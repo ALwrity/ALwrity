@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
   completeProfileOptimizationRecommendation,
@@ -40,6 +40,12 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [isLoadingNextBatch, setIsLoadingNextBatch] = useState(false);
   const [showNextBatchCta, setShowNextBatchCta] = useState(false);
 
+  const lastScoreRef = useRef<number | null>(null);
+  const [recheckDelta, setRecheckDelta] = useState<{
+    previous: number;
+    current: number;
+  } | null>(null);
+
   const applyBatchActionResponse = useCallback(
     (data: LinkedInProfileOptimizationBatchActionResponse) => {
       setRecommendations(data.profile_optimization);
@@ -49,6 +55,9 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setIsOptimizationExpanded(true);
       if (data.profile_validation) {
         dispatchProfileStrengthUpdated(data.profile_validation);
+        if (data.profile_validation.optimization_score != null) {
+          lastScoreRef.current = data.profile_validation.optimization_score;
+        }
       }
       console.info(`${LOG_PREFIX} batch action applied`, {
         activeCount: data.profile_optimization.length,
@@ -134,6 +143,10 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setShowNextBatchCta(false);
       setPanelState('complete');
       setIsOptimizationExpanded(true);
+      if (data.profile_validation?.optimization_score != null) {
+        lastScoreRef.current = data.profile_validation.optimization_score;
+      }
+      setRecheckDelta(null);
       console.info(`${LOG_PREFIX} loaded recommendations`, {
         count: items.length,
         source: meta?.source,
@@ -216,6 +229,64 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     await loadOptimization(true);
   }, [loadOptimization]);
 
+  const recheckProfile = useCallback(async () => {
+    if (!isProfileComplete) {
+      console.warn(`${LOG_PREFIX} recheck blocked — profile incomplete`);
+      return;
+    }
+    console.info(`${LOG_PREFIX} user requested live profile re-check`);
+    const previousScore = lastScoreRef.current;
+    setPanelState('loading');
+    setOptimizationUserError(null);
+    setOptimizationError(null);
+    setRecheckDelta(null);
+    setIsOptimizationExpanded(true);
+
+    try {
+      const data = await runLinkedInProfileOptimization({ refreshProfile: true });
+      const items = data.profile_optimization ?? null;
+      const meta = data.profile_optimization_meta ?? null;
+
+      if (data.profile_validation) {
+        dispatchProfileStrengthUpdated(data.profile_validation);
+      }
+
+      const newScore = data.profile_validation?.optimization_score ?? null;
+      if (newScore != null) {
+        lastScoreRef.current = newScore;
+      }
+      if (previousScore != null && newScore != null && previousScore !== newScore) {
+        setRecheckDelta({ previous: previousScore, current: newScore });
+      } else {
+        setRecheckDelta(null);
+      }
+
+      setRecommendations(items);
+      setOptimizationMeta(meta);
+      setShowNextBatchCta(false);
+      setPanelState('complete');
+
+      console.info(`${LOG_PREFIX} re-check complete`, {
+        activeCount: items?.length ?? 0,
+        source: meta?.source,
+        previousScore,
+        newScore,
+        delta: newScore != null && previousScore != null ? newScore - previousScore : null,
+      });
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to re-check your LinkedIn profile';
+      console.error(`${LOG_PREFIX} re-check failed:`, message, err);
+      setOptimizationUserError(message);
+      setOptimizationError(null);
+      setPanelState('error');
+    }
+  }, [isProfileComplete]);
+
+  const dismissRecheckDelta = useCallback(() => {
+    setRecheckDelta(null);
+  }, []);
+
   return {
     optimizationPanelState: panelState,
     isOptimizationOpen:
@@ -236,6 +307,10 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     expandOptimization,
     retryOptimization,
     refreshOptimization,
+    recheckProfile,
+    recheckDelta,
+    dismissRecheckDelta,
+    isRechecking: panelState === 'loading',
     markOptimizationItemComplete,
     loadNextOptimizationBatch,
   };
