@@ -8,6 +8,7 @@ import {
 interface LinkedInStudioTourProps {
   run: boolean;
   onRunChange: (run: boolean) => void;
+  storageKey?: string;
 }
 
 const JOYRIDE_STYLES = {
@@ -56,16 +57,17 @@ const JOYRIDE_STYLES = {
   },
 } as const;
 
-export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({ run, onRunChange }) => {
+export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({ run, onRunChange, storageKey }) => {
+  const key = storageKey ?? LINKEDIN_STUDIO_TOUR_SEEN_KEY;
   const handleCallback = useCallback(
     (data: CallBackProps) => {
       const { status } = data;
       if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-        localStorage.setItem(LINKEDIN_STUDIO_TOUR_SEEN_KEY, 'true');
+        localStorage.setItem(key, 'true');
         onRunChange(false);
       }
     },
-    [onRunChange]
+    [onRunChange, key]
   );
 
   return (

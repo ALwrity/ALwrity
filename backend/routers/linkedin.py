@@ -819,8 +819,8 @@ async def generate_from_url(
     user_id = _require_clerk_user_id(current_user, http_request)
 
     try:
-        # 1. Fetch URL content via Exa
-        exa_key = get_exa_key(user_id)
+        # 1. Fetch URL content via Exa (system key fallback, matching blog/podcast pattern)
+        exa_key = get_exa_key(user_id) or os.getenv("EXA_API_KEY")
         if not exa_key:
             raise HTTPException(status_code=400, detail="Exa API key not configured")
 

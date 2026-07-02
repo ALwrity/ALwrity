@@ -531,7 +531,7 @@ Always use the most appropriate tool for the user's request.`.trim();
       <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
         {/* Loading Indicator */}
         <LoadingIndicator
           isGenerating={isGenerating}
@@ -552,22 +552,55 @@ Always use the most appropriate tool for the user's request.`.trim();
             />
           </div>
         ) : draft || isGenerating ? (<>
-          {/* Back to Dashboard button */}
           {draft && !isGenerating && (
-            <div style={{ padding: '8px 24px', display: 'flex', justifyContent: 'flex-start' }}>
+            <div style={{ 
+              padding: '8px 24px', 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: 12,
+              flexShrink: 0,
+              borderBottom: '1px solid #e2e8f0',
+              background: '#f8fafc'
+            }}>
               <Button
                 type="button"
-                variant="outlined"
-                size="small"
+                variant="contained"
                 onClick={() => setDraft('')}
-                startIcon={<span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>←</span>}
-                sx={{ color: '#64748b', borderColor: '#d1d5db', '&:hover': { borderColor: '#0a66c2', color: '#0a66c2' } }}
+                startIcon={<span style={{ fontSize: 18, lineHeight: 1 }}>←</span>}
+                sx={{ 
+                  fontWeight: 700,
+                  bgcolor: '#0a66c2', 
+                  '&:hover': { bgcolor: '#004182' },
+                  textTransform: 'none',
+                  fontSize: 14,
+                  px: 2.5,
+                  py: 1,
+                  boxShadow: '0 2px 8px rgba(10, 102, 194, 0.3)',
+                }}
               >
                 Back to Dashboard
               </Button>
+
+              <Button
+                type='button'
+                variant="outlined"
+                color="primary"
+                startIcon={saveStatus === 'saving' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+                onClick={handleSaveToAssetLibrary}
+                disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                sx={{ textTransform: 'none', fontSize: 13, fontWeight: 600 }}
+              >
+                {saveStatus === 'saving' ? 'Saving...' : 
+                 saveStatus === 'saved' ? 'Saved ✓' : 
+                 'Save to Asset Library'}
+              </Button>
+
+              <div style={{ flex: 1 }} />
+
+              <PublishLinkedInPanel draft={draft} compact />
             </div>
           )}
-          {/* Editor Panel - Show when there's content or generating */}
+
           <ContentEditor
             isPreviewing={isPreviewing}
             pendingEdit={pendingEdit}
@@ -588,28 +621,6 @@ Always use the most appropriate tool for the user's request.`.trim();
             onPreviewToggle={handlePreviewToggle}
             topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
           />
-
-          {/* Save to Asset Library button - only when there's generated content */}
-          {draft && !isGenerating && (
-            <div style={{ padding: '8px 24px', display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                type='button'
-                variant="contained"
-                color="success"
-                startIcon={saveStatus === 'saving' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
-                onClick={handleSaveToAssetLibrary}
-                disabled={saveStatus === 'saving' || saveStatus === 'saved'}
-                size="small"
-              >
-                {saveStatus === 'saving' ? 'Saving...' : 
-                 saveStatus === 'saved' ? 'Saved ✓' : 
-                 'Save to Asset Library'}
-              </Button>
-            </div>
-          )}
-
-          {draft && !isGenerating && <PublishLinkedInPanel draft={draft} />}
-          
         </>) : (
           /* Welcome Message - Show when no content */
           <WelcomeMessage
