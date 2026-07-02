@@ -10,6 +10,8 @@ interface StepResult {
   duration?: number;
   qualityScore?: number;
   data?: any;
+  /** Legacy payload key — prefer `data` when both are present. */
+  results?: any;
   errors?: string[];
   warnings?: string[];
   metadata?: {

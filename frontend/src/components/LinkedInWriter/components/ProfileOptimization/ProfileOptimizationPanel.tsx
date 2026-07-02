@@ -1,12 +1,14 @@
-import React from 'react';
+﻿import React from 'react';
 import { CircularProgress } from '@mui/material';
 
 import type {
+  LinkedInAIProfileIntelligence,
   LinkedInProfileOptimizationItem,
   LinkedInProfileOptimizationMeta,
 } from '../../../../api/linkedinSocial';
 import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
 import { formatRelativeUpdatedAt } from '../TopicRecommendations/topicRecommendationLabels';
+import { BrandIdentityCard } from './BrandIdentityCard';
 import { ProfileOptimizationCard } from './ProfileOptimizationCard';
 import { ProfileOptimizationSummaryBar } from './ProfileOptimizationSummaryBar';
 import { SectionScoresPanel } from './SectionScoresPanel';
@@ -28,6 +30,9 @@ interface ProfileOptimizationPanelProps {
   isRechecking?: boolean;
   onRecheckProfile?: () => void;
   onDismissRecheckDelta?: () => void;
+  /** AI-detected brand identity (Phase 5 intelligence). */
+  aiProfileIntelligence?: LinkedInAIProfileIntelligence | null;
+  profileStrengthPercent?: number | null;
   onCollapse?: () => void;
   onExpand?: () => void;
   onRefresh?: () => void;
@@ -73,7 +78,40 @@ const panelBackgroundGlowStyle: React.CSSProperties = {
   zIndex: 0,
 };
 
-/** Phase 7 — profile optimization recommendations panel. */
+const IMPACT_RANK: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
+const EFFORT_RANK: Record<string, number> = { Low: 0, Medium: 1, High: 2 };
+
+function computePriorityScore(item: LinkedInProfileOptimizationItem): number {
+  const impactScore = IMPACT_RANK[item.impact] ?? 99;
+  const effortScore = EFFORT_RANK[item.effort] ?? 99;
+  return impactScore * 10 + effortScore;
+}
+
+function findQuickWin(
+  items: LinkedInProfileOptimizationItem[]
+): LinkedInProfileOptimizationItem | null {
+  return (
+    items.find((item) => item.impact === 'High' && item.effort === 'Low') ??
+    items.find((item) => item.impact === 'High' && item.effort === 'Medium') ??
+    items.find((item) => item.impact === 'Medium' && item.effort === 'Low') ??
+    null
+  );
+}
+
+function formatEffortTimeLabel(effort: string): string {
+  switch (effort) {
+    case 'Low':
+      return 'Takes ~5 minutes';
+    case 'Medium':
+      return 'Takes ~20 minutes';
+    case 'High':
+      return 'Takes an afternoon';
+    default:
+      return '';
+  }
+}
+
+/** Phase 7 ΓÇö profile optimization recommendations panel. */
 export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> = ({
   isOpen,
   isLoading = false,
@@ -91,6 +129,8 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   isRechecking = false,
   onRecheckProfile,
   onDismissRecheckDelta,
+  aiProfileIntelligence,
+  profileStrengthPercent,
   onCollapse,
   onExpand,
   onRefresh,
@@ -115,6 +155,36 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     }
     return map;
   }, [recommendations]);
+
+  const sortedRecommendations = React.useMemo(() => {
+    if (!recommendations) return [];
+    return [...recommendations].sort(
+      (a, b) => computePriorityScore(a) - computePriorityScore(b)
+    );
+  }, [recommendations]);
+
+  const quickWin = React.useMemo(() => {
+    if (!recommendations) return null;
+    return findQuickWin(recommendations);
+  }, [recommendations]);
+
+  const remainingItems = React.useMemo(() => {
+    if (!quickWin) return sortedRecommendations;
+    return sortedRecommendations.filter((item) => item.id !== quickWin.id);
+  }, [sortedRecommendations, quickWin]);
+
+  const [showAllAngles, setShowAllAngles] = React.useState(false);
+  const VISIBLE_ANGLES_COUNT = 3;
+  const writingOpportunities = aiProfileIntelligence?.writing_opportunities ?? [];
+  const visibleOpportunities = showAllAngles
+    ? writingOpportunities
+    : writingOpportunities.slice(0, VISIBLE_ANGLES_COUNT);
+  const hiddenCount = Math.max(0, writingOpportunities.length - VISIBLE_ANGLES_COUNT);
+  const contentBridgeIndustry =
+    aiProfileIntelligence?.industry && aiProfileIntelligence.industry !== 'Unknown'
+      ? aiProfileIntelligence.industry
+      : 'your industry';
+  const contentBridgeExpertise = aiProfileIntelligence?.primary_expertise?.[0];
 
   if (!isOpen) {
     return null;
@@ -160,7 +230,23 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   }
 
   return (
-    <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
+    <>
+      <style>{`
+        @media (max-width: 480px) {
+          .profile-opt-panel {
+            padding: 12px !important;
+          }
+          .profile-opt-flex-row {
+            flex-direction: column !important;
+            gap: 12px !important;
+          }
+          .profile-opt-flex-item {
+            flex: 1 1 auto !important;
+            width: 100% !important;
+          }
+        }
+      `}</style>
+    <div className="profile-opt-panel" style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
       <div
         style={{
           ...linkedInPlaceholderCardStyles.inner,
@@ -173,6 +259,13 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
         <div style={panelBackgroundGlowStyle} />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
+          {aiProfileIntelligence && (
+            <BrandIdentityCard
+              intelligence={aiProfileIntelligence}
+              profileStrengthPercent={profileStrengthPercent}
+            />
+          )}
+
           <div
             style={{
               display: 'flex',
@@ -192,16 +285,17 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   color: '#1e293b',
                 }}
               >
-                Profile optimization suggestions
+                Improve your LinkedIn profile
               </h3>
               <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b', lineHeight: 1.55 }}>
-                Five high-impact improvements based on your profile gaps and LinkedIn best
-                practices.
+                {quickWin
+                  ? "ALwrity detected opportunities to get more views, connections, and leads — prioritized by impact and time required. Start with 'Quick win'."
+                  : 'ALwrity detected opportunities to get more views, connections, and leads — prioritized by impact and time required.'}
               </p>
               {updatedLabel && (
                 <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
                   {updatedLabel}
-                  {optimizationMeta?.source ? ` · Source: ${optimizationMeta.source}` : ''}
+                  {optimizationMeta?.source ? ` ┬╖ Source: ${optimizationMeta.source}` : ''}
                 </p>
               )}
               {!updatedLabel && optimizationMeta?.source && (
@@ -209,7 +303,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   Source: {optimizationMeta.source}
                   {typeof optimizationMeta.remaining_in_backlog === 'number' &&
                     optimizationMeta.remaining_in_backlog > 0 &&
-                    ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
+                    ` ┬╖ ${optimizationMeta.remaining_in_backlog} more in backlog`}
                 </p>
               )}
             </div>
@@ -247,7 +341,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   }}
                 >
                   <CircularProgress size={20} sx={{ color: '#0A66C2' }} />
-                  Generating profile suggestions…
+                  Generating profile suggestionsΓÇª
                 </div>
                 {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
                   <div key={index} style={SKELETON_CARD_STYLE} aria-hidden />
@@ -322,7 +416,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   whiteSpace: 'nowrap',
                 }}
               >
-                {isLoadingNextBatch ? 'Loading…' : 'Get your next 5 recommendations'}
+                {isLoadingNextBatch ? 'LoadingΓÇª' : 'Get your next 5 recommendations'}
               </button>
             </div>
           )}
@@ -379,7 +473,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   whiteSpace: 'nowrap',
                 }}
               >
-                {isRechecking ? 'Re-checking…' : '🔄 Re-check my profile'}
+                {isRechecking ? 'Re-checkingΓÇª' : '≡ƒöä Re-check my profile'}
               </button>
             </div>
           )}
@@ -411,11 +505,11 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                 }}
               >
                 {recheckDelta.current > recheckDelta.previous
-                  ? `✅ Real score improved: ${recheckDelta.previous} → ${recheckDelta.current} (+${
+                  ? `Γ£à Real score improved: ${recheckDelta.previous} ΓåÆ ${recheckDelta.current} (+${
                       recheckDelta.current - recheckDelta.previous
                     } from your live LinkedIn changes).`
                   : recheckDelta.current < recheckDelta.previous
-                    ? `Real score changed: ${recheckDelta.previous} → ${recheckDelta.current} (${recheckDelta.current - recheckDelta.previous}). The rubric re-evaluated against your current LinkedIn profile.`
+                    ? `Real score changed: ${recheckDelta.previous} ΓåÆ ${recheckDelta.current} (${recheckDelta.current - recheckDelta.previous}). The rubric re-evaluated against your current LinkedIn profile.`
                     : `Score unchanged at ${recheckDelta.current}. The rubric didn't detect new gaps based on your live LinkedIn profile.`}
               </p>
               <button
@@ -432,7 +526,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   padding: 0,
                 }}
               >
-                ×
+                ├ù
               </button>
             </div>
           )}
@@ -442,21 +536,276 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
               id="profile-optimization-list"
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
             >
-              {recommendations.map((item, index) => (
+              {quickWin && (
+                <div
+                  style={{
+                    padding: '12px 14px',
+                    borderRadius: 10,
+                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
+                    border: '1px solid #f59e0b',
+                    marginBottom: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '5px 10px',
+                      borderRadius: 999,
+                      backgroundColor: '#f59e0b',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <span style={{ fontSize: 14 }}>⚡</span>
+                    Do This First
+                    <span
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: 999,
+                        backgroundColor: 'rgba(255,255,255,0.92)',
+                        color: '#92400e',
+                        fontSize: 11,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {formatEffortTimeLabel(quickWin.effort)}
+                    </span>
+                  </div>
+                  <ProfileOptimizationCard
+                    recommendation={quickWin}
+                    index={0}
+                    onMarkDone={onMarkDone}
+                    onSkip={onSkip}
+                    isMarking={markingRecommendationId === quickWin.id}
+                    publicIdentifier={publicIdentifier}
+                    showEffortTimeLabel={formatEffortTimeLabel(quickWin.effort)}
+                  />
+                </div>
+              )}
+
+              {remainingItems.map((item, index) => (
                 <ProfileOptimizationCard
                   key={item.id}
                   recommendation={item}
-                  index={index}
+                  index={quickWin ? index + 1 : index}
                   onMarkDone={onMarkDone}
                   onSkip={onSkip}
                   isMarking={markingRecommendationId === item.id}
                   publicIdentifier={publicIdentifier}
+                  showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
                 />
               ))}
             </div>
           )}
+
+          {showCards && writingOpportunities.length > 0 && (
+              <div
+                style={{
+                  marginTop: 24,
+                  padding: '18px 20px',
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
+                  border: '1px solid #c4b5fd',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                    aria-hidden
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
+                        stroke="white"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <h4
+                      style={{
+                        margin: '0 0 4px',
+                        fontSize: 15,
+                        fontWeight: 700,
+                        color: '#5b21b6',
+                      }}
+                    >
+                      Content angles from your profile
+                    </h4>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        color: '#7c3aed',
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      Your experience in {contentBridgeIndustry}
+                      {contentBridgeExpertise && (
+                        <> and expertise in <strong>{contentBridgeExpertise}</strong></>
+                      )}{' '}
+                      makes these content angles native to you — not generic topics.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                    marginBottom: 16,
+                  }}
+                >
+                  {visibleOpportunities.map((opportunity, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        backgroundColor: '#fff',
+                        border: '1px solid #ddd6fe',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: '50%',
+                          backgroundColor: '#f3e8ff',
+                          color: '#7c3aed',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {idx + 1}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 14,
+                          color: '#4c1d95',
+                          fontWeight: 500,
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {opportunity}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAngles((v) => !v)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '8px 14px',
+                      borderRadius: 8,
+                      border: '1px solid #c4b5fd',
+                      backgroundColor: '#fff',
+                      color: '#6b21a8',
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      marginBottom: 12,
+                      transition: 'background 150ms ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#f3e8ff';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#fff';
+                    }}
+                  >
+                    {showAllAngles ? (
+                      <>Show fewer angles ▲</>
+                    ) : (
+                      <>Show {hiddenCount} more angle{hiddenCount !== 1 ? 's' : ''} ▼</>
+                    )}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.dispatchEvent(new CustomEvent('linkedinwriter:getTopicIdeas'));
+                  }}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 18px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    width: '100%',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                  >
+                    <path
+                      d="M12 5v14M5 12h14"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Get topic ideas from these angles
+                </button>
+              </div>
+            )}
         </div>
       </div>
     </div>
+    </>
   );
 };

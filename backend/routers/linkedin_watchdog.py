@@ -242,7 +242,7 @@ async def refresh_watchdog(current_user: Dict[str, Any] = Depends(get_current_us
 
 @router.get("/updates", response_model=WatchdogUpdatesResponse)
 async def get_updates(
-    category: Optional[str] = Query(None, regex="^(industry|company|person)$"),
+    category: Optional[str] = Query(None, pattern="^(industry|company|person)$"),
     since: Optional[str] = Query(None),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):

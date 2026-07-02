@@ -19,27 +19,29 @@ export function formatProfileSection(section: string): string {
   return SECTION_LABELS[section] ?? section.replace(/_/g, ' ');
 }
 
+/** TC-013: Iconography for impact badges */
 export function formatOptimizationImpact(impact: string): string {
   switch (impact) {
     case 'High':
-      return 'High visibility impact';
+      return '🚀 High visibility impact';
     case 'Medium':
-      return 'Moderate improvement';
+      return '⚖️ Moderate improvement';
     case 'Low':
-      return 'Nice to have';
+      return '✓ Nice to have';
     default:
       return impact;
   }
 }
 
+/** TC-013: Iconography for effort badges */
 export function formatOptimizationEffort(effort: string): string {
   switch (effort) {
     case 'Low':
-      return 'Quick win';
+      return '⚡ Quick win';
     case 'Medium':
-      return 'Some effort';
+      return '⏱️ Some effort';
     case 'High':
-      return 'Worth the investment';
+      return '🎯 Worth the investment';
     default:
       return effort;
   }

@@ -15,6 +15,8 @@ from typing import Optional, List
 from models.onboarding import Base as OnboardingBase
 from models.seo_analysis import Base as SEOAnalysisBase
 from models.content_planning import Base as ContentPlanningBase
+# Register enhanced calendar tables on the same metadata as content planning.
+import models.enhanced_calendar_models  # noqa: F401
 from models.enhanced_strategy_models import Base as EnhancedStrategyBase
 # Monitoring models now use the same base as enhanced strategy models
 from models.monitoring_models import Base as MonitoringBase
@@ -415,7 +417,7 @@ def _ensure_calendar_events_user_id_column(engine, user_id: str) -> None:
 
 def _ensure_enhanced_calendar_user_id_type(engine, user_id: str) -> None:
     """Migrate user_id from INTEGER to VARCHAR(255) in enhanced calendar tables."""
-    from models.enhanced_calendar_models import Base as EnhancedBase
+    from models.content_planning import Base as EnhancedBase
 
     tables = [
         "ai_calendar_recommendations",

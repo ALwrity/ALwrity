@@ -691,11 +691,11 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 10px 8px;
-  background: #ffffff;
-  border: 2px solid #bce0fd;
-  border-radius: 12px;
-  box-shadow: 0 2px 8px rgba(10, 102, 194, 0.06);
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .linkedin-dashboard-rail-knowledge {
@@ -1138,13 +1138,13 @@ body.linkedin-dashboard-view cpk-web-inspector {
   font-style: italic;
 }
 
-/* Generated Image Display */
+/* Generated Image Display - clean without outer box */
 .generated-image {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-bottom: 16px;
 }
 
 .image-header {
@@ -1164,15 +1164,15 @@ body.linkedin-dashboard-view cpk-web-inspector {
 
 .image-preview {
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
 }
 
 .preview-image {
   max-width: 100%;
   height: auto;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: none;
 }
 
 .image-actions {

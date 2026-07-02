@@ -61,7 +61,8 @@ export const ProfileOptimizationSummaryBar: React.FC<ProfileOptimizationSummaryB
             color: '#1e293b',
           }}
         >
-          Profile optimization suggestions
+          {/* TC-014: Updated title for conversion focus */}
+          Improve your LinkedIn profile
         </h3>
         <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
           {subtitleParts.join(' · ')}

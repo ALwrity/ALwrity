@@ -13,7 +13,8 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
 }) => {
   const isFixed = variant === 'fixed';
   const isStacked = layout === 'stacked';
-  const buttonSize = isFixed ? 56 : 48;
+  const isRail = variant === 'rail';
+  const buttonSize = isFixed ? 56 : isRail ? 56 : 48;
 
   return (
     <div
@@ -75,17 +76,21 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
       </button>
       <span
         style={{
-          fontSize: 8,
+          fontSize: isRail ? 9 : 8,
           fontWeight: 700,
           color: '#0a66c2',
           textAlign: 'center',
           maxWidth: 108,
           lineHeight: 1.2,
-          background: 'rgba(255,255,255,0.92)',
-          padding: '2px 6px',
-          borderRadius: 8,
-          border: '1px solid #BCE0FD',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          ...(isRail
+            ? {}
+            : {
+                background: 'rgba(255,255,255,0.92)',
+                padding: '2px 6px',
+                borderRadius: 8,
+                border: '1px solid #BCE0FD',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+              }),
         }}
       >
         Ask ALwrity Co-Pilot
