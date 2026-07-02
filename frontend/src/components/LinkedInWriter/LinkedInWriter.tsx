@@ -552,6 +552,21 @@ Always use the most appropriate tool for the user's request.`.trim();
             />
           </div>
         ) : draft || isGenerating ? (<>
+          {/* Back to Dashboard button */}
+          {draft && !isGenerating && (
+            <div style={{ padding: '8px 24px', display: 'flex', justifyContent: 'flex-start' }}>
+              <Button
+                type="button"
+                variant="outlined"
+                size="small"
+                onClick={() => setDraft('')}
+                startIcon={<span aria-hidden style={{ fontSize: 16, lineHeight: 1 }}>←</span>}
+                sx={{ color: '#64748b', borderColor: '#d1d5db', '&:hover': { borderColor: '#0a66c2', color: '#0a66c2' } }}
+              >
+                Back to Dashboard
+              </Button>
+            </div>
+          )}
           {/* Editor Panel - Show when there's content or generating */}
           <ContentEditor
             isPreviewing={isPreviewing}

@@ -53,7 +53,7 @@ export const Header: React.FC<HeaderProps> = ({
     left: number;
     maxHeight: number;
   } | null>(null);
-  const { connected, connectWithOAuth } = useLinkedInSocialConnection();
+  const { connected } = useLinkedInSocialConnection();
   const [profileStrengthPercent, setProfileStrengthPercent] = useState<number | null>(null);
   const [profileValidation, setProfileValidation] = useState<LinkedInProfileValidation | null>(
     null
@@ -224,10 +224,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleOpenOptimiseProfile = () => {
-    if (!connected) {
-      void connectWithOAuth();
-      return;
-    }
+    if (!connected) return;
     window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
   };
 
@@ -309,8 +306,9 @@ export const Header: React.FC<HeaderProps> = ({
             onOptimiseProfile={handleOpenOptimiseProfile}
             profileStrengthPercent={connected ? profileStrengthPercent : null}
             strengthLabel={strengthLabel}
-            strengthTooltip={connected ? strengthTooltip : undefined}
+            strengthTooltip={connected ? strengthTooltip : 'Connect LinkedIn to optimise your profile'}
             isLoading={profileStrengthLoading}
+            isDisabled={!connected}
             variant="ticker"
           />
           <div

@@ -9,7 +9,10 @@ export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis';
 interface WorkflowActionModalsProps {
   activeModal: WorkflowModalId | null;
   onClose: () => void;
+  connected?: boolean;
 }
+
+const CONNECT_REQUIRED_REASON = 'Connect LinkedIn to use this feature';
 
 const CREATE_TILE_TOOLS = [
   {
@@ -45,6 +48,7 @@ const CREATE_TILE_TOOLS = [
 export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   activeModal,
   onClose,
+  connected = false,
 }) => {
   const navigate = useNavigate();
 
@@ -180,6 +184,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             icon="📅"
             accent="#10b981"
             onClick={openCalendar}
+            disabled={!connected}
+            disabledReason={CONNECT_REQUIRED_REASON}
           />
         </div>
       </DashboardActionModal>
@@ -192,6 +198,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             icon="👤"
             accent="#6366f1"
             onClick={openProfileAnalytics}
+            disabled={!connected}
+            disabledReason={CONNECT_REQUIRED_REASON}
           />
           <DashboardToolTile
             title="Content Analytics"
@@ -199,6 +207,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             icon="📊"
             accent="#8b5cf6"
             onClick={openContentAnalytics}
+            disabled={!connected}
+            disabledReason={CONNECT_REQUIRED_REASON}
           />
           <DashboardToolTile
             title="SEO Analytics"
