@@ -137,6 +137,15 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
               onClick={openTopicIdeas}
             />
           </div>
+          <div style={{ width: 140, flexShrink: 0 }}>
+            <DashboardToolTile
+              title="Library"
+              description="Browse saved posts and drafts"
+              icon="📚"
+              accent="#6366f1"
+              onClick={openDrafts}
+            />
+          </div>
           {CREATE_TILE_TOOLS.map((tool) => (
             <div key={tool.id} style={{ width: 140, flexShrink: 0 }}>
               <DashboardToolTile

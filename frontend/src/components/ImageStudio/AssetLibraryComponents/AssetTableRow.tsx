@@ -41,6 +41,7 @@ interface AssetTableRowProps {
   textPreview?: { content: string; loading: boolean; expanded: boolean };
   onToggleTextPreview?: (asset: ContentAsset) => void;
   onCopyId: (id: string) => void;
+  onOpenLinkedInAsset?: (asset: ContentAsset) => void;
 }
 
 export const AssetTableRow: React.FC<AssetTableRowProps> = ({
@@ -58,6 +59,7 @@ export const AssetTableRow: React.FC<AssetTableRowProps> = ({
   textPreview,
   onToggleTextPreview,
   onCopyId,
+  onOpenLinkedInAsset,
 }) => {
   return (
     <TableRow
@@ -159,6 +161,21 @@ export const AssetTableRow: React.FC<AssetTableRowProps> = ({
                   <Box sx={{ color: '#667eea', fontSize: 20 }}>🔬</Box>
                 </ListItemIcon>
                 <ListItemText>Restore in Researcher</ListItemText>
+              </MenuItem>
+            )}
+            {/* Edit in LinkedIn Studio option for linkedin_writer text assets */}
+            {asset.source_module === 'linkedin_writer' && asset.asset_type === 'text' && onOpenLinkedInAsset && (
+              <MenuItem 
+                onClick={() => { 
+                  onOpenLinkedInAsset(asset); 
+                  onMenuClose(asset.id); 
+                }}
+                sx={{ color: '#0a66c2' }}
+              >
+                <ListItemIcon>
+                  <Box sx={{ color: '#0a66c2', fontSize: 20 }}>📝</Box>
+                </ListItemIcon>
+                <ListItemText>Edit in LinkedIn Studio</ListItemText>
               </MenuItem>
             )}
             <MenuItem onClick={() => { onFavorite(asset.id); onMenuClose(asset.id); }}>

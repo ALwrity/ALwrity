@@ -145,6 +145,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     calendarDescription?: string;
     calendarEventId?: string;
     workflowTaskId?: string;
+    linkedinDraftContent?: string;
+    linkedinDraftAssetId?: number;
   } | null;
 
   useEffect(() => {
@@ -162,6 +164,12 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
       const contextText = `Topic: ${topic}${description ? `\nDescription: ${description}` : ''}`;
       handleContextChange(contextText);
       // Clear navigation state so refresh doesn't re-trigger
+      window.history.replaceState({}, document.title);
+    }
+
+    const draftContent = locationState?.linkedinDraftContent;
+    if (draftContent) {
+      setDraft(draftContent);
       window.history.replaceState({}, document.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
