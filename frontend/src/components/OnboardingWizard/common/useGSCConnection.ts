@@ -116,9 +116,6 @@ export const useGSCConnection = () => {
               } catch {}
             })();
           }
-          setTimeout(() => {
-            window.location.href = '/onboarding?step=5';
-          }, 250);
         }
       };
       window.addEventListener('message', messageHandler);

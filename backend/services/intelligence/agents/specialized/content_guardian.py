@@ -38,7 +38,7 @@ class ContentGuardianAgent(SIFBaseAgent):
         self.sif_service = sif_service
 
     # ── existing utilities ────────────────────────────────────────
-    def _create_txtai_agent(self):
+    async def _create_txtai_agent(self):
         if not TXTAI_AVAILABLE or Agent is None:
             return None
         try:
@@ -47,7 +47,7 @@ class ContentGuardianAgent(SIFBaseAgent):
                 tools=[{"name": "brand_voice_checker", "description": "Checks content against brand voice guidelines", "target": self._check_brand_voice}],
                 llm=_llm_for_agent, max_iterations=3)
         except Exception as e:
-            logger.warning(f"Failed to create txtai agent for ContentGuardian: {e}"); return None
+            logger.error(f"Failed to create txtai agent for ContentGuardian: {e}"); raise e
 
     def _check_brand_voice(self, content: str) -> Dict[str, Any]:
         return {"consistent": True, "score": 0.95, "notes": "Content aligns with professional/authoritative tone."}

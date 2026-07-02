@@ -167,8 +167,8 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
               aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
               style={{
                 position: 'absolute',
-                left: -4,
-                bottom: 12,
+                right: -4,
+                bottom: 8,
                 width: 34,
                 height: 34,
                 borderRadius: '50%',

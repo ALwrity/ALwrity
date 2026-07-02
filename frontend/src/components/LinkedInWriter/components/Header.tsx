@@ -13,6 +13,8 @@ import {
 } from '../utils/profileStrengthUtils';
 import {
   PROFILE_STRENGTH_UPDATED_EVENT,
+  dispatchProfileStrengthUpdated,
+  dispatchLinkedInPersonaUpdated,
   type ProfileStrengthUpdatedDetail,
 } from '../utils/profileStrengthEvents';
 import { getLinkedInProfileFoundation } from '../../../api/linkedinSocial';
@@ -58,7 +60,19 @@ export const Header: React.FC<HeaderProps> = ({
   );
   const [profileStrengthLoading, setProfileStrengthLoading] = useState(false);
   const { corePersona, platformPersona } = usePlatformPersonaContext();
-  
+
+  // Broadcast persona snapshot to global components (e.g. UserBadge) that cannot
+  // call usePlatformPersonaContext() directly because they live outside the provider.
+  useEffect(() => {
+    if (!corePersona) return;
+    dispatchLinkedInPersonaUpdated({
+      personaName: corePersona.persona_name,
+      archetype: corePersona.archetype,
+      coreBelief: corePersona.core_belief ?? null,
+      defaultTone: platformPersona?.tonal_range?.default_tone ?? null,
+    });
+  }, [corePersona, platformPersona]);
+
   // Brainstorm modal state
   const [showBrainstormModal, setShowBrainstormModal] = useState(false);
   const [seed, setSeed] = useState('');
@@ -176,8 +190,14 @@ export const Header: React.FC<HeaderProps> = ({
     getLinkedInProfileFoundation()
       .then((data) => {
         if (!cancelled) {
-          setProfileValidation(data.profile_validation ?? null);
-          setProfileStrengthPercent(getDisplayProfileStrengthPercent(data.profile_validation));
+          const validation = data.profile_validation ?? null;
+          setProfileValidation(validation);
+          setProfileStrengthPercent(getDisplayProfileStrengthPercent(validation));
+          // Broadcast validation + AI intelligence so subscribers (e.g. UserBadge) never
+          // need a separate API call for either piece of profile data.
+          if (validation) {
+            dispatchProfileStrengthUpdated(validation, data.ai_profile_intelligence ?? null);
+          }
         }
       })
       .catch(() => {

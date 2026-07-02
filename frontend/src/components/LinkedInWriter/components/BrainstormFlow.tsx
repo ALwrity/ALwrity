@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
 import { apiClient } from '../../../api/client';
 import '../../../types/linkedinWriterEvents';
-import MySavedIdeas, { type SavedBrainstormIdea } from './MySavedIdeas';
+import MySavedIdeas, { type SavedBrainstormIdea } from './Brainstorm/MySavedIdeas';
 
 // Define the cache data type
 interface BrainstormCacheData {
@@ -516,7 +516,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                               e.stopPropagation();
                               void handleSaveIdea(i);
                             }}
-                            disabled={isSaved || isSavingThis === i}
+                            disabled={isSaved || isSavingThis}
                             title={isSaved ? 'Already saved' : 'Save to My Ideas'}
                             style={{
                               alignSelf: 'flex-start',
@@ -696,7 +696,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
         open={myIdeasOpen}
         onClose={() => setMyIdeasOpen(false)}
         onAfterDelete={() => void refreshSavedCount()}
-        onUseInCopilot={(prompt) => {
+        onUseInCopilot={(prompt: string) => {
           window.dispatchEvent(
             new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } })
           );

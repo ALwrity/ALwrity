@@ -71,6 +71,7 @@ class TxtaiIntelligenceService:
         self.index_path = f"workspace/workspace_{user_id}/indices/txtai"
         self.embeddings = None
         self._initialized = False
+        self._initialization_in_progress = False
         self.enable_caching = enable_caching
         self.cache_manager = semantic_cache_manager if enable_caching else None
         self._backend = "faiss"  # Default backend
@@ -84,10 +85,21 @@ class TxtaiIntelligenceService:
         # self._initialize_embeddings()
 
     def _ensure_initialized(self):
-        """Lazy initialization helper — non-blocking check.
-        Actual initialization is handled by _ensure_initialized_async,
-        which all callers that need the service already fall through to.
-        """
+        """Lazy initialization helper - non-blocking version for API calls."""
+        if self._initialized:
+            # Already initialized, no-op
+            return
+        
+        if self._initialization_in_progress:
+            # Initialization already triggered, skip to avoid blocking
+            logger.debug(f"Initialization already in progress for user {self.user_id}, skipping redundant call")
+            return
+        
+        # Mark as in progress and initialize in background thread
+        self._initialization_in_progress = True
+        thread = threading.Thread(target=self._initialize_embeddings, daemon=True)
+        thread.start()
+        logger.debug(f"Background initialization started for user {self.user_id}")
     
     async def _ensure_initialized_async(self):
         """Async initialization helper - waits for initialization to complete."""

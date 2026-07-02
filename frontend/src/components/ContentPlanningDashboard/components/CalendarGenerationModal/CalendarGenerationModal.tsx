@@ -688,7 +688,7 @@ const CalendarGenerationModal: React.FC<CalendarGenerationModalProps> = ({
                 onClick={() => {
                   console.log('Calendar generation completed');
                   const step12Result = currentProgress.stepResults[12];
-                  const step12Data = step12Result?.data || {};
+                  const step12Data = step12Result?.data ?? step12Result?.results ?? {};
                   onComplete({
                     calendar: {
                       id: sessionId,

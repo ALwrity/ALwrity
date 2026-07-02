@@ -122,6 +122,12 @@ export interface LinkedInProfileValidation {
   /** Rubric-based best-practice score (0–100), when available from Phase 3 enrichment. */
   optimization_score?: number | null;
   optimization_gaps_count?: number | null;
+  /**
+   * Per-section 0–100 rubric scores, keyed by section name
+   * (e.g. ``headline``, ``summary``, ``skills``). Always includes all 10
+   * known sections when present.
+   */
+  section_scores?: Record<string, number> | null;
   score_basis?: 'rubric' | 'rubric_with_progress' | 'completeness_fallback' | null;
 }
 
@@ -529,10 +535,15 @@ export async function runLinkedInTopicAnalysis(
 
 /** Profile advisor (Phase 7) — cache-first unless forceRegenerate. */
 export async function runLinkedInProfileOptimization(
-  options: { forceRegenerate?: boolean; refreshIntelligence?: boolean } = {}
+  options: {
+    forceRegenerate?: boolean;
+    refreshIntelligence?: boolean;
+    refreshProfile?: boolean;
+  } = {}
 ): Promise<LinkedInProfileAcquireResponse> {
   console.info('[ProfileOptimization] loading profile optimization (Phase 7)', options);
   return getLinkedInProfile({
+    refresh: options.refreshProfile ?? false,
     refreshIntelligence: options.refreshIntelligence ?? false,
     includeProfileOptimization: true,
     refreshProfileOptimization: options.forceRegenerate ?? false,

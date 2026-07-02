@@ -106,6 +106,8 @@ export function useLinkedInProfileCompletion() {
   const [lastCompletedPhase, setLastCompletedPhase] = useState<number | null>(null);
   const [profileValidation, setProfileValidation] =
     useState<LinkedInProfileValidation | null>(null);
+
+  const [profile, setProfile] = useState<Record<string, unknown> | null>(null);
   const [questions, setQuestions] = useState<LinkedInCompletionQuestion[]>([]);
   const [aiProfileIntelligence, setAiProfileIntelligence] =
     useState<LinkedInAIProfileIntelligence | null>(null);
@@ -140,6 +142,7 @@ export function useLinkedInProfileCompletion() {
   }, []);
 
   const applyFoundationResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
+    setProfile(data.profile ?? null);
     setProfileValidation(data.profile_validation ?? null);
     setQuestions(data.profile_completion?.questions ?? []);
     setAiProfileIntelligence(data.ai_profile_intelligence ?? null);
@@ -164,6 +167,7 @@ export function useLinkedInProfileCompletion() {
   }, []);
 
   const applyTopicResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
+    setProfile(data.profile ?? null);
     setProfileValidation(data.profile_validation ?? null);
     setAiProfileIntelligence(data.ai_profile_intelligence ?? null);
     setAiProfileIntelligenceMeta(data.ai_profile_intelligence_meta ?? null);
@@ -318,6 +322,7 @@ export function useLinkedInProfileCompletion() {
     analysisError: topicError ?? foundationError,
     isAnalyzing,
     hasTopicResults,
+    profile,
     profileValidation,
     questions,
     aiProfileIntelligence,
