@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardActionModal } from './DashboardActionModal';
 import { DashboardToolTile } from './DashboardToolTile';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
+import {
+  GrowthSnapshotModal,
+  PostTodayModal,
+  BrandScorecardModal,
+  WeeklyPlanModal,
+  ViralCopywriterModal,
+} from './AnalysisWedgeModals';
+
+type AnalysisSub = 'snapshot' | 'post_today' | 'brand_score' | 'weekly_plan' | 'viral' | null;
 
 export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis';
 
@@ -47,6 +56,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   onClose,
 }) => {
   const navigate = useNavigate();
+  const [analysisSub, setAnalysisSub] = useState<AnalysisSub>(null);
 
   const openBrainstorm = () => {
     onClose();
@@ -170,8 +180,43 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         </div>
       </DashboardActionModal>
 
-      <DashboardActionModal open={activeModal === 'analysis'} title="Analysis" onClose={onClose} maxWidth={640}>
+      <DashboardActionModal open={activeModal === 'analysis'} title="Analysis" onClose={onClose} maxWidth={680}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          <DashboardToolTile
+            title="Growth Snapshot"
+            description="Instant view: top trending topic, biggest content gap, brand score"
+            icon="⚡"
+            accent="#f59e0b"
+            onClick={() => { onClose(); setAnalysisSub('snapshot'); }}
+          />
+          <DashboardToolTile
+            title="Post Today"
+            description="AI ranks your top 3 post opportunities right now"
+            icon="🎯"
+            accent="#0a66c2"
+            onClick={() => { onClose(); setAnalysisSub('post_today'); }}
+          />
+          <DashboardToolTile
+            title="Brand Score"
+            description="Full personal brand breakdown across 5 dimensions"
+            icon="🏆"
+            accent="#8b5cf6"
+            onClick={() => { onClose(); setAnalysisSub('brand_score'); }}
+          />
+          <DashboardToolTile
+            title="Weekly Plan"
+            description="Mon–Fri AI content plan with Create Now + Schedule CTAs"
+            icon="📅"
+            accent="#059669"
+            onClick={() => { onClose(); setAnalysisSub('weekly_plan'); }}
+          />
+          <DashboardToolTile
+            title="Viral Patterns"
+            description="Top viral formats in your niche — write in any style"
+            icon="🔥"
+            accent="#dc2626"
+            onClick={() => { onClose(); setAnalysisSub('viral'); }}
+          />
           <DashboardToolTile
             title="Profile Analytics"
             description="Profile strength, gaps, and optimisation"
@@ -181,20 +226,26 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           />
           <DashboardToolTile
             title="Content Analytics"
-            description="Post performance and engagement trends"
+            description="Post performance, engagement trends, and growth engine"
             icon="📊"
-            accent="#8b5cf6"
+            accent="#0ea5e9"
             onClick={openContentAnalytics}
           />
           <DashboardToolTile
             title="SEO Analytics"
             description="See how your LinkedIn content ranks in search"
             icon="🔎"
-            accent="#0ea5e9"
+            accent="#475569"
             onClick={openSeoAnalytics}
           />
         </div>
       </DashboardActionModal>
+
+      <GrowthSnapshotModal open={analysisSub === 'snapshot'} onClose={() => setAnalysisSub(null)} />
+      <PostTodayModal open={analysisSub === 'post_today'} onClose={() => setAnalysisSub(null)} />
+      <BrandScorecardModal open={analysisSub === 'brand_score'} onClose={() => setAnalysisSub(null)} />
+      <WeeklyPlanModal open={analysisSub === 'weekly_plan'} onClose={() => setAnalysisSub(null)} />
+      <ViralCopywriterModal open={analysisSub === 'viral'} onClose={() => setAnalysisSub(null)} />
     </>
   );
 };
