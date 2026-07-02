@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
 import { apiClient } from '../../../api/client';
 import '../../../types/linkedinWriterEvents';
+import MySavedIdeas, { type SavedBrainstormIdea } from './MySavedIdeas';
 
 // Define the cache data type
 interface BrainstormCacheData {
@@ -56,6 +57,78 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
   setIsUsingCache
 }) => {
   const { corePersona, platformPersona } = usePlatformPersonaContext();
+
+  // Track which idea prompts the user has already saved in this session,
+  // so the "Save" button can flip to "Saved ✓" without re-fetching the
+  // server list. The source of truth is still the backend; this is just
+  // a UI hint to avoid duplicate POSTs.
+  const [savedPromptHashes, setSavedPromptHashes] = useState<Set<string>>(() => new Set());
+  // A monotonic counter that increments on every successful save; we
+  // surface it as the badge count on the "My Ideas (N)" button.
+  const [savedCount, setSavedCount] = useState<number>(0);
+  const [myIdeasOpen, setMyIdeasOpen] = useState<boolean>(false);
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Debounce timer for saved feedback so rapid clicks don't flicker.
+  const saveTimerRef = useRef<number | null>(null);
+
+  const hashPrompt = useCallback((p: string) => p.trim().toLowerCase(), []);
+
+  const refreshSavedCount = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/brainstorm/saved-ideas', {
+        params: { limit: 100, offset: 0 },
+      });
+      const total = Number(res.data?.total) || 0;
+      setSavedCount(total);
+      if (Array.isArray(res.data?.ideas)) {
+        const ideas: SavedBrainstormIdea[] = res.data.ideas;
+        setSavedPromptHashes(new Set(ideas.map((it) => hashPrompt(it.prompt))));
+      }
+    } catch {
+      // Silent: count is best-effort; the user can still open the modal.
+    }
+  }, [hashPrompt]);
+
+  // Best-effort load on mount so the "My Ideas (N)" badge is populated.
+  useEffect(() => {
+    void refreshSavedCount();
+  }, [refreshSavedCount]);
+
+  const handleSaveIdea = useCallback(
+    async (idx: number) => {
+      const idea = ideas[idx];
+      if (!idea) return;
+      const prompt = idea.prompt?.trim() || '';
+      if (!prompt) return;
+      const hash = hashPrompt(prompt);
+      if (savedPromptHashes.has(hash)) {
+        return; // Already saved this session.
+      }
+      setSavingIndex(idx);
+      setSaveError(null);
+      try {
+        await apiClient.post('/api/brainstorm/saved-ideas', {
+          prompt,
+          rationale: idea.rationale || '',
+          source_seed:
+            (window.lastBrainstormEvent?.detail?.seed as string | undefined) || '',
+        });
+        setSavedPromptHashes((prev) => {
+          const next = new Set(prev);
+          next.add(hash);
+          return next;
+        });
+        setSavedCount((c) => c + 1);
+        if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = window.setTimeout(() => setSavingIndex(null), 1200);
+      } catch (e: any) {
+        setSaveError(e?.response?.data?.detail || e?.message || 'Failed to save idea');
+        setSavingIndex(null);
+      }
+    },
+    [ideas, savedPromptHashes, hashPrompt]
+  );
 
   const loaderMessages = useMemo(() => ([
     'Searching the web for the most recent and relevant coverage...',
@@ -274,6 +347,38 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
               <div>Brainstorm: Google Search Prompts</div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button
+                  type="button"
+                  onClick={() => setMyIdeasOpen(true)}
+                  style={{
+                    background: 'rgba(255,255,255,0.2)',
+                    border: 'none',
+                    color: 'white',
+                    borderRadius: 6,
+                    padding: '4px 10px',
+                    cursor: 'pointer',
+                    fontSize: 12,
+                    fontWeight: 600,
+                  }}
+                  title="View your saved brainstorm ideas"
+                >
+                  📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+                </button>
+                {saveError && (
+                  <span
+                    title={saveError}
+                    style={{
+                      background: 'rgba(254, 226, 226, 0.95)',
+                      color: '#b91c1c',
+                      borderRadius: 6,
+                      padding: '4px 8px',
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    save failed
+                  </span>
+                )}
+                <button
                   onClick={() => {
                     // Force refresh by clearing cache and re-running
                     const { prompt, seed: ideaSeed } = window.lastBrainstormEvent?.detail || {};
@@ -374,24 +479,63 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                   <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
                     {aiSearchPrompts.map((p, i) => {
                       const rationale = ideas[i]?.rationale;
+                      const isSaved = savedPromptHashes.has(hashPrompt(p));
+                      const isSavingThis = savingIndex === i;
                       return (
-                        <label key={i} style={{ 
-                          display: 'grid', 
-                          gridTemplateColumns: 'auto 1fr', 
-                          gap: 12, 
-                          alignItems: 'flex-start', 
-                          border: '1px solid #e5e7eb', 
-                          borderRadius: 10, 
-                          padding: '12px 16px',
-                          cursor: 'pointer',
-                          transition: 'border-color 0.2s'
-                        }}>
-                          <input type="radio" name="aiPrompt" checked={selectedPrompt === p} onChange={() => setSelectedPrompt(p)} style={{ marginTop: 3 }} />
+                        <div
+                          key={i}
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'auto 1fr auto',
+                            gap: 12,
+                            alignItems: 'flex-start',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: 10,
+                            padding: '12px 16px',
+                            cursor: 'pointer',
+                            transition: 'border-color 0.2s',
+                            background: selectedPrompt === p ? '#f0f9ff' : '#ffffff',
+                            borderColor: selectedPrompt === p ? '#0a66c2' : '#e5e7eb',
+                          }}
+                          onClick={() => setSelectedPrompt(p)}
+                        >
+                          <input
+                            type="radio"
+                            name="aiPrompt"
+                            checked={selectedPrompt === p}
+                            onChange={() => setSelectedPrompt(p)}
+                            style={{ marginTop: 3, cursor: 'pointer' }}
+                          />
                           <div>
                             <div style={{ fontSize: 14, color: '#111827', fontWeight: 600, lineHeight: 1.4 }}>{p}</div>
                             {rationale && <div style={{ marginTop: 6, color: '#6b7280', fontSize: 12, lineHeight: 1.3 }}>{rationale}</div>}
                           </div>
-                        </label>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              void handleSaveIdea(i);
+                            }}
+                            disabled={isSaved || isSavingThis === i}
+                            title={isSaved ? 'Already saved' : 'Save to My Ideas'}
+                            style={{
+                              alignSelf: 'flex-start',
+                              padding: '4px 10px',
+                              borderRadius: 6,
+                              border: isSaved
+                                ? '1px solid #6ee7b7'
+                                : '1px solid #0a66c2',
+                              background: isSaved ? '#d1fae5' : '#ffffff',
+                              color: isSaved ? '#047857' : '#0a66c2',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              cursor: isSaved ? 'default' : 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {isSaved ? '✓ Saved' : isSavingThis ? 'Saving…' : '🔖 Save'}
+                          </button>
+                        </div>
                       );
                     })}
                   </div>
@@ -547,6 +691,19 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
           </div>
         </div>
       )}
+
+      <MySavedIdeas
+        open={myIdeasOpen}
+        onClose={() => setMyIdeasOpen(false)}
+        onAfterDelete={() => void refreshSavedCount()}
+        onUseInCopilot={(prompt) => {
+          window.dispatchEvent(
+            new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } })
+          );
+          setMyIdeasOpen(false);
+          setBrainstormVisible(false);
+        }}
+      />
     </>
   );
 };
