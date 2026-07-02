@@ -330,6 +330,30 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
                       )}
                       <button
                         type="button"
+                        onClick={() => {
+                          window.dispatchEvent(
+                            new CustomEvent('linkedinwriter:openQuickCreate', {
+                              detail: {
+                                type: 'post',
+                                topic: idea.prompt,
+                                ...(idea.rationale ? { key_points: idea.rationale } : {}),
+                              },
+                            })
+                          );
+                          onClose();
+                        }}
+                        style={{
+                          ...ACTION_BTN_STYLE,
+                          background: '#ec4899',
+                          color: '#ffffff',
+                          border: 'none',
+                        }}
+                        title="Open this idea in the Post creator"
+                      >
+                        ✍️ Create Post
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => void handleCopy(idea)}
                         style={PRIMARY_BTN_STYLE}
                       >
