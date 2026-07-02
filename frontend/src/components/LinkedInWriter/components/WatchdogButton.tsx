@@ -5,6 +5,18 @@ import { WatchdogDashboard } from './WatchdogDashboard';
 import { type LinkedInPreferences } from '../utils/storageUtils';
 
 const POLL_INTERVAL_MS = 5 * 60 * 1000;
+const WATCHDOG_UNREAD_CHANGED_EVENT = 'linkedinwriter:watchdogUnreadChanged';
+
+function dispatchWatchdogUnreadChanged(count: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent(WATCHDOG_UNREAD_CHANGED_EVENT, { detail: { count } })
+    );
+  } catch {
+    // ignore (older browser, SSR)
+  }
+}
 
 interface WatchdogButtonProps {
   generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
@@ -34,6 +46,7 @@ export const WatchdogButton: React.FC<WatchdogButtonProps> = ({ generatePost, us
         if (res.success) {
           localStorage.setItem('alwrity-watchdog-updates', JSON.stringify(res.updates));
           setUnreadCount(res.unread_count);
+          dispatchWatchdogUnreadChanged(res.unread_count);
         }
       } catch {
         // silent — offline or server error
