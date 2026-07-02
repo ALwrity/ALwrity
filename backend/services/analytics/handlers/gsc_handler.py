@@ -61,12 +61,8 @@ class GSCAnalyticsHandler(BaseAnalyticsHandler):
 
             # logger.info(f"GSC Sites found for user {user_id}: {sites}")
             if not sites:
-                # logger.warning(f"No GSC sites found for user {user_id}")
-                # Return standard empty response instead of error to avoid logs noise
-                return self.create_success_response(
-                    metrics={"clicks": 0, "impressions": 0, "ctr": 0, "position": 0}, 
-                    date_range={'start': start_date, 'end': end_date}
-                )
+                logger.warning(f"No GSC sites found for user {user_id} — failing fast")
+                return self.create_error_response("No Google Search Console sites found for this account. Add a property in Google Search Console first.")
             
             # Select site: Prefer target_url match, otherwise first site
             selected_site = sites[0]
@@ -387,18 +383,7 @@ class GSCAnalyticsHandler(BaseAnalyticsHandler):
             
         except Exception as e:
             logger.error(f"Error processing GSC metrics: {e}")
-            return {
-                'connection_status': 'error',
-                'connected_sites': 0,
-                'total_clicks': 0,
-                'total_impressions': 0,
-                'avg_ctr': 0,
-                'avg_position': 0,
-                'total_queries': 0,
-                'top_queries': [],
-                'top_pages': [],
-                'error': str(e)
-            }
+            raise  # fail fast — let caller create a proper error response
     
     def _extract_query_from_row(self, row: Dict[str, Any]) -> str:
         """Extract query text from GSC API row data"""
@@ -407,13 +392,13 @@ class GSCAnalyticsHandler(BaseAnalyticsHandler):
             if keys and len(keys) > 0:
                 first_key = keys[0]
                 if isinstance(first_key, dict):
-                    return first_key.get('keys', ['Unknown'])[0]
+                    return first_key.get('keys', [''])[0]
                 else:
                     return str(first_key)
-            return 'Unknown'
+            raise ValueError(f"No 'keys' field in GSC row: {row}")
         except Exception as e:
             logger.error(f"Error extracting query from row: {e}")
-            return 'Unknown'
+            raise
 
     def _extract_page_from_row(self, row: Dict[str, Any]) -> str:
         """Extract page URL from GSC API row data"""
@@ -425,7 +410,7 @@ class GSCAnalyticsHandler(BaseAnalyticsHandler):
                     return first_key.get('keys', [''])[0]
                 else:
                     return str(first_key)
-            return ''
+            raise ValueError(f"No 'keys' field in GSC row: {row}")
         except Exception as e:
             logger.error(f"Error extracting page from row: {e}")
-            return ''
+            raise

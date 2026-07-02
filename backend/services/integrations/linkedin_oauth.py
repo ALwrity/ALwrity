@@ -53,6 +53,19 @@ def _is_placeholder_backend_url(url: str) -> bool:
     return any(token in normalized for token in _PLACEHOLDER_BACKEND_URL_TOKENS)
 
 
+def _normalize_backend_origin(url: str) -> Optional[str]:
+    """Return scheme://host[:port] for a backend base URL, or None if invalid."""
+    parsed = urlparse(url.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def _is_localhost_origin(origin: str) -> bool:
+    host = (urlparse(origin).hostname or "").lower()
+    return host in ("localhost", "127.0.0.1", "::1")
+
+
 class LinkedInOAuthService(OAuthProviderBase):
     """Manages LinkedIn Growth Engine credentials (Zernio, Unipile, or native OAuth).
 
@@ -1032,13 +1045,77 @@ class LinkedInOAuthService(OAuthProviderBase):
             )
             return False
 
-    def _resolve_public_backend_url(self) -> str:
+    def validate_callback_base(self, callback_base: Optional[str]) -> Optional[str]:
+        """
+        Validate an optional OAuth redirect base from the frontend (local dev).
+
+        Accepts localhost backend URLs or origins matching configured BACKEND_URL /
+        NGROK_URL / LINKEDIN_SOCIAL_REDIRECT_URI.
+        """
+        if not callback_base or not callback_base.strip():
+            return None
+        origin = _normalize_backend_origin(callback_base.strip().rstrip("/"))
+        if not origin:
+            return None
+        if _is_localhost_origin(origin):
+            return origin
+        for env_key in ("BACKEND_URL", "NGROK_URL", "LINKEDIN_SOCIAL_REDIRECT_URI"):
+            raw = os.getenv(env_key, "").strip()
+            if not raw:
+                continue
+            allowed = _normalize_backend_origin(raw)
+            if allowed and origin == allowed:
+                return origin
+            if env_key == "LINKEDIN_SOCIAL_REDIRECT_URI":
+                parsed = urlparse(raw)
+                if parsed.scheme and parsed.netloc:
+                    redirect_origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+                    if origin == redirect_origin:
+                        return origin
+        logger.warning(
+            f"[LinkedInConnect] Rejected callback_base={callback_base!r} "
+            "(not localhost and not in configured backend URLs)"
+        )
+        return None
+
+    def _should_prefer_localhost_callback(self) -> bool:
+        """In local development, use localhost unless explicitly forcing ngrok."""
+        if os.getenv("LINKEDIN_USE_NGROK_CALLBACK", "").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        ):
+            return False
+        env = os.getenv("ENVIRONMENT", "development").strip().lower()
+        debug = os.getenv("DEBUG", "").strip().lower() in ("1", "true", "yes")
+        return env in ("development", "dev", "local") or debug
+
+    def _resolve_public_backend_url(self, callback_base: Optional[str] = None) -> str:
         """
         Resolve the public backend base URL for Unipile OAuth redirects and webhooks.
 
-        Priority: LINKEDIN_SOCIAL_REDIRECT_URI origin → NGROK_URL → BACKEND_URL
-        (each skipped if placeholder) → localhost for local browser callbacks.
+        Priority: validated callback_base (from frontend) → localhost in dev →
+        LINKEDIN_SOCIAL_REDIRECT_URI origin → NGROK_URL → BACKEND_URL → localhost.
         """
+        if callback_base:
+            logger.info(
+                f"[LinkedInConnect] Using public backend URL from callback_base={callback_base}"
+            )
+            return callback_base.rstrip("/")
+
+        if self._should_prefer_localhost_callback():
+            local = (
+                os.getenv("LINKEDIN_LOCAL_BACKEND_URL", "http://localhost:8000")
+                .strip()
+                .rstrip("/")
+            )
+            if local and _normalize_backend_origin(local):
+                logger.info(
+                    f"[LinkedInConnect] Development mode: using local OAuth callback "
+                    f"base={local} (set LINKEDIN_USE_NGROK_CALLBACK=true to use ngrok)"
+                )
+                return local
+
         configured_redirect = os.getenv("LINKEDIN_SOCIAL_REDIRECT_URI", "").strip()
         if configured_redirect:
             parsed = urlparse(configured_redirect)
@@ -1077,6 +1154,41 @@ class LinkedInOAuthService(OAuthProviderBase):
             "Set NGROK_URL for notify_url webhooks from Unipile servers."
         )
         return "http://localhost:8000"
+
+    def validate_callback_base(self, callback_base: Optional[str]) -> str:
+        """
+        Validate optional frontend-provided backend base URL for OAuth redirects.
+
+        Local dev sends ``callback_base=http://localhost:8000`` so redirects avoid
+        stale ngrok URLs in backend ``.env``. When omitted, uses
+        ``_resolve_public_backend_url()``.
+
+        Returns:
+            Normalized origin ``scheme://host[:port]`` without trailing slash.
+
+        Raises:
+            ValueError: If ``callback_base`` is not a valid http(s) origin.
+        """
+        if not callback_base or not str(callback_base).strip():
+            return self._resolve_public_backend_url()
+
+        raw = str(callback_base).strip().rstrip("/")
+        parsed = urlparse(raw)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("callback_base must use http or https")
+        if not parsed.netloc:
+            raise ValueError("callback_base must include a valid host")
+
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        if _is_placeholder_backend_url(origin):
+            logger.warning(
+                f"[LinkedInConnect] Ignoring placeholder callback_base={origin}; "
+                "using resolved public backend URL"
+            )
+            return self._resolve_public_backend_url()
+
+        logger.info(f"[LinkedInConnect] Using client callback_base={origin}")
+        return origin
 
     async def try_sync_unipile_accounts(self, user_id: str) -> bool:
         """
@@ -1169,11 +1281,21 @@ class LinkedInOAuthService(OAuthProviderBase):
         )
         return False
 
-    def _get_redirect_uri(self) -> str:
+    def _get_redirect_uri(self, callback_base: Optional[str] = None) -> str:
+        if callback_base:
+            return f"{callback_base.rstrip('/')}/api/linkedin-social/callback"
+        if self._should_prefer_localhost_callback():
+            local = (
+                os.getenv("LINKEDIN_LOCAL_BACKEND_URL", "http://localhost:8000")
+                .strip()
+                .rstrip("/")
+            )
+            if local:
+                return f"{local}/api/linkedin-social/callback"
         configured = os.getenv("LINKEDIN_SOCIAL_REDIRECT_URI")
         if configured and not _is_placeholder_backend_url(configured.strip()):
             return configured.strip()
-        backend_url = self._resolve_public_backend_url()
+        backend_url = self._resolve_public_backend_url(callback_base)
         return f"{backend_url}/api/linkedin-social/callback"
 
     def _build_oauth_state(self, user_id: str, state: Optional[str] = None) -> str:
@@ -1187,27 +1309,34 @@ class LinkedInOAuthService(OAuthProviderBase):
             return None
         return state.split(":", 1)[0]
 
-    def _get_unipile_redirect_urls(self, user_id: str) -> Dict[str, str]:
+    def _get_unipile_redirect_urls(
+        self, user_id: str, callback_base: Optional[str] = None
+    ) -> Dict[str, str]:
         """Build Unipile redirect URLs for OAuth callback and webhook notification."""
-        backend_url = self._resolve_public_backend_url()
+        backend_url = self._resolve_public_backend_url(callback_base)
         encoded_name = quote(user_id, safe="")
-        callback_base = f"{backend_url}/api/linkedin-social/callback"
+        callback_base_url = f"{backend_url}/api/linkedin-social/callback"
         return {
             "success": (
-                f"{callback_base}?provider=unipile&status=success&name={encoded_name}"
+                f"{callback_base_url}?provider=unipile&status=success&name={encoded_name}"
             ),
             "failure": (
-                f"{callback_base}?provider=unipile&status=error&name={encoded_name}"
+                f"{callback_base_url}?provider=unipile&status=error&name={encoded_name}"
             ),
             "notify": f"{backend_url}/api/unipile/webhook",
         }
 
     async def generate_authorization_url(
-        self, user_id: str, state: Optional[str] = None
+        self,
+        user_id: str,
+        state: Optional[str] = None,
+        *,
+        callback_base: Optional[str] = None,
     ) -> Dict[str, str]:
         """Return OAuth authorization URL for Zernio, Unipile, or native LinkedIn based on LINKEDIN_PROVIDER."""
         provider = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
         oauth_state = self._build_oauth_state(user_id, state)
+        backend_base = callback_base or self._resolve_public_backend_url()
 
         if provider == "zernio":
             api_key = os.getenv("ZERNIO_API_KEY")
@@ -1221,7 +1350,7 @@ class LinkedInOAuthService(OAuthProviderBase):
                 f"profile_id={profile_id}"
             )
 
-            redirect_uri = self._get_redirect_uri()
+            redirect_uri = self._get_redirect_uri(callback_base)
             redirect_with_state = (
                 f"{redirect_uri}?alwrity_state={quote(oauth_state, safe='')}"
             )
@@ -1252,10 +1381,10 @@ class LinkedInOAuthService(OAuthProviderBase):
             from services.integrations.linkedin.unipile_client import UnipileClient
 
             client = UnipileClient()
-            redirect_urls = self._get_unipile_redirect_urls(user_id)
-            backend_url = self._resolve_public_backend_url()
+            redirect_urls = self._get_unipile_redirect_urls(user_id, callback_base)
+            backend_url = self._resolve_public_backend_url(callback_base)
             logger.info(
-                f"[LinkedInConnect] Unipile redirect base_url={backend_url} user_id={user_id} "
+                f"[LinkedInConnect] Unipile redirect base_url={backend_base} user_id={user_id} "
                 f"success={redirect_urls['success']}"
             )
 
@@ -1294,7 +1423,7 @@ class LinkedInOAuthService(OAuthProviderBase):
             .decode("utf-8")
             .rstrip("=")
         )
-        redirect_uri = self._get_redirect_uri()
+        redirect_uri = self._get_redirect_uri(callback_base)
         scopes = "r_liteprofile r_emailaddress w_member_social"
         params = urlencode(
             {

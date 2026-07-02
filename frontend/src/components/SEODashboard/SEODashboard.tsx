@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Box,
@@ -145,6 +145,7 @@ const SEODashboard: React.FC = () => {
 
   // PlatformAnalytics refresh handle
   const platformRefreshRef = useRef<(() => Promise<void>) | null>(null);
+  const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
 
   // Sync dashboard analysis to Copilot store so readables have URL/context
   const setCopilotAnalysisData = useSEOCopilotStore(state => state.setAnalysisData);
@@ -857,12 +858,10 @@ const SEODashboard: React.FC = () => {
                 </Box>
                 
                 <PlatformAnalytics
-                  platforms={['gsc', 'bing']}
+                  platforms={analyticsPlatforms}
                   showSummary={true}
                   refreshInterval={0}
-                  onDataLoaded={(analyticsData) => {
-                    console.log('Real analytics data loaded:', analyticsData);
-                  }}
+                  onDataLoaded={() => {}}
                   onRefreshReady={(fn) => { platformRefreshRef.current = fn; }}
                   onReconnect={(platform) => {
                     if (platform === 'gsc') {

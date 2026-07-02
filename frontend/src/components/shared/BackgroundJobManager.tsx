@@ -86,7 +86,7 @@ const BackgroundJobManager: React.FC<BackgroundJobManagerProps> = ({
   // Create Bing comprehensive insights job
   const createComprehensiveInsightsJob = async () => {
     if (!siteUrl) {
-      alert('No site URL provided. Please connect Bing first.');
+      alert('Cannot create job: no site URL configured');
       return;
     }
     setLoading(true);
@@ -116,7 +116,7 @@ const BackgroundJobManager: React.FC<BackgroundJobManagerProps> = ({
   // Create Bing data collection job
   const createDataCollectionJob = async () => {
     if (!siteUrl) {
-      alert('No site URL provided. Please connect Bing first.');
+      alert('Cannot create job: no site URL configured');
       return;
     }
     setLoading(true);

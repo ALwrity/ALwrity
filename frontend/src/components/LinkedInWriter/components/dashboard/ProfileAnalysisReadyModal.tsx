@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { OptimiseProfileControl } from './OptimiseProfileControl';
@@ -27,6 +27,16 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
   isOptimiseDisabled = false,
   isProfileComplete = true,
 }) => {
+  // Global 2: Accessibility - Focus management
+  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (open && primaryButtonRef.current) {
+      // Move focus to primary action button when modal opens
+      primaryButtonRef.current.focus();
+    }
+  }, [open]);
+
   if (!open) return null;
 
   const modalContent = (
@@ -78,6 +88,7 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
             Profile analysis ready
           </h2>
           <button
+            ref={primaryButtonRef}
             type="button"
             onClick={onDismiss}
             aria-label="Close"

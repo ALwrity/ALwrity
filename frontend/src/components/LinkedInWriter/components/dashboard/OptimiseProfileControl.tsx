@@ -2,19 +2,20 @@ import React from 'react';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import CheckIcon from '@mui/icons-material/Check';
 import StarIcon from '@mui/icons-material/Star';
+import CircularProgress from '@mui/material/CircularProgress';
 import { getProfileStrengthSegmentFillCount } from '../../utils/profileStrengthUtils';
 
 /** Larger button size for better visibility in the header nav */
 export const PROFILE_ACTION_BTN_HEIGHT = 64;
 
 const SEGMENT_COLORS = [
-  '#4338ca',
-  '#3b82f6',
-  '#0ea5e9',
-  '#14b8a6',
-  '#22c55e',
-  '#4ade80',
-  '#d1d5db',
+  '#4338ca', // indigo-700
+  '#3b82f6', // blue-500
+  '#0ea5e9', // sky-500
+  '#14b8a6', // teal-500
+  '#22c55e', // green-500
+  '#16a34a', // green-600 (darker for WCAG contrast)
+  '#64748b', // slate-500 (darker gray for contrast)
 ];
 
 interface ProfileStrengthTickerProps {
@@ -30,13 +31,17 @@ function ProfileStrengthTicker({ percent, strengthLabel, strengthTooltip }: Prof
 
   return (
     <div
-      style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}
-      title={strengthTooltip}
+      role="progressbar"
+      aria-valuenow={clamped}
+      aria-valuemin={0}
+      aria-valuemax={100}
       aria-label={
         strengthTooltip
           ? `${clamped}% profile strength. ${strengthTooltip}`
           : `${clamped}% profile strength${strengthLabel ? `. ${strengthLabel}` : ''}`
       }
+      style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}
+      title={strengthTooltip}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
         <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{clamped}%</span>
@@ -57,6 +62,7 @@ function ProfileStrengthTicker({ percent, strengthLabel, strengthTooltip }: Prof
                 height: 10,
                 borderRadius: 3,
                 background: isFilled ? color : '#e5e7eb',
+                border: isFilled ? '1px solid rgba(0,0,0,0.1)' : '1px solid #d1d5d6',
                 flexShrink: 0,
                 transition: 'background 200ms ease',
               }}
@@ -217,7 +223,7 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
         }}
       >
         {isLoading ? (
-          '…'
+          <CircularProgress size={20} thickness={4} sx={{ color: '#0a66c2' }} />
         ) : (
           <>
             <span>Optimise</span>

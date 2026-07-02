@@ -11,7 +11,11 @@ import {
   type LinkedInProfileOptimizationItem,
   type LinkedInProfileOptimizationMeta,
 } from '../api/linkedinSocial';
-import { dispatchProfileStrengthUpdated } from '../components/LinkedInWriter/utils/profileStrengthEvents';
+import {
+  dispatchProfileStrengthUpdated,
+  dispatchLinkedInPriorityAction,
+  selectTopPriorityAction,
+} from '../components/LinkedInWriter/utils/profileStrengthEvents';
 
 const LOG_PREFIX = '[ProfileOptimization]';
 
@@ -59,6 +63,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
           lastScoreRef.current = data.profile_validation.optimization_score;
         }
       }
+      // Broadcast the new top-priority action so UserBadge can update the #1 Today card.
+      dispatchLinkedInPriorityAction(selectTopPriorityAction(data.profile_optimization, null));
       console.info(`${LOG_PREFIX} batch action applied`, {
         activeCount: data.profile_optimization.length,
         remainingInBacklog: data.profile_optimization_meta.remaining_in_backlog ?? 0,
@@ -147,6 +153,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
         lastScoreRef.current = data.profile_validation.optimization_score;
       }
       setRecheckDelta(null);
+      dispatchLinkedInPriorityAction(selectTopPriorityAction(items, null));
       console.info(`${LOG_PREFIX} loaded recommendations`, {
         count: items.length,
         source: meta?.source,

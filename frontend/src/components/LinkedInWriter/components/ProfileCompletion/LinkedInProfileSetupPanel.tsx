@@ -22,7 +22,37 @@ import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
 
-const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed';
+const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed_v2';
+const DISMISSAL_EXPIRY_HOURS = 24;
+
+/** Check if dismissal is still valid (within expiry window) */
+function isDismissalValid(): boolean {
+  try {
+    const raw = localStorage.getItem(ANALYSIS_MODAL_DISMISSED_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw) as { timestamp: number; expires: number };
+    if (!data.expires) return false;
+    return Date.now() < data.expires;
+  } catch {
+    return false;
+  }
+}
+
+/** Store dismissal with 24-hour expiry */
+function storeDismissal(): void {
+  try {
+    const dismissForHours = DISMISSAL_EXPIRY_HOURS;
+    localStorage.setItem(
+      ANALYSIS_MODAL_DISMISSED_KEY,
+      JSON.stringify({
+        timestamp: Date.now(),
+        expires: Date.now() + dismissForHours * 60 * 60 * 1000,
+      })
+    );
+  } catch {
+    // localStorage may be unavailable in private mode
+  }
+}
 
 interface LinkedInProfileSetupPanelProps {
   displayName: string;
@@ -146,6 +176,18 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
   const [dismissedErrorKey, setDismissedErrorKey] = useState<string | null>(null);
 
+  // TC-007: Auto-show analysis modal when profile data is ready and not recently dismissed
+  useEffect(() => {
+    if (
+      centered &&
+      foundationStatus === 'ready' &&
+      profileValidation &&
+      !isDismissalValid()
+    ) {
+      setShowAnalysisModal(true);
+    }
+  }, [centered, foundationStatus, profileValidation]);
+
   const closeTopicPanel = () => {
     setIsTopicPanelOpen(false);
     collapseRecommendations();
@@ -228,7 +270,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   }, [runTopicAnalysis, openOptimizationPanel]);
 
   const dismissAnalysisModal = () => {
-    sessionStorage.setItem(ANALYSIS_MODAL_DISMISSED_KEY, '1');
+    storeDismissal();
     setShowAnalysisModal(false);
   };
 
@@ -360,6 +402,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 markingRecommendationId={markingRecommendationId}
                 publicIdentifier={publicIdentifier}
                 sectionScores={profileValidation?.section_scores ?? null}
+                aiProfileIntelligence={aiProfileIntelligence}
+                profileStrengthPercent={profileStrengthPercent}
                 recheckDelta={recheckDelta}
                 isRechecking={isRechecking}
                 onRecheckProfile={() => {
@@ -401,6 +445,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           markingRecommendationId={markingRecommendationId}
           publicIdentifier={publicIdentifier}
           sectionScores={profileValidation?.section_scores ?? null}
+          aiProfileIntelligence={aiProfileIntelligence}
+          profileStrengthPercent={profileStrengthPercent}
           recheckDelta={recheckDelta}
           isRechecking={isRechecking}
           onRecheckProfile={() => {

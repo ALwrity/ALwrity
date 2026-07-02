@@ -194,8 +194,10 @@ const BingInsightsCard: React.FC<BingInsightsCardProps> = ({
   const loadInsights = useCallback(async () => {
     // Only load if we don't have insights passed as props
     if (propInsights) return;
+    // Fail fast: require a real siteUrl
     if (!siteUrl) {
       setInternalError('No site URL provided for Bing insights');
+      setInternalLoading(false);
       return;
     }
 
