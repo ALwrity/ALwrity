@@ -70,6 +70,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     window.dispatchEvent(new CustomEvent('linkedinwriter:getTopicIdeas'));
   };
 
+  const openShareLink = () => {
+    onClose();
+    window.dispatchEvent(new CustomEvent('linkedinwriter:openShareLink'));
+  };
+
   const openDrafts = () => {
     onClose();
     navigate('/asset-library?source_module=linkedin_writer');
@@ -139,11 +144,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           </div>
           <div style={{ width: 140, flexShrink: 0 }}>
             <DashboardToolTile
-              title="Library"
-              description="Browse saved posts and drafts"
-              icon="📚"
-              accent="#6366f1"
-              onClick={openDrafts}
+              title="Share a Link"
+              description="Turn any URL into a LinkedIn post"
+              icon="🔗"
+              accent="#10b981"
+              onClick={openShareLink}
             />
           </div>
           {CREATE_TILE_TOOLS.map((tool) => (
