@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { LinkedInPreferences } from '../utils/storageUtils';
 import { PersonaChip } from '../../TextEditor/ContentPreviewHeaderComponents';
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onResetDraft,
   generatePost,
 }) => {
+  const navigate = useNavigate();
   const personaDropdownRef = useRef<HTMLDivElement>(null);
   const personaButtonRef = useRef<HTMLButtonElement>(null);
   const personaPanelRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export const Header: React.FC<HeaderProps> = ({
     left: number;
     maxHeight: number;
   } | null>(null);
-  const { connected, connectWithOAuth } = useLinkedInSocialConnection();
+  const { connected } = useLinkedInSocialConnection();
   const [profileStrengthPercent, setProfileStrengthPercent] = useState<number | null>(null);
   const [profileValidation, setProfileValidation] = useState<LinkedInProfileValidation | null>(
     null
@@ -242,10 +244,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleOpenOptimiseProfile = () => {
-    if (!connected) {
-      void connectWithOAuth();
-      return;
-    }
+    if (!connected) return;
     window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
   };
 
@@ -327,8 +326,9 @@ export const Header: React.FC<HeaderProps> = ({
             onOptimiseProfile={handleOpenOptimiseProfile}
             profileStrengthPercent={connected ? profileStrengthPercent : null}
             strengthLabel={strengthLabel}
-            strengthTooltip={connected ? strengthTooltip : undefined}
+            strengthTooltip={connected ? strengthTooltip : 'Connect LinkedIn to optimise your profile'}
             isLoading={profileStrengthLoading}
+            isDisabled={!connected}
             variant="ticker"
           />
           <div
@@ -676,6 +676,28 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="linkedin-writer-header-controls" style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={() => navigate('/asset-library?source_module=linkedin_writer')}
+            title="Saved posts and drafts"
+            aria-label="Open Asset Library"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: '#ffffff',
+              borderRadius: 24,
+              border: '1px solid rgba(10, 102, 194, 0.35)',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 13,
+              color: '#0a66c2',
+              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
+            }}
+          >
+            📚 Library
+          </button>
           <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Save as SaveIcon } from '@mui/icons-material';
+import { linkedInWriterApi } from '../../services/linkedInWriterApi';
 import { CopilotSidebar } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
 import './styles/alwrity-copilot.css';
@@ -138,6 +139,10 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     getStorageStats
   } = useCopilotPersistence();
   
+  // Save-to-asset-library state
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
   const locationState = location.state as {
@@ -145,6 +150,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     calendarDescription?: string;
     calendarEventId?: string;
     workflowTaskId?: string;
+    linkedinDraftContent?: string;
+    linkedinDraftAssetId?: number;
   } | null;
 
   useEffect(() => {
@@ -162,6 +169,12 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
       const contextText = `Topic: ${topic}${description ? `\nDescription: ${description}` : ''}`;
       handleContextChange(contextText);
       // Clear navigation state so refresh doesn't re-trigger
+      window.history.replaceState({}, document.title);
+    }
+
+    const draftContent = locationState?.linkedinDraftContent;
+    if (draftContent) {
+      setDraft(draftContent);
       window.history.replaceState({}, document.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,9 +202,52 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // Optionally trigger generation immediately or let user review
   }, [handleContextChange]);
 
+  // ── Share a Link (Quick Post from URL) ──
+  const [showShareLinkModal, setShowShareLinkModal] = useState(false);
+  const [shareLinkUrl, setShareLinkUrl] = useState('');
+  const [shareLinkTone, setShareLinkTone] = useState('professional');
+  const [shareLinkMyTake, setShareLinkMyTake] = useState('');
+  const [shareLinkGenerating, setShareLinkGenerating] = useState(false);
+  const [shareLinkError, setShareLinkError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onOpen = () => {
+      setShareLinkUrl('');
+      setShareLinkMyTake('');
+      setShareLinkError(null);
+      setShowShareLinkModal(true);
+    };
+    window.addEventListener('linkedinwriter:openShareLink', onOpen);
+    return () => window.removeEventListener('linkedinwriter:openShareLink', onOpen);
+  }, []);
+
+  const handleGenerateFromUrl = async () => {
+    const url = shareLinkUrl.trim();
+    if (!url) return;
+    setShareLinkGenerating(true);
+    setShareLinkError(null);
+    try {
+      const result = await linkedInWriterApi.generateFromUrl({
+        url,
+        tone: shareLinkTone,
+        my_take: shareLinkMyTake.trim() || undefined,
+      });
+      if (result?.success && result?.data?.content) {
+        setShowShareLinkModal(false);
+        window.dispatchEvent(
+          new CustomEvent('linkedinwriter:updateDraft', { detail: { content: result.data.content } })
+        );
+      } else {
+        setShareLinkError(result?.error || 'Generation failed');
+      }
+    } catch (err: any) {
+      setShareLinkError(err?.response?.data?.detail || err?.message || 'Failed to generate from URL');
+    } finally {
+      setShareLinkGenerating(false);
+    }
+  };
+
   // ── Save to Asset Library (podcast-maker pattern: save only, stay on page) ──
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
-  const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
   
   const handleSaveToAssetLibrary = async () => {
     if (!draft) return;
@@ -475,7 +531,7 @@ Always use the most appropriate tool for the user's request.`.trim();
       <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
         {/* Loading Indicator */}
         <LoadingIndicator
           isGenerating={isGenerating}
@@ -496,7 +552,55 @@ Always use the most appropriate tool for the user's request.`.trim();
             />
           </div>
         ) : draft || isGenerating ? (<>
-          {/* Editor Panel - Show when there's content or generating */}
+          {draft && !isGenerating && (
+            <div style={{ 
+              padding: '8px 24px', 
+              display: 'flex', 
+              alignItems: 'center',
+              gap: 12,
+              flexShrink: 0,
+              borderBottom: '1px solid #e2e8f0',
+              background: '#f8fafc'
+            }}>
+              <Button
+                type="button"
+                variant="contained"
+                onClick={() => setDraft('')}
+                startIcon={<span style={{ fontSize: 18, lineHeight: 1 }}>←</span>}
+                sx={{ 
+                  fontWeight: 700,
+                  bgcolor: '#0a66c2', 
+                  '&:hover': { bgcolor: '#004182' },
+                  textTransform: 'none',
+                  fontSize: 14,
+                  px: 2.5,
+                  py: 1,
+                  boxShadow: '0 2px 8px rgba(10, 102, 194, 0.3)',
+                }}
+              >
+                Back to Dashboard
+              </Button>
+
+              <Button
+                type='button'
+                variant="outlined"
+                color="primary"
+                startIcon={saveStatus === 'saving' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
+                onClick={handleSaveToAssetLibrary}
+                disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+                sx={{ textTransform: 'none', fontSize: 13, fontWeight: 600 }}
+              >
+                {saveStatus === 'saving' ? 'Saving...' : 
+                 saveStatus === 'saved' ? 'Saved ✓' : 
+                 'Save to Asset Library'}
+              </Button>
+
+              <div style={{ flex: 1 }} />
+
+              <PublishLinkedInPanel draft={draft} compact />
+            </div>
+          )}
+
           <ContentEditor
             isPreviewing={isPreviewing}
             pendingEdit={pendingEdit}
@@ -517,28 +621,6 @@ Always use the most appropriate tool for the user's request.`.trim();
             onPreviewToggle={handlePreviewToggle}
             topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
           />
-
-          {/* Save to Asset Library button - only when there's generated content */}
-          {draft && !isGenerating && (
-            <div style={{ padding: '8px 24px', display: 'flex', justifyContent: 'flex-end' }}>
-              <Button
-                type='button'
-                variant="contained"
-                color="success"
-                startIcon={saveStatus === 'saving' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
-                onClick={handleSaveToAssetLibrary}
-                disabled={saveStatus === 'saving' || saveStatus === 'saved'}
-                size="small"
-              >
-                {saveStatus === 'saving' ? 'Saving...' : 
-                 saveStatus === 'saved' ? 'Saved ✓' : 
-                 'Save to Asset Library'}
-              </Button>
-            </div>
-          )}
-
-          {draft && !isGenerating && <PublishLinkedInPanel draft={draft} />}
-          
         </>) : (
           /* Welcome Message - Show when no content */
           <WelcomeMessage
@@ -570,6 +652,117 @@ Always use the most appropriate tool for the user's request.`.trim();
             : `Failed to save: ${saveErrorMessage || 'Please try again.'}`}
         </Alert>
       </Snackbar>
+
+      {/* ── Share a Link Modal ── */}
+      {showShareLinkModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+          }}
+          onClick={() => setShowShareLinkModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'white', width: 520, maxWidth: '92vw', borderRadius: 16,
+              boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                padding: '16px 20px', background: 'linear-gradient(135deg, #0a66c2 0%, #125ea2 100%)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}
+            >
+              <span style={{ fontWeight: 800, fontSize: 16 }}>🔗 Share a Link</span>
+              <button
+                onClick={() => setShowShareLinkModal(false)}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>URL *</div>
+                <input
+                  value={shareLinkUrl}
+                  onChange={(e) => setShareLinkUrl(e.target.value)}
+                  placeholder="https://example.com/article"
+                  style={{
+                    width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                    fontSize: 14, boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Tone</div>
+                  <select
+                    value={shareLinkTone}
+                    onChange={(e) => setShareLinkTone(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                      fontSize: 14, background: 'white',
+                    }}
+                  >
+                    <option value="professional">Professional</option>
+                    <option value="conversational">Conversational</option>
+                    <option value="authoritative">Authoritative</option>
+                    <option value="inspirational">Inspirational</option>
+                    <option value="educational">Educational</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+                  Your Take <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+                </div>
+                <textarea
+                  value={shareLinkMyTake}
+                  onChange={(e) => setShareLinkMyTake(e.target.value)}
+                  placeholder="Add your perspective, opinion, or key insight..."
+                  rows={3}
+                  style={{
+                    width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
+                    fontSize: 14, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+              {shareLinkError && (
+                <div style={{ padding: '8px 12px', background: '#fef2f2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>
+                  {shareLinkError}
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+                <button
+                  onClick={() => setShowShareLinkModal(false)}
+                  style={{
+                    padding: '10px 20px', background: '#fff', color: '#374151',
+                    border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600,
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleGenerateFromUrl}
+                  disabled={!shareLinkUrl.trim() || shareLinkGenerating}
+                  style={{
+                    padding: '10px 20px',
+                    background: !shareLinkUrl.trim() || shareLinkGenerating ? '#93c5fd' : '#0a66c2',
+                    color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer',
+                    fontSize: 14, fontWeight: 600,
+                  }}
+                >
+                  {shareLinkGenerating ? 'Generating...' : 'Generate Post'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Register CopilotKit Actions */}
       <RegisterLinkedInActions />

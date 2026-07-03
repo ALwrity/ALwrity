@@ -64,10 +64,10 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
   const posts = data?.posts ?? [];
 
   useEffect(() => {
-    if (panelState === 'idle') {
+    if (panelState === 'idle' && connected) {
       void fetchPosts({ limit: 8 });
     }
-  }, [panelState, fetchPosts]);
+  }, [panelState, fetchPosts, connected]);
 
   const totals = useMemo(() => {
     let impressions = 0;

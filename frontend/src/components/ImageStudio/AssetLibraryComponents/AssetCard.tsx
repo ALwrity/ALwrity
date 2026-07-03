@@ -34,6 +34,7 @@ interface AssetCardProps {
   onDelete: (id: number) => void;
   onRestore: (asset: ContentAsset) => void;
   onOpenBlogAsset?: (asset: ContentAsset) => void;
+  onOpenLinkedInAsset?: (asset: ContentAsset) => void;
 }
 
 export const AssetCard: React.FC<AssetCardProps> = ({
@@ -46,6 +47,7 @@ export const AssetCard: React.FC<AssetCardProps> = ({
   onDelete,
   onRestore,
   onOpenBlogAsset,
+  onOpenLinkedInAsset,
 }) => {
   return (
     <Card
@@ -243,6 +245,18 @@ export const AssetCard: React.FC<AssetCardProps> = ({
                 sx={{ color: '#3b82f6' }}
               >
                 <Box sx={{ fontSize: 20 }}>✏️</Box>
+              </IconButton>
+            </Tooltip>
+          )}
+          {/* Open LinkedIn Asset button for linkedin_writer text assets */}
+          {asset.source_module === 'linkedin_writer' && asset.asset_type === 'text' && onOpenLinkedInAsset && (
+            <Tooltip title="Edit in LinkedIn Studio">
+              <IconButton
+                size="small"
+                onClick={() => onOpenLinkedInAsset(asset)}
+                sx={{ color: '#0a66c2' }}
+              >
+                <Box sx={{ fontSize: 20 }}>📝</Box>
               </IconButton>
             </Tooltip>
           )}

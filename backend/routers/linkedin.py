@@ -29,6 +29,8 @@ from utils.text_asset_tracker import save_and_track_text_content
 from models.api_monitoring import APIRequest
 from sqlalchemy import func
 from collections import defaultdict
+from services.user_api_key_context import get_exa_key
+from pydantic import BaseModel, Field
 
 # Initialize the LinkedIn service instance
 linkedin_service = LinkedInService()
@@ -776,6 +778,193 @@ async def generate_comment_response(
         raise HTTPException(
             status_code=500,
             detail=error_response(ERROR_CODES['GENERATION_FAILED'], f"Failed to generate LinkedIn comment response: {str(e)}")
+        )
+
+
+# ── Request/Response schemas for generate-from-url ──
+
+class LinkedInGenerateFromUrlRequest(BaseModel):
+    url: str = Field(..., min_length=5, max_length=2048, description="URL to extract content from")
+    tone: str = Field(default="professional", description="Writing tone for the generated post")
+    my_take: Optional[str] = Field(None, max_length=1000, description="Optional personal take/perspective")
+    include_hashtags: bool = Field(default=True)
+    include_call_to_action: bool = Field(default=True)
+
+
+class LinkedInGenerateFromUrlResponse(BaseModel):
+    success: bool = True
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+@router.post(
+    "/generate-from-url",
+    response_model=LinkedInGenerateFromUrlResponse,
+    summary="Generate LinkedIn Post from URL",
+    description="""
+    Extract content from a URL and generate a LinkedIn post.
+    
+    Uses Exa to fetch and summarize the URL content, then generates
+    a professional LinkedIn post with the extracted information.
+    """
+)
+async def generate_from_url(
+    request: LinkedInGenerateFromUrlRequest,
+    http_request: Request,
+    db: Session = Depends(get_db),
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
+):
+    """Generate a LinkedIn post from a URL."""
+    start_time = time.time()
+    user_id = _require_clerk_user_id(current_user, http_request)
+
+    try:
+        # 1. Fetch URL content via Exa (system key fallback, matching blog/podcast pattern)
+        exa_key = get_exa_key(user_id) or os.getenv("EXA_API_KEY")
+        if not exa_key:
+            raise HTTPException(status_code=400, detail="Exa API key not configured")
+
+        from exa_py import Exa
+        exa = Exa(exa_key)
+        contents_result = exa.get_contents(
+            urls=[request.url],
+            text=True,
+            highlights=True,
+            summary=True,
+        )
+
+        if not contents_result or not contents_result.results:
+            raise HTTPException(status_code=422, detail="Could not extract content from the provided URL")
+
+        entry = contents_result.results[0]
+        page_title = getattr(entry, 'title', '') or ''
+        page_text = getattr(entry, 'text', '') or ''
+        page_summary = getattr(entry, 'summary', '') or ''
+        highlights = getattr(entry, 'highlights', []) or []
+
+        if not page_text and not page_summary:
+            raise HTTPException(status_code=422, detail="No readable content found at the URL")
+
+        # 2. Build LLM prompt
+        tone = request.tone or "professional"
+        my_take = request.my_take or ""
+
+        content_excerpt = page_text[:8000] if page_text else page_summary[:8000]
+        highlights_text = "\n".join(highlights[:5]) if highlights else ""
+
+        hashtags_instruction = (
+            "Include 3-5 relevant hashtags at the end of the post. "
+            "Return them as a JSON list in the hashtags field."
+            if request.include_hashtags else ""
+        )
+        cta_instruction = (
+            "End the post with a clear call-to-action that encourages engagement (comments, reactions, shares). "
+            "Return it in the call_to_action field."
+            if request.include_call_to_action else ""
+        )
+
+        system_prompt = f"""You are an expert LinkedIn content creator. Generate a professional LinkedIn post based on the web article provided below.
+
+Guidelines:
+- Write in a {tone} tone suitable for LinkedIn
+- Start with a compelling hook that grabs attention
+- Summarize the key insight from the article in 2-3 paragraphs
+- Add your own analysis and perspective to provide value beyond the article itself
+- Keep the post between 150-300 words
+- Structure: Hook → Key Insight → Analysis → Takeaway
+{hashtags_instruction}
+{cta_instruction}
+
+Return the response as JSON with these fields:
+- "content": the full post text (without hashtags and CTA)
+- "hashtags": array of {{"hashtag": string, "category": string}} objects (only if include_hashtags is true)
+- "call_to_action": string (only if include_call_to_action is true)
+"""
+
+        user_prompt = f"""Article title: {page_title}
+
+Article summary: {page_summary or "N/A"}
+
+Key highlights:
+{highlights_text}
+
+Article content:
+{content_excerpt}
+
+{f"Personal take to incorporate: {my_take}" if my_take else ""}
+
+Generate LinkedIn post:"""
+
+        # 3. Generate post via LLM
+        generated = await llm_text_gen(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            response_format="json",
+            user_id=user_id,
+        )
+
+        if not generated:
+            raise HTTPException(status_code=500, detail="Content generation returned empty result")
+
+        # 4. Parse the LLM response
+        try:
+            parsed = json.loads(generated) if isinstance(generated, str) else generated
+        except (json.JSONDecodeError, TypeError):
+            parsed = {"content": generated if isinstance(generated, str) else str(generated)}
+
+        content = (parsed.get("content") or "").strip()
+        if not content:
+            raise HTTPException(status_code=500, detail="Generated content is empty")
+
+        hashtags = parsed.get("hashtags", [])
+        call_to_action = parsed.get("call_to_action", "")
+
+        # 5. Save to Asset Library
+        text_to_save = content
+        if call_to_action:
+            text_to_save += f"\n\n{call_to_action}"
+        if hashtags:
+            tag_str = " ".join(
+                f"#{h['hashtag']}" if isinstance(h, dict) and 'hashtag' in h
+                else f"#{h}" for h in hashtags
+            )
+            text_to_save += f"\n\n{tag_str}"
+
+        save_and_track_text_content(
+            db=db,
+            user_id=user_id,
+            content=text_to_save,
+            source_module="linkedin_writer",
+            title=f"LinkedIn Post: {page_title[:80]}" if page_title else "LinkedIn Post from URL",
+            description=f"Generated from URL: {request.url}",
+            prompt=f"URL: {request.url}\nTone: {tone}",
+            tags=["linkedin", "post", "from_url"],
+            asset_metadata={
+                "source_url": request.url,
+                "tone": tone,
+                "content_type": "linkedin_post",
+                "word_count": len(content.split()),
+            },
+        )
+
+        logger.info(f"Successfully generated LinkedIn post from URL in {time.time() - start_time:.2f}s")
+        return LinkedInGenerateFromUrlResponse(
+            success=True,
+            data={
+                "content": content,
+                "character_count": len(content),
+                "hashtags": hashtags,
+                "call_to_action": call_to_action,
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating LinkedIn post from URL: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to generate LinkedIn post from URL: {str(e)}"
         )
 
 

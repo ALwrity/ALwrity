@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from 'react';
 import { usePostAnalytics } from '../../hooks/usePostAnalytics';
+import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
 import { EmptyState, IdleState, RefreshBar } from './EmptyState';
 import { ErrorState } from './ErrorState';
@@ -17,6 +18,7 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
   isActive,
   onGenerateSimilarPost,
 }) => {
+  const { connected } = useLinkedInSocialConnection();
   const {
     data,
     panelState,
@@ -29,10 +31,10 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
   const showSkeleton = isLoading && !data;
 
   useEffect(() => {
-    if (isActive && panelState === 'idle') {
+    if (isActive && panelState === 'idle' && connected) {
       void fetchPosts();
     }
-  }, [isActive, panelState, fetchPosts]);
+  }, [isActive, panelState, fetchPosts, connected]);
 
   const handleFetch = useCallback(() => {
     void refreshPosts();

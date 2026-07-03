@@ -16,9 +16,10 @@ import {
 
 interface PublishLinkedInPanelProps {
   draft: string;
+  compact?: boolean;
 }
 
-const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft }) => {
+const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft, compact = false }) => {
   const {
     connected,
     provider,
@@ -60,6 +61,28 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft }) =>
       setIsPublishing(false);
     }
   };
+
+  if (compact) {
+    return (
+      <Box display="flex" alignItems="center" gap={1}>
+        <Chip
+          size="small"
+          label={isLoading ? 'Checking...' : connected ? 'Connected' : 'Not connected'}
+          color={connected ? 'success' : 'default'}
+          variant="outlined"
+        />
+        <Button
+          variant="contained"
+          disabled={!canPublish}
+          onClick={handlePublish}
+          startIcon={isPublishing ? <CircularProgress size={16} color="inherit" /> : <LinkedInIcon />}
+          sx={{ bgcolor: '#0A66C2', '&:hover': { bgcolor: '#004182' }, textTransform: 'none', fontSize: 13, fontWeight: 600 }}
+        >
+          {isPublishing ? 'Publishing...' : 'Publish'}
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box
