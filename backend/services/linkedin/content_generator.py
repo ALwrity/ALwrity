@@ -544,7 +544,7 @@ class ContentGenerator:
                 user_id=user_id,
                 flow_type="linkedin_article",
                 max_tokens=request.word_count * 10,
-                temperature=0.7
+                temperature=0.3
             )
             
             # Parse structured response (handle both dict from Gemini and str from others)

@@ -69,17 +69,19 @@ class ArticlePromptBuilder:
         - Use industry-specific terminology appropriately
         - Include expert quotes or insights when relevant
 
-        SEO & ENGAGEMENT OPTIMIZATION:
-        - Use relevant keywords naturally throughout the content
-        - Include engaging subheadings for scannability
-        - Add bullet points and numbered lists for key insights
-        - Include relevant hashtags for discoverability
-        - End with thought-provoking questions to encourage comments
+        LINKEDIN-SPECIFIC FORMATTING:
+        - Write short paragraphs (2-3 sentences max) — LinkedIn readers scan on mobile
+        - Place the strongest hook in the first 2 lines (the "see more" cutoff)
+        - Use line breaks between sections for visual breathing room
+        - Use bold sparingly for key phrases, not entire sentences
+        - Avoid hashtags — LinkedIn articles don't use them; rely on headline keywords for discovery
 
-        VISUAL ELEMENTS:
-        - Suggest 2-3 relevant images or graphics
-        - Recommend data visualization opportunities
-        - Include pull quotes for key insights
+        ENGAGEMENT OPTIMIZATION:
+        - Open with a hook that challenges a common assumption or poses a problem the reader recognizes
+        - Use subheadings every 200-300 words for scannability
+        - Include bullet points and numbered lists for key insights
+        - End each major section with a one-sentence takeaway the reader can apply immediately
+        - Close with a specific call-to-action that invites comments (question, poll, or "what am I missing?")
 
         KEY SECTIONS TO COVER: {', '.join(request.key_sections) if request.key_sections else 'Industry overview, current challenges, emerging trends, practical solutions, future outlook'}
 
@@ -89,7 +91,11 @@ class ArticlePromptBuilder:
         - Only cite sources for factual claims, statistics, data points, and specific findings — not for general industry knowledge.
         - If you do not cite any sources, return an empty list for cited_source_indices.
 
-        ANTI-HALLUCINATION: Only make claims, statistics, and data points that are directly supported by the RESEARCH CONTEXT section above. Do not invent or fabricate statistics, dates, percentages, or specific findings. If the research does not contain a relevant data point, make a general observation instead of inventing a number.
+        GROUNDING RULES:
+        - When the RESEARCH CONTEXT provides specific numbers (statistics, percentages, dates), use them and cite the source.
+        - When the RESEARCH CONTEXT does NOT contain a relevant data point for a claim you want to make, state it as a general observation or industry trend — do not invent a number.
+        - It is better to make a strong, specific argument without a statistic than to attach a fabricated number to a weak point.
+        - If the research is thin on a subtopic, acknowledge the gap with phrases like "While specific data on X is still emerging, the direction is clear..." rather than inventing data.
 
         REMEMBER: This article should position the author as a thought leader while providing actionable insights that readers can immediately apply in their professional lives.
         """
