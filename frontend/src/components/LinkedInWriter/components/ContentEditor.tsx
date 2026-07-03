@@ -377,7 +377,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   }, [draft, showPreview, onPreviewToggle]);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       {/* Predictive Diff Preview */}
       <DiffPreviewModal
         isPreviewing={isPreviewing}

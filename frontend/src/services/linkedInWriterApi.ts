@@ -331,6 +331,11 @@ export const linkedInWriterApi = {
   fetchVideoBlobUrl: fetchLinkedInVideoBlobUrl,
   pollVideoTask: pollLinkedInVideoTask,
   mapVideoMotion: mapMotionToApi,
+
+  async generateFromUrl(params: GenerateFromUrlRequest): Promise<GenerateFromUrlResponse> {
+    const { data } = await aiApiClient.post('/api/linkedin/generate-from-url', params);
+    return data;
+  },
 };
 
 // ── Asset Library Save ────────────────────────────────────────────────
@@ -389,4 +394,30 @@ export const saveLinkedInToAssetLibrary = async (
   console.log('[linkedInWriterApi] LinkedIn post saved to Asset Library:', response.data.id);
   
   return { assetId: response.data.id };
+};
+
+// ── Share a Link / Quick Post from URL ─────────────────────────────────
+
+export interface GenerateFromUrlRequest {
+  url: string;
+  tone?: string;
+  my_take?: string;
+}
+
+export interface GenerateFromUrlResponse {
+  success: boolean;
+  data?: {
+    content: string;
+    character_count?: number;
+    hashtags?: Array<{ hashtag: string; category: string }>;
+    call_to_action?: string;
+  };
+  error?: string;
+}
+
+export const generateFromUrl = async (
+  params: GenerateFromUrlRequest
+): Promise<GenerateFromUrlResponse> => {
+  const response = await aiApiClient.post('/api/linkedin/generate-from-url', params);
+  return response.data;
 };

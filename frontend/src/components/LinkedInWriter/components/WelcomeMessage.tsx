@@ -18,6 +18,7 @@ import {
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
 import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
 import { LINKEDIN_STUDIO_TOUR_SEEN_KEY } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
+import { useAuth } from '@clerk/clerk-react';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import {
   ContentCoachModal,
@@ -62,6 +63,10 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [kcAskAlwrity, setKcAskAlwrity] = useState(false);
   const social = useLinkedInSocialConnection();
   const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
+  const { userId } = useAuth();
+  const tourSeenKey = userId
+    ? `${LINKEDIN_STUDIO_TOUR_SEEN_KEY}_${userId}`
+    : LINKEDIN_STUDIO_TOUR_SEEN_KEY;
 
   const handleDisconnect = useCallback(async () => {
     if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
@@ -95,11 +100,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
   useEffect(() => {
     if (isSocialLoading) return;
-    if (localStorage.getItem(LINKEDIN_STUDIO_TOUR_SEEN_KEY)) return;
+    if (localStorage.getItem(tourSeenKey)) return;
 
-    const timer = window.setTimeout(() => setRunStudioTour(true), 800);
+    const timer = window.setTimeout(() => {
+      localStorage.setItem(tourSeenKey, 'true');
+      setRunStudioTour(true);
+    }, 800);
     return () => window.clearTimeout(timer);
-  }, [isSocialLoading]);
+  }, [isSocialLoading, tourSeenKey]);
 
   useEffect(() => {
     const requireConnection = (event: Event) => {
@@ -240,17 +248,19 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           color: '#666',
         }}
       >
-        <button
-          type="button"
-          className="linkedin-studio-tour-trigger"
-          data-tour="li-tour-trigger"
-          onClick={() => setRunStudioTour(true)}
-          aria-label="How to use LinkedIn Studio — start guided tour"
-          title="How to use LinkedIn Studio"
-        >
-          <span aria-hidden>?</span>
-          <span className="linkedin-studio-tour-trigger-label">Tour</span>
-        </button>
+        {!localStorage.getItem(tourSeenKey) && (
+          <button
+            type="button"
+            className="linkedin-studio-tour-trigger"
+            data-tour="li-tour-trigger"
+            onClick={() => setRunStudioTour(true)}
+            aria-label="How to use LinkedIn Studio — start guided tour"
+            title="How to use LinkedIn Studio"
+          >
+            <span aria-hidden>?</span>
+            <span className="linkedin-studio-tour-trigger-label">Tour</span>
+          </button>
+        )}
 
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
@@ -283,6 +293,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         <WorkflowActionModals
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
+          connected={connected}
         />
 
         <button
@@ -352,7 +363,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         onClose={() => setCopilotError(null)}
       />
 
-      <LinkedInStudioTour run={runStudioTour} onRunChange={setRunStudioTour} />
+      <LinkedInStudioTour run={runStudioTour} onRunChange={setRunStudioTour} storageKey={tourSeenKey} />
     </div>
   );
 };

@@ -270,6 +270,12 @@ router_manager.include_router_safely(charts_router, "charts")
 router_manager.include_router_safely(links_router, "links")
 router_manager.include_optional_routers()
 
+# Include brainstorm router (Plan wedge brainstorm ideas + My Saved Ideas)
+try:
+    app.include_router(brainstorm_router)
+except Exception:
+    pass  # May already be included via router_manager.include_core_routers()
+
 # SEO Dashboard endpoints
 @app.get("/api/seo-dashboard/data")
 async def seo_dashboard_data():

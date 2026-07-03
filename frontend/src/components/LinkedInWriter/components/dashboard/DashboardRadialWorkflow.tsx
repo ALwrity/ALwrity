@@ -6,6 +6,7 @@ import {
   type DashboardWorkflowCardId,
 } from './dashboardWorkflowConfig';
 import type { RadialLayout } from './dashboardRadialLayout';
+import { PlanWedgeStatusBadge } from './PlanWedgeStatusBadge';
 
 interface DashboardRadialWorkflowProps {
   layout: RadialLayout;
@@ -238,10 +239,15 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
           y={box.y}
           width={box.width}
           height={box.height}
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
+          style={{
+            pointerEvents: 'none',
+            userSelect: 'none',
+            overflow: card.id === 'plan' ? 'visible' : 'hidden',
+          }}
         >
           <div
             style={{
+              position: 'relative',
               width: '100%',
               height: '100%',
               display: 'flex',
@@ -291,6 +297,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
                 Recommended first step
               </div>
             )}
+            {card.id === 'plan' && <PlanWedgeStatusBadge />}
           </div>
         </foreignObject>
       </g>

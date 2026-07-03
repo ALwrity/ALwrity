@@ -289,9 +289,24 @@ const BASE = '/api/linkedin-social';
 /** Profile Phases 5–7 can run multiple LLM calls in one GET /profile request. */
 const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 300_000;
 
+/** In-flight promise cache so 4+ hook mounts share one request */
+let statusPromiseCache: Promise<LinkedInConnectionStatus> | null = null;
+let statusCacheExpiry = 0;
+const STATUS_CACHE_TTL = 3000;
+
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
-  const response = await apiClient.get(`${BASE}/connection/status`);
-  return response.data;
+  if (statusPromiseCache && Date.now() < statusCacheExpiry) {
+    return statusPromiseCache;
+  }
+  const promise = apiClient.get(`${BASE}/connection/status`).then((r) => r.data);
+  statusPromiseCache = promise;
+  statusCacheExpiry = Date.now() + STATUS_CACHE_TTL;
+  promise.finally(() => {
+    if (Date.now() >= statusCacheExpiry) {
+      statusPromiseCache = null;
+    }
+  });
+  return promise;
 }
 
 export async function getLinkedInAuthUrl(state?: string): Promise<LinkedInAuthUrlResponse> {
