@@ -16,6 +16,7 @@ import {
   ProgressTracker,
   GrowthEnginePanel,
   PostAnalyticsPanel,
+  PeopleYouMayKnowTabPanel,
   LinkedInWriterTabBar,
   type ProgressStep,
   type LinkedInWriterTab,
@@ -173,7 +174,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   useEffect(() => {
     const onSwitchTab = (event: Event) => {
       const tab = (event as CustomEvent<{ tab?: LinkedInWriterTab }>).detail?.tab;
-      if (tab === 'editor' || tab === 'growth' || tab === 'analytics') {
+      if (tab === 'editor' || tab === 'growth' || tab === 'pymk' || tab === 'analytics') {
         setActiveTab(tab);
       }
     };
@@ -488,6 +489,8 @@ Always use the most appropriate tool for the user's request.`.trim();
           <div style={{ flex: 1, overflow: 'auto' }}>
             <GrowthEnginePanel generatePost={generatePost} userPreferences={userPreferences} />
           </div>
+        ) : activeTab === 'pymk' ? (
+          <PeopleYouMayKnowTabPanel />
         ) : activeTab === 'analytics' ? (
           <div style={{ flex: 1, overflow: 'auto' }}>
             <PostAnalyticsPanel
