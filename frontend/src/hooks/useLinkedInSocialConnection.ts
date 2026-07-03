@@ -470,6 +470,16 @@ export const useLinkedInSocialConnection = () => {
 
 
 
+  const setDisconnected = useCallback(() => {
+    setStatus({ connected: false, provider: 'zernio', has_per_user_token: false, accounts: [] });
+    setAccounts([]);
+    setOrganizations([]);
+    setError(null);
+    setProfileLoadWarning(null);
+    setIsLoading(false);
+    setIsProfileLoading(false);
+  }, []);
+
   const disconnect = useCallback(async (): Promise<boolean> => {
     setDisconnectError(null);
     console.info('[LinkedInConnect] starting disconnect');
@@ -477,7 +487,7 @@ export const useLinkedInSocialConnection = () => {
     try {
       const result = await disconnectLinkedIn();
       clearSelectionStorage();
-      await checkStatus();
+      setDisconnected();
       console.info('[LinkedInConnect] disconnect succeeded', {
         success: result.success,
       });
@@ -492,7 +502,7 @@ export const useLinkedInSocialConnection = () => {
       if (isExpectedMissingEndpoint) {
         console.debug('[LinkedInConnect] disconnect endpoint not mounted (404); skipping');
         // Reset the connection state to "not connected" anyway.
-        await checkStatus();
+        setDisconnected();
         return true;
       } else {
         console.error('[LinkedInConnect] disconnect failed:', msg, err);
@@ -500,7 +510,7 @@ export const useLinkedInSocialConnection = () => {
         return false;
       }
     }
-  }, [checkStatus, clearSelectionStorage]);
+  }, [setDisconnected, clearSelectionStorage]);
 
 
 

@@ -78,7 +78,7 @@ export function formatDraftContent(content: string, citations?: any[], researchS
   formatted = formatted.replace(/\*(.+?)\*/g, '<em style="font-style: italic;">$1</em>');
   
   // Format bullet points
-  formatted = formatted.replace(/^[•·-] (.+)$/gm, '<div style="margin: 4px 0; padding-left: 16px;">• $1</div>');
+  formatted = formatted.replace(/^[•·-] (.+)$/gm, '<div style="margin: 4px 0; padding-left: 16px; color: #333;">• $1</div>');
   
   // Format numbered lists
   formatted = formatted.replace(/^\d+\. (.+)$/gm, (match, content, offset, string) => {
@@ -86,7 +86,7 @@ export function formatDraftContent(content: string, citations?: any[], researchS
     const currentLineIndex = lines.length - 1;
     const currentLine = lines[currentLineIndex];
     const number = currentLine.match(/^(\d+)\./)?.[1] || '1';
-    return `<div style="margin: 4px 0; padding-left: 16px;">${number}. ${content}</div>`;
+    return `<div style="margin: 4px 0; padding-left: 16px; color: #333;">${number}. ${content}</div>`;
   });
   
   // Format line breaks
