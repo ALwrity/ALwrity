@@ -293,7 +293,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         <WorkflowActionModals
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
-          connected={connected}
         />
 
         <button

@@ -7,6 +7,8 @@ import { ErrorState } from './ErrorState';
 import { LoadingState } from './LoadingState';
 import { PostCard } from './PostCard';
 import { EngagementSummary } from './EngagementSummary';
+import { PostTimelineChart } from './PostTimelineChart';
+import { BrandScoreSummaryCard } from './BrandScoreSummaryCard';
 import { colors, panelContainer, primaryBtn, secondaryBtn } from './styles';
 
 interface PostAnalyticsPanelProps {
@@ -118,6 +120,12 @@ Create a new post that captures the same essence but with different examples, up
 
       {data && panelState !== 'idle' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* F4 — Brand Score Summary Card (reads sessionStorage cache) */}
+          <BrandScoreSummaryCard />
+
+          {/* F2 — Post Performance Timeline Chart */}
+          {data.posts.length >= 3 && <PostTimelineChart posts={data.posts} />}
+
           {data.posts.length > 0 && <EngagementSummary posts={data.posts} />}
 
           <RefreshBar
