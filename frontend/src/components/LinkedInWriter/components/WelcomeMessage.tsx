@@ -20,6 +20,13 @@ import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
 import { LINKEDIN_STUDIO_TOUR_SEEN_KEY } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
 import { useAuth } from '@clerk/clerk-react';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
+import {
+  ContentCoachModal,
+  QuickStartWizardModal,
+  BestPracticesModal,
+  FeatureMapModal,
+  AskAlwrityModal,
+} from './dashboard/KnowledgeCenterModals';
 
 interface WelcomeMessageProps {
   draft: string;
@@ -48,6 +55,12 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [runStudioTour, setRunStudioTour] = useState(false);
+  // Knowledge Center modal states
+  const [kcContentCoach, setKcContentCoach] = useState(false);
+  const [kcQuickStart, setKcQuickStart] = useState(false);
+  const [kcBestPractices, setKcBestPractices] = useState(false);
+  const [kcFeatureMap, setKcFeatureMap] = useState(false);
+  const [kcAskAlwrity, setKcAskAlwrity] = useState(false);
   const social = useLinkedInSocialConnection();
   const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
   const { userId } = useAuth();
@@ -169,23 +182,41 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
   const handleKnowledgeCenterAction = (action: KnowledgeCenterAction) => {
     switch (action) {
-      case 'factCheck':
-        setShowFactCheckModal(true);
+      // ── New AI-first features ─────────────────────────────────────────────
+      case 'featureMap':
+        setKcFeatureMap(true);
         break;
-      case 'googleGround':
-        setShowAssistiveModal(true);
+      case 'contentCoach':
+        setKcContentCoach(true);
         break;
+      case 'bestPractices':
+        setKcBestPractices(true);
+        break;
+      case 'quickStart':
+        setKcQuickStart(true);
+        break;
+      case 'askAlwrity':
+        setKcAskAlwrity(true);
+        break;
+      // ── Unchanged ─────────────────────────────────────────────────────────
       case 'persona':
         window.dispatchEvent(new CustomEvent('linkedinwriter:openPreferences'));
         break;
-      case 'assistive':
-        setShowAssistiveModal(true);
-        break;
-      case 'copilot':
-        handleOpenCopilot();
-        break;
       case 'multimodal':
         setWorkflowModal('create');
+        break;
+      // ── Legacy fallbacks (backward compat) ────────────────────────────────
+      case 'factCheck':
+        setKcFeatureMap(true);
+        break;
+      case 'googleGround':
+        setKcAskAlwrity(true);
+        break;
+      case 'assistive':
+        setKcBestPractices(true);
+        break;
+      case 'copilot':
+        setKcQuickStart(true);
         break;
       default:
         break;
@@ -286,6 +317,21 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             openQuickCreatePost();
           }}
         />
+
+        {/* ── Knowledge Center Modals ── */}
+        <ContentCoachModal open={kcContentCoach} onClose={() => setKcContentCoach(false)} />
+        <QuickStartWizardModal open={kcQuickStart} onClose={() => setKcQuickStart(false)} />
+        <BestPracticesModal open={kcBestPractices} onClose={() => setKcBestPractices(false)} />
+        <FeatureMapModal
+          open={kcFeatureMap}
+          onClose={() => setKcFeatureMap(false)}
+          onOpenWedge={(id) => {
+            const cardId = id as DashboardWorkflowCardId;
+            if (isWorkflowModalId(cardId)) setWorkflowModal(cardId);
+          }}
+          onOpenCapability={(id) => handleKnowledgeCenterAction(id as KnowledgeCenterAction)}
+        />
+        <AskAlwrityModal open={kcAskAlwrity} onClose={() => setKcAskAlwrity(false)} />
 
         <div className="linkedin-mobile-copilot-fab">
           <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="fixed" />
