@@ -515,30 +515,10 @@ Always use the most appropriate tool for the user's request.`.trim();
         generatePost={generatePost}
       />
 
-      {/* Lightweight progress tracker under header */}
-      <div style={{ 
-        padding: '4px 16px',
-        transition: 'opacity 400ms ease, transform 400ms ease',
-        opacity: progressActive || progressSteps.length > 0 ? 1 : 0,
-        transform: progressActive || progressSteps.length > 0 ? 'translateY(0)' : 'translateY(-8px)',
-        maxHeight: progressActive || progressSteps.length > 0 ? '2000px' : 0,
-        overflow: 'hidden',
-        pointerEvents: progressActive || progressSteps.length > 0 ? 'auto' : 'none'
-      }}>
-        <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
-      </div>
-
       <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
-        {/* Loading Indicator */}
-        <LoadingIndicator
-          isGenerating={isGenerating}
-          loadingMessage={loadingMessage}
-          currentAction={currentAction}
-        />
-
           {/* Content Area */}
         {activeTab === 'growth' ? (
           <div style={{ flex: 1, overflow: 'auto' }}>
@@ -779,6 +759,9 @@ Always use the most appropriate tool for the user's request.`.trim();
         makeSystemMessage={makeSystemMessage}
         observabilityHooks={observabilityHooks}
       />
+
+      {/* Progress overlay — renders as fixed-position modal via portal */}
+      <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
     </div>
   );
 };

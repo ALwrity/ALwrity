@@ -210,7 +210,7 @@ async def generate_post(
                 if response.data.call_to_action:
                     text_content += f"\n\nCall to Action: {response.data.call_to_action}"
                 if response.data.hashtags:
-                    hashtag_text = " ".join([f"#{h.hashtag}" if isinstance(h, dict) else f"#{h.get('hashtag', '')}" for h in response.data.hashtags])
+                    hashtag_text = " ".join([f"#{h.get('hashtag', '') if isinstance(h, dict) else getattr(h, 'hashtag', '')}" for h in response.data.hashtags])
                     text_content += f"\n\nHashtags: {hashtag_text}"
                 
                 save_and_track_text_content(
