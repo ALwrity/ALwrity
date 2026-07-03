@@ -88,7 +88,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
     NotFoundError = Exception
-    logger.warn("OpenAI library not available. Install with: pip install openai")
+    logger.warning("OpenAI library not available. Install with: pip install openai")
 
 HF_FALLBACK_MODELS = [
     "openai/gpt-oss-120b:cerebras",
