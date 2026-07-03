@@ -7,12 +7,18 @@ import {
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 
 export type KnowledgeCenterAction =
+  | 'featureMap'
+  | 'contentCoach'
+  | 'persona'
+  | 'bestPractices'
+  | 'quickStart'
+  | 'multimodal'
+  | 'askAlwrity'
+  // legacy — kept for backward compatibility
   | 'factCheck'
   | 'googleGround'
-  | 'persona'
   | 'assistive'
-  | 'copilot'
-  | 'multimodal';
+  | 'copilot';
 
 interface KnowledgeCenterDockProps {
   onFeatureAction: (action: KnowledgeCenterAction) => void;
@@ -74,7 +80,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
       className="linkedin-knowledge-center-grid"
       style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))',
         gap: 8,
         padding: 10,
         background: '#ffffff',
