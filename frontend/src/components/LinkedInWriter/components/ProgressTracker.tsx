@@ -44,15 +44,21 @@ const HEADER_SUBTITLE_ERROR = 'Something went wrong during generation. Please tr
 
 export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active }) => {
   const [mounted, setMounted] = useState(false);
+  const isOpen = (steps && steps.length > 0);
 
-  // Delay mount for entrance animation
+  // Delay mount for entrance animation + lock body scroll while open
   useEffect(() => {
-    if (steps.length > 0) {
+    if (isOpen) {
       const t = setTimeout(() => setMounted(true), 10);
-      return () => clearTimeout(t);
+      document.body.style.overflow = 'hidden';
+      return () => {
+        clearTimeout(t);
+        document.body.style.overflow = '';
+      };
     }
     setMounted(false);
-  }, [steps.length]);
+    return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
 
   if (!steps || steps.length === 0) return null;
 
@@ -79,6 +85,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active 
         backdropFilter: 'blur(4px)',
         WebkitBackdropFilter: 'blur(4px)',
         opacity: mounted ? 1 : 0,
+        pointerEvents: 'auto',
         transition: 'opacity 300ms ease',
         padding: '24px',
       }}
