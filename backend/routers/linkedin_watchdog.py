@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import os
 from typing import Dict, Any, Optional, List
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from loguru import logger
@@ -27,14 +28,33 @@ def _resolve_user_id(current_user: Dict[str, Any]) -> str:
 def _build_webhook_url(request: Request) -> str:
     """Construct the webhook URL from the incoming request base.
 
-    Respects the EXA_WEBHOOK_BASE_URL env var so deployments can
-    override with a public HTTPS endpoint (required by Exa's API).
-    Falls back to the incoming request's base URL.
+    Preference order:
+    1. NGROK_URL env var (ngrok tunnel to local backend)
+    2. REACT_APP_API_URL env var (main API endpoint)
+    3. FRONTEND_URL env var (frontend, used as fallback)
+    4. Incoming request's base URL (local dev fallback)
+
+    Exa requires webhook URLs to be public HTTPS endpoints.
     """
-    api_url = os.getenv("REACT_APP_API_URL")
-    if api_url:
-        return api_url.rstrip("/") + "/api/linkedin/watchdog/webhook"
-    base = str(request.base_url).rstrip("/")
+    webhook_base = (
+        os.getenv("NGROK_URL")
+        or os.getenv("REACT_APP_API_URL")
+        or os.getenv("FRONTEND_URL")
+    )
+    if webhook_base:
+        base = webhook_base.rstrip("/")
+    else:
+        base = str(request.base_url).rstrip("/")
+    if base.startswith("http://"):
+        logger.warning(f"[Watchdog] Webhook URL uses HTTP, forcing HTTPS: {base}/api/linkedin/watchdog/webhook")
+        base = base.replace("http://", "https://", 1)
+    parsed = urlparse(base)
+    if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0"):
+        logger.warning(
+            f"[Watchdog] Webhook URL resolves to {parsed.hostname} — "
+            f"Exa requires a public HTTPS endpoint. "
+            f"Set NGROK_URL or REACT_APP_API_URL to a public HTTPS URL."
+        )
     return f"{base}/api/linkedin/watchdog/webhook"
 
 
@@ -272,19 +292,29 @@ async def mark_update_read(update_id: str,
 async def watchdog_webhook(payload: Dict[str, Any], request: Request):
     """Receive Exa Monitor run results via webhook.
 
-    Expected payload shape:
+    Expected payload shape (Exa v2 webhook events):
     {
-        "event": "monitor.run.completed",
-        "monitor": { "id": "...", ... },
-        "run": { "id": "...", "results": [...] },
-        "metadata": { "user_id": "...", "category": "...", "reference_id": "...", "reference_name": "..." }
+        "id": "event_abc123",
+        "object": "event",
+        "type": "monitor.run.completed",
+        "data": {
+            "id": "run_xyz789",
+            "monitorId": "mon_abc123",
+            "status": "completed",
+            "metadata": { "user_id": "...", "category": "...", "reference_id": "...", "reference_name": "..." },
+            "output": { "results": [ { "title": "...", "url": "...", ... } ] }
+        },
+        "createdAt": "..."
     }
 
     Signature verification uses the webhookSecret stored at monitor creation time.
-    The signature is passed in the `x-exa-signature-256` header (HMAC-SHA256).
+    The signature is passed in the `Exa-Signature` header (format: t=...,v1=...).
     """
-    signature = request.headers.get("x-exa-signature-256", "")
-    metadata = payload.get("metadata") or {}
+    signature = request.headers.get("Exa-Signature", "")
+
+    # Extract data from the event envelope
+    event_data = payload.get("data") or {}
+    metadata = event_data.get("metadata") or payload.get("metadata") or {}
     user_id = metadata.get("user_id")
     category = metadata.get("category")
     reference_id = metadata.get("reference_id")
@@ -294,8 +324,8 @@ async def watchdog_webhook(payload: Dict[str, Any], request: Request):
         logger.warning("[Watchdog] Webhook missing user_id in metadata")
         return {"success": False, "detail": "Missing user_id"}
 
-    # Verify webhook signature
-    monitor_id = payload.get("monitor", {}).get("id", "")
+    # Verify webhook signature (Exa-Signature: t=...,v1=...)
+    monitor_id = event_data.get("monitorId", "")
     if signature and monitor_id:
         from models.linkedin_watchdog_db_models import WatchdogMonitorDB
         from services.database import get_session_for_user
@@ -306,24 +336,31 @@ async def watchdog_webhook(payload: Dict[str, Any], request: Request):
                     WatchdogMonitorDB.exa_monitor_id == monitor_id
                 ).first()
                 if row and row.webhook_secret:
-                    expected = hmac.new(
-                        row.webhook_secret.encode(),
-                        (await request.body()),
-                        hashlib.sha256,
-                    ).hexdigest()
-                    if not hmac.compare_digest(f"sha256={expected}", signature):
-                        logger.warning(f"[Watchdog] Webhook signature mismatch for monitor {monitor_id}")
-                        return {"success": False, "detail": "Invalid signature"}
+                    parts = dict(p.split("=", 1) for p in signature.split(","))
+                    ts = parts.get("t", "")
+                    v1 = parts.get("v1", "")
+                    if ts and v1:
+                        body_bytes = await request.body()
+                        signed_payload = f"{ts}.{body_bytes.decode()}"
+                        expected = hmac.new(
+                            row.webhook_secret.encode(),
+                            signed_payload.encode(),
+                            hashlib.sha256,
+                        ).hexdigest()
+                        if not hmac.compare_digest(expected, v1):
+                            logger.warning(f"[Watchdog] Webhook signature mismatch for monitor {monitor_id}")
+                            return {"success": False, "detail": "Invalid signature"}
             except Exception:
                 pass
             finally:
                 db.close()
 
-    # Extract results
-    run_data = payload.get("run", {})
-    results = run_data.get("results", []) if isinstance(run_data, dict) else []
-    if not results and isinstance(run_data, list):
-        results = run_data
+    # Extract results from the run output
+    run_output = event_data.get("output") or {}
+    results = run_output.get("results", [])
+    if not results:
+        # Fallback: direct payload.results for older format
+        results = payload.get("results", [])
 
     if not results:
         logger.info(f"[Watchdog] Webhook received for {user_id}/{category}/{reference_id} — no new results")
