@@ -21,6 +21,9 @@ import {
 import { getLinkedInProfileFoundation } from '../../../api/linkedinSocial';
 import type { LinkedInProfileValidation } from '../../../api/linkedinSocial';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
+import { useLinkedInSearch } from '../hooks/useLinkedInSearch';
+import { LinkedInSearchBar } from './search/LinkedInSearchBar';
+import { LinkedInSearchModal } from './search/LinkedInSearchModal';
 
 const NAV_BG = '#BCE0FD';
 const NAV_TITLE_COLOR = '#0a66c2';
@@ -55,13 +58,22 @@ export const Header: React.FC<HeaderProps> = ({
     left: number;
     maxHeight: number;
   } | null>(null);
-  const { connected } = useLinkedInSocialConnection();
+  const { connected, connectWithOAuth } = useLinkedInSocialConnection();
+  const [searchBarCompact, setSearchBarCompact] = useState(false);
+  const linkedInSearch = useLinkedInSearch({ connected });
   const [profileStrengthPercent, setProfileStrengthPercent] = useState<number | null>(null);
   const [profileValidation, setProfileValidation] = useState<LinkedInProfileValidation | null>(
     null
   );
   const [profileStrengthLoading, setProfileStrengthLoading] = useState(false);
   const { corePersona, platformPersona } = usePlatformPersonaContext();
+
+  useEffect(() => {
+    const updateCompact = () => setSearchBarCompact(window.innerWidth < 900);
+    updateCompact();
+    window.addEventListener('resize', updateCompact);
+    return () => window.removeEventListener('resize', updateCompact);
+  }, []);
 
   // Broadcast persona snapshot to global components (e.g. UserBadge) that cannot
   // call usePlatformPersonaContext() directly because they live outside the provider.
@@ -318,6 +330,13 @@ export const Header: React.FC<HeaderProps> = ({
               ALwrity
             </p>
           </div>
+          <LinkedInSearchBar
+            value={linkedInSearch.query}
+            onChange={linkedInSearch.setQuery}
+            onSearch={() => void linkedInSearch.runSearch()}
+            disabled={!connected}
+            compact={searchBarCompact}
+          />
         </div>
 
         {/* Center — tools & content settings */}
@@ -1065,6 +1084,29 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
       )}
+
+      {/* LinkedIn Search modal */}
+      <LinkedInSearchModal
+        open={linkedInSearch.modalOpen}
+        query={linkedInSearch.query}
+        category={linkedInSearch.category}
+        items={linkedInSearch.items}
+        loading={linkedInSearch.loading}
+        loadingMore={linkedInSearch.loadingMore}
+        error={linkedInSearch.error}
+        errorType={linkedInSearch.errorType}
+        paging={linkedInSearch.paging}
+        hasSearched={linkedInSearch.hasSearched}
+        onClose={linkedInSearch.closeModal}
+        onCategoryChange={linkedInSearch.setCategory}
+        onLoadMore={() => void linkedInSearch.loadMore()}
+        onConnectClick={() => void connectWithOAuth()}
+        loadMoreEnabled={
+          Boolean(linkedInSearch.cursor) &&
+          !linkedInSearch.loading &&
+          !linkedInSearch.loadingMore
+        }
+      />
 
       {/* BrainstormFlow Component */}
       <BrainstormFlow
