@@ -91,7 +91,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
               }}>
                 <div style={{ textAlign: 'center' }}>
                   <img 
-                    src="/Alwrity-copilot1.png" 
+                    src="/alwrity-copilot1.png" 
                     alt="ALwrity Co-Pilot Interface"
                     style={{
                       width: '100%',
@@ -113,7 +113,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                 </div>
                 <div style={{ textAlign: 'center' }}>
                   <img 
-                    src="/Alwrity-copilot2.png" 
+                    src="/alwrity-copilot2.png" 
                     alt="ALwrity Co-Pilot Features"
                     style={{
                       width: '100%',
@@ -375,7 +375,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                 textAlign: 'center'
               }}>
                 <img 
-                  src="/Alwrity-fact-check.png" 
+                  src="/alwrity-fact-check.png" 
                   alt="ALwrity Fact Check Interface"
                   style={{
                     width: '100%',
@@ -401,7 +401,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
                 textAlign: 'center'
               }}>
                 <img 
-                  src="/Fact-check1.png" 
+                  src="/fact-check1.png" 
                   alt="Fact Check Results"
                   style={{
                     width: '100%',

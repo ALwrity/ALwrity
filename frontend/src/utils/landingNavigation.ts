@@ -1,4 +1,4 @@
-export type LandingSectionId = 'hero' | 'lifecycle' | 'features';
+export type LandingSectionId = 'hero' | 'lifecycle' | 'features' | 'pricing';
 
 /** Public marketing landing route — always shows Landing (signed-in or not). */
 export const LANDING_MARKETING_PATH = '/home';
@@ -51,7 +51,7 @@ export function scrollToLandingSectionWithRetry(
 
 export function parseLandingHash(hash: string): LandingSectionId | null {
   const id = hash.replace('#', '').trim();
-  if (id === 'hero' || id === 'lifecycle' || id === 'features') {
+  if (id === 'hero' || id === 'lifecycle' || id === 'features' || id === 'pricing') {
     return id;
   }
   return null;

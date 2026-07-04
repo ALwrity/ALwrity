@@ -32,6 +32,7 @@ import { motion } from 'framer-motion';
 import HeroSection from './HeroSection';
 import LandingNav from './LandingNav';
 import LandingFooter from './LandingFooter';
+import EnterpriseCTA from './EnterpriseCTA';
 import { ScrambleText } from '../ScrambleText';
 import {
   landingSectionTitleSx,
@@ -40,61 +41,12 @@ import {
   landingCardHoverSx,
 } from './landingStyles';
 import { parseLandingHash, scrollToLandingSectionWithRetry, isLandingMarketingPath } from '../../utils/landingNavigation';
+import { LANDING_PRICING_TEASER_PLANS } from './landingPricingTeaser';
+import { LANDING_LIFECYCLE_FEATURES } from './landingLifecycleFeatures';
+import { useDeferredBackground } from './useDeferredBackground';
+import { useLandingCanonical } from './useLandingCanonical';
 
-const PRICING_TEASER_PLANS = [
-  {
-    name: 'Free',
-    price: '$0',
-    period: '/mo',
-    highlight: false,
-    features: [
-      'Core AI copilot access',
-      'Content planning basics',
-      'Limited monthly AI credits',
-      'Single-platform publishing',
-      'Community support',
-    ],
-  },
-  {
-    name: 'Basic',
-    price: '$29',
-    period: '/mo',
-    highlight: true,
-    features: [
-      'Full content lifecycle tools',
-      'Multi-platform publishing',
-      'Web research & fact-checking',
-      'Brand voice memory',
-      'Priority email support',
-    ],
-  },
-  {
-    name: 'Pro',
-    price: '$79',
-    period: '/mo',
-    highlight: false,
-    features: [
-      'Advanced analytics dashboard',
-      'Higher AI usage limits',
-      'Team collaboration features',
-      'Scheduler & remarketing',
-      'Fact-checked AI content with source verification',
-    ],
-  },
-  {
-    name: 'Enterprise',
-    price: '$199',
-    period: '/mo',
-    highlight: false,
-    features: [
-      'Dedicated account manager',
-      'Custom integrations & SSO',
-      'Unlimited team seats',
-      'SLA & enterprise security',
-      'White-glove onboarding',
-    ],
-  },
-] as const;
+const LIFECYCLE_BG = '/content_lifecycle.png';
 
 // Scrambling text component for multiple phrases
 const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?: number; delay?: number; style?: React.CSSProperties }> = ({ 
@@ -128,14 +80,31 @@ const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?
 // Lazy load components for better performance
 const FeatureShowcase = lazy(() => import('./FeatureShowcase'));
 const SolopreneurDilemma = lazy(() => import('./SolopreneurDilemma'));
-const EnterpriseCTA = lazy(() => import('./EnterpriseCTA'));
 const IntroducingAlwrity = lazy(() => import('./IntroducingAlwrity'));
+
+const LIFECYCLE_ICON_BY_KEY = {
+  plan: <CalendarToday />,
+  generate: <Create />,
+  publish: <Publish />,
+  analyze: <Analytics />,
+  engage: <Chat />,
+  remarket: <Refresh />,
+} as const;
+
+/** Skeleton heights tuned to real section sizes (TC 040). */
+const SKELETON_HEIGHT = {
+  welcome: 480,
+  features: 520,
+  solopreneur: 420,
+} as const;
 
 const Landing: React.FC = () => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const { openSignIn } = useClerk();
+  const lifecycleBgUrl = useDeferredBackground(LIFECYCLE_BG);
+  useLandingCanonical();
   
   // Monitor performance
   usePerformanceMonitor('Landing');
@@ -240,50 +209,10 @@ const Landing: React.FC = () => {
     }
   };
 
-  const features = [
-    {
-      icon: <CalendarToday />,
-      title: 'Content Planning',
-      description: 'AI builds a living strategy and your content calendar from your goals, audience, and market signals. Drag, drop, and approve.',
-      badge: 'Strategy',
-      href: '/content-planning'
-    },
-    {
-      icon: <Create />,
-      title: 'Content Generation',
-      description: 'Generate text, images, audio, video and channel-ready posts for LinkedIn, Facebook, Instagram and blogs. Templates, brand voice and Personas baked in.',
-      badge: 'Multi‑Format',
-      href: '/dashboard'
-    },
-    {
-      icon: <Publish />,
-      title: 'Content Publishing',
-      description: 'Publish and schedule directly to connected social channels and your website. One-click cross‑posting while preserving native formats.',
-      badge: 'Automated',
-      href: '/scheduler-dashboard'
-    },
-    {
-      icon: <Analytics />,
-      title: 'Content Analytics',
-      description: 'Pulls analytics from connected platforms, analyzes with AI and surfaces actionable insights. Signals flow back to strategy and calendar for adaptive learning.',
-      badge: 'AI Insights',
-      href: '/seo-dashboard'
-    },
-    {
-      icon: <Chat />,
-      title: 'Content Engagement',
-      description: 'Monitor comments, DMs and reactions. Research communities and reply with AI assistance from within ALwrity to grow audience authentically.',
-      badge: 'Community',
-      href: '/linkedin-writer'
-    },
-    {
-      icon: <Refresh />,
-      title: 'Content Remarketing',
-      description: 'Analyzes historic performance, suggests edits, variants and redistribution. Measures KPI attainment and explains what worked—and what did not.',
-      badge: 'Optimization',
-      href: '/dashboard'
-    }
-  ];
+  const features = LANDING_LIFECYCLE_FEATURES.map((feature) => ({
+    ...feature,
+    icon: LIFECYCLE_ICON_BY_KEY[feature.iconKey],
+  }));
 
 
 
@@ -350,9 +279,12 @@ const Landing: React.FC = () => {
           color: '#fff',
           textDecoration: 'none',
           fontWeight: 600,
-          '&:focus': {
+          '&:focus-visible': {
+            position: 'fixed',
             left: 16,
             top: 16,
+            outline: '2px solid #fff',
+            outlineOffset: 2,
           },
         }}
       >
@@ -366,7 +298,7 @@ const Landing: React.FC = () => {
       <HeroSection />
 
       {/* Welcome / Why ALwrity — moved up for better conversion flow */}
-      <Suspense fallback={<SectionSkeleton minHeight={520} />}>
+      <Suspense fallback={<SectionSkeleton minHeight={SKELETON_HEIGHT.welcome} />}>
         <IntroducingAlwrity />
       </Suspense>
 
@@ -397,11 +329,12 @@ const Landing: React.FC = () => {
               left: 0,
               right: 0,
               bottom: 0,
-              backgroundImage: 'url(/content_lifecycle.png)',
+              backgroundImage: lifecycleBgUrl ? `url(${lifecycleBgUrl})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
-              zIndex: 0
+              zIndex: 0,
+              bgcolor: lifecycleBgUrl ? 'transparent' : '#0a0a0a',
             }}
           />
           {/* Dark overlay for readability */}
@@ -610,12 +543,18 @@ const Landing: React.FC = () => {
                           border: `1px solid ${alpha(theme.palette.common.white, 0.15)}`,
                           ...landingCardHoverSx,
                           '& .lifecycle-card-desc': {
-                            display: '-webkit-box',
-                            WebkitLineClamp: 3,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
+                            display: 'block',
+                            overflow: 'visible',
                           },
-                          '&:hover': { 
+                          [`@media (min-width: ${theme.breakpoints.values.md}px)`]: {
+                            '& .lifecycle-card-desc': {
+                              display: '-webkit-box',
+                              WebkitLineClamp: 3,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            },
+                          },
+                          '&:hover': {
                             ...landingCardHoverSx['&:hover'],
                             boxShadow: `0 24px 48px ${alpha(theme.palette.primary.main, 0.45)}, 0 0 24px ${alpha(theme.palette.primary.main, 0.2)}`,
                             borderColor: alpha(theme.palette.primary.main, 0.55),
@@ -654,7 +593,7 @@ const Landing: React.FC = () => {
                               />
                             </Stack>
                             <Stack spacing={0.75}>
-                              <Typography variant="subtitle1" fontWeight={700} sx={{ fontSize: '0.95rem', color: 'white' }}>
+                              <Typography variant="subtitle1" component="h3" fontWeight={700} sx={{ fontSize: '0.95rem', color: 'white' }}>
                                 {feature.title}
                               </Typography>
                               <Typography
@@ -674,6 +613,8 @@ const Landing: React.FC = () => {
                                 }
                                 size="small"
                                 endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                                aria-label={`Sign in to explore ${feature.title}`}
+                                data-landing-redirect={feature.href}
                                 sx={{
                                   textTransform: 'none',
                                   fontWeight: 600,
@@ -703,12 +644,12 @@ const Landing: React.FC = () => {
       </Box>
 
       {/* Feature Showcase with Carousel - Lazy Loaded */}
-      <Suspense fallback={<SectionSkeleton minHeight={640} />}>
+      <Suspense fallback={<SectionSkeleton minHeight={SKELETON_HEIGHT.features} />}>
         <FeatureShowcase />
       </Suspense>
 
       {/* The Solopreneur's Dilemma Section - Lazy Loaded */}
-      <Suspense fallback={<SectionSkeleton minHeight={560} />}>
+      <Suspense fallback={<SectionSkeleton minHeight={SKELETON_HEIGHT.solopreneur} />}>
         <SolopreneurDilemma />
       </Suspense>
 
@@ -731,7 +672,8 @@ const Landing: React.FC = () => {
                 Choose Your Plan
               </Typography>
               <Typography
-                variant="h6"
+                variant="body1"
+                component="p"
                 color="text.secondary"
                 sx={{
                   maxWidth: 900,
@@ -745,7 +687,7 @@ const Landing: React.FC = () => {
             </Box>
 
             <Grid container spacing={2} sx={{ width: '100%' }}>
-              {PRICING_TEASER_PLANS.map((plan) => (
+              {LANDING_PRICING_TEASER_PLANS.map((plan) => (
                 <Grid item xs={12} sm={6} md={3} key={plan.name}>
                   <Card
                     sx={{
@@ -765,11 +707,11 @@ const Landing: React.FC = () => {
                     }}
                   >
                     <CardContent sx={{ p: 2.25 }}>
-                      <Typography variant="h6" fontWeight={700} gutterBottom>
+                      <Typography variant="h6" component="h3" fontWeight={700} gutterBottom>
                         {plan.name}
                       </Typography>
                       <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ mb: 2 }}>
-                        <Typography variant="h4" fontWeight={800} color="primary.main">
+                        <Typography variant="h4" component="p" fontWeight={800} color="primary.main">
                           {plan.price}
                         </Typography>
                         {plan.period && (
@@ -778,7 +720,7 @@ const Landing: React.FC = () => {
                           </Typography>
                         )}
                       </Stack>
-                      <Stack spacing={0.75}>
+                      <Stack spacing={0.75} sx={{ mb: 1.5 }}>
                         {plan.features.map((feature) => (
                           <Stack key={feature} direction="row" spacing={0.75} alignItems="flex-start">
                             <Check sx={{ fontSize: 16, color: 'primary.main', mt: 0.25 }} />
@@ -788,6 +730,31 @@ const Landing: React.FC = () => {
                           </Stack>
                         ))}
                       </Stack>
+                      <Button
+                        fullWidth
+                        variant={plan.highlight ? 'contained' : 'outlined'}
+                        size="small"
+                        onClick={() => {
+                          if (plan.ctaAction === 'signin') {
+                            openSignIn({ forceRedirectUrl: '/onboarding' });
+                            return;
+                          }
+                          navigate('/pricing');
+                        }}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          fontSize: '0.82rem',
+                          py: 0.85,
+                          ...(plan.highlight
+                            ? {
+                                background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                              }
+                            : {}),
+                        }}
+                      >
+                        {plan.ctaLabel}
+                      </Button>
                     </CardContent>
                   </Card>
                 </Grid>
@@ -817,10 +784,8 @@ const Landing: React.FC = () => {
         </Container>
       </Box>
 
-      {/* Final CTA Section - Lazy Loaded */}
-      <Suspense fallback={<SectionSkeleton minHeight={480} />}>
-        <EnterpriseCTA />
-      </Suspense>
+      {/* Final CTA Section — eager load to avoid CLS (TC 040) */}
+      <EnterpriseCTA />
       </Box>
 
       <LandingFooter />

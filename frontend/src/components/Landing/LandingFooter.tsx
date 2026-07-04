@@ -19,6 +19,13 @@ interface LandingFooterProps {
   surface?: 'dark' | 'light';
 }
 
+const FOOTER_LINKS = [
+  { label: 'Privacy Policy', to: '/privacy' },
+  { label: 'Code of Conduct', to: '/code-of-conduct' },
+  { label: 'Terms of Service', to: '/terms' },
+  { label: 'Contact', to: '/contact' },
+] as const;
+
 const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
   const theme = useTheme();
   const year = new Date().getFullYear();
@@ -61,28 +68,19 @@ const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
           alignItems={{ xs: 'flex-start', md: 'center' }}
           spacing={3}
         >
-          <Stack spacing={1}>
-            <BrandMark
-              showSubtitle
-              showTagline
-              logoSize={40}
-              variant={isLight ? 'dark' : 'light'}
-            />
-            <Typography variant="caption" sx={{ color: mutedText }}>
-              © {year} ALwrity. Open-source &amp; community-driven.
-            </Typography>
-          </Stack>
+          <BrandMark
+            showSubtitle
+            showTagline
+            logoSize={40}
+            variant={isLight ? 'dark' : 'light'}
+          />
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 3 }} flexWrap="wrap">
-            <Link component={RouterLink} to="/privacy" sx={linkSx}>
-              Privacy Policy
-            </Link>
-            <Link component={RouterLink} to="/code-of-conduct" sx={linkSx}>
-              Code of Conduct
-            </Link>
-            <Link component={RouterLink} to="/terms" sx={linkSx}>
-              Terms of Service
-            </Link>
+            {FOOTER_LINKS.map(({ label, to }) => (
+              <Link key={to} component={RouterLink} to={to} sx={linkSx}>
+                {label}
+              </Link>
+            ))}
           </Stack>
         </Stack>
 
@@ -99,18 +97,15 @@ const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
           display="block"
           textAlign="center"
         >
-          © {year} ALwrity. See our{' '}
-          <Link component={RouterLink} to="/privacy" sx={{ color: footerLinkMuted }}>
-            Privacy Policy
-          </Link>
-          ,{' '}
-          <Link component={RouterLink} to="/code-of-conduct" sx={{ color: footerLinkMuted }}>
-            Code of Conduct
-          </Link>
-          , and{' '}
-          <Link component={RouterLink} to="/terms" sx={{ color: footerLinkMuted }}>
-            Terms of Service
-          </Link>
+          © {year} ALwrity. Open-source &amp; community-driven. See our{' '}
+          {FOOTER_LINKS.map(({ label, to }, index) => (
+            <React.Fragment key={to}>
+              {index > 0 && (index === FOOTER_LINKS.length - 1 ? ', and ' : ', ')}
+              <Link component={RouterLink} to={to} sx={{ color: footerLinkMuted }}>
+                {label}
+              </Link>
+            </React.Fragment>
+          ))}
           . Inquiries:{' '}
           <Link href="mailto:info@alwrity.com" sx={{ color: footerLinkMuted }}>
             info@alwrity.com

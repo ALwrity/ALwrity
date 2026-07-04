@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useClerk } from '@clerk/clerk-react';
-import { Box, Container, Typography, Stack, IconButton, useTheme, alpha, Theme } from '@mui/material';
+import { Box, Container, Typography, Stack, IconButton, useTheme, useMediaQuery, alpha, Theme } from '@mui/material';
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import Psychology from '@mui/icons-material/Psychology';
@@ -14,9 +14,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   landingSectionTitleSx,
   landingSectionSubtitleSx,
-  landingSectionHeaderGap,
   landingCardHoverSx,
 } from './landingStyles';
+import { useDeferredBackground } from './useDeferredBackground';
 
 interface Feature {
   image: string;
@@ -27,18 +27,18 @@ interface Feature {
 }
 
 const PRIMARY_SECTION_BG = '/alwrity_platform_experience.png';
-const FALLBACK_SECTION_BG = '/alwrity_co_pilote.png';
 
 const features: Feature[] = [
   {
-    image: '/Alwrity-copilot1.png',
+    image: '/alwrity-copilot1.png',
     title: 'AI-First Copilot',
-    description: 'Your personal LinkedIn writing assistant with persona-aware content generation. Create professional posts, articles, and carousels that match your unique voice.',
+    description:
+      'Your AI writing copilot for LinkedIn, blogs, and social — persona-aware content that matches your unique voice.',
     icon: <Assistant />,
     badge: 'Persona-Aware',
   },
   {
-    image: '/Alwrity-copilot2.png',
+    image: '/alwrity-copilot2.png',
     title: 'Intelligent Writing Partner',
     description: 'Context-aware AI Copilot that understands your content goals and audience. Get real-time suggestions and enhancements tailored to your strategy.',
     icon: <Psychology />,
@@ -52,21 +52,21 @@ const features: Feature[] = [
     badge: 'Live Research',
   },
   {
-    image: '/ALwrity-assistive-writing.png',
+    image: '/alwrity-assistive-writing.png',
     title: 'Assistive Writing Flow',
     description: 'Smart writing assistant that contextually continues your thoughts. Never face writer\'s block again with AI that understands your draft and goals.',
     icon: <Edit />,
     badge: 'Smart Assist',
   },
   {
-    image: '/Fact-check1.png',
+    image: '/fact-check1.png',
     title: 'Hallucination-Free Content',
     description: 'Advanced fact-checking with source verification and credibility scoring. Every claim is analyzed, validated, and cited with authority ratings.',
     icon: <FactCheck />,
     badge: 'Verified',
   },
   {
-    image: '/Alwrity-fact-check.png',
+    image: '/alwrity-fact-check.png',
     title: 'Claims Analysis Engine',
     description: 'Comprehensive fact-check results with supported, refuted, and insufficient claims. Ensure accuracy with AI-powered reasoning and source citations.',
     icon: <Verified />,
@@ -186,17 +186,15 @@ const FeatureShowcase: React.FC = () => {
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
   const { openSignIn } = useClerk();
+  const isMobileCarousel = useMediaQuery(theme.breakpoints.down('md'));
+  const itemsPerPage = isMobileCarousel ? 1 : 3;
   const [currentPage, setCurrentPage] = useState(0);
-  const [sectionBg, setSectionBg] = useState(PRIMARY_SECTION_BG);
-  const itemsPerPage = 3;
+  const sectionBg = useDeferredBackground(PRIMARY_SECTION_BG);
   const totalPages = Math.ceil(features.length / itemsPerPage);
 
   useEffect(() => {
-    const img = new Image();
-    img.onload = () => setSectionBg(PRIMARY_SECTION_BG);
-    img.onerror = () => setSectionBg(FALLBACK_SECTION_BG);
-    img.src = PRIMARY_SECTION_BG;
-  }, []);
+    setCurrentPage((prev) => Math.min(prev, Math.max(0, totalPages - 1)));
+  }, [totalPages]);
 
   const handleFeatureClick = useCallback(() => {
     if (isSignedIn) {
@@ -233,12 +231,24 @@ const FeatureShowcase: React.FC = () => {
     }),
   };
 
+  const arrowButtonSx = {
+    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+    color: 'white',
+    width: 44,
+    height: 44,
+    boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
+    '&:hover': {
+      background: `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.secondary.dark} 100%)`,
+    },
+  } as const;
+
   return (
     <Box
       id="features"
       sx={{
         position: 'relative',
-        backgroundImage: `url(${sectionBg})`,
+        backgroundImage: sectionBg ? `url(${sectionBg})` : undefined,
+        backgroundColor: '#0a0a0a',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         backgroundRepeat: 'no-repeat',
@@ -268,21 +278,34 @@ const FeatureShowcase: React.FC = () => {
         }}
       >
         <Stack spacing={0} alignItems="center">
-          <Stack spacing={1.25} alignItems="center" textAlign="center" sx={{ mb: landingSectionHeaderGap, mt: 0 }}>
-            <Typography variant="h3" component="h2" sx={{ ...landingSectionTitleSx, color: '#fff' }}>
-              Experience the Platform
-            </Typography>
-            <Typography
-              variant="body1"
-              maxWidth="780px"
-              sx={{ ...landingSectionSubtitleSx, color: alpha('#fff', 0.9), fontSize: { xs: '0.95rem', md: '1.05rem' } }}
-            >
-              See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking
-              — Transform your content workflow on one Dashboard
-            </Typography>
-          </Stack>
+          <Typography
+            variant="h3"
+            component="h2"
+            sx={{
+              ...landingSectionTitleSx,
+              color: '#fff',
+              mb: { xs: 1, md: 1.25 },
+            }}
+          >
+            Experience the Platform
+          </Typography>
+          <Typography
+            variant="body1"
+            maxWidth="780px"
+            textAlign="center"
+            sx={{
+              ...landingSectionSubtitleSx,
+              color: alpha('#fff', 0.9),
+              fontSize: { xs: '0.95rem', md: '1.05rem' },
+              mt: { xs: 2.5, md: 3 },
+              mb: { xs: 3.5, md: 4.5 },
+            }}
+          >
+            See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking
+            — Transform your content workflow on one Dashboard
+          </Typography>
 
-          <Box sx={{ position: 'relative', width: '100%', overflow: 'visible', px: { xs: 5, md: 9 } }}>
+          <Box sx={{ position: 'relative', width: '100%', overflow: 'visible', px: { xs: 0.5, md: 9 }, mt: { xs: 1, md: 1.5 } }}>
             <AnimatePresence mode="wait" custom={currentPage}>
               <motion.div
                 key={currentPage}
@@ -384,7 +407,7 @@ const FeatureShowcase: React.FC = () => {
                               >
                                 {feature.icon}
                               </Box>
-                              <Typography variant="subtitle2" fontWeight={700} color="white" sx={{ fontSize: '0.92rem' }}>
+                              <Typography variant="subtitle2" component="h3" fontWeight={700} color="white" sx={{ fontSize: '0.92rem' }}>
                                 {feature.title}
                               </Typography>
                             </Stack>
@@ -406,16 +429,13 @@ const FeatureShowcase: React.FC = () => {
                   aria-label="Previous features"
                   onClick={handlePrev}
                   sx={{
+                    ...arrowButtonSx,
+                    display: { xs: 'none', md: 'inline-flex' },
                     position: 'absolute',
-                    left: { xs: 4, md: 8 },
+                    left: 8,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                    color: 'white',
-                    width: 44,
-                    height: 44,
                     zIndex: 10,
-                    boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                   }}
                 >
                   <ArrowBack />
@@ -424,16 +444,13 @@ const FeatureShowcase: React.FC = () => {
                   aria-label="Next features"
                   onClick={handleNext}
                   sx={{
+                    ...arrowButtonSx,
+                    display: { xs: 'none', md: 'inline-flex' },
                     position: 'absolute',
-                    right: { xs: 4, md: 8 },
+                    right: 8,
                     top: '50%',
                     transform: 'translateY(-50%)',
-                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                    color: 'white',
-                    width: 44,
-                    height: 44,
                     zIndex: 10,
-                    boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.4)}`,
                   }}
                 >
                   <ArrowForward />
@@ -441,6 +458,23 @@ const FeatureShowcase: React.FC = () => {
               </>
             )}
           </Box>
+
+          {totalPages > 1 && (
+            <Stack
+              direction="row"
+              spacing={2}
+              justifyContent="center"
+              alignItems="center"
+              sx={{ display: { xs: 'flex', md: 'none' }, mt: 2, width: '100%' }}
+            >
+              <IconButton aria-label="Previous features" onClick={handlePrev} sx={arrowButtonSx}>
+                <ArrowBack />
+              </IconButton>
+              <IconButton aria-label="Next features" onClick={handleNext} sx={arrowButtonSx}>
+                <ArrowForward />
+              </IconButton>
+            </Stack>
+          )}
 
           {totalPages > 1 && (
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>

@@ -49,7 +49,7 @@ const BrandMark: React.FC<BrandMarkProps> = ({
         </Typography>
         {showSubtitle && (
           <Typography variant="caption" sx={{ color: subColor, lineHeight: 1.2, fontSize: '0.65rem' }}>
-            Alwrity Marketing Operating System
+            ALwrity Marketing Operating System
           </Typography>
         )}
         {showTagline && (
