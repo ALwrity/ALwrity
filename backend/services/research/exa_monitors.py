@@ -21,7 +21,7 @@ from loguru import logger
 import httpx
 
 
-MONITOR_BASE_URL = "https://api.exa.ai/monitors"
+MONITOR_BASE_URL = "https://api.exa.ai"
 DEFAULT_TIMEOUT = 30.0
 
 
@@ -39,6 +39,7 @@ class ExaMonitorClient:
                 "Content-Type": "application/json",
             },
             timeout=DEFAULT_TIMEOUT,
+            follow_redirects=True,
         )
         logger.info("ExaMonitorClient initialized")
 
@@ -161,7 +162,7 @@ class ExaMonitorClient:
                 "numResults": num_results,
                 "contents": {
                     "text": {"max_characters": 1000},
-                    "highlights": {"num_sentences": 3, "highlights_per_url": 2},
+                    "highlights": True,
                 },
             },
             "trigger": {
@@ -176,7 +177,7 @@ class ExaMonitorClient:
             payload["metadata"] = metadata
 
         try:
-            response = await self._http.post("/", json=payload)
+            response = await self._http.post("/monitors", json=payload)
             response.raise_for_status()
             data = response.json()
             if user_id:
@@ -206,10 +207,10 @@ class ExaMonitorClient:
         await self._preflight_check(user_id)
 
         try:
-            response = await self._http.get("/", params={"offset": offset, "limit": limit})
+            response = await self._http.get("/monitors", params={"offset": offset, "limit": limit})
             response.raise_for_status()
             data = response.json()
-            results = data if isinstance(data, list) else data.get("results", [])
+            results = data if isinstance(data, list) else data.get("data", [])
             return results
         except httpx.HTTPStatusError as e:
             logger.error(f"[ExaMonitor] list failed ({e.response.status_code})")
@@ -227,7 +228,7 @@ class ExaMonitorClient:
         await self._preflight_check(user_id)
 
         try:
-            response = await self._http.get(f"/{monitor_id}")
+            response = await self._http.get(f"/monitors/{monitor_id}")
             response.raise_for_status()
             return response.json()
         except httpx.HTTPStatusError as e:
@@ -248,7 +249,7 @@ class ExaMonitorClient:
         await self._preflight_check(user_id)
 
         try:
-            response = await self._http.delete(f"/{monitor_id}")
+            response = await self._http.delete(f"/monitors/{monitor_id}")
             response.raise_for_status()
             logger.info(f"[ExaMonitor] Deleted {monitor_id}")
             if user_id:
@@ -279,12 +280,12 @@ class ExaMonitorClient:
         await self._preflight_check(user_id)
 
         try:
-            response = await self._http.post(f"/{monitor_id}/trigger")
+            response = await self._http.post(f"/monitors/{monitor_id}/trigger")
             response.raise_for_status()
             data = response.json()
             if user_id:
                 self._track_usage(user_id)
-            logger.info(f"[ExaMonitor] Triggered run for {monitor_id}: run_id={data.get('id')}")
+            logger.info(f"[ExaMonitor] Triggered run for {monitor_id}: triggered={data.get('triggered')}")
             return data
         except httpx.HTTPStatusError as e:
             body = e.response.text[:300]
@@ -308,12 +309,12 @@ class ExaMonitorClient:
 
         try:
             response = await self._http.get(
-                f"/{monitor_id}/runs",
+                f"/monitors/{monitor_id}/runs",
                 params={"offset": offset, "limit": limit},
             )
             response.raise_for_status()
             data = response.json()
-            results = data if isinstance(data, list) else data.get("results", [])
+            results = data if isinstance(data, list) else data.get("data", [])
             return results
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
@@ -338,10 +339,13 @@ class ExaMonitorClient:
         await self._preflight_check(user_id)
 
         try:
-            response = await self._http.get(f"/{monitor_id}/runs/{run_id}")
+            response = await self._http.get(f"/monitors/{monitor_id}/runs/{run_id}")
             response.raise_for_status()
             data = response.json()
-            results = data if isinstance(data, list) else data.get("results", [])
+            if isinstance(data, list):
+                return data
+            output = data.get("output") or {}
+            results = output.get("results", [])
             return results
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
