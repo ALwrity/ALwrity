@@ -173,6 +173,12 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateS
         <MetricPill label="Reposts" value={formatMetric(post.engagement.reposts)} />
         <MetricPill label="Impressions" value={formatMetric(post.engagement.impressions)} />
         <MetricPill label="Eng. rate" value={`${engagementRatePct}%`} highlight />
+        {post.engagement.clicks > 0 && (
+          <MetricPill label="Clicks" value={formatMetric(post.engagement.clicks)} accent />
+        )}
+        {post.engagement.followers_gained > 0 && (
+          <MetricPill label="Followers" value={`+${formatMetric(post.engagement.followers_gained)}`} accent />
+        )}
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>
@@ -220,11 +226,17 @@ function MetricPill({
   label,
   value,
   highlight = false,
+  accent = false,
 }: {
   label: string;
   value: string;
   highlight?: boolean;
+  accent?: boolean;
 }) {
+  const bg = highlight ? colors.primaryLight : accent ? '#f0fdf4' : colors.surface;
+  const border = highlight ? '#bfdbfe' : accent ? '#bbf7d0' : colors.border;
+  const textColor = highlight ? colors.primary : accent ? '#059669' : colors.textBody;
+
   return (
     <span
       style={{
@@ -235,9 +247,9 @@ function MetricPill({
         borderRadius: 999,
         fontSize: 12,
         fontWeight: 600,
-        color: highlight ? colors.primary : colors.textBody,
-        background: highlight ? colors.primaryLight : colors.surface,
-        border: `1px solid ${highlight ? '#bfdbfe' : colors.border}`,
+        color: textColor,
+        background: bg,
+        border: `1px solid ${border}`,
       }}
     >
       <span style={{ color: colors.textSecondary, fontWeight: 500 }}>{label}</span>

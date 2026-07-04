@@ -2,10 +2,10 @@ import React, { useEffect, useMemo } from 'react';
 import { usePostAnalytics } from '../../hooks/usePostAnalytics';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
+import { ProfileGrowthWidget } from './ProfileGrowthWidget';
+import { DailyDigestWidget } from './DailyDigestWidget';
 
 const SIDEBAR_WIDTH = 224;
-/** Compact analytics panel — scrolls internally if needed. */
-const ANALYTICS_PANEL_MAX_HEIGHT = 200;
 
 interface DashboardAnalyticsSidebarProps {
   onViewAll?: () => void;
@@ -61,7 +61,7 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
 }) => {
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
   const { data, panelState, fetchPosts } = usePostAnalytics();
-  const posts = data?.posts ?? [];
+  const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
 
   useEffect(() => {
     if (panelState === 'idle' && connected) {
@@ -97,52 +97,58 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
 
       <div
         className="linkedin-analytics-panel-body"
-        style={{ maxHeight: ANALYTICS_PANEL_MAX_HEIGHT }}
+        style={{ maxHeight: 480, overflowY: 'auto' }}
       >
         {!connected ? (
           <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.4, marginBottom: 6 }}>
             Connect LinkedIn to see your post stats here.
           </div>
-        ) : isLoading ? (
-          <div style={{ fontSize: 10, color: '#64748b', padding: '8px 0', textAlign: 'center' }}>
-            Loading…
-          </div>
         ) : (
           <>
-            {posts.length === 0 && (
-              <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.4, marginBottom: 6 }}>
-                No post data yet.
+            {/* F1 — Profile Growth Snapshot */}
+            <ProfileGrowthWidget onViewAnalytics={onViewAll} />
+
+            {/* Post engagement mini chart */}
+            {isLoading && posts.length === 0 ? (
+              <div style={{ fontSize: 10, color: '#64748b', padding: '4px 0', textAlign: 'center' }}>
+                Loading posts…
               </div>
-            )}
-            {posts.length > 0 && (
+            ) : (
               <>
-                <div style={{ fontSize: 9, fontWeight: 700, color: '#475569', marginBottom: 2 }}>
-                  Post engagement
+                {posts.length > 0 && (
+                  <>
+                    <div style={{ fontSize: 9, fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                      Post engagement
+                    </div>
+                    <MiniBarChart posts={posts} />
+                  </>
+                )}
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: 5,
+                    marginTop: 8,
+                  }}
+                >
+                  <div className="linkedin-analytics-stat-chip">
+                    <div style={{ fontSize: 8, fontWeight: 600, color: '#64748b' }}>Followers</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#10b981', marginTop: 2 }}>
+                      {totals.followers > 0 ? `+${totals.followers}` : '—'}
+                    </div>
+                  </div>
+                  <div className="linkedin-analytics-stat-chip">
+                    <div style={{ fontSize: 8, fontWeight: 600, color: '#64748b' }}>CTR</div>
+                    <div style={{ fontSize: 14, fontWeight: 800, color: '#0a66c2', marginTop: 2 }}>
+                      {totals.impressions > 0 ? formatPct(totals.ctr) : '—'}
+                    </div>
+                  </div>
                 </div>
-                <MiniBarChart posts={posts} />
               </>
             )}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr',
-                gap: 5,
-                marginTop: 8,
-              }}
-            >
-              <div className="linkedin-analytics-stat-chip">
-                <div style={{ fontSize: 8, fontWeight: 600, color: '#64748b' }}>Followers</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#10b981', marginTop: 2 }}>
-                  {totals.followers > 0 ? `+${totals.followers}` : '—'}
-                </div>
-              </div>
-              <div className="linkedin-analytics-stat-chip">
-                <div style={{ fontSize: 8, fontWeight: 600, color: '#64748b' }}>CTR</div>
-                <div style={{ fontSize: 14, fontWeight: 800, color: '#0a66c2', marginTop: 2 }}>
-                  {totals.impressions > 0 ? formatPct(totals.ctr) : '—'}
-                </div>
-              </div>
-            </div>
+
+            {/* F3 — Daily AI Digest */}
+            <DailyDigestWidget />
           </>
         )}
 

@@ -18,15 +18,18 @@ function formatNumber(value: number): string {
 export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(({ posts }) => {
   const stats = useMemo(() => {
     if (posts.length === 0) {
-      return {
-        totalPosts: 0,
-        totalReactions: 0,
-        totalComments: 0,
-        totalReposts: 0,
-        totalImpressions: 0,
-        avgEngagementRate: 0,
-        bestPost: null as LinkedInPost | null,
-      };
+    return {
+      totalPosts: 0,
+      totalReactions: 0,
+      totalComments: 0,
+      totalReposts: 0,
+      totalImpressions: 0,
+      avgEngagementRate: 0,
+      totalClicks: 0,
+      totalFollowersGained: 0,
+      bestPost: null as LinkedInPost | null,
+      bestCtaPost: null as LinkedInPost | null,
+    };
     }
 
     let totalReactions = 0;
@@ -34,8 +37,12 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(({
     let totalReposts = 0;
     let totalImpressions = 0;
     let totalEngagementRate = 0;
+    let totalClicks = 0;
+    let totalFollowersGained = 0;
     let bestPost: LinkedInPost | null = null;
     let bestScore = 0;
+    let bestCtaPost: LinkedInPost | null = null;
+    let bestClicks = 0;
 
     for (const post of posts) {
       const e = post.engagement;
@@ -44,12 +51,20 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(({
       totalReposts += e.reposts;
       totalImpressions += e.impressions;
       totalEngagementRate += e.engagement_rate;
+      totalClicks += e.clicks ?? 0;
+      totalFollowersGained += e.followers_gained ?? 0;
 
       // Best post = highest engagement rate (or highest reactions as tie-breaker)
       const score = e.engagement_rate * 1000 + e.reactions;
       if (score > bestScore) {
         bestScore = score;
         bestPost = post;
+      }
+
+      // Best CTA post = highest clicks
+      if ((e.clicks ?? 0) > bestClicks) {
+        bestClicks = e.clicks ?? 0;
+        bestCtaPost = post;
       }
     }
 
@@ -60,7 +75,10 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(({
       totalReposts,
       totalImpressions,
       avgEngagementRate: totalEngagementRate / posts.length,
+      totalClicks,
+      totalFollowersGained,
       bestPost,
+      bestCtaPost: bestClicks > 0 ? bestCtaPost : null,
     };
   }, [posts]);
 
@@ -105,6 +123,22 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(({
       color: '#0891b2',
       bg: '#cffafe',
     },
+    ...(stats.totalClicks > 0
+      ? [{
+          label: 'Total Clicks',
+          value: formatNumber(stats.totalClicks),
+          color: '#7c3aed',
+          bg: '#f5f3ff',
+        }]
+      : []),
+    ...(stats.totalFollowersGained > 0
+      ? [{
+          label: 'Followers Gained',
+          value: `+${formatNumber(stats.totalFollowersGained)}`,
+          color: '#10b981',
+          bg: '#f0fdf4',
+        }]
+      : []),
   ];
 
   return (
@@ -196,6 +230,55 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(({
             }}
           >
             {(stats.bestPost.engagement.engagement_rate * 100).toFixed(1)}% engagement
+          </div>
+        </div>
+      )}
+
+      {stats.bestCtaPost && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: '12px 16px',
+            background: '#faf5ff',
+            borderRadius: 10,
+            border: '1px solid #e9d5ff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>🖱️</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#7c3aed' }}>
+              Best CTA post (most clicks)
+            </div>
+            <div
+              style={{
+                fontSize: 13,
+                color: '#0f172a',
+                marginTop: 2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+              title={stats.bestCtaPost.text}
+            >
+              {stats.bestCtaPost.text.slice(0, 100)}
+              {stats.bestCtaPost.text.length > 100 ? '…' : ''}
+            </div>
+          </div>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#7c3aed',
+              background: '#ede9fe',
+              padding: '4px 10px',
+              borderRadius: 999,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {formatNumber(stats.bestCtaPost.engagement.clicks ?? 0)} clicks
           </div>
         </div>
       )}
