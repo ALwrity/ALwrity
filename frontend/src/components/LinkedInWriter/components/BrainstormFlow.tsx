@@ -1,75 +1,59 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
-import { apiClient } from '../../../api/client';
+import { apiClient, aiApiClient } from '../../../api/client';
 import '../../../types/linkedinWriterEvents';
 import MySavedIdeas, { type SavedBrainstormIdea } from './Brainstorm/MySavedIdeas';
+import PersonalizedIdeasPanel, { type PersonalizedIdeaItem } from './Brainstorm/PersonalizedIdeasPanel';
 
-// Define the cache data type
-interface BrainstormCacheData {
-  ideas: { prompt: string; rationale?: string }[];
-  searchResults: any[];
-  timestamp: number;
+interface BrainstormOptions {
+  usePersona: boolean;
+  includeTrending: boolean;
+  remarketContent: boolean;
 }
-
-// Type guard function
-const isBrainstormCacheData = (data: any): data is BrainstormCacheData => {
-  return data && 
-         Array.isArray(data.ideas) && 
-         Array.isArray(data.searchResults) && 
-         typeof data.timestamp === 'number';
-};
 
 interface BrainstormFlowProps {
   brainstormVisible: boolean;
   setBrainstormVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  brainstormStage: 'loading' | 'select' | 'results';
-  setBrainstormStage: React.Dispatch<React.SetStateAction<'loading' | 'select' | 'results'>>;
-  loaderMessageIndex: number;
-  setLoaderMessageIndex: React.Dispatch<React.SetStateAction<number>>;
-  aiSearchPrompts: string[];
-  setAiSearchPrompts: React.Dispatch<React.SetStateAction<string[]>>;
-  selectedPrompt: string;
-  setSelectedPrompt: React.Dispatch<React.SetStateAction<string>>;
-  searchResults: any[];
-  setSearchResults: React.Dispatch<React.SetStateAction<any[]>>;
-  ideas: { prompt: string; rationale?: string }[];
-  setIdeas: React.Dispatch<React.SetStateAction<{ prompt: string; rationale?: string }[]>>;
-  isUsingCache: boolean;
-  setIsUsingCache: React.Dispatch<React.SetStateAction<boolean>>;
+  onBackToOptions?: () => void;
 }
+
+interface BrainstormIdea {
+  prompt: string;
+  rationale?: string;
+}
+
+interface BrainstormCacheData {
+  ideas: BrainstormIdea[];
+  timestamp: number;
+}
+
+const isBrainstormCacheData = (data: any): data is BrainstormCacheData =>
+  data && Array.isArray(data.ideas) && typeof data.timestamp === 'number';
 
 const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
   brainstormVisible,
   setBrainstormVisible,
-  brainstormStage,
-  setBrainstormStage,
-  loaderMessageIndex,
-  setLoaderMessageIndex,
-  aiSearchPrompts,
-  setAiSearchPrompts,
-  selectedPrompt,
-  setSelectedPrompt,
-  searchResults,
-  setSearchResults,
-  ideas,
-  setIdeas,
-  isUsingCache,
-  setIsUsingCache
+  onBackToOptions,
 }) => {
   const { corePersona, platformPersona } = usePlatformPersonaContext();
 
-  // Track which idea prompts the user has already saved in this session,
-  // so the "Save" button can flip to "Saved ✓" without re-fetching the
-  // server list. The source of truth is still the backend; this is just
-  // a UI hint to avoid duplicate POSTs.
+  const [stage, setStage] = useState<'idle' | 'loading' | 'results'>('idle');
+  const [ideas, setIdeas] = useState<BrainstormIdea[]>([]);
+  const [loaderMessageIndex, setLoaderMessageIndex] = useState(0);
+  const [isUsingCache, setIsUsingCache] = useState(false);
+
+  // ── Personalization state ──
+  const [personalizedStage, setPersonalizedStage] = useState<'idle' | 'loading' | 'results'>('idle');
+  const [personalizedIdeas, setPersonalizedIdeas] = useState<PersonalizedIdeaItem[]>([]);
+  const [personalizedDataSummary, setPersonalizedDataSummary] = useState('');
+  const [personalizedError, setPersonalizedError] = useState<string | null>(null);
+  const lastPersonalizeOptionsRef = useRef<{ seed: string; options: BrainstormOptions } | null>(null);
+
   const [savedPromptHashes, setSavedPromptHashes] = useState<Set<string>>(() => new Set());
-  // A monotonic counter that increments on every successful save; we
-  // surface it as the badge count on the "My Ideas (N)" button.
   const [savedCount, setSavedCount] = useState<number>(0);
   const [myIdeasOpen, setMyIdeasOpen] = useState<boolean>(false);
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // Debounce timer for saved feedback so rapid clicks don't flicker.
   const saveTimerRef = useRef<number | null>(null);
 
   const hashPrompt = useCallback((p: string) => p.trim().toLowerCase(), []);
@@ -82,15 +66,11 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
       const total = Number(res.data?.total) || 0;
       setSavedCount(total);
       if (Array.isArray(res.data?.ideas)) {
-        const ideas: SavedBrainstormIdea[] = res.data.ideas;
-        setSavedPromptHashes(new Set(ideas.map((it) => hashPrompt(it.prompt))));
+        setSavedPromptHashes(new Set(res.data.ideas.map((it: SavedBrainstormIdea) => hashPrompt(it.prompt))));
       }
-    } catch {
-      // Silent: count is best-effort; the user can still open the modal.
-    }
+    } catch { /* best-effort */ }
   }, [hashPrompt]);
 
-  // Best-effort load on mount so the "My Ideas (N)" badge is populated.
   useEffect(() => {
     void refreshSavedCount();
   }, [refreshSavedCount]);
@@ -102,23 +82,16 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
       const prompt = idea.prompt?.trim() || '';
       if (!prompt) return;
       const hash = hashPrompt(prompt);
-      if (savedPromptHashes.has(hash)) {
-        return; // Already saved this session.
-      }
+      if (savedPromptHashes.has(hash)) return;
       setSavingIndex(idx);
       setSaveError(null);
       try {
         await apiClient.post('/api/brainstorm/saved-ideas', {
           prompt,
           rationale: idea.rationale || '',
-          source_seed:
-            (window.lastBrainstormEvent?.detail?.seed as string | undefined) || '',
+          source_seed: (window.lastBrainstormEvent?.detail as any)?.seed || '',
         });
-        setSavedPromptHashes((prev) => {
-          const next = new Set(prev);
-          next.add(hash);
-          return next;
-        });
+        setSavedPromptHashes((prev) => { const n = new Set(prev); n.add(hash); return n; });
         setSavedCount((c) => c + 1);
         if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
         saveTimerRef.current = window.setTimeout(() => setSavingIndex(null), 1200);
@@ -130,407 +103,374 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
     [ideas, savedPromptHashes, hashPrompt]
   );
 
-  const loaderMessages = useMemo(() => ([
-    'Searching the web for the most recent and relevant coverage...',
-    'Extracting entities and context from top sources...',
-    'Aligning findings with your persona and audience...',
-    'Formulating high-signal brainstorm prompts you can use right away...'
-  ]), []);
+  const loaderMessages = useMemo(() => [
+    'Searching the web for recent coverage...',
+    'Analyzing content and extracting insights...',
+    'Aligning findings with your persona...',
+    'Formulating high-signal brainstorm prompts...',
+  ], []);
 
-  // Cache management utilities
-  const getCacheKey = useCallback((seed: string, personaId?: string, platformPersonaId?: string) => {
-    return `brainstorm_ideas_${seed}_${personaId || 'default'}_${platformPersonaId || 'default'}`;
-  }, []);
+  const getCacheKey = useCallback((seed: string, personaId?: string, platformPersonaId?: string) =>
+    `brainstorm_ideas_${seed}_${personaId || 'default'}_${platformPersonaId || 'default'}`, []);
 
   const getCachedIdeas = useCallback((cacheKey: string): BrainstormCacheData | null => {
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         const data = JSON.parse(cached);
-        if (isBrainstormCacheData(data)) {
-          // Check if cache is less than 1 hour old
-          if (Date.now() - data.timestamp < 3600000) {
-            return data;
-          } else {
-            sessionStorage.removeItem(cacheKey);
-          }
-        }
+        if (isBrainstormCacheData(data) && Date.now() - data.timestamp < 3600000) return data;
+        else sessionStorage.removeItem(cacheKey);
       }
-    } catch (e) {
-      console.warn('Failed to read brainstorm cache:', e);
-    }
+    } catch { /* ignore */ }
     return null;
   }, []);
 
-  const setCachedIdeas = useCallback((cacheKey: string, ideas: any[], searchResults: any[]) => {
+  const setCachedIdeas = useCallback((cacheKey: string, data: BrainstormIdea[]) => {
     try {
-      const cacheData = {
-        ideas,
-        searchResults,
-        timestamp: Date.now()
-      };
-      sessionStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    } catch (e) {
-      console.warn('Failed to cache brainstorm ideas:', e);
-    }
+      sessionStorage.setItem(cacheKey, JSON.stringify({ ideas: data, timestamp: Date.now() }));
+    } catch { /* ignore */ }
   }, []);
 
   const clearCache = useCallback(() => {
     try {
-      const keys = Object.keys(sessionStorage);
-      keys.forEach(key => {
-        if (key.startsWith('brainstorm_ideas_')) {
-          sessionStorage.removeItem(key);
-        }
+      Object.keys(sessionStorage).forEach(key => {
+        if (key.startsWith('brainstorm_ideas_')) sessionStorage.removeItem(key);
       });
-    } catch (e) {
-      console.warn('Failed to clear brainstorm cache:', e);
-    }
+    } catch { /* ignore */ }
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handler = async (ev: any) => {
       try {
-        // Store the event for refresh functionality
-        window.lastBrainstormEvent = ev;
-        
-        const { prompt, seed: ideaSeed, forceRefresh = false } = ev.detail || {};
-        const finalSeed = ideaSeed || prompt;
-        
         setBrainstormVisible(true);
-        setBrainstormStage('loading');
-        setLoaderMessageIndex(0);
+        window.lastBrainstormEvent = ev;
+        const { prompt, seed: ideaSeed, forceRefresh = false, options } = ev.detail || {};
+        const finalSeed = ideaSeed || prompt || '';
 
-        // Special case: show most recent cached ideas when seed is 'cached'
+        // Special case: 'cached' means show most recent cached ideas without API call
         if (finalSeed === 'cached') {
-          try {
-            const keys = Object.keys(sessionStorage);
-            let mostRecentCache: BrainstormCacheData | null = null;
-            let mostRecentKey = '';
-            let mostRecentTimestamp = 0;
-            
-            for (const key of keys) {
-              if (key.startsWith('brainstorm_ideas_')) {
-                const cached = sessionStorage.getItem(key);
-                if (cached) {
-                  const data = JSON.parse(cached);
-                  if (isBrainstormCacheData(data) && data.timestamp > mostRecentTimestamp && data.ideas.length > 0) {
-                    mostRecentTimestamp = data.timestamp;
-                    mostRecentCache = data;
-                    mostRecentKey = key;
-                  }
+          let mostRecent: BrainstormCacheData | null = null;
+          let mostRecentTs = 0;
+          for (const key of Object.keys(sessionStorage)) {
+            if (key.startsWith('brainstorm_ideas_')) {
+              try {
+                const data = JSON.parse(sessionStorage.getItem(key) || '');
+                if (isBrainstormCacheData(data) && data.timestamp > mostRecentTs && data.ideas.length > 0) {
+                  mostRecentTs = data.timestamp;
+                  mostRecent = data;
                 }
-              }
+              } catch { /* skip */ }
             }
-            
-            if (mostRecentCache !== null) {
-              console.log('Showing most recent cached brainstorm ideas from:', mostRecentKey);
-              setIdeas(mostRecentCache.ideas);
-              setAiSearchPrompts(mostRecentCache.ideas.map((x) => x.prompt));
-              setSelectedPrompt(mostRecentCache.ideas[0]?.prompt || '');
-              setSearchResults(mostRecentCache.searchResults || []);
-              setIsUsingCache(true);
-              setBrainstormStage('select');
-              return;
-            } else {
-              // No cached ideas found, close modal
-              setBrainstormVisible(false);
-              return;
-            }
-          } catch (e) {
-            console.warn('Failed to load cached ideas:', e);
-            setBrainstormVisible(false);
-            return;
           }
+          if (mostRecent) {
+            setIdeas(mostRecent.ideas);
+            setIsUsingCache(true);
+            setStage('results');
+          } else {
+            setBrainstormVisible(false);
+          }
+          return;
         }
 
-        // Check cache first (unless force refresh)
+        const hasOptions = options && (options.usePersona || options.includeTrending || options.remarketContent);
+
+        // If no seed and no options, nothing to do
+        if (!finalSeed && !hasOptions) return;
+
+        // Route: options-based → /personalized-ideas, seed-only → /ideas
+        if (hasOptions) {
+          setStage('loading');
+          setLoaderMessageIndex(0);
+          lastPersonalizeOptionsRef.current = { seed: finalSeed || '', options: { usePersona: options.usePersona || false, includeTrending: options.includeTrending || false, remarketContent: options.remarketContent || false } };
+          try {
+            const res = await aiApiClient.post('/api/brainstorm/personalized-ideas', {
+              seed: finalSeed || '',
+              count: 5,
+              include_trending: options.includeTrending || false,
+              remarket_content: options.remarketContent || false,
+              use_persona: options.usePersona || false,
+            });
+            const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
+            setPersonalizedIdeas(list);
+            const summary = res.data?.data_summary || '';
+            setPersonalizedDataSummary(summary);
+            if (list.length > 0) {
+              setPersonalizedStage('results');
+            } else {
+              setPersonalizedStage('idle');
+              setPersonalizedError(summary || 'No personalized ideas could be generated. Try different options or connect LinkedIn.');
+            }
+            setStage('idle');
+          } catch (e: any) {
+            setPersonalizedError(e?.response?.data?.detail || e?.message || 'Failed to generate personalized ideas');
+            setPersonalizedDataSummary('');
+            setPersonalizedStage('idle');
+            setStage('idle');
+          }
+          return;
+        }
+
+        // Seed-only path (existing behavior)
+        setStage('loading');
+        setLoaderMessageIndex(0);
+
         const personaId = corePersona?.id?.toString();
         const platformPersonaId = platformPersona?.id?.toString();
         const cacheKey = getCacheKey(finalSeed, personaId, platformPersonaId);
-        
+
         if (!forceRefresh) {
           const cached = getCachedIdeas(cacheKey);
           if (cached) {
-            console.log('Using cached brainstorm ideas for:', finalSeed);
             setIdeas(cached.ideas);
-            setAiSearchPrompts(cached.ideas.map((x) => x.prompt));
-            setSelectedPrompt(cached.ideas[0]?.prompt || '');
-            setSearchResults(cached.searchResults || []);
             setIsUsingCache(true);
-            setBrainstormStage('select');
+            setStage('results');
             return;
           }
         }
-        
         setIsUsingCache(false);
 
-        // Gentle loader progression
-        let step = 0;
         const interval = setInterval(() => {
-          step += 1;
-          setLoaderMessageIndex((idx: number) => Math.min(idx + 1, loaderMessages.length - 1));
-          if (step >= loaderMessages.length - 1) clearInterval(interval);
+          setLoaderMessageIndex((idx) => Math.min(idx + 1, loaderMessages.length - 1));
         }, 700);
 
-        // First: run grounded search for the seed prompt
-        let results: any[] = [];
-        try {
-          const sr = await apiClient.post('/api/brainstorm/search', { prompt: finalSeed });
-          results = sr.data?.results || [];
-        } catch {}
-        setSearchResults(results);
-
-        // Then: request persona-aware brainstorm ideas using the search results
         try {
           const ir = await apiClient.post('/api/brainstorm/ideas', {
             seed: finalSeed,
             persona: corePersona || null,
             platformPersona: platformPersona || null,
-            results,
-            count: 5
+            count: 5,
           });
-          if (ir.data) {
-            const data = ir.data;
-            const list = Array.isArray(data?.ideas) ? data.ideas : [];
-            setIdeas(list);
-            setAiSearchPrompts(list.map((x: any) => x.prompt));
-            setSelectedPrompt(list[0]?.prompt || '');
-            
-            // Cache the results
-            setCachedIdeas(cacheKey, list, results);
-            console.log('Cached brainstorm ideas for:', finalSeed);
-          } else {
-            setIdeas([]);
-          }
+          clearInterval(interval);
+          const list = Array.isArray(ir.data?.ideas) ? ir.data.ideas : [];
+          setIdeas(list);
+          if (list.length > 0) setCachedIdeas(cacheKey, list);
         } catch {
+          clearInterval(interval);
           setIdeas([]);
         }
 
-        setBrainstormStage('select');
+        setStage('results');
       } catch (e) {
         console.error('Brainstorm flow error:', e);
         setBrainstormVisible(false);
+        setStage('idle');
       }
     };
-    window.addEventListener('linkedinwriter:runGoogleSearchForIdeas', handler);
-    return () => window.removeEventListener('linkedinwriter:runGoogleSearchForIdeas', handler);
-  }, [corePersona, platformPersona, loaderMessages, getCacheKey, getCachedIdeas, setCachedIdeas, setBrainstormVisible, setBrainstormStage, setLoaderMessageIndex, setIdeas, setAiSearchPrompts, setSelectedPrompt, setSearchResults, setIsUsingCache]);
+    window.addEventListener('linkedinwriter:runBrainstormIdeas', handler);
+    return () => window.removeEventListener('linkedinwriter:runBrainstormIdeas', handler);
+  }, [corePersona, platformPersona, loaderMessages, getCacheKey, getCachedIdeas, setCachedIdeas, setBrainstormVisible]);
+
+  const handleClose = useCallback(() => {
+    setBrainstormVisible(false);
+    setStage('idle');
+    setIdeas([]);
+    setPersonalizedStage('idle');
+    setPersonalizedIdeas([]);
+    setPersonalizedDataSummary('');
+    setPersonalizedError(null);
+  }, [setBrainstormVisible]);
+
+  const handleGeneratePost = useCallback((prompt: string) => {
+    window.dispatchEvent(new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: 'post', topic: prompt } }));
+    handleClose();
+  }, [handleClose]);
+
+  const handleRefreshPersonalized = useCallback(async () => {
+    const last = lastPersonalizeOptionsRef.current;
+    if (!last) return;
+    setPersonalizedStage('loading');
+    setPersonalizedError(null);
+    try {
+      const res = await aiApiClient.post('/api/brainstorm/personalized-ideas', {
+        seed: last.seed,
+        count: 5,
+        include_trending: last.options.includeTrending,
+        remarket_content: last.options.remarketContent,
+        use_persona: last.options.usePersona,
+      });
+      const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
+      setPersonalizedIdeas(list);
+      const summary = res.data?.data_summary || '';
+      setPersonalizedDataSummary(summary);
+      if (list.length > 0) {
+        setPersonalizedStage('results');
+      } else {
+        setPersonalizedStage('idle');
+        setPersonalizedError(summary || 'No personalized ideas could be generated. Try different options or connect LinkedIn.');
+      }
+    } catch (e: any) {
+      setPersonalizedError(e?.response?.data?.detail || e?.message || 'Failed to generate personalized ideas');
+      setPersonalizedDataSummary('');
+      setPersonalizedStage('idle');
+    }
+  }, []);
+
+  // Show cached ideas when opened with "View Previous Ideas"
+  useEffect(() => {
+    if (!brainstormVisible) return;
+    // If no event was dispatched but modal is visible, check for cached ideas
+    if (stage === 'idle' && brainstormVisible) {
+      // This handles the case where Header opens the modal without dispatching the event
+      // The Header will dispatch the event which the above handler catches
+    }
+  }, [brainstormVisible, stage]);
+
+  if (!brainstormVisible) return null;
 
   return (
     <>
-      {/* Brainstorm Flow UI */}
-      {brainstormVisible && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10010, padding: 20 }}>
-          <div style={{ 
-            background: 'white', 
-            width: 800, 
-            maxWidth: '100%', 
-            height: '90vh',
-            borderRadius: 16, 
-            boxShadow: '0 20px 60px rgba(0,0,0,0.25)', 
-            overflow: 'hidden',
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10010, padding: 20 }}>
+        <div style={{
+          background: 'white',
+          width: 800,
+          maxWidth: '100%',
+          height: '90vh',
+          borderRadius: 16,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column'
+        }}>
+          {/* Fixed Header */}
+          <div style={{
+            padding: '16px 20px',
+            background: '#0a66c2',
+            color: 'white',
+            fontWeight: 800,
             display: 'flex',
-            flexDirection: 'column'
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexShrink: 0
           }}>
-            {/* Fixed Header */}
-            <div style={{ 
-              padding: 16, 
-              background: '#0a66c2', 
-              color: 'white', 
-              fontWeight: 800, 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              flexShrink: 0
-            }}>
-              <div>Brainstorm: Google Search Prompts</div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button
-                  type="button"
-                  onClick={() => setMyIdeasOpen(true)}
-                  style={{
-                    background: 'rgba(255,255,255,0.2)',
-                    border: 'none',
-                    color: 'white',
-                    borderRadius: 6,
-                    padding: '4px 10px',
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                  title="View your saved brainstorm ideas"
-                >
-                  📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
-                </button>
-                {saveError && (
-                  <span
-                    title={saveError}
-                    style={{
-                      background: 'rgba(254, 226, 226, 0.95)',
-                      color: '#b91c1c',
-                      borderRadius: 6,
-                      padding: '4px 8px',
-                      fontSize: 11,
-                      fontWeight: 600,
-                    }}
-                  >
-                    save failed
-                  </span>
-                )}
-                <button
-                  onClick={() => {
-                    // Force refresh by clearing cache and re-running
-                    const { prompt, seed: ideaSeed } = window.lastBrainstormEvent?.detail || {};
-                    if (prompt || ideaSeed) {
-                      window.dispatchEvent(new CustomEvent('linkedinwriter:runGoogleSearchForIdeas', { 
-                        detail: { prompt, seed: ideaSeed, forceRefresh: true } 
-                      }));
-                    }
-                  }}
-                  style={{ 
-                    background: 'rgba(255,255,255,0.2)', 
-                    border: 'none', 
-                    color: 'white', 
-                    borderRadius: 6, 
-                    padding: '4px 8px', 
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}
-                  title="Refresh ideas (bypass cache)"
-                >
-                  🔄
-                </button>
-                <button
-                  onClick={() => {
-                    clearCache();
-                    console.log('Brainstorm cache cleared');
-                  }}
-                  style={{ 
-                    background: 'rgba(255,255,255,0.2)', 
-                    border: 'none', 
-                    color: 'white', 
-                    borderRadius: 6, 
-                    padding: '4px 8px', 
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600
-                  }}
-                  title="Clear all cached brainstorm ideas"
-                >
-                  🗑️
-                </button>
-                <button 
-                  onClick={() => {
-                    setBrainstormVisible(false);
-                    setBrainstormStage('loading');
-                    setLoaderMessageIndex(0);
-                    setAiSearchPrompts([]);
-                    setSelectedPrompt('');
-                    setSearchResults([]);
-                    setIdeas([]);
-                  }} 
-                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-
-            {/* Scrollable Content */}
-            <div style={{ flex: 1, overflow: 'auto' }}>
-              {brainstormStage === 'loading' && (
-                <div style={{ padding: 24 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center' }}>
-                    <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #0a66c2', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
-                    <div>
-                      <div style={{ fontWeight: 800, color: '#111827' }}>Preparing Google search prompts</div>
-                      <div style={{ marginTop: 6, color: '#374151', fontSize: 14 }}>{loaderMessages[loaderMessageIndex]}</div>
-                    </div>
-                  </div>
-                  <ul style={{ margin: '12px 0 0 28px', color: '#6b7280', fontSize: 12, lineHeight: 1.6 }}>
-                    <li>1/4 Persona-aware analysis</li>
-                    <li>2/4 Seed expansion and entities</li>
-                    <li>3/4 Grounding and timeliness checks</li>
-                    <li>4/4 Output assembly</li>
-                  </ul>
-                  <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
-                </div>
+            <div>Brainstorm Ideas</div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => setMyIdeasOpen(true)}
+                style={{
+                  background: 'rgba(255,255,255,0.2)',
+                  border: 'none',
+                  color: 'white',
+                  borderRadius: 6,
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                }}
+              >
+                📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+              </button>
+              {saveError && (
+                <span style={{ background: 'rgba(254,226,226,0.95)', color: '#b91c1c', borderRadius: 6, padding: '4px 8px', fontSize: 11, fontWeight: 600 }}>
+                  save failed
+                </span>
               )}
+              <button
+                onClick={clearCache}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 6, padding: '4px 8px', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+                title="Clear cached ideas"
+              >
+                🗑️
+              </button>
+              <button onClick={handleClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>
+                ✕
+              </button>
+            </div>
+          </div>
 
-              {brainstormStage === 'select' && (
-                <div style={{ padding: 20 }}>
-                  <div style={{ marginBottom: 16, fontWeight: 700, color: '#1f2937', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    Select one prompt to run with Google Search
-                    {isUsingCache && (
-                      <span style={{ 
-                        fontSize: 12, 
-                        color: '#059669', 
-                        background: '#d1fae5', 
-                        padding: '2px 8px', 
-                        borderRadius: 12,
-                        fontWeight: 500
-                      }}>
-                        📦 Cached
-                      </span>
-                    )}
+          {/* Scrollable Content */}
+          <div style={{ flex: 1, overflow: 'auto' }}>
+            {stage === 'loading' && (
+              <div style={{ padding: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center' }}>
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #0a66c2', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                  <div>
+                    <div style={{ fontWeight: 800, color: '#111827' }}>Generating ideas</div>
+                    <div style={{ marginTop: 6, color: '#374151', fontSize: 14 }}>{loaderMessages[loaderMessageIndex]}</div>
                   </div>
+                </div>
+                <ul style={{ margin: '12px 0 0 28px', color: '#6b7280', fontSize: 12, lineHeight: 1.6 }}>
+                  <li>Searching the web via Exa</li>
+                  <li>Analyzing content and extracting insights</li>
+                  <li>Tailoring to your persona</li>
+                  <li>Formulating brainstorm prompts</li>
+                </ul>
+                <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+              </div>
+            )}
+
+            {stage === 'results' && (
+              <div style={{ padding: 20 }}>
+                <div style={{ marginBottom: 16, fontWeight: 700, color: '#1f2937', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {ideas.length > 0 ? 'Your brainstorm ideas' : 'No ideas found. Try a different topic.'}
+                  {isUsingCache && (
+                    <span style={{ fontSize: 12, color: '#059669', background: '#d1fae5', padding: '2px 8px', borderRadius: 12, fontWeight: 500 }}>
+                      📦 Cached
+                    </span>
+                  )}
+                </div>
+                {ideas.length > 0 && (
                   <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
-                    {aiSearchPrompts.map((p, i) => {
-                      const rationale = ideas[i]?.rationale;
-                      const isSaved = savedPromptHashes.has(hashPrompt(p));
+                    {ideas.map((idea, i) => {
+                      const isSaved = savedPromptHashes.has(hashPrompt(idea.prompt));
                       const isSavingThis = savingIndex === i;
                       return (
                         <div
                           key={i}
                           style={{
                             display: 'grid',
-                            gridTemplateColumns: 'auto 1fr auto',
+                            gridTemplateColumns: '1fr auto',
                             gap: 12,
                             alignItems: 'flex-start',
                             border: '1px solid #e5e7eb',
                             borderRadius: 10,
-                            padding: '12px 16px',
-                            cursor: 'pointer',
-                            transition: 'border-color 0.2s',
-                            background: selectedPrompt === p ? '#f0f9ff' : '#ffffff',
-                            borderColor: selectedPrompt === p ? '#0a66c2' : '#e5e7eb',
+                            padding: '14px 18px',
+                            background: '#ffffff',
                           }}
-                          onClick={() => setSelectedPrompt(p)}
                         >
-                          <input
-                            type="radio"
-                            name="aiPrompt"
-                            checked={selectedPrompt === p}
-                            onChange={() => setSelectedPrompt(p)}
-                            style={{ marginTop: 3, cursor: 'pointer' }}
-                          />
                           <div>
-                            <div style={{ fontSize: 14, color: '#111827', fontWeight: 600, lineHeight: 1.4 }}>{p}</div>
-                            {rationale && <div style={{ marginTop: 6, color: '#6b7280', fontSize: 12, lineHeight: 1.3 }}>{rationale}</div>}
+                            <div style={{ fontSize: 14, color: '#111827', fontWeight: 600, lineHeight: 1.4 }}>
+                              {idea.prompt}
+                            </div>
+                            {idea.rationale && (
+                              <div style={{ marginTop: 6, color: '#6b7280', fontSize: 12, lineHeight: 1.3 }}>
+                                {idea.rationale}
+                              </div>
+                            )}
+                            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleGeneratePost(idea.prompt)}
+                                style={{
+                                  padding: '4px 12px',
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  background: '#0a66c2',
+                                  color: 'white',
+                                  fontSize: 12,
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                Generate post
+                              </button>
+                            </div>
                           </div>
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void handleSaveIdea(i);
-                            }}
+                            onClick={(e) => { e.stopPropagation(); void handleSaveIdea(i); }}
                             disabled={isSaved || isSavingThis}
-                            title={isSaved ? 'Already saved' : 'Save to My Ideas'}
                             style={{
-                              alignSelf: 'flex-start',
                               padding: '4px 10px',
                               borderRadius: 6,
-                              border: isSaved
-                                ? '1px solid #6ee7b7'
-                                : '1px solid #0a66c2',
+                              border: isSaved ? '1px solid #6ee7b7' : '1px solid #0a66c2',
                               background: isSaved ? '#d1fae5' : '#ffffff',
                               color: isSaved ? '#047857' : '#0a66c2',
                               fontSize: 12,
                               fontWeight: 600,
                               cursor: isSaved ? 'default' : 'pointer',
                               whiteSpace: 'nowrap',
+                              alignSelf: 'flex-start',
                             }}
                           >
                             {isSaved ? '✓ Saved' : isSavingThis ? 'Saving…' : '🔖 Save'}
@@ -539,169 +479,159 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                       );
                     })}
                   </div>
-                </div>
-              )}
-
-              {brainstormStage === 'results' && (
-                <div style={{ padding: 20 }}>
-                  <div style={{ marginBottom: 16, fontWeight: 700, color: '#1f2937' }}>Search Results</div>
-                  {searchResults.length === 0 ? (
-                    <div style={{ color: '#6b7280' }}>No results or search unavailable. Try another prompt.</div>
-                  ) : (
-                    <div style={{ display: 'grid', gap: 12, marginBottom: 20 }}>
-                      {searchResults.map((r: any, idx: number) => (
-                        <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: '12px 16px' }}>
-                          <div style={{ fontWeight: 700, color: '#111827', marginBottom: 4 }}>{r.title || r.name || 'Result'}</div>
-                          <div style={{ color: '#374151', fontSize: 13, lineHeight: 1.4 }}>{r.snippet || r.description || r.content || ''}</div>
-                          {r.url && (<div style={{ marginTop: 6, fontSize: 12, color: '#2563eb' }}><a href={r.url} target="_blank" rel="noreferrer">{r.url}</a></div>)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Fixed Footer */}
-            {brainstormStage !== 'loading' && (
-              <div style={{ 
-                padding: '16px 20px', 
-                borderTop: '1px solid #e5e7eb', 
-                display: 'flex', 
-                justifyContent: 'space-between', 
-                alignItems: 'center', 
-                gap: 12,
-                flexShrink: 0,
-                backgroundColor: '#f9fafb'
-              }}>
-                {brainstormStage === 'select' && (
-                  <>
-                    <button
-                      onClick={() => {
-                        // Send prompt to copilot chat input to generate a post from this prompt
-                        window.dispatchEvent(new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt: selectedPrompt } }));
-                        setBrainstormVisible(false);
-                      }}
-                      disabled={!selectedPrompt}
-                      style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: 8, 
-                        background: selectedPrompt ? '#111827' : '#9ca3af', 
-                        color: 'white', 
-                        border: 'none', 
-                        cursor: selectedPrompt ? 'pointer' : 'not-allowed', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      Generate post from this prompt
-                    </button>
-                    <button 
-                      onClick={() => setBrainstormVisible(false)} 
-                      style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: 8, 
-                        background: 'white', 
-                        border: '1px solid #e5e7eb', 
-                        cursor: 'pointer', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={async () => {
-                        // Use existing Google grounding flow via backend LinkedInService
-                        try {
-                          const resp = await apiClient.post('/api/brainstorm/search', { prompt: selectedPrompt });
-                          setSearchResults(resp.data?.results || []);
-                          setBrainstormStage('results');
-                        } catch {
-                          setSearchResults([]);
-                          setBrainstormStage('results');
-                        }
-                      }}
-                      disabled={!selectedPrompt}
-                      style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: 8, 
-                        background: selectedPrompt ? '#0a66c2' : '#c7d2fe', 
-                        color: 'white', 
-                        border: 'none', 
-                        cursor: selectedPrompt ? 'pointer' : 'not-allowed', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      Run Google Search
-                    </button>
-                  </>
-                )}
-
-                {brainstormStage === 'results' && (
-                  <>
-                    <button
-                      onClick={() => setBrainstormStage('select')}
-                      style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: 8, 
-                        background: '#6b7280', 
-                        color: 'white', 
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      Back to Prompts
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Seed Copilot chat to generate a post
-                        window.dispatchEvent(new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt: selectedPrompt } }));
-                        setBrainstormVisible(false);
-                      }}
-                      style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: 8, 
-                        background: '#111827', 
-                        color: 'white', 
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      Generate post from this prompt
-                    </button>
-                    <button 
-                      onClick={() => setBrainstormVisible(false)} 
-                      style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: 8, 
-                        background: '#0a66c2', 
-                        color: 'white', 
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        fontWeight: 600 
-                      }}
-                    >
-                      Done
-                    </button>
-                  </>
                 )}
               </div>
             )}
+
+            {personalizedStage === 'loading' && (() => {
+              const opts = lastPersonalizeOptionsRef.current?.options;
+              const hasPersona = opts?.usePersona ?? false;
+              const hasTrending = opts?.includeTrending ?? false;
+              const hasRemarket = opts?.remarketContent ?? false;
+              const items: string[] = [];
+              if (hasPersona) items.push('Reading your LinkedIn profile & communication style');
+              if (hasTrending) items.push('Scanning industry trends & growth insights');
+              if (hasRemarket) items.push('Reviewing your generated content & saved ideas');
+              if (!items.length) items.push('Checking your account data');
+              items.push('Formulating personalized angles');
+              return (
+                <div style={{ padding: 24 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #0a66c2', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />
+                    <div>
+                      <div style={{ fontWeight: 800, color: '#111827' }}>Analyzing your data</div>
+                      <div style={{ marginTop: 6, color: '#374151', fontSize: 14 }}>Gathering insights from your selected sources...</div>
+                    </div>
+                  </div>
+                  <ul style={{ margin: '12px 0 0 28px', color: '#6b7280', fontSize: 12, lineHeight: 1.6 }}>
+                    {items.map((item, i) => <li key={i}>{item}</li>)}
+                  </ul>
+                  <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+                </div>
+              );
+            })()}
+
+            {personalizedStage === 'results' && personalizedIdeas.length > 0 && (
+              <PersonalizedIdeasPanel
+                ideas={personalizedIdeas}
+                dataSummary={personalizedDataSummary}
+                onGeneratePost={handleGeneratePost}
+                onRefresh={handleRefreshPersonalized}
+                onBack={onBackToOptions}
+              />
+            )}
+
+            {personalizedError && stage === 'idle' && (
+              <div style={{ padding: 24, textAlign: 'center' }}>
+                {onBackToOptions && (
+                  <div style={{ textAlign: 'left', marginBottom: 12 }}>
+                    <button
+                      type="button"
+                      onClick={() => { setPersonalizedError(null); onBackToOptions(); }}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #d1d5db',
+                        background: 'white',
+                        color: '#374151',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ← Back to options
+                    </button>
+                  </div>
+                )}
+                <div style={{ color: '#6b7280', fontSize: 12, marginBottom: 4 }}>No ideas generated</div>
+                <div style={{ color: '#374151', fontSize: 13, lineHeight: 1.5, marginBottom: 16, background: '#f9fafb', padding: '12px 16px', borderRadius: 8, display: 'inline-block', textAlign: 'left', maxWidth: 420 }}>
+                  {personalizedError}
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => { setPersonalizedError(null); }}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: 6,
+                      border: '1px solid #d1d5db',
+                      background: 'white',
+                      color: '#374151',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      marginRight: 8,
+                    }}
+                  >
+                    Dismiss
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPersonalizedError(null);
+                      if (lastPersonalizeOptionsRef.current) {
+                        window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
+                          detail: {
+                            seed: lastPersonalizeOptionsRef.current.seed,
+                            options: lastPersonalizeOptionsRef.current.options,
+                            forceRefresh: true,
+                          },
+                        }));
+                      }
+                    }}
+                    style={{
+                      padding: '6px 16px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: '#0a66c2',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    🔄 Retry
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
+
+          {/* Fixed Footer */}
+          {stage === 'results' && (
+            <div style={{
+              padding: '16px 20px',
+              borderTop: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'flex-end',
+              alignItems: 'center',
+              gap: 12,
+              flexShrink: 0,
+              backgroundColor: '#f9fafb'
+            }}>
+              <button onClick={handleClose} style={{
+                padding: '10px 20px',
+                borderRadius: 8,
+                background: 'white',
+                border: '1px solid #e5e7eb',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}>
+                Close
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <MySavedIdeas
         open={myIdeasOpen}
         onClose={() => setMyIdeasOpen(false)}
         onAfterDelete={() => void refreshSavedCount()}
         onUseInCopilot={(prompt: string) => {
-          window.dispatchEvent(
-            new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } })
-          );
+          window.dispatchEvent(new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } }));
           setMyIdeasOpen(false);
-          setBrainstormVisible(false);
+          handleClose();
         }}
       />
     </>
