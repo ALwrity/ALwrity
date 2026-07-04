@@ -38,7 +38,7 @@ const isPublicAppRoute = (): boolean => {
   return ['/', '/pricing', '/privacy', '/terms', '/code-of-conduct', '/contact'].includes(path);
 };
 
-const PUBLIC_API_PATHS = ['/api/subscription/plans', '/api/subscription/pricing'];
+const PUBLIC_API_PATHS = ['/api/subscription/plans', '/api/subscription/pricing', '/api/contact'] as const;
 
 const isPublicApiPath = (url?: string): boolean => {
   if (!url) return false;
@@ -242,10 +242,12 @@ apiClient.interceptors.request.use(
     }
 
     try {
+      // Public marketing APIs must not send stale Clerk tokens (causes 401 on /plans, etc.)
+      if (isPublicApiPath(config.url)) {
+        return config;
+      }
+
       if (!authTokenGetter) {
-        if (isPublicApiPath(config.url)) {
-          return config;
-        }
         console.error(`[apiClient] ❌ authTokenGetter not set for ${config.url} - rejecting request`);
         console.error(`[apiClient] This usually means TokenInstaller hasn't run yet. Please wait for authentication to initialize.`);
         return Promise.reject(new Error('Authentication not ready. Please wait for sign-in to complete.'));

@@ -20,7 +20,7 @@ import {
   Chip,
 } from '@mui/material';
 import Warning from '@mui/icons-material/Warning';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link as RouterLink } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
 import { apiClient, getApiUrl } from '../../api/client';
 import { saveNavigationState, restoreNavigationState, saveCurrentPhaseForTool } from '../../utils/navigationState';
@@ -504,8 +504,8 @@ const PricingPage: React.FC = () => {
         <Box sx={{ textAlign: 'center', mt: 5 }}>
           <Typography variant="body2" sx={{ color: '#64748b' }}>
             Need a custom plan?{' '}
-            <Link href="mailto:info@alwrity.com" sx={{ color: '#6366f1', fontWeight: 600 }}>
-              Email us at info@alwrity.com
+            <Link component={RouterLink} to="/contact" sx={{ color: '#6366f1', fontWeight: 600 }}>
+              Contact our team
             </Link>
           </Typography>
         </Box>
@@ -609,9 +609,9 @@ const PricingPage: React.FC = () => {
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" sx={{ mb: 2, color: '#374151', lineHeight: 1.6 }}>
-            We&apos;re excited you&apos;re considering ALwrity {inquiryModal.planName}. Please connect with us at{' '}
-            <Link href="mailto:info@alwrity.com" sx={{ color: '#6366f1', fontWeight: 600 }}>
-              info@alwrity.com
+            We&apos;re excited you&apos;re considering ALwrity {inquiryModal.planName}. Visit our{' '}
+            <Link component={RouterLink} to="/contact" sx={{ color: '#6366f1', fontWeight: 600 }}>
+              Contact page
             </Link>{' '}
             and our team will help you find the right fit.
           </Typography>
@@ -625,7 +625,9 @@ const PricingPage: React.FC = () => {
           </Button>
           <Button
             variant="contained"
-            href="mailto:info@alwrity.com"
+            component={RouterLink}
+            to="/contact"
+            onClick={() => setInquiryModal({ open: false, tier: '', planName: '' })}
             sx={{
               textTransform: 'none',
               fontWeight: 600,
@@ -633,7 +635,7 @@ const PricingPage: React.FC = () => {
               '&:hover': { bgcolor: '#4f46e5' },
             }}
           >
-            Email info@alwrity.com
+            Contact our team
           </Button>
         </DialogActions>
       </Dialog>

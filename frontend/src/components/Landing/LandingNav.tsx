@@ -24,6 +24,7 @@ import {
   landingPathForSection,
   scrollToLandingSection,
   isLandingMarketingPath,
+  isLegalStaticNavPath,
   LANDING_MARKETING_PATH,
   type LandingSectionId,
 } from '../../utils/landingNavigation';
@@ -53,6 +54,7 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
   const location = useLocation();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isLightSurface = surface === 'light';
+  const disableNavAutoHide = isLegalStaticNavPath(location.pathname);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navVisible, setNavVisible] = useState(true);
   const [elevated, setElevated] = useState(false);
@@ -92,6 +94,22 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
   }, [navVisible]);
 
   useEffect(() => {
+    if (disableNavAutoHide) {
+      setNavVisible(true);
+      clearHideTimer();
+    }
+  }, [disableNavAutoHide, clearHideTimer]);
+
+  useEffect(() => {
+    if (disableNavAutoHide) {
+      const onScroll = () => {
+        const y = window.scrollY;
+        setElevated(isLightSurface ? y > 8 : y > 24);
+      };
+      window.addEventListener('scroll', onScroll, { passive: true });
+      return () => window.removeEventListener('scroll', onScroll);
+    }
+
     const onScroll = () => {
       const y = window.scrollY;
       setElevated(isLightSurface ? y > 8 : y > 24);
@@ -127,7 +145,7 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
       clearHideTimer();
       document.documentElement.style.removeProperty('--sticky-top-offset');
     };
-  }, [clearHideTimer, revealNav, isLightSurface]);
+  }, [clearHideTimer, revealNav, isLightSurface, disableNavAutoHide]);
 
   const navLinkSx = isLightSurface
     ? {

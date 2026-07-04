@@ -696,6 +696,14 @@ from routers.linkedin_watchdog import router as linkedin_watchdog_router
 app.include_router(linkedin_watchdog_router)
 app.include_router(content_assets_router)
 
+# Public contact form (no auth) — always available for marketing site
+from api.contact_routes import router as contact_router
+app.include_router(contact_router)
+router_group_status["contact_form"] = {
+    "mounted": True,
+    "reason": "Public marketing contact page",
+}
+
 # Include Podcast Maker router (only when podcast feature is enabled)
 if _is_feature_enabled("podcast") and "all" not in get_enabled_features():
     from api.podcast.router import router as podcast_router

@@ -40,6 +40,7 @@ class APIKeyInjectionMiddleware:
         path_lower = (request.url.path or '').lower()
         return (
             path_lower.startswith('/api/subscription/')
+            or path_lower.startswith('/api/contact')
             or path_lower.startswith('/api/onboarding/')
             or path_lower.endswith('/status')
             or path_lower.endswith('/health')
