@@ -4,7 +4,8 @@ LinkedIn Article Generation Prompts
 This module contains prompt templates and builders for generating LinkedIn articles.
 """
 
-from typing import Any, Optional, Dict
+from typing import Any, Optional, Dict, List
+from models.linkedin_models import LinkedInOutlineSection
 
 
 class ArticlePromptBuilder:
@@ -56,10 +57,11 @@ class ArticlePromptBuilder:
         CONTENT STRUCTURE:
         - Compelling headline that promises specific value
         - Engaging introduction with a hook and clear value proposition
-        - 3-5 main sections with actionable insights and examples
         - Data-driven insights with proper citations
         - Practical takeaways and next steps
         - Strong conclusion with a call-to-action
+
+        {self._build_outline_block(request)}
 
         CONTENT QUALITY REQUIREMENTS:
         - Include statistics and trends from the research sources provided
@@ -85,6 +87,8 @@ class ArticlePromptBuilder:
 
         KEY SECTIONS TO COVER: {', '.join(request.key_sections) if request.key_sections else 'Industry overview, current challenges, emerging trends, practical solutions, future outlook'}
 
+        {self._build_outline_override_block(request)}
+
         CITATION FORMAT:
         - When you reference a specific data point, statistic, or claim from the research sources above, add [Source N] immediately after the claim, where N is the source number from the RESEARCH CONTEXT.
         - Example: "According to Gartner [Source 1], AI adoption has increased by 40% year-over-year."
@@ -100,3 +104,33 @@ class ArticlePromptBuilder:
         REMEMBER: This article should position the author as a thought leader while providing actionable insights that readers can immediately apply in their professional lives.
         """
         return prompt.strip()
+
+    @staticmethod
+    def _build_outline_block(request) -> str:
+        """Build the outline-specific block for CONTENT STRUCTURE when outline_override is set."""
+        outline = getattr(request, 'outline_override', None)
+        if not outline:
+            return "- 3-5 main sections with actionable insights and examples"
+        
+        lines = ["- FOLLOW THIS OUTLINE PRECISELY for the article sections:"]
+        for i, sec in enumerate(outline, 1):
+            heading = sec.heading if isinstance(sec.heading, str) else sec.get('heading', f'Section {i}')
+            key_points = sec.key_points if isinstance(getattr(sec, 'key_points', None), list) else sec.get('key_points', [])
+            lines.append(f"  {i}. {heading}")
+            for kp in key_points[:3]:
+                lines.append(f"     - {kp}")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _build_outline_override_block(request) -> str:
+        """Build the outline override directive for KEY SECTIONS TO COVER."""
+        outline = getattr(request, 'outline_override', None)
+        if not outline:
+            return ""
+        
+        headings = []
+        for sec in outline:
+            h = sec.heading if isinstance(sec.heading, str) else sec.get('heading', '')
+            headings.append(h)
+        
+        return f"OVERRIDE — Use ONLY these sections in this order: {', '.join(headings)}. Do not add or remove sections."

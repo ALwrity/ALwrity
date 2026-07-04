@@ -118,24 +118,92 @@ class ContentGenerator:
         return f"Source {source_num}"
 
     def _build_research_context(self, research_sources: List) -> str:
-        """Build research context string from research sources for prompt injection."""
+        """Build research context string from research sources for prompt injection.
+        
+        Prioritizes Exa AI-generated highlights and summary over raw content text.
+        """
         if not research_sources:
             return ""
         
         today = datetime.now().strftime("%B %d, %Y")
         context_parts = [f"\n\nTODAY'S DATE: {today}\n\nRESEARCH CONTEXT (use this information to ground your content with facts and data):"]
-        for i, source in enumerate(research_sources[:8], 1):  # Limit to top 8 sources
+        for i, source in enumerate(research_sources[:12], 1):
             title = getattr(source, 'title', f'Source {i}')
             url = getattr(source, 'url', '')
+            highlights = getattr(source, 'highlights', None)
+            summary = getattr(source, 'summary', None)
             content = getattr(source, 'content', '')
+            
             context_parts.append(f"\n{i}. {title}")
             if url:
                 context_parts.append(f"   URL: {url}")
-            if content:
-                context_parts.append(f"   Key insight: {content[:300]}")
+            
+            # Use Exa AI highlights (most concise and valuable)
+            if highlights:
+                for h in highlights[:3]:
+                    context_parts.append(f"   - {h[:300]}")
+            # Fall back to Exa AI summary
+            elif summary:
+                context_parts.append(f"   Summary: {summary[:500]}")
+            # Fall back to raw content truncation
+            elif content:
+                context_parts.append(f"   Key insight: {content[:500]}")
         
         context_parts.append("\nInstructions: Use the research above to include specific data points, statistics, and factual claims in your content. Cite sources where appropriate.")
         return "\n".join(context_parts)
+    
+    async def _synthesize_research(self, research_sources: List, topic: str, user_id: str = None) -> str:
+        """Distill research sources into structured bullet points using LLM.
+        
+        Produces a concise synthesis focused on key statistics, trends, and
+        actionable findings relevant to the topic.
+        """
+        if not research_sources:
+            return ""
+        
+        today = datetime.now().strftime("%B %d, %Y")
+        sources_text = []
+        for i, s in enumerate(research_sources[:15], 1):
+            title = getattr(s, 'title', f'Source {i}')
+            highlights = getattr(s, 'highlights', None)
+            summary = getattr(s, 'summary', None)
+            content = getattr(s, 'content', '')
+            
+            snippet = f"Source {i}: {title}\n"
+            if highlights:
+                snippet += "\n".join(f"  - {h}" for h in highlights[:3])
+            elif summary:
+                snippet += f"  Summary: {summary[:500]}"
+            elif content:
+                snippet += f"  Excerpt: {content[:500]}"
+            sources_text.append(snippet)
+        
+        synthesis_prompt = f"""You are a research analyst. Below are {len(research_sources)} research sources about "{topic}".
+
+Extract and organize the most important information into these categories:
+- KEY STATISTICS: Specific numbers, percentages, dates, and data points
+- KEY TRENDS: Emerging patterns, shifts, and发展方向
+- EXPERT INSIGHTS: Quotes, opinions, and expert perspectives
+- ACTIONABLE FINDINGS: Practical takeaways that can be applied
+
+Research sources:
+{chr(10).join(sources_text)}
+
+Today's date: {today}
+
+Return ONLY the synthesized findings in clear bullet points under each category heading. Be concise and factual. If a category has no relevant data, skip it."""
+        
+        try:
+            synthesis = llm_text_gen(
+                prompt=synthesis_prompt,
+                user_id=user_id,
+                flow_type="research_synthesis",
+                temperature=0.2
+            )
+            return f"\n\nRESEARCH SYNTHESIS:\n{synthesis}"
+        except Exception as e:
+            logger.warning(f"Research synthesis failed, using raw context: {e}")
+            return ""
     
     async def generate_post(
         self,
@@ -532,10 +600,17 @@ class ContentGenerator:
                     pass
             prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data)
             
-            # Inject research context into prompt
+            # Step A: Inject raw research context (highlights/summary prioritized)
             research_context = self._build_research_context(research_sources)
             if research_context:
                 prompt += research_context
+            
+            # Step B: Synthesize research into structured bullet points
+            research_synthesis = await self._synthesize_research(
+                research_sources, request.topic, user_id
+            )
+            if research_synthesis:
+                prompt += research_synthesis
             
             # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(

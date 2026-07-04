@@ -12,7 +12,7 @@ import {
   type LinkedInPreferences
 } from '../utils/storageUtils';
 import { getContextAwareSuggestions, mapPostType, mapTone, mapIndustry, mapSearchEngine, readPrefs } from '../utils/linkedInWriterUtils';
-import { linkedInWriterApi, GroundingLevel } from '../../../services/linkedInWriterApi';
+import { linkedInWriterApi, GroundingLevel, LinkedInOutlineSection } from '../../../services/linkedInWriterApi';
 import { CopilotPersistenceManager } from '../utils/enhancedPersistence';
 
 export function useLinkedInWriter() {
@@ -45,6 +45,12 @@ export function useLinkedInWriter() {
   };
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
   const [progressActive, setProgressActive] = useState<boolean>(false);
+
+  // Outline state (Phase 2)
+  const [outlineSections, setOutlineSections] = useState<LinkedInOutlineSection[]>([]);
+  const [outlineTitleSuggestions, setOutlineTitleSuggestions] = useState<string[]>([]);
+  const [outlineMode, setOutlineMode] = useState(false);
+  const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
 
   // Chat history state
   const [historyVersion, setHistoryVersion] = useState<number>(0);
@@ -202,6 +208,7 @@ export function useLinkedInWriter() {
     }, 1500);
 
     try {
+      const sectionOverride = outlineSections.length > 0 ? outlineSections : undefined;
       const res = await linkedInWriterApi.generateArticle({
         topic: params?.topic || prefs.topic || 'Digital transformation strategies',
         industry: mapIndustry(params?.industry || prefs.industry),
@@ -214,7 +221,8 @@ export function useLinkedInWriter() {
         search_engine: mapSearchEngine(params?.search_engine || prefs.search_engine),
         word_count: params?.word_count || prefs.word_count || 1500,
         grounding_level: 'enhanced' as GroundingLevel,
-        include_citations: true
+        include_citations: true,
+        outline_override: sectionOverride,
       });
       clearInterval(progressInterval);
       if (res.success && res.data) {
@@ -249,7 +257,7 @@ export function useLinkedInWriter() {
       window.dispatchEvent(new CustomEvent('linkedinwriter:progressError', { detail: { id: 'finalize', details: error.message } }));
       return { success: false, error: error.message || 'Generation failed' };
     }
-  }, []);
+  }, [outlineSections]);
 
   const generateCarousel = useCallback(async (params?: any) => {
     const prefs = readPrefs();
@@ -641,6 +649,9 @@ export function useLinkedInWriter() {
   const handleClear = useCallback(() => {
     setDraft('');
     setContext('');
+    setOutlineSections([]);
+    setOutlineTitleSuggestions([]);
+    setOutlineMode(false);
   }, []);
 
   const handleCopy = useCallback(async () => {
@@ -657,6 +668,66 @@ export function useLinkedInWriter() {
     setChatHistory([]);
     console.log('[LinkedIn Writer] Chat memory cleared by user');
   }, []);
+
+  // ── Outline methods (Phase 2) ─────────────────────────────────
+  const generateOutline = useCallback(async (params?: any) => {
+    const prefs = readPrefs();
+    setIsGeneratingOutline(true);
+    window.dispatchEvent(new CustomEvent('linkedinwriter:loadingStart', {
+      detail: { action: 'generateLinkedInOutline', message: 'Planning article sections...' }
+    }));
+
+    try {
+      const res = await linkedInWriterApi.generateOutline({
+        topic: params?.topic || prefs.topic || 'Digital transformation strategies',
+        industry: mapIndustry(params?.industry || prefs.industry),
+        tone: mapTone(params?.tone || prefs.tone),
+        target_audience: params?.target_audience || prefs.target_audience || 'Industry professionals and executives',
+        word_count: params?.word_count || prefs.word_count || 1500,
+        research_enabled: params?.research_enabled ?? (prefs.research_enabled ?? true),
+        search_engine: mapSearchEngine(params?.search_engine || prefs.search_engine),
+        grounding_level: 'enhanced' as GroundingLevel,
+        include_citations: true,
+      });
+
+      if (res.success && res.outline) {
+        setOutlineSections(res.outline);
+        setOutlineTitleSuggestions(res.title_suggestions || []);
+        setOutlineMode(true);
+        window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
+        return { success: true, outline: res.outline };
+      }
+      window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
+      return { success: false, error: res.error || 'Outline generation failed' };
+    } catch (error: any) {
+      window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd'));
+      return { success: false, error: error.message || 'Outline generation failed' };
+    } finally {
+      setIsGeneratingOutline(false);
+    }
+  }, []);
+
+  const refineOutline = useCallback(async (operation: string, sectionId?: string, payload?: any) => {
+    try {
+      const res = await linkedInWriterApi.refineOutline({
+        outline: outlineSections,
+        operation: operation as any,
+        section_id: sectionId,
+        payload,
+      });
+
+      if (res.success && res.outline) {
+        setOutlineSections(res.outline);
+        if (res.title_suggestions) {
+          setOutlineTitleSuggestions(res.title_suggestions);
+        }
+        return { success: true };
+      }
+      return { success: false, error: res.error || 'Refine failed' };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Refine failed' };
+    }
+  }, [outlineSections]);
 
   return {
     // State
@@ -726,6 +797,16 @@ export function useLinkedInWriter() {
     setQualityMetrics,
     setGroundingEnabled,
     setSearchQueries,
+
+    // Outline state (Phase 2)
+    outlineSections,
+    setOutlineSections,
+    outlineTitleSuggestions,
+    outlineMode,
+    setOutlineMode,
+    isGeneratingOutline,
+    generateOutline,
+    refineOutline,
 
     // Progress (exposed to UI)
     progressSteps,

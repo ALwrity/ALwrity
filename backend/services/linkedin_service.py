@@ -454,7 +454,7 @@ class LinkedInService:
         """
         Conduct research using the configured search engine with caching.
         
-        For Exa: delegates to ExaResearchProvider.simple_search() with pre-flight validation
+        For Exa: delegates to shared ExaResearchProvider.simple_search() with pre-flight validation
         For Tavily: delegates to TavilyService.search() with pre-flight validation
         For Google/unknown: falls back to Exa if available
         
@@ -496,7 +496,9 @@ class LinkedInService:
                     relevance_score=r.get('relevance_score', 0.5),
                     credibility_score=r.get('credibility_score', 0.5),
                     source_type=r.get('source_type', 'web'),
-                    publication_date=r.get('publication_date')
+                    publication_date=r.get('publication_date'),
+                    highlights=r.get('highlights'),
+                    summary=r.get('summary')
                 ))
             return sources
         
@@ -522,12 +524,15 @@ class LinkedInService:
                     # Continue anyway - don't block research for pre-flight issues
             
             if search_engine_lower == "exa":
-                from services.research import get_exa_content_provider
+                from services.research.exa_research_provider import ExaResearchProvider
                 
                 try:
-                    provider = get_exa_content_provider()
+                    provider = ExaResearchProvider()
                 except RuntimeError:
                     logger.warning("Exa API key not configured, falling back to Tavily")
+                    provider = None
+                except Exception as init_err:
+                    logger.warning(f"ExaResearchProvider init failed ({init_err}), falling back to Tavily")
                     provider = None
                 
                 if provider:
@@ -547,7 +552,9 @@ class LinkedInService:
                                 relevance_score=r.get('score', 0.5),
                                 credibility_score=r.get('score', 0.5),
                                 source_type='web',
-                                publication_date=r.get('publishedDate')
+                                publication_date=r.get('publishedDate'),
+                                highlights=r.get('highlights'),
+                                summary=r.get('summary')
                             ))
                         
                         # Cache the results
@@ -559,7 +566,9 @@ class LinkedInService:
                                 'relevance_score': s.relevance_score,
                                 'credibility_score': s.credibility_score,
                                 'source_type': s.source_type,
-                                'publication_date': s.publication_date
+                                'publication_date': s.publication_date,
+                                'highlights': s.highlights,
+                                'summary': s.summary
                             }
                             for s in sources
                         ]

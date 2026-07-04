@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ResearchSource, Citation, ContentQualityMetrics } from '../../../services/linkedInWriterApi';
+import ResearchSourceCard from '../../shared/ResearchSourceCard';
+import { TextToSpeechButton } from '../../shared/TextToSpeechButton';
 
 interface GroundingDataDisplayProps {
   researchSources: ResearchSource[];
@@ -7,144 +9,6 @@ interface GroundingDataDisplayProps {
   qualityMetrics?: ContentQualityMetrics;
   groundingEnabled: boolean;
 }
-
-const SourceCard: React.FC<{ source: ResearchSource; index: number }> = ({ source, index }) => {
-  const [showFullContent, setShowFullContent] = useState(false);
-
-  const formatScore = (score: number) => `${(score * 100).toFixed(0)}%`;
-
-  return (
-    <div style={{
-      padding: '16px',
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      border: '1px solid #e5e7eb',
-      borderLeft: '4px solid #0a66c2',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }}>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-        marginBottom: '8px'
-      }}>
-        <h5 style={{
-          margin: 0,
-          fontSize: '14px',
-          fontWeight: '600',
-          color: '#1f2937',
-          flex: 1,
-          marginRight: '8px'
-        }}>
-          {source.title}
-        </h5>
-        <div style={{
-          fontSize: '11px',
-          color: '#6b7280',
-          backgroundColor: '#f3f4f6',
-          padding: '4px 10px',
-          borderRadius: '12px',
-          whiteSpace: 'nowrap'
-        }}>
-          Source {index + 1}
-        </div>
-      </div>
-
-      <div style={{
-        fontSize: '13px',
-        color: '#6b7280',
-        marginBottom: '10px',
-        wordBreak: 'break-all'
-      }}>
-        <a
-          href={source.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            color: '#0a66c2',
-            textDecoration: 'none'
-          }}
-        >
-          ↗ {source.url}
-        </a>
-      </div>
-
-      {/* Content preview (expandable) */}
-      {source.content && (
-        <div style={{ marginBottom: '10px' }}>
-          <div style={{
-            fontSize: '13px',
-            color: '#4b5563',
-            lineHeight: '1.5',
-            ...(!showFullContent ? {
-              maxHeight: '60px',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            } : {})
-          }}>
-            {source.content}
-          </div>
-          {source.content.length > 200 && (
-            <button
-              onClick={() => setShowFullContent(!showFullContent)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: '#0a66c2',
-                cursor: 'pointer',
-                fontSize: '12px',
-                padding: '4px 0',
-                fontWeight: '600'
-              }}
-            >
-              {showFullContent ? 'Show less' : 'Show full text'}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Source type badge and scores */}
-      <div style={{
-        display: 'flex',
-        gap: '8px',
-        flexWrap: 'wrap',
-        fontSize: '11px'
-      }}>
-        {source.source_type && (
-          <span style={{
-            backgroundColor: '#eef6ff',
-            padding: '4px 8px',
-            borderRadius: '6px',
-            fontWeight: '600',
-            color: '#0a66c2'
-          }}>
-            {source.source_type.replace('_', ' ')}
-          </span>
-        )}
-        {source.relevance_score && (
-          <span style={{
-            backgroundColor: '#f0fdf4',
-            padding: '4px 8px',
-            borderRadius: '6px',
-            color: '#166534'
-          }}>
-            Relevance: {formatScore(source.relevance_score)}
-          </span>
-        )}
-        {source.credibility_score && (
-          <span style={{
-            backgroundColor: '#fefce8',
-            padding: '4px 8px',
-            borderRadius: '6px',
-            color: '#854d0e'
-          }}>
-            Credibility: {formatScore(source.credibility_score)}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-};
 
 
 export const GroundingDataDisplay: React.FC<GroundingDataDisplayProps> = ({
@@ -216,7 +80,15 @@ export const GroundingDataDisplay: React.FC<GroundingDataDisplayProps> = ({
           gap: '12px'
         }}>
           {researchSources.map((source, index) => (
-            <SourceCard key={index} source={source} index={index} />
+            <ResearchSourceCard
+              key={index}
+              source={source}
+              index={index}
+              accent="#0a66c2"
+              showRelevance
+              showTextToSpeech
+              TextToSpeechButton={TextToSpeechButton}
+            />
           ))}
         </div>
       </div>

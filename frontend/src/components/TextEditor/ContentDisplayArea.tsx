@@ -1,7 +1,9 @@
-import React, { useMemo, useEffect, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { formatDraftContent } from '../LinkedInWriter/utils/contentFormatters';
 import WritingAssistantCard from './WritingAssistantCard';
 import { WASuggestion } from '../../services/writingAssistantService';
+import MarkdownToolbar from './MarkdownToolbar';
+import { applyMarkdownFormat, type MarkdownFormatType } from './markdownFormatting';
 
 interface ContentDisplayAreaProps {
   contentRef: React.RefObject<HTMLDivElement>;
@@ -74,6 +76,28 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
     }
   };
 
+  const handleFormat = useCallback(
+    (type: MarkdownFormatType) => {
+      const textarea = textareaRef.current;
+      const result = applyMarkdownFormat(textarea, localDraft, type);
+      if (!result) return;
+      const { newValue, cursorPos } = result;
+
+      setLocalDraft(newValue);
+
+      if (onDraftChange) onDraftChange(newValue);
+
+      requestAnimationFrame(() => {
+        if (textarea) {
+          textarea.focus();
+          textarea.setSelectionRange(cursorPos, cursorPos);
+          updateCaretRect(textarea);
+        }
+      });
+    },
+    [localDraft, onDraftChange],
+  );
+
   // Memoize the formatted content to prevent infinite re-rendering
   const formattedContent = useMemo(() => {
     if (!draft) return '';
@@ -112,7 +136,8 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
         lineHeight: '1.6',
         position: 'relative',
         userSelect: 'text',
-        overflow: 'visible'
+        overflow: 'visible',
+        color: '#333'
       }}
     >
       {/* Inline Writing Suggestion Card (anchored near caret when editing) */}
@@ -182,52 +207,57 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
         {draft ? (
           <div>
             {assistantOn ? (
-              <textarea
-                ref={textareaRef}
-                value={localDraft}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  setLocalDraft(value);
+              <div>
+                <MarkdownToolbar onFormat={handleFormat} />
+                <textarea
+                  ref={textareaRef}
+                  value={localDraft}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setLocalDraft(value);
 
-                  const caretIndex = e.target.selectionStart ?? value.length;
-                  // Debounce suggestion trigger to avoid per-keystroke calls
-                  if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
-                  if (onTriggerSuggestion) {
-                    suggestionTimerRef.current = setTimeout(() => {
-                      onTriggerSuggestion(value, caretIndex);
-                    }, 800);
-                  }
+                    const caretIndex = e.target.selectionStart ?? value.length;
+                    // Debounce suggestion trigger to avoid per-keystroke calls
+                    if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
+                    if (onTriggerSuggestion) {
+                      suggestionTimerRef.current = setTimeout(() => {
+                        onTriggerSuggestion(value, caretIndex);
+                      }, 800);
+                    }
 
-                  // Update caret rect for popover placement
-                  updateCaretRect(e.currentTarget);
+                    // Update caret rect for popover placement
+                    updateCaretRect(e.currentTarget);
 
-                  // If user is typing while a suggestion is visible, hide it immediately
-                  if (waSuggestion && onDismissSuggestion) {
-                    onDismissSuggestion();
-                  }
+                    // If user is typing while a suggestion is visible, hide it immediately
+                    if (waSuggestion && onDismissSuggestion) {
+                      onDismissSuggestion();
+                    }
 
-                  // Debounce the draft save
-                  if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-                  saveTimerRef.current = setTimeout(() => {
-                    onDraftChange(value);
-                  }, 600);
-                }}
-                onKeyUp={(e) => updateCaretRect(e.currentTarget)}
-                autoFocus
-                style={{
-                  width: '100%',
-                  outline: 'none',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '8px',
-                  padding: '12px',
-                  background: '#fff',
-                  fontFamily: 'inherit',
-                  fontSize: '14px',
-                  lineHeight: '1.6',
-                  whiteSpace: 'pre-wrap',
-                  resize: 'vertical'
-                }}
-              />
+                    // Debounce the draft save
+                    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+                    saveTimerRef.current = setTimeout(() => {
+                      onDraftChange(value);
+                    }, 600);
+                  }}
+                  onKeyUp={(e) => updateCaretRect(e.currentTarget)}
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    outline: 'none',
+                    border: '1px solid #e2e8f0',
+                    borderTop: 'none',
+                    borderRadius: '0 0 8px 8px',
+                    padding: '12px',
+                    background: '#fff',
+                    color: '#333',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    whiteSpace: 'pre-wrap',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
             ) : (
               <div dangerouslySetInnerHTML={{ __html: formattedContent }} />
             )}

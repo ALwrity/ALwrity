@@ -68,6 +68,13 @@ export interface LinkedInPostRequest {
   include_citations?: boolean;
 }
 
+export interface LinkedInOutlineSection {
+  id: string;
+  heading: string;
+  key_points: string[];
+  source_indices?: number[];
+}
+
 export interface LinkedInArticleRequest {
   topic: string;
   industry: string;
@@ -81,6 +88,33 @@ export interface LinkedInArticleRequest {
   word_count?: number;
   grounding_level?: GroundingLevel;
   include_citations?: boolean;
+  outline_override?: LinkedInOutlineSection[];
+}
+
+export interface LinkedInOutlineRequest {
+  topic: string;
+  industry: string;
+  tone?: LinkedInTone;
+  target_audience?: string;
+  word_count?: number;
+  research_enabled?: boolean;
+  search_engine?: SearchEngine;
+  grounding_level?: GroundingLevel;
+  include_citations?: boolean;
+}
+
+export interface LinkedInOutlineResponse {
+  success: boolean;
+  outline: LinkedInOutlineSection[];
+  title_suggestions: string[];
+  error?: string;
+}
+
+export interface LinkedInOutlineRefineRequest {
+  outline: LinkedInOutlineSection[];
+  operation: 'add' | 'remove' | 'rename' | 'move';
+  section_id?: string;
+  payload?: Record<string, any>;
 }
 
 export interface LinkedInCarouselRequest {
@@ -119,12 +153,18 @@ export interface LinkedInCommentResponseRequest {
 export interface ResearchSource {
   title: string;
   url: string;
+  excerpt?: string;
   content: string;
   relevance_score?: number;
   credibility_score?: number;
   domain_authority?: number;
   source_type?: string;
   publication_date?: string;
+  index?: number;
+  highlights?: string[];
+  summary?: string;
+  image?: string;
+  author?: string;
 }
 
 export interface HashtagSuggestion {
@@ -334,6 +374,18 @@ export const linkedInWriterApi = {
 
   async generateFromUrl(params: GenerateFromUrlRequest): Promise<GenerateFromUrlResponse> {
     const { data } = await aiApiClient.post('/api/linkedin/generate-from-url', params);
+    return data;
+  },
+
+  // ── Outline API (Phase 2) ─────────────────────────────────────
+
+  async generateOutline(request: LinkedInOutlineRequest): Promise<LinkedInOutlineResponse> {
+    const { data } = await aiApiClient.post('/api/linkedin/generate-outline', request);
+    return data;
+  },
+
+  async refineOutline(request: LinkedInOutlineRefineRequest): Promise<LinkedInOutlineResponse> {
+    const { data } = await aiApiClient.post('/api/linkedin/outline/refine', request);
     return data;
   },
 };

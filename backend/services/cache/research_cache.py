@@ -15,6 +15,9 @@ from loguru import logger
 class ResearchCache:
     """Cache for research results with exact keyword matching."""
     
+    # Increment when cache schema changes to invalidate old entries
+    CACHE_VERSION = "v2"
+    
     def __init__(self, max_cache_size: int = 100, cache_ttl_hours: int = 24):
         """
         Initialize the research cache.
@@ -44,8 +47,8 @@ class ResearchCache:
         normalized_industry = industry.lower().strip() if industry else "general"
         normalized_audience = target_audience.lower().strip() if target_audience else "general"
         
-        # Create a consistent string representation
-        cache_string = f"{normalized_keywords}|{normalized_industry}|{normalized_audience}"
+        # Create a consistent string representation with cache version
+        cache_string = f"{self.CACHE_VERSION}|{normalized_keywords}|{normalized_industry}|{normalized_audience}"
         
         # Generate MD5 hash
         return hashlib.md5(cache_string.encode('utf-8')).hexdigest()

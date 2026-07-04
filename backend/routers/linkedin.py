@@ -19,11 +19,17 @@ from models.linkedin_models import (
     LinkedInVideoScriptRequest, LinkedInCommentResponseRequest,
     LinkedInPostResponse, LinkedInArticleResponse, LinkedInCarouselResponse,
     LinkedInVideoScriptResponse, LinkedInCommentResponseResult,
-    LinkedInEditContentRequest, LinkedInEditContentResponse
+    LinkedInEditContentRequest, LinkedInEditContentResponse,
+    LinkedInOutlineRequest, LinkedInOutlineResponse, LinkedInOutlineRefineRequest,
 )
+from services.linkedin.outline_generator import LinkedInOutlineGenerator
+
+# Global outline generator instance
+outline_generator = LinkedInOutlineGenerator()
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.linkedin_service import LinkedInService
 from services.linkedin.carousel import LinkedInCarouselPDFRenderer
+from services.linkedin.research_handler import ResearchHandler
 from middleware.auth_middleware import get_current_user
 from utils.text_asset_tracker import save_and_track_text_content
 from models.api_monitoring import APIRequest
@@ -1168,4 +1174,93 @@ async def get_usage_stats(db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=500,
             detail=error_response(ERROR_CODES['GENERATION_FAILED'], "Failed to retrieve usage statistics")
+        )
+
+
+# ═══════════════════════════════════════════════════════════════
+# Outline Endpoints (Phase 2)
+# ═══════════════════════════════════════════════════════════════
+
+@router.post(
+    "/generate-outline",
+    response_model=LinkedInOutlineResponse,
+    tags=["LinkedIn Outlines"],
+    summary="Generate Article Outline",
+    description="Generate a structured outline for a LinkedIn article with section headings and key points."
+)
+async def generate_outline(
+    request: LinkedInOutlineRequest,
+    http_request: Request,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    """Generate an article outline from research."""
+    start_time = time.time()
+
+    try:
+        logger.info(f"Received outline generation request for topic: {request.topic}")
+
+        if not request.topic.strip():
+            raise HTTPException(status_code=422, detail=error_response(ERROR_CODES['VALIDATION'], "Topic cannot be empty"))
+
+        user_id = _require_clerk_user_id(current_user, http_request)
+
+        # Conduct research using the same LinkedInService research path
+        research_handler = ResearchHandler(linkedin_service)
+        research_sources, _ = await research_handler.conduct_research(
+            request=request,
+            research_enabled=request.research_enabled,
+            search_engine=request.search_engine.value if hasattr(request.search_engine, 'value') else request.search_engine,
+            max_results=15,
+            user_id=user_id,
+        )
+
+        # Generate outline
+        response = await outline_generator.generate_outline(
+            topic=request.topic,
+            industry=request.industry,
+            tone=request.tone.value if hasattr(request.tone, 'value') else request.tone,
+            target_audience=request.target_audience,
+            word_count=request.word_count,
+            research_sources=research_sources,
+            user_id=user_id,
+        )
+
+        duration = time.time() - start_time
+        logger.info(f"Generated outline with {len(response.outline)} sections in {duration:.2f}s")
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        duration = time.time() - start_time
+        logger.error(f"Error generating outline: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=error_response(ERROR_CODES['GENERATION_FAILED'], f"Outline generation failed: {str(e)}")
+        )
+
+
+@router.post(
+    "/outline/refine",
+    response_model=LinkedInOutlineResponse,
+    tags=["LinkedIn Outlines"],
+    summary="Refine Article Outline",
+    description="Apply human-in-the-loop changes to an existing outline: add, remove, rename, or reorder sections."
+)
+async def refine_outline(
+    request: LinkedInOutlineRefineRequest,
+):
+    """Refine an existing outline with HITL operations."""
+    try:
+        response = outline_generator.refine_outline(request)
+        if not response.success:
+            raise HTTPException(status_code=500, detail=error_response(ERROR_CODES['GENERATION_FAILED'], response.error or "Refine failed"))
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error refining outline: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=error_response(ERROR_CODES['GENERATION_FAILED'], f"Outline refine failed: {str(e)}")
         )

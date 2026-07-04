@@ -47,6 +47,14 @@ class GroundingLevel(str, Enum):
     ENTERPRISE = "enterprise"
 
 
+class LinkedInOutlineSection(BaseModel):
+    """A single section in a LinkedIn article outline."""
+    id: str = Field(..., description="Section identifier (s1, s2, ...)")
+    heading: str = Field(..., description="Section heading/title")
+    key_points: List[str] = Field(default_factory=list, description="Key points to cover in this section")
+    source_indices: List[int] = Field(default_factory=list, description="Indices into research sources")
+
+
 class LinkedInPostRequest(BaseModel):
     """Request model for LinkedIn post generation."""
     topic: str = Field(..., description="Main topic for the post", min_length=3, max_length=200)
@@ -101,6 +109,7 @@ class LinkedInArticleRequest(BaseModel):
     include_citations: bool = Field(default=True, description="Whether to include inline citations")
     user_id: Optional[int] = Field(default=1, description="User id for persona lookup")
     persona_override: Optional[Dict[str, Any]] = Field(default=None, description="Session-only persona overrides to apply without saving")
+    outline_override: Optional[List[LinkedInOutlineSection]] = Field(None, description="Pre-generated outline to use instead of generating sections inline")
     
     class Config:
         json_schema_extra = {
@@ -230,6 +239,8 @@ class ResearchSource(BaseModel):
     domain_authority: Optional[float] = Field(None, description="Domain authority score (0.0-1.0)")
     source_type: Optional[str] = Field(None, description="Type of source (academic, business_news, etc.)")
     publication_date: Optional[str] = Field(None, description="Publication date if available")
+    highlights: Optional[List[str]] = Field(None, description="Exa AI-generated key highlights")
+    summary: Optional[str] = Field(None, description="Exa AI-generated summary of the source")
     raw_result: Optional[Dict[str, Any]] = Field(None, description="Raw search result data")
 
 
@@ -566,6 +577,50 @@ class LinkedInCommentResponseResult(BaseModel):
     generation_metadata: Dict[str, Any] = {}
     error: Optional[str] = None
     grounding_status: Optional[Dict[str, Any]] = Field(None, description="Grounding operation status")
+
+
+# ═══════════════════════════════════════════════════════════════
+# Outline models (Phase 2 — optional article outline step)
+# ═══════════════════════════════════════════════════════════════
+
+class LinkedInOutlineRequest(BaseModel):
+    """Request model for LinkedIn article outline generation."""
+    topic: str = Field(..., description="Main topic for the article", min_length=3, max_length=200)
+    industry: str = Field(..., description="Target industry context", min_length=2, max_length=100)
+    tone: LinkedInTone = Field(default=LinkedInTone.PROFESSIONAL, description="Tone of the article")
+    target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
+    word_count: int = Field(default=1500, description="Target word count", ge=500, le=5000)
+    research_enabled: bool = Field(default=True, description="Whether to include research-backed content")
+    search_engine: SearchEngine = Field(default=SearchEngine.EXA, description="Search engine for research")
+    grounding_level: GroundingLevel = Field(default=GroundingLevel.ENHANCED, description="Level of content grounding")
+    include_citations: bool = Field(default=True, description="Whether to include inline citations")
+    user_id: Optional[int] = Field(default=1, description="User id for persona lookup")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "topic": "Digital transformation in manufacturing",
+                "industry": "Manufacturing",
+                "tone": "professional",
+                "word_count": 2000,
+            }
+        }
+
+
+class LinkedInOutlineResponse(BaseModel):
+    """Response model for LinkedIn article outline generation."""
+    success: bool = True
+    outline: List[LinkedInOutlineSection] = Field(default_factory=list, description="Generated outline sections")
+    title_suggestions: List[str] = Field(default_factory=list, description="AI-generated title options")
+    error: Optional[str] = None
+
+
+class LinkedInOutlineRefineRequest(BaseModel):
+    """Request model for refining an existing outline."""
+    outline: List[LinkedInOutlineSection] = Field(..., description="Current outline state")
+    operation: str = Field(..., description="Operation: add, remove, rename, move")
+    section_id: Optional[str] = Field(None, description="Target section ID (not needed for add)")
+    payload: Optional[Dict[str, Any]] = Field(None, description="Operation-specific data")
 
 
 class LinkedInEditContentRequest(BaseModel):

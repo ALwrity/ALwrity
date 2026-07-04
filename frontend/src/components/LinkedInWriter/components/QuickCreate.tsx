@@ -65,7 +65,9 @@ interface QuickCreateProps {
   onGenerateArticle: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   onGenerateCarousel: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   onGenerateVideoScript: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onGenerateOutline: (params?: any) => Promise<{ success: boolean; outline?: any; error?: string }>;
   userPreferences: LinkedInPreferences;
+  outlineMode: boolean;
   /** Hide inline grid — modals only (opened via workflow / events) */
   variant?: 'default' | 'hidden';
 }
@@ -430,13 +432,16 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   onGenerateArticle,
   onGenerateCarousel,
   onGenerateVideoScript,
+  onGenerateOutline,
   userPreferences,
+  outlineMode,
   variant = 'default',
 }) => {
   const [selectedType, setSelectedType] = useState<ContentType | null>(null);
   const [formData, setFormData] = useState(defaultForm);
   const [generating, setGenerating] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
+  const [outlinePlanMode, setOutlinePlanMode] = useState(false);
 
   // Feature 3 — Persona badge
   const [personaInfo, setPersonaInfo] = useState<PersonaInfo | null>(null);
@@ -599,6 +604,19 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       setVariations(resolved);
       setVariationsPhase('ready');
       setGenerating(false);
+      return;
+    }
+
+    // Outline-plan path (article only)
+    if (outlinePlanMode && selectedType === 'article') {
+      setGenerating(true);
+      const params = { ...formData };
+      try {
+        await onGenerateOutline(params);
+        closeModal();
+      } finally {
+        setGenerating(false);
+      }
       return;
     }
 
@@ -883,7 +901,35 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                     )}
                   </label>
                 )}
-                {selectedType !== 'post' && <div style={{ flex: 1 }} />}
+                {selectedType === 'article' && !outlineMode && (
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      flex: 1,
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: outlinePlanMode ? '#057642' : '#6b7280',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={outlinePlanMode}
+                      onChange={e => setOutlinePlanMode(e.target.checked)}
+                      style={{ width: 14, height: 14, accentColor: '#057642', cursor: 'pointer' }}
+                    />
+                    Plan sections first
+                    {outlinePlanMode && (
+                      <span style={{ fontSize: 10, background: '#ecfdf5', color: '#057642', borderRadius: 4, padding: '1px 5px', fontWeight: 700 }}>
+                        HITL
+                      </span>
+                    )}
+                  </label>
+                )}
+                {selectedType !== 'post' && selectedType !== 'article' && <div style={{ flex: 1 }} />}
 
                 <button onClick={closeModal} style={{ padding: '10px 20px', border: '1px solid #d1d5db', borderRadius: 8, background: 'white', cursor: 'pointer', fontSize: 14, fontWeight: 600 }}>
                   Cancel
@@ -895,7 +941,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                     padding: '10px 24px',
                     border: 'none',
                     borderRadius: 8,
-                    background: generating ? '#9ca3af' : variationsMode ? '#6366f1' : (CONTENT_TYPES.find(c => c.type === selectedType)?.color || '#0a66c2'),
+                    background: generating ? '#9ca3af' : variationsMode ? '#6366f1' : outlinePlanMode ? '#057642' : (CONTENT_TYPES.find(c => c.type === selectedType)?.color || '#0a66c2'),
                     color: 'white',
                     cursor: generating ? 'not-allowed' : 'pointer',
                     fontSize: 14,
@@ -907,7 +953,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                   }}
                 >
                   {generating && <div style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid white', borderTopColor: 'transparent', animation: 'spin 0.8s linear infinite' }} />}
-                  {generating ? 'Generating...' : variationsMode ? '✦ Generate 3 Variations' : 'Generate'}
+                  {generating ? 'Generating...' : variationsMode ? '✦ Generate 3 Variations' : outlinePlanMode ? '✦ Plan Sections' : 'Generate'}
                 </button>
               </div>
             )}

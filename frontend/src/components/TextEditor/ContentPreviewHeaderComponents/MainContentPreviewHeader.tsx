@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import PersonaChip from './PersonaChip';
+import { TextToSpeechButton } from '../../shared/TextToSpeechButton';
 
 // Extend HTMLDivElement interface for custom tooltip properties
 interface ExtendedDivElement extends HTMLDivElement {
@@ -462,6 +463,8 @@ const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
                 <span style={{ fontSize: '10px', opacity: 0.8 }}>
                   {draft.split(/\s+/).length} words • {Math.ceil(draft.split(/\s+/).length / 200)} min read
                 </span>
+                {/* Read aloud */}
+                <TextToSpeechButton text={draft} size="small" showSettings={false} />
                 {/* Assistive Writing toggle */}
                 {onAssistantToggle && (
                   <label 

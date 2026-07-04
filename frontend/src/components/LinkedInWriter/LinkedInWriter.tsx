@@ -21,6 +21,7 @@ import {
   type ProgressStep,
   type LinkedInWriterTab,
 } from './components';
+import OutlineEditor from './components/OutlineEditor';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
@@ -115,7 +116,16 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     generatePost,
     generateArticle,
     generateCarousel,
-    generateVideoScript
+    generateVideoScript,
+
+    // Outline state (Phase 2)
+    outlineSections,
+    outlineTitleSuggestions,
+    outlineMode,
+    setOutlineMode,
+    isGeneratingOutline,
+    generateOutline,
+    refineOutline,
   } = useLinkedInWriter();
 
   // Get persona context for enhanced AI assistance
@@ -193,6 +203,12 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     window.addEventListener('linkedinwriter:switchTab', onSwitchTab);
     return () => window.removeEventListener('linkedinwriter:switchTab', onSwitchTab);
   }, []);
+
+  // ── Outline → Article handler ──
+  const handleGenerateArticleFromOutline = useCallback(async () => {
+    await generateArticle();
+    setOutlineMode(false);
+  }, [generateArticle, setOutlineMode]);
 
   // ── Generate similar post handler ──
   const handleGenerateSimilarPost = useCallback((prompt: string) => {
@@ -602,6 +618,17 @@ Always use the most appropriate tool for the user's request.`.trim();
             topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
           />
         </>) : (
+          /* Outline Editor - Show when planning sections */
+          outlineMode && outlineSections.length > 0 ? (
+            <OutlineEditor
+              outline={outlineSections}
+              titleSuggestions={outlineTitleSuggestions}
+              onRefine={refineOutline}
+              onGenerateArticle={handleGenerateArticleFromOutline}
+              onBack={() => setOutlineMode(false)}
+              isGenerating={isGenerating}
+            />
+          ) : (
           /* Welcome Message - Show when no content */
           <WelcomeMessage
             draft={draft}
@@ -610,8 +637,10 @@ Always use the most appropriate tool for the user's request.`.trim();
             onGenerateArticle={generateArticle}
             onGenerateCarousel={generateCarousel}
             onGenerateVideoScript={generateVideoScript}
+            onGenerateOutline={generateOutline}
+            outlineMode={outlineMode}
             userPreferences={userPreferences}
-          />
+          />)
         )}
       </div>
 

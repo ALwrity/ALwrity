@@ -35,6 +35,8 @@ interface WelcomeMessageProps {
   onGenerateArticle: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   onGenerateCarousel: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   onGenerateVideoScript: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onGenerateOutline: (params?: any) => Promise<{ success: boolean; outline?: any; error?: string }>;
+  outlineMode: boolean;
   userPreferences: LinkedInPreferences;
 }
 
@@ -45,6 +47,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   onGenerateArticle,
   onGenerateCarousel,
   onGenerateVideoScript,
+  onGenerateOutline,
+  outlineMode,
   userPreferences,
 }) => {
   const [showCopilotModal, setShowCopilotModal] = useState(false);
@@ -287,6 +291,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           onGenerateArticle={onGenerateArticle}
           onGenerateCarousel={onGenerateCarousel}
           onGenerateVideoScript={onGenerateVideoScript}
+          onGenerateOutline={onGenerateOutline}
+          outlineMode={outlineMode}
           userPreferences={userPreferences}
         />
 
