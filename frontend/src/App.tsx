@@ -13,6 +13,7 @@ import Landing from './components/Landing/Landing';
 import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
 import PricingPage from './components/Pricing/PricingPage';
+import ContactPage from './components/Landing/ContactPage';
 
 // ─── Lazy loaded route components ───────────────────────────────────────────
 // Default exports
@@ -29,7 +30,6 @@ const PodcastDashboard = React.lazy(() => import('./components/PodcastMaker/Podc
 const PrivacyPolicyPage = React.lazy(() => import('./components/Landing/PrivacyPolicyPage'));
 const TermsOfServicePage = React.lazy(() => import('./components/Landing/TermsOfServicePage'));
 const CodeOfConductPage = React.lazy(() => import('./components/Landing/CodeOfConductPage'));
-const ContactPage = React.lazy(() => import('./components/Landing/ContactPage'));
 const WixTestPage = React.lazy(() => import('./components/WixTestPage/WixTestPage'));
 const WixCallbackPage = React.lazy(() => import('./components/WixCallbackPage/WixCallbackPage'));
 

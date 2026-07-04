@@ -547,6 +547,10 @@ app.include_router(content_assets_router)
 from api.podcast.router import router as podcast_router
 app.include_router(podcast_router)
 
+# Public contact form (no auth)
+from api.contact_routes import router as contact_router
+app.include_router(contact_router)
+
 # Include YouTube Creator Studio router
 from api.youtube.router import router as youtube_router
 app.include_router(youtube_router, prefix="/api")

@@ -3,6 +3,13 @@ export type LandingSectionId = 'hero' | 'lifecycle' | 'features' | 'pricing';
 /** Public marketing landing route — always shows Landing (signed-in or not). */
 export const LANDING_MARKETING_PATH = '/home';
 
+/** Legal/support pages keep the nav bar visible while scrolling. */
+export const LEGAL_STATIC_NAV_PATHS = ['/contact', '/privacy', '/terms', '/code-of-conduct'] as const;
+
+export function isLegalStaticNavPath(pathname: string): boolean {
+  return (LEGAL_STATIC_NAV_PATHS as readonly string[]).includes(pathname);
+}
+
 const NAV_OFFSET_PX = 72;
 
 export function isLandingMarketingPath(pathname: string): boolean {
