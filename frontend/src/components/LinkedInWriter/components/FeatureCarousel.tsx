@@ -24,7 +24,7 @@ export const FeatureCarousel: React.FC<FeatureCarouselProps> = ({
       title: 'Check Facts',
       desc: 'Select text and verify claims with web-backed evidence.',
       icon: '🔍',
-      image: '/Alwrity-fact-check.png',
+      image: '/alwrity-fact-check.png',
       onClick: onFactCheckClick
     },
     {
@@ -41,13 +41,13 @@ export const FeatureCarousel: React.FC<FeatureCarouselProps> = ({
       title: 'Assistive Writing',
       desc: 'Inline, contextual suggestions as you type with citations.',
       icon: '✍️',
-      image: '/ALwrity-assistive-writing.png'
+      image: '/alwrity-assistive-writing.png'
     },
     {
       title: 'ALwrity Copilot',
       desc: 'Advanced AI assistant for comprehensive content creation and editing.',
       icon: '🤖',
-      image: '/Alwrity-copilot1.png',
+      image: '/alwrity-copilot1.png',
       onClick: onCopilotClick
     },
     {

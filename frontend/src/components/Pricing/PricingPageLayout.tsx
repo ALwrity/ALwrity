@@ -4,7 +4,7 @@ import LandingNav from '../Landing/LandingNav';
 import LandingFooter from '../Landing/LandingFooter';
 
 const SITE_URL = 'https://www.alwrity.com';
-const OG_IMAGE = `${SITE_URL}/Alwrity-copilot1.png`;
+const OG_IMAGE = `${SITE_URL}/alwrity-copilot1.png`;
 
 interface PricingPageLayoutProps {
   children: React.ReactNode;

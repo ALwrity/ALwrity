@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Box,
   Button,
@@ -11,7 +11,6 @@ import {
   useTheme,
   alpha,
 } from '@mui/material';
-import { useClerk } from '@clerk/clerk-react';
 import {
   RocketLaunch,
   Business,
@@ -24,17 +23,14 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import { landingSectionTitleSx, landingSectionSubtitleSx } from './landingStyles';
+import { scrollToLandingSection } from '../../utils/landingNavigation';
+import { useDeferredBackground } from './useDeferredBackground';
+
+const VORTEX_BG = '/alwrity_landing_bg_vortex.png';
 
 const IntroducingAlwrity: React.FC = () => {
   const theme = useTheme();
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const { openSignIn } = useClerk();
-
-  useEffect(() => {
-    const img = new Image();
-    img.onload = () => setImageLoaded(true);
-    img.src = '/alwrity_landing_bg_vortex.png';
-  }, []);
+  const bgUrl = useDeferredBackground(VORTEX_BG);
 
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
@@ -57,7 +53,7 @@ const IntroducingAlwrity: React.FC = () => {
       icon: <Security />,
       title: 'Privacy First',
       description: 'Your data stays yours. No tracking, no data mining, no selling of user information. Complete privacy protection.',
-      highlight: 'Zero Tracking',
+      highlight: 'Privacy-first design',
     },
     {
       icon: <Speed />,
@@ -100,11 +96,11 @@ const IntroducingAlwrity: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundImage: 'url(/alwrity_landing_bg_vortex.png)',
+          backgroundImage: bgUrl ? `url(${bgUrl})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
-          opacity: imageLoaded ? 0.82 : 0,
+          opacity: bgUrl ? 0.82 : 0,
           transition: 'opacity 0.8s ease',
           zIndex: 0,
         },
@@ -147,7 +143,7 @@ const IntroducingAlwrity: React.FC = () => {
             {/* CTA */}
             <motion.div variants={fadeInUp}>
               <Button
-                onClick={() => openSignIn({ forceRedirectUrl: '/onboarding' })}
+                onClick={() => scrollToLandingSection('lifecycle')}
                 variant="contained"
                 size="large"
                 startIcon={<RocketLaunch />}
@@ -166,7 +162,7 @@ const IntroducingAlwrity: React.FC = () => {
                   transition: 'all 0.3s ease',
                 }}
               >
-                Start free with ALwrity
+                See how it works ↓
               </Button>
             </motion.div>
 
@@ -250,7 +246,7 @@ const IntroducingAlwrity: React.FC = () => {
                             </Typography>
                           </Stack>
                           <Stack spacing={0.75}>
-                            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'white', fontSize: '0.95rem' }}>
+                            <Typography variant="subtitle1" component="h3" fontWeight={700} sx={{ color: 'white', fontSize: '0.95rem' }}>
                               {capability.title}
                             </Typography>
                             <Typography variant="body2" color="rgba(255,255,255,0.8)" lineHeight={1.5} sx={{ fontSize: '0.82rem' }}>
@@ -265,8 +261,8 @@ const IntroducingAlwrity: React.FC = () => {
               ))}
             </Grid>
 
-            {/* Social proof stats — reduced size */}
-            <Grid container spacing={2} sx={{ width: '100%', pt: { xs: 0.5, md: 1 } }}>
+            {/* Social proof stats — pulled closer to capability cards */}
+            <Grid container spacing={2} sx={{ width: '100%', pt: 0, mt: { xs: -1, md: -2 } }}>
               {socialProofStats.map((stat, index) => (
                 <Grid item xs={6} md={3} key={index}>
                   <motion.div variants={fadeInUp}>
@@ -288,6 +284,7 @@ const IntroducingAlwrity: React.FC = () => {
                       </Box>
                       <Typography
                         variant="h6"
+                        component="p"
                         sx={{
                           fontWeight: 800,
                           fontSize: { xs: '1.1rem', md: '1.25rem' },

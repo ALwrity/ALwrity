@@ -12,7 +12,9 @@ import {
   ListItemText,
   Toolbar,
   useTheme,
+  useMediaQuery,
   alpha,
+  Button,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import CloseIcon from '@mui/icons-material/Close';
@@ -39,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Home', section: 'hero' },
   { label: 'Lifecycle', section: 'lifecycle' },
   { label: 'Features', section: 'features' },
-  { label: 'Pricing', href: '/pricing' },
+  { label: 'Pricing', section: 'pricing' },
 ];
 
 const NAV_HIDE_DELAY_MS = 3500;
@@ -49,6 +51,7 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isLightSurface = surface === 'light';
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navVisible, setNavVisible] = useState(true);
@@ -315,6 +318,34 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
           ))}
         </List>
       </Drawer>
+
+      {isMobile && !navVisible && (
+        <Button
+          variant="contained"
+          aria-label="Open navigation menu"
+          onClick={() => setMobileOpen(true)}
+          sx={{
+            position: 'fixed',
+            bottom: 16,
+            right: 16,
+            zIndex: theme.zIndex.speedDial,
+            borderRadius: 999,
+            px: 2.25,
+            py: 0.85,
+            minWidth: 0,
+            textTransform: 'none',
+            fontWeight: 700,
+            fontSize: '0.9rem',
+            boxShadow: `0 6px 20px ${alpha(theme.palette.primary.main, 0.45)}`,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+            '&:hover': {
+              boxShadow: `0 8px 24px ${alpha(theme.palette.primary.main, 0.55)}`,
+            },
+          }}
+        >
+          Menu
+        </Button>
+      )}
     </>
   );
 };

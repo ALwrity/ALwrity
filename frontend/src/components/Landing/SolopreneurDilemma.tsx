@@ -19,7 +19,10 @@ import {
 import { motion } from 'framer-motion';
 import { useClerk } from '@clerk/clerk-react';
 import { ScrambleText } from '../ScrambleText';
+import { useDeferredBackground } from './useDeferredBackground';
 import { landingSectionTitleSx } from './landingStyles';
+
+const SECTION_BG = '/alwrity_landing_pg_bg.png';
 
 // Scrambling text component for multiple phrases
 const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?: number; delay?: number }> = ({ 
@@ -51,6 +54,7 @@ const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?
 const SolopreneurDilemma: React.FC = () => {
   const theme = useTheme();
   const { openSignIn } = useClerk();
+  const sectionBgUrl = useDeferredBackground(SECTION_BG);
 
   const painPoints = [
     {
@@ -118,7 +122,7 @@ const SolopreneurDilemma: React.FC = () => {
     <Box
       sx={{
         position: 'relative',
-        py: { xs: 8, md: 12 },
+        py: { xs: 5, md: 7 },
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -126,7 +130,7 @@ const SolopreneurDilemma: React.FC = () => {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundImage: 'url(/alwrity_landing_pg_bg.png)',
+          backgroundImage: sectionBgUrl ? `url(${sectionBgUrl})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -144,7 +148,7 @@ const SolopreneurDilemma: React.FC = () => {
         },
       }}
     >
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2, pt: { xs: 2, md: 3 } }}>
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2, pt: { xs: 0, md: 0.5 } }}>
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -156,7 +160,7 @@ const SolopreneurDilemma: React.FC = () => {
             direction={{ xs: 'column', md: 'row' }} 
             spacing={{ xs: 1, md: 2 }} 
             alignItems={{ xs: 'center', md: 'flex-start' }}
-            sx={{ mb: 6 }}
+            sx={{ mb: { xs: 4, md: 5 } }}
           >
             <Box sx={{ flex: 1 }}>
               <motion.div variants={itemVariants}>
@@ -183,6 +187,7 @@ const SolopreneurDilemma: React.FC = () => {
               <motion.div variants={itemVariants}>
                 <Typography 
                   variant="h5" 
+                  component="p"
                   sx={{ 
                     color: 'rgba(255, 255, 255, 0.9)',
                     fontWeight: 400,
@@ -197,7 +202,7 @@ const SolopreneurDilemma: React.FC = () => {
             </Box>
           </Stack>
 
-          <Box sx={{ ml: { xs: 0, md: '45%' } }}>
+          <Box sx={{ ml: { xs: 0, md: '35%' } }}>
             <Grid container spacing={6} alignItems="center">
               {/* Left Column - Pain Points */}
               <Grid item xs={12} md={6}>
@@ -269,7 +274,8 @@ const SolopreneurDilemma: React.FC = () => {
                           </Box>
                           <Stack spacing={1} sx={{ flex: 1 }}>
                             <Typography 
-                              variant="h6" 
+                              variant="h6"
+                              component="h3"
                               fontWeight={600}
                               sx={{ 
                                 color: 'white',
@@ -370,7 +376,8 @@ const SolopreneurDilemma: React.FC = () => {
                           </Box>
                           <Stack spacing={1} sx={{ flex: 1 }}>
                             <Typography 
-                              variant="h6" 
+                              variant="h6"
+                              component="h3"
                               fontWeight={600}
                               sx={{ 
                                 color: 'white',
@@ -429,7 +436,7 @@ const SolopreneurDilemma: React.FC = () => {
                 </Stack>
               </motion.div>
             </Grid>
-          </Grid>
+            </Grid>
           </Box>
         </motion.div>
       </Container>
