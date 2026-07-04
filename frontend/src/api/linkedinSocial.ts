@@ -719,3 +719,204 @@ export async function completeLinkedInProfile(
   const response = await apiClient.post(`${BASE}/profile/complete`, { answers });
   return response.data;
 }
+
+// ---------------------------------------------------------------------------
+// LinkedIn Studio search (Unipile Classic Search proxy)
+// ---------------------------------------------------------------------------
+
+export type LinkedInSearchCategory = 'posts' | 'jobs' | 'people' | 'companies';
+
+export interface LinkedInSearchFilters {
+  location?: string[];
+  industry?: string[];
+  company?: string[];
+  past_company?: string[];
+  school?: string[];
+  service?: string[];
+  network_distance?: number[];
+  sort_by?: 'relevance' | 'date';
+  date_posted?: string | null;
+}
+
+export interface LinkedInSearchRequest {
+  keywords: string;
+  category: LinkedInSearchCategory;
+  api?: 'classic';
+  limit?: number;
+  cursor?: string | null;
+  account_id?: string | null;
+  filters?: LinkedInSearchFilters;
+}
+
+export interface LinkedInSearchPagingResponse {
+  start?: number;
+  page_count?: number;
+  total_count?: number;
+}
+
+export interface LinkedInSearchResponse {
+  success: boolean;
+  object: string;
+  items: Array<Record<string, unknown>>;
+  paging: LinkedInSearchPagingResponse;
+  cursor?: string | null;
+  active_category: LinkedInSearchCategory;
+  provider: string;
+}
+
+export interface LinkedInSearchParametersQuery {
+  type: string;
+  keywords?: string;
+  limit?: number;
+  service?: string;
+  account_id?: string;
+}
+
+export interface LinkedInSearchParameterItem {
+  id: string;
+  title: string;
+  picture_url?: string | null;
+  additional_data?: Record<string, unknown>;
+}
+
+export interface LinkedInSearchParametersResponse {
+  success: boolean;
+  object: string;
+  items: LinkedInSearchParameterItem[];
+  paging: { page_count?: number };
+  provider: string;
+}
+
+const LINKEDIN_SEARCH_NOT_CONNECTED =
+  'Connect your LinkedIn account to search.';
+
+const LINKEDIN_SEARCH_UNAVAILABLE =
+  'LinkedIn search is unavailable. Please try again later.';
+
+/** Perform a LinkedIn Classic search via the backend Unipile proxy. */
+export async function searchLinkedIn(
+  request: LinkedInSearchRequest,
+  signal?: AbortSignal
+): Promise<LinkedInSearchResponse> {
+  const response = await apiClient.post(`${BASE}/search`, request, { signal });
+  return response.data;
+}
+
+/** Retrieve LinkedIn search parameter IDs for filter autocomplete. */
+export async function getLinkedInSearchParameters(
+  params: LinkedInSearchParametersQuery,
+  signal?: AbortSignal
+): Promise<LinkedInSearchParametersResponse> {
+  const response = await apiClient.get(`${BASE}/search/parameters`, {
+    params,
+    signal,
+  });
+  return response.data;
+}
+
+function isSearchRequestAborted(err: unknown): boolean {
+  if (err instanceof DOMException && err.name === 'AbortError') {
+    return true;
+  }
+  if (err && typeof err === 'object') {
+    const candidate = err as { code?: string; name?: string; message?: string };
+    if (candidate.code === 'ERR_CANCELED' || candidate.name === 'CanceledError') {
+      return true;
+    }
+    if (typeof candidate.message === 'string' && candidate.message.toLowerCase().includes('canceled')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Map search API failures to user-friendly messages. */
+export function getLinkedInSearchErrorMessage(err: unknown): string {
+  if (isSearchRequestAborted(err)) {
+    return '';
+  }
+
+  if (err instanceof RequestTimeoutError) {
+    return 'LinkedIn search is taking longer than expected. Please try again.';
+  }
+
+  if (err instanceof NetworkError) {
+    return 'Cannot reach the ALwrity server. Check that the backend is running and try again.';
+  }
+
+  if (err instanceof ConnectionError) {
+    return err.message || 'Backend server is experiencing issues. Please try again later.';
+  }
+
+  if (err && typeof err === 'object' && 'response' in err) {
+    const axiosErr = err as {
+      response?: { status?: number; data?: { detail?: string } };
+    };
+    const status = axiosErr.response?.status;
+    const detail = axiosErr.response?.data?.detail;
+    const detailText = typeof detail === 'string' ? detail : '';
+
+    if (status === 403) {
+      if (detailText.toLowerCase().includes('not connected')) {
+        return LINKEDIN_SEARCH_NOT_CONNECTED;
+      }
+      return LINKEDIN_SEARCH_NOT_CONNECTED;
+    }
+
+    if (status === 401) {
+      return 'Your LinkedIn session expired. Please reconnect and try again.';
+    }
+
+    if (status === 429) {
+      return 'Search limit reached. Try again in a few minutes.';
+    }
+
+    if (status === 503) {
+      console.warn('[LinkedInSearch] provider unavailable:', detailText || status);
+      return LINKEDIN_SEARCH_UNAVAILABLE;
+    }
+
+    if (status === 502) {
+      return 'Unable to complete LinkedIn search. Please try again.';
+    }
+
+    if (status === 400 && detailText.trim()) {
+      return detailText;
+    }
+
+    if (detailText.trim()) {
+      return detailText;
+    }
+  }
+
+  return getLinkedInSocialErrorMessage(err);
+}
+
+/** Classify search errors for UI treatment (connect CTA, generic banner, etc.). */
+export function getLinkedInSearchErrorType(
+  err: unknown,
+  connected: boolean
+): 'not_connected' | 'generic' | null {
+  if (isSearchRequestAborted(err)) {
+    return null;
+  }
+
+  if (!connected) {
+    return 'not_connected';
+  }
+
+  if (err && typeof err === 'object' && 'response' in err) {
+    const axiosErr = err as {
+      response?: { status?: number; data?: { detail?: string } };
+    };
+    const status = axiosErr.response?.status;
+    const detail = axiosErr.response?.data?.detail;
+    const detailText = typeof detail === 'string' ? detail.toLowerCase() : '';
+
+    if (status === 403 || (status === 401 && detailText.includes('reconnect'))) {
+      return 'not_connected';
+    }
+  }
+
+  return 'generic';
+}

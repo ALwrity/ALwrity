@@ -1,13 +1,12 @@
 """
 Low-level Unipile HTTP client for LinkedIn Growth Engine.
 
-This client provides minimal functionality for Phase 1:
+This client provides functionality for LinkedIn Growth Engine:
 - Generate hosted auth link for LinkedIn connection
-- Fetch account details
+- Fetch account details and profiles
 - List connected accounts
 - Delete/disconnect account
-
-Analytics and publishing methods are stubbed for future phases.
+- LinkedIn Classic search and search parameter lookup
 """
 
 from __future__ import annotations
@@ -703,5 +702,162 @@ class UnipileClient:
             f"[UnipileClient] get_user_posts success account_id={account_id} "
             f"identifier={identifier} items={item_count} "
             f"next_cursor={'set' if next_cursor else 'none'}"
+        )
+        return data
+
+    async def linkedin_search(
+        self,
+        account_id: str,
+        payload: dict[str, Any],
+        *,
+        cursor: Optional[str] = None,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """
+        Perform a LinkedIn Classic search via Unipile ``POST /api/v1/linkedin/search``.
+
+        Args:
+            account_id: Unipile account ID for the connected LinkedIn account
+            payload: Search body (api, category, keywords, filters, etc.)
+            cursor: Optional pagination cursor from a previous response
+            limit: Result limit (Classic max 50)
+
+        Returns:
+            Raw Unipile LinkedinSearch response dict
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        safe_limit = max(1, min(limit, 50))
+        url = self._get_full_url("/api/v1/linkedin/search")
+        params: dict[str, str | int] = {
+            "account_id": account_id,
+            "limit": safe_limit,
+        }
+        if cursor:
+            params["cursor"] = cursor
+
+        category = payload.get("category") if isinstance(payload, dict) else None
+        keywords = payload.get("keywords") if isinstance(payload, dict) else None
+
+        logger.info(
+            "[UnipileClient] linkedin_search account_id={} category={} keywords={!r} "
+            "limit={} cursor={}",
+            account_id,
+            category,
+            keywords,
+            safe_limit,
+            "set" if cursor else "none",
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(
+                url,
+                params=params,
+                json=payload,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        item_count = 0
+        next_cursor = None
+        total_count = None
+        if isinstance(data, dict):
+            items = data.get("items")
+            if isinstance(items, list):
+                item_count = len(items)
+            next_cursor = data.get("cursor")
+            paging = data.get("paging")
+            if isinstance(paging, dict):
+                total_count = paging.get("total_count")
+
+        logger.info(
+            "[UnipileClient] linkedin_search success account_id={} category={} "
+            "items={} total_count={} next_cursor={}",
+            account_id,
+            category,
+            item_count,
+            total_count,
+            "set" if next_cursor else "none",
+        )
+        return data
+
+    async def get_linkedin_search_parameters(
+        self,
+        account_id: str,
+        parameter_type: str,
+        *,
+        keywords: Optional[str] = None,
+        limit: int = 10,
+        service: str = "CLASSIC",
+    ) -> dict[str, Any]:
+        """
+        Retrieve LinkedIn search parameter IDs via Unipile
+        ``GET /api/v1/linkedin/search/parameters``.
+
+        Args:
+            account_id: Unipile account ID for the connected LinkedIn account
+            parameter_type: Parameter type (e.g. LOCATION, INDUSTRY, COMPANY)
+            keywords: Optional text to narrow parameter lookup
+            limit: Number of parameters to return (1-100)
+            service: LinkedIn API variant (CLASSIC, RECRUITER, SALES_NAVIGATOR)
+
+        Returns:
+            Raw Unipile LinkedinSearchParametersList response dict
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        safe_limit = max(1, min(limit, 100))
+        url = self._get_full_url("/api/v1/linkedin/search/parameters")
+        params: dict[str, str | int] = {
+            "account_id": account_id,
+            "type": parameter_type,
+            "limit": safe_limit,
+            "service": service,
+        }
+        if keywords:
+            params["keywords"] = keywords
+
+        logger.info(
+            "[UnipileClient] get_linkedin_search_parameters account_id={} type={} "
+            "keywords={!r} limit={} service={}",
+            account_id,
+            parameter_type,
+            keywords,
+            safe_limit,
+            service,
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(
+                url,
+                params=params,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        item_count = 0
+        if isinstance(data, dict):
+            items = data.get("items")
+            if isinstance(items, list):
+                item_count = len(items)
+
+        logger.info(
+            "[UnipileClient] get_linkedin_search_parameters success account_id={} "
+            "type={} items={}",
+            account_id,
+            parameter_type,
+            item_count,
         )
         return data
