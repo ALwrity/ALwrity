@@ -28,6 +28,9 @@ export { GrowthEnginePanel } from './GrowthEngine';
 export { PostAnalyticsPanel } from './PostAnalytics';
 export { EngagementSummary } from './PostAnalytics';
 
+// People You May Know (PYMK)
+export { PeopleYouMayKnowTabPanel } from './PeopleYouMayKnow';
+
 // Tab navigation
 export { LinkedInWriterTabBar } from './LinkedInWriterTabBar';
 export type { LinkedInWriterTab } from './LinkedInWriterTabBar';

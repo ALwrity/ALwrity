@@ -283,29 +283,31 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
   if (panelState === 'idle') {
     return (
       <div style={{ padding: '24px 32px', maxWidth: 900, margin: '0 auto' }}>
-        <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: colors.textDark }}>
-          Growth Engine
-        </h2>
-        <p style={{ margin: '0 0 24px', fontSize: 13, color: colors.textSecondary }}>
-          AI-powered insights to grow your LinkedIn reach. Data-backed, actionable suggestions.
-        </p>
-        <EmptyState
-          icon="🚀"
-          message="Ready to analyze your LinkedIn growth. Click below to generate all insights in one go, or load individual cards."
-        />
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button
-            onClick={runAllAnalyses}
-            style={{
-              ...primaryBtn,
-              padding: '10px 28px',
-              fontSize: 14,
-              borderRadius: 8,
-            }}
-            aria-label="Run all growth analyses"
-          >
-            🚀 Load All Insights (1 AI call)
-          </button>
+        <div>
+          <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: colors.textDark }}>
+            Growth Engine
+          </h2>
+          <p style={{ margin: '0 0 24px', fontSize: 13, color: colors.textSecondary }}>
+            AI-powered insights to grow your LinkedIn reach. Data-backed, actionable suggestions.
+          </p>
+          <EmptyState
+            icon="🚀"
+            message="Ready to analyze your LinkedIn growth. Click below to generate all insights in one go, or load individual cards."
+          />
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button
+              onClick={runAllAnalyses}
+              style={{
+                ...primaryBtn,
+                padding: '10px 28px',
+                fontSize: 14,
+                borderRadius: 8,
+              }}
+              aria-label="Run all growth analyses"
+            >
+              🚀 Load All Insights (1 AI call)
+            </button>
+          </div>
         </div>
       </div>
     );
