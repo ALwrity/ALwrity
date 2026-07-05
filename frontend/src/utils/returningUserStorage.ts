@@ -1,3 +1,5 @@
+import { getDefaultLandingRoute, shouldSkipOnboarding } from './demoMode';
+
 const HAS_SIGNED_IN_KEY = 'alwrity_has_signed_in';
 const FIRST_NAME_KEY = 'alwrity_user_first_name';
 
@@ -16,6 +18,10 @@ export function getStoredFirstName(): string | null {
 }
 
 export function getPostAuthDestination(): string {
+  if (shouldSkipOnboarding()) {
+    return getDefaultLandingRoute();
+  }
+
   const onboardingComplete = localStorage.getItem('onboarding_complete') === 'true';
   return onboardingComplete ? '/dashboard' : '/onboarding';
 }

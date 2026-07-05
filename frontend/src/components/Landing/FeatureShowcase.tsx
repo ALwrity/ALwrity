@@ -17,6 +17,7 @@ import {
   landingCardHoverSx,
 } from './landingStyles';
 import { useDeferredBackground } from './useDeferredBackground';
+import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
 interface Feature {
   image: string;
@@ -197,11 +198,12 @@ const FeatureShowcase: React.FC = () => {
   }, [totalPages]);
 
   const handleFeatureClick = useCallback(() => {
+    const destination = getPostAuthDestination();
     if (isSignedIn) {
-      navigate('/');
+      navigate(destination);
       return;
     }
-    openSignIn({ forceRedirectUrl: '/onboarding' });
+    openSignIn({ forceRedirectUrl: destination });
   }, [isSignedIn, navigate, openSignIn]);
 
   const handleNext = () => setCurrentPage((prev) => (prev + 1) % totalPages);

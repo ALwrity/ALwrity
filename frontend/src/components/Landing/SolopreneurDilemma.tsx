@@ -21,6 +21,7 @@ import { useClerk } from '@clerk/clerk-react';
 import { ScrambleText } from '../ScrambleText';
 import { useDeferredBackground } from './useDeferredBackground';
 import { landingSectionTitleSx } from './landingStyles';
+import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
 const SECTION_BG = '/alwrity_landing_pg_bg.png';
 
@@ -408,7 +409,7 @@ const SolopreneurDilemma: React.FC = () => {
                       variant="contained"
                       size="large"
                       endIcon={<ArrowForward />}
-                      onClick={() => openSignIn({ forceRedirectUrl: '/onboarding' })}
+                      onClick={() => openSignIn({ forceRedirectUrl: getPostAuthDestination() })}
                       sx={{
                         mt: 3,
                         py: 2,

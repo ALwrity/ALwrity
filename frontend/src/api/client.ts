@@ -45,6 +45,43 @@ const isPublicApiPath = (url?: string): boolean => {
   return PUBLIC_API_PATHS.some((path) => url.includes(path));
 };
 
+const getErrorDetailText = (data: any): string => {
+  const detail = data?.detail ?? data?.message ?? data?.error ?? '';
+  if (typeof detail === 'string') return detail.toLowerCase();
+  if (detail && typeof detail === 'object') {
+    return JSON.stringify(detail).toLowerCase();
+  }
+  return '';
+};
+
+const isLinkedInConnection401 = (error: any): boolean => {
+  if (error?.response?.status !== 401) return false;
+
+  const url = String(error?.config?.url || '');
+  if (!url.includes('/api/linkedin-social/')) return false;
+
+  const detail = getErrorDetailText(error.response.data);
+  return (
+    (
+      detail.includes('linkedin') &&
+      (
+        detail.includes('not connected') ||
+        detail.includes('no linkedin') ||
+        detail.includes('no personal account')
+      )
+    ) ||
+    detail.includes('missing_credentials') ||
+    detail.includes('missing credentials') ||
+    (
+      detail.includes('unipile') &&
+      (
+        detail.includes('not connected') ||
+        detail.includes('invalid credentials')
+      )
+    )
+  );
+};
+
 // Global subscription error handler
 // Can be async to support subscription status refresh
 let globalSubscriptionErrorHandler: ((error: any) => boolean | Promise<boolean>) | null = null;
@@ -365,6 +402,14 @@ apiClient.interceptors.response.use(
       return Promise.reject(connectionError);
     }
 
+    if (isLinkedInConnection401(error)) {
+      console.warn(
+        'LinkedIn connection/account 401 - preserving Clerk session',
+        error.response?.data
+      );
+      return Promise.reject(error);
+    }
+
     // If 401 and we haven't retried yet, try to refresh token and retry
     if (error?.response?.status === 401 && !originalRequest._retry && authTokenGetter) {
       originalRequest._retry = true;
@@ -525,6 +570,14 @@ aiApiClient.interceptors.response.use(
       return Promise.reject(
         new ConnectionError(`Server error ${error.response.status}: ${error.response.statusText || 'Internal Server Error'}`)
       );
+    }
+
+    if (isLinkedInConnection401(error)) {
+      console.warn(
+        'LinkedIn connection/account 401 - preserving Clerk session',
+        error.response?.data
+      );
+      return Promise.reject(error);
     }
     
     // If 401 and we haven't retried yet, try to refresh token and retry

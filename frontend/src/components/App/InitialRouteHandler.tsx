@@ -4,7 +4,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useOAuthTokenAlerts } from '../../hooks/useOAuthTokenAlerts';
-import { shouldSkipOnboarding, getDefaultLandingRoute, isFeatureOnlyMode, getSingleFeature } from '../../utils/demoMode';
+import { shouldSkipOnboarding, getDefaultLandingRoute } from '../../utils/demoMode';
 import { restoreNavigationState } from '../../utils/navigationState';
 import ConnectionErrorPage from '../shared/ConnectionErrorPage';
 
@@ -301,9 +301,9 @@ const InitialRouteHandler: React.FC = () => {
     }
 
     if (shouldSkipOnboarding()) {
-      // Feature-only mode still requires subscription
-      console.log('InitialRouteHandler: No subscription data in feature-only mode → Pricing page');
-      return navigateAndLog("/pricing");
+      const route = getDefaultLandingRoute();
+      console.log(`InitialRouteHandler: No subscription data in feature-only mode → ${route}`);
+      return navigateAndLog(route);
     }
 
     console.log('InitialRouteHandler: No subscription data after check → Pricing page');
@@ -315,6 +315,12 @@ const InitialRouteHandler: React.FC = () => {
   if (isNewUser || !subscription.active) {
     console.log('InitialRouteHandler: No active subscription - modal will be shown by SubscriptionContext');
     if (isNewUser) {
+      if (shouldSkipOnboarding()) {
+        const route = getDefaultLandingRoute();
+        console.log(`InitialRouteHandler: New user in feature-only mode → ${route}`);
+        return navigateAndLog(route);
+      }
+
       console.log('InitialRouteHandler: New user (no subscription) → Pricing page');
       return <Navigate to="/pricing" replace />;
     }

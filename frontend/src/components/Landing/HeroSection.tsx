@@ -23,6 +23,7 @@ import {
 import { motion } from 'framer-motion';
 import { ScrambleText } from '../ScrambleText';
 import { scrollToLandingSection, scrollToLandingSectionWithRetry, type LandingSectionId } from '../../utils/landingNavigation';
+import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
 const CTA_ROTATE_INTERVAL_MS = 6000;
 const HEADLINE_ROTATE_INTERVAL_MS = 12000;
@@ -91,11 +92,12 @@ const HeroSection: React.FC = () => {
   const { openSignIn } = useClerk();
 
   const handleAuthNavigation = () => {
+    const destination = getPostAuthDestination();
     if (isSignedIn) {
-      navigate('/');
+      navigate(destination);
       return;
     }
-    openSignIn({ forceRedirectUrl: '/onboarding' });
+    openSignIn({ forceRedirectUrl: destination });
   };
 
   const handleChipScroll = (section: LandingSectionId) => {
