@@ -46,7 +46,7 @@ function polar(cx: number, cy: number, r: number, deg: number): { x: number; y: 
 
 function accentFill(accent: string, alpha = 0.16): string {
   const hex = accent.replace('#', '');
-  if (hex.length !== 6) return `rgba(10, 102, 194, ${alpha})`;
+  if (hex.length !== 6) return `rgba(66, 133, 244, ${alpha})`;
   const r = parseInt(hex.slice(0, 2), 16);
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
@@ -223,15 +223,15 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
         <path
           className="workflow-wedge-base"
           d={wedgePath}
-          fill={isActive ? accentFill(card.accent, 0.2) : isRecommended ? accentFill(card.accent, 0.08) : '#ffffff'}
+          fill={isActive ? accentFill(card.accent, 0.2) : isRecommended ? accentFill(card.accent, 0.08) : 'url(#wedgeFill)'}
           stroke={isActive || isRecommended ? card.accent : FRAME_COLOR}
-          strokeWidth={isActive ? 3 : isRecommended ? 2.4 : 2.2}
+          strokeWidth={isActive ? 3 : isRecommended ? 2.4 : 1.2}
           strokeLinejoin="round"
           style={{
             transition: 'fill 180ms ease, stroke 180ms ease, filter 180ms ease',
             filter: isActive
-              ? `drop-shadow(0 10px 22px ${accentFill(card.accent, 0.45)})`
-              : 'drop-shadow(0 2px 6px rgba(10,102,194,0.08)',
+              ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)}) drop-shadow(0 8px 12px rgba(0,0,0,0.1))`
+              : 'drop-shadow(0 2px 8px rgba(66,133,244,0.25)) drop-shadow(0 4px 6px rgba(0,0,0,0.05))',
           }}
         />
         <foreignObject
@@ -304,6 +304,8 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
     );
   };
 
+  const glowR = outerR * 1.4;
+
   return (
     <svg
       viewBox={`0 ${viewBoxY} ${viewW} ${viewH}`}
@@ -312,9 +314,54 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
       style={{ display: 'block', overflow: 'visible' }}
       aria-label="LinkedIn workflow"
     >
+      <defs>
+        <radialGradient id="wedge-ring-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="rgba(66,133,244,0.05)" />
+          <stop offset="35%" stopColor="rgba(66,133,244,0.22)" />
+          <stop offset="65%" stopColor="rgba(66,133,244,0.12)" />
+          <stop offset="100%" stopColor="rgba(66,133,244,0)" />
+        </radialGradient>
+        <linearGradient id="wedgeFill" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="100%" stopColor="#eaf2fa" />
+        </linearGradient>
+        <filter id="atmospheric-glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="28" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+      <g
+        className="radial-glow-breath"
+        style={{
+          transformOrigin: `${centerX}px ${centerY}px`,
+          animation: 'prominentBreathe 2.5s ease-in-out infinite',
+        }}
+      >
+        <circle
+          cx={centerX}
+          cy={centerY}
+          r={glowR}
+          fill="url(#wedge-ring-glow)"
+          filter="url(#atmospheric-glow)"
+          style={{ pointerEvents: 'none' }}
+        />
+      </g>
       <style>{`
         .workflow-wedge:focus-visible .workflow-wedge-base {
           stroke-width: 3px;
+        }
+        @keyframes prominentBreathe {
+          0%, 100% {
+            transform: scale(1);
+            opacity: 0.6;
+          }
+          50% {
+            transform: scale(1.04);
+            opacity: 1;
+          }
         }
       `}</style>
       {orderedCards.map(renderWedge)}

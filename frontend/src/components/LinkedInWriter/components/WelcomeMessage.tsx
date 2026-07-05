@@ -97,6 +97,12 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   }, []);
 
   useEffect(() => {
+    const onOpenBrainstorm = () => setWorkflowModal('plan');
+    window.addEventListener('linkedinwriter:openBrainstorm', onOpenBrainstorm);
+    return () => window.removeEventListener('linkedinwriter:openBrainstorm', onOpenBrainstorm);
+  }, []);
+
+  useEffect(() => {
     const onStartTour = () => setRunStudioTour(true);
     window.addEventListener('linkedinwriter:startStudioTour', onStartTour);
     return () => window.removeEventListener('linkedinwriter:startStudioTour', onStartTour);

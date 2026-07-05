@@ -6,14 +6,10 @@ export interface LinkedInWriterGlobals {
 declare global {
   interface WindowEventMap {
     'linkedinwriter:copilotSeedFromPrompt': CustomEvent<{ prompt: string }>;
-    'linkedinwriter:runGoogleSearchForIdeas': CustomEvent<{
+    'linkedinwriter:runBrainstormIdeas': CustomEvent<{
       prompt?: string;
       seed?: string;
       forceRefresh?: boolean;
-      usePersona?: boolean;
-      useGoogleSearch?: boolean;
-      includeTrending?: boolean;
-      remarketContent?: boolean;
     }>;
     'linkedinwriter:updateDraft': CustomEvent<string>;
     'linkedinwriter:applyEdit': CustomEvent<{ target: string }>;

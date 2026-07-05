@@ -1,6 +1,5 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
 
 interface DashboardActionModalProps {
   open: boolean;
@@ -41,7 +40,8 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.45)',
+        background: 'rgba(0, 0, 0, 0.45)',
+        backdropFilter: 'blur(2px)',
         padding: 24,
       }}
       onClick={handleBackdropClose}
@@ -56,16 +56,16 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
           flexDirection: 'column',
           background: '#ffffff',
           borderRadius: 16,
-          border: `2px solid ${FRAME_COLOR}`,
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.18)',
+          border: '1px solid #e5e7eb',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           overflow: 'hidden',
         }}
       >
         <div
           style={{
-            padding: '16px 20px',
-            borderBottom: `1px solid ${FRAME_COLOR}`,
-            background: FRAME_COLOR,
+            padding: '14px 20px',
+            borderBottom: '1px solid #e5e7eb',
+            background: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -75,7 +75,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         >
           <h2
             id="dashboard-action-modal-title"
-            style={{ margin: 0, fontSize: 17, fontWeight: 700, color: '#0a66c2' }}
+            style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0a66c2', letterSpacing: '-0.01em' }}
           >
             {title}
           </h2>
@@ -87,12 +87,16 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
               style={{
                 background: 'transparent',
                 border: 'none',
-                fontSize: 22,
+                fontSize: 18,
                 lineHeight: 1,
                 cursor: 'pointer',
-                color: '#475569',
-                padding: 4,
+                color: '#9ca3af',
+                padding: '4px 8px',
+                borderRadius: 6,
+                transition: 'background 0.15s',
               }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
             >
               ✕
             </button>
