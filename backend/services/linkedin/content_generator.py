@@ -520,8 +520,17 @@ Return ONLY the synthesized findings in clear bullet points under each category 
             
             # Inject research context into prompt
             research_context = self._build_research_context(research_sources)
+            has_key_points = getattr(request, 'key_points', None)
             if research_context:
                 prompt += research_context
+                if has_key_points:
+                    prompt += """\n\n        RESEARCH-TO-KEY-POINTS MAPPING:
+        For each key point, find which research source(s) best support it. When writing:
+        - Open each key point section by anchoring it to its best-matching research finding
+        - Use inline references like "According to [Source N]" when citing specific data
+        - If research contradicts a key point, acknowledge the nuance rather than forcing alignment"""
+            elif has_key_points:
+                prompt += """\n\n        NOTE: No external research sources were available. Write the post using your general industry knowledge for each key point. Avoid fabricated data — state opinions, frameworks, and observations instead."""
             
             # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(
