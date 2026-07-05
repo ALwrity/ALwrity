@@ -452,11 +452,18 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [variationsPhase, setVariationsPhase] = useState<'idle' | 'generating' | 'ready'>('idle');
   const [variations, setVariations] = useState<VariationResult[]>([]);
   const variationAbortRef = useRef<AbortController | null>(null);
+  const brainstormTimeoutRef = useRef<number | null>(null);
+  const brainstromActiveRef = useRef(false);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [topicFocused, setTopicFocused] = useState(false);
 
   const openModal = useCallback((type: ContentType) => {
+    if (brainstormTimeoutRef.current) {
+      window.clearTimeout(brainstormTimeoutRef.current);
+      brainstormTimeoutRef.current = null;
+    }
+    brainstromActiveRef.current = false;
     setFormData({
       ...defaultForm,
       industry: userPreferences?.industry || '',
@@ -471,6 +478,11 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   }, [userPreferences]);
 
   const closeModal = useCallback(() => {
+    if (brainstormTimeoutRef.current) {
+      window.clearTimeout(brainstormTimeoutRef.current);
+      brainstormTimeoutRef.current = null;
+    }
+    brainstromActiveRef.current = false;
     variationAbortRef.current?.abort();
     setSelectedType(null);
     setFormData(defaultForm);
@@ -498,6 +510,13 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         type === 'carousel' ||
         type === 'video_script'
       ) {
+        // Clear brainstorm safety timeout — idea was selected
+        if (brainstormTimeoutRef.current) {
+          window.clearTimeout(brainstormTimeoutRef.current);
+          brainstormTimeoutRef.current = null;
+        }
+        brainstromActiveRef.current = false;
+
         // Open modal with defaults first, then overlay any pre-fill data from the event
         setFormData({
           ...defaultForm,
@@ -674,14 +693,26 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               <button
                 type="button"
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
-                    detail: {
-                      seed: formData.topic.trim() || '',
-                      options: { usePersona: false, includeTrending: false, remarketContent: false },
-                      forceRefresh: false,
-                    },
-                  }));
+                  const topic = formData.topic.trim();
+                  brainstromActiveRef.current = true;
+                  brainstormTimeoutRef.current = window.setTimeout(() => {
+                    // Safety net: if no idea was selected (no openQuickCreate fired),
+                    // reopen the Post modal after 15s
+                    if (brainstromActiveRef.current) {
+                      brainstromActiveRef.current = false;
+                      openModal('post');
+                    }
+                  }, 15000);
                   closeModal();
+                  setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
+                      detail: {
+                        seed: topic || '',
+                        options: { usePersona: false, includeTrending: false, remarketContent: false },
+                        forceRefresh: false,
+                      },
+                    }));
+                  }, 100);
                 }}
                 style={{
                   position: 'absolute', right: 6, top: 5,
