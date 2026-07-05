@@ -460,7 +460,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [brainstormIdeas, setBrainstormIdeas] = useState<string[]>([]);
   const [brainstormOptions, setBrainstormOptions] = useState({ usePersona: false, includeTrending: false, remarketContent: false });
   const [topicFocused, setTopicFocused] = useState(false);
-  const [keyPointsFocused, setKeyPointsFocused] = useState(false);
 
   const openModal = useCallback((type: ContentType) => {
     setFormData({
@@ -881,27 +880,23 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                 <textarea
                   value={formData.key_points}
                   onChange={e => setField('key_points', e.target.value)}
-                  onFocus={() => setKeyPointsFocused(true)}
-                  onBlur={() => setTimeout(() => setKeyPointsFocused(false), 200)}
                   placeholder="Key point 1 / Key point 2 / Key point 3"
                   rows={3}
                   style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
                 />
-                {keyPointsFocused && (
-                  <button
-                    type="button"
-                    style={{
-                      position: 'absolute', right: 6, bottom: 8,
-                      padding: '4px 10px', borderRadius: 6,
-                      border: '1px solid #8b5cf6', background: '#fff',
-                      color: '#8b5cf6', fontWeight: 700, fontSize: 12,
-                      cursor: 'pointer', whiteSpace: 'nowrap',
-                      display: 'flex', alignItems: 'center', gap: 4,
-                    }}
-                  >
-                    ✨ Get Key Points
-                  </button>
-                )}
+                <button
+                  type="button"
+                  style={{
+                    position: 'absolute', right: 6, bottom: 8,
+                    padding: '4px 10px', borderRadius: 6,
+                    border: '1px solid #8b5cf6', background: '#fff',
+                    color: '#8b5cf6', fontWeight: 700, fontSize: 12,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: 4,
+                  }}
+                >
+                  ✨ Get Key Points
+                </button>
               </div>
             </div>
           </div>
@@ -976,7 +971,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData, topicError, personaInfo]);
+  }, [selectedType, formData, topicError, personaInfo, brainstormOpen, brainstormOptions, brainstormLoading, brainstormIdeas, topicFocused, advancedOpen, handleBrainstorm, setField]);
 
   const showInlineGrid = variant === 'default';
 
