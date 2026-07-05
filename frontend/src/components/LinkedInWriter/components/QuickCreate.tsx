@@ -3,8 +3,7 @@ import { LinkedInPreferences } from '../utils/storageUtils';
 import { linkedInWriterApi } from '../../../services/linkedInWriterApi';
 import { getPlatformPersona } from '../../../api/persona';
 import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/linkedInWriterUtils';
-import DataSourceSelector from './Brainstorm/DataSourceSelector';
-import { aiApiClient } from '../../../api/client';
+
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
 
@@ -455,10 +454,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const variationAbortRef = useRef<AbortController | null>(null);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [brainstormOpen, setBrainstormOpen] = useState(false);
-  const [brainstormLoading, setBrainstormLoading] = useState(false);
-  const [brainstormIdeas, setBrainstormIdeas] = useState<string[]>([]);
-  const [brainstormOptions, setBrainstormOptions] = useState({ usePersona: false, includeTrending: false, remarketContent: false });
   const [topicFocused, setTopicFocused] = useState(false);
 
   const openModal = useCallback((type: ContentType) => {
@@ -473,8 +468,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsPhase('idle');
     setVariations([]);
     setAdvancedOpen(false);
-    setBrainstormOpen(false);
-    setBrainstormIdeas([]);
   }, [userPreferences]);
 
   const closeModal = useCallback(() => {
@@ -486,8 +479,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsPhase('idle');
     setVariations([]);
     setAdvancedOpen(false);
-    setBrainstormOpen(false);
-    setBrainstormIdeas([]);
   }, []);
 
   useEffect(() => {
@@ -523,8 +514,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         setVariationsPhase('idle');
         setVariations([]);
         setAdvancedOpen(false);
-        setBrainstormOpen(false);
-        setBrainstormIdeas([]);
       }
     };
     window.addEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
@@ -655,37 +644,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     }
   };
 
-  const handleBrainstorm = useCallback(async () => {
-    const hasOptions = brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent;
-    if (!formData.topic.trim() && !hasOptions) return;
-    setBrainstormLoading(true);
-    setBrainstormIdeas([]);
-    try {
-      if (hasOptions) {
-        const res = await aiApiClient.post('/api/brainstorm/personalized-ideas', {
-          seed: formData.topic.trim() || '',
-          count: 5,
-          include_trending: brainstormOptions.includeTrending,
-          remarket_content: brainstormOptions.remarketContent,
-          use_persona: brainstormOptions.usePersona,
-        });
-        const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
-        setBrainstormIdeas(list.map((item: any) => item.title || item.prompt || ''));
-      } else {
-        const res = await aiApiClient.post('/api/brainstorm/ideas', {
-          seed: formData.topic.trim(),
-          count: 5,
-        });
-        const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
-        setBrainstormIdeas(list.map((item: any) => item.prompt || ''));
-      }
-    } catch {
-      setBrainstormIdeas([]);
-    } finally {
-      setBrainstormLoading(false);
-    }
-  }, [formData.topic, brainstormOptions]);
-
   const handleUseVariation = useCallback((content: string) => {
     window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: content }));
     closeModal();
@@ -715,7 +673,16 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             {topicFocused && selectedType === 'post' && (
               <button
                 type="button"
-                onClick={() => setBrainstormOpen(prev => !prev)}
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
+                    detail: {
+                      seed: formData.topic.trim() || '',
+                      options: { usePersona: false, includeTrending: false, remarketContent: false },
+                      forceRefresh: false,
+                    },
+                  }));
+                  closeModal();
+                }}
                 style={{
                   position: 'absolute', right: 6, top: 5,
                   padding: '4px 10px', borderRadius: 6,
@@ -733,71 +700,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             <p style={{ margin: '6px 0 0', color: '#b91c1c', fontSize: 12 }}>{topicError}</p>
           )}
         </div>
-
-        {/* Brainstorm inline panel (Post only) */}
-        {selectedType === 'post' && brainstormOpen && (
-          <div style={{
-            marginBottom: 14,
-            border: '1px solid #bfdbfe',
-            borderRadius: 10,
-            padding: 12,
-            background: '#f8faff',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <span style={{ fontWeight: 700, fontSize: 13, color: '#1f2937' }}>Brainstorm Ideas</span>
-              <button
-                type="button"
-                onClick={() => setBrainstormOpen(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 16, padding: 0 }}
-              >
-                ✕
-              </button>
-            </div>
-            <DataSourceSelector
-              options={brainstormOptions}
-              onChange={(upd) => setBrainstormOptions(prev => ({ ...prev, ...upd }))}
-              connected={true}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button
-                type="button"
-                onClick={handleBrainstorm}
-                disabled={brainstormLoading || (!formData.topic.trim() && !brainstormOptions.usePersona && !brainstormOptions.includeTrending && !brainstormOptions.remarketContent)}
-                style={{
-                  padding: '6px 14px', borderRadius: 6, border: 'none',
-                  background: formData.topic.trim() || brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent
-                    ? '#0a66c2' : '#e5e7eb',
-                  color: formData.topic.trim() || brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent
-                    ? '#fff' : '#9ca3af',
-                  fontWeight: 700, fontSize: 12, cursor: formData.topic.trim() || brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent ? 'pointer' : 'not-allowed',
-                }}
-              >
-                {brainstormLoading ? '⏳ Generating...' : '⚡ Generate Ideas'}
-              </button>
-            </div>
-            {brainstormIdeas.length > 0 && (
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {brainstormIdeas.map((idea, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => { setField('topic', idea); setBrainstormOpen(false); }}
-                    style={{
-                      textAlign: 'left', padding: '7px 10px', borderRadius: 6,
-                      border: '1px solid #e5e7eb', background: '#fff',
-                      cursor: 'pointer', fontSize: 12, color: '#1f2937',
-                      lineHeight: 1.4, transition: 'all 0.1s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#0a66c2'; e.currentTarget.style.background = '#eff6ff'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#fff'; }}
-                  >
-                    {idea}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Advanced Options (Industry, Tone, Target Audience) */}
         <div style={{ marginBottom: 14 }}>
@@ -886,12 +788,16 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                 />
                 <button
                   type="button"
+                  disabled={!formData.topic.trim()}
                   style={{
                     position: 'absolute', right: 6, bottom: 8,
                     padding: '4px 10px', borderRadius: 6,
-                    border: '1px solid #8b5cf6', background: '#fff',
-                    color: '#8b5cf6', fontWeight: 700, fontSize: 12,
-                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    border: `1px solid ${formData.topic.trim() ? '#8b5cf6' : '#d1d5db'}`,
+                    background: formData.topic.trim() ? '#fff' : '#f9fafb',
+                    color: formData.topic.trim() ? '#8b5cf6' : '#9ca3af',
+                    fontWeight: 700, fontSize: 12,
+                    cursor: formData.topic.trim() ? 'pointer' : 'not-allowed',
+                    whiteSpace: 'nowrap',
                     display: 'flex', alignItems: 'center', gap: 4,
                   }}
                 >
@@ -971,7 +877,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData, topicError, personaInfo, brainstormOpen, brainstormOptions, brainstormLoading, brainstormIdeas, topicFocused, advancedOpen, handleBrainstorm, setField]);
+  }, [selectedType, formData, topicError, personaInfo, topicFocused, advancedOpen, setField, closeModal]);
 
   const showInlineGrid = variant === 'default';
 
@@ -1018,7 +924,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       {/* Generation Modal */}
       {selectedType && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10020, padding: 20 }}>
-          <div style={{ background: 'white', width: variationsPhase !== 'idle' ? 620 : 520, maxWidth: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', transition: 'width 200ms ease' }}>
+          <div style={{ background: 'white', width: variationsPhase !== 'idle' ? 868 : 728, maxWidth: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', transition: 'width 200ms ease' }}>
 
             {/* Modal header */}
             <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
