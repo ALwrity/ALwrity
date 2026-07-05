@@ -19,6 +19,121 @@ from models.subscription_models import (
     UsageSummary, APIUsageLog, APIProvider, SubscriptionTier
 )
 
+DEFAULT_SUBSCRIPTION_PLANS = [
+    {
+        "name": "Free",
+        "tier": SubscriptionTier.FREE,
+        "price_monthly": 0.0,
+        "price_yearly": 0.0,
+        "ai_text_generation_calls_limit": 50,  # Explicit: Free gets 50 AI text calls (via Gemini fallback)
+        "gemini_calls_limit": 50,
+        "openai_calls_limit": 0,  # DISABLED: OpenAI access not included in Free tier
+        "anthropic_calls_limit": 0,  # DISABLED: Anthropic access not included in Free tier
+        "mistral_calls_limit": 0,  # DISABLED: HuggingFace not in Free tier
+        "tavily_calls_limit": 10,
+        "serper_calls_limit": 10,
+        "metaphor_calls_limit": 0,  # DISABLED: Metaphor not in Free tier
+        "firecrawl_calls_limit": 0,  # DISABLED: Firecrawl not in Free tier
+        "stability_calls_limit": 10,  # 10 images - enough for 2 podcasts (5 images each)
+        "exa_calls_limit": 10,  # 10 research queries - enough to try the product
+        "video_calls_limit": 2,  # 2 video renders - try podcast video on Free
+        "image_edit_calls_limit": 5,  # 5 image edits - enough to try the product
+        "audio_calls_limit": 10,  # 10 audio clips - enough for 2 podcasts (5 clips each)
+        "wavespeed_calls_limit": 0,  # 0 = unlimited for Free; video controlled via video_calls_limit
+        "gemini_tokens_limit": 50000,
+        "openai_tokens_limit": 0,  # DISABLED
+        "anthropic_tokens_limit": 0,  # DISABLED
+        "mistral_tokens_limit": 0,  # DISABLED
+        "monthly_cost_limit": 2.0,  # $2 cap - prevents runaway costs on free tier
+        "features": ["basic_content_generation", "limited_research"],
+        "description": "Perfect for trying out ALwrity"
+    },
+    {
+        "name": "Basic",
+        "tier": SubscriptionTier.BASIC,
+        "price_monthly": 29.0,
+        "price_yearly": 290.0,
+        "ai_text_generation_calls_limit": 500,  # Unified limit for all LLM providers
+        "gemini_calls_limit": 1000,  # Legacy, kept for backwards compatibility (not used for enforcement)
+        "openai_calls_limit": 500,
+        "anthropic_calls_limit": 200,
+        "mistral_calls_limit": 500,
+        "tavily_calls_limit": 200,
+        "serper_calls_limit": 200,
+        "metaphor_calls_limit": 100,
+        "firecrawl_calls_limit": 100,
+        "stability_calls_limit": 25,  # 25 images - good for podcast episode covers
+        "exa_calls_limit": 100,  # 100 research queries
+        "video_calls_limit": 10,  # 10 videos - enough for a few podcast episodes
+        "image_edit_calls_limit": 25,  # 25 AI image edits
+        "audio_calls_limit": 100,  # INCREASED: 100 AI audio generation calls/month (Minimax Speech OSS)
+        "wavespeed_calls_limit": 200,  # WaveSpeed combined limit: TTS + video + image + LLM (Minimax Speech $0.002/min, Qwen $0.03/img, Kling $0.25/5s)
+        "gemini_tokens_limit": 100000,  # INCREASED: 100K tokens per provider (OSS-focused strategy)
+        "openai_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
+        "anthropic_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
+        "mistral_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
+        "monthly_cost_limit": 25.0,  # $25 cap - podcast-focused pricing
+        "features": ["full_content_generation", "advanced_research", "basic_analytics", "all_tools_access", "oss_models_priority"],
+        "description": "Perfect for individuals and small teams. Access all ALwrity features with generous limits powered by OSS AI models."
+    },
+    {
+        "name": "Pro",
+        "tier": SubscriptionTier.PRO,
+        "price_monthly": 79.0,
+        "price_yearly": 790.0,
+        "ai_text_generation_calls_limit": 3000,  # Explicit: Pro gets 3000 AI text calls
+        "gemini_calls_limit": 5000,
+        "openai_calls_limit": 2500,
+        "anthropic_calls_limit": 1000,
+        "mistral_calls_limit": 2500,
+        "tavily_calls_limit": 1000,
+        "serper_calls_limit": 1000,
+        "metaphor_calls_limit": 500,
+        "firecrawl_calls_limit": 500,
+        "stability_calls_limit": 100,  # 100 images - good for regular podcasts
+        "exa_calls_limit": 500,  # 500 research queries
+        "video_calls_limit": 30,  # 30 videos - enough for daily episodes
+        "image_edit_calls_limit": 100,  # 100 AI image edits
+        "audio_calls_limit": 100,  # 100 audio clips - podcast-focused
+        "wavespeed_calls_limit": 500,  # WaveSpeed combined limit: TTS + video + image + LLM
+        "gemini_tokens_limit": 5000000,
+        "openai_tokens_limit": 2500000,
+        "anthropic_tokens_limit": 1000000,
+        "mistral_tokens_limit": 2500000,
+        "monthly_cost_limit": 100.0,  # $100 cap - podcast-focused
+        "features": ["unlimited_content_generation", "premium_research", "advanced_analytics", "priority_support"],
+        "description": "Perfect for growing businesses"
+    },
+    {
+        "name": "Enterprise",
+        "tier": SubscriptionTier.ENTERPRISE,
+        "price_monthly": 199.0,
+        "price_yearly": 1990.0,
+        "ai_text_generation_calls_limit": 0,  # Unlimited
+        "gemini_calls_limit": 0,  # Unlimited
+        "openai_calls_limit": 0,
+        "anthropic_calls_limit": 0,
+        "mistral_calls_limit": 0,
+        "tavily_calls_limit": 0,
+        "serper_calls_limit": 0,
+        "metaphor_calls_limit": 0,
+        "firecrawl_calls_limit": 0,
+        "stability_calls_limit": 0,
+        "exa_calls_limit": 0,  # Unlimited
+        "video_calls_limit": 0,  # Unlimited for enterprise
+        "image_edit_calls_limit": 0,  # Unlimited image editing for enterprise
+        "audio_calls_limit": 0,  # Unlimited audio generation for enterprise
+        "wavespeed_calls_limit": 0,  # Unlimited for enterprise
+        "gemini_tokens_limit": 0,
+        "openai_tokens_limit": 0,
+        "anthropic_tokens_limit": 0,
+        "mistral_tokens_limit": 0,
+        "monthly_cost_limit": 500.0,
+        "features": ["unlimited_everything", "white_label", "dedicated_support", "custom_integrations"],
+        "description": "For large organizations with high-volume needs"
+    }
+]
+
 class PricingService:
     """Service for managing API pricing and cost calculations."""
     
@@ -549,120 +664,7 @@ class PricingService:
     def initialize_default_plans(self):
         """Initialize default subscription plans."""
         
-        plans = [
-            {
-                "name": "Free",
-                "tier": SubscriptionTier.FREE,
-                "price_monthly": 0.0,
-                "price_yearly": 0.0,
-                "ai_text_generation_calls_limit": 50,  # Explicit: Free gets 50 AI text calls (via Gemini fallback)
-                "gemini_calls_limit": 50,
-                "openai_calls_limit": 0,  # DISABLED: OpenAI access not included in Free tier
-                "anthropic_calls_limit": 0,  # DISABLED: Anthropic access not included in Free tier
-                "mistral_calls_limit": 0,  # DISABLED: HuggingFace not in Free tier
-                "tavily_calls_limit": 10,
-                "serper_calls_limit": 10,
-                "metaphor_calls_limit": 0,  # DISABLED: Metaphor not in Free tier
-                "firecrawl_calls_limit": 0,  # DISABLED: Firecrawl not in Free tier
-                "stability_calls_limit": 10,  # 10 images - enough for 2 podcasts (5 images each)
-                "exa_calls_limit": 10,  # 10 research queries - enough to try the product
-                "video_calls_limit": 2,  # 2 video renders - try podcast video on Free
-                "image_edit_calls_limit": 5,  # 5 image edits - enough to try the product
-                "audio_calls_limit": 10,  # 10 audio clips - enough for 2 podcasts (5 clips each)
-                "wavespeed_calls_limit": 0,  # 0 = unlimited for Free; video controlled via video_calls_limit
-                "gemini_tokens_limit": 50000,
-                "openai_tokens_limit": 0,  # DISABLED
-                "anthropic_tokens_limit": 0,  # DISABLED
-                "mistral_tokens_limit": 0,  # DISABLED
-                "monthly_cost_limit": 2.0,  # $2 cap - prevents runaway costs on free tier
-                "features": ["basic_content_generation", "limited_research"],
-                "description": "Perfect for trying out ALwrity"
-            },
-            {
-                "name": "Basic",
-                "tier": SubscriptionTier.BASIC,
-                "price_monthly": 29.0,
-                "price_yearly": 290.0,
-                "ai_text_generation_calls_limit": 500,  # Unified limit for all LLM providers
-                "gemini_calls_limit": 1000,  # Legacy, kept for backwards compatibility (not used for enforcement)
-                "openai_calls_limit": 500,
-                "anthropic_calls_limit": 200,
-                "mistral_calls_limit": 500,
-                "tavily_calls_limit": 200,
-                "serper_calls_limit": 200,
-                "metaphor_calls_limit": 100,
-                "firecrawl_calls_limit": 100,
-                "stability_calls_limit": 25,  # 25 images - good for podcast episode covers
-                "exa_calls_limit": 100,  # 100 research queries
-                "video_calls_limit": 10,  # 10 videos - enough for a few podcast episodes
-                "image_edit_calls_limit": 25,  # 25 AI image edits
-                "audio_calls_limit": 100,  # INCREASED: 100 AI audio generation calls/month (Minimax Speech OSS)
-                "wavespeed_calls_limit": 200,  # WaveSpeed combined limit: TTS + video + image + LLM (Minimax Speech $0.002/min, Qwen $0.03/img, Kling $0.25/5s)
-                "gemini_tokens_limit": 100000,  # INCREASED: 100K tokens per provider (OSS-focused strategy)
-                "openai_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
-                "anthropic_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
-                "mistral_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
-                "monthly_cost_limit": 25.0,  # $25 cap - podcast-focused pricing
-                "features": ["full_content_generation", "advanced_research", "basic_analytics", "all_tools_access", "oss_models_priority"],
-                "description": "Perfect for individuals and small teams. Access all ALwrity features with generous limits powered by OSS AI models."
-            },
-            {
-                "name": "Pro",
-                "tier": SubscriptionTier.PRO,
-                "price_monthly": 79.0,
-                "price_yearly": 790.0,
-                "ai_text_generation_calls_limit": 3000,  # Explicit: Pro gets 3000 AI text calls
-                "gemini_calls_limit": 5000,
-                "openai_calls_limit": 2500,
-                "anthropic_calls_limit": 1000,
-                "mistral_calls_limit": 2500,
-                "tavily_calls_limit": 1000,
-                "serper_calls_limit": 1000,
-                "metaphor_calls_limit": 500,
-                "firecrawl_calls_limit": 500,
-                "stability_calls_limit": 100,  # 100 images - good for regular podcasts
-                "exa_calls_limit": 500,  # 500 research queries
-                "video_calls_limit": 30,  # 30 videos - enough for daily episodes
-                "image_edit_calls_limit": 100,  # 100 AI image edits
-                "audio_calls_limit": 100,  # 100 audio clips - podcast-focused
-                "wavespeed_calls_limit": 500,  # WaveSpeed combined limit: TTS + video + image + LLM
-                "gemini_tokens_limit": 5000000,
-                "openai_tokens_limit": 2500000,
-                "anthropic_tokens_limit": 1000000,
-                "mistral_tokens_limit": 2500000,
-                "monthly_cost_limit": 100.0,  # $100 cap - podcast-focused
-                "features": ["unlimited_content_generation", "premium_research", "advanced_analytics", "priority_support"],
-                "description": "Perfect for growing businesses"
-            },
-            {
-                "name": "Enterprise",
-                "tier": SubscriptionTier.ENTERPRISE,
-                "price_monthly": 199.0,
-                "price_yearly": 1990.0,
-                "ai_text_generation_calls_limit": 0,  # Unlimited
-                "gemini_calls_limit": 0,  # Unlimited
-                "openai_calls_limit": 0,
-                "anthropic_calls_limit": 0,
-                "mistral_calls_limit": 0,
-                "tavily_calls_limit": 0,
-                "serper_calls_limit": 0,
-                "metaphor_calls_limit": 0,
-                "firecrawl_calls_limit": 0,
-                "stability_calls_limit": 0,
-                "exa_calls_limit": 0,  # Unlimited
-                "video_calls_limit": 0,  # Unlimited for enterprise
-                "image_edit_calls_limit": 0,  # Unlimited image editing for enterprise
-                "audio_calls_limit": 0,  # Unlimited audio generation for enterprise
-                "wavespeed_calls_limit": 0,  # Unlimited for enterprise
-                "gemini_tokens_limit": 0,
-                "openai_tokens_limit": 0,
-                "anthropic_tokens_limit": 0,
-                "mistral_tokens_limit": 0,
-                "monthly_cost_limit": 500.0,
-                "features": ["unlimited_everything", "white_label", "dedicated_support", "custom_integrations"],
-                "description": "For large organizations with high-volume needs"
-            }
-        ]
+        plans = DEFAULT_SUBSCRIPTION_PLANS
         
         for plan_data in plans:
             existing = self.db.query(SubscriptionPlan).filter(
