@@ -3,6 +3,8 @@ import { LinkedInPreferences } from '../utils/storageUtils';
 import { linkedInWriterApi } from '../../../services/linkedInWriterApi';
 import { getPlatformPersona } from '../../../api/persona';
 import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/linkedInWriterUtils';
+import DataSourceSelector from './Brainstorm/DataSourceSelector';
+import { aiApiClient } from '../../../api/client';
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
 
@@ -452,6 +454,14 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [variations, setVariations] = useState<VariationResult[]>([]);
   const variationAbortRef = useRef<AbortController | null>(null);
 
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [brainstormOpen, setBrainstormOpen] = useState(false);
+  const [brainstormLoading, setBrainstormLoading] = useState(false);
+  const [brainstormIdeas, setBrainstormIdeas] = useState<string[]>([]);
+  const [brainstormOptions, setBrainstormOptions] = useState({ usePersona: false, includeTrending: false, remarketContent: false });
+  const [topicFocused, setTopicFocused] = useState(false);
+  const [keyPointsFocused, setKeyPointsFocused] = useState(false);
+
   const openModal = useCallback((type: ContentType) => {
     setFormData({
       ...defaultForm,
@@ -463,6 +473,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsMode(false);
     setVariationsPhase('idle');
     setVariations([]);
+    setAdvancedOpen(false);
+    setBrainstormOpen(false);
+    setBrainstormIdeas([]);
   }, [userPreferences]);
 
   const closeModal = useCallback(() => {
@@ -473,6 +486,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsMode(false);
     setVariationsPhase('idle');
     setVariations([]);
+    setAdvancedOpen(false);
+    setBrainstormOpen(false);
+    setBrainstormIdeas([]);
   }, []);
 
   useEffect(() => {
@@ -507,6 +523,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         setVariationsMode(false);
         setVariationsPhase('idle');
         setVariations([]);
+        setAdvancedOpen(false);
+        setBrainstormOpen(false);
+        setBrainstormIdeas([]);
       }
     };
     window.addEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
@@ -637,6 +656,37 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     }
   };
 
+  const handleBrainstorm = useCallback(async () => {
+    const hasOptions = brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent;
+    if (!formData.topic.trim() && !hasOptions) return;
+    setBrainstormLoading(true);
+    setBrainstormIdeas([]);
+    try {
+      if (hasOptions) {
+        const res = await aiApiClient.post('/api/brainstorm/personalized-ideas', {
+          seed: formData.topic.trim() || '',
+          count: 5,
+          include_trending: brainstormOptions.includeTrending,
+          remarket_content: brainstormOptions.remarketContent,
+          use_persona: brainstormOptions.usePersona,
+        });
+        const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
+        setBrainstormIdeas(list.map((item: any) => item.title || item.prompt || ''));
+      } else {
+        const res = await aiApiClient.post('/api/brainstorm/ideas', {
+          seed: formData.topic.trim(),
+          count: 5,
+        });
+        const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
+        setBrainstormIdeas(list.map((item: any) => item.prompt || ''));
+      }
+    } catch {
+      setBrainstormIdeas([]);
+    } finally {
+      setBrainstormLoading(false);
+    }
+  }, [formData.topic, brainstormOptions]);
+
   const handleUseVariation = useCallback((content: string) => {
     window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: content }));
     closeModal();
@@ -654,46 +704,157 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       <>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Topic *</label>
-          <input
-            value={formData.topic}
-            onChange={e => setField('topic', e.target.value)}
-            placeholder={`e.g., ${selectedType === 'video_script' ? 'Networking tips' : 'AI trends in ' + (formData.industry || 'Technology')}`}
-            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              value={formData.topic}
+              onChange={e => setField('topic', e.target.value)}
+              onFocus={() => setTopicFocused(true)}
+              onBlur={() => setTimeout(() => setTopicFocused(false), 200)}
+              placeholder={`e.g., ${selectedType === 'video_script' ? 'Networking tips' : 'AI trends in ' + (formData.industry || 'Technology')}`}
+              style={{ width: '100%', padding: '10px 12px', border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
+            {topicFocused && selectedType === 'post' && (
+              <button
+                type="button"
+                onClick={() => setBrainstormOpen(prev => !prev)}
+                style={{
+                  position: 'absolute', right: 6, top: 5,
+                  padding: '4px 10px', borderRadius: 6,
+                  border: '1px solid #0a66c2', background: '#fff',
+                  color: '#0a66c2', fontWeight: 700, fontSize: 12,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                🧠 Brainstorm
+              </button>
+            )}
+          </div>
           {topicError && (
             <p style={{ margin: '6px 0 0', color: '#b91c1c', fontSize: 12 }}>{topicError}</p>
           )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Industry</label>
-            <select
-              value={formData.industry}
-              onChange={e => setField('industry', e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', background: 'white' }}
-            >
-              {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
-            </select>
+
+        {/* Brainstorm inline panel (Post only) */}
+        {selectedType === 'post' && brainstormOpen && (
+          <div style={{
+            marginBottom: 14,
+            border: '1px solid #bfdbfe',
+            borderRadius: 10,
+            padding: 12,
+            background: '#f8faff',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#1f2937' }}>Brainstorm Ideas</span>
+              <button
+                type="button"
+                onClick={() => setBrainstormOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 16, padding: 0 }}
+              >
+                ✕
+              </button>
+            </div>
+            <DataSourceSelector
+              options={brainstormOptions}
+              onChange={(upd) => setBrainstormOptions(prev => ({ ...prev, ...upd }))}
+              connected={true}
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={handleBrainstorm}
+                disabled={brainstormLoading || (!formData.topic.trim() && !brainstormOptions.usePersona && !brainstormOptions.includeTrending && !brainstormOptions.remarketContent)}
+                style={{
+                  padding: '6px 14px', borderRadius: 6, border: 'none',
+                  background: formData.topic.trim() || brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent
+                    ? '#0a66c2' : '#e5e7eb',
+                  color: formData.topic.trim() || brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent
+                    ? '#fff' : '#9ca3af',
+                  fontWeight: 700, fontSize: 12, cursor: formData.topic.trim() || brainstormOptions.usePersona || brainstormOptions.includeTrending || brainstormOptions.remarketContent ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {brainstormLoading ? '⏳ Generating...' : '⚡ Generate Ideas'}
+              </button>
+            </div>
+            {brainstormIdeas.length > 0 && (
+              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {brainstormIdeas.map((idea, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => { setField('topic', idea); setBrainstormOpen(false); }}
+                    style={{
+                      textAlign: 'left', padding: '7px 10px', borderRadius: 6,
+                      border: '1px solid #e5e7eb', background: '#fff',
+                      cursor: 'pointer', fontSize: 12, color: '#1f2937',
+                      lineHeight: 1.4, transition: 'all 0.1s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#0a66c2'; e.currentTarget.style.background = '#eff6ff'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#fff'; }}
+                  >
+                    {idea}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Tone</label>
-            <select
-              value={formData.tone}
-              onChange={e => setField('tone', e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', background: 'white' }}
-            >
-              {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
+        )}
+
+        {/* Advanced Options (Industry, Tone, Target Audience) */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Target Audience</label>
-          <input
-            value={formData.target_audience}
-            onChange={e => setField('target_audience', e.target.value)}
-            placeholder="e.g., Product Managers, CTOs"
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-          />
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(prev => !prev)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#f9fafb', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              color: '#374151', transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f9fafb'; }}
+          >
+            <span>Advanced Options</span>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>{advancedOpen ? '▲' : '▼'}</span>
+          </button>
+          {advancedOpen && (
+            <div style={{
+              marginTop: 8, padding: 12, border: '1px solid #e5e7eb',
+              borderRadius: 8, background: '#fff',
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Industry</label>
+                  <select
+                    value={formData.industry}
+                    onChange={e => setField('industry', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', background: 'white' }}
+                  >
+                    {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Tone</label>
+                  <select
+                    value={formData.tone}
+                    onChange={e => setField('tone', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', background: 'white' }}
+                  >
+                    {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Target Audience</label>
+                <input
+                  value={formData.target_audience}
+                  onChange={e => setField('target_audience', e.target.value)}
+                  placeholder="e.g., Product Managers, CTOs"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </>
     );
@@ -716,13 +877,32 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             {commonFields}
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Key Points</label>
-              <textarea
-                value={formData.key_points}
-                onChange={e => setField('key_points', e.target.value)}
-                placeholder="Key point 1 / Key point 2 / Key point 3"
-                rows={3}
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              />
+              <div style={{ position: 'relative' }}>
+                <textarea
+                  value={formData.key_points}
+                  onChange={e => setField('key_points', e.target.value)}
+                  onFocus={() => setKeyPointsFocused(true)}
+                  onBlur={() => setTimeout(() => setKeyPointsFocused(false), 200)}
+                  placeholder="Key point 1 / Key point 2 / Key point 3"
+                  rows={3}
+                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
+                />
+                {keyPointsFocused && (
+                  <button
+                    type="button"
+                    style={{
+                      position: 'absolute', right: 6, bottom: 8,
+                      padding: '4px 10px', borderRadius: 6,
+                      border: '1px solid #8b5cf6', background: '#fff',
+                      color: '#8b5cf6', fontWeight: 700, fontSize: 12,
+                      cursor: 'pointer', whiteSpace: 'nowrap',
+                      display: 'flex', alignItems: 'center', gap: 4,
+                    }}
+                  >
+                    ✨ Get Key Points
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         );
