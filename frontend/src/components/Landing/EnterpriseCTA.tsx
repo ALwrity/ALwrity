@@ -14,6 +14,7 @@ import { useClerk } from '@clerk/clerk-react';
 import RocketLaunch from '@mui/icons-material/RocketLaunch';
 import { motion } from 'framer-motion';
 import { landingSectionTitleSx } from './landingStyles';
+import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
 const EnterpriseCTA: React.FC = () => {
   const theme = useTheme();
@@ -134,7 +135,7 @@ const EnterpriseCTA: React.FC = () => {
 
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
                       <Button
-                        onClick={() => openSignIn({ forceRedirectUrl: '/onboarding' })}
+                        onClick={() => openSignIn({ forceRedirectUrl: getPostAuthDestination() })}
                         variant="contained"
                         size="large"
                         startIcon={<RocketLaunch />}

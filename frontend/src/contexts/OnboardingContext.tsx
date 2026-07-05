@@ -257,7 +257,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   /**
    * Computed properties
    */
-  const isOnboardingComplete = data?.onboarding?.is_completed ?? false;
+  const isOnboardingComplete = shouldSkipOnboarding() || (data?.onboarding?.is_completed ?? false);
   const currentStep = data?.onboarding?.current_step ?? 1;
   const completionPercentage = data?.onboarding?.completion_percentage ?? 0;
 

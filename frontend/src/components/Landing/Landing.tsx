@@ -45,6 +45,7 @@ import { LANDING_PRICING_TEASER_PLANS } from './landingPricingTeaser';
 import { LANDING_LIFECYCLE_FEATURES } from './landingLifecycleFeatures';
 import { useDeferredBackground } from './useDeferredBackground';
 import { useLandingCanonical } from './useLandingCanonical';
+import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
 const LIFECYCLE_BG = '/content_lifecycle.png';
 
@@ -736,7 +737,7 @@ const Landing: React.FC = () => {
                         size="small"
                         onClick={() => {
                           if (plan.ctaAction === 'signin') {
-                            openSignIn({ forceRedirectUrl: '/onboarding' });
+                            openSignIn({ forceRedirectUrl: getPostAuthDestination() });
                             return;
                           }
                           navigate('/pricing');
