@@ -180,6 +180,13 @@ class LimitValidator:
                     ).first()
                     if usage:
                         self.db.refresh(usage)  # Ensure fresh data
+                if not usage:
+                    usage = self.db.query(UsageSummary).filter(
+                        UsageSummary.user_id == user_id,
+                        UsageSummary.billing_period == current_period
+                    ).first()
+                    if usage:
+                        self.db.refresh(usage)
             except Exception as sql_error:
                 logger.debug(f"[Subscription Check] Raw SQL query failed, using ORM: {sql_error}")
                 # Fallback to ORM query
@@ -189,46 +196,41 @@ class LimitValidator:
                 ).first()
                 if usage:
                     self.db.refresh(usage)  # Ensure fresh data
-                
-                if not usage:
-                    # First usage this period, create summary
+
+            if not usage:
+                # First usage this period, create summary
+                try:
+                    # Try to create with minimal fields first to avoid missing column errors
+                    from sqlalchemy import text
                     try:
-                        # Try to create with minimal fields first to avoid missing column errors
-                        from sqlalchemy import text
-                        try:
-                            # Insert with only essential fields
-                            insert_sql = text("""
-                                INSERT INTO usage_summaries (user_id, billing_period, created_at, updated_at)
-                                VALUES (:user_id, :period, datetime('now'), datetime('now'))
-                            """)
-                            self.db.execute(insert_sql, {'user_id': user_id, 'period': current_period})
-                            self.db.commit()
-                            
-                            # Now fetch the created record
-                            usage = self.db.query(UsageSummary).filter(
-                                UsageSummary.user_id == user_id,
-                                UsageSummary.billing_period == current_period
-                            ).first()
-                            
-                        except Exception as sql_error:
-                            logger.debug(f"[Subscription Check] Direct SQL insert failed, trying ORM: {sql_error}")
-                            # Fallback to ORM creation
-                            usage = UsageSummary(
-                                user_id=user_id,
-                                billing_period=current_period
-                            )
-                            self.db.add(usage)
-                            self.db.commit()
-                    except Exception as create_error:
-                        logger.error(f"Error creating usage summary: {create_error}")
-                        self.db.rollback()
-                        # STRICT: Fail closed on DB error
-                        return False, f"Failed to create usage summary: {str(create_error)}", {}
-            except Exception as e:
-                logger.error(f"Error getting usage summary for {user_id}: {e}")
-                self.db.rollback()
-                # STRICT: Fail closed on DB error
-                return False, f"Failed to retrieve usage summary: {str(e)}", {}
+                        # Insert with only essential fields
+                        insert_sql = text("""
+                            INSERT INTO usage_summaries (user_id, billing_period, created_at, updated_at)
+                            VALUES (:user_id, :period, datetime('now'), datetime('now'))
+                        """)
+                        self.db.execute(insert_sql, {'user_id': user_id, 'period': current_period})
+                        self.db.commit()
+
+                        # Now fetch the created record
+                        usage = self.db.query(UsageSummary).filter(
+                            UsageSummary.user_id == user_id,
+                            UsageSummary.billing_period == current_period
+                        ).first()
+
+                    except Exception as insert_sql_error:
+                        logger.debug(f"[Subscription Check] Direct SQL insert failed, trying ORM: {insert_sql_error}")
+                        # Fallback to ORM creation
+                        usage = UsageSummary(
+                            user_id=user_id,
+                            billing_period=current_period
+                        )
+                        self.db.add(usage)
+                        self.db.commit()
+                except Exception as create_error:
+                    logger.error(f"Error creating usage summary: {create_error}")
+                    self.db.rollback()
+                    # STRICT: Fail closed on DB error
+                    return False, f"Failed to create usage summary: {str(create_error)}", {}
             
             # Check call limits with error handling
             # NOTE: call_limit = 0 means UNLIMITED (Enterprise plans)
@@ -356,10 +358,11 @@ class LimitValidator:
             # Check cost limits with error handling
             try:
                 cost_limit = limits['limits'].get('monthly_cost', 0) or 0
+                current_cost = (usage.total_cost or 0) if usage else 0
                 # Enforce limit based on tier (Free: 0=disabled, others: 0=unlimited)
-                if _should_enforce_limit(cost_limit, user_tier) and usage.total_cost >= cost_limit:
-                    result = (False, f"Monthly cost limit reached. Current cost: ${usage.total_cost:.2f}, Limit: ${cost_limit:.2f}", {
-                        'current_cost': usage.total_cost,
+                if _should_enforce_limit(cost_limit, user_tier) and current_cost >= cost_limit:
+                    result = (False, f"Monthly cost limit reached. Current cost: ${current_cost:.2f}, Limit: ${cost_limit:.2f}", {
+                        'current_cost': current_cost,
                         'limit': cost_limit,
                         'usage_percentage': 100.0
                     })
@@ -391,12 +394,12 @@ class LimitValidator:
                     call_limit_value = call_limit
                 
                 call_usage_pct = (current_call_count / max(call_limit_value, 1)) * 100 if call_limit_value > 0 else 0
-                cost_usage_pct = (usage.total_cost / max(cost_limit, 1)) * 100 if cost_limit > 0 else 0
+                cost_usage_pct = (current_cost / max(cost_limit, 1)) * 100 if cost_limit > 0 else 0
                 result = (True, "Within limits", {
                     'current_calls': current_call_count,
                     'call_limit': call_limit_value,
                     'call_usage_percentage': call_usage_pct,
-                    'current_cost': usage.total_cost,
+                    'current_cost': current_cost,
                     'cost_limit': cost_limit,
                     'cost_usage_percentage': cost_usage_pct
                 })
