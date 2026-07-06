@@ -48,6 +48,22 @@ class PostPromptBuilder:
             except Exception:
                 persona_block = ""
 
+        has_key_points = bool(request.key_points)
+        key_points_section = ""
+        if has_key_points:
+            points_list = '\n'.join(f'      {i+1}. {kp}' for i, kp in enumerate(request.key_points))
+            key_points_section = f"""
+        KEY POINTS (use these as the post's structural skeleton — each key point should become a dedicated section or paragraph):
+
+{points_list}
+
+        STRUCTURE REQUIREMENT: The post MUST cover ALL of the key points above in order. Dedicate one paragraph or bullet group to each key point. Do not omit or merge any of them. Open with a hook that leads into the first key point, then walk through each one sequentially, and close with a call-to-action that ties them together.
+
+        RESEARCH MAPPING: For each key point, scan the RESEARCH CONTEXT section below and anchor it with a relevant data point, statistic, example, or expert finding. If a key point lacks a direct research match, use general industry knowledge — but prioritize research-backed claims wherever possible."""
+        else:
+            key_points_section = """
+        KEY POINTS: Current industry trends, challenges, and opportunities — focus on what the target audience cares about most right now. Use the RESEARCH CONTEXT below to find supporting data and statistics."""
+
         prompt = f"""
         You are an expert LinkedIn content strategist with 10+ years of experience in the {request.industry} industry. Create a highly engaging, professional LinkedIn post that drives meaningful engagement and establishes thought leadership.
 
@@ -58,10 +74,10 @@ class PostPromptBuilder:
         MAX LENGTH: {request.max_length} characters
 
         {persona_block}
+{key_points_section}
 
         CONTENT REQUIREMENTS:
         - Start with a compelling hook that addresses a pain point or opportunity
-        - Include 2-3 specific, actionable insights or data points
         - Use storytelling elements to make it relatable and memorable
         - Include industry-specific examples or case studies when relevant
         - End with a thought-provoking question or clear call-to-action
@@ -72,8 +88,6 @@ class PostPromptBuilder:
         - Use line breaks and emojis strategically for readability
         - Encourage comments by asking for opinions or experiences
         - Make it shareable by providing genuine value
-
-        KEY POINTS TO COVER: {', '.join(request.key_points) if request.key_points else 'Current industry trends, challenges, and opportunities'}
 
         FORMATTING:
         - Use bullet points or numbered lists for key insights
