@@ -114,7 +114,7 @@ export const linkedInStudioTourSteps: Step[] = [
     target: '[data-tour="li-tour-trigger"]',
     title: 'You are ready',
     content:
-      'Replay this tour anytime from the Tour button. Start with Plan or Create — connect LinkedIn when you are ready to publish.',
+      'Replay this tour anytime from the Tour guide button. Start with Plan or Create — connect LinkedIn when you are ready to publish.',
     placement: 'bottom',
     styles: TOUR_TOOLTIP_STYLE,
   },

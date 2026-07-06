@@ -113,7 +113,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     if (localStorage.getItem(tourSeenKey)) return;
 
     const timer = window.setTimeout(() => {
-      localStorage.setItem(tourSeenKey, 'true');
       setRunStudioTour(true);
     }, 800);
     return () => window.clearTimeout(timer);
@@ -258,19 +257,17 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           color: '#666',
         }}
       >
-        {!localStorage.getItem(tourSeenKey) && (
-          <button
-            type="button"
-            className="linkedin-studio-tour-trigger"
-            data-tour="li-tour-trigger"
-            onClick={() => setRunStudioTour(true)}
-            aria-label="How to use LinkedIn Studio — start guided tour"
-            title="How to use LinkedIn Studio"
-          >
-            <span aria-hidden>?</span>
-            <span className="linkedin-studio-tour-trigger-label">Tour</span>
-          </button>
-        )}
+        <button
+          type="button"
+          className="linkedin-studio-tour-trigger"
+          data-tour="li-tour-trigger"
+          onClick={() => setRunStudioTour(true)}
+          aria-label="How to use LinkedIn Studio — start guided tour"
+          title="Tour guide — how to use LinkedIn Studio"
+        >
+          <span aria-hidden>?</span>
+          <span className="linkedin-studio-tour-trigger-label">Tour guide</span>
+        </button>
 
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
