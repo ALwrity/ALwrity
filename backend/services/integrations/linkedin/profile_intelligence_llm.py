@@ -1,7 +1,8 @@
 """
-Phase 5 — LLM adapter for AI profile intelligence (Gemini structured JSON).
+Phase 5 — LLM adapter for AI profile intelligence (structured JSON).
 
-Thin wrapper over injectable ``generate_fn``; no validation or persistence.
+Thin wrapper over injectable ``generate_fn`` or centralized ``llm_text_gen``;
+no validation or persistence.
 """
 
 from __future__ import annotations
@@ -13,14 +14,13 @@ from loguru import logger
 
 from services.integrations.linkedin.profile_intelligence_types import (
     DEFAULT_PROFILE_INTELLIGENCE_MODEL,
+    PROFILE_INTELLIGENCE_LLM_MAX_TOKENS,
+    PROFILE_INTELLIGENCE_LLM_TEMPERATURE,
     ai_profile_intelligence_json_schema,
 )
-from services.llm_providers.gemini_provider import gemini_structured_json_response
+from services.llm_providers.main_text_generation import llm_text_gen
 
 _LOG_PREFIX = "[ProfileIntelligence]"
-
-PROFILE_INTELLIGENCE_LLM_TEMPERATURE = 0.2
-PROFILE_INTELLIGENCE_LLM_MAX_TOKENS = 4096
 
 ProfileIntelligenceGenerateFn = Callable[..., Any]
 
@@ -33,8 +33,8 @@ class ProfileIntelligenceLLMError(Exception):
         self.error_kind = error_kind
 
 
-def _classify_gemini_error(exc: Exception) -> str:
-    """Return a safe error category for Gemini/provider failures (for logging)."""
+def _classify_llm_error(exc: Exception) -> str:
+    """Return a safe error category for LLM/provider failures (for logging)."""
     msg = str(exc).lower()
     if "resource_exhausted" in msg or "quota" in msg or "rate limit" in msg:
         return "quota_or_rate_limit"
@@ -44,14 +44,16 @@ def _classify_gemini_error(exc: Exception) -> str:
         return "timeout"
     if "invalid json" in msg or "json" in msg:
         return "invalid_json"
+    if "subscription" in msg or "429" in msg:
+        return "subscription_limit"
     return "provider_error"
 
 
-def _log_gemini_provider_error(exc: Exception, *, user_id: Optional[str]) -> None:
-    """Log Gemini/provider failures with safe metadata for production debugging."""
-    error_kind = _classify_gemini_error(exc)
+def _log_llm_provider_error(exc: Exception, *, user_id: Optional[str]) -> None:
+    """Log LLM/provider failures with safe metadata for production debugging."""
+    error_kind = _classify_llm_error(exc)
     logger.error(
-        "{} Gemini/provider failure kind={} type={} user_id={} message={}",
+        "{} LLM/provider failure kind={} type={} user_id={} message={}",
         _LOG_PREFIX,
         error_kind,
         type(exc).__name__,
@@ -59,7 +61,7 @@ def _log_gemini_provider_error(exc: Exception, *, user_id: Optional[str]) -> Non
         str(exc)[:500],
     )
     logger.exception(
-        "{} Gemini/provider traceback user_id={} kind={}",
+        "{} LLM/provider traceback user_id={} kind={}",
         _LOG_PREFIX,
         user_id,
         error_kind,
@@ -71,7 +73,7 @@ def call_profile_intelligence_llm(
     system_prompt: str,
     user_prompt: str,
     user_id: Optional[str] = None,
-    generate_fn: ProfileIntelligenceGenerateFn = gemini_structured_json_response,
+    generate_fn: Optional[ProfileIntelligenceGenerateFn] = None,
 ) -> dict[str, Any]:
     """
     Call the LLM to generate structured profile intelligence JSON.
@@ -80,7 +82,7 @@ def call_profile_intelligence_llm(
         system_prompt: System instruction for the model
         user_prompt: User message (serialized ``LinkedInProfileContext`` JSON)
         user_id: Optional ALwrity user ID for provider usage tracking
-        generate_fn: Injectable structured JSON generator (default: Gemini)
+        generate_fn: Injectable structured JSON generator (default: ``llm_text_gen``)
 
     Returns:
         Parsed dict from the LLM (not yet validated by Pydantic)
@@ -98,19 +100,30 @@ def call_profile_intelligence_llm(
     )
 
     try:
-        response = generate_fn(
-            prompt=user_prompt,
-            schema=schema,
-            temperature=PROFILE_INTELLIGENCE_LLM_TEMPERATURE,
-            max_tokens=PROFILE_INTELLIGENCE_LLM_MAX_TOKENS,
-            system_prompt=system_prompt,
-            user_id=user_id,
-        )
+        if generate_fn is not None:
+            response = generate_fn(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                json_struct=schema,
+                user_id=user_id,
+                max_tokens=PROFILE_INTELLIGENCE_LLM_MAX_TOKENS,
+                temperature=PROFILE_INTELLIGENCE_LLM_TEMPERATURE,
+            )
+        else:
+            response = llm_text_gen(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                json_struct=schema,
+                user_id=user_id,
+                flow_type="linkedin_profile_intelligence",
+                max_tokens=PROFILE_INTELLIGENCE_LLM_MAX_TOKENS,
+                temperature=PROFILE_INTELLIGENCE_LLM_TEMPERATURE,
+            )
     except ProfileIntelligenceLLMError:
         raise
     except Exception as exc:
-        _log_gemini_provider_error(exc, user_id=user_id)
-        error_kind = _classify_gemini_error(exc)
+        _log_llm_provider_error(exc, user_id=user_id)
+        error_kind = _classify_llm_error(exc)
         raise ProfileIntelligenceLLMError(
             "Unable to generate AI profile intelligence from LLM",
             error_kind=error_kind,

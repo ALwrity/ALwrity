@@ -188,7 +188,7 @@ def profile_optimization_gemini_json_schema() -> dict[str, Any]:
     service layer merges multiple batches into the full backlog (Layer 2 / Step 4).
 
     Returns:
-        Flat hand-crafted schema suitable for ``gemini_structured_json_response``
+        Flat hand-crafted schema suitable for ``llm_text_gen`` structured output
     """
     return {
         "type": "object",

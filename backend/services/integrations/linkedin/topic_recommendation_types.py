@@ -81,6 +81,6 @@ def topic_recommendation_json_schema() -> dict[str, Any]:
     Return JSON schema for Gemini structured output (LLM fields only).
 
     Returns:
-        JSON schema dict suitable for ``gemini_structured_json_response``
+        JSON schema dict suitable for ``llm_text_gen`` structured output
     """
     return TopicRecommendationLLMResponse.model_json_schema()
