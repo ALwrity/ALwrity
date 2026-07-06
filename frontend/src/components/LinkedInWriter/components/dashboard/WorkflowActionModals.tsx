@@ -29,16 +29,13 @@ import {
 } from './RemarkWedgeModals';
 import {
   DraftLibraryModal,
-  QualityCheckModal,
-  TimingAdvisorModal,
-  ScheduleQuickModal,
   PublishNowModal,
 } from './PublishWedgeModals';
 
-type AnalysisSub = 'snapshot' | 'post_today' | 'brand_score' | 'weekly_plan' | 'viral' | null;
+type AnalysisSub = 'snapshot' | 'brand_score' | 'weekly_plan' | 'viral' | null;
 type EngagementSub = 'booster' | 'comment' | 'opportunities' | 'pulse' | 'network' | null;
 type RemarkSub = 'repurpose' | 'transformer' | 'refresh' | 'reviver' | 'perf_plan' | null;
-type PublishSub = 'drafts' | 'quality' | 'timing' | 'schedule' | 'publish_now' | null;
+type PublishSub = 'drafts' | 'post_today' | 'publish_now' | null;
 
 export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis' | 'engagement' | 'remarket';
 
@@ -62,8 +59,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const [analysisSub, setAnalysisSub]     = useState<AnalysisSub>(null);
   const [engagementSub, setEngagementSub] = useState<EngagementSub>(null);
   const [remarkSub, setRemarkSub]         = useState<RemarkSub>(null);
-  const [publishSub, setPublishSub]       = useState<PublishSub>(null);
-  const [timingPrefill, setTimingPrefill] = useState<{ date: string; time: string } | null>(null);
+  const [publishSub, setPublishSub] = useState<PublishSub>(null);
 
   const [brainstormSeed, setBrainstormSeed] = useState('');
   const [usePersona, setUsePersona] = useState(false);
@@ -263,7 +259,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
       {/* ── Publish ── */}
       <DashboardActionModal open={activeModal === 'publish'} title="Publish" onClose={onClose} maxWidth={640}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
           <DashboardToolTile
             title="My Drafts"
             description="Browse and restore your saved LinkedIn posts"
@@ -272,25 +268,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             onClick={() => { onClose(); setPublishSub('drafts'); }}
           />
           <DashboardToolTile
-            title="Quality Check"
-            description="Score your post across 6 dimensions before publishing"
-            icon="📊"
-            accent="#8b5cf6"
-            onClick={() => { onClose(); setPublishSub('quality'); }}
-          />
-          <DashboardToolTile
-            title="Best Time to Post"
-            description="Industry-keyed optimal LinkedIn posting windows"
-            icon="⏰"
-            accent="#0ea5e9"
-            onClick={() => { onClose(); setPublishSub('timing'); }}
-          />
-          <DashboardToolTile
-            title="Schedule Post"
-            description="Add to your content calendar without leaving the studio"
-            icon="📅"
-            accent="#10b981"
-            onClick={() => { onClose(); setPublishSub('schedule'); }}
+            title="Post Today"
+            description="AI ranks your top 3 post opportunities right now"
+            icon="🎯"
+            accent="#0a66c2"
+            onClick={() => { onClose(); setPublishSub('post_today'); }}
           />
           <DashboardToolTile
             title="Publish to LinkedIn"
@@ -311,28 +293,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
       {/* ── Publish sub-modals ── */}
       <DraftLibraryModal open={publishSub === 'drafts'} onClose={() => setPublishSub(null)} />
-      <QualityCheckModal open={publishSub === 'quality'} onClose={() => setPublishSub(null)} />
-      <TimingAdvisorModal
-        open={publishSub === 'timing'}
-        onClose={() => setPublishSub(null)}
-        onScheduleSlot={(date: string, time: string) => {
-          setTimingPrefill({ date, time });
-          setPublishSub('schedule');
-        }}
-      />
-      <ScheduleQuickModal
-        open={publishSub === 'schedule'}
-        onClose={() => { setPublishSub(null); setTimingPrefill(null); }}
-        prefillDate={timingPrefill?.date}
-        prefillTime={timingPrefill?.time}
-      />
+      <PostTodayModal open={publishSub === 'post_today'} onClose={() => setPublishSub(null)} />
       <PublishNowModal open={publishSub === 'publish_now'} onClose={() => setPublishSub(null)} />
 
       {/* ── Analysis ── */}
       <DashboardActionModal open={activeModal === 'analysis'} title="Analysis" onClose={onClose} maxWidth={680}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
           <DashboardToolTile title="Growth Snapshot" description="Instant view: top trending topic, biggest content gap, brand score" icon="⚡" accent="#f59e0b" onClick={() => { onClose(); setAnalysisSub('snapshot'); }} />
-          <DashboardToolTile title="Post Today"      description="AI ranks your top 3 post opportunities right now"                   icon="🎯" accent="#0a66c2" onClick={() => { onClose(); setAnalysisSub('post_today'); }} />
           <DashboardToolTile title="Brand Score"     description="Full personal brand breakdown across 5 dimensions"                  icon="🏆" accent="#8b5cf6" onClick={() => { onClose(); setAnalysisSub('brand_score'); }} />
           <DashboardToolTile title="Weekly Plan"     description="Mon–Fri AI content plan with Create Now + Schedule CTAs"            icon="📅" accent="#059669" onClick={() => { onClose(); setAnalysisSub('weekly_plan'); }} />
           <DashboardToolTile title="Viral Patterns"  description="Top viral formats in your niche — write in any style"              icon="🔥" accent="#dc2626" onClick={() => { onClose(); setAnalysisSub('viral'); }} />
@@ -343,7 +310,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       </DashboardActionModal>
 
       <GrowthSnapshotModal  open={analysisSub === 'snapshot'}    onClose={() => setAnalysisSub(null)} />
-      <PostTodayModal       open={analysisSub === 'post_today'}  onClose={() => setAnalysisSub(null)} />
       <BrandScorecardModal  open={analysisSub === 'brand_score'} onClose={() => setAnalysisSub(null)} />
       <WeeklyPlanModal      open={analysisSub === 'weekly_plan'} onClose={() => setAnalysisSub(null)} />
       <ViralCopywriterModal open={analysisSub === 'viral'}       onClose={() => setAnalysisSub(null)} />

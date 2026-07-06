@@ -268,7 +268,7 @@ export const AssetLibrary: React.FC = () => {
       if (navigator.share) {
         await navigator.share({
           title: asset.title || asset.filename,
-          text: asset.description,
+          text: asset.asset_metadata?.content || asset.description || '',
           url: asset.file_url,
         });
       } else {
@@ -298,8 +298,9 @@ export const AssetLibrary: React.FC = () => {
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
+    const getContent = (a: ContentAsset) => a.asset_metadata?.content || a.description || '';
     try {
-      let content = asset.description || '';
+      let content = getContent(asset);
       if (!content) {
         const resp = await fetch(`${API_BASE_URL}/api/content-assets/${asset.id}/content`, { headers });
         if (resp.ok) {
@@ -315,7 +316,7 @@ export const AssetLibrary: React.FC = () => {
       });
     } catch {
       navigate('/linkedin-writer', {
-        state: { linkedinDraftContent: asset.description || '' },
+        state: { linkedinDraftContent: getContent(asset) },
       });
     }
   };

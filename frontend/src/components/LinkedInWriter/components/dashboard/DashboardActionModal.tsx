@@ -6,7 +6,7 @@ interface DashboardActionModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
-  maxWidth?: number;
+  maxWidth?: number | string;
   maxHeight?: string;
   zIndex?: number;
   disableClose?: boolean;

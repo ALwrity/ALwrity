@@ -143,7 +143,7 @@ async def get_preview_score(
     try:
         user_id = _extract_user_id(current_user)
         service = PreviewScoreService()
-        return await service.score_post(request=request, user_id=user_id)
+        return service.score_post(request=request, user_id=user_id)
     except HTTPException:
         raise
     except Exception as e:

@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button, Snackbar, Alert, CircularProgress } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
-import { linkedInWriterApi } from '../../services/linkedInWriterApi';
+import { Save as SaveIcon, RateReview as RateReviewIcon } from '@mui/icons-material';
+import { QualityCheckModal } from './components/dashboard/PublishWedgeModals';
+import { linkedInWriterApi, saveLinkedInToAssetLibrary } from '../../services/linkedInWriterApi';
 import { CopilotSidebar } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
 import './styles/alwrity-copilot.css';
@@ -27,7 +28,6 @@ import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
-import { saveLinkedInToAssetLibrary } from '../../services/linkedInWriterApi';
 import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
 // Optional debug flag: set to true to enable verbose logs locally
@@ -152,6 +152,9 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   // Save-to-asset-library state
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
+
+  // Quality Check state
+  const [qualityCheckOpen, setQualityCheckOpen] = useState(false);
 
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
@@ -591,6 +594,18 @@ Always use the most appropriate tool for the user's request.`.trim();
                  'Save to Asset Library'}
               </Button>
 
+              <Button
+                type='button'
+                variant="outlined"
+                color="secondary"
+                startIcon={<RateReviewIcon />}
+                onClick={() => setQualityCheckOpen(true)}
+                disabled={!draft}
+                sx={{ textTransform: 'none', fontSize: 13, fontWeight: 600 }}
+              >
+                Quality Check
+              </Button>
+
               <div style={{ flex: 1 }} />
 
               <PublishLinkedInPanel draft={draft} compact />
@@ -661,6 +676,14 @@ Always use the most appropriate tool for the user's request.`.trim();
             : `Failed to save: ${saveErrorMessage || 'Please try again.'}`}
         </Alert>
       </Snackbar>
+
+      {/* Quality Check Modal */}
+      <QualityCheckModal
+        open={qualityCheckOpen}
+        onClose={() => setQualityCheckOpen(false)}
+        initialContent={draft}
+        contextHint={context || undefined}
+      />
 
       {/* ── Share a Link Modal ── */}
       {showShareLinkModal && (
