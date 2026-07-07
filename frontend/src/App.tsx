@@ -128,7 +128,6 @@ const App: React.FC = () => {
     const handleKeyUpdate = (event: CustomEvent) => {
       const newKey = event.detail?.apiKey;
       if (newKey) {
-        console.log('App: CopilotKit key updated, reloading...');
         setCopilotApiKey(newKey);
         setTimeout(() => window.location.reload(), 500);
       }
