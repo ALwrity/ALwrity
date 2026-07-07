@@ -45,6 +45,7 @@ import { ImageStudioLayout } from './ImageStudioLayout';
 import { DashboardHeaderProps } from '../shared/types';
 import { useContentAssets, AssetFilters, ContentAsset } from '../../hooks/useContentAssets';
 import { intentResearchApi } from '../../api/intentResearchApi';
+import { postAnalyticsApi, LinkedInPost } from '../../services/postAnalyticsApi';
 import { AssetFilters as AssetFiltersComponent } from './AssetLibraryComponents/AssetFilters';
 import { AssetCard } from './AssetLibraryComponents/AssetCard';
 import { AssetTableRow } from './AssetLibraryComponents/AssetTableRow';
@@ -84,6 +85,12 @@ export const AssetLibrary: React.FC = () => {
     severity: 'success',
   });
   const [textPreviews, setTextPreviews] = useState<{ [key: number]: { content: string; loading: boolean; expanded: boolean } }>({});
+
+  // LinkedIn post analytics state (only used when source_module === 'linkedin_writer')
+  const [analyticsPosts, setAnalyticsPosts] = useState<LinkedInPost[]>([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
+  const [analyticsLastSynced, setAnalyticsLastSynced] = useState<number | null>(null);
 
   // Debounce search query
   useEffect(() => {
@@ -179,6 +186,27 @@ export const AssetLibrary: React.FC = () => {
     setTabValue(newValue);
     setPage(0);
   };
+
+  const handleRefreshAnalytics = async (refresh = false) => {
+    setAnalyticsLoading(true);
+    setAnalyticsError('');
+    try {
+      const res = await postAnalyticsApi.fetchStoredAnalytics(refresh);
+      setAnalyticsPosts(res.posts ?? []);
+      if (res.posts && res.posts.length > 0) setAnalyticsLastSynced(Date.now());
+    } catch {
+      setAnalyticsError('Could not load post analytics. Make sure LinkedIn is connected.');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  };
+
+  // Load cached analytics on mount for LinkedIn writer
+  useEffect(() => {
+    if (urlSourceModule === 'linkedin_writer') {
+      void handleRefreshAnalytics(false);
+    }
+  }, [urlSourceModule]);
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
@@ -759,6 +787,60 @@ export const AssetLibrary: React.FC = () => {
             </Grid>
           )}
 
+          {/* LinkedIn Post Analytics section — only in LinkedIn writer context */}
+          {urlSourceModule === 'linkedin_writer' && (
+            <Box sx={{ mt: 4, borderTop: '1px solid rgba(255,255,255,0.08)', pt: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6" sx={{ color: 'rgba(255,255,255,0.9)', fontWeight: 700, fontSize: 15 }}>
+                  📊 Post Analytics
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                  {analyticsLastSynced && (
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 11 }}>
+                      Last synced: {formatTimeAgo(analyticsLastSynced)}
+                    </Typography>
+                  )}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<Refresh />}
+                    disabled={analyticsLoading}
+                    onClick={() => void handleRefreshAnalytics(true)}
+                    sx={{ borderColor: 'rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.7)', fontSize: 11 }}
+                  >
+                    {analyticsLoading ? 'Syncing…' : 'Sync from LinkedIn'}
+                  </Button>
+                </Box>
+              </Box>
+
+              {analyticsLoading && (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                  <CircularProgress size={28} />
+                </Box>
+              )}
+
+              {analyticsError && (
+                <Alert severity="error" sx={{ mb: 2 }}>{analyticsError}</Alert>
+              )}
+
+              {!analyticsLoading && !analyticsError && analyticsPosts.length === 0 && (
+                <Box sx={{ textAlign: 'center', py: 4, color: 'rgba(255,255,255,0.5)' }}>
+                  <Typography variant="body2">
+                    No analytics data yet. Sync from LinkedIn to view engagement metrics for your published posts.
+                  </Typography>
+                </Box>
+              )}
+
+              {!analyticsLoading && analyticsPosts.length > 0 && (
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {analyticsPosts.slice(0, 10).map(post => (
+                    <AnalyticsRow key={post.id} post={post} />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
+
           {/* Pagination */}
           {total > pageSize && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, gap: 2, alignItems: 'center' }}>
@@ -797,3 +879,59 @@ export const AssetLibrary: React.FC = () => {
     </ImageStudioLayout>
   );
 };
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+function formatTimeAgo(timestamp: number): string {
+  const minutes = Math.floor((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+const rowBase: React.CSSProperties = {
+  background: 'rgba(255,255,255,0.03)',
+  border: '1px solid rgba(255,255,255,0.08)',
+  borderRadius: 8,
+  padding: '10px 14px',
+  transition: 'background 0.15s',
+};
+
+const AnalyticsRow: React.FC<{ post: LinkedInPost }> = ({ post }) => {
+  const m = post.engagement;
+  const rate = m?.engagement_rate ?? 0;
+  const ratePct = (rate * 100).toFixed(1);
+  const rateColor = rate >= 0.05 ? '#166534' : rate >= 0.02 ? '#854d0e' : '#991b1b';
+  const rateBg = rate >= 0.05 ? '#dcfce7' : rate >= 0.02 ? '#fef9c3' : '#fee2e2';
+  const snippet = post.text?.slice(0, 120) ?? '';
+  const hasMore = (post.text?.length ?? 0) > 120;
+
+  return (
+    <div style={rowBase}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', flex: 1, lineHeight: 1.4 }}>
+          {snippet}{hasMore ? '…' : ''}
+        </div>
+        <span style={{ fontSize: 11, fontWeight: 800, background: rateBg, color: rateColor, padding: '2px 7px', borderRadius: 5, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          {ratePct}% eng.
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 0 }}>
+        <MetricChip icon="❤️" value={m?.reactions ?? 0} label="reactions" />
+        <MetricChip icon="💬" value={m?.comments ?? 0} label="comments" />
+        <MetricChip icon="🔁" value={m?.reposts ?? 0} label="reposts" />
+        <MetricChip icon="👁️" value={m?.impressions ?? 0} label="views" />
+      </div>
+    </div>
+  );
+};
+
+const MetricChip: React.FC<{ icon: string; value: number; label: string }> = ({ icon, value, label }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+    <span style={{ fontSize: 12 }}>{icon}</span>
+    <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.85)' }}>{value.toLocaleString()}</span>
+    <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{label}</span>
+  </div>
+);
