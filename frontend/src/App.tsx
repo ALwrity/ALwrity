@@ -12,7 +12,7 @@ import { ConditionalCopilotKit, AuthenticatedCopilotWrapper } from './components
 import Landing from './components/Landing/Landing';
 import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
-import PricingPage from './components/Pricing/PricingPage';
+const PricingPage = React.lazy(() => import('./components/Pricing/PricingPage'));
 
 // ─── Lazy loaded route components ───────────────────────────────────────────
 // Default exports
@@ -110,8 +110,8 @@ const App: React.FC = () => {
     const envKey = process.env.REACT_APP_COPILOTKIT_API_KEY || '';
     const key = (savedKey || envKey).trim();
     
-    // Validate key format if present
-    if (key && !key.startsWith('ck_pub_')) {
+    // Validate key format if present (dev-only to avoid production console leaks)
+    if (key && !key.startsWith('ck_pub_') && process.env.NODE_ENV === 'development') {
       console.warn('CopilotKit API key format invalid - must start with ck_pub_');
     }
     
@@ -128,7 +128,9 @@ const App: React.FC = () => {
     const handleKeyUpdate = (event: CustomEvent) => {
       const newKey = event.detail?.apiKey;
       if (newKey) {
-        console.log('App: CopilotKit key updated, reloading...');
+        if (process.env.NODE_ENV === 'development') {
+          console.log('App: CopilotKit key updated, reloading...');
+        }
         setCopilotApiKey(newKey);
         setTimeout(() => window.location.reload(), 500);
       }
@@ -163,15 +165,54 @@ const App: React.FC = () => {
   const clerkPublishableKey = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY || '';
   const clerkJSUrl = process.env.REACT_APP_CLERK_JS_URL;
 
-  // Show error if required keys are missing
-  if (!clerkPublishableKey) {
+  // Detect placeholder / missing keys — a placeholder passes !key but crashes Clerk
+  const isPlaceholderKey = (val: string): boolean =>
+    !val || val.includes('your_') || val.endsWith('_here') || val.trim() === '';
+
+  // Show actionable setup screen instead of crashing with a cryptic error
+  if (isPlaceholderKey(clerkPublishableKey)) {
     return (
-      <Box sx={{ p: 3, textAlign: 'center' }}>
-        <Typography color="error" variant="h6">
-          Missing Clerk Publishable Key
+      <Box
+        sx={{
+          p: 4,
+          textAlign: 'center',
+          maxWidth: 560,
+          mx: 'auto',
+          mt: { xs: 6, md: 12 },
+        }}
+      >
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+          ⚙️ Local Setup Required
         </Typography>
-        <Typography variant="body2" sx={{ mt: 1 }}>
-          Please add REACT_APP_CLERK_PUBLISHABLE_KEY to your .env file
+        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>
+          Add your Clerk publishable key to <code>frontend/.env</code> to run the app locally.
+        </Typography>
+        <Box
+          component="pre"
+          sx={{
+            textAlign: 'left',
+            bgcolor: '#f5f5f5',
+            border: '1px solid #e0e0e0',
+            borderRadius: 1,
+            p: 2,
+            fontSize: 13,
+            overflowX: 'auto',
+            mb: 3,
+          }}
+        >
+          {'REACT_APP_CLERK_PUBLISHABLE_KEY=pk_test_...'}
+        </Box>
+        <Typography variant="body2" color="text.secondary">
+          Get a free key at{' '}
+          <a
+            href="https://clerk.com"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: '#1976d2' }}
+          >
+            clerk.com
+          </a>{' '}
+          → Dashboard → API Keys
         </Typography>
       </Box>
     );
