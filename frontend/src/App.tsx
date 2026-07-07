@@ -103,18 +103,18 @@ const RootRoute: React.FC = () => {
 const App: React.FC = () => {
   // React Hooks MUST be at the top before any conditionals
   const [loading, setLoading] = useState(true);
-  
+
   // Get CopilotKit key from localStorage or .env
   const [copilotApiKey, setCopilotApiKey] = useState(() => {
     const savedKey = localStorage.getItem('copilotkit_api_key');
     const envKey = process.env.REACT_APP_COPILOTKIT_API_KEY || '';
     const key = (savedKey || envKey).trim();
-    
+
     // Validate key format if present
     if (key && !key.startsWith('ck_pub_')) {
       console.warn('CopilotKit API key format invalid - must start with ck_pub_');
     }
-    
+
     return key;
   });
 
@@ -128,12 +128,11 @@ const App: React.FC = () => {
     const handleKeyUpdate = (event: CustomEvent) => {
       const newKey = event.detail?.apiKey;
       if (newKey) {
-        console.log('App: CopilotKit key updated, reloading...');
         setCopilotApiKey(newKey);
         setTimeout(() => window.location.reload(), 500);
       }
     };
-    
+
     window.addEventListener('copilotkit-key-updated', handleKeyUpdate as EventListener);
     return () => window.removeEventListener('copilotkit-key-updated', handleKeyUpdate as EventListener);
   }, []);
@@ -186,84 +185,84 @@ const App: React.FC = () => {
             <TokenInstaller />
             <Suspense fallback={<LazyLoadingFallback />}>
               <Routes>
-                    <Route path="/" element={<RootRoute />} />
-                    <Route path="/home" element={<Landing />} />
-                    <Route 
-                      path="/onboarding" 
-                      element={
-                        <ErrorBoundary context="Onboarding Wizard" showDetails>
-                          <WizardWithNavigate />
-                        </ErrorBoundary>
-                      } 
-                    />
-                    {/* Error Boundary Testing - Development Only */}
-                    {process.env.NODE_ENV === 'development' && (
-                      <Route path="/error-test" element={<ErrorBoundaryTest />} />
-                    )}
-                    <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
-                    <Route path="/seo" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/seo-dashboard" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/backlink-outreach" element={<ProtectedRoute><FeatureRoute feature="backlinking"><BacklinkOutreachDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/content-planning" element={<ProtectedRoute><FeatureRoute feature="content-planning"><ContentPlanningDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/facebook-writer" element={<ProtectedRoute><FeatureRoute feature="facebook"><FacebookWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/linkedin-writer" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/blog-writer" element={<ProtectedRoute><FeatureRoute feature="blog_writer"><BlogWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/youtube-creator" element={<ProtectedRoute><FeatureRoute feature="youtube"><YouTubeCreator /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/podcast-maker" element={<ProtectedRoute><FeatureRoute feature="podcast"><PodcastDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-studio" element={<ProtectedRoute><FeatureRoute feature="image"><ImageStudioDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio" element={<ProtectedRoute><FeatureRoute feature="video"><VideoStudioDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/create" element={<ProtectedRoute><FeatureRoute feature="video"><CreateVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/avatar" element={<ProtectedRoute><FeatureRoute feature="video"><AvatarVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/enhance" element={<ProtectedRoute><FeatureRoute feature="video"><EnhanceVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/extend" element={<ProtectedRoute><FeatureRoute feature="video"><ExtendVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/edit" element={<ProtectedRoute><FeatureRoute feature="video"><EditVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/transform" element={<ProtectedRoute><FeatureRoute feature="video"><TransformVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/social" element={<ProtectedRoute><FeatureRoute feature="video"><SocialVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/face-swap" element={<ProtectedRoute><FeatureRoute feature="video"><FaceSwap /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/video-translate" element={<ProtectedRoute><FeatureRoute feature="video"><VideoTranslate /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/video-background-remover" element={<ProtectedRoute><FeatureRoute feature="video"><VideoBackgroundRemover /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/add-audio-to-video" element={<ProtectedRoute><FeatureRoute feature="video"><AddAudioToVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/video-studio/library" element={<ProtectedRoute><FeatureRoute feature="video"><LibraryVideo /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-generator" element={<ProtectedRoute><FeatureRoute feature="image"><CreateStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-editor" element={<ProtectedRoute><FeatureRoute feature="image"><EditStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-upscale" element={<ProtectedRoute><FeatureRoute feature="image"><UpscaleStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-control" element={<ProtectedRoute><FeatureRoute feature="image"><ControlStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-studio/face-swap" element={<ProtectedRoute><FeatureRoute feature="image"><FaceSwapStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-studio/compress" element={<ProtectedRoute><FeatureRoute feature="image"><CompressionStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-studio/processing" element={<ProtectedRoute><FeatureRoute feature="image"><ImageProcessingStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/image-studio/social-optimizer" element={<ProtectedRoute><FeatureRoute feature="image"><SocialOptimizer /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/asset-library" element={<ProtectedRoute><FeatureRoute feature="asset-library"><AssetLibrary /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/campaign-creator" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductMarketingDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/campaign-creator/photoshoot" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductPhotoshootStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/campaign-creator/animation" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductAnimationStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/campaign-creator/video" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductVideoStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/campaign-creator/avatar" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductAvatarStudio /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/product-marketing" element={<Navigate to="/campaign-creator" replace />} />
-                    <Route path="/scheduler-dashboard" element={<ProtectedRoute><FeatureRoute feature="scheduler"><SchedulerDashboard /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
-                    <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
-                    <Route path="/team-activity" element={<ProtectedRoute><TeamActivityPage /></ProtectedRoute>} />
-                    <Route path="/stripe-disputes" element={<ProtectedRoute><StripeDisputesDashboard /></ProtectedRoute>} />
-                    <Route path="/pricing" element={<PricingPage />} />
-                    <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                    <Route path="/terms" element={<TermsOfServicePage />} />
-                    <Route path="/code-of-conduct" element={<CodeOfConductPage />} />
-                    <Route path="/contact" element={<ContactPage />} />
-                    <Route path="/research-test" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
-                    <Route path="/research-dashboard" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
-                    <Route path="/alwrity-researcher" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
-                    <Route path="/intent-research" element={<FeatureRoute feature="research"><IntentResearchTest /></FeatureRoute>} />
-                    <Route path="/wix-test" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
-                    <Route path="/wix-test-direct" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
-                    {/* Auth callbacks — always accessible (needed for OAuth flow) */}
-                    <Route path="/wix/callback" element={<WixCallbackPage />} />
-                    <Route path="/wp/callback" element={<WordPressCallbackPage />} />
-                    <Route path="/gsc/callback" element={<GSCAuthCallback />} />
-                    <Route path="/bing/callback" element={<BingCallbackPage />} />
-                    <Route path="/youtube/callback" element={<YouTubeCallbackPage />} />
-                    <Route path="/bing-analytics-storage" element={<ProtectedRoute><FeatureRoute feature="bing"><BingAnalyticsStorage /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/" element={<RootRoute />} />
+                <Route path="/home" element={<Landing />} />
+                <Route
+                  path="/onboarding"
+                  element={
+                    <ErrorBoundary context="Onboarding Wizard" showDetails>
+                      <WizardWithNavigate />
+                    </ErrorBoundary>
+                  }
+                />
+                {/* Error Boundary Testing - Development Only */}
+                {process.env.NODE_ENV === 'development' && (
+                  <Route path="/error-test" element={<ErrorBoundaryTest />} />
+                )}
+                <Route path="/dashboard" element={<ProtectedRoute><MainDashboard /></ProtectedRoute>} />
+                <Route path="/seo" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/seo-dashboard" element={<ProtectedRoute><FeatureRoute feature="seo"><SEODashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/backlink-outreach" element={<ProtectedRoute><FeatureRoute feature="backlinking"><BacklinkOutreachDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/content-planning" element={<ProtectedRoute><FeatureRoute feature="content-planning"><ContentPlanningDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/facebook-writer" element={<ProtectedRoute><FeatureRoute feature="facebook"><FacebookWriter /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/linkedin-writer" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/blog-writer" element={<ProtectedRoute><FeatureRoute feature="blog_writer"><BlogWriter /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/youtube-creator" element={<ProtectedRoute><FeatureRoute feature="youtube"><YouTubeCreator /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/podcast-maker" element={<ProtectedRoute><FeatureRoute feature="podcast"><PodcastDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-studio" element={<ProtectedRoute><FeatureRoute feature="image"><ImageStudioDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio" element={<ProtectedRoute><FeatureRoute feature="video"><VideoStudioDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/create" element={<ProtectedRoute><FeatureRoute feature="video"><CreateVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/avatar" element={<ProtectedRoute><FeatureRoute feature="video"><AvatarVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/enhance" element={<ProtectedRoute><FeatureRoute feature="video"><EnhanceVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/extend" element={<ProtectedRoute><FeatureRoute feature="video"><ExtendVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/edit" element={<ProtectedRoute><FeatureRoute feature="video"><EditVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/transform" element={<ProtectedRoute><FeatureRoute feature="video"><TransformVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/social" element={<ProtectedRoute><FeatureRoute feature="video"><SocialVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/face-swap" element={<ProtectedRoute><FeatureRoute feature="video"><FaceSwap /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/video-translate" element={<ProtectedRoute><FeatureRoute feature="video"><VideoTranslate /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/video-background-remover" element={<ProtectedRoute><FeatureRoute feature="video"><VideoBackgroundRemover /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/add-audio-to-video" element={<ProtectedRoute><FeatureRoute feature="video"><AddAudioToVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/video-studio/library" element={<ProtectedRoute><FeatureRoute feature="video"><LibraryVideo /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-generator" element={<ProtectedRoute><FeatureRoute feature="image"><CreateStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-editor" element={<ProtectedRoute><FeatureRoute feature="image"><EditStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-upscale" element={<ProtectedRoute><FeatureRoute feature="image"><UpscaleStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-control" element={<ProtectedRoute><FeatureRoute feature="image"><ControlStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-studio/face-swap" element={<ProtectedRoute><FeatureRoute feature="image"><FaceSwapStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-studio/compress" element={<ProtectedRoute><FeatureRoute feature="image"><CompressionStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-studio/processing" element={<ProtectedRoute><FeatureRoute feature="image"><ImageProcessingStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/image-studio/social-optimizer" element={<ProtectedRoute><FeatureRoute feature="image"><SocialOptimizer /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/asset-library" element={<ProtectedRoute><FeatureRoute feature="asset-library"><AssetLibrary /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/campaign-creator" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductMarketingDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/campaign-creator/photoshoot" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductPhotoshootStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/campaign-creator/animation" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductAnimationStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/campaign-creator/video" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductVideoStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/campaign-creator/avatar" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductAvatarStudio /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/product-marketing" element={<Navigate to="/campaign-creator" replace />} />
+                <Route path="/scheduler-dashboard" element={<ProtectedRoute><FeatureRoute feature="scheduler"><SchedulerDashboard /></FeatureRoute></ProtectedRoute>} />
+                <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />
+                <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
+                <Route path="/team-activity" element={<ProtectedRoute><TeamActivityPage /></ProtectedRoute>} />
+                <Route path="/stripe-disputes" element={<ProtectedRoute><StripeDisputesDashboard /></ProtectedRoute>} />
+                <Route path="/pricing" element={<PricingPage />} />
+                <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                <Route path="/terms" element={<TermsOfServicePage />} />
+                <Route path="/code-of-conduct" element={<CodeOfConductPage />} />
+                <Route path="/contact" element={<ContactPage />} />
+                <Route path="/research-test" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
+                <Route path="/research-dashboard" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
+                <Route path="/alwrity-researcher" element={<FeatureRoute feature="research"><ResearchDashboard /></FeatureRoute>} />
+                <Route path="/intent-research" element={<FeatureRoute feature="research"><IntentResearchTest /></FeatureRoute>} />
+                <Route path="/wix-test" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
+                <Route path="/wix-test-direct" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
+                {/* Auth callbacks — always accessible (needed for OAuth flow) */}
+                <Route path="/wix/callback" element={<WixCallbackPage />} />
+                <Route path="/wp/callback" element={<WordPressCallbackPage />} />
+                <Route path="/gsc/callback" element={<GSCAuthCallback />} />
+                <Route path="/bing/callback" element={<BingCallbackPage />} />
+                <Route path="/youtube/callback" element={<YouTubeCallbackPage />} />
+                <Route path="/bing-analytics-storage" element={<ProtectedRoute><FeatureRoute feature="bing"><BingAnalyticsStorage /></FeatureRoute></ProtectedRoute>} />
               </Routes>
             </Suspense>
           </ConditionalCopilotKit>
@@ -273,7 +272,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <ErrorBoundary 
+    <ErrorBoundary
       context="Application Root"
       showDetails={process.env.NODE_ENV === 'development'}
       onError={(error, errorInfo) => {
