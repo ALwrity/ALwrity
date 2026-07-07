@@ -438,6 +438,7 @@ export const saveLinkedInToAssetLibrary = async (
     asset_metadata: {
       platform: 'linkedin',
       content_type: 'linkedin_post',
+      content: params.content,
       word_count: params.content ? params.content.split(/\s+/).length : 0,
       ...(params.assetMetadata || {}),
     },

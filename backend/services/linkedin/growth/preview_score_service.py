@@ -1,4 +1,4 @@
-import asyncio
+import json
 from datetime import datetime, timezone
 from loguru import logger
 
@@ -8,23 +8,30 @@ from models.linkedin_growth_models import (
     PostPreviewDimension,
 )
 from .cache import growth_cache
-from .circuit_breaker import protected_llm_call
 
 
 class PreviewScoreService:
     """Analyzes a LinkedIn post draft and returns scores across dimensions."""
 
-    async def score_post(
+    def score_post(
         self,
         request: PreviewScoreRequest,
         user_id: str,
     ) -> PostPreviewScoreResponse:
         """Score a post draft across multiple quality dimensions."""
-        result = await self._llm_score_post(request, user_id)
+        result = self._llm_score_post(request, user_id)
         if result is None:
             raise RuntimeError("Preview score LLM generation returned no result")
 
-        dimensions = [PostPreviewDimension(**d) for d in result.get("dimensions", [])]
+        dimensions_raw = result.get("dimensions", [])
+        if not dimensions_raw or not isinstance(dimensions_raw, list):
+            raise RuntimeError("Preview score LLM returned invalid dimensions")
+
+        try:
+            dimensions = [PostPreviewDimension(**d) for d in dimensions_raw]
+        except Exception as e:
+            raise RuntimeError(f"Failed to parse preview score dimensions: {e}") from e
+
         return PostPreviewScoreResponse(
             overall_score=result.get("overall_score", 50),
             dimensions=dimensions,
@@ -36,7 +43,7 @@ class PreviewScoreService:
             generated_at=datetime.now(timezone.utc),
         )
 
-    async def _llm_score_post(
+    def _llm_score_post(
         self,
         request: PreviewScoreRequest,
         user_id: str,
@@ -45,32 +52,48 @@ class PreviewScoreService:
         from services.llm_providers.main_text_generation import llm_text_gen
 
         system_prompt = (
-            "You are a LinkedIn content strategist. Analyze the given LinkedIn post "
-            "and score it across these dimensions (0-100 each):\n\n"
-            "1. Hook Strength — How compelling is the opening?\n"
-            "2. Clarity — Is the message easy to understand?\n"
-            "3. Engagement Potential — Will it spark comments/shares?\n"
-            "4. Value Proposition — Does it provide value to the reader?\n"
-            "5. Call to Action — Is there a clear next step?\n"
-            "6. Readability — Is it well-structured and scannable?\n\n"
+            "You are a LinkedIn content strategist with expert-level knowledge of the "
+            "LinkedIn platform, its algorithm, and what drives engagement on the feed.\n\n"
+            "Analyze the given text as a LinkedIn post. **Infer** what quality means "
+            "for THIS post based on its topic, tone, and structure — do not apply "
+            "generic copywriting rules. Evaluate how well it would perform natively on "
+            "LinkedIn's feed.\n\n"
+            "Score it across 6 dimensions (0-100 each). **Infer** which dimensions are "
+            "most relevant for THIS post — the list below is a starting point, but you "
+            "may adapt the dimension names slightly if the post warrants it:\n\n"
+            "1. Hook & First Impression — Does the opening stop the scroll?\n"
+            "2. Message Clarity — Is the core insight immediately graspable?\n"
+            "3. Engagement Triggers — Does it invite reaction, comment, or save?\n"
+            "4. Value & Originality — Does it teach, challenge, or inspire?\n"
+            "5. Structure & Scannability — Is it formatted for a mobile feed?\n"
+            "6. Authenticity & Voice — Does it sound like a person, not a brand?\n\n"
             "For each dimension, provide:\n"
-            "- dimension: name exactly as listed above\n"
+            "- dimension: name you inferred (match the spirit of the guidelines above)\n"
             "- score: integer 0-100\n"
-            "- feedback: 1-2 sentences of actionable advice\n"
-            "- data_source_detail: what this score is based on\n"
+            "- feedback: specific, actionable advice with a concrete rewrite example or "
+            "excerpt from the post — quote the exact text you are critiquing\n"
+            "- data_source_detail: briefly explain what feature of the post informed "
+            "this score (e.g., 'Opening uses a statistic but buries it in the second "
+            "paragraph')\n"
             "- confidence: high/medium/low\n\n"
             "Also provide:\n"
-            "- overall_score: integer 0-100 (weighted average)\n"
-            "- top_improvement: the single most impactful suggestion (1 sentence)\n\n"
-            "Output ONLY valid JSON. Be critical and specific."
+            "- overall_score: integer 0-100 (weighted, prioritizing dimensions that "
+            "matter most for this specific post)\n"
+            "- top_improvement: the single highest-leverage change the author could "
+            "make — be specific and mention exact text from the post\n\n"
+            "Output ONLY valid JSON. Be critical — a score of 80+ should mean this "
+            "dimension is genuinely excellent, not merely adequate."
         )
 
+        context_block = f"\nTopic / context: {request.context}\n" if request.context else ""
         prompt = (
-            f"Post content:\n{request.content}\n\n"
-            f"Context: {request.context or ''}\n"
+            f"LinkedIn post to evaluate:\n\n{request.content}\n\n"
+            f"{context_block}"
             f"Word count: {len(request.content.split())}\n\n"
-            "Score this LinkedIn post. Return JSON with 'dimensions' array of "
-            "exactly 6 items, 'overall_score' (integer), and 'top_improvement' (string)."
+            "Score this as a native LinkedIn post. Consider its topic, tone, "
+            "target reader, and how it would perform in the LinkedIn feed. "
+            "Return JSON with 'dimensions' array (exactly 6 items), "
+            "'overall_score' (integer 0-100), and 'top_improvement' (string)."
         )
 
         json_schema = {
@@ -112,18 +135,50 @@ class PreviewScoreService:
             return cached_llm
 
         try:
-            raw = await protected_llm_call(
-                llm_text_gen,
+            raw = llm_text_gen(
                 prompt=prompt,
                 system_prompt=system_prompt,
                 json_struct=json_schema,
                 user_id=user_id,
+                flow_type="preview_score",
             )
-            if isinstance(raw, dict) and "dimensions" in raw and "overall_score" in raw:
-                growth_cache.set(llm_cache_key, raw, ttl_seconds=3600)
-                return raw
-            logger.warning("[PreviewScore] LLM returned unexpected shape: {}", type(raw))
-            return None
         except Exception as exc:
             logger.error("[PreviewScore] LLM generation failed: {}", exc)
             return None
+
+        # Normalize: llm_text_gen with json_struct returns dict, but
+        # some providers may return a JSON string (standard blog writer pattern)
+        if isinstance(raw, str):
+            cleaned = raw.strip()
+            if cleaned.startswith("```json"):
+                cleaned = cleaned[7:]
+            elif cleaned.startswith("```"):
+                cleaned = cleaned[3:]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+            try:
+                raw = json.loads(cleaned)
+            except json.JSONDecodeError as e:
+                logger.warning("[PreviewScore] Failed to parse LLM string response as JSON: {}", e)
+                return None
+
+        if not isinstance(raw, dict):
+            logger.warning("[PreviewScore] LLM returned unexpected type: {}", type(raw))
+            return None
+
+        # Normalize key variants (some providers may use slightly different keys)
+        dims = raw.get("dimensions", raw.get("scores", raw.get("dimension_scores", [])))
+        overall = raw.get("overall_score", raw.get("overall", raw.get("total_score")))
+        improvement = raw.get("top_improvement", raw.get("improvement", ""))
+
+        if not isinstance(dims, list) or overall is None:
+            logger.warning("[PreviewScore] LLM response missing required fields: dims={} overall={}", bool(dims), overall)
+            return None
+
+        normalized = {
+            "dimensions": dims,
+            "overall_score": overall,
+            "top_improvement": improvement or "",
+        }
+        growth_cache.set(llm_cache_key, normalized, ttl_seconds=3600)
+        return normalized
