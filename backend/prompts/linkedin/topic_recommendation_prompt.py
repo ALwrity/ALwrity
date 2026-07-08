@@ -57,18 +57,22 @@ question at the end, story format, data reveal, etc.) — not generic advice.
 Hashtag Rule: max 3 per post; more reduces reach.
 Network participation: commenting on 5+ posts/day compounds profile visibility.
 
-Output schema — each recommendation object must include:
+Output schema:
 {
-  "topic": "string — concise topic title",
-  "rationale": "string — why this fits the user (second person)",
-  "recommended_format": "LinkedIn Post | LinkedIn Article",
-  "target_audience": ["string", ...],
-  "growth_impact": "High | Medium | Low",
-  "hook_idea": "string — one-line hook formula (Q / C / S) for this topic",
-  "engagement_tip": "string — one concrete engagement tactic for this topic"
+  "recommendations": [
+    {
+      "topic": "string — concise topic title",
+      "rationale": "string — why this fits the user (second person)",
+      "recommended_format": "LinkedIn Post | LinkedIn Article",
+      "target_audience": ["string", ...],
+      "growth_impact": "High | Medium | Low",
+      "hook_idea": "string — one-line hook formula (Q / C / S) for this topic",
+      "engagement_tip": "string — one concrete engagement tactic for this topic"
+    }
+  ]
 }
 
-Return a JSON array of exactly five objects matching the schema above.
+Return a JSON object containing a "recommendations" array with exactly five items matching the schema above.
 """
 
 
@@ -77,5 +81,5 @@ def build_topic_recommendation_user_prompt(profile_intelligence: dict[str, Any])
     return (
         "Here is the AIProfileIntelligence JSON for this user.\n"
         "Recommend exactly five LinkedIn content ideas following all rules above.\n\n"
-        f"{json.dumps(profile_intelligence, indent=2)}"
+        f"{json.dumps(profile_intelligence, indent=2, default=str)}"
     )

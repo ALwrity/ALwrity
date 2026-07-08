@@ -31,11 +31,10 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
     }}
   >
     <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
-    <DashboardCopilotFab onOpen={onOpenCopilot} />
-    <KnowledgeCenterDock
-      onFeatureAction={onKnowledgeCenterAction ?? (() => {})}
-      variant="rail"
-    />
+    {onOpenCopilot && <DashboardCopilotFab onOpenCopilot={onOpenCopilot} variant="rail" layout="stacked" />}
+    {onKnowledgeCenterAction && (
+      <KnowledgeCenterDock onFeatureAction={onKnowledgeCenterAction} variant="rail" />
+    )}
     {/* Issue #731 — LinkedIn best-practice contextual tip */}
     <LinkedInBestPracticesTip />
   </aside>
