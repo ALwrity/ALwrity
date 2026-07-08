@@ -8,11 +8,14 @@ import json
 from typing import Dict, Any, List, Tuple
 from collections import Counter, defaultdict
 from loguru import logger
-import nltk
-from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-from nltk.tag import pos_tag
-from textstat import flesch_reading_ease, flesch_kincaid_grade
+
+# Stubs for lazy loading to avoid import-time dependency crashes
+sent_tokenize = None
+word_tokenize = None
+stopwords = None
+pos_tag = None
+flesch_reading_ease = None
+flesch_kincaid_grade = None
 
 
 class EnhancedLinguisticAnalyzer:
@@ -25,7 +28,7 @@ class EnhancedLinguisticAnalyzer:
         self._initialized = False
 
     def _ensure_initialized(self):
-        """Lazily load spaCy model and NLTK data on first method call."""
+        """Lazily load spaCy model, NLTK, and textstat data on first method call."""
         if self._initialized:
             return
 
@@ -42,6 +45,25 @@ class EnhancedLinguisticAnalyzer:
             logger.error(f"ERROR: spaCy model 'en_core_web_sm' is REQUIRED. Download with: python -m spacy download en_core_web_sm")
             raise OSError("spaCy model 'en_core_web_sm' is required. Download with: python -m spacy download en_core_web_sm") from e
 
+        # Lazily load nltk and textstat to avoid import-time crashes
+        try:
+            import nltk
+            from nltk.tokenize import sent_tokenize as _sent_tokenize, word_tokenize as _word_tokenize
+            from nltk.corpus import stopwords as _stopwords
+            from nltk.tag import pos_tag as _pos_tag
+            import textstat
+
+            global sent_tokenize, word_tokenize, stopwords, pos_tag, flesch_reading_ease, flesch_kincaid_grade
+            sent_tokenize = _sent_tokenize
+            word_tokenize = _word_tokenize
+            stopwords = _stopwords
+            pos_tag = _pos_tag
+            flesch_reading_ease = textstat.flesch_reading_ease
+            flesch_kincaid_grade = textstat.flesch_kincaid_grade
+        except ImportError as e:
+            logger.error("ERROR: NLTK and textstat are REQUIRED for persona generation. Install them using: pip install nltk textstat")
+            raise ImportError("NLTK and textstat are required for enhanced persona generation. Install them using: pip install nltk textstat") from e
+
         # Download required NLTK data
         try:
             nltk.data.find('tokenizers/punkt_tab')
@@ -49,9 +71,17 @@ class EnhancedLinguisticAnalyzer:
             nltk.data.find('taggers/averaged_perceptron_tagger')
         except LookupError:
             logger.warning("NLTK data not found. Downloading required data...")
-            nltk.download('punkt_tab', quiet=True)
-            nltk.download('stopwords', quiet=True)
-            nltk.download('averaged_perceptron_tagger', quiet=True)
+            try:
+                nltk.download('punkt_tab', quiet=True)
+                nltk.download('stopwords', quiet=True)
+                nltk.download('averaged_perceptron_tagger', quiet=True)
+            except Exception as e:
+                logger.error(f"Failed to download NLTK data: {e}")
+                # Try fallback punkt if needed
+                try:
+                    nltk.download('punkt', quiet=True)
+                except:
+                    pass
 
         self._initialized = True
 
