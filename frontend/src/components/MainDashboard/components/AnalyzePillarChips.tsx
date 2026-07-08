@@ -35,11 +35,11 @@ const AnalyzePillarChips: React.FC<AnalyzePillarChipsProps> = ({
       priority: 'high' as const,
       estimatedTime: 20,
       actionType: 'navigate' as const,
-      actionUrl: '/content-planning-dashboard',
+      actionUrl: '/content-planning',
       icon: Analytics,
       color: "#9C27B0",
       enabled: true,
-      action: () => navigate('/content-planning-dashboard')
+      action: () => navigate('/content-planning')
     },
     {
       id: "analyze-strategy-alignment",
@@ -50,11 +50,11 @@ const AnalyzePillarChips: React.FC<AnalyzePillarChipsProps> = ({
       priority: 'high' as const,
       estimatedTime: 15,
       actionType: 'navigate' as const,
-      actionUrl: '/content-planning-dashboard',
+      actionUrl: '/content-planning',
       icon: Dashboard,
       color: "#673AB7",
       enabled: true,
-      action: () => navigate('/content-planning-dashboard')
+      action: () => navigate('/content-planning')
     },
     {
       id: "analyze-update-dashboard",
@@ -74,7 +74,7 @@ const AnalyzePillarChips: React.FC<AnalyzePillarChipsProps> = ({
   ];
 
   const handlePlanDashboardClick = () => {
-    navigate('/content-planning-dashboard');
+    navigate('/content-planning');
   };
 
   return (

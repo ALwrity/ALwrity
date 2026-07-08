@@ -36,11 +36,11 @@ const EngagePillarChips: React.FC<EngagePillarChipsProps> = ({
       priority: 'high' as const,
       estimatedTime: 10,
       actionType: 'navigate' as const,
-      actionUrl: '/content-planning-dashboard',
+      actionUrl: '/content-planning',
       icon: Comment,
       color: "#E91E63",
       enabled: true,
-      action: () => navigate('/content-planning-dashboard')
+      action: () => navigate('/content-planning')
     },
     {
       id: "engage-twitter-mention",
@@ -51,11 +51,11 @@ const EngagePillarChips: React.FC<EngagePillarChipsProps> = ({
       priority: 'high' as const,
       estimatedTime: 5,
       actionType: 'navigate' as const,
-      actionUrl: '/content-planning-dashboard',
+      actionUrl: '/content-planning',
       icon: Twitter,
       color: "#1DA1F2",
       enabled: true,
-      action: () => navigate('/content-planning-dashboard')
+      action: () => navigate('/content-planning')
     },
     {
       id: "engage-linkedin-post",
