@@ -48,6 +48,7 @@ class BackgroundJobService:
         self.workers: Dict[str, threading.Thread] = {}
         self.job_handlers: Dict[str, Callable] = {}
         self.max_concurrent_jobs = 3
+        self._lock = threading.RLock()
         
         # Register job handlers
         self._register_job_handlers()
@@ -65,43 +66,45 @@ class BackgroundJobService:
         job_id = f"{job_type}_{user_id}_{int(time.time())}"
         
         job = BackgroundJob(job_id, job_type, user_id, data)
-        self.jobs[job_id] = job
-        
-        logger.info(f"Created background job: {job_id} for user {user_id}")
-        
-        # Start the job if we have capacity
-        if len(self.workers) < self.max_concurrent_jobs:
-            self._start_job(job_id)
-        else:
-            logger.info(f"Job {job_id} queued - max concurrent jobs reached")
-        
+        with self._lock:
+            self.jobs[job_id] = job
+            
+            logger.info(f"Created background job: {job_id} for user {user_id}")
+            
+            # Start the job if we have capacity
+            if len(self.workers) < self.max_concurrent_jobs:
+                self._start_job(job_id)
+            else:
+                logger.info(f"Job {job_id} queued - max concurrent jobs reached")
+            
         return job_id
     
     def _start_job(self, job_id: str):
         """Start a background job"""
-        if job_id not in self.jobs:
-            logger.error(f"Job {job_id} not found")
-            return
-        
-        job = self.jobs[job_id]
-        if job.status != JobStatus.PENDING:
-            logger.warning(f"Job {job_id} is not pending, current status: {job.status}")
-            return
-        
-        # Create worker thread
-        worker = threading.Thread(
-            target=self._run_job,
-            args=(job_id,),
-            daemon=True,
-            name=f"BackgroundJob-{job_id}"
-        )
-        
-        self.workers[job_id] = worker
-        job.status = JobStatus.RUNNING
-        job.started_at = datetime.now()
-        job.message = "Job started"
-        
-        worker.start()
+        with self._lock:
+            if job_id not in self.jobs:
+                logger.error(f"Job {job_id} not found")
+                return
+            
+            job = self.jobs[job_id]
+            if job.status != JobStatus.PENDING:
+                logger.warning(f"Job {job_id} is not pending, current status: {job.status}")
+                return
+            
+            # Create worker thread
+            worker = threading.Thread(
+                target=self._run_job,
+                args=(job_id,),
+                daemon=True,
+                name=f"BackgroundJob-{job_id}"
+            )
+            
+            self.workers[job_id] = worker
+            job.status = JobStatus.RUNNING
+            job.started_at = datetime.now()
+            job.message = "Job started"
+            
+            worker.start()
         logger.info(f"Started background job: {job_id}")
     
     def _run_job(self, job_id: str):
@@ -136,50 +139,54 @@ class BackgroundJobService:
                 job.error = str(e)
                 job.message = f"Job failed: {str(e)}"
         finally:
-            # Clean up worker thread
-            if job_id in self.workers:
-                del self.workers[job_id]
-            
-            # Start next pending job
-            self._start_next_pending_job()
+            with self._lock:
+                # Clean up worker thread
+                if job_id in self.workers:
+                    del self.workers[job_id]
+                
+                # Start next pending job
+                self._start_next_pending_job()
     
     def _start_next_pending_job(self):
         """Start the next pending job if we have capacity"""
-        if len(self.workers) >= self.max_concurrent_jobs:
-            return
-        
-        # Find next pending job
-        for job_id, job in self.jobs.items():
-            if job.status == JobStatus.PENDING:
-                self._start_job(job_id)
-                break
+        with self._lock:
+            if len(self.workers) >= self.max_concurrent_jobs:
+                return
+            
+            # Find next pending job
+            for job_id, job in self.jobs.items():
+                if job.status == JobStatus.PENDING:
+                    self._start_job(job_id)
+                    break
     
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         """Get the status of a job"""
-        job = self.jobs.get(job_id)
-        if not job:
-            return None
-        
-        return {
-            'job_id': job.job_id,
-            'job_type': job.job_type,
-            'user_id': job.user_id,
-            'status': job.status.value,
-            'progress': job.progress,
-            'message': job.message,
-            'created_at': job.created_at.isoformat(),
-            'started_at': job.started_at.isoformat() if job.started_at else None,
-            'completed_at': job.completed_at.isoformat() if job.completed_at else None,
-            'result': job.result,
-            'error': job.error
-        }
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                return None
+            
+            return {
+                'job_id': job.job_id,
+                'job_type': job.job_type,
+                'user_id': job.user_id,
+                'status': job.status.value,
+                'progress': job.progress,
+                'message': job.message,
+                'created_at': job.created_at.isoformat(),
+                'started_at': job.started_at.isoformat() if job.started_at else None,
+                'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+                'result': job.result,
+                'error': job.error
+            }
     
     def get_user_jobs(self, user_id: str, limit: int = 10) -> list:
         """Get recent jobs for a user"""
         user_jobs = []
-        for job in self.jobs.values():
-            if job.user_id == user_id:
-                user_jobs.append(self.get_job_status(job.job_id))
+        with self._lock:
+            for job in self.jobs.values():
+                if job.user_id == user_id:
+                    user_jobs.append(self.get_job_status(job.job_id))
         
         # Sort by created_at descending and limit
         user_jobs.sort(key=lambda x: x['created_at'], reverse=True)
@@ -187,30 +194,32 @@ class BackgroundJobService:
     
     def cancel_job(self, job_id: str) -> bool:
         """Cancel a pending job"""
-        job = self.jobs.get(job_id)
-        if not job:
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if not job:
+                return False
+            
+            if job.status == JobStatus.PENDING:
+                job.status = JobStatus.CANCELLED
+                job.message = "Job cancelled"
+                logger.info(f"Cancelled job {job_id}")
+                return True
+            
             return False
-        
-        if job.status == JobStatus.PENDING:
-            job.status = JobStatus.CANCELLED
-            job.message = "Job cancelled"
-            logger.info(f"Cancelled job {job_id}")
-            return True
-        
-        return False
     
     def cleanup_old_jobs(self, max_age_hours: int = 24):
         """Clean up old completed/failed jobs"""
         cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
         
         jobs_to_remove = []
-        for job_id, job in self.jobs.items():
-            if (job.status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED] and
-                job.created_at < cutoff_time):
-                jobs_to_remove.append(job_id)
-        
-        for job_id in jobs_to_remove:
-            del self.jobs[job_id]
+        with self._lock:
+            for job_id, job in self.jobs.items():
+                if (job.status in [JobStatus.COMPLETED, JobStatus.FAILED, JobStatus.CANCELLED] and
+                    job.created_at < cutoff_time):
+                    jobs_to_remove.append(job_id)
+            
+            for job_id in jobs_to_remove:
+                del self.jobs[job_id]
         
         if jobs_to_remove:
             logger.info(f"Cleaned up {len(jobs_to_remove)} old jobs")
@@ -221,7 +230,9 @@ class BackgroundJobService:
         """Handle Bing comprehensive insights generation"""
         try:
             user_id = job.user_id
-            site_url = job.data.get('site_url', 'https://www.alwrity.com/')
+            site_url = job.data.get('site_url')
+            if not site_url:
+                raise ValueError("No site URL provided for Bing insights")
             days = job.data.get('days', 30)
             
             logger.info(f"Generating comprehensive Bing insights for user {user_id}")
@@ -286,7 +297,9 @@ class BackgroundJobService:
         """Handle Bing data collection from API"""
         try:
             user_id = job.user_id
-            site_url = job.data.get('site_url', 'https://www.alwrity.com/')
+            site_url = job.data.get('site_url')
+            if not site_url:
+                raise ValueError("No site URL provided for Bing data collection")
             days_back = job.data.get('days_back', 30)
             
             logger.info(f"Collecting Bing data for user {user_id}")
@@ -351,7 +364,14 @@ class BackgroundJobService:
             
             # Get fresh analytics data
             import asyncio
-            analytics_data = asyncio.run(analytics_service.get_comprehensive_analytics(user_id, platforms))
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                analytics_data = loop.run_until_complete(
+                    analytics_service.get_comprehensive_analytics(user_id, platforms)
+                )
+            finally:
+                loop.close()
             
             job.progress = 90
             job.message = "Generating summary..."
