@@ -662,6 +662,7 @@ if _is_full_mode():
 # Include platform analytics router
 if _is_full_mode():
     from routers.platform_analytics import router as platform_analytics_router
+    from routers.ad_studio import router as ad_studio_router
     app.include_router(platform_analytics_router)
     # Include Bing Analytics Storage router to expose storage-backed endpoints
     from routers.bing_analytics_storage import router as bing_analytics_storage_router
@@ -677,6 +678,7 @@ if _is_full_mode():
         app.include_router(product_marketing_router)
     if campaign_creator_router:
         app.include_router(campaign_creator_router)
+    app.include_router(ad_studio_router)
 
     router_group_status["platform_extensions"] = {
         "mounted": True,

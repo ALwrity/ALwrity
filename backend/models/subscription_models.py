@@ -7,7 +7,7 @@ Comprehensive models for usage-based subscription system with API cost tracking.
 from typing import Optional
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, Text, ForeignKey, Enum, Index, UniqueConstraint
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
 import enum

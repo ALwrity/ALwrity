@@ -4,7 +4,7 @@ Persistent storage for API monitoring statistics.
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, Index, Text
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from datetime import datetime
 import json
 

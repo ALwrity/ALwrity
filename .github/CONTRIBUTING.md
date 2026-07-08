@@ -37,21 +37,20 @@ cd ALwrity
 
 # Backend setup
 cd backend
+python -m venv venv
+# Activate on Windows: venv\Scripts\activate
+# Activate on Mac/Linux: source venv/bin/activate
 pip install -r requirements.txt
 cp env_template.txt .env  # Configure your API keys
+python migrate_schema.py  # Run database migrations
 python start_alwrity_backend.py
 
 # Frontend setup (in a new terminal)
 cd frontend
 npm install
-cp env_template.txt .env  # Configure your environment
+cp env_template.txt .env  # Configure your API keys and environment
 npm start
 ```
-
-### Environment Configuration
-1. **Backend**: Copy `backend/env_template.txt` to `backend/.env`
-2. **Frontend**: Copy `frontend/env_template.txt` to `frontend/.env`
-3. **API Keys**: Add your AI service API keys to the respective `.env` files
 
 ## 📝 Coding Standards
 
@@ -85,7 +84,7 @@ npm start
 ### Backend Testing
 ```bash
 cd backend
-python -m pytest test/
+python -m pytest tests/
 ```
 
 ### Frontend Testing

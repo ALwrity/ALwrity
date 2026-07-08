@@ -1,5 +1,5 @@
 """User Business Information Model for ALwrity backend."""
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy import Column, Integer, String, Text, DateTime, func
 from loguru import logger
 from datetime import datetime

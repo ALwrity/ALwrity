@@ -85,8 +85,9 @@ const LibraryVideo = React.lazy(() => import('./components/VideoStudio').then(m 
 const ProductMarketingDashboard = React.lazy(() => import('./components/ProductMarketing').then(m => ({ default: m.ProductMarketingDashboard })));
 const ProductPhotoshootStudio = React.lazy(() => import('./components/ProductMarketing').then(m => ({ default: m.ProductPhotoshootStudio })));
 const ProductAnimationStudio = React.lazy(() => import('./components/ProductMarketing').then(m => ({ default: m.ProductAnimationStudio })));
-const ProductVideoStudio = React.lazy(() => import('./components/ProductMarketing').then(m => ({ default: m.ProductVideoStudio })));
-const ProductAvatarStudio = React.lazy(() => import('./components/ProductMarketing').then(m => ({ default: m.ProductAvatarStudio })));
+const ProductVideoStudio = React.lazy(() => import('./components/ProductMarketing/Studio/VideoStudio').then(m => ({ default: m.ProductVideoStudio })));
+const ProductAvatarStudio = React.lazy(() => import('./components/ProductMarketing/Studio/AvatarStudio').then(m => ({ default: m.ProductAvatarStudio })));
+const AdStudioDashboard = React.lazy(() => import('./components/AdStudio/AdStudioDashboard').then(m => ({ default: m.AdStudioDashboard })));
 
 // BacklinkOutreach barrel (1 export)
 const BacklinkOutreachDashboard = React.lazy(() => import('./components/BacklinkOutreach').then(m => ({ default: m.BacklinkOutreachDashboard })));
@@ -240,6 +241,7 @@ const App: React.FC = () => {
                     <Route path="/campaign-creator/animation" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductAnimationStudio /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/campaign-creator/video" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductVideoStudio /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/campaign-creator/avatar" element={<ProtectedRoute><FeatureRoute feature="campaign"><ProductAvatarStudio /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/ad-studio" element={<ProtectedRoute><AdStudioDashboard /></ProtectedRoute>} />
                     <Route path="/product-marketing" element={<Navigate to="/campaign-creator" replace />} />
                     <Route path="/scheduler-dashboard" element={<ProtectedRoute><FeatureRoute feature="scheduler"><SchedulerDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/billing" element={<ProtectedRoute><BillingPage /></ProtectedRoute>} />

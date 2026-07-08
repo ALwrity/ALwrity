@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, Text, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
