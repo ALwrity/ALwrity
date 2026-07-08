@@ -35,16 +35,25 @@ export interface ImageGeneratorHandle {
   generate: () => Promise<void> | void;
 }
 
-const MODEL_META: Record<string, { label: string; cost: string; description: string }> = {
-  'qwen-image': { label: 'Qwen Image', cost: '$0.30/image', description: 'Fast generation, optimized for blog content' },
-  'ideogram-v3-turbo': { label: 'Ideogram V3 Turbo', cost: '$0.30/image', description: 'Superior text rendering, photorealistic' },
-  'flux-kontext-pro': { label: 'FLUX Kontext Pro', cost: '$0.30/image', description: 'Professional typography, improved prompt adherence' },
-  'black-forest-labs/FLUX.1-Krea-dev': { label: 'FLUX.1 Krea Dev', cost: '$0.30', description: 'Photorealistic Flux model' },
-  'black-forest-labs/FLUX.1-dev': { label: 'FLUX.1 Dev', cost: '$0.30', description: 'High-quality Flux generation' },
-  'runwayml/flux-dev': { label: 'Flux Dev (Runway)', cost: '$0.30', description: 'RunwayML hosted Flux' },
-  'stable-diffusion-xl-1024-v1-0': { label: 'SDXL 1.0', cost: '$0.30', description: 'SDXL-quality professional outputs' },
-  'stable-diffusion-xl-base-1.0': { label: 'SDXL Base', cost: '$0.30', description: 'SDXL base model' },
+type ModelMeta = {
+  label: string;
+  cost: string;
+  costUsd: number;
+  description: string;
 };
+
+const MODEL_META: Record<string, ModelMeta> = {
+  'qwen-image': { label: 'Qwen Image', cost: '$0.30/image', costUsd: 0.30, description: 'Fast generation, optimized for blog content' },
+  'ideogram-v3-turbo': { label: 'Ideogram V3 Turbo', cost: '$0.30/image', costUsd: 0.30, description: 'Superior text rendering, photorealistic' },
+  'flux-kontext-pro': { label: 'FLUX Kontext Pro', cost: '$0.04/image', costUsd: 0.04, description: 'Professional typography, improved prompt adherence' },
+  'black-forest-labs/FLUX.1-Krea-dev': { label: 'FLUX.1 Krea Dev', cost: '$0.30/image', costUsd: 0.30, description: 'Photorealistic Flux model' },
+  'black-forest-labs/FLUX.1-dev': { label: 'FLUX.1 Dev', cost: '$0.30/image', costUsd: 0.30, description: 'High-quality Flux generation' },
+  'runwayml/flux-dev': { label: 'Flux Dev (Runway)', cost: '$0.30/image', costUsd: 0.30, description: 'RunwayML hosted Flux' },
+  'stable-diffusion-xl-1024-v1-0': { label: 'SDXL 1.0', cost: '$0.30/image', costUsd: 0.30, description: 'SDXL-quality professional outputs' },
+  'stable-diffusion-xl-base-1.0': { label: 'SDXL Base', cost: '$0.30/image', costUsd: 0.30, description: 'SDXL base model' },
+};
+
+const SESSION_COST_WARNING_THRESHOLD = 1;
 
 const PROVIDER_MODELS: Record<string, string[]> = {
   wavespeed: ['qwen-image', 'ideogram-v3-turbo', 'flux-kontext-pro'],
@@ -77,6 +86,7 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Array<{ prompt: string; negative_prompt?: string; width?: number; height?: number; overlay_text?: string }>>([]);
   const [suggestionIndex, setSuggestionIndex] = useState<number>(0);
+  const [sessionGeneratedCount, setSessionGeneratedCount] = useState<number>(0);
 
   // Fetch the active image provider from backend GPT_PROVIDER
   useEffect(() => {
@@ -254,6 +264,13 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
       alert(`Resolution ${width}x${height} exceeds maximum ${MAX_DIMENSIONS.maxWidth}x${MAX_DIMENSIONS.maxHeight} for model ${model}. Please adjust the dimensions.`);
       return;
     }
+    if (
+      estimatedSpendAfterNext >= SESSION_COST_WARNING_THRESHOLD &&
+      !window.confirm(`This session is estimated to reach $${estimatedSpendAfterNext.toFixed(2)} after this image. Continue generating?`)
+    ) {
+      console.timeEnd('[onGenerate] total');
+      return;
+    }
     
     const suggestion = suggestionIndex >= 0 && suggestionIndex < suggestions.length ? suggestions[suggestionIndex] : null;
     const req: ImageGenerationRequest = { 
@@ -274,6 +291,7 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
       return;
     }
     console.timeLog('[onGenerate] generate', 'done');
+    setSessionGeneratedCount((count) => count + 1);
     if (onImageReady) onImageReady(res.image_base64);
     try {
       const { publishImage } = await import('../../utils/imageBus');
@@ -288,9 +306,15 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
   }));
 
   const currentModelMeta = model ? MODEL_META[model] : undefined;
+  const sessionEstimatedSpend = sessionGeneratedCount * (currentModelMeta?.costUsd || 0);
+  const estimatedSpendAfterNext = sessionEstimatedSpend + (currentModelMeta?.costUsd || 0);
+  const lowerCostModel = availableModels
+    .map((availableModel) => ({ id: availableModel, meta: MODEL_META[availableModel] }))
+    .filter(({ meta }) => meta && currentModelMeta && meta.costUsd < currentModelMeta.costUsd)
+    .sort((a, b) => a.meta.costUsd - b.meta.costUsd)[0];
   const costInfo = currentModelMeta
-    ? { cost: currentModelMeta.cost, description: currentModelMeta.description }
-    : { cost: '', description: '' };
+    ? { cost: currentModelMeta.cost, description: currentModelMeta.description, costUsd: currentModelMeta.costUsd }
+    : { cost: '', description: '', costUsd: 0 };
 
   if (configLoading) {
     return (
@@ -557,6 +581,49 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
             <Typography variant="caption" sx={{ color: '#5f6368' }}>
               {costInfo.description}
             </Typography>
+          </Box>
+          <Box sx={{ mt: 1.5 }}>
+            <Alert
+              severity={lowerCostModel ? 'info' : 'success'}
+              icon={<InfoIcon />}
+              sx={{
+                py: 0.75,
+                backgroundColor: lowerCostModel ? '#eff6ff' : '#f0fdf4',
+                '& .MuiAlert-message': { width: '100%' }
+              }}
+            >
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Cost guard
+                </Typography>
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`${sessionGeneratedCount} generated this session`}
+                  sx={{ fontSize: '11px' }}
+                />
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`Session estimate: $${sessionEstimatedSpend.toFixed(2)}`}
+                  sx={{ fontSize: '11px' }}
+                />
+                {lowerCostModel ? (
+                  <Button
+                    size="small"
+                    variant="text"
+                    onClick={() => setModel(lowerCostModel.id)}
+                    sx={{ textTransform: 'none', fontSize: '12px', fontWeight: 700, px: 1 }}
+                  >
+                    Switch to {lowerCostModel.meta.label} ({lowerCostModel.meta.cost})
+                  </Button>
+                ) : (
+                  <Typography variant="caption" sx={{ color: '#166534' }}>
+                    Current model is the lowest-cost option for this provider.
+                  </Typography>
+                )}
+              </Box>
+            </Alert>
           </Box>
         </Box>
 
