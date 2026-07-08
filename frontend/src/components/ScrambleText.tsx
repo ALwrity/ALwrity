@@ -23,6 +23,8 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
   const { displayText, start, stop } = useScramble({ text, duration });
   const ref = useRef<HTMLElement>(null);
   const intervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
+  const hasTriggeredRef = useRef(false);
 
   useEffect(() => {
     const element = ref.current;
@@ -30,22 +32,34 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
 
     // A flag to ensure our timeouts don't run after unmount
     let isMounted = true;
+    hasTriggeredRef.current = false;
 
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setTimeout(() => {
-            if (!isMounted) return;
-            start();
-            if (intervalRef.current) clearInterval(intervalRef.current);
-            intervalRef.current = window.setInterval(start, restartInterval);
-          }, delay);
+          if (!hasTriggeredRef.current) {
+            hasTriggeredRef.current = true;
+            if (timeoutRef.current) clearTimeout(timeoutRef.current);
+            timeoutRef.current = window.setTimeout(() => {
+              if (!isMounted) return;
+              start();
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              intervalRef.current = window.setInterval(start, restartInterval);
+            }, delay);
+          }
         } else {
           stop();
-          if (intervalRef.current) clearInterval(intervalRef.current);
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+          }
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
         }
       },
-      { threshold: 0.2, rootMargin: '0px' }
+      { threshold: 0.1, rootMargin: '0px' }
     );
 
     observer.observe(element);
@@ -53,11 +67,13 @@ export const ScrambleText: React.FC<ScrambleTextProps> = ({
     return () => {
       isMounted = false;
       observer.disconnect();
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (intervalRef.current) clearInterval(intervalRef.current);
       stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [delay, restartInterval, text]); // Re-run effect if text or config changes. start/stop are stable.
+  }, [delay, restartInterval, text]); // Re-run effect if text or config changes.
+
 
   return (
     <Component ref={ref} className={className} style={style}>

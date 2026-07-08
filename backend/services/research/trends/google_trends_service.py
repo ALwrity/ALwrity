@@ -51,10 +51,14 @@ try:
     from pytrends.request import TrendReq as _TrendReq
     from pytrends.exceptions import TooManyRequestsError as _TooManyRequestsError
     PYTrends_AVAILABLE = True
-except ImportError:
+except Exception as e:
     PYTrends_AVAILABLE = False
     _TooManyRequestsError = None
-    logger.warning("pytrends not installed. Google Trends features will be unavailable.")
+    # Provide a dummy class for type annotations and fail-fast behavior
+    class _TrendReq:
+        def __init__(self, *args, **kwargs):
+            raise ImportError("pytrends is not installed. Google Trends features will be unavailable.")
+    logger.warning(f"pytrends not installed or failed to import. Google Trends features will be unavailable: {e}")
 
 # Patch 2: pytrends related_topics() and related_queries() use keyword[0]
 # which raises IndexError on empty lists, but only catch KeyError.
@@ -162,9 +166,6 @@ class GoogleTrendsService:
     _429_cooldown_period = 1800  # 30 minutes cooldown after 429
 
     def __init__(self):
-        if not PYTrends_AVAILABLE:
-            raise RuntimeError("pytrends library is required. Install with: pip install pytrends")
-
         # Initialize shared rate limiter at class level (lazy init)
         if self.__class__._shared_rate_limiter is None:
             self.__class__._shared_rate_limiter = RateLimiter(max_calls=1, period=3.0)  # 1 call per 3 seconds
@@ -175,7 +176,10 @@ class GoogleTrendsService:
         self.cache = self.__class__._shared_cache
         self.cache_ttl = self._cache_ttl
 
-        logger.info("GoogleTrendsService initialized (pytrends 4.9.2, shared rate limiter, 3s period, shared cache, 30min 429 cooldown)")
+        if not PYTrends_AVAILABLE:
+            logger.warning("GoogleTrendsService initialized but pytrends library is not installed. Trends features will return fallback data.")
+        else:
+            logger.info("GoogleTrendsService initialized (pytrends 4.9.2, shared rate limiter, 3s period, shared cache, 30min 429 cooldown)")
 
     # -----------------------------------------------------------------------
     # Public API
@@ -204,6 +208,12 @@ class GoogleTrendsService:
         """
         if not keywords:
             raise ValueError("Keywords list cannot be empty")
+
+        if not PYTrends_AVAILABLE:
+            logger.warning("pytrends is not installed. Returning fallback response for analyze_trends.")
+            return self._create_fallback_response(
+                keywords, timeframe, geo, gprop, "pytrends library is not installed."
+            )
 
         if len(keywords) > 5:
             logger.warning(f"Too many keywords ({len(keywords)}), using first 5")
