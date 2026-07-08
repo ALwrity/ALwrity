@@ -799,6 +799,180 @@ def _batch_action_response_from_items(
     )
 
 
+def _load_profile_optimization_for_response(
+    user_id: str,
+    profile_context: dict[str, Any],
+    profile_validation: ProfileValidationResult,
+    ai_profile_intelligence: dict[str, Any],
+    repository: ProfileRepository,
+    *,
+    force_regenerate: bool = False,
+) -> tuple[
+    Optional[List[ProfileOptimizationResponse]],
+    Optional[ProfileOptimizationMetaResponse],
+    Optional[str],
+    Optional[ProfileAnalysisErrorResponse],
+]:
+    """
+    Generate or load profile optimization recommendations for API responses.
+
+    Returns user-facing ``profile_optimization_error`` plus structured ``analysis_error``.
+    """
+    if not profile_validation.get("is_profile_complete"):
+        logger.info(
+            "[ProfileOptimization] API skip — profile incomplete user_id={} missing_fields={}",
+            user_id,
+            profile_validation.get("missing_fields"),
+        )
+        return None, None, None, None
+
+    if not isinstance(ai_profile_intelligence, dict) or not ai_profile_intelligence:
+        logger.info(
+            "[ProfileOptimization] API skip — intelligence missing user_id={}",
+            user_id,
+        )
+        return (
+            None,
+            None,
+            None,
+            _make_analysis_error(
+                7,
+                "missing_intelligence",
+                "Complete profile analysis before generating profile suggestions.",
+                user_id=user_id,
+            ),
+        )
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 7 start user_id={} force_regenerate={}",
+        user_id,
+        force_regenerate,
+    )
+    try:
+        recommendations, meta = get_or_generate_profile_optimization(
+            user_id,
+            profile_context,
+            profile_validation,
+            ai_profile_intelligence,
+            repository=repository,
+            force_regenerate=force_regenerate,
+        )
+    except ProfileOptimizationLLMError as exc:
+        error_kind = getattr(exc, "error_kind", "llm_failure")
+        logger.exception(
+            "[ProfileOptimization] LLM failure user_id={} kind={}: {}",
+            user_id,
+            error_kind,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            error_kind,
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+    except ProfileOptimizationValidationError as exc:
+        validation_code = getattr(exc, "validation_code", "validation_failed")
+        logger.exception(
+            "[ProfileOptimization] validation failure user_id={} code={}: {}",
+            user_id,
+            validation_code,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            validation_code,
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+    except (ProfileOptimizationError, ValueError) as exc:
+        logger.exception(
+            "[ProfileOptimization] orchestration failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "orchestration_failed",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] unexpected failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "unexpected_error",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+
+    meta_response = _profile_optimization_meta_to_response(meta)
+    if meta.get("source") == "no_gaps":
+        logger.info(
+            "[LinkedInAnalysis] Phase 7 complete user_id={} source=no_gaps count=0",
+            user_id,
+        )
+        return [], meta_response, None, None
+
+    if recommendations is None:
+        logger.info(
+            "[ProfileOptimization] API load returned None recommendations user_id={}",
+            user_id,
+        )
+        return None, None, None, None
+
+    if not recommendations:
+        logger.warning(
+            "[ProfileOptimization] API load returned empty recommendations user_id={}",
+            user_id,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "empty_response",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+
+    try:
+        response_items = [
+            _optimization_dict_to_response(item) for item in recommendations
+        ]
+    except Exception as exc:
+        logger.exception(
+            "[ProfileOptimization] response mapping failure user_id={}: {}",
+            user_id,
+            exc,
+        )
+        analysis_error = _make_analysis_error(
+            7,
+            "response_mapping_failed",
+            _PROFILE_OPTIMIZATION_USER_ERROR,
+            exc,
+            user_id=user_id,
+        )
+        return None, None, _PROFILE_OPTIMIZATION_USER_ERROR, analysis_error
+
+    logger.info(
+        "[LinkedInAnalysis] Phase 7 complete user_id={} source={} count={}",
+        user_id,
+        meta.get("source"),
+        len(response_items),
+    )
+    return response_items, meta_response, None, None
+
 
 def _build_profile_completion_payload(
     validation: ProfileValidationResult,
