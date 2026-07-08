@@ -17,7 +17,7 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
   onOpenCopilot,
   onKnowledgeCenterAction,
 }) => (
-  <aside
+  <aside className="linkedin-dashboard-right-rail" aria-label="Dashboard tools"
     style={{
       width: DASHBOARD_RIGHT_RAIL_WIDTH,
       minWidth: DASHBOARD_RIGHT_RAIL_WIDTH,
