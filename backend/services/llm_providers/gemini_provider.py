@@ -376,7 +376,7 @@ def _dict_to_types_schema(schema: Dict[str, Any]) -> types.Schema:
     return _convert(schema)
 
 @retry(wait=wait_random_exponential(min=1, max=60), stop=stop_after_attempt(6))
-def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, top_k=40, max_tokens=8192, system_prompt=None, user_id: str = None):
+def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, top_k=40, max_tokens=8192, system_prompt=None, user_id: str = None, model: Optional[str] = None):
     """
     Generate structured JSON response using Google's Gemini Pro model.
     
@@ -446,10 +446,12 @@ def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, 
             types_schema = types.Schema(type=types.Type.OBJECT)
 
         # Add debugging for API call
+        chosen_model = model or "gemini-2.5-flash"
         logger.info(
-            "Gemini structured call | prompt_len=%s | schema_kind=%s | temp=%s | top_p=%s | top_k=%s | max_tokens=%s",
+            "Gemini structured call | prompt_len=%s | schema_kind=%s | model=%s | temp=%s | top_p=%s | top_k=%s | max_tokens=%s",
             len(prompt) if isinstance(prompt, str) else '<non-str>',
             type(types_schema).__name__,
+            chosen_model,
             temperature,
             top_p,
             top_k,
@@ -474,7 +476,7 @@ def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, 
         
         async def make_api_call():
             return client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=chosen_model,
                 contents=prompt,
                 config=generation_config,
             )
@@ -490,7 +492,7 @@ def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, 
                 logger.warning("⚠️ Already in async context, using direct sync call")
                 # For now, let's use a simpler approach without retry logic
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=chosen_model,
                     contents=prompt,
                     config=generation_config,
                 )

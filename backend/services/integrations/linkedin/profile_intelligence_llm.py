@@ -71,6 +71,9 @@ def call_profile_intelligence_llm(
     system_prompt: str,
     user_prompt: str,
     user_id: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
     generate_fn: ProfileIntelligenceGenerateFn = gemini_structured_json_response,
 ) -> dict[str, Any]:
     """
@@ -89,23 +92,42 @@ def call_profile_intelligence_llm(
         ProfileIntelligenceLLMError: When the provider fails or returns unusable output
     """
     schema = ai_profile_intelligence_json_schema()
+    # Show which model/params are being requested; fall back to defaults when not provided
+    effective_model = model or DEFAULT_PROFILE_INTELLIGENCE_MODEL
+    effective_temperature = (
+        temperature if isinstance(temperature, (int, float)) else PROFILE_INTELLIGENCE_LLM_TEMPERATURE
+    )
+    effective_max_tokens = (
+        int(max_tokens) if isinstance(max_tokens, int) and max_tokens > 0 else PROFILE_INTELLIGENCE_LLM_MAX_TOKENS
+    )
+
     logger.info(
-        "{} call_profile_intelligence_llm start model={} user_prompt_len={} user_id={}",
+        "{} call_profile_intelligence_llm start model={} temp={} max_tokens={} user_prompt_len={} user_id={}",
         _LOG_PREFIX,
-        DEFAULT_PROFILE_INTELLIGENCE_MODEL,
+        effective_model,
+        effective_temperature,
+        effective_max_tokens,
         len(user_prompt) if isinstance(user_prompt, str) else None,
         user_id,
     )
 
     try:
-        response = generate_fn(
-            prompt=user_prompt,
-            schema=schema,
-            temperature=PROFILE_INTELLIGENCE_LLM_TEMPERATURE,
-            max_tokens=PROFILE_INTELLIGENCE_LLM_MAX_TOKENS,
-            system_prompt=system_prompt,
-            user_id=user_id,
-        )
+        # Pass through per-request params to the provider adapter when supported.
+        gen_kwargs: dict[str, Any] = {
+            "prompt": user_prompt,
+            "schema": schema,
+            "system_prompt": system_prompt,
+            "user_id": user_id,
+        }
+        # Only include optional params when provided to avoid breaking adapters that don't accept them
+        if temperature is not None:
+            gen_kwargs["temperature"] = effective_temperature
+        if max_tokens is not None:
+            gen_kwargs["max_tokens"] = effective_max_tokens
+        if model is not None:
+            gen_kwargs["model"] = model
+
+        response = generate_fn(**gen_kwargs)
     except ProfileIntelligenceLLMError:
         raise
     except Exception as exc:

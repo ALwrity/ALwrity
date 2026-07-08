@@ -58,6 +58,9 @@ def get_or_generate_profile_intelligence(
     profile_validation: ProfileValidationResult,
     repository: Optional[ProfileRepository] = None,
     force_regenerate: bool = False,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
     generate_fn: ProfileIntelligenceGenerateFn = gemini_structured_json_response,
 ) -> tuple[Optional[dict[str, Any]], ProfileIntelligenceAcquireMeta]:
     """
@@ -171,6 +174,9 @@ def get_or_generate_profile_intelligence(
         profile_context,
         context_hash=context_hash,
         repository=repo,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
         generate_fn=generate_fn,
     )
     updated_at = repo.get_analysis_row(user_id)
@@ -248,6 +254,9 @@ def _generate_and_persist_intelligence(
     *,
     context_hash: str,
     repository: ProfileRepository,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
     generate_fn: ProfileIntelligenceGenerateFn,
 ) -> dict[str, Any]:
     """Run LLM (with one validation retry), validate, and persist intelligence."""
@@ -263,6 +272,9 @@ def _generate_and_persist_intelligence(
     raw = _call_llm_with_validation_retry(
         user_id=user_id,
         user_prompt=user_prompt,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
         generate_fn=generate_fn,
     )
 
@@ -299,6 +311,9 @@ def _call_llm_with_validation_retry(
     *,
     user_id: str,
     user_prompt: str,
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None,
     generate_fn: ProfileIntelligenceGenerateFn,
 ) -> dict[str, Any]:
     """Call LLM once; retry once when validation fails on the parsed response."""
@@ -307,6 +322,9 @@ def _call_llm_with_validation_retry(
         system_prompt=PROFILE_INTELLIGENCE_SYSTEM_PROMPT,
         user_prompt=user_prompt,
         user_id=user_id,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
         generate_fn=generate_fn,
     )
     logger.info(
@@ -337,6 +355,9 @@ def _call_llm_with_validation_retry(
         system_prompt=PROFILE_INTELLIGENCE_SYSTEM_PROMPT,
         user_prompt=retry_prompt,
         user_id=user_id,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
         generate_fn=generate_fn,
     )
     logger.info(

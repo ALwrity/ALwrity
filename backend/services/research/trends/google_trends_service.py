@@ -54,6 +54,7 @@ try:
 except ImportError:
     PYTrends_AVAILABLE = False
     _TooManyRequestsError = None
+    _TrendReq = Any
     logger.warning("pytrends not installed. Google Trends features will be unavailable.")
 
 # Patch 2: pytrends related_topics() and related_queries() use keyword[0]
