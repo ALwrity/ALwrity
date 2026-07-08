@@ -54,7 +54,7 @@ class UserWorkspaceManager:
 
             config = self._create_user_config(user_id)
             config_file = user_dir / "config" / "user_config.json"
-            with open(config_file, 'w') as f:
+            with open(config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, indent=2)
 
             try:
@@ -147,7 +147,7 @@ class UserWorkspaceManager:
             
         config_file = user_dir / "config" / "user_config.json"
         if config_file.exists():
-            with open(config_file, 'r') as f:
+            with open(config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             return {
                 "user_id": user_id,
@@ -164,13 +164,13 @@ class UserWorkspaceManager:
             config_file = user_dir / "config" / "user_config.json"
             
             if config_file.exists():
-                with open(config_file, 'r') as f:
+                with open(config_file, 'r', encoding='utf-8') as f:
                     config = json.load(f)
                 
                 # Deep merge updates
                 self._deep_merge(config, updates)
                 
-                with open(config_file, 'w') as f:
+                with open(config_file, 'w', encoding='utf-8') as f:
                     json.dump(config, f, indent=2)
                 
                 logger.info(f"✅ User config updated for user {user_id}")
@@ -254,7 +254,7 @@ class UserWorkspaceManager:
             "copilotkit": {"enabled": True, "assistant_type": "content"}
         }
         
-        with open(ai_config, 'w') as f:
+        with open(ai_config, 'w', encoding='utf-8') as f:
             json.dump(ai_services, f, indent=2)
     
     def _setup_content_analysis(self, user_id: str):
@@ -284,7 +284,7 @@ class UserWorkspaceManager:
             "wordpress": {"enabled": False, "connected": False}
         }
         
-        with open(integrations_config, 'w') as f:
+        with open(integrations_config, 'w', encoding='utf-8') as f:
             json.dump(integrations, f, indent=2)
     
     def _setup_complete_features(self, user_id: str):

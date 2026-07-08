@@ -33,7 +33,7 @@ def check_credentials_file():
         return False
     
     try:
-        with open(credentials_path, 'r') as f:
+        with open(credentials_path, 'r', encoding='utf-8') as f:
             credentials = json.load(f)
         
         required_fields = ['web', 'client_id', 'client_secret']

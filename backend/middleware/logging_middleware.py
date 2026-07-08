@@ -234,7 +234,7 @@ class LogAnalyzer:
             cutoff_time = datetime.utcnow().timestamp() - (hours * 3600)
             operations = []
             
-            async with aiofiles.open(performance_file, "r") as file:
+            async with aiofiles.open(performance_file, "r", encoding="utf-8") as file:
                 async for line in file:
                     try:
                         data = json.loads(line.strip())
@@ -278,7 +278,7 @@ class LogAnalyzer:
             cutoff_time = datetime.utcnow().timestamp() - (hours * 3600)
             errors = []
             
-            async with aiofiles.open(error_file, "r") as file:
+            async with aiofiles.open(error_file, "r", encoding="utf-8") as file:
                 async for line in file:
                     try:
                         data = json.loads(line.strip())

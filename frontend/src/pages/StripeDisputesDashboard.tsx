@@ -318,7 +318,7 @@ const StripeDisputesDashboard: React.FC = () => {
           <a
             href="https://docs.stripe.com/disputes/prevention/card-testing"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             Card testing
           </a>
@@ -326,7 +326,7 @@ const StripeDisputesDashboard: React.FC = () => {
           <a
             href="https://docs.stripe.com/disputes/prevention/identifying-fraud"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
           >
             Identifying potential fraud
           </a>
