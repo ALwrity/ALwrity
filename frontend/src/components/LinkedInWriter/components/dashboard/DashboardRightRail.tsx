@@ -3,6 +3,7 @@ import { DashboardAnalyticsSidebar, DASHBOARD_RIGHT_RAIL_WIDTH } from './Dashboa
 import { DashboardCopilotFab } from './DashboardCopilotFab';
 import { KnowledgeCenterDock, type KnowledgeCenterAction } from './KnowledgeCenterDock';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
+import { LinkedInBestPracticesTip } from '../LinkedInBestPracticesTip';
 
 interface DashboardRightRailProps {
   onViewAllAnalytics?: () => void;
@@ -10,43 +11,32 @@ interface DashboardRightRailProps {
   onKnowledgeCenterAction?: (action: KnowledgeCenterAction) => void;
 }
 
-/** Right rail: Analytics panel, Co-Pilot, and Knowledge Center as separate stacked blocks. */
+/** Right rail: Analytics panel, Co-Pilot, Knowledge Center, and Best-Practice Tip. */
 export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
   onViewAllAnalytics,
   onOpenCopilot,
   onKnowledgeCenterAction,
-}) => {
-  return (
-    <aside
-      className="linkedin-dashboard-right-rail"
-      aria-label="Dashboard tools"
-      style={{
-        width: DASHBOARD_RIGHT_RAIL_WIDTH,
-        flexShrink: 0,
-        alignSelf: 'stretch',
-        borderLeft: `2px solid ${FRAME_COLOR}`,
-        background: '#fafbfc',
-        padding: '10px 10px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 10,
-        minHeight: 0,
-        overflow: 'visible',
-      }}
-    >
-      <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
-
-      {onOpenCopilot && (
-        <div className="linkedin-dashboard-rail-copilot">
-          <DashboardCopilotFab onOpenCopilot={onOpenCopilot} variant="rail" layout="stacked" />
-        </div>
-      )}
-
-      {onKnowledgeCenterAction && (
-        <div className="linkedin-dashboard-rail-knowledge">
-          <KnowledgeCenterDock variant="rail" onFeatureAction={onKnowledgeCenterAction} />
-        </div>
-      )}
-    </aside>
-  );
-};
+}) => (
+  <aside
+    style={{
+      width: DASHBOARD_RIGHT_RAIL_WIDTH,
+      minWidth: DASHBOARD_RIGHT_RAIL_WIDTH,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 12,
+      background: FRAME_COLOR,
+      borderRadius: 16,
+      padding: 16,
+      boxSizing: 'border-box',
+    }}
+  >
+    <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
+    <DashboardCopilotFab onOpen={onOpenCopilot} />
+    <KnowledgeCenterDock
+      onFeatureAction={onKnowledgeCenterAction ?? (() => {})}
+      variant="rail"
+    />
+    {/* Issue #731 — LinkedIn best-practice contextual tip */}
+    <LinkedInBestPracticesTip />
+  </aside>
+);
