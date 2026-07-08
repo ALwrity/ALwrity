@@ -174,9 +174,6 @@ export const LinkedInBestPracticesTip: React.FC = () => {
     return Math.floor(Date.now() / 86_400_000) % TIPS.length;
   });
 
-  // If the user has already dismissed, skip rendering entirely
-  if (dismissed) return null;
-
   const tip = TIPS[currentIndex];
 
   const handleDismiss = useCallback(() => {
@@ -195,6 +192,9 @@ export const LinkedInBestPracticesTip: React.FC = () => {
   const handleDotClick = useCallback((idx: number) => {
     setCurrentIndex(idx);
   }, []);
+
+  // If the user has already dismissed, skip rendering entirely
+  if (dismissed) return null;
 
   return (
     <div style={panelStyle} role="complementary" aria-label="LinkedIn best practice tip">
