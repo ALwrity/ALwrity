@@ -8,7 +8,6 @@ Leverages existing non-AI SEO tools and uses single AI prompt for structured ana
 import asyncio
 import math
 import re
-import textstat
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from utils.logger_utils import get_service_logger
@@ -292,6 +291,7 @@ class BlogContentSEOAnalyzer:
     async def _analyze_readability(self, content: str) -> Dict[str, Any]:
         """Analyze content readability using textstat integration"""
         try:
+            import textstat
             # Calculate readability metrics
             readability_metrics = {
                 'flesch_reading_ease': textstat.flesch_reading_ease(content),
