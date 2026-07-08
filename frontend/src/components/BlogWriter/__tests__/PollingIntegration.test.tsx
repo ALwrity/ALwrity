@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { ResearchAction } from '../ResearchAction';
 import { KeywordInputForm } from '../KeywordInputForm';
 import { blogWriterApi } from '../../../services/blogWriterApi';
