@@ -55,13 +55,33 @@ SECRET_KEY=your_secret_key
 
 ### 2. Frontend Configuration
 
-Create a `.env` file in the frontend directory:
+Copy the provided environment template before starting the frontend.
+
+**Linux/macOS**
 
 ```bash
-REACT_APP_API_URL=http://localhost:8000
-REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_key
-REACT_APP_COPILOT_API_KEY=your_copilot_key
+cp env_template.txt .env
 ```
+
+**Windows (Command Prompt)**
+
+```cmd
+copy env_template.txt .env
+```
+
+Then open the `.env` file and update the required values:
+
+```env
+REACT_APP_API_BASE_URL=http://localhost:8000
+REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+REACT_APP_CLERK_JWT_TEMPLATE=
+```
+
+> **Important:** Replace `your_clerk_publishable_key` with the Publishable Key from your Clerk dashboard.
+
+You can create a free Clerk application and obtain your Clerk Publishable Key from:
+
+https://clerk.com/docs
 
 ## Running the Application
 
