@@ -265,9 +265,16 @@ export const ImageGenerator = React.forwardRef<ImageGeneratorHandle, ImageGenera
       overlay_text: suggestion?.overlay_text || undefined,
     };
     console.time('[onGenerate] generate');
-    const res = await generate(req);
+    let res;
+    try {
+      res = await generate(req);
+    } catch {
+      console.timeEnd('[onGenerate] generate');
+      console.timeEnd('[onGenerate] total');
+      return;
+    }
     console.timeLog('[onGenerate] generate', 'done');
-    if (res && onImageReady) onImageReady(res.image_base64);
+    if (onImageReady) onImageReady(res.image_base64);
     try {
       const { publishImage } = await import('../../utils/imageBus');
       publishImage({ base64: res.image_base64, provider: res.provider, model: res.model });
