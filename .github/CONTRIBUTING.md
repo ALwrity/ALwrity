@@ -5,7 +5,7 @@ Thank you for your interest in contributing to ALwrity! 🚀 We welcome contribu
 ## 🤝 How to Contribute
 
 ### 1. **Report Issues**
-- Use our [GitHub Issues](https://github.com/AJaySi/ALwrity/issues) to report bugs or request features
+- Use our [GitHub Issues](https://github.com/ALwrity/ALwrity/issues) to report bugs or request features
 - Check existing issues before creating new ones
 - Provide clear descriptions and steps to reproduce bugs
 
