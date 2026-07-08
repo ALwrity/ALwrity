@@ -15,6 +15,7 @@ from ..onboarding.api_key_manager import APIKeyManager
 
 from .gemini_provider import gemini_text_response, gemini_structured_json_response
 from .huggingface_provider import huggingface_text_response, huggingface_structured_json_response
+from .openai_provider import openai_text_response, openai_structured_json_response
 from .tenant_provider_config import tenant_provider_config_resolver
 
 
@@ -170,6 +171,8 @@ def llm_text_gen(
             available_providers.append("huggingface")
         if api_key_manager.get_api_key("wavespeed"):
             available_providers.append("wavespeed")
+        if api_key_manager.get_api_key("openai"):
+            available_providers.append("openai")
         
         logger.warning(
             f"[llm_text_gen][{flow_tag}] Provider preflight: env_provider='{env_provider or 'auto'}', "
@@ -406,9 +409,28 @@ def llm_text_gen(
                 api_took_ms = (time.time() - t1) * 1000
                 total_ms = (time.time() - t0) * 1000
                 logger.warning(f"[llm_text_gen][{flow_tag}] wavespeed: user={user_id} import_took={(t1-t0)*1000:.0f}ms api_took={api_took_ms:.0f}ms total={total_ms:.0f}ms")
+            elif gpt_provider == "openai":
+                if json_struct:
+                    response_text = openai_structured_json_response(
+                        prompt=prompt,
+                        schema=json_struct,
+                        model=model or "gpt-4o-mini",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_instructions
+                    )
+                else:
+                    response_text = openai_text_response(
+                        prompt=prompt,
+                        model=model or "gpt-4o-mini",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        top_p=top_p,
+                        system_prompt=system_instructions
+                    )
             else:
                 logger.error(f"[llm_text_gen] Unknown provider: {gpt_provider}")
-                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed")
+                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed, openai")
             
             # TRACK USAGE after successful API call
             if response_text:
