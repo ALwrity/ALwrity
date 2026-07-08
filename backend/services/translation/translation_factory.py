@@ -40,7 +40,9 @@ def get_translator(
     """
     global _TRANSLATOR_CACHE
     
-    cache_key = f"{quality.value}_{id(kwargs)}"
+    # Convert kwargs to a sorted string representation for stable caching
+    kwargs_str = "_".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
+    cache_key = f"{quality.value}_{kwargs_str}"
     
     if not force_new and cache_key in _TRANSLATOR_CACHE:
         return _TRANSLATOR_CACHE[cache_key]
@@ -66,7 +68,7 @@ def translate_text(
     quality: TranslationQuality = TranslationQuality.LOW,
 ) -> TranslationResult:
     """
-    Convenience function to translate text.
+    Convenience function to translate text with persistent caching.
     
     Args:
         text: Text to translate
@@ -77,8 +79,32 @@ def translate_text(
     Returns:
         TranslationResult
     """
+    from .translation_cache import get_cache
+    cache = get_cache()
+    cached = cache.get(text, target_language, quality.value)
+    if cached:
+        return TranslationResult(
+            translated_text=cached["translated_text"],
+            source_language=cached["source_language"],
+            target_language=cached["target_language"],
+            provider=cached["provider"],
+            quality=TranslationQuality(cached["quality"]),
+            metadata=cached["metadata"],
+        )
+
     translator = get_translator(quality)
-    return translator.translate(text, target_language, source_language)
+    result = translator.translate(text, target_language, source_language)
+    
+    cache.set(
+        text=text,
+        target_language=target_language,
+        quality=quality.value,
+        translated_text=result.translated_text,
+        source_language=result.source_language,
+        provider=result.provider,
+        metadata=result.metadata,
+    )
+    return result
 
 
 def translate_batch(
@@ -88,7 +114,7 @@ def translate_batch(
     quality: TranslationQuality = TranslationQuality.LOW,
 ) -> list[TranslationResult]:
     """
-    Convenience function to translate multiple texts.
+    Convenience function to translate multiple texts with persistent caching.
     
     Args:
         texts: List of texts to translate
@@ -99,8 +125,44 @@ def translate_batch(
     Returns:
         List of TranslationResults
     """
-    translator = get_translator(quality)
-    return translator.translate_batch(texts, target_language, source_language)
+    from .translation_cache import get_cache
+    cache = get_cache()
+    
+    results = [None] * len(texts)
+    uncached_indices = []
+    uncached_texts = []
+    
+    for i, text in enumerate(texts):
+        cached = cache.get(text, target_language, quality.value)
+        if cached:
+            results[i] = TranslationResult(
+                translated_text=cached["translated_text"],
+                source_language=cached["source_language"],
+                target_language=cached["target_language"],
+                provider=cached["provider"],
+                quality=TranslationQuality(cached["quality"]),
+                metadata=cached["metadata"],
+            )
+        else:
+            uncached_indices.append(i)
+            uncached_texts.append(text)
+            
+    if uncached_texts:
+        translator = get_translator(quality)
+        batch_results = translator.translate_batch(uncached_texts, target_language, source_language)
+        for idx, res in zip(uncached_indices, batch_results):
+            results[idx] = res
+            cache.set(
+                text=texts[idx],
+                target_language=target_language,
+                quality=quality.value,
+                translated_text=res.translated_text,
+                source_language=res.source_language,
+                provider=res.provider,
+                metadata=res.metadata,
+            )
+            
+    return results
 
 
 def list_supported_languages(
@@ -170,3 +232,8 @@ def clear_translator_cache() -> None:
     global _TRANSLATOR_CACHE
     _TRANSLATOR_CACHE.clear()
     logger.info("Translation provider cache cleared")
+    try:
+        from .translation_cache import get_cache
+        get_cache().clear()
+    except Exception as e:
+        logger.warning(f"Failed to clear persistent translation cache: {e}")

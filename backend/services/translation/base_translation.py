@@ -84,6 +84,7 @@ class BaseTranslationProvider(ABC):
     LANGUAGE_CODE_MAPPING: Dict[str, str] = {}
     
     def __init__(self):
+        self.LANGUAGE_CODE_MAPPING = {}
         self._build_language_mapping()
     
     def _build_language_mapping(self) -> None:
