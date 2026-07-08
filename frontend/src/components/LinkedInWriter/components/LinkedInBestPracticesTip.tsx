@@ -60,7 +60,7 @@ const TIPS: BestPracticeTip[] = [
     emoji: '#️⃣',
     title: 'Hashtag Rule',
     body:
-      'Use a maximum of 3 hashtags per post. LinkedIn's algorithm treats more ' +
+      'Use a maximum of 3 hashtags per post. LinkedIn\'s algorithm treats more ' +
       'than 3 as a spam signal, actively reducing distribution.',
   },
   {
