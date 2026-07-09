@@ -188,3 +188,7 @@ class PostAnalyticsHistoryResponse(BaseModel):
     summary: EngagementSummary
     top_gainers: list[PostDelta]
     top_decliners: list[PostDelta]
+    last_synced_at: Optional[datetime] = Field(
+        default=None,
+        description="When post analytics were last fetched from LinkedIn",
+    )

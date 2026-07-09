@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from loguru import logger
@@ -19,6 +19,18 @@ from models.linkedin_posts_models import (
     PostDelta,
 )
 from models.post_analytics_snapshot_model import PostAnalyticsSnapshot
+
+# Max posts shown in top gainers / top decliners lists
+TOP_TREND_POSTS_LIMIT = 5
+
+
+def _utc_iso(dt: Optional[datetime]) -> Optional[str]:
+    """Serialize a naive UTC datetime as an ISO-8601 string with Z suffix."""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt.isoformat() + "Z"
 
 
 class LinkedInPostAnalyticsService:
@@ -112,7 +124,7 @@ class LinkedInPostAnalyticsService:
         if len(epochs) < 2:
             now = datetime.utcnow()
             return PostAnalyticsHistoryResponse(
-                period={"from": now, "to": now},
+                period={"from": _utc_iso(now), "to": _utc_iso(now)},
                 summary=EngagementSummary(
                     total_posts=0,
                     reactions=MetricDelta(before=0, now=0, delta=0, pct_change=0.0),
@@ -123,6 +135,7 @@ class LinkedInPostAnalyticsService:
                 ),
                 top_gainers=[],
                 top_decliners=[],
+                last_synced_at=self.get_last_synced_at(user_id),
             )
 
         t1, t2 = epochs[0][0], epochs[1][0]  # t1 = latest, t2 = previous
@@ -241,14 +254,15 @@ class LinkedInPostAnalyticsService:
             return d.reactions_delta + d.comments_delta + d.impressions_delta
 
         sorted_deltas = sorted(deltas, key=_sort_key, reverse=True)
-        top_gainers = [d for d in sorted_deltas if _sort_key(d) > 0][:limit]
-        top_decliners = [d for d in reversed(sorted_deltas) if _sort_key(d) < 0][:limit]
+        top_gainers = [d for d in sorted_deltas if _sort_key(d) > 0][:TOP_TREND_POSTS_LIMIT]
+        top_decliners = [d for d in reversed(sorted_deltas) if _sort_key(d) < 0][:TOP_TREND_POSTS_LIMIT]
 
         return PostAnalyticsHistoryResponse(
-            period={"from": t2.isoformat(), "to": t1.isoformat()},
+            period={"from": _utc_iso(t2), "to": _utc_iso(t1)},
             summary=summary,
             top_gainers=top_gainers,
             top_decliners=top_decliners,
+            last_synced_at=self.get_last_synced_at(user_id),
         )
 
     # ── Internal helpers ───────────────────────────────────────────────────

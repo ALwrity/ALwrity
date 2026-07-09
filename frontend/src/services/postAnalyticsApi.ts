@@ -80,6 +80,8 @@ export interface PostAnalyticsHistoryResponse {
   summary: EngagementSummary;
   top_gainers: PostDelta[];
   top_decliners: PostDelta[];
+  /** ISO timestamp of the last successful LinkedIn analytics sync. */
+  last_synced_at?: string | null;
 }
 
 export const postAnalyticsApi = {
