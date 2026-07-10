@@ -3,11 +3,10 @@
  *
  * Surfaces the Brand Scorecard from the alwrity_growth_engine sessionStorage
  * cache at the top of PostAnalyticsPanel. Zero API calls when cache is warm.
- * Includes a "Improve Brand Score" CTA that opens the Growth Engine modal.
+ * Includes a "Improve Brand Score" CTA that navigates to the Growth Engine tab.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import type { BrandScorecardResponse } from '../../../../services/linkedInGrowthApi';
-import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
 
 const GROWTH_CACHE_KEY = 'alwrity_growth_engine';
 
@@ -23,6 +22,12 @@ function readBrandScorecard(): BrandScorecardResponse | null {
     const cache = JSON.parse(raw) as GrowthCache;
     return cache?.data?.brand_scorecard ?? null;
   } catch { return null; }
+}
+
+function openGrowthTab() {
+  window.dispatchEvent(
+    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })
+  );
 }
 
 // ─── score colour helper ─────────────────────────────────────────────────────
@@ -129,7 +134,7 @@ export const BrandScoreSummaryCard: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={openGrowthEngineModal}
+          onClick={openGrowthTab}
           style={{
             padding: '8px 14px',
             background: '#0a66c2',
@@ -164,7 +169,7 @@ export const BrandScoreSummaryCard: React.FC = () => {
         <div style={{ fontSize: 14, fontWeight: 700, color: '#0f172a' }}>Brand Health Score</div>
         <button
           type="button"
-          onClick={openGrowthEngineModal}
+          onClick={openGrowthTab}
           style={{
             padding: '5px 10px',
             background: '#eff6ff',

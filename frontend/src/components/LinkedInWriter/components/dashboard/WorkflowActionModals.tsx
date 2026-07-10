@@ -7,10 +7,6 @@ import DataSourceSelector from '../Brainstorm/DataSourceSelector';
 import { usePlatformPersonaContext } from '../../../shared/PersonaContext/PlatformPersonaProvider';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import {
-  openGrowthEngineModal,
-  openPostAnalyticsModal,
-} from '../../utils/linkedInDashboardEvents';
-import {
   GrowthSnapshotModal,
   PostTodayModal,
   BrandScorecardModal,
@@ -111,9 +107,9 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const openQuickCreate     = (type: string) => { onClose(); dispatch('linkedinwriter:openQuickCreate', { type }); };
   const openCalendar        = () => { onClose(); navigate('/content-planning', { state: { activeTab: 1 } }); };
   const openProfileAnalytics = () => { onClose(); dispatch('linkedinwriter:openOptimiseProfile'); };
-  const openContentAnalytics = () => { onClose(); openPostAnalyticsModal(); };
+  const openContentAnalytics = () => { onClose(); dispatch('linkedinwriter:openPostAnalytics'); };
   const openSeoAnalytics    = () => { onClose(); navigate('/seo-dashboard'); };
-  const openGrowthEngine    = () => { onClose(); openGrowthEngineModal(); };
+  const openGrowthEngine    = () => { onClose(); dispatch('linkedinwriter:switchTab', { tab: 'growth' }); };
 
   return (
     <>

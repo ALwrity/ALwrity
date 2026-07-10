@@ -23,12 +23,6 @@ import { colors, primaryBtn } from './styles';
 import { type LinkedInPreferences } from '../../utils/storageUtils';
 
 interface GrowthEnginePanelProps {
-  /** When false, panel renders nothing (used inside dashboard modal). */
-  open?: boolean;
-  /** When true, omits page-level title chrome (modal supplies the header). */
-  embedded?: boolean;
-  /** Called after a post is successfully generated from the insight modal. */
-  onClose?: () => void;
   generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
   userPreferences: LinkedInPreferences;
 }
@@ -38,9 +32,6 @@ type PanelState = 'idle' | 'loading' | 'loaded' | 'error';
 type RefreshKey = 'trending' | 'network' | 'engagement' | 'viral' | 'strategy' | 'gaps' | 'brand';
 
 export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
-  open = true,
-  embedded = false,
-  onClose,
   generatePost,
   userPreferences,
 }) => {
@@ -58,14 +49,7 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
   }>({ visible: false, topic: '', context: '', loading: false, error: '' });
 
   const mountedRef = useRef(true);
-
-  const pageShell = useCallback(
-    (extra?: React.CSSProperties): React.CSSProperties =>
-      embedded
-        ? { display: 'flex', flexDirection: 'column', gap: 20, ...extra }
-        : { padding: '24px 32px', maxWidth: 900, margin: '0 auto', ...extra },
-    [embedded],
-  );
+  const fetchedRef = useRef(false);
 
   // Re-render every 60s so relative timestamps stay current
   useEffect(() => {
@@ -73,9 +57,10 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
     return () => clearInterval(id);
   }, []);
 
-  // Restore sessionStorage cache when panel opens
+  // Restore sessionStorage cache on mount
   useEffect(() => {
-    if (!open) return;
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
 
     try {
       const raw = sessionStorage.getItem('alwrity_growth_engine');
@@ -86,18 +71,14 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
         if (age < TTL) {
           setConsolidated(parsed.data);
           setPanelState('loaded');
-          return;
+        } else {
+          sessionStorage.removeItem('alwrity_growth_engine');
         }
-        sessionStorage.removeItem('alwrity_growth_engine');
       }
-      setConsolidated(null);
-      setPanelState('idle');
     } catch {
       sessionStorage.removeItem('alwrity_growth_engine');
-      setConsolidated(null);
-      setPanelState('idle');
     }
-  }, [open]);
+  }, []);
 
   // Persist the latest consolidated data to sessionStorage
   const persistToSession = useCallback((data: ConsolidatedGrowthResponse) => {
@@ -287,7 +268,6 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
       });
       if (result.success) {
         setCreationModal({ visible: false, topic: '', context: '', loading: false, error: '' });
-        onClose?.();
       } else {
         setCreationModal((prev) => ({ ...prev, loading: false, error: result.error || 'Generation failed' }));
       }
@@ -295,24 +275,18 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
       const msg = err instanceof Error ? err.message : 'Generation failed';
       setCreationModal((prev) => ({ ...prev, loading: false, error: msg }));
     }
-  }, [generatePost, creationModal.topic, creationModal.context, userPreferences, onClose]);
-
-  if (!open) {
-    return null;
-  }
+  }, [generatePost, creationModal.topic, creationModal.context, userPreferences]);
 
   // ------------------------------------------------------------------
   // Idle state — user hasn't triggered any analysis yet
   // ------------------------------------------------------------------
   if (panelState === 'idle') {
     return (
-      <div style={pageShell()}>
-        {!embedded && (
-          <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: colors.textDark }}>
-            Growth Engine
-          </h2>
-        )}
-        <p style={{ margin: embedded ? '0 0 16px' : '0 0 24px', fontSize: 13, color: colors.textSecondary }}>
+      <div style={{ padding: '24px 32px', maxWidth: 900, margin: '0 auto' }}>
+        <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 700, color: colors.textDark }}>
+          Growth Engine
+        </h2>
+        <p style={{ margin: '0 0 24px', fontSize: 13, color: colors.textSecondary }}>
           AI-powered insights to grow your LinkedIn reach. Data-backed, actionable suggestions.
         </p>
         <EmptyState
@@ -357,13 +331,11 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
     });
 
     return (
-      <div style={pageShell()}>
-        {!embedded && (
-          <div style={{ marginBottom: 4 }}>
-            <div style={sk(24, '280px')} />
-            <div style={{ ...sk(13, '420px'), marginTop: 8 }} />
-          </div>
-        )}
+      <div style={{ padding: '24px 32px', maxWidth: 900, margin: '0 auto' }}>
+        <div style={{ marginBottom: 4 }}>
+          <div style={sk(24, '280px')} />
+          <div style={{ ...sk(13, '420px'), marginTop: 8 }} />
+        </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginTop: 20 }}>
           {[1, 2, 3, 4, 5, 6, 7].map((i) => (
             <div
@@ -394,7 +366,7 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
   // ------------------------------------------------------------------
   if (panelState === 'error') {
     return (
-      <div style={pageShell()}>
+      <div style={{ padding: '24px 32px', maxWidth: 900, margin: '0 auto' }}>
         <div
           style={{
             background: '#fef2f2',
@@ -523,37 +495,41 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
   );
 
   return (
-    <div style={pageShell()}>
-      {(!embedded || bestPickAvailable()) && (
-        <div style={{ marginBottom: 4 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            {!embedded && (
-              <div>
-                <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: colors.textDark }}>
-                  Growth Engine
-                </h2>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: colors.textSecondary }}>
-                  AI-powered insights. Refresh individual cards to get fresh AI-generated recommendations.
-                </p>
-              </div>
-            )}
-            {bestPickAvailable() && (
-              <button
-                onClick={handleBestPick}
-                style={{
-                  ...primaryBtn,
-                  padding: '8px 18px', fontSize: 13, borderRadius: 8,
-                  whiteSpace: 'nowrap',
-                  marginLeft: embedded ? 0 : 16,
-                }}
-                aria-label="Generate the best post based on all insights"
-              >
-                🎯 Generate Best Post
-              </button>
-            )}
+    <div
+      style={{
+        padding: '24px 32px',
+        maxWidth: 900,
+        margin: '0 auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 20,
+      }}
+    >
+      <div style={{ marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: colors.textDark }}>
+              Growth Engine
+            </h2>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: colors.textSecondary }}>
+              AI-powered insights. Refresh individual cards to get fresh AI-generated recommendations.
+            </p>
           </div>
+          {bestPickAvailable() && (
+            <button
+              onClick={handleBestPick}
+              style={{
+                ...primaryBtn,
+                padding: '8px 18px', fontSize: 13, borderRadius: 8,
+                whiteSpace: 'nowrap', marginLeft: 16,
+              }}
+              aria-label="Generate the best post based on all insights"
+            >
+              🎯 Generate Best Post
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
       {isStale && (
         <div
@@ -747,7 +723,7 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
           style={{
             position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: embedded ? 12000 : 10020, padding: 20,
+            zIndex: 10020, padding: 20,
           }}
           onClick={() => { if (!creationModal.loading) setCreationModal((p) => ({ ...p, visible: false })); }}
         >
