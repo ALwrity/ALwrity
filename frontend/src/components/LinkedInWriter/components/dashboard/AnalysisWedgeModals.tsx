@@ -28,6 +28,7 @@ import {
   barColor,
   CONFIDENCE_COLORS,
 } from '../GrowthEngine/styles';
+import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
 
 export { EngagementTrendsModal } from './EngagementTrendsModal';
 
@@ -82,12 +83,6 @@ function openInCreate(topic: string, keyPoints: string, type: string = 'post') {
     new CustomEvent('linkedinwriter:openQuickCreate', {
       detail: { type, topic, key_points: keyPoints },
     })
-  );
-}
-
-function switchToGrowthEngine() {
-  window.dispatchEvent(
-    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })
   );
 }
 
@@ -491,7 +486,7 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                     </div>
                     <button
                       onClick={() => {
-                        switchToGrowthEngine();
+                        openGrowthEngineModal();
                         onClose();
                       }}
                       style={{
@@ -525,7 +520,7 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
             >
               <button
                 onClick={() => {
-                  switchToGrowthEngine();
+                  openGrowthEngineModal();
                   onClose();
                 }}
                 style={{
@@ -779,7 +774,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({ open, onClose })
                 + {candidates.length - 3} more opportunities in the{' '}
                 <button
                   onClick={() => {
-                    switchToGrowthEngine();
+                    openGrowthEngineModal();
                     onClose();
                   }}
                   style={{

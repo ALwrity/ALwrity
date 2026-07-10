@@ -32,6 +32,7 @@ import {
   scoreBg,
   barColor,
 } from '../GrowthEngine/styles';
+import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
 
 // ---------------------------------------------------------------------------
 // Shared helpers (mirror of AnalysisWedgeModals pattern)
@@ -648,7 +649,7 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({ open, on
       {data && !loading && opportunities.length > 3 && (
         <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4, textAlign: 'center' }}>
           {opportunities.length - 3} more in the{' '}
-          <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })); onClose(); }}
+          <button type="button" onClick={() => { openGrowthEngineModal(); onClose(); }}
             style={{ background: 'none', border: 'none', color: colors.primary, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
             Growth Engine →
           </button>
@@ -1009,7 +1010,7 @@ export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({ open, 
       {!loading && suggestions.length > 3 && (
         <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4, textAlign: 'center' }}>
           + {suggestions.length - 3} more in the{' '}
-          <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })); onClose(); }}
+          <button type="button" onClick={() => { openGrowthEngineModal(); onClose(); }}
             style={{ background: 'none', border: 'none', color: colors.primary, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
             Growth Engine →
           </button>
