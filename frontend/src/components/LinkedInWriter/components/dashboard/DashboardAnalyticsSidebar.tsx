@@ -5,7 +5,7 @@ import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
 import { ProfileGrowthWidget } from './ProfileGrowthWidget';
 import { DailyDigestWidget } from './DailyDigestWidget';
 
-const SIDEBAR_WIDTH = 224;
+const SIDEBAR_WIDTH = 300;
 
 interface DashboardAnalyticsSidebarProps {
   onViewAll?: () => void;
@@ -87,10 +87,10 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
   return (
     <div className="linkedin-analytics-panel">
       <div className="linkedin-analytics-panel-header">
-        <h3 style={{ margin: 0, fontSize: 12, fontWeight: 700, color: '#0f172a' }}>Analytics</h3>
+        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Analytics</h3>
         {onViewAll && (
           <button type="button" className="linkedin-analytics-panel-link" onClick={onViewAll}>
-            Open full
+            View all posts
           </button>
         )}
       </div>
@@ -117,7 +117,7 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
               <>
                 {posts.length > 0 && (
                   <>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: '#475569', marginBottom: 2 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
                       Post engagement
                     </div>
                     <MiniBarChart posts={posts} />
@@ -132,13 +132,13 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
                   }}
                 >
                   <div className="linkedin-analytics-stat-chip">
-                    <div style={{ fontSize: 8, fontWeight: 600, color: '#64748b' }}>Followers</div>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: '#64748b' }}>Followers</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#10b981', marginTop: 2 }}>
                       {totals.followers > 0 ? `+${totals.followers}` : '—'}
                     </div>
                   </div>
                   <div className="linkedin-analytics-stat-chip">
-                    <div style={{ fontSize: 8, fontWeight: 600, color: '#64748b' }}>CTR</div>
+                    <div style={{ fontSize: 9, fontWeight: 600, color: '#64748b' }}>CTR</div>
                     <div style={{ fontSize: 14, fontWeight: 800, color: '#0a66c2', marginTop: 2 }}>
                       {totals.impressions > 0 ? formatPct(totals.ctr) : '—'}
                     </div>

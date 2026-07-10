@@ -11,13 +11,17 @@ import { PostTimelineChart } from './PostTimelineChart';
 import { BrandScoreSummaryCard } from './BrandScoreSummaryCard';
 import { colors, panelContainer, primaryBtn, secondaryBtn } from './styles';
 
-interface PostAnalyticsPanelProps {
-  isActive: boolean;
+export interface PostAnalyticsPanelProps {
+  /** When true, fetches and renders post analytics content. */
+  open: boolean;
+  /** When true, omits page-level chrome (used inside dashboard modal). */
+  embedded?: boolean;
   onGenerateSimilarPost?: (prompt: string) => void;
 }
 
 export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
-  isActive,
+  open,
+  embedded = false,
   onGenerateSimilarPost,
 }) => {
   const { connected } = useLinkedInSocialConnection();
@@ -33,10 +37,10 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
   const showSkeleton = isLoading && !data;
 
   useEffect(() => {
-    if (isActive && panelState === 'idle' && connected) {
+    if (open && panelState === 'idle' && connected) {
       void fetchPosts();
     }
-  }, [isActive, panelState, fetchPosts, connected]);
+  }, [open, panelState, fetchPosts, connected]);
 
   const handleFetch = useCallback(() => {
     void refreshPosts();
@@ -50,7 +54,6 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
     (post: LinkedInPost) => {
       if (!onGenerateSimilarPost) return;
 
-      // Create a prompt based on the post
       const prompt = `Generate a LinkedIn post similar to this one, but with fresh angles and updated insights. Keep the tone and style consistent.
 
 Original post:
@@ -70,45 +73,76 @@ Create a new post that captures the same essence but with different examples, up
     [onGenerateSimilarPost]
   );
 
-  if (!isActive) {
+  if (!open) {
     return null;
   }
 
   return (
-    <div style={panelContainer}>
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
-          gap: 16,
-          marginBottom: 20,
-        }}
-      >
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: colors.textDark }}>
-            Post Analytics
-          </h2>
-          <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+    <div style={embedded ? undefined : panelContainer}>
+      {!embedded ? (
+        <header
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 16,
+            marginBottom: 20,
+          }}
+        >
+          <div>
+            <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: colors.textDark }}>
+              Post Analytics
+            </h2>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+              Review engagement on your personal LinkedIn posts — reactions, comments, impressions,
+              and more.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleFetch}
+            disabled={isLoading}
+            style={{
+              ...primaryBtn,
+              flexShrink: 0,
+              background: isLoading ? '#93c5fd' : colors.primary,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+            }}
+            aria-label="Get post list"
+          >
+            {isLoading ? 'Loading…' : 'Get Post List'}
+          </button>
+        </header>
+      ) : (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
             Review engagement on your personal LinkedIn posts — reactions, comments, impressions,
             and more.
           </p>
+          <button
+            type="button"
+            onClick={handleFetch}
+            disabled={isLoading}
+            style={{
+              ...primaryBtn,
+              flexShrink: 0,
+              background: isLoading ? '#93c5fd' : colors.primary,
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+            }}
+            aria-label="Get post list"
+          >
+            {isLoading ? 'Loading…' : 'Get Post List'}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleFetch}
-          disabled={isLoading}
-          style={{
-            ...primaryBtn,
-            flexShrink: 0,
-            background: isLoading ? '#93c5fd' : colors.primary,
-            cursor: isLoading ? 'not-allowed' : 'pointer',
-          }}
-          aria-label="Get post list"
-        >
-          {isLoading ? 'Loading…' : 'Get Post List'}
-        </button>
-      </header>
+      )}
 
       {panelState === 'idle' && <IdleState onFetch={handleFetch} />}
 
@@ -120,10 +154,8 @@ Create a new post that captures the same essence but with different examples, up
 
       {data && panelState !== 'idle' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* F4 — Brand Score Summary Card (reads sessionStorage cache) */}
           <BrandScoreSummaryCard />
 
-          {/* F2 — Post Performance Timeline Chart */}
           {data.posts.length >= 3 && <PostTimelineChart posts={data.posts} />}
 
           {data.posts.length > 0 && <EngagementSummary posts={data.posts} />}
