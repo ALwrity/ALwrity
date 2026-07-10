@@ -15,6 +15,7 @@ import {
 import { colors, rowBase } from '../GrowthEngine/styles';
 import { ComparisonPeriodBlock, LastUpdatedBanner } from './EngagementTrendsTimeDisplay';
 import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
+import { ENGAGEMENT_TRENDS_MODAL_SIZE } from './engagementTrendsModalLayout';
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
   return (
@@ -203,8 +204,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
       open={open}
       title="Engagement Trends"
       onClose={onClose}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
+      {...ENGAGEMENT_TRENDS_MODAL_SIZE}
     >
       <div>
         <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>

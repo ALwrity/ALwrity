@@ -13,7 +13,7 @@ import {
   WeeklyPlanModal,
   ViralCopywriterModal,
   EngagementTrendsModal,
-} from './AnalysisWedgeModals';
+} from './analysisWedgeModalExports';
 import {
   EngagementBoosterModal,
   CommentAssistantModal,
