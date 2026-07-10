@@ -4,10 +4,11 @@
  * Reads the alwrity_growth_engine sessionStorage cache and surfaces
  * the top post opportunity, content gap, and trending topic with
  * one-click "Create Post" CTAs. Falls back to a single CTA that
- * navigates to the Growth Engine tab when the cache is empty.
+ * opens the Growth Engine modal when the cache is empty.
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { linkedInGrowthApi, type ConsolidatedGrowthResponse } from '../../../../services/linkedInGrowthApi';
+import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
 
 const GROWTH_CACHE_KEY = 'alwrity_growth_engine';
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
@@ -32,12 +33,6 @@ function cacheAgeLabel(cachedAt: number): string {
 function openQuickCreate(topic: string) {
   window.dispatchEvent(
     new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: 'post', topic } })
-  );
-}
-
-function openGrowthTab() {
-  window.dispatchEvent(
-    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })
   );
 }
 
@@ -165,7 +160,7 @@ export const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({ compact = 
           </div>
           <button
             type="button"
-            onClick={openGrowthTab}
+            onClick={openGrowthEngineModal}
             style={{
               fontSize: 9,
               fontWeight: 700,
