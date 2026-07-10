@@ -50,6 +50,7 @@ import models.website_analysis_monitoring_models
 import models.platform_insights_monitoring_models
 import models.agent_activity_models
 import models.daily_workflow_models
+import models.linkedin_monitoring_models
 # Phase 3.4: SIF indexing watermark table (per-user, per-source content-hash ledger)
 import models.sif_indexing_watermark  # noqa: F401
 # Phase 2.1: Industry Watchdog DB persistence
@@ -390,6 +391,40 @@ def _ensure_onboarding_session_payload_column(engine, user_id: str) -> None:
         logger.error(f"Failed onboarding_sessions payload schema migration for user {user_id}: {e}")
 
 
+def _ensure_onboarding_session_type_column(engine, user_id: str) -> None:
+    """Backfill onboarding_type column for onboarding_sessions table.
+
+    Adds a NOT NULL column with default 'website' so legacy rows
+    are treated as the website onboarding path.  SQLite ALTER TABLE
+    ADD COLUMN with a DEFAULT is idempotent-safe because PRAGMA
+    table_info is used to check for the column first.
+    """
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='onboarding_sessions'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_cols = {
+                row[1] for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(onboarding_sessions)"
+                ).fetchall()
+            }
+
+            if "onboarding_type" not in existing_cols:
+                conn.exec_driver_sql(
+                    "ALTER TABLE onboarding_sessions "
+                    "ADD COLUMN onboarding_type VARCHAR(32) NOT NULL DEFAULT 'website'"
+                )
+                logger.warning(
+                    f"Auto-migrated onboarding_sessions column 'onboarding_type' for user {user_id}"
+                )
+    except Exception as e:
+        logger.error(f"Failed onboarding_sessions onboarding_type schema migration for user {user_id}: {e}")
+
+
 def _ensure_calendar_events_user_id_column(engine, user_id: str) -> None:
     """Backfill user_id column for calendar_events table."""
     try:
@@ -694,6 +729,7 @@ def init_user_database(user_id: str):
         _ensure_scheduler_task_columns(engine, user_id)
         _ensure_onboarding_data_integration_columns(engine, user_id)
         _ensure_onboarding_session_payload_column(engine, user_id)
+        _ensure_onboarding_session_type_column(engine, user_id)
         _ensure_calendar_events_user_id_column(engine, user_id)
         MonitoringBase.metadata.create_all(bind=engine)
         APIMonitoringBase.metadata.create_all(bind=engine)

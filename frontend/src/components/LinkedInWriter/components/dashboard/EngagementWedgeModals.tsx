@@ -714,13 +714,6 @@ export const PostPulseModal: React.FC<PostPulseModalProps> = ({ open, onClose, c
   const [boosted, setBoosted] = useState<Record<string, string>>({});
   const [loadedAt, setLoadedAt] = useState<number | null>(null);
 
-  // On mount: reset state, auto-load from DB cache
-  useEffect(() => {
-    if (!open) return;
-    setError(''); setBoosted({}); setPosts([]); setLoadedAt(null);
-    void fetchPosts(false);
-  }, [open, fetchPosts]);
-
   const fetchPosts = useCallback(async (refresh = false) => {
     setLoading(true); setError('');
     try {
@@ -732,6 +725,13 @@ export const PostPulseModal: React.FC<PostPulseModalProps> = ({ open, onClose, c
       setError('Could not load your posts. Make sure LinkedIn is connected.');
     } finally { setLoading(false); }
   }, []);
+
+  // On mount: reset state, auto-load from DB cache
+  useEffect(() => {
+    if (!open) return;
+    setError(''); setBoosted({}); setPosts([]); setLoadedAt(null);
+    void fetchPosts(false);
+  }, [open, fetchPosts]);
 
   const sorted = useMemo(() =>
     [...posts].sort((a, b) => (b.engagement?.engagement_rate ?? 0) - (a.engagement?.engagement_rate ?? 0)),

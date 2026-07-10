@@ -10,7 +10,9 @@ import {
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
 import { apiClient } from '../../api/client';
 import WebsiteStep from './WebsiteStep';
+import LinkedInConnectStep from './LinkedInConnectStep';
 import CompetitorAnalysisStep from './CompetitorAnalysisStep';
+import LinkedInResearchStep from './LinkedInResearchStep';
 import PersonalizationStep from './PersonalizationStep';
 import IntegrationsStep from './IntegrationsStep';
 import FinalStep from './FinalStep';
@@ -23,11 +25,19 @@ import SystemStatusChip from './common/SystemStatusChip';
 const DEV_DEBUG = false;
 const trace = DEV_DEBUG ? console.log : (..._args: any[]) => {};
 
-const steps = [
+const websiteSteps = [
   { label: 'Website', description: 'Set up your website', icon: '🌐' },
   { label: 'Research', description: 'Discover competitors', icon: '🔍' },
   { label: 'Personalization', description: 'Customize your experience', icon: '⚙️' },
   { label: 'Integrations', description: 'Connect additional services', icon: '🔗' },
+  { label: 'Finish', description: 'Complete setup', icon: '✅' }
+];
+
+const linkedinSteps = [
+  { label: 'Connect', description: 'Connect your LinkedIn account', icon: '🔗' },
+  { label: 'Research', description: 'Discover creators and content gaps', icon: '🔍' },
+  { label: 'Persona', description: 'Generate your LinkedIn persona', icon: '⚙️' },
+  { label: 'Preferences', description: 'Set content preferences', icon: '📝' },
   { label: 'Finish', description: 'Complete setup', icon: '✅' }
 ];
 
@@ -54,8 +64,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [isCurrentStepValid, setIsCurrentStepValid] = useState<boolean>(false);
   const [stepValidationStates, setStepValidationStates] = useState<Record<number, boolean>>({});
   const [stepHeaderContent, setStepHeaderContent] = useState<StepHeaderContent>({
-    title: steps[0].label,
-    description: steps[0].description
+    title: websiteSteps[0].label,
+    description: websiteSteps[0].description
   });
   const [validationMessage, setValidationMessage] = useState<string>('');
   const [backgroundTasks, setBackgroundTasks] = useState<{
@@ -65,6 +75,21 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     failed_count: number;
     all_done: boolean;
   } | null>(null);
+  // Default onboarding type from enabled features when no session exists yet.
+  // This ensures ALWRITY_ENABLED_FEATURES=linkedin lands on the LinkedIn wizard
+  // before the backend session is created.
+  const defaultOnboardingType = useMemo(() => {
+    const enabled = new Set(
+      (process.env.REACT_APP_ENABLED_FEATURES || 'all')
+        .toLowerCase()
+        .split(',')
+        .map(f => f.trim())
+    );
+    return enabled.has('linkedin') && !enabled.has('all') ? 'linkedin' : 'website';
+  }, []);
+
+  const [onboardingType, setOnboardingType] = useState<string>(defaultOnboardingType);
+  const steps = useMemo(() => onboardingType === 'linkedin' ? linkedinSteps : websiteSteps, [onboardingType]);
 
   useEffect(() => {
     if (activeStep < 1) return;
@@ -89,17 +114,27 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     
     switch (step) {
       case 0: // Website Analysis — website URL or LinkedIn connection is sufficient
+        if (onboardingType === 'linkedin') {
+          return !!(data?.integrations?.connectedPlatforms?.includes('linkedin'));
+        }
         return !!(data && (data.website || data.website_url || data?.integrations?.connectedPlatforms?.includes('linkedin')));
       
-      case 1: // Competitor Analysis
+      case 1: // Competitor Analysis / LinkedIn Research
+        if (onboardingType === 'linkedin') {
+          return !!(data && (data.research_depth || data.content_types || data.growth_summary));
+        }
         return !!(data && (data.competitors || data.researchSummary || data.sitemapAnalysis));
       
       case 2: // Persona Generation
-        const hasValidPersonaData = data && 
-                                  data.corePersona && 
-                                  data.platformPersonas && 
+        const hasValidPersonaData = data &&
+                                  data.corePersona &&
+                                  data.platformPersonas &&
                                   Object.keys(data.platformPersonas).length > 0 &&
                                   data.qualityMetrics;
+        // Website path requires brand avatar + voice clone; LinkedIn path only needs persona
+        if (onboardingType === 'linkedin') {
+          return !!hasValidPersonaData;
+        }
         const hasBrandAvatar = data?.brandAvatar?.set;
         const hasVoiceClone = data?.voiceClone?.set;
         return !!hasValidPersonaData && !!hasBrandAvatar && !!hasVoiceClone;
@@ -120,6 +155,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const stepDataRef = useRef(stepData);
   const competitorDataCollectorRef = useRef(competitorDataCollector);
   const websiteDataCollectorRef = useRef<(() => any) | null>(null);
+  const integrationsDataCollectorRef = useRef<(() => any) | null>(null);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -163,8 +199,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       if (!isValid) {
         const pData = dataToValidate || {};
         if (!pData.corePersona) setValidationMessage('Please generate your Brand Identity (Text) first.');
-        else if (!pData.brandAvatar?.set) setValidationMessage('Please generate your Brand Avatar.');
-        else if (!pData.voiceClone?.set) setValidationMessage('Please generate your Voice Clone.');
+        else if (onboardingType !== 'linkedin' && !pData.brandAvatar?.set) setValidationMessage('Please generate your Brand Avatar.');
+        else if (onboardingType !== 'linkedin' && !pData.voiceClone?.set) setValidationMessage('Please generate your Voice Clone.');
         else setValidationMessage('Complete all personalization steps to continue.');
       } else {
         setValidationMessage('');
@@ -202,6 +238,14 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       websiteDataCollectorRef.current = dataCollector;
     } else {
       console.error('Wizard: website dataCollector is not a function:', dataCollector);
+    }
+  }, []);
+
+  const handleIntegrationsDataReady = useCallback((dataCollector: (() => any) | undefined) => {
+    if (typeof dataCollector === 'function') {
+      integrationsDataCollectorRef.current = dataCollector;
+    } else {
+      console.error('Wizard: integrations dataCollector is not a function:', dataCollector);
     }
   }, []);
 
@@ -306,6 +350,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           
           setActiveStep(computedStep);
           setProgressState(onboarding.completion_percentage);
+          setOnboardingType(onboarding.onboarding_type || 'website');
 
           setLoading(false);
           return;
@@ -402,6 +447,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         console.log('Wizard: Final computed step (API):', computedStep, 'from backend step:', onboarding.current_step);
         setActiveStep(computedStep);
         setProgressState(onboarding.completion_percentage);
+        setOnboardingType(onboarding.onboarding_type || 'website');
         // Note: Session managed by Clerk auth, no need to track separately
 
         console.log('Wizard: Initialized from API:', {
@@ -429,6 +475,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   }, []); // Run only once on mount - stepData is used for logging only
 
   const handleNext = useCallback(async (rawStepData?: any) => {
+    const isLinkedIn = onboardingType === 'linkedin';
     trace('Wizard: handleNext called - step:', activeStep, steps[activeStep]?.label);
     
     // Check if rawStepData is a React SyntheticEvent or native Event
@@ -490,18 +537,25 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
 
     // Merge research data with existing step data for CompetitorAnalysisStep
+    // or LinkedInResearchStep.
     if (activeStep === 1 && currentStepData) {
       const currentData = stepDataRef.current || {};
       const researchData = currentStepData || {};
 
-      if (researchData.competitors || researchData.researchSummary || researchData.sitemapAnalysis) {
+      const hasWebsiteResearch = !!(researchData.competitors || researchData.researchSummary || researchData.sitemapAnalysis);
+      const hasLinkedInResearch = !!(researchData.growth_summary || researchData.research_depth || researchData.content_types);
+
+      if (hasWebsiteResearch || hasLinkedInResearch) {
         currentStepData = {
           ...currentData,
           ...researchData,
           competitors: researchData.competitors || currentData.competitors,
           researchSummary: researchData.researchSummary || currentData.researchSummary,
           sitemapAnalysis: researchData.sitemapAnalysis || currentData.sitemapAnalysis,
-          stepType: 'research',
+          growth_summary: researchData.growth_summary || currentData.growth_summary,
+          research_depth: researchData.research_depth || currentData.research_depth,
+          content_types: researchData.content_types || currentData.content_types,
+          stepType: hasLinkedInResearch ? 'linkedin_research' : 'research',
           completedAt: new Date().toISOString()
         };
 
@@ -537,17 +591,30 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
 
-    // Special handling for IntegrationsStep (step 4)
-    if (activeStep === 4) {
-      const currentData = stepDataRef.current || {};
-      if (!currentStepData && currentData && typeof currentData === 'object') {
-        if (currentData.integrations) {
+    // Special handling for IntegrationsStep (step 3)
+    if (activeStep === 3) {
+      const collector = integrationsDataCollectorRef.current;
+      const integrationsData = collector && typeof collector === 'function' ? collector() : {};
+      if (isLinkedIn) {
+        if (integrationsData && Object.keys(integrationsData).length > 0) {
           currentStepData = {
-            integrations: currentData.integrations,
+            ...(stepDataRef.current || {}),
+            ...integrationsData,
+            stepType: 'integrations',
+            completedAt: new Date().toISOString()
           };
-        } else {
-          currentStepData = currentData;
+          trace('Wizard: Collected LinkedIn preferences data:', currentStepData);
         }
+      } else {
+        // Website: IntegrationsStep is informational; advance using the persona data
+        // collected in step 2 so backend step 4 can persist it and schedule tasks.
+        const currentData = stepDataRef.current || {};
+        currentStepData = {
+          ...currentData,
+          stepType: 'integrations',
+          completedAt: new Date().toISOString()
+        };
+        trace('Wizard: Advancing website IntegrationsStep with existing step data:', currentStepData);
       }
     }
 
@@ -580,9 +647,16 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       currentStepData.competitors ||
       currentStepData.researchSummary ||
       currentStepData.sitemapAnalysis ||
+      currentStepData.growth_summary ||
+      currentStepData.research_depth ||
+      currentStepData.content_types ||
       currentStepData.corePersona || 
       currentStepData.platformPersonas ||
-      currentStepData.qualityMetrics
+      currentStepData.qualityMetrics ||
+      currentStepData.postingCadence ||
+      currentStepData.preferredFormats ||
+      currentStepData.contentTopics ||
+      currentStepData.engagementGoals
     );
 
     const hasIntegrationsData = !!(currentStepData && typeof currentStepData === 'object' && currentStepData.integrations);
@@ -595,6 +669,11 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       console.warn('Wizard: No serialized step data supplied; skipping backend completion for step', currentStepNumber);
       return;
     } else {
+      // Inject onboarding_type into payload so the backend strategy dispatch
+      // can create the session with the correct type on step 1.
+      if (currentStepData && typeof currentStepData === 'object') {
+        currentStepData.onboarding_type = onboardingType;
+      }
       try {
         const stepResult = await setCurrentStep(currentStepNumber, currentStepData);
         trace('Wizard: Step completion result:', stepResult);
@@ -719,23 +798,53 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   }, []);
 
   const renderStepContent = (step: number) => {
+    // Step 0 branches by onboarding type: WebsiteStep for website, LinkedInConnectStep for linkedin
+    const step0Component = onboardingType === 'linkedin' ? (
+      <LinkedInConnectStep
+        key="linkedin-connect"
+        onContinue={handleNext}
+        updateHeaderContent={updateHeaderContent}
+        onValidationChange={(isValid) => handleStepValidationChange(0, isValid)}
+        onDataReady={handleWebsiteDataReady}
+      />
+    ) : (
+      <WebsiteStep
+        key="website"
+        onContinue={handleNext}
+        updateHeaderContent={updateHeaderContent}
+        onValidationChange={(isValid) => handleStepValidationChange(0, isValid)}
+        onDataReady={handleWebsiteDataReady}
+      />
+    );
+
     const stepComponents = [
-      <WebsiteStep key="website" onContinue={handleNext} updateHeaderContent={updateHeaderContent} onValidationChange={(isValid) => handleStepValidationChange(0, isValid)} onDataReady={handleWebsiteDataReady} />,
-      <CompetitorAnalysisStep 
-        key="research" 
-        onContinue={handleNext} 
-        onBack={handleBack}
-        userUrl={stepData?.website || stepData?.website_url || localStorage.getItem('website_url') || ''}
-        industryContext={stepData?.industryContext}
-        onDataReady={handleCompetitorDataReady}
-        initialData={stepData}
-      />,
+      step0Component,
+      // Step 1 branches by onboarding type: CompetitorAnalysisStep for website, LinkedInResearchStep for linkedin
+      onboardingType === 'linkedin' ? (
+        <LinkedInResearchStep
+          key="linkedin-research"
+          onContinue={handleNext}
+          updateHeaderContent={updateHeaderContent}
+          onValidationChange={(isValid) => handleStepValidationChange(1, isValid)}
+          onDataReady={handleCompetitorDataReady}
+        />
+      ) : (
+        <CompetitorAnalysisStep 
+          key="research" 
+          onContinue={handleNext} 
+          onBack={handleBack}
+          userUrl={stepData?.website || stepData?.website_url || localStorage.getItem('website_url') || ''}
+          industryContext={stepData?.industryContext}
+          onDataReady={handleCompetitorDataReady}
+        />
+      ),
       <PersonalizationStep 
         key="personalization" 
         onContinue={handleNext} 
         updateHeaderContent={updateHeaderContent}
         onValidationChange={(isValid: boolean) => handleStepValidationChange(2, isValid)}
         onDataChange={handleStepDataChange}
+        onboardingType={onboardingType}
         onboardingData={personaOnboardingData}
         stepData={personaStepData}
       />,
@@ -743,8 +852,10 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         key="integrations" 
         onContinue={handleNext} 
         updateHeaderContent={updateHeaderContent}
+        onboardingType={onboardingType}
+        onDataReady={handleIntegrationsDataReady}
       />,
-      <FinalStep key="final" onContinue={handleComplete} updateHeaderContent={updateHeaderContent} />
+      <FinalStep key="final" onContinue={handleComplete} updateHeaderContent={updateHeaderContent} onboardingType={onboardingType} />
     ];
 
     return (

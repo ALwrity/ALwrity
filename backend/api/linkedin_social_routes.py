@@ -15,6 +15,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from loguru import logger
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from middleware.auth_middleware import clerk_auth, get_current_user, security
 from models.linkedin_social_models import (
@@ -120,6 +121,8 @@ from services.integrations.oauth_callback_utils import (
     build_oauth_callback_html,
     sanitize_error,
 )
+from services.database import get_db_session
+from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
 
 router = APIRouter(prefix="/api/linkedin-social", tags=["LinkedIn Social"])
 
@@ -1752,6 +1755,7 @@ async def handle_oauth_callback_get(
     message: Optional[str] = Query(None, description="Error message if status is error"),
     name: Optional[str] = Query(None, description="User ID passed to Unipile as 'name' param"),
     user_id: str = Depends(_resolve_linkedin_callback_user),
+    db: Session = Depends(get_db_session),
 ) -> HTMLResponse:
     """HTML OAuth callback that stores credentials and notifies opener via postMessage.
 
@@ -1816,6 +1820,13 @@ async def handle_oauth_callback_get(
                 )
 
             logger.info(f"[LinkedInConnect] Unipile callback succeeded user_id={user_id}")
+
+            # Create OAuth monitoring task for LinkedIn
+            try:
+                create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
+            except Exception as e:
+                logger.warning(f"[LinkedInConnect] Failed to create monitoring task: {e}")
+
             payload = {
                 "type": "LINKEDIN_OAUTH_SUCCESS",
                 "success": True,
@@ -1853,6 +1864,13 @@ async def handle_oauth_callback_get(
             if not ok:
                 raise HTTPException(status_code=400, detail="Zernio connect callback failed")
             logger.info(f"[LinkedInConnect] Zernio callback succeeded user_id={user_id}")
+
+            # Create OAuth monitoring task for LinkedIn
+            try:
+                create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
+            except Exception as e:
+                logger.warning(f"[LinkedInConnect] Failed to create monitoring task: {e}")
+
             payload = {
                 "type": "LINKEDIN_OAUTH_SUCCESS",
                 "success": True,
@@ -1879,6 +1897,12 @@ async def handle_oauth_callback_get(
         token_result = _oauth_service.handle_native_oauth_callback(user_id, code, state)
         if not token_result:
             raise HTTPException(status_code=400, detail="LinkedIn OAuth token exchange failed")
+
+        # Create OAuth monitoring task for LinkedIn
+        try:
+            create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
+        except Exception as e:
+            logger.warning(f"[LinkedInConnect] Failed to create monitoring task: {e}")
 
         payload = {
             "type": "LINKEDIN_OAUTH_SUCCESS",

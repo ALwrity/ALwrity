@@ -13,6 +13,7 @@ from services.website_analysis_service import WebsiteAnalysisService
 from services.research_preferences_service import ResearchPreferencesService
 from services.persona_analysis_service import PersonaAnalysisService
 from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
+from models.onboarding import OnboardingSession
 
 class OnboardingSummaryService:
     """Service for handling onboarding summary generation with user isolation."""
@@ -37,6 +38,9 @@ class OnboardingSummaryService:
                 raise HTTPException(status_code=500, detail="Database session could not be created")
             try:
                 integrated_data = await self.integration_service.process_onboarding_data(self.user_id, db)
+                onboarding_session = db.query(OnboardingSession).filter(OnboardingSession.user_id == self.user_id).order_by(OnboardingSession.updated_at.desc()).first()
+                onboarding_type = getattr(onboarding_session, 'onboarding_type', None) if onboarding_session else None
+                payload = getattr(onboarding_session, 'payload', None) or {} if onboarding_session else {}
             finally:
                 db.close()
             
@@ -46,18 +50,22 @@ class OnboardingSummaryService:
             persona_data = integrated_data.get('persona_data', {})
             canonical_profile = integrated_data.get('canonical_profile', {})
             api_keys_data = integrated_data.get('api_keys_data', {})
+            is_linkedin = onboarding_type == 'linkedin'
             
             # Get API keys
             api_keys = self._get_api_keys(api_keys_data)
             
             # Get personalization settings
-            personalization_settings = self._get_personalization_settings(research_preferences)
+            personalization_settings = self._get_personalization_settings(research_preferences, persona_data)
             
             # Check persona generation readiness
-            persona_readiness = self._check_persona_readiness(website_analysis)
+            persona_readiness = self._check_persona_readiness(website_analysis, persona_data, is_linkedin)
+            
+            # Determine integrations / content preferences
+            integrations = self._get_integrations(payload, is_linkedin)
             
             # Determine capabilities
-            capabilities = self._determine_capabilities(api_keys, website_analysis, research_preferences, personalization_settings, persona_readiness)
+            capabilities = self._determine_capabilities(api_keys, website_analysis, research_preferences, personalization_settings, persona_readiness, integrations, is_linkedin)
             
             return {
                 "api_keys": api_keys,
@@ -66,9 +74,10 @@ class OnboardingSummaryService:
                 "research_preferences": research_preferences,
                 "personalization_settings": personalization_settings,
                 "persona_readiness": persona_readiness,
-                "integrations": {},
+                "integrations": integrations,
                 "capabilities": capabilities,
-                "canonical_profile": canonical_profile
+                "canonical_profile": canonical_profile,
+                "onboarding_type": onboarding_type
             }
             
         except Exception as e:
@@ -107,23 +116,69 @@ class OnboardingSummaryService:
                 "google": {"configured": False, "value": None}
             }
     
-    def _get_personalization_settings(self, research_preferences: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Get personalization settings based on research preferences."""
-        if not research_preferences:
+    def _get_personalization_settings(self, research_preferences: Optional[Dict[str, Any]], persona_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Get personalization settings based on research preferences and persona data."""
+        if persona_data and isinstance(persona_data, dict):
+            platform_personas = persona_data.get('platform_personas') or {}
+            linkedin_persona = platform_personas.get('linkedin') if isinstance(platform_personas, dict) else None
+            core = persona_data.get('core_persona') or {}
+            if linkedin_persona or core:
+                return {
+                    "writing_style": linkedin_persona.get('writing_style', core.get('writing_style', 'professional')) if linkedin_persona else core.get('writing_style', 'professional'),
+                    "target_audience": linkedin_persona.get('target_audience', core.get('target_audience', 'general')) if linkedin_persona else core.get('target_audience', 'general'),
+                    "brand_voice": linkedin_persona.get('brand_voice', core.get('brand_voice', '')) if linkedin_persona else core.get('brand_voice', ''),
+                    "tone": linkedin_persona.get('tone', core.get('tone', '')) if linkedin_persona else core.get('tone', ''),
+                    "content_focus": research_preferences.get('content_focus', 'informative') if research_preferences else 'informative'
+                }
+        if research_preferences:
             return {
-                "writing_style": "professional",
-                "target_audience": "general",
-                "content_focus": "informative"
+                "writing_style": research_preferences.get('writing_style', 'professional'),
+                "target_audience": research_preferences.get('target_audience', 'general'),
+                "content_focus": research_preferences.get('content_focus', 'informative')
             }
-        
         return {
-            "writing_style": research_preferences.get('writing_style', 'professional'),
-            "target_audience": research_preferences.get('target_audience', 'general'),
-            "content_focus": research_preferences.get('content_focus', 'informative')
+            "writing_style": "professional",
+            "target_audience": "general",
+            "content_focus": "informative"
         }
-    
-    def _check_persona_readiness(self, website_analysis: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+
+    def _get_integrations(self, payload: Optional[Dict[str, Any]], is_linkedin: bool) -> Dict[str, Any]:
+        """Get integration / content preference data from session payload."""
+        if not is_linkedin:
+            return {}
+        payload = payload or {}
+        preferences = payload.get('linkedin_content_preferences') or {}
+        return {
+            "postingCadence": preferences.get('posting_cadence'),
+            "preferredFormats": preferences.get('preferred_formats'),
+            "contentTopics": preferences.get('content_topics'),
+            "engagementGoals": preferences.get('engagement_goals'),
+        }
+
+    def _check_persona_readiness(self, website_analysis: Optional[Dict[str, Any]], persona_data: Optional[Dict[str, Any]] = None, is_linkedin: bool = False) -> Dict[str, Any]:
         """Check if persona generation is ready based on available data."""
+        if is_linkedin:
+            if not persona_data:
+                return {
+                    "ready": False,
+                    "reason": "LinkedIn persona not generated",
+                    "missing_data": ["persona_data"]
+                }
+            core = persona_data.get('core_persona') or {}
+            platform_personas = persona_data.get('platform_personas') or {}
+            has_linkedin_persona = isinstance(platform_personas, dict) and bool(platform_personas.get('linkedin'))
+            if has_linkedin_persona or core:
+                return {
+                    "ready": True,
+                    "reason": "LinkedIn persona available",
+                    "missing_data": []
+                }
+            return {
+                "ready": False,
+                "reason": "LinkedIn persona not generated",
+                "missing_data": ["linkedin_persona"]
+            }
+
         if not website_analysis:
             return {
                 "ready": False,
@@ -143,8 +198,19 @@ class OnboardingSummaryService:
     def _determine_capabilities(self, api_keys: Dict[str, Any], website_analysis: Optional[Dict[str, Any]], 
                               research_preferences: Optional[Dict[str, Any]], 
                               personalization_settings: Dict[str, Any], 
-                              persona_readiness: Dict[str, Any]) -> Dict[str, Any]:
+                              persona_readiness: Dict[str, Any],
+                              integrations: Dict[str, Any],
+                              is_linkedin: bool = False) -> Dict[str, Any]:
         """Determine available capabilities based on configured data."""
+        if is_linkedin:
+            return {
+                "ai_content_generation": any(key.get("configured") for key in api_keys.values()) or bool(integrations),
+                "linkedin_research": research_preferences is not None,
+                "linkedin_persona": persona_readiness.get("ready", False),
+                "linkedin_content_preferences": bool(integrations.get("postingCadence") or integrations.get("preferredFormats")),
+                "linkedin_monitoring": research_preferences is not None and persona_readiness.get("ready", False)
+            }
+        
         capabilities = {
             "ai_content_generation": any(key.get("configured") for key in api_keys.values()),
             "website_analysis": website_analysis is not None,

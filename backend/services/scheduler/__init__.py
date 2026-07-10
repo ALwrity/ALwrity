@@ -25,6 +25,9 @@ from .executors.bing_insights_executor import BingInsightsExecutor
 from .executors.advertools_executor import AdvertoolsExecutor
 from .executors.sif_indexing_executor import SIFIndexingExecutor
 from .executors.market_trends_executor import MarketTrendsExecutor
+from .executors.linkedin_profile_sync_executor import LinkedInProfileSyncExecutor
+from .executors.linkedin_post_analytics_sync_executor import LinkedInPostAnalyticsSyncExecutor
+from .executors.linkedin_growth_reanalysis_executor import LinkedInGrowthReanalysisExecutor
 from .utils.task_loader import load_due_monitoring_tasks
 from .utils.oauth_token_task_loader import load_due_oauth_token_monitoring_tasks
 from .utils.website_analysis_task_loader import load_due_website_analysis_tasks
@@ -35,6 +38,9 @@ from .utils.platform_insights_task_loader import load_due_platform_insights_task
 from .utils.advertools_task_loader import load_due_advertools_tasks
 from .utils.sif_indexing_task_loader import load_due_sif_indexing_tasks
 from .utils.market_trends_task_loader import load_due_market_trends_tasks
+from .utils.linkedin_profile_sync_task_loader import load_due_linkedin_profile_sync_tasks
+from .utils.linkedin_post_analytics_sync_task_loader import load_due_linkedin_post_analytics_sync_tasks
+from .utils.linkedin_growth_reanalysis_task_loader import load_due_linkedin_growth_reanalysis_tasks
 from services.daily_workflow_batch import generate_scheduled_daily_workflows
 
 # Global scheduler instance (initialized on first access)
@@ -148,6 +154,23 @@ def get_scheduler() -> TaskScheduler:
             load_due_market_trends_tasks
         )
 
+        # Register LinkedIn background task executors
+        _scheduler_instance.register_executor(
+            'linkedin_profile_sync',
+            LinkedInProfileSyncExecutor(),
+            load_due_linkedin_profile_sync_tasks
+        )
+        _scheduler_instance.register_executor(
+            'linkedin_post_analytics_sync',
+            LinkedInPostAnalyticsSyncExecutor(),
+            load_due_linkedin_post_analytics_sync_tasks
+        )
+        _scheduler_instance.register_executor(
+            'linkedin_growth_reanalysis',
+            LinkedInGrowthReanalysisExecutor(),
+            load_due_linkedin_growth_reanalysis_tasks
+        )
+
         today_workflow_hour_utc = int(os.getenv('TODAY_WORKFLOW_SCHEDULE_HOUR_UTC', '2'))
         today_workflow_minute_utc = int(os.getenv('TODAY_WORKFLOW_SCHEDULE_MINUTE_UTC', '0'))
         _scheduler_instance.scheduler.add_job(
@@ -175,6 +198,9 @@ __all__ = [
     'BingInsightsExecutor',
     'SIFIndexingExecutor',
     'MarketTrendsExecutor',
+    'LinkedInProfileSyncExecutor',
+    'LinkedInPostAnalyticsSyncExecutor',
+    'LinkedInGrowthReanalysisExecutor',
     'get_scheduler',
     # Exception handling
     'SchedulerExceptionHandler',

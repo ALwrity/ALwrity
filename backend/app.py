@@ -91,7 +91,7 @@ logger.info("app.py: Early memory checkpoint after env load")
 
 # Import modular utilities (skip OnboardingManager import in feature-only modes)
 from alwrity_utils import HealthChecker, RateLimiter, FrontendServing, RouterManager
-if _is_full_mode():
+if _is_full_mode() or _is_feature_enabled("linkedin"):
     from alwrity_utils import OnboardingManager
 
 # Skip monitoring middleware in feature-only modes to save memory
@@ -120,6 +120,18 @@ from api.subscription import router as subscription_router
 step3_routes = None
 if _is_full_mode():
     from api.onboarding_utils.step3_routes import router as step3_routes
+
+# Load step4_persona routes for LinkedIn mode too
+if _is_full_mode() or _is_feature_enabled("linkedin"):
+    from api.onboarding_utils.step4_persona_routes_optimized import router as step4_persona_routes
+else:
+    step4_persona_routes = None
+
+# Load persona routes for LinkedIn mode too
+if _is_full_mode() or _is_feature_enabled("linkedin"):
+    from api.persona_routes import router as persona_routes
+else:
+    persona_routes = None
 
 # Import SEO tools router (skip in feature-only modes - uses seo_analyzer)
 seo_tools_router = None
@@ -196,7 +208,7 @@ from services.startup_health import (
 # Trigger reload for monitoring fix
 
 # Import OAuth token monitoring routes (skip in feature-only modes)
-if _is_full_mode():
+if _is_full_mode() or _is_feature_enabled("linkedin"):
     from api.oauth_token_monitoring_routes import router as oauth_token_monitoring_router
 else:
     oauth_token_monitoring_router = None
@@ -316,8 +328,8 @@ router_manager = RouterManager(app)
 router_group_status: Dict[str, Dict[str, Any]] = {}
 
 onboarding_manager = None
-# Only create OnboardingManager in full mode
-if _is_full_mode():
+# Create OnboardingManager in full mode or LinkedIn mode
+if _is_full_mode() or _is_feature_enabled("linkedin"):
     from alwrity_utils import OnboardingManager
     onboarding_manager = OnboardingManager(app)
 
@@ -411,14 +423,21 @@ async def feature_profile_status():
 @app.get("/api/onboarding/status")
 async def onboarding_status():
     """Get onboarding manager status (or demo-mode disabled state)."""
-    if not _is_full_mode():
+    if not _is_full_mode() and not _is_feature_enabled("linkedin"):
         return {
             "enabled": False,
             "status": "disabled",
             "message": f"Onboarding is disabled in feature-only mode. Enabled features: {list(get_enabled_features())}",
             "feature_mode": "single",
         }
-    return onboarding_manager.get_onboarding_status()
+    if onboarding_manager:
+        return onboarding_manager.get_onboarding_status()
+    return {
+        "enabled": False,
+        "status": "not_initialized",
+        "message": "Onboarding manager not initialized.",
+        "feature_mode": "single" if not _is_full_mode() else "full",
+    }
 
 # Include routers using modular utilities
 enabled_features = get_enabled_features()
@@ -494,6 +513,18 @@ else:
         "mounted": True,
         "reason": f"Feature-only mode: {enabled_features}",
     }
+
+    # LinkedIn-specific routers that are not matched by feature-only filtering
+    if "linkedin" in enabled_features:
+        # OAuth token monitoring (required for LinkedIn token health)
+        if oauth_token_monitoring_router:
+            router_manager.include_router_safely(oauth_token_monitoring_router, "oauth_token_monitoring")
+        # Step 4 persona routes
+        if step4_persona_routes:
+            router_manager.include_router_safely(step4_persona_routes, "step4_persona")
+        # Persona routes
+        if persona_routes:
+            router_manager.include_router_safely(persona_routes, "persona")
 
 # Safety net: explicitly include hallucination detector (import may fail gracefully)
 if hallucination_detector_router:
@@ -744,6 +775,12 @@ if _is_full_mode():
     if oauth_token_monitoring_router:
         app.include_router(oauth_token_monitoring_router)
 
+    # Include persona routes for persona management
+    if step4_persona_routes:
+        app.include_router(step4_persona_routes)
+    if persona_routes:
+        app.include_router(persona_routes)
+
     # Autonomous Agents API routes (Phase 3A)
     from api.agents_api import router as agents_router
     app.include_router(agents_router)
@@ -812,8 +849,8 @@ async def startup_event():
         else:
             logger.info(f"[FEATURE-MODE] Skipping startup health routine (features: {enabled_features})")
 
-        # Start task scheduler only in full mode
-        if _is_full_mode():
+        # Start task scheduler in full mode or LinkedIn mode (for background executors)
+        if _is_full_mode() or _is_feature_enabled("linkedin"):
             from services.scheduler import get_scheduler
             await get_scheduler().start()
         else:

@@ -14,6 +14,9 @@ class OnboardingSession(Base):
     started_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     payload = Column(JSON, nullable=True)  # Task scheduling manifest
+    # Platform onboarding framework: "website" (default), "linkedin", "instagram", "youtube", etc.
+    # Existing rows default to "website" so the current flow is unchanged.
+    onboarding_type = Column(String(32), nullable=False, default="website")
     api_keys = relationship('APIKey', back_populates='session', cascade="all, delete-orphan")
     website_analyses = relationship('WebsiteAnalysis', back_populates='session', cascade="all, delete-orphan")
     research_preferences = relationship('ResearchPreferences', back_populates='session', cascade="all, delete-orphan", uselist=False)
@@ -22,7 +25,7 @@ class OnboardingSession(Base):
     platform_integrations = relationship('PlatformIntegration', back_populates='session', cascade="all, delete-orphan", uselist=False)
 
     def __repr__(self):
-        return f"<OnboardingSession(id={self.id}, user_id={self.user_id}, step={self.current_step}, progress={self.progress})>"
+        return f"<OnboardingSession(id={self.id}, user_id={self.user_id}, type={self.onboarding_type}, step={self.current_step}, progress={self.progress})>"
 
 class APIKey(Base):
     __tablename__ = 'api_keys'

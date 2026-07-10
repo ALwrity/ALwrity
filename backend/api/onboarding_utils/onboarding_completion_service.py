@@ -130,46 +130,71 @@ class OnboardingCompletionService:
             from services.onboarding.progress_service import OnboardingProgressService
             user_id = str(current_user.get('id'))
             progress_service = OnboardingProgressService()
-            
-            missing_steps = await self._validate_required_steps_database(user_id)
-            if missing_steps:
-                missing_steps_str = ", ".join(missing_steps)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Cannot complete onboarding. The following steps must be completed first: {missing_steps_str}"
-                )
 
-            await self._validate_api_keys(user_id)
-            
-            persona_generated = await _generate_persona_from_onboarding(user_id)
-            
-            success = progress_service.complete_onboarding(user_id)
-            if not success:
-                raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
-
-            # ── Step 6: tasks already scheduled at Steps 2-5 ───────────────
-            logger.info(f"[complete_onboarding] Step 6: scheduling only progressive_setup "
-                        f"(other tasks were already scheduled at Steps 2-5)")
-
-            db = get_session_for_user(user_id)
+            # Detect LinkedIn onboarding — strategy's step5 already handles everything
+            from models.onboarding import OnboardingSession
+            db_check = get_session_for_user(user_id)
             try:
-                try:
-                    from services.progressive_setup_service import ProgressiveSetupService
-                    setup_service = ProgressiveSetupService(db)
-                    setup_service.initialize_user_environment(user_id)
-                    scheduled_tasks.append("progressive_setup")
-                    logger.info(f"Initialized user environment for {user_id}")
-                except Exception as e:
-                    failed_tasks.append({"task": "progressive_setup", "error": str(e)})
-                    logger.warning(f"Failed to initialize user environment for {user_id}: {e}")
-
-                db.commit()
-            except Exception as e:
-                db.rollback()
-                failed_tasks.append({"task": "progressive_setup_db", "error": str(e)})
-                logger.error(f"Failed to commit progressive setup for user {user_id}: {e}")
+                session = db_check.query(OnboardingSession).filter(
+                    OnboardingSession.user_id == user_id
+                ).order_by(OnboardingSession.updated_at.desc()).first()
+                is_linkedin = session and session.onboarding_type == "linkedin"
+            except Exception:
+                is_linkedin = False
             finally:
-                db.close()
+                db_check.close()
+
+            if not is_linkedin:
+                # Website onboarding: full validation + task scheduling
+                missing_steps = await self._validate_required_steps_database(user_id)
+                if missing_steps:
+                    missing_steps_str = ", ".join(missing_steps)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot complete onboarding. The following steps must be completed first: {missing_steps_str}"
+                    )
+
+                await self._validate_api_keys(user_id)
+
+                persona_generated = await _generate_persona_from_onboarding(user_id)
+
+                success = progress_service.complete_onboarding(user_id)
+                if not success:
+                    raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
+
+                # ── Step 6: tasks already scheduled at Steps 2-5 ───────────────
+                logger.info(f"[complete_onboarding] Step 6: scheduling only progressive_setup "
+                            f"(other tasks were already scheduled at Steps 2-5)")
+
+                db = get_session_for_user(user_id)
+                try:
+                    try:
+                        from services.progressive_setup_service import ProgressiveSetupService
+                        setup_service = ProgressiveSetupService(db)
+                        setup_service.initialize_user_environment(user_id)
+                        scheduled_tasks.append("progressive_setup")
+                        logger.info(f"Initialized user environment for {user_id}")
+                    except Exception as e:
+                        failed_tasks.append({"task": "progressive_setup", "error": str(e)})
+                        logger.warning(f"Failed to initialize user environment for {user_id}: {e}")
+
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    failed_tasks.append({"task": "progressive_setup_db", "error": str(e)})
+                    logger.error(f"Failed to commit progressive setup for user {user_id}: {e}")
+                finally:
+                    db.close()
+            else:
+                # LinkedIn onboarding: strategy already validated, ran progressive setup,
+                # marked complete, and scheduled all tasks. Just confirm.
+                logger.info(f"[complete_onboarding] LinkedIn onboarding for {user_id} — strategy already handled completion")
+                success = progress_service.complete_onboarding(user_id)
+                if not success:
+                    raise HTTPException(status_code=500, detail="Failed to mark onboarding as complete")
+                persona_generated = True
+                scheduled_tasks = ["linkedin_profile_sync", "linkedin_post_analytics_sync",
+                                   "linkedin_growth_reanalysis", "oauth_token_monitoring"]
             
             try:
                 from services.agent_activity_service import AgentActivityService
@@ -199,7 +224,6 @@ class OnboardingCompletionService:
 
             # Record completion summary in OnboardingSession payload
             try:
-                from models.onboarding import OnboardingSession
                 summary_db = get_session_for_user(user_id)
                 if summary_db:
                     session = summary_db.query(OnboardingSession).filter(
@@ -208,7 +232,7 @@ class OnboardingCompletionService:
                     if session:
                         payload = dict(session.payload) if session.payload else {}
                         payload["persona_generated"] = persona_generated
-                        payload["progressive_setup_completed"] = "progressive_setup" in scheduled_tasks
+                        payload["progressive_setup_completed"] = "progressive_setup" in scheduled_tasks or is_linkedin
                         payload["completed_at"] = datetime.now(timezone.utc).isoformat()
                         payload["failed_tasks"] = failed_tasks if failed_tasks else []
                         session.payload = payload
@@ -246,9 +270,16 @@ class OnboardingCompletionService:
                 integrated_data = await integration_service.process_onboarding_data(user_id, db)
 
                 from services.onboarding.progress_service import OnboardingProgressService
+                from models.onboarding import OnboardingSession
                 progress_service = OnboardingProgressService()
                 status = progress_service.get_onboarding_status(user_id)
                 current_step = status.get("current_step", 1)
+
+                session = db.query(OnboardingSession).filter(
+                    OnboardingSession.user_id == user_id
+                ).order_by(OnboardingSession.updated_at.desc()).first()
+                onboarding_type = session.onboarding_type if session else "website"
+                is_linkedin_onboarding = onboarding_type == "linkedin"
                 
                 for step_num in self.required_steps:
                     step_completed = False
@@ -271,8 +302,18 @@ class OnboardingCompletionService:
                             if has_global_providers:
                                 step_completed = True
                     elif step_num == 2:
-                        website = integrated_data.get('website_analysis', {})
-                        step_completed = bool(website and (website.get('website_url') or website.get('writing_style')))
+                        if is_linkedin_onboarding:
+                            # LinkedIn onboarding uses profile + post analysis instead of website analysis
+                            from services.integrations.linkedin.profile_repository import ProfileRepository
+                            try:
+                                repo = ProfileRepository()
+                                profile_context = repo.get_profile_context(user_id)
+                                step_completed = bool(profile_context)
+                            except Exception:
+                                step_completed = False
+                        else:
+                            website = integrated_data.get('website_analysis', {})
+                            step_completed = bool(website and (website.get('website_url') or website.get('writing_style')))
                     elif step_num == 3:
                         research = integrated_data.get('research_preferences', {})
                         step_completed = bool(research and (research.get('research_depth') or research.get('content_types')))

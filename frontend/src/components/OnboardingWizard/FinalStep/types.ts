@@ -21,6 +21,7 @@ export interface Capability {
 export interface FinalStepProps {
   onContinue: () => void;
   updateHeaderContent: (content: { title: string; description: string }) => void;
+  onboardingType?: string;
 }
 
 export interface OnboardingCompletionResult {

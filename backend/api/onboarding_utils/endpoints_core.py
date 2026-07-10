@@ -137,6 +137,7 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 "last_updated": status['last_updated'],
                 "completed_at": status['completed_at'],
                 "can_proceed_to_final": True if status['is_completed'] else status['current_step'] >= 5,
+                "onboarding_type": status.get("onboarding_type", "website"),
                 "steps": steps_data,
             },
             "session": {
