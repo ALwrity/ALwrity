@@ -45,6 +45,18 @@ Open a terminal (Command Prompt, PowerShell, or Terminal) and run:
 git clone https://github.com/AJaySi/ALwrity.git
 cd ALwrity
 ```
+After cloning the repository, your project directory should look similar to the following:
+
+![Project Structure](../assets/installation/install-clone.png)
+
+The repository is organized into the following main directories:
+
+- **backend/** – Python backend services
+- **frontend/** – React frontend application
+- **docs-site/** – Documentation website built with MkDocs
+- **docs/** – Internal project documentation
+- **.github/** – GitHub workflows and project templates
+
 
 If Git is not installed, download and install it from
 **[Git Downloads](https://git-scm.com/downloads)** before continuing.
@@ -95,39 +107,14 @@ After the installation completes successfully, continue to the configuration ste
 
 Before running ALwrity, you need to configure the required environment variables for both the backend and frontend.
 
+
 ### 1. Backend Environment Variables
 
-Navigate to the `backend` folder and create a `.env` file if one does not already exist.
+Navigate to the `backend` directory.
 
-Add the following variables:
-
-```env
-# AI Service API Keys
-GEMINI_API_KEY=your_gemini_api_key
-OPENAI_API_KEY=your_openai_api_key
-ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# Database
-DATABASE_URL=sqlite:///./alwrity.db
-
-# Security
-SECRET_KEY=your_secret_key
-```
-
-> **Important:** Replace the placeholder values with your actual API keys before starting the backend.
-
-
-### 2. Frontend Environment Variables
-
-The frontend already provides an `env_template.txt` file containing the required environment variables.
+The backend provides an `env_template.txt` file that contains the required environment variables.
 
 Copy this template and rename it to `.env`.
-
-**Linux/macOS**
-
-```bash
-cp env_template.txt .env
-```
 
 **Windows (Command Prompt)**
 
@@ -135,7 +122,63 @@ cp env_template.txt .env
 copy env_template.txt .env
 ```
 
-After creating the `.env` file, open it in your editor and update the required values.
+**Linux/macOS**
+
+```bash
+cp env_template.txt .env
+```
+
+After creating the `.env` file, open it in your preferred text editor and replace the placeholder values with your own configuration.
+
+The `.env` file stores configuration values such as API keys, server settings, and database configuration that the backend requires to run.
+
+Example:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+```
+
+The following table explains the most important environment variables used during local development.
+
+### Environment Variable Descriptions
+
+| Variable | Description | Where to Get It |
+|----------|-------------|-----------------|
+| `GEMINI_API_KEY` | API key used to access Google's Gemini models for AI-powered content generation. | Google AI Studio |
+| `OPENAI_API_KEY` | API key used to access OpenAI models such as GPT. | OpenAI Platform |
+| `ANTHROPIC_API_KEY` | API key used to access Anthropic Claude models. | Anthropic Console |
+| `DATABASE_URL` | Database connection string used by the backend. Leave the default value for local development. | No action required |
+| `SECRET_KEY` | Secret key used by the backend for secure sessions and authentication. Generate a random secure string before deployment. | Generate your own |
+| `HOST` | Network interface on which the backend server runs. | Keep the default value (`0.0.0.0`) |
+| `PORT` | Port used by the backend server. | Keep the default value (`8000`) |
+| `DEBUG` | Enables debugging features during development. | Use `true` for development |
+| `LOG_LEVEL` | Controls the amount of log information displayed by the backend. | Keep the default value (`INFO`) |
+
+> **Important:** Replace the placeholder API keys and `SECRET_KEY` with your own values before starting the backend.
+
+### 2. Frontend Environment Variables
+
+The frontend includes an `env_template.txt` file containing the required environment variables.
+
+Copy this template and rename it to `.env`.
+
+**Windows (Command Prompt)**
+
+```cmd
+copy env_template.txt .env
+```
+
+**Linux/macOS**
+
+```bash
+cp env_template.txt .env
+```
+
+After creating the `.env` file, open it in your preferred text editor and update the required values.
+
+Example:
 
 ```env
 REACT_APP_API_BASE_URL=http://localhost:8000
@@ -143,10 +186,19 @@ REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
 REACT_APP_CLERK_JWT_TEMPLATE=
 ```
 
-> **Important:** Replace `your_clerk_publishable_key` with the Publishable Key from your Clerk dashboard.
+### Frontend Environment Variable Descriptions
 
-You can create a free Clerk application and obtain your Publishable Key from the
-**[Clerk Documentation](https://clerk.com/docs)**.
+| Variable | Description | Where to Get It |
+|----------|-------------|-----------------|
+| `REACT_APP_API_BASE_URL` | URL of the backend server that the frontend communicates with. | Use `http://localhost:8000` for local development. |
+| `REACT_APP_CLERK_PUBLISHABLE_KEY` | Public key used by Clerk for frontend authentication. | Clerk Dashboard |
+| `REACT_APP_CLERK_JWT_TEMPLATE` | Optional JWT template name used for authentication if configured in Clerk. Leave it blank unless your Clerk setup requires it. | Clerk Dashboard (optional) |
+
+> **Important:** Replace `your_clerk_publishable_key` with your own Publishable Key before running the frontend.
+
+You can create a free Clerk application and obtain your Publishable Key from the official Clerk documentation:
+
+**[Clerk Documentation](https://clerk.com/docs)**
 
 After saving the `.env` file, the frontend is ready to communicate with your local backend.
 
