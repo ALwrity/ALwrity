@@ -27,6 +27,7 @@ import {
   FeatureMapModal,
   AskAlwrityModal,
 } from './dashboard/KnowledgeCenterModals';
+import { PostAnalyticsModal } from './dashboard/PostAnalyticsModal';
 
 interface WelcomeMessageProps {
   draft: string;
@@ -38,6 +39,7 @@ interface WelcomeMessageProps {
   onGenerateOutline: (params?: any) => Promise<{ success: boolean; outline?: any; error?: string }>;
   outlineMode: boolean;
   userPreferences: LinkedInPreferences;
+  onGenerateSimilarPost?: (prompt: string) => void;
 }
 
 export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
@@ -50,11 +52,13 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   onGenerateOutline,
   outlineMode,
   userPreferences,
+  onGenerateSimilarPost,
 }) => {
   const [showCopilotModal, setShowCopilotModal] = useState(false);
   const [showAssistiveModal, setShowAssistiveModal] = useState(false);
   const [showFactCheckModal, setShowFactCheckModal] = useState(false);
   const [workflowModal, setWorkflowModal] = useState<WorkflowModalId | null>(null);
+  const [postAnalyticsOpen, setPostAnalyticsOpen] = useState(false);
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -88,6 +92,12 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   useEffect(() => {
     document.body.classList.add('linkedin-dashboard-view');
     return () => document.body.classList.remove('linkedin-dashboard-view');
+  }, []);
+
+  useEffect(() => {
+    const onOpenPostAnalytics = () => setPostAnalyticsOpen(true);
+    window.addEventListener('linkedinwriter:openPostAnalytics', onOpenPostAnalytics);
+    return () => window.removeEventListener('linkedinwriter:openPostAnalytics', onOpenPostAnalytics);
   }, []);
 
   useEffect(() => {
@@ -167,10 +177,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     );
   };
 
-  const openAnalyticsTab = () => {
-    window.dispatchEvent(
-      new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'analytics' } })
-    );
+  const openPostAnalytics = () => {
+    setPostAnalyticsOpen(true);
   };
 
   const handleWorkflowCardAction = (cardId: DashboardWorkflowCardId) => {
@@ -307,7 +315,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         <button
           type="button"
           className="linkedin-mobile-analytics-teaser"
-          onClick={openAnalyticsTab}
+          onClick={openPostAnalytics}
         >
           View Post Analytics →
         </button>
@@ -342,6 +350,10 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         />
         <AskAlwrityModal open={kcAskAlwrity} onClose={() => setKcAskAlwrity(false)} />
 
+        <div className="linkedin-dashboard-copilot-fab">
+          <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="corner" />
+        </div>
+
         <div className="linkedin-mobile-copilot-fab">
           <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="fixed" />
         </div>
@@ -359,9 +371,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       </div>
 
       <DashboardRightRail
-        onViewAllAnalytics={openAnalyticsTab}
-        onOpenCopilot={handleOpenCopilot}
+        onViewAllAnalytics={openPostAnalytics}
         onKnowledgeCenterAction={handleKnowledgeCenterAction}
+      />
+
+      <PostAnalyticsModal
+        open={postAnalyticsOpen}
+        onClose={() => setPostAnalyticsOpen(false)}
+        onGenerateSimilarPost={onGenerateSimilarPost}
       />
 
       <DashboardSimpleErrorModal

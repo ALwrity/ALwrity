@@ -525,7 +525,7 @@
 .linkedin-dashboard-main {
   position: relative;
   isolation: isolate;
-  padding-bottom: 0;
+  padding-bottom: 90px;
   padding-top: 0;
 }
 
@@ -680,7 +680,7 @@
   background: #ffffff;
   border: 2px solid #bce0fd;
   border-radius: 12px;
-  padding: 8px 10px 10px;
+  padding: 10px 12px 12px;
   box-shadow: 0 2px 8px rgba(10, 102, 194, 0.06);
 }
 
@@ -688,18 +688,19 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
-  margin-bottom: 6px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .linkedin-analytics-panel-link {
-  font-size: 9px;
+  font-size: 10px;
   font-weight: 600;
   color: #0a66c2;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
+  white-space: nowrap;
 }
 
 .linkedin-analytics-panel-body {
@@ -711,19 +712,7 @@
   background: #f8fafc;
   border: 1px solid #bce0fd;
   border-radius: 8px;
-  padding: 6px 8px;
-}
-
-.linkedin-dashboard-rail-copilot {
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 0;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
+  padding: 8px 10px;
 }
 
 .linkedin-dashboard-rail-knowledge {
@@ -787,6 +776,21 @@
   display: none;
 }
 
+.linkedin-dashboard-copilot-fab {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 20;
+  pointer-events: auto;
+}
+
+.linkedin-copilot-fab-corner-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
 .linkedin-watchdog-mount {
   position: absolute;
   width: 0;
@@ -801,6 +805,10 @@
     display: none !important;
   }
 
+  .linkedin-dashboard-copilot-fab {
+    display: none;
+  }
+
   .linkedin-mobile-analytics-teaser {
     display: block;
   }
@@ -808,7 +816,8 @@
   .linkedin-mobile-copilot-fab {
     display: block;
     position: fixed;
-    right: 20px;
+    left: 20px;
+    right: auto;
     bottom: 20px;
     z-index: 1200;
   }
