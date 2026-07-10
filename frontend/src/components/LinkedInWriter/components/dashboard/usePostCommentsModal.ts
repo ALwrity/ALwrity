@@ -180,8 +180,15 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
 
   const selectCommentForReply = useCallback((commentId: string) => {
     setSelectedCommentId(commentId);
+    setReplyText('');
     setReplyError('');
     setReplySuccess(false);
+  }, []);
+
+  const cancelReply = useCallback(() => {
+    setSelectedCommentId(null);
+    setReplyText('');
+    setReplyError('');
   }, []);
 
   const canReply =
@@ -208,6 +215,7 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
     selectedCommentId,
     setSelectedCommentId,
     selectCommentForReply,
+    cancelReply,
     selectedComment,
     replying,
     replyError,

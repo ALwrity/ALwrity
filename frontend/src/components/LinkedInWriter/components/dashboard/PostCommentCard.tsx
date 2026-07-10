@@ -2,18 +2,35 @@ import React from 'react';
 
 import { colors } from '../GrowthEngine/styles';
 import { formatLocalizedRelativeTime } from './engagementTrendsLocaleFormat';
+import { PostCommentInlineReply } from './PostCommentInlineReply';
 import type { PostComment } from './postCommentsTypes';
 
 export interface PostCommentCardProps {
   comment: PostComment;
   selected: boolean;
   onSelectReply: (commentId: string) => void;
+  replyText?: string;
+  onReplyTextChange?: (value: string) => void;
+  onSendReply?: () => void;
+  onCancelReply?: () => void;
+  canSendReply?: boolean;
+  sendingReply?: boolean;
+  replyDisabled?: boolean;
+  replyError?: string;
 }
 
 export const PostCommentCard: React.FC<PostCommentCardProps> = ({
   comment,
   selected,
   onSelectReply,
+  replyText = '',
+  onReplyTextChange,
+  onSendReply,
+  onCancelReply,
+  canSendReply = false,
+  sendingReply = false,
+  replyDisabled = false,
+  replyError,
 }) => (
   <div
     style={{
@@ -74,23 +91,39 @@ export const PostCommentCard: React.FC<PostCommentCardProps> = ({
         >
           {comment.text}
         </div>
-        <button
-          type="button"
-          onClick={() => onSelectReply(comment.id)}
-          style={{
-            marginTop: 8,
-            padding: '4px 10px',
-            background: selected ? colors.primary : 'transparent',
-            color: selected ? '#fff' : colors.primary,
-            border: `1px solid ${colors.primary}`,
-            borderRadius: 6,
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: 'pointer',
-          }}
-        >
-          {selected ? 'Replying to this' : 'Reply to this'}
-        </button>
+
+        {!selected && (
+          <button
+            type="button"
+            onClick={() => onSelectReply(comment.id)}
+            style={{
+              marginTop: 8,
+              padding: '4px 10px',
+              background: 'transparent',
+              color: colors.primary,
+              border: `1px solid ${colors.primary}`,
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Reply
+          </button>
+        )}
+
+        {selected && onReplyTextChange && onSendReply && onCancelReply && (
+          <PostCommentInlineReply
+            replyText={replyText}
+            onReplyTextChange={onReplyTextChange}
+            onSend={onSendReply}
+            onCancel={onCancelReply}
+            canSend={canSendReply}
+            sending={sendingReply}
+            disabled={replyDisabled}
+            error={replyError}
+          />
+        )}
       </div>
     </div>
   </div>

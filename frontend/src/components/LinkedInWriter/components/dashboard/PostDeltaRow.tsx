@@ -70,7 +70,7 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({ post, gain, onViewCo
               gap: 6,
             }}
           >
-            💬 View Comments
+            💬 Reply
             <span
               style={{
                 background: '#16a34a',

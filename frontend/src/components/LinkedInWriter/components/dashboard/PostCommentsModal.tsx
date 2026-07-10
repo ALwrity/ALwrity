@@ -1,5 +1,6 @@
 /**
  * Post Comments modal — list, paginate, and reply to LinkedIn post comments.
+ * Reply composer appears inline under the selected comment.
  */
 import React from 'react';
 
@@ -12,7 +13,6 @@ import {
   POST_COMMENTS_MODAL_SIZE,
   POST_COMMENTS_MODAL_Z_INDEX,
 } from './postCommentsModalLayout';
-import { UNIPILE_MAX_COMMENT_LENGTH } from './postCommentsTypes';
 import { usePostCommentsModal } from './usePostCommentsModal';
 
 export interface PostCommentsModalProps {
@@ -51,7 +51,7 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
     setReplyText,
     selectedCommentId,
     selectCommentForReply,
-    selectedComment,
+    cancelReply,
     replying,
     replyError,
     replySuccess,
@@ -167,6 +167,14 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
                   comment={c}
                   selected={selectedCommentId === c.id}
                   onSelectReply={selectCommentForReply}
+                  replyText={selectedCommentId === c.id ? replyText : ''}
+                  onReplyTextChange={setReplyText}
+                  onSendReply={() => void handleReply()}
+                  onCancelReply={cancelReply}
+                  canSendReply={canReply}
+                  sendingReply={replying}
+                  replyDisabled={!connected || loading}
+                  replyError={selectedCommentId === c.id ? replyError : undefined}
                 />
               ))}
               {hasMore && (
@@ -188,111 +196,34 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
           )}
         </div>
 
-        <div
-          style={{
-            flexShrink: 0,
-            paddingTop: 10,
-            borderTop: `1px solid ${colors.border}`,
-          }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 600, color: colors.textDark, marginBottom: 6 }}>
-            Reply to comments on this post
-          </div>
-          {!selectedCommentId && (
-            <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
-              Select a comment above with &quot;Reply to this&quot; before sending your reply.
-            </div>
-          )}
-          {selectedComment && (
-            <div
-              style={{
-                fontSize: 11,
-                color: colors.primary,
-                marginBottom: 6,
-                padding: '6px 8px',
-                background: '#eff6ff',
-                borderRadius: 6,
-              }}
-            >
-              Replying to <strong>{selectedComment.author.name}</strong>: &quot;
-              {selectedComment.text.slice(0, 80)}
-              {selectedComment.text.length > 80 ? '…' : ''}&quot;
-            </div>
-          )}
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Type your reply…"
-            maxLength={UNIPILE_MAX_COMMENT_LENGTH}
-            disabled={!connected || replying || loading}
-            rows={2}
+        {replySuccess && (
+          <div
             style={{
-              width: '100%',
-              boxSizing: 'border-box',
+              flexShrink: 0,
+              fontSize: 12,
+              color: '#16a34a',
               padding: '8px 10px',
-              border: `1px solid ${colors.border}`,
-              borderRadius: 8,
-              fontSize: 13,
-              resize: 'vertical',
-              fontFamily: 'inherit',
-              marginBottom: 4,
-              maxHeight: 120,
-            }}
-          />
-          <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6, textAlign: 'right' }}>
-            {replyText.length}/{UNIPILE_MAX_COMMENT_LENGTH}
-          </div>
-          {replyError && (
-            <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 8 }}>{replyError}</div>
-          )}
-          {replySuccess && (
-            <div
-              style={{
-                fontSize: 12,
-                color: '#16a34a',
-                marginBottom: 8,
-                padding: '8px 10px',
-                background: '#f0fdf4',
-                borderRadius: 6,
-                border: '1px solid #bbf7d0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 8,
-                flexWrap: 'wrap',
-              }}
-            >
-              <span>Reply posted on LinkedIn.</span>
-              <button
-                type="button"
-                onClick={() => void refreshComments()}
-                disabled={refreshing}
-                style={actionButtonStyle(!refreshing)}
-              >
-                {refreshing ? 'Refreshing…' : 'Refresh comments'}
-              </button>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => void handleReply()}
-            disabled={!canReply}
-            style={{
-              width: '100%',
-              padding: '10px',
-              background: canReply ? colors.primary : '#d1d5db',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: canReply ? 'pointer' : 'not-allowed',
-              opacity: replying ? 0.7 : 1,
+              background: '#f0fdf4',
+              borderRadius: 6,
+              border: '1px solid #bbf7d0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+              flexWrap: 'wrap',
             }}
           >
-            {replying ? 'Posting reply…' : '↩ Reply'}
-          </button>
-        </div>
+            <span>Reply posted on LinkedIn.</span>
+            <button
+              type="button"
+              onClick={() => void refreshComments()}
+              disabled={refreshing}
+              style={actionButtonStyle(!refreshing)}
+            >
+              {refreshing ? 'Refreshing…' : 'Refresh comments'}
+            </button>
+          </div>
+        )}
       </div>
     </DashboardActionModal>
   );
