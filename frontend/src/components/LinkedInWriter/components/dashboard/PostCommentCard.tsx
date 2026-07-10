@@ -1,7 +1,7 @@
 import React from 'react';
 
 import { colors } from '../GrowthEngine/styles';
-import { formatLocalizedRelativeTime } from './engagementTrendsLocaleFormat';
+import { PostCommentEngagementMeta, PostCommentThreadReplies } from './PostCommentThreadReplies';
 import { PostCommentInlineReply } from './PostCommentInlineReply';
 import type { PostComment } from './postCommentsTypes';
 
@@ -17,6 +17,13 @@ export interface PostCommentCardProps {
   sendingReply?: boolean;
   replyDisabled?: boolean;
   replyError?: string;
+  /** Nested replies under this comment. */
+  nestedReplies?: PostComment[];
+  repliesExpanded?: boolean;
+  repliesLoading?: boolean;
+  repliesError?: string;
+  onToggleReplies?: () => void;
+  onRetryReplies?: () => void;
 }
 
 export const PostCommentCard: React.FC<PostCommentCardProps> = ({
@@ -31,6 +38,12 @@ export const PostCommentCard: React.FC<PostCommentCardProps> = ({
   sendingReply = false,
   replyDisabled = false,
   replyError,
+  nestedReplies = [],
+  repliesExpanded = false,
+  repliesLoading = false,
+  repliesError,
+  onToggleReplies,
+  onRetryReplies,
 }) => (
   <div
     style={{
@@ -76,11 +89,7 @@ export const PostCommentCard: React.FC<PostCommentCardProps> = ({
             </span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
-          {comment.created_at ? formatLocalizedRelativeTime(comment.created_at) : 'Unknown time'}
-          {comment.reaction_count > 0 && ` · ${comment.reaction_count} reactions`}
-          {comment.reply_count > 0 && ` · ${comment.reply_count} replies`}
-        </div>
+        <PostCommentEngagementMeta comment={comment} />
         <div
           style={{
             fontSize: 13,
@@ -122,6 +131,19 @@ export const PostCommentCard: React.FC<PostCommentCardProps> = ({
             sending={sendingReply}
             disabled={replyDisabled}
             error={replyError}
+          />
+        )}
+
+        {onToggleReplies && onRetryReplies && (
+          <PostCommentThreadReplies
+            parentId={comment.id}
+            replyCount={comment.reply_count}
+            expanded={repliesExpanded}
+            loading={repliesLoading}
+            error={repliesError}
+            replies={nestedReplies}
+            onToggle={onToggleReplies}
+            onRetry={onRetryReplies}
           />
         )}
       </div>

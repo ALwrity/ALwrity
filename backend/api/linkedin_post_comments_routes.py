@@ -151,6 +151,7 @@ def _raise_comments_http_error(exc: Exception, *, user_id: str, operation: str) 
     summary="List comments on a LinkedIn post",
     description=(
         "Proxy Unipile GET /api/v1/posts/{social_id}/comments. "
+        "Pass comment_id to list nested replies under a parent comment. "
         "Requires LINKEDIN_PROVIDER=unipile and a connected LinkedIn account."
     ),
 )
@@ -159,9 +160,13 @@ async def get_post_comments(
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     limit: int = Query(20, ge=1, le=100, description="Comments per page"),
     sort_by: str = Query("MOST_RECENT", description="MOST_RECENT or MOST_RELEVANT"),
+    comment_id: Optional[str] = Query(
+        None,
+        description="When set, list replies under this parent comment id",
+    ),
     current_user: dict = Depends(get_current_user),
 ) -> PostCommentsListResponse:
-    """List comments for a post by Unipile social_id."""
+    """List comments for a post by Unipile social_id (or replies when comment_id is set)."""
     user_id = _user_id(current_user)
     try:
         return await list_comments(
@@ -170,6 +175,7 @@ async def get_post_comments(
             cursor=cursor,
             limit=limit,
             sort_by=sort_by,
+            comment_id=comment_id,
         )
     except (LinkedInPostCommentsNotAvailableError, LinkedInNotConnectedError, LinkedInPostCommentsValidationError, UnipileAPIError) as exc:
         _raise_comments_http_error(exc, user_id=user_id, operation="list_comments")

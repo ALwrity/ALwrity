@@ -10,6 +10,7 @@ import {
 } from '../../../../services/postCommentsApi';
 import type { PostComment } from './postCommentsTypes';
 import { UNIPILE_MAX_COMMENT_LENGTH } from './postCommentsTypes';
+import { usePostCommentReplies } from './usePostCommentReplies';
 
 export function resolvePostSocialId(post: PostDelta | null): string | null {
   const id = post?.social_id?.trim();
@@ -39,6 +40,16 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
   const cursorRef = useRef<string | null>(null);
 
   const socialId = resolvePostSocialId(post);
+  const {
+    repliesByParent,
+    expandedParents,
+    loadingParents,
+    errorsByParent,
+    toggleReplies,
+    refreshReplies,
+    resetReplies,
+    setMounted: setRepliesMounted,
+  } = usePostCommentReplies({ socialId, connected });
 
   const resetState = useCallback(() => {
     setComments([]);
@@ -54,7 +65,8 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
     setLoadingMore(false);
     setRefreshing(false);
     setReplying(false);
-  }, []);
+    resetReplies();
+  }, [resetReplies]);
 
   const fetchComments = useCallback(
     async (mode: 'initial' | 'more' | 'refresh') => {
@@ -79,6 +91,7 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
         setReplySuccess(false);
         cursorRef.current = null;
         setCursor(null);
+        resetReplies();
       } else if (mode === 'more') {
         setLoadingMore(true);
       } else {
@@ -120,7 +133,7 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
         if (mode === 'refresh') setRefreshing(false);
       }
     },
-    [socialId, connected]
+    [socialId, connected, resetReplies]
   );
 
   const loadComments = useCallback(() => fetchComments('initial'), [fetchComments]);
@@ -129,6 +142,7 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
 
   useEffect(() => {
     mountedRef.current = true;
+    setRepliesMounted(true);
     if (!open || !post) {
       resetState();
       return;
@@ -136,8 +150,9 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
     void fetchComments('initial');
     return () => {
       mountedRef.current = false;
+      setRepliesMounted(false);
     };
-  }, [open, post?.post_id, socialId, connected, fetchComments, resetState]);
+  }, [open, post?.post_id, socialId, connected, fetchComments, resetState, setRepliesMounted]);
 
   const handleReply = useCallback(async () => {
     if (!socialId || !selectedCommentId) return;
@@ -152,12 +167,13 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
       return;
     }
 
+    const parentId = selectedCommentId;
     setReplying(true);
     setReplyError('');
     setReplySuccess(false);
     try {
       await postCommentsApi.replyToComment(socialId, {
-        comment_id: selectedCommentId,
+        comment_id: parentId,
         text: trimmed,
       });
       if (!mountedRef.current) return;
@@ -165,6 +181,7 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
       setReplyText('');
       setSelectedCommentId(null);
       await fetchComments('refresh');
+      await refreshReplies(parentId);
     } catch (err: unknown) {
       if (mountedRef.current) {
         setReplyError(getPostCommentsReplyErrorMessage(err));
@@ -172,7 +189,7 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
     } finally {
       if (mountedRef.current) setReplying(false);
     }
-  }, [socialId, selectedCommentId, replyText, fetchComments]);
+  }, [socialId, selectedCommentId, replyText, fetchComments, refreshReplies]);
 
   const selectedComment = selectedCommentId
     ? comments.find((c) => c.id === selectedCommentId) ?? null
@@ -225,5 +242,11 @@ export function usePostCommentsModal({ open, post, connected = true }: UsePostCo
     loadMoreComments,
     refreshComments,
     handleReply,
+    repliesByParent,
+    expandedParents,
+    loadingParents,
+    errorsByParent,
+    toggleReplies,
+    refreshReplies,
   };
 }

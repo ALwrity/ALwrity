@@ -91,7 +91,11 @@ def _iso_timestamp(value: Any) -> str:
     return str(value)
 
 
-def _normalize_comment_item(raw: dict[str, Any]) -> Optional[PostCommentItem]:
+def _normalize_comment_item(
+    raw: dict[str, Any],
+    *,
+    parent_comment_id: Optional[str] = None,
+) -> Optional[PostCommentItem]:
     """Map Unipile Comment (LinkedIn or Instagram shape) to PostCommentItem."""
     if not isinstance(raw, dict):
         return None
@@ -105,10 +109,15 @@ def _normalize_comment_item(raw: dict[str, Any]) -> Optional[PostCommentItem]:
 
     reply_count = 0
     reaction_count = 0
+    impressions_count = 0
+    user_reacted: Optional[str] = None
     author_name = "Unknown"
     headline: Optional[str] = None
     avatar_url: Optional[str] = None
     profile_url: Optional[str] = None
+    resolved_parent = parent_comment_id or (
+        str(raw["parent_comment_id"]) if raw.get("parent_comment_id") else None
+    )
 
     # LinkedIn shape: author string + author_details object
     author_details = raw.get("author_details")
@@ -123,6 +132,9 @@ def _normalize_comment_item(raw: dict[str, Any]) -> Optional[PostCommentItem]:
         )
         reply_count = int(raw.get("reply_counter") or 0)
         reaction_count = int(raw.get("reaction_counter") or 0)
+        impressions_count = int(raw.get("impressions_counter") or 0)
+        reacted = raw.get("user_reacted")
+        user_reacted = str(reacted) if reacted else None
     else:
         # Instagram-style shape: author object
         author_obj = raw.get("author")
@@ -142,6 +154,11 @@ def _normalize_comment_item(raw: dict[str, Any]) -> Optional[PostCommentItem]:
         reaction_count = int(
             raw.get("comment_like_count") or raw.get("reaction_counter") or 0
         )
+        impressions_count = int(raw.get("impressions_counter") or 0)
+        if raw.get("has_liked_comment") is True:
+            user_reacted = "LIKE"
+        elif raw.get("user_reacted"):
+            user_reacted = str(raw.get("user_reacted"))
 
     return PostCommentItem(
         id=str(comment_id),
@@ -155,17 +172,26 @@ def _normalize_comment_item(raw: dict[str, Any]) -> Optional[PostCommentItem]:
         created_at=created_at,
         reply_count=reply_count,
         reaction_count=reaction_count,
+        impressions_count=impressions_count,
+        user_reacted=user_reacted,
+        parent_comment_id=resolved_parent,
     )
 
 
-def _normalize_comment_list(data: dict[str, Any]) -> PostCommentsListResponse:
+def _normalize_comment_list(
+    data: dict[str, Any],
+    *,
+    parent_comment_id: Optional[str] = None,
+) -> PostCommentsListResponse:
     """Build PostCommentsListResponse from raw Unipile CommentList."""
     items_raw = data.get("items")
     items: list[PostCommentItem] = []
     if isinstance(items_raw, list):
         for raw in items_raw:
             if isinstance(raw, dict):
-                normalized = _normalize_comment_item(raw)
+                normalized = _normalize_comment_item(
+                    raw, parent_comment_id=parent_comment_id
+                )
                 if normalized:
                     items.append(normalized)
 
@@ -192,13 +218,25 @@ async def list_comments(
     cursor: Optional[str] = None,
     limit: int = 20,
     sort_by: str = "MOST_RECENT",
+    comment_id: Optional[str] = None,
     oauth: Optional[LinkedInOAuthService] = None,
 ) -> PostCommentsListResponse:
-    """List comments for a post via Unipile."""
+    """List top-level comments, or replies when comment_id is provided."""
     _ensure_unipile_provider()
     resolved_social_id = _require_social_id(social_id)
+    parent_id = (comment_id or "").strip() or None
     oauth_service = oauth or LinkedInOAuthService()
     account_id = _resolve_account_id(user_id, oauth_service)
+
+    logger.info(
+        "[PostComments] list_comments user_id={} social_id={} parent_comment_id={} "
+        "limit={} cursor={}",
+        user_id,
+        resolved_social_id,
+        parent_id or "none",
+        limit,
+        "set" if cursor else "none",
+    )
 
     client = UnipilePostCommentsClient()
     raw = await client.list_post_comments(
@@ -207,8 +245,9 @@ async def list_comments(
         cursor=cursor,
         limit=limit,
         sort_by=sort_by,
+        comment_id=parent_id,
     )
-    return _normalize_comment_list(raw)
+    return _normalize_comment_list(raw, parent_comment_id=parent_id)
 
 
 async def reply_to_comment(

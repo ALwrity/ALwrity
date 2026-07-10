@@ -19,7 +19,7 @@ class PostCommentAuthor(BaseModel):
 
 
 class PostCommentItem(BaseModel):
-    """Single comment on a LinkedIn post."""
+    """Single comment on a LinkedIn post (or a nested reply)."""
 
     id: str
     text: str
@@ -27,6 +27,15 @@ class PostCommentItem(BaseModel):
     created_at: str
     reply_count: int = 0
     reaction_count: int = 0
+    impressions_count: int = 0
+    user_reacted: Optional[str] = Field(
+        default=None,
+        description="Reaction type if the connected account reacted (e.g. LIKE)",
+    )
+    parent_comment_id: Optional[str] = Field(
+        default=None,
+        description="Parent comment id when this item is a nested reply",
+    )
 
 
 class PostCommentsListResponse(BaseModel):

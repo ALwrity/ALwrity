@@ -60,6 +60,12 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
     loadMoreComments,
     refreshComments,
     handleReply,
+    repliesByParent,
+    expandedParents,
+    loadingParents,
+    errorsByParent,
+    toggleReplies,
+    refreshReplies,
   } = usePostCommentsModal({ open, post, connected });
 
   if (!open || !post) return null;
@@ -175,6 +181,12 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
                   sendingReply={replying}
                   replyDisabled={!connected || loading}
                   replyError={selectedCommentId === c.id ? replyError : undefined}
+                  nestedReplies={repliesByParent[c.id] ?? []}
+                  repliesExpanded={Boolean(expandedParents[c.id])}
+                  repliesLoading={Boolean(loadingParents[c.id])}
+                  repliesError={errorsByParent[c.id]}
+                  onToggleReplies={() => void toggleReplies(c.id)}
+                  onRetryReplies={() => void refreshReplies(c.id)}
                 />
               ))}
               {hasMore && (

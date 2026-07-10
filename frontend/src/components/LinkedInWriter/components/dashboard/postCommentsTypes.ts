@@ -1,5 +1,5 @@
 /**
- * Types for LinkedIn post comments (Unipile proxy — Phase 1 UI / Phase 2+ API).
+ * Types for LinkedIn post comments (Unipile proxy).
  */
 
 export interface PostCommentAuthor {
@@ -16,6 +16,11 @@ export interface PostComment {
   created_at: string;
   reply_count: number;
   reaction_count: number;
+  impressions_count?: number;
+  /** Reaction type if the connected account reacted (e.g. LIKE). */
+  user_reacted?: string | null;
+  /** Set when this item is a nested reply under a parent comment. */
+  parent_comment_id?: string | null;
 }
 
 export interface PostCommentsListResponse {
@@ -36,3 +41,11 @@ export interface PostCommentReplyResponse {
 }
 
 export const UNIPILE_MAX_COMMENT_LENGTH = 1250;
+
+export function formatReplyCountLabel(count: number): string {
+  return count === 1 ? '1 reply' : `${count} replies`;
+}
+
+export function formatReactionCountLabel(count: number): string {
+  return count === 1 ? '1 reaction' : `${count} reactions`;
+}

@@ -18,14 +18,20 @@ export type { PostCommentsErrorType } from './postCommentsErrorUtils';
 const BASE = '/api/linkedin/post-analytics';
 
 export const postCommentsApi = {
-  /** List comments for a post (Unipile social_id). */
+  /** List comments for a post (Unipile social_id), or replies when commentId is set. */
   async fetchPostComments(
     socialId: string,
-    params?: { cursor?: string; limit?: number }
+    params?: { cursor?: string; limit?: number; commentId?: string }
   ): Promise<PostCommentsListResponse> {
+    const { commentId, ...rest } = params ?? {};
     const { data } = await aiApiClient.get<PostCommentsListResponse>(
       `${BASE}/posts/${encodeURIComponent(socialId)}/comments`,
-      { params }
+      {
+        params: {
+          ...rest,
+          ...(commentId ? { comment_id: commentId } : {}),
+        },
+      }
     );
     return data;
   },
