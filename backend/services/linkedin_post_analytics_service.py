@@ -202,6 +202,7 @@ class LinkedInPostAnalyticsService:
                     d.text = (row.text or "")[:200]
                     d.author_name = row.author_name or ""
                     d.share_url = row.share_url
+                    d.social_id = row.social_id
 
         # 5. Aggregate summary stats (O(n) via dict lookups)
         total = len(deltas)

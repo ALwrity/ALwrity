@@ -56,6 +56,8 @@ export interface MetricDelta {
 
 export interface PostDelta {
   post_id: string;
+  /** Unipile social_id — required for list/reply comments API (Phase 2+). */
+  social_id?: string | null;
   text: string;
   author_name: string;
   share_url: string | null;

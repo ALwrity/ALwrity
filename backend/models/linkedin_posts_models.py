@@ -162,6 +162,10 @@ class MetricDelta(BaseModel):
 class PostDelta(BaseModel):
     """Per-post delta between two snapshot epochs."""
     post_id: str
+    social_id: Optional[str] = Field(
+        default=None,
+        description="Unipile social_id required for list/reply comments API",
+    )
     text: str
     author_name: str
     share_url: Optional[str] = None

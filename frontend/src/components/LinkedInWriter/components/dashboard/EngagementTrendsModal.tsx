@@ -12,10 +12,12 @@ import {
   type PostAnalyticsHistoryResponse,
   type PostDelta,
 } from '../../../../services/postAnalyticsApi';
-import { colors, rowBase } from '../GrowthEngine/styles';
+import { colors } from '../GrowthEngine/styles';
 import { ComparisonPeriodBlock, LastUpdatedBanner } from './EngagementTrendsTimeDisplay';
 import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
 import { ENGAGEMENT_TRENDS_MODAL_SIZE } from './engagementTrendsModalLayout';
+import { PostDeltaRow } from './PostDeltaRow';
+import { PostCommentsModal } from './PostCommentsModal';
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
   return (
@@ -134,6 +136,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   const [data, setData] = useState<PostAnalyticsHistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [commentsPost, setCommentsPost] = useState<PostDelta | null>(null);
   const mountedRef = useRef(true);
 
   const fetchData = useCallback(async (refreshFirst = false) => {
@@ -361,7 +364,12 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   📈 Top Gainers
                 </div>
                 {data.top_gainers.map((post) => (
-                  <PostDeltaRow key={post.post_id} post={post} gain />
+                  <PostDeltaRow
+                    key={post.post_id}
+                    post={post}
+                    gain
+                    onViewComments={setCommentsPost}
+                  />
                 ))}
               </div>
             )}
@@ -381,7 +389,12 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   📉 Top Decliners
                 </div>
                 {data.top_decliners.map((post) => (
-                  <PostDeltaRow key={post.post_id} post={post} gain={false} />
+                  <PostDeltaRow
+                    key={post.post_id}
+                    post={post}
+                    gain={false}
+                    onViewComments={setCommentsPost}
+                  />
                 ))}
               </div>
             )}
@@ -409,6 +422,12 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
           </>
         )}
       </div>
+      <PostCommentsModal
+        open={!!commentsPost}
+        post={commentsPost}
+        connected={connected}
+        onClose={() => setCommentsPost(null)}
+      />
     </DashboardActionModal>
   );
 };
@@ -464,56 +483,3 @@ const SummaryDeltaCard: React.FC<{
     </div>
   );
 };
-
-const PostDeltaRow: React.FC<{ post: PostDelta; gain: boolean }> = ({ post, gain }) => (
-  <div
-    style={{
-      ...rowBase,
-      marginBottom: 8,
-      borderLeft: `3px solid ${gain ? '#16a34a' : '#dc2626'}`,
-    }}
-  >
-    <div style={{ fontSize: 13, fontWeight: 600, color: colors.textDark, marginBottom: 6 }}>
-      {post.text ? `${post.text.slice(0, 100)}…` : '(no text)'}
-    </div>
-    <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
-      {post.author_name}
-      {post.share_url ? ' · ' : ''}
-      {post.share_url && (
-        <a
-          href={post.share_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{ color: colors.primary, textDecoration: 'none', fontWeight: 600 }}
-        >
-          View on LinkedIn →
-        </a>
-      )}
-    </div>
-    <div style={{ display: 'flex', gap: 12 }}>
-      <DeltaChip icon="❤️" delta={post.reactions_delta} />
-      <DeltaChip icon="💬" delta={post.comments_delta} />
-      <DeltaChip icon="👁️" delta={post.impressions_delta} />
-    </div>
-    <div
-      style={{
-        fontSize: 11,
-        color: gain ? '#16a34a' : '#dc2626',
-        fontWeight: 700,
-        marginTop: 4,
-      }}
-    >
-      ER: {(post.engagement_rate_before * 100).toFixed(1)}% → {(post.engagement_rate_now * 100).toFixed(1)}%
-    </div>
-  </div>
-);
-
-const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-    <span>{icon}</span>
-    <span style={{ fontSize: 12, fontWeight: 700, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>
-      {delta >= 0 ? '+' : ''}
-      {delta}
-    </span>
-  </div>
-);
