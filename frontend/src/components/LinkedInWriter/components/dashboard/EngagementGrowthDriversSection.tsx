@@ -3,10 +3,12 @@ import React, { useMemo } from 'react';
 import type { EngagementSummary } from '../../../../services/postAnalyticsApi';
 import { colors } from '../GrowthEngine/styles';
 import { formatLocalizedComparisonPeriod } from './engagementTrendsLocaleFormat';
+import { GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsModalLayout';
 
 export interface EngagementGrowthDriversSectionProps {
   period: { from: string; to: string };
   summary: EngagementSummary;
+  showContributionBadges: boolean;
   children: React.ReactNode;
 }
 
@@ -34,12 +36,13 @@ function buildOverallGrowthLine(summary: EngagementSummary): string {
     return 'No net change across reactions, comments, or impressions in this period.';
   }
 
-  return `Overall growth this period: ${parts.join(' · ')}.`;
+  return `Overall: ${parts.join(' · ')}.`;
 }
 
 export const EngagementGrowthDriversSection: React.FC<EngagementGrowthDriversSectionProps> = ({
   period,
   summary,
+  showContributionBadges,
   children,
 }) => {
   const comparison = useMemo(
@@ -48,15 +51,15 @@ export const EngagementGrowthDriversSection: React.FC<EngagementGrowthDriversSec
   );
 
   return (
-    <div style={{ marginBottom: 14 }}>
+    <div style={{ marginBottom: 10 }}>
       <div
         style={{
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: 700,
           color: '#16a34a',
           textTransform: 'uppercase',
-          letterSpacing: 0.6,
-          marginBottom: 8,
+          letterSpacing: 0.5,
+          marginBottom: 6,
         }}
       >
         📈 Growth drivers
@@ -64,26 +67,27 @@ export const EngagementGrowthDriversSection: React.FC<EngagementGrowthDriversSec
 
       <div
         style={{
-          marginBottom: 12,
-          padding: '10px 12px',
+          marginBottom: 8,
+          padding: '8px 10px',
           background: '#f0fdf4',
           border: '1px solid #bbf7d0',
           borderRadius: 8,
-          fontSize: 12,
+          fontSize: 11,
           color: colors.textSecondary,
-          lineHeight: 1.55,
+          lineHeight: 1.4,
         }}
       >
-        <p style={{ margin: '0 0 8px', color: colors.textDark, fontWeight: 600 }}>
-          These posts drove your engagement growth between{' '}
+        <p style={{ margin: '0 0 4px', color: colors.textDark, fontWeight: 600 }}>
+          Posts driving growth between{' '}
           <span style={{ color: '#15803d' }}>{comparison.previous.display}</span> and{' '}
           <span style={{ color: '#15803d' }}>{comparison.latest.display}</span>.
         </p>
-        <p style={{ margin: '0 0 8px' }}>
-          Percentages show each post&apos;s share of total positive growth (reactions + comments +
-          impressions) across all posts in this comparison.
-        </p>
-        <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: '#166534' }}>
+        {showContributionBadges && (
+          <p style={{ margin: '0 0 4px' }} title={GROWTH_CONTRIBUTION_TOOLTIP}>
+            Contribution % = share of total positive growth (reactions + comments + impressions).
+          </p>
+        )}
+        <p style={{ margin: 0, fontSize: 10, fontWeight: 600, color: '#166534' }}>
           {buildOverallGrowthLine(summary)}
         </p>
       </div>

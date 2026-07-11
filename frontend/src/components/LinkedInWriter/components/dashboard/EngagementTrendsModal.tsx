@@ -4,7 +4,7 @@
  * Compares post engagement between the last two DB snapshot epochs.
  * Extracted from AnalysisWedgeModals.tsx to keep files under 500 lines.
  */
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { DashboardActionModal } from './DashboardActionModal';
 import {
@@ -13,12 +13,17 @@ import {
   type PostDelta,
 } from '../../../../services/postAnalyticsApi';
 import { colors } from '../GrowthEngine/styles';
-import { ComparisonPeriodBlock, LastUpdatedBanner } from './EngagementTrendsTimeDisplay';
 import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
-import { ENGAGEMENT_TRENDS_MODAL_SIZE } from './engagementTrendsModalLayout';
+import {
+  ENGAGEMENT_TRENDS_BODY_STYLE,
+  ENGAGEMENT_TRENDS_MODAL_SIZE,
+} from './engagementTrendsModalLayout';
+import { shouldShowContributionBadges } from './engagementTrendsGrowthUtils';
 import { PostDeltaRow } from './PostDeltaRow';
 import { PostCommentsModal } from './PostCommentsModal';
 import { EngagementGrowthDriversSection } from './EngagementGrowthDriversSection';
+import { EngagementTrendsSummaryGrid } from './EngagementTrendsSummaryGrid';
+import { EngagementTrendsMetadataFooter } from './EngagementTrendsMetadataFooter';
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
   return (
@@ -33,12 +38,12 @@ function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
 // ---------------------------------------------------------------------------
 
 const primaryLoadBtn: React.CSSProperties = {
-  padding: '10px 24px',
+  padding: '8px 18px',
   background: colors.primary,
   color: '#fff',
   border: 'none',
   borderRadius: 8,
-  fontSize: 14,
+  fontSize: 13,
   fontWeight: 700,
   cursor: 'pointer',
 };
@@ -51,10 +56,10 @@ const CacheEmptyPrompt: React.FC<{
   onLoad: () => void;
   disabled?: boolean;
 }> = ({ icon, title, description, buttonLabel, onLoad, disabled }) => (
-  <div style={{ textAlign: 'center', padding: '24px 0' }}>
-    <div style={{ fontSize: 36, marginBottom: 12 }}>{icon}</div>
-    <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>{title}</div>
-    <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>{description}</div>
+  <div style={{ textAlign: 'center', padding: '16px 0' }}>
+    <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
+    <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>{title}</div>
+    <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 14 }}>{description}</div>
     <button
       type="button"
       onClick={onLoad}
@@ -75,18 +80,18 @@ const LoadingRow: React.FC<{ message: string }> = ({ message }) => (
     style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 12,
-      padding: '24px 0',
+      gap: 10,
+      padding: '16px 0',
       justifyContent: 'center',
       color: colors.textSecondary,
-      fontSize: 13,
+      fontSize: 12,
     }}
   >
     <span
       style={{
         display: 'inline-block',
-        width: 16,
-        height: 16,
+        width: 14,
+        height: 14,
         border: '2px solid #d1d5db',
         borderTopColor: colors.primary,
         borderRadius: '50%',
@@ -102,18 +107,18 @@ const NoChangesEmptyState: React.FC = () => (
   <div
     style={{
       textAlign: 'center',
-      padding: '24px 16px',
+      padding: '16px 12px',
       marginBottom: 8,
       background: colors.rowBg,
       border: `1px solid ${colors.border}`,
       borderRadius: 8,
     }}
   >
-    <div style={{ fontSize: 28, marginBottom: 10 }}>📊</div>
-    <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>
+    <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
+    <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
       No changes detected
     </div>
-    <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+    <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
       There are no changes in post analytics to compare with.
     </div>
   </div>
@@ -203,6 +208,11 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
       data.top_gainers.length > 0 ||
       data.top_decliners.length > 0);
 
+  const showContributionBadges = useMemo(
+    () => (data ? shouldShowContributionBadges(data.top_gainers) : false),
+    [data],
+  );
+
   return (
     <DashboardActionModal
       open={open}
@@ -210,11 +220,13 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
       onClose={onClose}
       {...ENGAGEMENT_TRENDS_MODAL_SIZE}
     >
-      <div>
-        <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-          See how your post engagement has changed between the last two syncs — track growth,
-          spot declines, and measure what works.
-        </p>
+      <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
+        {!data && !loading && (
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+            See how your post engagement has changed between the last two syncs — track growth,
+            spot declines, and measure what works.
+          </p>
+        )}
 
         {!connected && !data && !loading && (
           <CacheEmptyPrompt
@@ -239,12 +251,12 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
         )}
 
         {connected && !data && !loading && error && (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>
+          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
+            <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
               Could not load trends
             </div>
-            <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 20 }}>{error}</div>
+            <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 14 }}>{error}</div>
             <button
               type="button"
               onClick={handleLoad}
@@ -264,18 +276,6 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 
         {data && !loading && (
           <>
-            {data.last_synced_at && (
-              <LastUpdatedBanner
-                lastSyncedAt={data.last_synced_at}
-                onRefresh={handleSync}
-                loading={loading}
-              />
-            )}
-
-            {!hasInsufficientSnapshots(data.period) && (
-              <ComparisonPeriodBlock from={data.period.from} to={data.period.to} />
-            )}
-
             {showInsufficientSnapshots && !data.last_synced_at && (
               <CacheEmptyPrompt
                 icon="📈"
@@ -291,18 +291,18 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
               <div
                 style={{
                   textAlign: 'center',
-                  padding: '20px 16px',
+                  padding: '14px 12px',
                   marginBottom: 8,
                   background: colors.rowBg,
                   border: `1px solid ${colors.border}`,
                   borderRadius: 8,
                 }}
               >
-                <div style={{ fontSize: 28, marginBottom: 10 }}>📈</div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>
+                <div style={{ fontSize: 24, marginBottom: 8 }}>📈</div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
                   Not enough history to compare
                 </div>
-                <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
+                <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
                   Sync again after your post metrics change to build a comparison snapshot.
                 </div>
               </div>
@@ -311,52 +311,21 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
             {showNoChanges && <NoChangesEmptyState />}
 
             {hasTrendData && data.summary.total_posts > 0 && (
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <SummaryDeltaCard
-                  icon="❤️"
-                  label="Reactions"
-                  before={data.summary.reactions.before}
-                  now={data.summary.reactions.now}
-                  delta={data.summary.reactions.delta}
-                  pct={data.summary.reactions.pct_change}
-                />
-                <SummaryDeltaCard
-                  icon="💬"
-                  label="Comments"
-                  before={data.summary.comments.before}
-                  now={data.summary.comments.now}
-                  delta={data.summary.comments.delta}
-                  pct={data.summary.comments.pct_change}
-                />
-                <SummaryDeltaCard
-                  icon="👁️"
-                  label="Impressions"
-                  before={data.summary.impressions.before}
-                  now={data.summary.impressions.now}
-                  delta={data.summary.impressions.delta}
-                  pct={data.summary.impressions.pct_change}
-                />
-                <SummaryDeltaCard
-                  icon="📊"
-                  label="Avg ER"
-                  before={Math.round(data.summary.avg_engagement_rate_before * 100)}
-                  now={Math.round(data.summary.avg_engagement_rate_now * 100)}
-                  delta={Math.round(
-                    (data.summary.avg_engagement_rate_now - data.summary.avg_engagement_rate_before) * 100
-                  )}
-                  pct={0}
-                  isRate
-                />
-              </div>
+              <EngagementTrendsSummaryGrid summary={data.summary} />
             )}
 
             {data.top_gainers.length > 0 && (
-              <EngagementGrowthDriversSection period={data.period} summary={data.summary}>
+              <EngagementGrowthDriversSection
+                period={data.period}
+                summary={data.summary}
+                showContributionBadges={showContributionBadges}
+              >
                 {data.top_gainers.map((post) => (
                   <PostDeltaRow
                     key={post.post_id}
                     post={post}
                     gain
+                    showContribution={showContributionBadges}
                     onViewComments={setCommentsPost}
                   />
                 ))}
@@ -364,18 +333,18 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
             )}
 
             {data.top_decliners.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 10 }}>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 10,
                     fontWeight: 700,
                     color: '#dc2626',
                     textTransform: 'uppercase',
-                    letterSpacing: 0.6,
+                    letterSpacing: 0.5,
                     marginBottom: 6,
                   }}
                 >
-                  📉 Top Decliners
+                  📉 Top decliners
                 </div>
                 {data.top_decliners.map((post) => (
                   <PostDeltaRow
@@ -394,20 +363,28 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
               disabled={loading}
               style={{
                 width: '100%',
-                padding: '8px',
+                padding: '7px',
                 background: 'none',
                 border: `1px solid ${colors.border}`,
                 borderRadius: 6,
-                fontSize: 12,
+                fontSize: 11,
                 color: colors.textSecondary,
                 cursor: loading ? 'not-allowed' : 'pointer',
                 fontWeight: 600,
-                marginTop: 8,
+                marginTop: 4,
                 opacity: loading ? 0.6 : 1,
               }}
             >
               ⟳ Sync Latest & Recompute
             </button>
+
+            <EngagementTrendsMetadataFooter
+              lastSyncedAt={data.last_synced_at}
+              period={data.period}
+              showComparison={!hasInsufficientSnapshots(data.period)}
+              onRefresh={handleSync}
+              loading={loading}
+            />
           </>
         )}
       </div>
@@ -418,57 +395,5 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
         onClose={() => setCommentsPost(null)}
       />
     </DashboardActionModal>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
-
-const SummaryDeltaCard: React.FC<{
-  icon: string;
-  label: string;
-  before: number;
-  now: number;
-  delta: number;
-  pct: number;
-  isRate?: boolean;
-}> = ({ icon, label, before, now, delta, pct, isRate }) => {
-  const up = delta >= 0;
-  return (
-    <div
-      style={{
-        flex: '1 1 calc(50% - 4px)',
-        minWidth: 120,
-        padding: '10px 12px',
-        background: colors.rowBg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: 8,
-      }}
-    >
-      <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 4, fontWeight: 600 }}>
-        {icon} {label}
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: up ? '#16a34a' : '#dc2626', marginBottom: 2 }}>
-        {isRate ? `${now}%` : now.toLocaleString()}
-      </div>
-      <div style={{ fontSize: 11, color: colors.textSecondary }}>
-        <span style={{ color: up ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-          {up ? '+' : ''}
-          {isRate ? `${delta}pp` : delta.toLocaleString()}
-        </span>
-        {!isRate && pct !== 0 && (
-          <span>
-            {' '}
-            ({up ? '+' : ''}
-            {pct}%)
-          </span>
-        )}
-        <span style={{ color: colors.textTertiary }}>
-          {' '}
-          from {isRate ? `${before}%` : before.toLocaleString()}
-        </span>
-      </div>
-    </div>
   );
 };

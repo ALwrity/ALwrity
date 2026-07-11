@@ -2,6 +2,7 @@ import React from 'react';
 
 import type { PostDelta } from '../../../../services/postAnalyticsApi';
 import { colors, rowBase } from '../GrowthEngine/styles';
+import { GrowthContributionBadge } from './GrowthContributionBadge';
 
 const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -16,12 +17,19 @@ const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) =
 export interface PostDeltaRowProps {
   post: PostDelta;
   gain: boolean;
+  showContribution?: boolean;
   onViewComments?: (post: PostDelta) => void;
 }
 
-export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({ post, gain, onViewComments }) => {
+export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
+  post,
+  gain,
+  showContribution = true,
+  onViewComments,
+}) => {
   const showViewComments = post.comments_delta > 0 && onViewComments;
-  const showContribution =
+  const showContributionBadge =
+    showContribution &&
     gain &&
     post.growth_contribution_pct != null &&
     post.growth_contribution_pct > 0;
@@ -54,26 +62,8 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({ post, gain, onViewCo
         >
           {post.text ? `${post.text.slice(0, 100)}…` : '(no text)'}
         </div>
-        {showContribution && (
-          <div
-            title="Share of total positive engagement growth (reactions + comments + impressions) across all your posts in this comparison."
-            style={{
-              flexShrink: 0,
-              textAlign: 'right',
-              padding: '4px 8px',
-              background: '#dcfce7',
-              border: '1px solid #86efac',
-              borderRadius: 8,
-              maxWidth: 120,
-            }}
-          >
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#15803d', lineHeight: 1.2 }}>
-              {post.growth_contribution_pct}% of growth
-            </div>
-            <div style={{ fontSize: 9, fontWeight: 600, color: '#166534', marginTop: 2, lineHeight: 1.2 }}>
-              Key growth driver
-            </div>
-          </div>
+        {showContributionBadge && (
+          <GrowthContributionBadge contributionPct={post.growth_contribution_pct!} />
         )}
       </div>
       <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
