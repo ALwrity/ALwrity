@@ -341,8 +341,23 @@ class EditService:
         try:
             logger.info(f"[EditService] Volume adjustment: user={user_id}, factor={volume_factor}")
             
-            if volume_factor < 0:
+            try:
+                validated_volume_factor = float(volume_factor)
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=400, detail="Volume factor must be a valid number")
+
+            if not math.isfinite(validated_volume_factor):
+                raise HTTPException(status_code=400, detail="Volume factor must be a finite number")
+
+            if validated_volume_factor < 0:
                 raise HTTPException(status_code=400, detail="Volume factor must be non-negative")
+
+            if validated_volume_factor > 5.0:
+                raise HTTPException(status_code=400, detail="Volume factor cannot exceed 5.0 to prevent distortion")
+
+            safe_volume_factor = f"{validated_volume_factor:.6f}".rstrip("0").rstrip(".")
+            if safe_volume_factor == "":
+                safe_volume_factor = "0"
             
             with tempfile.NamedTemporaryFile(suffix=".mp4", delete=False) as input_file:
                 input_file.write(video_data)
@@ -356,7 +371,7 @@ class EditService:
                 
                 cmd = [
                     "ffmpeg", "-i", input_path,
-                    "-af", f"volume={volume_factor}",
+                    "-af", f"volume={safe_volume_factor}",
                     "-c:v", "copy", "-c:a", "aac", "-y", output_path
                 ]
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -381,7 +396,7 @@ class EditService:
                         video_data=processed_video_bytes,
                         filename=filename,
                         asset_type="video_edit",
-                        metadata={"edit_type": "volume", "volume_factor": volume_factor},
+                        metadata={"edit_type": "volume", "volume_factor": validated_volume_factor},
                     )
                     
                     return {
@@ -390,7 +405,7 @@ class EditService:
                         "asset_id": asset_result.get("asset_id"),
                         "cost": 0.0,
                         "edit_type": "volume",
-                        "metadata": {"volume_factor": volume_factor},
+                        "metadata": {"volume_factor": validated_volume_factor},
                     }
                 finally:
                     db.close()
