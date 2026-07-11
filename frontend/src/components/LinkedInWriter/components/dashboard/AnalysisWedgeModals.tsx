@@ -8,7 +8,7 @@
  * F5  ViralCopywriterModal     — top viral patterns with "Write in This Style" CTA
  * F6  EngagementTrendsModal    — see EngagementTrendsModal.tsx
  */
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { DashboardActionModal } from './DashboardActionModal';
 import {
   linkedInGrowthApi,
@@ -28,8 +28,6 @@ import {
   barColor,
   CONFIDENCE_COLORS,
 } from '../GrowthEngine/styles';
-
-export { EngagementTrendsModal } from './EngagementTrendsModal';
 
 // ---------------------------------------------------------------------------
 // Shared helpers

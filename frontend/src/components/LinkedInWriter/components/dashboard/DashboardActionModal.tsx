@@ -6,7 +6,9 @@ interface DashboardActionModalProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  width?: number | string;
   maxWidth?: number | string;
+  height?: number | string;
   maxHeight?: string;
   zIndex?: number;
   disableClose?: boolean;
@@ -17,7 +19,9 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   title,
   onClose,
   children,
+  width,
   maxWidth = 720,
+  height,
   maxHeight = 'min(90vh, 640px)',
   zIndex = 11000,
   disableClose = false,
@@ -49,8 +53,9 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%',
+          width: width ?? '100%',
           maxWidth,
+          height,
           maxHeight,
           display: 'flex',
           flexDirection: 'column',
