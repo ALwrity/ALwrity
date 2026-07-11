@@ -84,6 +84,22 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
             overflow: 'visible',
           }}
         >
+          {onOptimiseProfile && (
+            <button
+              type="button"
+              className="linkedin-profile-optimise-btn"
+              onClick={onOptimiseProfile}
+              disabled={isOptimiseDisabled || isOptimiseLoading}
+              title={
+                isOptimiseLoading
+                  ? 'Optimising profile...'
+                  : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
+              }
+              aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
+            >
+              {isOptimiseLoading ? '…' : '✦'}
+            </button>
+          )}
           <div
             className="linkedin-profile-avatar-wrap linkedin-profile-connected"
             aria-label="LinkedIn connected profile"
@@ -152,53 +168,6 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
             </div>
           )}
           </div>
-
-          {onOptimiseProfile && (
-            <button
-              type="button"
-              className="linkedin-profile-optimise-btn"
-              onClick={onOptimiseProfile}
-              disabled={isOptimiseDisabled || isOptimiseLoading}
-              title={
-                isOptimiseLoading
-                  ? 'Optimising profile...'
-                  : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
-              }
-              aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
-              style={{
-                position: 'absolute',
-                right: -4,
-                bottom: 8,
-                width: 34,
-                height: 34,
-                borderRadius: '50%',
-                border: '2px solid rgba(255,255,255,0.95)',
-                background: 'rgba(14,165,233,0.98)',
-                color: '#fff',
-                fontSize: 17,
-                fontWeight: 800,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: isOptimiseDisabled || isOptimiseLoading ? 'default' : 'pointer',
-                opacity: isOptimiseDisabled ? 0.55 : 1,
-                boxShadow: '0 4px 16px rgba(2,132,199,0.45)',
-                zIndex: 35,
-                transition: 'transform 140ms ease, box-shadow 140ms ease',
-              }}
-              onMouseEnter={(e) => {
-                if (isOptimiseDisabled || isOptimiseLoading) return;
-                e.currentTarget.style.transform = 'translateY(-1px) scale(1.06)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(2,132,199,0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(2,132,199,0.45)';
-              }}
-            >
-              {isOptimiseLoading ? '…' : '✦'}
-            </button>
-          )}
         </div>
 
         {showDisconnect && (

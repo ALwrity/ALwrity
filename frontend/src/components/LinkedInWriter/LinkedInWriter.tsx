@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button, Snackbar, Alert, CircularProgress } from '@mui/material';
-import { Save as SaveIcon } from '@mui/icons-material';
-import { linkedInWriterApi } from '../../services/linkedInWriterApi';
+import { Save as SaveIcon, RateReview as RateReviewIcon } from '@mui/icons-material';
+import { QualityCheckModal } from './components/dashboard/PublishWedgeModals';
+import { linkedInWriterApi, saveLinkedInToAssetLibrary } from '../../services/linkedInWriterApi';
 import { CopilotSidebar } from '@copilotkit/react-ui';
 import '@copilotkit/react-ui/styles.css';
 import './styles/alwrity-copilot.css';
@@ -15,12 +16,7 @@ import {
   LoadingIndicator,
   WelcomeMessage,
   ProgressTracker,
-  GrowthEnginePanel,
-  PostAnalyticsPanel,
-  PeopleYouMayKnowTabPanel,
-  LinkedInWriterTabBar,
   type ProgressStep,
-  type LinkedInWriterTab,
 } from './components';
 import OutlineEditor from './components/OutlineEditor';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
@@ -28,7 +24,6 @@ import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
-import { saveLinkedInToAssetLibrary } from '../../services/linkedInWriterApi';
 import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
 // Optional debug flag: set to true to enable verbose logs locally
@@ -154,6 +149,9 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
+  // Quality Check state
+  const [qualityCheckOpen, setQualityCheckOpen] = useState(false);
+
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
   const locationState = location.state as {
@@ -191,20 +189,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Tab navigation ──
-  const [activeTab, setActiveTab] = useState<LinkedInWriterTab>('editor');
-
-  useEffect(() => {
-    const onSwitchTab = (event: Event) => {
-      const tab = (event as CustomEvent<{ tab?: LinkedInWriterTab }>).detail?.tab;
-      if (tab === 'editor' || tab === 'growth' || tab === 'pymk' || tab === 'analytics') {
-        setActiveTab(tab);
-      }
-    };
-    window.addEventListener('linkedinwriter:switchTab', onSwitchTab);
-    return () => window.removeEventListener('linkedinwriter:switchTab', onSwitchTab);
-  }, []);
-
   // ── Outline → Article handler ──
   const handleGenerateArticleFromOutline = useCallback(async () => {
     await generateArticle();
@@ -213,10 +197,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
 
   // ── Generate similar post handler ──
   const handleGenerateSimilarPost = useCallback((prompt: string) => {
-    // Switch to editor tab and set context
-    setActiveTab('editor');
     handleContextChange(prompt);
-    // Optionally trigger generation immediately or let user review
   }, [handleContextChange]);
 
   // ── Share a Link (Quick Post from URL) ──
@@ -532,25 +513,10 @@ Always use the most appropriate tool for the user's request.`.trim();
         generatePost={generatePost}
       />
 
-      <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
-          {/* Content Area */}
-        {activeTab === 'growth' ? (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <GrowthEnginePanel generatePost={generatePost} userPreferences={userPreferences} />
-          </div>
-        ) : activeTab === 'pymk' ? (
-          <PeopleYouMayKnowTabPanel />
-        ) : activeTab === 'analytics' ? (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <PostAnalyticsPanel
-              isActive={activeTab === 'analytics'}
-              onGenerateSimilarPost={handleGenerateSimilarPost}
-            />
-          </div>
-        ) : draft || isGenerating ? (<>
+        {draft || isGenerating ? (<>
           {draft && !isGenerating && (
             <div style={{ 
               padding: '8px 24px', 
@@ -592,6 +558,18 @@ Always use the most appropriate tool for the user's request.`.trim();
                 {saveStatus === 'saving' ? 'Saving...' : 
                  saveStatus === 'saved' ? 'Saved ✓' : 
                  'Save to Asset Library'}
+              </Button>
+
+              <Button
+                type='button'
+                variant="outlined"
+                color="secondary"
+                startIcon={<RateReviewIcon />}
+                onClick={() => setQualityCheckOpen(true)}
+                disabled={!draft}
+                sx={{ textTransform: 'none', fontSize: 13, fontWeight: 600 }}
+              >
+                Quality Check
               </Button>
 
               <div style={{ flex: 1 }} />
@@ -643,6 +621,7 @@ Always use the most appropriate tool for the user's request.`.trim();
             onGenerateOutline={generateOutline}
             outlineMode={outlineMode}
             userPreferences={userPreferences}
+            onGenerateSimilarPost={handleGenerateSimilarPost}
           />)
         )}
       </div>
@@ -664,6 +643,14 @@ Always use the most appropriate tool for the user's request.`.trim();
             : `Failed to save: ${saveErrorMessage || 'Please try again.'}`}
         </Alert>
       </Snackbar>
+
+      {/* Quality Check Modal */}
+      <QualityCheckModal
+        open={qualityCheckOpen}
+        onClose={() => setQualityCheckOpen(false)}
+        initialContent={draft}
+        contextHint={context || undefined}
+      />
 
       {/* ── Share a Link Modal ── */}
       {showShareLinkModal && (

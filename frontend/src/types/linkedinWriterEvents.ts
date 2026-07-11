@@ -9,6 +9,7 @@ declare global {
     'linkedinwriter:runBrainstormIdeas': CustomEvent<{
       prompt?: string;
       seed?: string;
+      type?: string;
       forceRefresh?: boolean;
     }>;
     'linkedinwriter:updateDraft': CustomEvent<string>;
@@ -32,6 +33,15 @@ declare global {
     }>;
     'linkedinwriter:showTodaysTasks': CustomEvent;
     'linkedinwriter:updateLinkedInPreferences': CustomEvent;
+    'linkedinwriter:openQuickCreate': CustomEvent<{
+      type?: string;
+      topic?: string;
+      key_points?: string;
+      target_audience?: string;
+      industry?: string;
+      post_type?: string;
+    }>;
+    'linkedinwriter:cancelBrainstorm': CustomEvent;
   }
 
   interface Window {

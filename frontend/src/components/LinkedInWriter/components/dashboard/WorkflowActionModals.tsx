@@ -7,12 +7,17 @@ import DataSourceSelector from '../Brainstorm/DataSourceSelector';
 import { usePlatformPersonaContext } from '../../../shared/PersonaContext/PlatformPersonaProvider';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import {
+  openGrowthEngineModal,
+  openPostAnalyticsModal,
+} from '../../utils/linkedInDashboardEvents';
+import {
   GrowthSnapshotModal,
   PostTodayModal,
   BrandScorecardModal,
   WeeklyPlanModal,
   ViralCopywriterModal,
-} from './AnalysisWedgeModals';
+  EngagementTrendsModal,
+} from './analysisWedgeModalExports';
 import {
   EngagementBoosterModal,
   CommentAssistantModal,
@@ -29,16 +34,15 @@ import {
 } from './RemarkWedgeModals';
 import {
   DraftLibraryModal,
-  QualityCheckModal,
-  TimingAdvisorModal,
-  ScheduleQuickModal,
   PublishNowModal,
 } from './PublishWedgeModals';
+import { PeopleYouMayKnowModal } from '../PeopleYouMayKnow/PeopleYouMayKnowModal';
 
-type AnalysisSub = 'snapshot' | 'post_today' | 'brand_score' | 'weekly_plan' | 'viral' | null;
-type EngagementSub = 'booster' | 'comment' | 'opportunities' | 'pulse' | 'network' | null;
+type PlanSub = 'weekly_plan' | null;
+type AnalysisSub = 'snapshot' | 'brand_score' | 'viral' | 'trends' | null;
+type EngagementSub = 'booster' | 'comment' | 'opportunities' | 'pulse' | 'network' | 'pymk' | null;
 type RemarkSub = 'repurpose' | 'transformer' | 'refresh' | 'reviver' | 'perf_plan' | null;
-type PublishSub = 'drafts' | 'quality' | 'timing' | 'schedule' | 'publish_now' | null;
+type PublishSub = 'drafts' | 'post_today' | 'publish_now' | null;
 
 export type WorkflowModalId = 'plan' | 'create' | 'publish' | 'analysis' | 'engagement' | 'remarket';
 
@@ -59,11 +63,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   onClose,
 }) => {
   const navigate = useNavigate();
+  const [planSub, setPlanSub]             = useState<PlanSub>(null);
   const [analysisSub, setAnalysisSub]     = useState<AnalysisSub>(null);
   const [engagementSub, setEngagementSub] = useState<EngagementSub>(null);
   const [remarkSub, setRemarkSub]         = useState<RemarkSub>(null);
-  const [publishSub, setPublishSub]       = useState<PublishSub>(null);
-  const [timingPrefill, setTimingPrefill] = useState<{ date: string; time: string } | null>(null);
+  const [publishSub, setPublishSub] = useState<PublishSub>(null);
 
   const [brainstormSeed, setBrainstormSeed] = useState('');
   const [usePersona, setUsePersona] = useState(false);
@@ -108,9 +112,9 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const openQuickCreate     = (type: string) => { onClose(); dispatch('linkedinwriter:openQuickCreate', { type }); };
   const openCalendar        = () => { onClose(); navigate('/content-planning', { state: { activeTab: 1 } }); };
   const openProfileAnalytics = () => { onClose(); dispatch('linkedinwriter:openOptimiseProfile'); };
-  const openContentAnalytics = () => { onClose(); dispatch('linkedinwriter:switchTab', { tab: 'analytics' }); };
+  const openContentAnalytics = () => { onClose(); openPostAnalyticsModal(); };
   const openSeoAnalytics    = () => { onClose(); navigate('/seo-dashboard'); };
-  const openGrowthEngine    = () => { onClose(); dispatch('linkedinwriter:switchTab', { tab: 'growth' }); };
+  const openGrowthEngine    = () => { onClose(); openGrowthEngineModal(); };
 
   return (
     <>
@@ -244,8 +248,83 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
               <span style={{ color: '#0ea5e9', fontSize: 16, fontWeight: 600 }}>→</span>
             </div>
           </div>
+
+          {/* Weekly Plan Card */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 12,
+            background: '#fff',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            marginTop: 10,
+          }}>
+            <div style={{
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              cursor: 'pointer',
+            }}
+              onClick={() => { onClose(); setPlanSub('weekly_plan'); }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
+            >
+              <div style={{
+                width: 30, height: 30,
+                borderRadius: 7,
+                background: 'rgba(5,150,105,0.1)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 15, flexShrink: 0,
+              }}>
+                📅
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#1f2937', fontSize: 14 }}>Weekly Plan</div>
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>Mon–Fri AI content plan with Create Now + Schedule CTAs</div>
+              </div>
+              <span style={{ color: '#059669', fontSize: 16, fontWeight: 600 }}>→</span>
+            </div>
+          </div>
+
+          {/* Content Calendar Card (WIP) */}
+          <div style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 12,
+            background: '#f9fafb',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            marginTop: 10,
+            opacity: 0.6,
+          }}>
+            <div style={{
+              padding: '10px 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              cursor: 'default',
+            }}>
+              <div style={{
+                width: 30, height: 30,
+                borderRadius: 7,
+                background: 'rgba(156,163,175,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 15, flexShrink: 0,
+              }}>
+                🗓️
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, color: '#9ca3af', fontSize: 14 }}>
+                  Content Calendar <span style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', background: '#e5e7eb', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>WIP</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>Full calendar view of all scheduled content</div>
+              </div>
+            </div>
+          </div>
         </div>
       </DashboardActionModal>
+
+      {/* ── Plan sub-modals ── */}
+      <WeeklyPlanModal open={planSub === 'weekly_plan'} onClose={() => setPlanSub(null)} />
 
       {/* ── Create ── */}
       <DashboardActionModal open={activeModal === 'create'} title="Quick Create" onClose={onClose} maxWidth={820}>
@@ -272,25 +351,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             onClick={() => { onClose(); setPublishSub('drafts'); }}
           />
           <DashboardToolTile
-            title="Quality Check"
-            description="Score your post across 6 dimensions before publishing"
-            icon="📊"
-            accent="#8b5cf6"
-            onClick={() => { onClose(); setPublishSub('quality'); }}
-          />
-          <DashboardToolTile
-            title="Best Time to Post"
-            description="Industry-keyed optimal LinkedIn posting windows"
-            icon="⏰"
-            accent="#0ea5e9"
-            onClick={() => { onClose(); setPublishSub('timing'); }}
-          />
-          <DashboardToolTile
-            title="Schedule Post"
-            description="Add to your content calendar without leaving the studio"
-            icon="📅"
-            accent="#10b981"
-            onClick={() => { onClose(); setPublishSub('schedule'); }}
+            title="Post Today"
+            description="AI ranks your top 3 post opportunities right now"
+            icon="🎯"
+            accent="#0a66c2"
+            onClick={() => { onClose(); setPublishSub('post_today'); }}
           />
           <DashboardToolTile
             title="Publish to LinkedIn"
@@ -299,43 +364,21 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             accent="#dc2626"
             onClick={() => { onClose(); setPublishSub('publish_now'); }}
           />
-          <DashboardToolTile
-            title="Content Calendar"
-            description="Full calendar view of all scheduled content"
-            icon="🗓️"
-            accent="#f59e0b"
-            onClick={openCalendar}
-          />
         </div>
       </DashboardActionModal>
 
       {/* ── Publish sub-modals ── */}
       <DraftLibraryModal open={publishSub === 'drafts'} onClose={() => setPublishSub(null)} />
-      <QualityCheckModal open={publishSub === 'quality'} onClose={() => setPublishSub(null)} />
-      <TimingAdvisorModal
-        open={publishSub === 'timing'}
-        onClose={() => setPublishSub(null)}
-        onScheduleSlot={(date: string, time: string) => {
-          setTimingPrefill({ date, time });
-          setPublishSub('schedule');
-        }}
-      />
-      <ScheduleQuickModal
-        open={publishSub === 'schedule'}
-        onClose={() => { setPublishSub(null); setTimingPrefill(null); }}
-        prefillDate={timingPrefill?.date}
-        prefillTime={timingPrefill?.time}
-      />
+      <PostTodayModal open={publishSub === 'post_today'} onClose={() => setPublishSub(null)} />
       <PublishNowModal open={publishSub === 'publish_now'} onClose={() => setPublishSub(null)} />
 
       {/* ── Analysis ── */}
-      <DashboardActionModal open={activeModal === 'analysis'} title="Analysis" onClose={onClose} maxWidth={680}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+      <DashboardActionModal open={activeModal === 'analysis'} title="Analysis" onClose={onClose} maxWidth={720}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
           <DashboardToolTile title="Growth Snapshot" description="Instant view: top trending topic, biggest content gap, brand score" icon="⚡" accent="#f59e0b" onClick={() => { onClose(); setAnalysisSub('snapshot'); }} />
-          <DashboardToolTile title="Post Today"      description="AI ranks your top 3 post opportunities right now"                   icon="🎯" accent="#0a66c2" onClick={() => { onClose(); setAnalysisSub('post_today'); }} />
           <DashboardToolTile title="Brand Score"     description="Full personal brand breakdown across 5 dimensions"                  icon="🏆" accent="#8b5cf6" onClick={() => { onClose(); setAnalysisSub('brand_score'); }} />
-          <DashboardToolTile title="Weekly Plan"     description="Mon–Fri AI content plan with Create Now + Schedule CTAs"            icon="📅" accent="#059669" onClick={() => { onClose(); setAnalysisSub('weekly_plan'); }} />
-          <DashboardToolTile title="Viral Patterns"  description="Top viral formats in your niche — write in any style"              icon="🔥" accent="#dc2626" onClick={() => { onClose(); setAnalysisSub('viral'); }} />
+          <DashboardToolTile title="Viral Patterns"     description="Top viral formats in your niche — write in any style"               icon="🔥" accent="#dc2626" onClick={() => { onClose(); setAnalysisSub('viral'); }} />
+          <DashboardToolTile title="Engagement Trends" description="See how your posts perform over time — track growth, spot declines" icon="📈" accent="#16a34a" onClick={() => { onClose(); setAnalysisSub('trends'); }} />
           <DashboardToolTile title="Profile Analytics"  description="Profile strength, gaps, and optimisation"                       icon="👤" accent="#6366f1" onClick={openProfileAnalytics} />
           <DashboardToolTile title="Content Analytics"  description="Post performance, engagement trends, and growth engine"          icon="📊" accent="#0ea5e9" onClick={openContentAnalytics} />
           <DashboardToolTile title="SEO Analytics"      description="See how your LinkedIn content ranks in search"                   icon="🔎" accent="#475569" onClick={openSeoAnalytics} />
@@ -343,10 +386,9 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       </DashboardActionModal>
 
       <GrowthSnapshotModal  open={analysisSub === 'snapshot'}    onClose={() => setAnalysisSub(null)} />
-      <PostTodayModal       open={analysisSub === 'post_today'}  onClose={() => setAnalysisSub(null)} />
       <BrandScorecardModal  open={analysisSub === 'brand_score'} onClose={() => setAnalysisSub(null)} />
-      <WeeklyPlanModal      open={analysisSub === 'weekly_plan'} onClose={() => setAnalysisSub(null)} />
-      <ViralCopywriterModal open={analysisSub === 'viral'}       onClose={() => setAnalysisSub(null)} />
+      <ViralCopywriterModal  open={analysisSub === 'viral'}       onClose={() => setAnalysisSub(null)} />
+      <EngagementTrendsModal open={analysisSub === 'trends'}      onClose={() => setAnalysisSub(null)} connected={connected} />
 
       {/* ── Engagement ── */}
       <DashboardActionModal open={activeModal === 'engagement'} title="Engagement" onClose={onClose} maxWidth={680}>
@@ -374,9 +416,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           />
           <DashboardToolTile
             title="Post Pulse"
-            description="Real engagement metrics — repurpose winners, boost underperformers"
+            description={connected ? "Real engagement metrics — repurpose winners, boost underperformers" : "Connect LinkedIn to view your post engagement metrics"}
             icon="📊"
             accent="#8b5cf6"
+            disabled={!connected}
+            disabledReason="Connect your LinkedIn account to view post engagement metrics"
             onClick={() => { onClose(); setEngagementSub('pulse'); }}
           />
           <DashboardToolTile
@@ -385,6 +429,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             icon="🤝"
             accent="#dc2626"
             onClick={() => { onClose(); setEngagementSub('network'); }}
+          />
+          <DashboardToolTile
+            title="People You May Know"
+            description="Live LinkedIn network suggestions — discover connections in your industry"
+            icon="👥"
+            accent="#10b981"
+            onClick={() => { onClose(); setEngagementSub('pymk'); }}
           />
           <DashboardToolTile
             title="Growth Engine"
@@ -396,11 +447,12 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         </div>
       </DashboardActionModal>
 
-      <EngagementBoosterModal open={engagementSub === 'booster'}       onClose={() => setEngagementSub(null)} />
+      <EngagementBoosterModal open={engagementSub === 'booster'}       onClose={() => setEngagementSub(null)} connected={connected} />
       <CommentAssistantModal  open={engagementSub === 'comment'}       onClose={() => setEngagementSub(null)} />
-      <OpportunitiesModal     open={engagementSub === 'opportunities'} onClose={() => setEngagementSub(null)} />
-      <PostPulseModal         open={engagementSub === 'pulse'}         onClose={() => setEngagementSub(null)} />
-      <NetworkAdvisorModal    open={engagementSub === 'network'}       onClose={() => setEngagementSub(null)} />
+      <OpportunitiesModal     open={engagementSub === 'opportunities'} onClose={() => setEngagementSub(null)} connected={connected} />
+      <PostPulseModal         open={engagementSub === 'pulse'}         onClose={() => setEngagementSub(null)} connected={connected} />
+      <NetworkAdvisorModal    open={engagementSub === 'network'}       onClose={() => setEngagementSub(null)} connected={connected} />
+      <PeopleYouMayKnowModal open={engagementSub === 'pymk'} onClose={() => setEngagementSub(null)} />
 
       {/* ── Remarket ── */}
       <DashboardActionModal open={activeModal === 'remarket'} title="Remarket" onClose={onClose} maxWidth={680}>

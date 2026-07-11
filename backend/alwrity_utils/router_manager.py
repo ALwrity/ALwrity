@@ -36,6 +36,8 @@ CORE_ROUTER_REGISTRY = [
     {"name": "linkedin_growth", "module": "api.linkedin_growth_routes", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "linkedin_posts", "module": "api.linkedin_posts_routes", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "linkedin_pymk", "module": "api.linkedin_pymk_routes", "attr": "router", "features": {"all", "core", "linkedin"}},
+    {"name": "linkedin_post_analytics", "module": "api.linkedin_post_analytics_routes", "attr": "router", "features": {"all", "core", "linkedin"}},
+    {"name": "linkedin_post_comments", "module": "api.linkedin_post_comments_routes", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "brainstorm", "module": "api.brainstorm", "attr": "router", "features": {"all", "core", "linkedin"}},
     {"name": "hallucination_detector", "module": "api.hallucination_detector", "attr": "router", "features": {"all", "core"}},
     {"name": "writing_assistant", "module": "api.writing_assistant", "attr": "router", "features": {"all", "core", "blog_writer"}},

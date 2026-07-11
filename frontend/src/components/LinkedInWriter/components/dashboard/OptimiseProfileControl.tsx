@@ -5,8 +5,8 @@ import StarIcon from '@mui/icons-material/Star';
 import CircularProgress from '@mui/material/CircularProgress';
 import { getProfileStrengthSegmentFillCount } from '../../utils/profileStrengthUtils';
 
-/** Larger button size for better visibility in the header nav */
-export const PROFILE_ACTION_BTN_HEIGHT = 64;
+/** Header nav optimise button — sized to fit fixed 72px bar via CSS alignment */
+export const PROFILE_ACTION_BTN_HEIGHT = 55;
 
 const SEGMENT_COLORS = [
   '#4338ca', // indigo-700
@@ -40,26 +40,26 @@ function ProfileStrengthTicker({ percent, strengthLabel, strengthTooltip }: Prof
           ? `${clamped}% profile strength. ${strengthTooltip}`
           : `${clamped}% profile strength${strengthLabel ? `. ${strengthLabel}` : ''}`
       }
-      style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}
+      style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
       title={strengthTooltip}
     >
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <span style={{ fontSize: 13, fontWeight: 800, color: '#0f172a' }}>{clamped}%</span>
+        <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{clamped}%</span>
         {strengthLabel && (
-          <span style={{ fontSize: 10, fontWeight: 500, color: '#64748b', lineHeight: 1.2 }}>
+          <span style={{ fontSize: 9, fontWeight: 500, color: '#64748b', lineHeight: 1.2 }}>
             {strengthLabel}
           </span>
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         {SEGMENT_COLORS.slice(0, segments).map((color, i) => {
           const isFilled = i < filledCount;
           return (
             <div
               key={i}
               style={{
-                width: 26,
-                height: 10,
+                width: 20,
+                height: 8,
                 borderRadius: 3,
                 background: isFilled ? color : '#e5e7eb',
                 border: isFilled ? '1px solid rgba(0,0,0,0.1)' : '1px solid #d1d5d6',
@@ -185,42 +185,15 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
   const btnSize = PROFILE_ACTION_BTN_HEIGHT;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-      }}
-    >
+    <div className="linkedin-optimise-profile-control">
       <button
         type="button"
+        className="linkedin-optimise-profile-btn"
         onClick={onOptimiseProfile}
         disabled={disabled}
         aria-label={label}
         title={strengthTooltip || label}
-        style={{
-          width: btnSize,
-          height: btnSize,
-          flexShrink: 0,
-          borderRadius: '50%',
-          border: '2px solid #0a66c2',
-          background: '#ffffff',
-          color: '#0f172a',
-          fontSize: 11,
-          fontWeight: 700,
-          lineHeight: 1.2,
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          opacity: disabled ? 0.65 : 1,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          textAlign: 'center',
-          padding: 8,
-          boxShadow: '0 3px 10px rgba(10, 102, 194, 0.18)',
-        }}
+        style={{ width: btnSize, height: btnSize }}
       >
         {isLoading ? (
           <CircularProgress size={20} thickness={4} sx={{ color: '#0a66c2' }} />

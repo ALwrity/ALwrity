@@ -438,6 +438,7 @@ export const saveLinkedInToAssetLibrary = async (
     asset_metadata: {
       platform: 'linkedin',
       content_type: 'linkedin_post',
+      content: params.content,
       word_count: params.content ? params.content.split(/\s+/).length : 0,
       ...(params.assetMetadata || {}),
     },
@@ -471,5 +472,37 @@ export const generateFromUrl = async (
   params: GenerateFromUrlRequest
 ): Promise<GenerateFromUrlResponse> => {
   const response = await aiApiClient.post('/api/linkedin/generate-from-url', params);
+  return response.data;
+};
+
+// ── Generate Key Points ─────────────────────────────────────────────────
+
+export interface KeyPointSet {
+  id: number;
+  title: string;
+  points: string[];
+  reason_to_choose: string;
+}
+
+export interface GenerateKeyPointsRequest {
+  topic: string;
+  industry?: string;
+  tone?: string;
+  target_audience?: string;
+  brainstorm_context?: string;
+}
+
+export interface GenerateKeyPointsResponse {
+  success: boolean;
+  data?: {
+    key_point_sets: KeyPointSet[];
+  };
+  error?: string;
+}
+
+export const generateKeyPoints = async (
+  params: GenerateKeyPointsRequest
+): Promise<GenerateKeyPointsResponse> => {
+  const response = await aiApiClient.post('/api/linkedin/generate-key-points', params);
   return response.data;
 };

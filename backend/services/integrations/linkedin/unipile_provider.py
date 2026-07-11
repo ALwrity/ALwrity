@@ -33,6 +33,9 @@ from services.integrations.linkedin.unipile_client import (
     avatar_url_from_user_profile,
     profile_identifier_from_owner,
 )
+from services.integrations.linkedin.unipile_post_comments_client import (
+    UnipilePostCommentsClient,
+)
 from services.integrations.linkedin.zernio_client import avatar_url_from_item
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 
@@ -689,16 +692,41 @@ class UnipileProvider:
     async def list_comments(
         self, user_id: str, account_id: str, post_urn: str
     ) -> list[CommentInfo]:
-        """
-        List comments on a LinkedIn post.
+        """List comments on a LinkedIn post via Unipile (post_urn = social_id)."""
+        client = UnipilePostCommentsClient()
+        data = await client.list_post_comments(account_id, post_urn)
+        items = data.get("items") if isinstance(data, dict) else []
+        if not isinstance(items, list):
+            return []
 
-        Phase 1: Not implemented. Raises NotImplementedError.
-        Phase 4: Will implement comment listing.
-        """
-        logger.warning(
-            f"[UnipileProvider] list_comments called but not implemented (Phase 1)"
-        )
-        raise NotImplementedError(_COMMENTS_NOT_IMPLEMENTED)
+        comments: list[CommentInfo] = []
+        for raw in items:
+            if not isinstance(raw, dict):
+                continue
+            comment_id = raw.get("id") or raw.get("provider_id")
+            if not comment_id:
+                continue
+            author = raw.get("author")
+            author_name: Optional[str] = None
+            if isinstance(author, str):
+                author_name = author
+            elif isinstance(author, dict):
+                author_name = (
+                    author.get("public_identifier")
+                    or author.get("provider_id")
+                )
+            comments.append(
+                CommentInfo(
+                    comment_id=str(comment_id),
+                    text=raw.get("text"),
+                    author=author_name,
+                    created_at=raw.get("date") or (
+                        str(raw.get("created_at")) if raw.get("created_at") is not None else None
+                    ),
+                    raw=raw,
+                )
+            )
+        return comments
 
     async def reply_to_comment(
         self,
@@ -708,16 +736,27 @@ class UnipileProvider:
         comment_id: str,
         text: str,
     ) -> ReplyResult:
-        """
-        Reply to a LinkedIn comment.
-
-        Phase 1: Not implemented. Raises NotImplementedError.
-        Phase 4: Will implement comment replies.
-        """
-        logger.warning(
-            f"[UnipileProvider] reply_to_comment called but not implemented (Phase 1)"
-        )
-        raise NotImplementedError(_COMMENTS_NOT_IMPLEMENTED)
+        """Reply to a LinkedIn comment via Unipile (post_urn = social_id)."""
+        client = UnipilePostCommentsClient()
+        try:
+            data = await client.send_post_comment(
+                account_id,
+                post_urn,
+                text,
+                comment_id=comment_id,
+            )
+            new_id = data.get("comment_id") if isinstance(data, dict) else None
+            return ReplyResult(
+                success=True,
+                comment_id=str(new_id) if new_id else None,
+                raw=data if isinstance(data, dict) else {},
+            )
+        except UnipileAPIError as exc:
+            return ReplyResult(
+                success=False,
+                error=str(exc),
+                raw={"status_code": exc.status_code, "error_type": exc.error_type},
+            )
 
     # Phase 1 helper methods for connection management
 

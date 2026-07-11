@@ -12,6 +12,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 PROFILE_INTELLIGENCE_SCHEMA_VERSION = 1
 DEFAULT_PROFILE_INTELLIGENCE_MODEL = "gemini-2.5-flash"
+PROFILE_INTELLIGENCE_LLM_MAX_TOKENS = 4096
+PROFILE_INTELLIGENCE_LLM_TEMPERATURE = 0.2
 UNKNOWN_SENTINEL = "Unknown"
 
 
@@ -69,6 +71,6 @@ def ai_profile_intelligence_json_schema() -> dict[str, Any]:
     Return JSON schema for Gemini structured output (LLM fields only).
 
     Returns:
-        JSON schema dict suitable for ``gemini_structured_json_response``
+        JSON schema dict suitable for ``llm_text_gen`` structured output
     """
     return AIProfileIntelligencePayload.model_json_schema()

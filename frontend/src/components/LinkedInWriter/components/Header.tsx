@@ -26,8 +26,7 @@ import { useLinkedInSearch } from '../hooks/useLinkedInSearch';
 import { LinkedInSearchBar } from './search/LinkedInSearchBar';
 import { LinkedInSearchModal } from './search/LinkedInSearchModal';
 
-const NAV_BG = '#BCE0FD';
-const NAV_TITLE_COLOR = '#0a66c2';
+const NAV_TITLE_CLASS = 'linkedin-writer-header-title';
 
 interface HeaderProps {
   userPreferences: LinkedInPreferences;
@@ -225,17 +224,10 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <div
       className="linkedin-writer-header"
-      style={{
-        background: NAV_BG,
-        color: '#1a1a2e',
-        padding: '12px 24px',
-        borderBottom: '1px solid rgba(10, 102, 194, 0.12)',
-        boxShadow: '0 1px 4px rgba(0, 0, 0, 0.04)',
-      }}
     >
-      <div className="linkedin-writer-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-        {/* Left — logo (home) + product title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+      <div className="linkedin-writer-header-row">
+        {/* Left — logo (home) + product title + search */}
+        <div className="linkedin-writer-header-left">
           <button
             type="button"
             onClick={handleLogoClick}
@@ -261,29 +253,7 @@ export const Header: React.FC<HeaderProps> = ({
             />
           </button>
           <div style={{ minWidth: 0 }}>
-            <h1
-              style={{
-                margin: 0,
-                fontSize: '22px',
-                fontWeight: 700,
-                letterSpacing: '-0.3px',
-                color: NAV_TITLE_COLOR,
-                lineHeight: 1.2,
-              }}
-            >
-              LinkedIn Studio
-            </h1>
-            <p
-              style={{
-                margin: 0,
-                fontSize: '13px',
-                fontStyle: 'italic',
-                color: '#1a1a2e',
-                lineHeight: 1.3,
-              }}
-            >
-              ALwrity
-            </p>
+            <h1 className={NAV_TITLE_CLASS}>LinkedIn Studio</h1>
           </div>
           <LinkedInSearchBar
             value={linkedInSearch.query}
@@ -294,8 +264,8 @@ export const Header: React.FC<HeaderProps> = ({
           />
         </div>
 
-        {/* Center — tools & content settings */}
-        <div className="linkedin-writer-header-center" style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, justifyContent: 'center' }}>
+        {/* Center — profile tools & content settings */}
+        <div className="linkedin-writer-header-center">
           <OptimiseProfileControl
             onOptimiseProfile={handleOpenOptimiseProfile}
             profileStrengthPercent={connected ? profileStrengthPercent : null}
@@ -307,32 +277,19 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <div
             ref={personaDropdownRef}
-            style={{
-              position: 'relative',
-            }}
+            className="linkedin-writer-header-persona"
           >
             <button
               ref={personaButtonRef}
               type="button"
+              className="linkedin-writer-header-pill-btn"
               title="Set tone, industry, audience, and writing persona"
               aria-expanded={showPreferencesModal}
               aria-haspopup="dialog"
               onClick={togglePreferencesPanel}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 16px',
-                background: '#ffffff',
-                borderRadius: 24,
-                border: '1px solid rgba(10, 102, 194, 0.35)',
-                transition: 'all 0.2s ease',
-                boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-                cursor: 'pointer',
-              }}
             >
-              <span style={{ fontSize: 14, color: NAV_TITLE_COLOR, opacity: 0.9 }} aria-hidden>⚙️</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: NAV_TITLE_COLOR }}>
+              <span className="linkedin-writer-header-pill-icon" aria-hidden>⚙️</span>
+              <span className="linkedin-writer-header-pill-label">
                 Content Persona
               </span>
             </button>
@@ -649,26 +606,13 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="linkedin-writer-header-controls" style={{ display: 'flex', gap: 12, alignItems: 'center', flexShrink: 0 }}>
+        <div className="linkedin-writer-header-controls">
           <button
             type="button"
+            className="linkedin-writer-header-pill-btn"
             onClick={() => navigate('/asset-library?source_module=linkedin_writer')}
             title="Saved posts and drafts"
             aria-label="Open Asset Library"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 14px',
-              background: '#ffffff',
-              borderRadius: 24,
-              border: '1px solid rgba(10, 102, 194, 0.35)',
-              cursor: 'pointer',
-              fontWeight: 600,
-              fontSize: 13,
-              color: '#0a66c2',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-            }}
           >
             📚 Library
           </button>

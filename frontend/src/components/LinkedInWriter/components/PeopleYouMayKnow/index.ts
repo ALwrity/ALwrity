@@ -1,4 +1,4 @@
 export { PeopleYouMayKnowPanel } from './PeopleYouMayKnowPanel';
-export { PeopleYouMayKnowTabPanel } from './PeopleYouMayKnowTabPanel';
+export { PeopleYouMayKnowModal } from './PeopleYouMayKnowModal';
 export { PymkPersonCard } from './PymkPersonCard';
 export { PymkCohortFilter } from './PymkCohortFilter';

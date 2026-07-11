@@ -7,7 +7,7 @@
  * F3  ScheduleQuickModal     — calendar quick-add
  * F5  PublishNowModal        — direct LinkedIn publish with pre-flight
  */
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardActionModal } from './DashboardActionModal';
 import { PreviewScoreCard } from '../GrowthEngine/PreviewScoreCard';
@@ -102,6 +102,11 @@ interface ContentAsset {
   description: string;
   created_at: string;
   source_module?: string;
+  asset_metadata?: {
+    content?: string;
+    word_count?: number;
+    [key: string]: unknown;
+  };
 }
 
 interface DraftLibraryModalProps {
@@ -114,11 +119,17 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({ open, onCl
   const [drafts, setDrafts] = useState<ContentAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [qualityCheckAsset, setQualityCheckAsset] = useState<ContentAsset | null>(null);
+  const [showTiming, setShowTiming] = useState(false);
+  const [scheduleAsset, setScheduleAsset] = useState<ContentAsset | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     setError('');
+    setQualityCheckAsset(null);
+    setShowTiming(false);
+    setScheduleAsset(null);
     apiClient
       .get('/api/content-assets/', {
         params: { source_module: 'linkedin_writer', limit: 5, sort_by: 'created_at', sort_order: 'desc' },
@@ -131,8 +142,11 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({ open, onCl
       .finally(() => setLoading(false));
   }, [open]);
 
+  const getAssetContent = (asset: ContentAsset): string =>
+    asset.asset_metadata?.content || asset.description || '';
+
   const handleOpenInStudio = (asset: ContentAsset) => {
-    openInStudio(asset.description, onClose);
+    openInStudio(getAssetContent(asset), onClose);
   };
 
   const handleViewAll = () => {
@@ -140,66 +154,178 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({ open, onCl
     navigate('/asset-library?source_module=linkedin_writer');
   };
 
+  const handleCloseQualityCheck = () => {
+    setQualityCheckAsset(null);
+  };
+
   return (
-    <DashboardActionModal open={open} title="My Drafts" onClose={onClose} maxWidth={560}>
+    <DashboardActionModal open={open} title="My Drafts" onClose={onClose} maxWidth="80vw">
       <div>
-        <p style={{ margin: '0 0 14px', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
-          Your last 5 saved LinkedIn drafts. Open any draft directly in the Studio editor.
-        </p>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          marginBottom: 18, paddingBottom: 14,
+          borderBottom: '1px solid #e5e7eb',
+        }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8,
+            background: 'linear-gradient(135deg, #0a66c2, #004182)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, flexShrink: 0,
+          }}>📁</div>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#1f2937' }}>
+              Saved Drafts
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>
+              Your last 5 LinkedIn drafts — open, score, schedule, or check timing
+            </div>
+          </div>
+        </div>
 
         {loading && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '20px 0', color: '#64748b', fontSize: 13 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '32px 0', color: '#64748b', fontSize: 13 }}>
             <Spinner /> Loading drafts…
           </div>
         )}
 
         {error && (
-          <div style={{ padding: '10px 14px', background: '#fef2f2', borderRadius: 8, color: '#dc2626', fontSize: 13, marginBottom: 12 }}>
+          <div style={{ padding: '12px 16px', background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca', color: '#dc2626', fontSize: 13, marginBottom: 12 }}>
             {error}
           </div>
         )}
 
         {!loading && !error && drafts.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '24px 0', color: '#94a3b8', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: '#94a3b8', fontSize: 13 }}>
             No saved drafts yet. Generate content in the Create wedge to get started.
           </div>
         )}
 
-        {drafts.map((asset) => (
-          <div key={asset.id} style={{ ...cardBox, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 13, color: '#111827', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {asset.title || 'Untitled Draft'}
-                </div>
-                <div style={{ fontSize: 11, color: '#9ca3af' }}>
-                  {asset.created_at
-                    ? new Date(asset.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                    : ''}
-                  {asset.description ? ` · ${asset.description.length} chars` : ''}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {drafts.map((asset) => (
+            <div
+              key={asset.id}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#cbd5e1'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.06)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.boxShadow = 'none'; }}
+              style={{
+                background: '#ffffff',
+                borderRadius: 12,
+                border: '1.5px solid #e2e8f0',
+                padding: '14px 16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 10,
+                transition: 'border-color 0.15s, box-shadow 0.15s',
+                position: 'relative',
+                overflow: 'hidden',
+              }}
+            >
+              {/* Left accent bar */}
+              <div style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0, width: 3,
+                background: 'linear-gradient(180deg, #0a66c2, #8b5cf6)',
+                borderRadius: '3px 0 0 3px',
+              }} />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#111827', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {asset.title || 'Untitled Draft'}
+                  </div>
+                  <div style={{ fontSize: 11, color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {asset.created_at
+                      ? new Date(asset.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                      : ''}
+                    {asset.description && (
+                      <>
+                        <span style={{ color: '#d1d5db' }}>·</span>
+                        <span>{asset.description.split(/\s+/).length} words</span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
+              {(() => {
+                const content = getAssetContent(asset);
+                const isShort = content.length < 60 && content === asset.title;
+                return (
+                  <div style={{
+                    fontSize: 12.5, color: '#6b7280', lineHeight: 1.6,
+                    background: '#f8fafc', borderRadius: 8, padding: '10px 12px',
+                    border: '1px solid #f1f5f9',
+                  }}>
+                    {isShort
+                      ? <span style={{ fontStyle: 'italic', color: '#9ca3af' }}>Full content not available. Open in Studio to view.</span>
+                      : `"${content.slice(0, 150)}${content.length > 150 ? '…' : ''}"`
+                    }
+                  </div>
+                );
+              })()}
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <button style={panelBtn(true)} onClick={() => handleOpenInStudio(asset)}>
+                  ✍️ Open in Studio
+                </button>
+                <button
+                  style={{ ...panelBtn(), borderColor: '#8b5cf6', color: '#8b5cf6' }}
+                  onClick={() => setQualityCheckAsset(asset)}
+                >
+                  📊 Quality Check
+                </button>
+                <button
+                  style={{ ...panelBtn(), borderColor: '#10b981', color: '#10b981' }}
+                  onClick={() => setScheduleAsset(asset)}
+                >
+                  📅 Schedule
+                </button>
+                <button
+                  style={{ ...panelBtn(), borderColor: '#0ea5e9', color: '#0ea5e9' }}
+                  onClick={() => setShowTiming(true)}
+                >
+                  ⏰ Best Time
+                </button>
+              </div>
             </div>
-            <div style={{ fontSize: 12, color: '#64748b', lineHeight: 1.5, fontStyle: 'italic' }}>
-              "{asset.description?.slice(0, 90)}{(asset.description?.length ?? 0) > 90 ? '…' : ''}"
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-              <button style={panelBtn(true)} onClick={() => handleOpenInStudio(asset)}>
-                ✍️ Open in Studio
-              </button>
-              <button style={panelBtn()} onClick={handleViewAll}>
-                📁 View in Library
-              </button>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-          <button style={panelBtn()} onClick={handleViewAll}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, paddingTop: 12, borderTop: '1px solid #e5e7eb' }}>
+          <button
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 18px', borderRadius: 8,
+              border: '1.5px solid #d1d5db', background: '#ffffff',
+              color: '#374151', fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', transition: 'border-color 0.12s',
+            }}
+            onClick={handleViewAll}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = '#0a66c2'; e.currentTarget.style.color = '#0a66c2'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#d1d5db'; e.currentTarget.style.color = '#374151'; }}
+          >
             View All in Library →
           </button>
         </div>
       </div>
+
+      {/* Quality Check sub-modal for selected draft */}
+      <QualityCheckModal
+        open={!!qualityCheckAsset}
+        onClose={handleCloseQualityCheck}
+        initialContent={qualityCheckAsset ? getAssetContent(qualityCheckAsset) : undefined}
+        contextHint={qualityCheckAsset?.title ?? undefined}
+      />
+
+      {/* Best Time to Post sub-modal */}
+      <TimingAdvisorModal
+        open={showTiming}
+        onClose={() => setShowTiming(false)}
+      />
+
+      {/* Schedule sub-modal for selected draft */}
+      <ScheduleQuickModal
+        open={!!scheduleAsset}
+        onClose={() => setScheduleAsset(null)}
+        initialContent={scheduleAsset ? getAssetContent(scheduleAsset) : undefined}
+        initialTopic={scheduleAsset?.title ?? undefined}
+      />
     </DashboardActionModal>
   );
 };
@@ -211,9 +337,13 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({ open, onCl
 interface QualityCheckModalProps {
   open: boolean;
   onClose: () => void;
+  /** When provided, scores this content instead of the localStorage draft */
+  initialContent?: string;
+  /** Optional topic/context hint passed to the scoring API */
+  contextHint?: string;
 }
 
-export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({ open, onClose }) => {
+export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({ open, onClose, initialContent, contextHint }) => {
   const [content, setContent] = useState('');
   const [scoreResult, setScoreResult] = useState<PostPreviewScoreResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -221,11 +351,11 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({ open, onCl
 
   useEffect(() => {
     if (open) {
-      setContent(readDraftFromStorage());
+      setContent(initialContent ?? readDraftFromStorage());
       setScoreResult(null);
       setError('');
     }
-  }, [open]);
+  }, [open, initialContent]);
 
   const handleScore = async () => {
     if (!content.trim()) {
@@ -236,7 +366,9 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({ open, onCl
     setError('');
     setScoreResult(null);
     try {
-      const result = await linkedInGrowthApi.getPostPreviewScore({ content });
+      const params: { content: string; context?: string } = { content };
+      if (contextHint) params.context = contextHint;
+      const result = await linkedInGrowthApi.getPostPreviewScore(params);
       setScoreResult(result);
     } catch {
       setError('Scoring failed. Please try again.');
@@ -278,7 +410,7 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({ open, onCl
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6, fontSize: 11, color: '#9ca3af' }}>
               <span>{content.length} / 3000 chars</span>
-              {!readDraftFromStorage() && (
+              {!initialContent && !readDraftFromStorage() && (
                 <span>Tip: Generate content first in the Create wedge</span>
               )}
             </div>
@@ -540,6 +672,10 @@ interface ScheduleQuickModalProps {
   /** Pre-fill from timing advisor */
   prefillDate?: string;
   prefillTime?: string;
+  /** When provided, schedules this content instead of the localStorage draft */
+  initialContent?: string;
+  /** When provided, pre-fills the topic field */
+  initialTopic?: string;
 }
 
 const FORMAT_OPTIONS = [
@@ -553,6 +689,8 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
   onClose,
   prefillDate = '',
   prefillTime = '',
+  initialContent,
+  initialTopic,
 }) => {
   const navigate = useNavigate();
   const [topic, setTopic] = useState('');
@@ -565,15 +703,19 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
 
   useEffect(() => {
     if (open) {
-      const draft = readDraftFromStorage();
-      setTopic(draft.slice(0, 100).replace(/\n/g, ' ') || '');
+      if (initialTopic !== undefined) {
+        setTopic(initialTopic.slice(0, 100).replace(/\n/g, ' '));
+      } else {
+        const draft = readDraftFromStorage();
+        setTopic(draft.slice(0, 100).replace(/\n/g, ' ') || '');
+      }
       setDate(prefillDate || new Date(Date.now() + 86400000).toISOString().split('T')[0]);
       setTime(prefillTime || '09:30');
       setFormat('post');
       setError('');
       setSuccess(null);
     }
-  }, [open, prefillDate, prefillTime]);
+  }, [open, prefillDate, prefillTime, initialTopic]);
 
   const handleSchedule = async () => {
     if (!topic.trim()) {
@@ -586,10 +728,11 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
     }
     setLoading(true);
     setError('');
+    const contentToSchedule = initialContent ?? readDraftFromStorage();
     try {
       const result = await contentPlanningApi.createEvent({
         title: topic.slice(0, 120),
-        description: readDraftFromStorage().slice(0, 500) || topic,
+        description: contentToSchedule.slice(0, 500) || topic,
         date: `${date}T${time || '09:00'}:00`,
         platform: 'linkedin',
         content_type: format,

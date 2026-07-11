@@ -1240,6 +1240,122 @@ async def generate_outline(
         )
 
 
+# ── Generate Key Points ────────────────────────────────────────────────
+
+
+class KeyPointsRequest(BaseModel):
+    topic: str = Field(..., min_length=1, description="Post topic")
+    industry: Optional[str] = None
+    tone: Optional[str] = None
+    target_audience: Optional[str] = None
+    brainstorm_context: Optional[str] = None
+
+
+class KeyPointSet(BaseModel):
+    id: int
+    title: str
+    points: List[str]
+    reason_to_choose: str
+
+
+class KeyPointsResponse(BaseModel):
+    success: bool = True
+    data: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+
+_KEY_POINTS_JSON_STRUCT = {
+    "type": "object",
+    "properties": {
+        "key_point_sets": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "points": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "reason_to_choose": {"type": "string"},
+                },
+                "required": ["id", "title", "points", "reason_to_choose"],
+            },
+        },
+    },
+    "required": ["key_point_sets"],
+}
+
+
+def _build_key_points_prompt(req: KeyPointsRequest) -> str:
+    parts = [f"Generate a LinkedIn post about: {req.topic}"]
+    if req.industry:
+        parts.append(f"Industry: {req.industry}")
+    if req.tone:
+        parts.append(f"Tone: {req.tone}")
+    if req.target_audience:
+        parts.append(f"Target audience: {req.target_audience}")
+    if req.brainstorm_context:
+        parts.append(f"Brainstorm context/angle: {req.brainstorm_context}")
+    return "\n".join(parts)
+
+
+_KEY_POINTS_SYSTEM_PROMPT = """You are a LinkedIn content strategist and copywriter.
+
+Given a post topic (and optional industry, tone, audience, and brainstorm context),
+generate exactly 3 distinct sets of key points for a LinkedIn post.
+
+Each set must offer a different content angle:
+1. Educational / thought-leadership angle
+2. Storytelling / personal-experience angle
+3. Data-driven / industry-insight angle
+
+For every set include:
+- title: a short, compelling label for the angle
+- points: 4–6 specific, concrete key points that the post could cover
+- reason_to_choose: 1–2 sentences explaining when/why a creator should pick this angle
+
+Return valid JSON matching the required schema."""
+
+
+@router.post(
+    "/generate-key-points",
+    response_model=KeyPointsResponse,
+    summary="Generate Key Points for a LinkedIn Post",
+    description="Generate 3 distinct sets of key points with different angles for a LinkedIn post topic.",
+)
+async def generate_key_points(
+    req: KeyPointsRequest,
+    http_request: Request,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
+):
+    try:
+        user_id = _require_clerk_user_id(current_user, http_request)
+        prompt = _build_key_points_prompt(req)
+
+        result = llm_text_gen(
+            prompt=prompt,
+            system_prompt=_KEY_POINTS_SYSTEM_PROMPT,
+            json_struct=_KEY_POINTS_JSON_STRUCT,
+            user_id=user_id,
+            flow_type="generate_key_points",
+            temperature=0.7,
+        )
+
+        if isinstance(result, dict) and isinstance(result.get("key_point_sets"), list):
+            return KeyPointsResponse(data={"key_point_sets": result["key_point_sets"]})
+        return KeyPointsResponse(
+            success=False,
+            error="Failed to parse key points from LLM response.",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating key points: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post(
     "/outline/refine",
     response_model=LinkedInOutlineResponse,

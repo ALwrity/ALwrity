@@ -289,6 +289,31 @@ const BASE = '/api/linkedin-social';
 /** Profile Phases 5–7 can run multiple LLM calls in one GET /profile request. */
 const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 300_000;
 
+// ── Profile foundation cache (sessionStorage, 30 min TTL) ────────────────────
+const PROFILE_CACHE_KEY = 'alwrity_linkedin_profile';
+const PROFILE_CACHE_TTL = 30 * 60 * 1000;
+
+function readProfileCache(): LinkedInProfileAcquireResponse | null {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    const { data, cachedAt } = JSON.parse(raw);
+    if (!cachedAt || Date.now() - cachedAt > PROFILE_CACHE_TTL) {
+      sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function writeProfileCache(data: LinkedInProfileAcquireResponse) {
+  try {
+    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }));
+  } catch { /* storage full */ }
+}
+
 /** In-flight promise cache so 4+ hook mounts share one request */
 let statusPromiseCache: Promise<LinkedInConnectionStatus> | null = null;
 let statusCacheExpiry = 0;
@@ -525,7 +550,21 @@ export async function getLinkedInProfileFoundation(
     refresh,
     refreshIntelligence,
   });
-  return getLinkedInProfile({ refresh, refreshIntelligence });
+
+  // Return cached data when no refresh requested and cache is fresh
+  if (!refresh && !refreshIntelligence) {
+    const cached = readProfileCache();
+    if (cached) return cached;
+  }
+
+  const data = await getLinkedInProfile({ refresh, refreshIntelligence });
+
+  // Cache the result only for standard foundation loads (not AI refreshes)
+  if (!refreshIntelligence) {
+    writeProfileCache(data);
+  }
+
+  return data;
 }
 
 export interface RunLinkedInTopicAnalysisOptions {

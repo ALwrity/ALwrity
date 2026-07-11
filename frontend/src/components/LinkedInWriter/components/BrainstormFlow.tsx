@@ -49,6 +49,8 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
   const [personalizedError, setPersonalizedError] = useState<string | null>(null);
   const lastPersonalizeOptionsRef = useRef<{ seed: string; options: BrainstormOptions } | null>(null);
 
+  const brainstormTypeRef = useRef<string>('post');
+
   const [savedPromptHashes, setSavedPromptHashes] = useState<Set<string>>(() => new Set());
   const [savedCount, setSavedCount] = useState<number>(0);
   const [myIdeasOpen, setMyIdeasOpen] = useState<boolean>(false);
@@ -141,11 +143,14 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
 
   useEffect(() => {
     const handler = async (ev: any) => {
+      console.log('[BrainstormFlow] event received, detail:', ev?.detail);
       try {
         setBrainstormVisible(true);
         window.lastBrainstormEvent = ev;
-        const { prompt, seed: ideaSeed, forceRefresh = false, options } = ev.detail || {};
+        const { prompt, seed: ideaSeed, type: brainstormType, forceRefresh = false, options } = ev.detail || {};
+        brainstormTypeRef.current = brainstormType || 'post';
         const finalSeed = ideaSeed || prompt || '';
+        console.log('[BrainstormFlow] finalSeed:', JSON.stringify(finalSeed), 'hasOptions:', !!options && (options.usePersona || options.includeTrending || options.remarketContent));
 
         // Special case: 'cached' means show most recent cached ideas without API call
         if (finalSeed === 'cached') {
@@ -234,7 +239,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
         }, 700);
 
         try {
-          const ir = await apiClient.post('/api/brainstorm/ideas', {
+          const ir = await aiApiClient.post('/api/brainstorm/ideas', {
             seed: finalSeed,
             persona: corePersona || null,
             platformPersona: platformPersona || null,
@@ -252,6 +257,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
         setStage('results');
       } catch (e) {
         console.error('Brainstorm flow error:', e);
+        window.dispatchEvent(new CustomEvent('linkedinwriter:cancelBrainstorm'));
         setBrainstormVisible(false);
         setStage('idle');
       }
@@ -261,6 +267,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
   }, [corePersona, platformPersona, loaderMessages, getCacheKey, getCachedIdeas, setCachedIdeas, setBrainstormVisible]);
 
   const handleClose = useCallback(() => {
+    window.dispatchEvent(new CustomEvent('linkedinwriter:cancelBrainstorm'));
     setBrainstormVisible(false);
     setStage('idle');
     setIdeas([]);
@@ -271,7 +278,8 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
   }, [setBrainstormVisible]);
 
   const handleGeneratePost = useCallback((prompt: string) => {
-    window.dispatchEvent(new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: 'post', topic: prompt } }));
+    const contentType = brainstormTypeRef.current;
+    window.dispatchEvent(new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: contentType, topic: prompt } }));
     handleClose();
   }, [handleClose]);
 
@@ -452,7 +460,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                                   cursor: 'pointer',
                                 }}
                               >
-                                Generate post
+                                Generate {brainstormTypeRef.current === 'article' ? 'article' : 'post'}
                               </button>
                             </div>
                           </div>

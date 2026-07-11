@@ -3,6 +3,11 @@ import { LinkedInPreferences } from '../utils/storageUtils';
 import { linkedInWriterApi } from '../../../services/linkedInWriterApi';
 import { getPlatformPersona } from '../../../api/persona';
 import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/linkedInWriterUtils';
+import DataSourceSelector from './Brainstorm/DataSourceSelector';
+import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
+import { KeyPointsSection } from './KeyPointsSection';
+import { VariationPicker, assembleFullContent, type VariationResult } from './VariationPicker';
+
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
 
@@ -265,152 +270,7 @@ const PersonaBadge: React.FC<{ persona: PersonaInfo; toneLabel: string }> = ({ p
   </div>
 );
 
-// ── Variation Result types + helpers (Feature 5) ──────────────────────────────
-interface VariationResult {
-  label: string;
-  toneIcon: string;
-  content: string | null;
-  error: string | null;
-}
-
-function assembleFullContent(data: any): string {
-  const content = data?.content || '';
-  const hashtags = (data?.hashtags || []).map((h: any) =>
-    typeof h === 'string' ? h : h?.hashtag || ''
-  ).filter(Boolean).join(' ');
-  const cta = data?.call_to_action || '';
-  let full = content;
-  if (hashtags) full += `\n\n${hashtags}`;
-  if (cta) full += `\n\n${cta}`;
-  return full;
-}
-
-const VARIATION_TONES = [
-  { tone: '', label: 'Your Tone', toneIcon: '🎯' },
-  { tone: 'conversational', label: 'Conversational', toneIcon: '💬' },
-  { tone: 'inspirational', label: 'Inspirational', toneIcon: '🚀' },
-];
-
-const VariationPicker: React.FC<{
-  variations: VariationResult[];
-  generating: boolean;
-  onUse: (content: string) => void;
-}> = ({ variations, generating, onUse }) => {
-  const [expandedIdx, setExpandedIdx] = React.useState<number | null>(null);
-  return (
-    <div>
-      <div style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {generating ? (
-          <>
-            <div
-              style={{
-                width: 14, height: 14, borderRadius: '50%',
-                border: '2px solid #0a66c2', borderTopColor: 'transparent',
-                animation: 'spin 0.8s linear infinite', flexShrink: 0,
-              }}
-            />
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-              Generating 3 tone variations — this may take a moment…
-            </span>
-          </>
-        ) : (
-          <span style={{ fontSize: 13, fontWeight: 700, color: '#111827' }}>
-            Pick the best variation and send it to the editor
-          </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {(generating ? VARIATION_TONES : variations).map((v, i) => {
-          const result = variations[i];
-          const isLoading = generating;
-          const hasContent = !isLoading && result?.content;
-          const hasError = !isLoading && result?.error;
-          const expanded = expandedIdx === i;
-          return (
-            <div
-              key={i}
-              style={{
-                border: `1.5px solid ${hasContent ? '#bfdbfe' : '#e5e7eb'}`,
-                borderRadius: 10,
-                background: hasContent ? '#f8faff' : '#f9fafb',
-                overflow: 'hidden',
-                transition: 'border-color 180ms',
-              }}
-            >
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  padding: '10px 12px',
-                  cursor: hasContent ? 'pointer' : 'default',
-                }}
-                onClick={() => hasContent && setExpandedIdx(expanded ? null : i)}
-              >
-                <span style={{ fontSize: 16 }}>{v.toneIcon}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', flex: 1 }}>
-                  {v.label}
-                </span>
-                {isLoading && (
-                  <div
-                    style={{
-                      width: 12, height: 12, borderRadius: '50%',
-                      border: '2px solid #9ca3af', borderTopColor: 'transparent',
-                      animation: 'spin 0.8s linear infinite',
-                    }}
-                  />
-                )}
-                {hasError && (
-                  <span style={{ fontSize: 11, color: '#b91c1c', fontWeight: 600 }}>Failed</span>
-                )}
-                {hasContent && (
-                  <>
-                    <span style={{ fontSize: 11, color: '#6b7280' }}>
-                      {expanded ? 'hide ▲' : 'preview ▼'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={e => { e.stopPropagation(); onUse(result.content!); }}
-                      style={{
-                        padding: '5px 12px',
-                        border: 'none',
-                        borderRadius: 6,
-                        background: '#0a66c2',
-                        color: '#fff',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        flexShrink: 0,
-                      }}
-                    >
-                      Use this ✓
-                    </button>
-                  </>
-                )}
-              </div>
-              {expanded && hasContent && (
-                <div
-                  style={{
-                    padding: '0 12px 12px',
-                    borderTop: '1px solid #e0e7ef',
-                    maxHeight: 180,
-                    overflowY: 'auto',
-                    fontSize: 12,
-                    color: '#334155',
-                    lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {result.content}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
+// ── Variation helpers imported from VariationPicker ──────────────────────────
 
 const defaultForm = {
   topic: '',
@@ -451,8 +311,22 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [variationsPhase, setVariationsPhase] = useState<'idle' | 'generating' | 'ready'>('idle');
   const [variations, setVariations] = useState<VariationResult[]>([]);
   const variationAbortRef = useRef<AbortController | null>(null);
+  const brainstormTimeoutRef = useRef<number | null>(null);
+  const brainstromActiveRef = useRef(false);
+
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [topicFocused, setTopicFocused] = useState(false);
+  const [usePersona, setUsePersona] = useState(false);
+  const [includeTrending, setIncludeTrending] = useState(false);
+  const [remarketContent, setRemarketContent] = useState(false);
+  const { connected } = useLinkedInSocialConnection();
 
   const openModal = useCallback((type: ContentType) => {
+    if (brainstormTimeoutRef.current) {
+      window.clearTimeout(brainstormTimeoutRef.current);
+      brainstormTimeoutRef.current = null;
+    }
+    brainstromActiveRef.current = false;
     setFormData({
       ...defaultForm,
       industry: userPreferences?.industry || '',
@@ -463,9 +337,18 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsMode(false);
     setVariationsPhase('idle');
     setVariations([]);
+    setAdvancedOpen(false);
+    setUsePersona(false);
+    setIncludeTrending(false);
+    setRemarketContent(false);
   }, [userPreferences]);
 
   const closeModal = useCallback(() => {
+    if (brainstormTimeoutRef.current) {
+      window.clearTimeout(brainstormTimeoutRef.current);
+      brainstormTimeoutRef.current = null;
+    }
+    brainstromActiveRef.current = false;
     variationAbortRef.current?.abort();
     setSelectedType(null);
     setFormData(defaultForm);
@@ -473,6 +356,10 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsMode(false);
     setVariationsPhase('idle');
     setVariations([]);
+    setAdvancedOpen(false);
+    setUsePersona(false);
+    setIncludeTrending(false);
+    setRemarketContent(false);
   }, []);
 
   useEffect(() => {
@@ -492,6 +379,13 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         type === 'carousel' ||
         type === 'video_script'
       ) {
+        // Clear brainstorm safety timeout — idea was selected
+        if (brainstormTimeoutRef.current) {
+          window.clearTimeout(brainstormTimeoutRef.current);
+          brainstormTimeoutRef.current = null;
+        }
+        brainstromActiveRef.current = false;
+
         // Open modal with defaults first, then overlay any pre-fill data from the event
         setFormData({
           ...defaultForm,
@@ -507,11 +401,28 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         setVariationsMode(false);
         setVariationsPhase('idle');
         setVariations([]);
+        setAdvancedOpen(false);
+        setUsePersona(false);
+        setIncludeTrending(false);
+        setRemarketContent(false);
       }
     };
     window.addEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
     return () => window.removeEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
   }, [userPreferences]);
+
+  // Cancel brainstorm safety timeout when BrainstormFlow is manually closed
+  useEffect(() => {
+    const onCancelBrainstorm = () => {
+      if (brainstormTimeoutRef.current) {
+        window.clearTimeout(brainstormTimeoutRef.current);
+        brainstormTimeoutRef.current = null;
+      }
+      brainstromActiveRef.current = false;
+    };
+    window.addEventListener('linkedinwriter:cancelBrainstorm', onCancelBrainstorm);
+    return () => window.removeEventListener('linkedinwriter:cancelBrainstorm', onCancelBrainstorm);
+  }, []);
 
   useEffect(() => {
     if (!selectedType) return;
@@ -566,7 +477,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         industry: mapIndustry(formData.industry || 'Technology') as any,
         post_type: mapPostType(formData.post_type) as any,
         target_audience: formData.target_audience || 'Business leaders and professionals',
-        key_points: formData.key_points ? [formData.key_points] : [],
+        key_points: formData.key_points
+          ? formData.key_points.split(' / ').map(kp => kp.trim()).filter(Boolean)
+          : [],
         include_hashtags: true,
         include_call_to_action: true,
         research_enabled: true,
@@ -622,7 +535,12 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
     // Normal single-generation path
     setGenerating(true);
-    const params = { ...formData };
+    const params = {
+      ...formData,
+      key_points: formData.key_points
+        ? formData.key_points.split(' / ').map(kp => kp.trim()).filter(Boolean)
+        : [],
+    };
     try {
       const generators = {
         post: onGeneratePost,
@@ -654,46 +572,142 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       <>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Topic *</label>
-          <input
-            value={formData.topic}
-            onChange={e => setField('topic', e.target.value)}
-            placeholder={`e.g., ${selectedType === 'video_script' ? 'Networking tips' : 'AI trends in ' + (formData.industry || 'Technology')}`}
-            style={{ width: '100%', padding: '10px 12px', border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-          />
+          <div style={{ position: 'relative' }}>
+            <input
+              value={formData.topic}
+              onChange={e => setField('topic', e.target.value)}
+              onFocus={() => setTopicFocused(true)}
+              onBlur={() => setTimeout(() => setTopicFocused(false), 200)}
+              placeholder={`e.g., ${selectedType === 'video_script' ? 'Networking tips' : 'AI trends in ' + (formData.industry || 'Technology')}`}
+              style={{ width: '100%', padding: '10px 12px', border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+            />
+            {topicFocused && (selectedType === 'post' || selectedType === 'article') && (
+              <button
+                type="button"
+                onClick={() => {
+                  const topic = formData.topic.trim();
+                  const brainstormType = selectedType;
+                  console.log('[Brainstorm] clicked, topic:', JSON.stringify(topic), 'type:', brainstormType);
+                  if (!topic) {
+                    setTopicError('Enter a topic first to brainstorm ideas.');
+                    return;
+                  }
+
+                  brainstromActiveRef.current = true;
+                  setTopicError(null);
+
+                  // Lightweight close — hide modal without clearing brainstorm safety net
+                  variationAbortRef.current?.abort();
+                  setSelectedType(null);
+
+                  // Safety timeout: reopen same modal type if BrainstormFlow closes without selecting an idea
+                  brainstormTimeoutRef.current = window.setTimeout(() => {
+                    console.log('[Brainstorm] safety timeout fired, active:', brainstromActiveRef.current);
+                    if (brainstromActiveRef.current) {
+                      brainstromActiveRef.current = false;
+                      openModal(brainstormType);
+                    }
+                  }, 15000);
+
+                  console.log('[Brainstorm] dispatching event with seed:', topic, 'options:', { usePersona, includeTrending, remarketContent });
+                  window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
+                    detail: {
+                      seed: topic,
+                      type: brainstormType,
+                      options: { usePersona, includeTrending, remarketContent },
+                      forceRefresh: false,
+                    },
+                  }));
+                  console.log('[Brainstorm] event dispatched');
+                }}
+                style={{
+                  position: 'absolute', right: 6, top: 5,
+                  padding: '4px 10px', borderRadius: 6,
+                  border: '1px solid #0a66c2', background: '#fff',
+                  color: '#0a66c2', fontWeight: 700, fontSize: 12,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}
+              >
+                🧠 Brainstorm
+              </button>
+            )}
+          </div>
           {topicError && (
             <p style={{ margin: '6px 0 0', color: '#b91c1c', fontSize: 12 }}>{topicError}</p>
           )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Industry</label>
-            <select
-              value={formData.industry}
-              onChange={e => setField('industry', e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', background: 'white' }}
-            >
-              {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Tone</label>
-            <select
-              value={formData.tone}
-              onChange={e => setField('tone', e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', background: 'white' }}
-            >
-              {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-        </div>
+
+        {/* DataSourceSelector — Post only, always visible */}
+            {selectedType === 'post' && (
+              <div style={{ marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <DataSourceSelector
+                  options={{ usePersona, includeTrending, remarketContent }}
+                  onChange={(upd) => {
+                    if (upd.usePersona !== undefined) setUsePersona(upd.usePersona);
+                    if (upd.includeTrending !== undefined) setIncludeTrending(upd.includeTrending);
+                    if (upd.remarketContent !== undefined) setRemarketContent(upd.remarketContent);
+                  }}
+                  connected={connected}
+                />
+              </div>
+            )}
+
+        {/* Advanced Options (Industry, Tone, Target Audience) */}
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Target Audience</label>
-          <input
-            value={formData.target_audience}
-            onChange={e => setField('target_audience', e.target.value)}
-            placeholder="e.g., Product Managers, CTOs"
-            style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
-          />
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen(prev => !prev)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '9px 12px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#f9fafb', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              color: '#374151', transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f3f4f6'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f9fafb'; }}
+          >
+            <span>Advanced Options</span>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>{advancedOpen ? '▲' : '▼'}</span>
+          </button>
+          {advancedOpen && (
+            <div style={{
+              marginTop: 8, padding: 12, border: '1px solid #e5e7eb',
+              borderRadius: 8, background: '#fff',
+            }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Industry</label>
+                  <select
+                    value={formData.industry}
+                    onChange={e => setField('industry', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', background: 'white' }}
+                  >
+                    {INDUSTRIES.map(ind => <option key={ind} value={ind}>{ind}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Tone</label>
+                  <select
+                    value={formData.tone}
+                    onChange={e => setField('tone', e.target.value)}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', background: 'white' }}
+                  >
+                    {TONES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Target Audience</label>
+                <input
+                  value={formData.target_audience}
+                  onChange={e => setField('target_audience', e.target.value)}
+                  placeholder="e.g., Product Managers, CTOs"
+                  style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </>
     );
@@ -714,16 +728,14 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               onSelect={value => setField('post_type', value)}
             />
             {commonFields}
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Key Points</label>
-              <textarea
-                value={formData.key_points}
-                onChange={e => setField('key_points', e.target.value)}
-                placeholder="Key point 1 / Key point 2 / Key point 3"
-                rows={3}
-                style={{ width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', boxSizing: 'border-box' }}
-              />
-            </div>
+            <KeyPointsSection
+              topic={formData.topic}
+              industry={formData.industry}
+              tone={formData.tone}
+              targetAudience={formData.target_audience}
+              keyPoints={formData.key_points}
+              onChange={value => setField('key_points', value)}
+            />
           </div>
         );
       case 'article':
@@ -796,7 +808,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData, topicError, personaInfo]);
+  }, [selectedType, formData, topicError, personaInfo, topicFocused, advancedOpen, setField, closeModal]);
 
   const showInlineGrid = variant === 'default';
 
@@ -806,36 +818,42 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         <>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, textAlign: 'center' }}>Quick Create</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
-            {CONTENT_TYPES.map(({ type, label, icon, description, color }) => (
-              <button
-                key={type}
-                onClick={() => openModal(type)}
-                style={{
-                  padding: '14px 10px',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  background: 'white',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  textAlign: 'center',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.06)'
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = color;
-                  e.currentTarget.style.boxShadow = `0 4px 12px ${color}20`;
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = '#e5e7eb';
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
-                  e.currentTarget.style.transform = 'translateY(0)';
-                }}
-              >
-                <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{label}</div>
-                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, lineHeight: '1.3' }}>{description}</div>
-              </button>
-            ))}
+            {CONTENT_TYPES.map(({ type, label, icon, description, color }) => {
+              const disabled = type === 'carousel' || type === 'video_script';
+              return (
+                <button
+                  key={type}
+                  onClick={() => { if (!disabled) openModal(type); }}
+                  style={{
+                    padding: '14px 10px',
+                    border: `1px solid ${disabled ? '#e5e7eb' : '#e5e7eb'}`,
+                    borderRadius: 12,
+                    background: disabled ? '#f9fafb' : 'white',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s',
+                    textAlign: 'center',
+                    boxShadow: disabled ? 'none' : '0 1px 3px rgba(0,0,0,0.06)',
+                    opacity: disabled ? 0.45 : 1,
+                  }}
+                  onMouseEnter={e => {
+                    if (disabled) return;
+                    e.currentTarget.style.borderColor = color;
+                    e.currentTarget.style.boxShadow = `0 4px 12px ${color}20`;
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                  }}
+                  onMouseLeave={e => {
+                    if (disabled) return;
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
+                    e.currentTarget.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <div style={{ fontSize: 28, marginBottom: 6, filter: disabled ? 'grayscale(1)' : 'none' }}>{icon}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: disabled ? '#9ca3af' : '#111827' }}>{label}</div>
+                  <div style={{ fontSize: 11, color: disabled ? '#d1d5db' : '#6b7280', marginTop: 4, lineHeight: '1.3' }}>{disabled ? 'Coming soon' : description}</div>
+                </button>
+              );
+            })}
           </div>
         </>
       )}
@@ -843,7 +861,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       {/* Generation Modal */}
       {selectedType && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10020, padding: 20 }}>
-          <div style={{ background: 'white', width: variationsPhase !== 'idle' ? 620 : 520, maxWidth: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', transition: 'width 200ms ease' }}>
+          <div style={{ background: 'white', width: variationsPhase !== 'idle' ? 868 : 728, maxWidth: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', transition: 'width 200ms ease' }}>
 
             {/* Modal header */}
             <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

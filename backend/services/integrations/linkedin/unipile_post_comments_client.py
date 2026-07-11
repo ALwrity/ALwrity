@@ -1,0 +1,164 @@
+"""
+Unipile post comments API — extends UnipileClient without growing unipile_client.py.
+
+LinkedIn requires post ``social_id`` (not URL post id) for list/reply:
+https://developer.unipile.com/reference/postscontroller_listallcomments
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+from urllib.parse import quote
+
+import httpx
+from loguru import logger
+
+from services.integrations.linkedin.unipile_client import (
+    UnipileAPIError,
+    UnipileClient,
+    _auth_headers,
+    _post_auth_headers,
+    _raise_for_error,
+)
+
+SUPPORTED_COMMENT_SORT = frozenset({"MOST_RECENT", "MOST_RELEVANT"})
+
+
+class UnipilePostCommentsClient(UnipileClient):
+    """Unipile client with post comment list and reply endpoints."""
+
+    async def list_post_comments(
+        self,
+        account_id: str,
+        post_social_id: str,
+        *,
+        cursor: Optional[str] = None,
+        limit: int = 20,
+        sort_by: str = "MOST_RECENT",
+        comment_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        List comments on a LinkedIn post via ``GET /api/v1/posts/{post_id}/comments``.
+
+        Args:
+            account_id: Unipile account ID
+            post_social_id: LinkedIn ``social_id`` from the post object
+            cursor: Pagination cursor from a previous response
+            limit: Page size (1–100)
+            sort_by: ``MOST_RECENT`` or ``MOST_RELEVANT``
+            comment_id: When set, list replies to this comment
+
+        Returns:
+            Raw Unipile CommentList response dict
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        safe_limit = max(1, min(limit, 100))
+        normalized_sort = sort_by if sort_by in SUPPORTED_COMMENT_SORT else "MOST_RECENT"
+        encoded_post_id = quote(post_social_id, safe="")
+        url = self._get_full_url(f"/api/v1/posts/{encoded_post_id}/comments")
+        params: dict[str, str | int] = {
+            "account_id": account_id,
+            "limit": safe_limit,
+            "sort_by": normalized_sort,
+        }
+        if cursor:
+            params["cursor"] = cursor
+        if comment_id:
+            params["comment_id"] = comment_id
+
+        logger.info(
+            "[UnipilePostCommentsClient] list_post_comments account_id={} post_social_id={} "
+            "limit={} sort_by={} cursor={}",
+            account_id,
+            post_social_id,
+            safe_limit,
+            normalized_sort,
+            "set" if cursor else "none",
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(
+                url,
+                params=params,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        item_count = 0
+        next_cursor = None
+        if isinstance(data, dict):
+            items = data.get("items")
+            if isinstance(items, list):
+                item_count = len(items)
+            next_cursor = data.get("cursor")
+
+        logger.info(
+            "[UnipilePostCommentsClient] list_post_comments success account_id={} "
+            "items={} next_cursor={}",
+            account_id,
+            item_count,
+            "set" if next_cursor else "none",
+        )
+        return data if isinstance(data, dict) else {}
+
+    async def send_post_comment(
+        self,
+        account_id: str,
+        post_social_id: str,
+        text: str,
+        *,
+        comment_id: Optional[str] = None,
+    ) -> dict[str, Any]:
+        """
+        Comment on a post or reply to a comment via ``POST /api/v1/posts/{post_id}/comments``.
+
+        Uses multipart/form-data per Unipile spec (same as create_post).
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        trimmed = (text or "").strip()
+        if not trimmed:
+            raise ValueError("Comment text is required")
+        if len(trimmed) > 1250:
+            raise ValueError("Comment text must be 1250 characters or fewer")
+
+        encoded_post_id = quote(post_social_id, safe="")
+        url = self._get_full_url(f"/api/v1/posts/{encoded_post_id}/comments")
+        form_fields: dict[str, tuple[None, str]] = {
+            "account_id": (None, account_id),
+            "text": (None, trimmed),
+        }
+        if comment_id:
+            form_fields["comment_id"] = (None, comment_id)
+
+        logger.info(
+            "[UnipilePostCommentsClient] send_post_comment account_id={} post_social_id={} "
+            "text_len={} reply_to={}",
+            account_id,
+            post_social_id,
+            len(trimmed),
+            comment_id or "none",
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(
+                url,
+                files=form_fields,
+                headers=_post_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        reply_id = data.get("comment_id") if isinstance(data, dict) else None
+        logger.info(
+            "[UnipilePostCommentsClient] send_post_comment success account_id={} "
+            "status={} comment_id={}",
+            account_id,
+            response.status_code,
+            reply_id,
+        )
+        return data if isinstance(data, dict) else {}

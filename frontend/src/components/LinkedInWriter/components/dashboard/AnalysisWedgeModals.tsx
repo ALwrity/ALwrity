@@ -6,6 +6,7 @@
  * F3  BrandScorecardModal      — full BrandScorecard component in a modal
  * F4  WeeklyPlanModal          — Mon-Fri content plan with Create Now + Schedule CTAs
  * F5  ViralCopywriterModal     — top viral patterns with "Write in This Style" CTA
+ * F6  EngagementTrendsModal    — see EngagementTrendsModal.tsx
  */
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { DashboardActionModal } from './DashboardActionModal';
@@ -27,6 +28,7 @@ import {
   barColor,
   CONFIDENCE_COLORS,
 } from '../GrowthEngine/styles';
+import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -39,11 +41,17 @@ interface CachePayload {
   cachedAt: number;
 }
 
+const CACHE_TTL = 3600000; // 1 hour — matches backend LLM cache
+
 function readCache(): CachePayload | null {
   try {
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachePayload;
+    if (!parsed.cachedAt || Date.now() - parsed.cachedAt > CACHE_TTL) {
+      sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -73,12 +81,6 @@ function openInCreate(topic: string, keyPoints: string, type: string = 'post') {
     new CustomEvent('linkedinwriter:openQuickCreate', {
       detail: { type, topic, key_points: keyPoints },
     })
-  );
-}
-
-function switchToGrowthEngine() {
-  window.dispatchEvent(
-    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'analytics' } })
   );
 }
 
@@ -138,7 +140,7 @@ function useGrowthInsights(open: boolean) {
     setLoading(false);
   }, [open]);
 
-  const loadAll = useCallback(async (errorMessage = 'Could not load insights. Please try again.') => {
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -147,8 +149,10 @@ function useGrowthInsights(open: boolean) {
       setData(result);
       setCachedAt(Date.now());
       return result;
-    } catch {
-      setError(errorMessage);
+    } catch (err: unknown) {
+      const axiosErr = err as { response?: { data?: { detail?: string } } };
+      const msg = axiosErr.response?.data?.detail;
+      setError(msg ?? (err instanceof Error ? err.message : 'Could not load insights. Please try again.'));
       return null;
     } finally {
       setLoading(false);
@@ -175,12 +179,17 @@ const CacheEmptyPrompt: React.FC<{
   description: string;
   buttonLabel: string;
   onLoad: () => void;
-}> = ({ icon, title, description, buttonLabel, onLoad }) => (
+  disabled?: boolean;
+}> = ({ icon, title, description, buttonLabel, onLoad, disabled }) => (
   <div style={{ textAlign: 'center', padding: '24px 0' }}>
     <div style={{ fontSize: 36, marginBottom: 12 }}>{icon}</div>
     <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>{title}</div>
     <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>{description}</div>
-    <button type="button" onClick={onLoad} style={primaryLoadBtn}>{buttonLabel}</button>
+    <button type="button" onClick={onLoad} disabled={disabled} style={{
+      ...primaryLoadBtn,
+      opacity: disabled ? 0.6 : 1,
+      cursor: disabled ? 'not-allowed' : 'pointer',
+    }}>{buttonLabel}</button>
   </div>
 );
 
@@ -475,7 +484,7 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                     </div>
                     <button
                       onClick={() => {
-                        switchToGrowthEngine();
+                        openGrowthEngineModal();
                         onClose();
                       }}
                       style={{
@@ -509,7 +518,7 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
             >
               <button
                 onClick={() => {
-                  switchToGrowthEngine();
+                  openGrowthEngineModal();
                   onClose();
                 }}
                 style={{
@@ -668,6 +677,32 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
     }
   }
 
+  if (c.viral_analysis?.patterns) {
+    for (const p of c.viral_analysis.patterns) {
+      candidates.push({
+        topic: p.example_headline,
+        hook: p.description,
+        sourceLabel: 'Viral Pattern',
+        sourceIcon: '📈',
+        confidence: p.confidence,
+        score: (SCORE_MAP[p.confidence] ?? 1) + CARD_PRIORITY.viral,
+      });
+    }
+  }
+
+  if (c.network_suggestions?.suggestions) {
+    for (const s of c.network_suggestions.suggestions) {
+      candidates.push({
+        topic: `${s.name} — ${s.title}${s.company ? ` @ ${s.company}` : ''}`,
+        hook: s.why_connect,
+        sourceLabel: 'Network Suggestion',
+        sourceIcon: '🤝',
+        confidence: s.confidence,
+        score: (SCORE_MAP[s.confidence] ?? 1) + CARD_PRIORITY.network,
+      });
+    }
+  }
+
   candidates.sort((a, b) => b.score - a.score);
   return candidates;
 }
@@ -702,16 +737,16 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({ open, onClose })
           <>
             <CacheEmptyPrompt
               icon="🎯"
-              title="No insights loaded yet"
-              description="Load your growth analysis to get AI-ranked post recommendations."
-              buttonLabel="🚀 Load Insights"
+              title={error ? 'Failed to load insights' : 'No insights loaded yet'}
+              description={error ? 'Try again or close and reopen the modal.' : 'Load your growth analysis to get AI-ranked post recommendations.'}
+              buttonLabel={error ? '🔁 Retry' : '🚀 Load Insights'}
               onLoad={handleLoadAll}
             />
             {error && <ErrorBanner message={error} />}
           </>
         )}
 
-        {loading && <LoadingRow message="Ranking post opportunities…" />}
+        {loading && <LoadingRow message={data ? 'Refreshing insights…' : 'Running AI analysis across all growth signals…'} />}
 
         {/* Ranked candidates */}
         {!loading && top3.length > 0 && (
@@ -737,7 +772,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({ open, onClose })
                 + {candidates.length - 3} more opportunities in the{' '}
                 <button
                   onClick={() => {
-                    switchToGrowthEngine();
+                    openGrowthEngineModal();
                     onClose();
                   }}
                   style={{
@@ -893,7 +928,7 @@ interface BrandScorecardModalProps {
 
 export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({ open, onClose }) => {
   const { data, loading, error, loadAll } = useGrowthInsights(open);
-  const handleLoad = () => void loadAll('Could not load brand scorecard. Please try again.');
+  const handleLoad = () => void loadAll();
   const sc = data?.brand_scorecard;
 
   return (
@@ -957,7 +992,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
     setScheduleError('');
   }, [open]);
 
-  const handleLoad = () => void loadAll('Could not load weekly plan. Please try again.');
+  const handleLoad = () => void loadAll();
 
   const ws = data?.weekly_strategy;
   const posts: DailyPostIdea[] = ws?.daily_posts ?? [];
@@ -1243,7 +1278,7 @@ interface ViralCopywriterModalProps {
 
 export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open, onClose }) => {
   const { data, loading, error, loadAll } = useGrowthInsights(open);
-  const handleLoad = () => void loadAll('Could not load viral patterns. Please try again.');
+  const handleLoad = () => void loadAll();
   const va = data?.viral_analysis;
   const patterns: ViralPattern[] = va?.patterns ?? [];
   const industry = va?.industry ?? 'your industry';

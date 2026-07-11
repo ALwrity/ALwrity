@@ -32,6 +32,7 @@ import {
   scoreBg,
   barColor,
 } from '../GrowthEngine/styles';
+import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
 
 // ---------------------------------------------------------------------------
 // Shared helpers (mirror of AnalysisWedgeModals pattern)
@@ -66,6 +67,41 @@ function openInCreate(topic: string, keyPoints: string, type = 'post') {
 function pushDraftToStudio(text: string) {
   window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: text }));
 }
+
+function formatAge(cachedAt: number): string {
+  const ms = Date.now() - cachedAt;
+  const min = Math.floor(ms / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min} min ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}
+
+const RefreshBar: React.FC<{ cachedAt: number; onRefresh: () => void; loading?: boolean }> = ({ cachedAt, onRefresh, loading }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, fontSize: 11, color: colors.textTertiary }}>
+    <span>Last refreshed {formatAge(cachedAt)}</span>
+    <button type="button" onClick={onRefresh} disabled={loading}
+      style={{ background: 'none', border: `1px solid ${colors.border}`, borderRadius: 5, padding: '2px 8px', fontSize: 11, color: colors.textSecondary, cursor: loading ? 'default' : 'pointer', fontWeight: 600, opacity: loading ? 0.5 : 1 }}>
+      {loading ? 'Loading…' : '↻ Refresh'}
+    </button>
+  </div>
+);
+
+const ConnectPrompt: React.FC<{ message: string }> = ({ message }) => (
+  <div style={{ textAlign: 'center', padding: '30px 0' }}>
+    <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.7 }}>🔗</div>
+    <div style={{ fontWeight: 700, fontSize: 15, color: colors.textDark, marginBottom: 8 }}>LinkedIn Account Required</div>
+    <div style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 1.5, maxWidth: 340, margin: '0 auto' }}>{message}</div>
+  </div>
+);
+
+const StaleDataNote: React.FC = () => (
+  <div style={{ padding: '8px 12px', background: '#fffbeb', borderRadius: 8, color: '#92400e', fontSize: 12, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+    <span>⚠️</span>
+    <span>Showing cached data. Connect your LinkedIn account for the latest insights.</span>
+  </div>
+);
 
 // ── Shared UI ────────────────────────────────────────────────────────────────
 
@@ -152,9 +188,9 @@ function useGrowthCache(open: boolean) {
 // E5 — Engagement Booster Modal
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface EngagementBoosterModalProps { open: boolean; onClose: () => void; }
+interface EngagementBoosterModalProps { open: boolean; onClose: () => void; connected?: boolean; }
 
-export const EngagementBoosterModal: React.FC<EngagementBoosterModalProps> = ({ open, onClose }) => {
+export const EngagementBoosterModal: React.FC<EngagementBoosterModalProps> = ({ open, onClose, connected = true }) => {
   const [original, setOriginal] = useState('');
   const [optimised, setOptimised] = useState('');
   const [step, setStep] = useState<'input' | 'optimising' | 'scoring' | 'result'>('input');
@@ -208,6 +244,12 @@ export const EngagementBoosterModal: React.FC<EngagementBoosterModalProps> = ({ 
 
       {step === 'input' && (
         <>
+          {!connected && (
+            <div style={{ padding: '8px 12px', background: '#eff6ff', borderRadius: 8, color: '#1e40af', fontSize: 12, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>ℹ️</span>
+              <span>Connect LinkedIn for accurate engagement scoring on before/after versions.</span>
+            </div>
+          )}
           {error && <ErrorBanner msg={error} />}
           <div style={{ marginBottom: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: colors.textMedium, marginBottom: 6 }}>
@@ -505,9 +547,9 @@ const FieldLabel: React.FC<{ label: string }> = ({ label }) => (
 // E1 — Engagement Opportunities Quick-View
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface OpportunitiesModalProps { open: boolean; onClose: () => void; }
+interface OpportunitiesModalProps { open: boolean; onClose: () => void; connected?: boolean; }
 
-export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({ open, onClose }) => {
+export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({ open, onClose, connected = true }) => {
   const { data, loading, error, loadAll } = useGrowthCache(open);
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -533,7 +575,13 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({ open, on
         AI-identified conversations to engage with now — copy a comment, refine it, or create a post on the topic.
       </p>
 
-      {!data && !loading && (
+      {!connected && data && <StaleDataNote />}
+
+      {!data && !loading && !connected && (
+        <ConnectPrompt message="Connect your LinkedIn account to discover engagement opportunities tailored to your network." />
+      )}
+
+      {!data && !loading && connected && (
         <EmptyPrompt
           icon="💬"
           title="No opportunities cached"
@@ -601,7 +649,7 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({ open, on
       {data && !loading && opportunities.length > 3 && (
         <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4, textAlign: 'center' }}>
           {opportunities.length - 3} more in the{' '}
-          <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })); onClose(); }}
+          <button type="button" onClick={() => { openGrowthEngineModal(); onClose(); }}
             style={{ background: 'none', border: 'none', color: colors.primary, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
             Growth Engine →
           </button>
@@ -657,24 +705,34 @@ const InlineRefineForm: React.FC<{ comment: string; originalPost: string; onClos
 // E3 — Post Engagement Pulse
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface PostPulseModalProps { open: boolean; onClose: () => void; }
+interface PostPulseModalProps { open: boolean; onClose: () => void; connected?: boolean; }
 
-export const PostPulseModal: React.FC<PostPulseModalProps> = ({ open, onClose }) => {
+export const PostPulseModal: React.FC<PostPulseModalProps> = ({ open, onClose, connected = true }) => {
   const [posts, setPosts] = useState<LinkedInPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [boosting, setBoosting] = useState<string | null>(null);
   const [boosted, setBoosted] = useState<Record<string, string>>({});
+  const [loadedAt, setLoadedAt] = useState<number | null>(null);
 
+  const fetchPosts = useCallback(async (refresh = false) => {
+    setLoading(true); setError('');
+    try {
+      const res = await postAnalyticsApi.fetchStoredAnalytics(refresh);
+      const fetched = res.posts ?? [];
+      setPosts(fetched);
+      if (fetched.length > 0) setLoadedAt(Date.now());
+    } catch {
+      setError('Could not load your posts. Make sure LinkedIn is connected.');
+    } finally { setLoading(false); }
+  }, []);
+
+  // On mount: reset state, auto-load from DB cache
   useEffect(() => {
     if (!open) return;
-    setPosts([]); setError(''); setBoosted({});
-    setLoading(true);
-    postAnalyticsApi.fetchPosts({ limit: 10 })
-      .then(res => setPosts(res.posts ?? []))
-      .catch(() => setError('Could not load your posts. Make sure LinkedIn is connected.'))
-      .finally(() => setLoading(false));
-  }, [open]);
+    setError(''); setBoosted({}); setPosts([]); setLoadedAt(null);
+    void fetchPosts(false);
+  }, [open, fetchPosts]);
 
   const sorted = useMemo(() =>
     [...posts].sort((a, b) => (b.engagement?.engagement_rate ?? 0) - (a.engagement?.engagement_rate ?? 0)),
@@ -705,18 +763,28 @@ export const PostPulseModal: React.FC<PostPulseModalProps> = ({ open, onClose })
       {loading && <LoadingRow message="Loading your post metrics from LinkedIn…" />}
       {error && <ErrorBanner msg={error} />}
 
-      {!loading && posts.length === 0 && !error && (
+      {/* No cache + not connected → connect prompt */}
+      {!loading && posts.length === 0 && !connected && !error && (
+        <ConnectPrompt message="Connect your LinkedIn account to view engagement metrics for your published posts." />
+      )}
+
+      {/* No cache + connected → empty state with Load button */}
+      {!loading && posts.length === 0 && connected && !error && (
         <EmptyPrompt
           icon="📊"
-          title="No posts found"
-          desc="Connect your LinkedIn account and publish a post to see engagement metrics here."
-          btnLabel="Refresh"
-          onLoad={() => { setLoading(true); postAnalyticsApi.fetchPosts({ limit: 10 }).then(r => setPosts(r.posts)).catch(() => setError('Failed.')).finally(() => setLoading(false)); }}
+          title="No posts loaded yet"
+          desc="Load your recent LinkedIn posts to see engagement metrics."
+          btnLabel="🚀 Load Posts"
+          onLoad={() => void fetchPosts(false)}
         />
       )}
 
+      {/* Cached/loaded posts */}
       {!loading && topPosts.length > 0 && (
         <>
+          {/* RefreshBar — triggers full sync from Unipile */}
+          {loadedAt && <RefreshBar cachedAt={loadedAt} onRefresh={() => void fetchPosts(true)} loading={loading} />}
+
           <SectionHeader icon="🏆" label="Top Performing Posts" />
           {topPosts.map(post => (
             <PostMetricsRow
@@ -832,9 +900,9 @@ const MetricChip: React.FC<{ icon: string; value: number; label: string }> = ({ 
 // E4 — Network Growth Advisor
 // ─────────────────────────────────────────────────────────────────────────────
 
-interface NetworkAdvisorModalProps { open: boolean; onClose: () => void; }
+interface NetworkAdvisorModalProps { open: boolean; onClose: () => void; connected?: boolean; }
 
-export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({ open, onClose }) => {
+export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({ open, onClose, connected = true }) => {
   const { data, loading, error, loadAll } = useGrowthCache(open);
   const [drafting, setDrafting] = useState<number | null>(null);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
@@ -868,7 +936,13 @@ export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({ open, 
         AI-suggested connections to grow your network this week — with personalised outreach messages.
       </p>
 
-      {!data && !loading && (
+      {!connected && data && <StaleDataNote />}
+
+      {!data && !loading && !connected && (
+        <ConnectPrompt message="Connect your LinkedIn account to get personalised network suggestions based on your profile and activity." />
+      )}
+
+      {!data && !loading && connected && (
         <EmptyPrompt
           icon="🤝"
           title="No network suggestions cached"
@@ -936,7 +1010,7 @@ export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({ open, 
       {!loading && suggestions.length > 3 && (
         <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 4, textAlign: 'center' }}>
           + {suggestions.length - 3} more in the{' '}
-          <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })); onClose(); }}
+          <button type="button" onClick={() => { openGrowthEngineModal(); onClose(); }}
             style={{ background: 'none', border: 'none', color: colors.primary, cursor: 'pointer', fontSize: 12, fontWeight: 600, padding: 0 }}>
             Growth Engine →
           </button>

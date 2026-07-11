@@ -2,7 +2,7 @@ import React from 'react';
 
 interface DashboardCopilotFabProps {
   onOpenCopilot: () => void;
-  variant?: 'rail' | 'fixed';
+  variant?: 'rail' | 'fixed' | 'corner';
   layout?: 'absolute' | 'stacked';
 }
 
@@ -12,15 +12,23 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
   layout = 'absolute',
 }) => {
   const isFixed = variant === 'fixed';
+  const isCorner = variant === 'corner';
   const isStacked = layout === 'stacked';
   const isRail = variant === 'rail';
-  const buttonSize = isFixed ? 56 : isRail ? 56 : 48;
+  const buttonSize = isFixed || isCorner ? 56 : isRail ? 56 : 48;
+  const showLabelBadge = isFixed || isCorner;
 
   return (
     <div
-      className={isFixed ? 'linkedin-copilot-fab-fixed-inner' : undefined}
-      style={
+      className={
         isFixed
+          ? 'linkedin-copilot-fab-fixed-inner'
+          : isCorner
+            ? 'linkedin-copilot-fab-corner-inner'
+            : undefined
+      }
+      style={
+        isFixed || isCorner
           ? undefined
           : isStacked
             ? {
@@ -80,17 +88,17 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
           fontWeight: 700,
           color: '#0a66c2',
           textAlign: 'center',
-          maxWidth: 108,
+          maxWidth: isCorner ? 120 : 108,
           lineHeight: 1.2,
-          ...(isRail
-            ? {}
-            : {
+          ...(showLabelBadge
+            ? {
                 background: 'rgba(255,255,255,0.92)',
                 padding: '2px 6px',
                 borderRadius: 8,
                 border: '1px solid #BCE0FD',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-              }),
+              }
+            : {}),
         }}
       >
         Ask ALwrity Co-Pilot

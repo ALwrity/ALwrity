@@ -146,3 +146,53 @@ class PostAnalyticsSummary(BaseModel):
     total_followers_gained: int = Field(..., ge=0)
     average_engagement_rate: float = Field(..., ge=0.0, le=1.0)
     best_performing_post_id: Optional[str] = Field(default=None)
+
+
+# ── Engagement Trends (time-series history) ─────────────────────────────
+
+
+class MetricDelta(BaseModel):
+    """Before/after values and deltas for a single metric."""
+    before: int
+    now: int
+    delta: int
+    pct_change: float
+
+
+class PostDelta(BaseModel):
+    """Per-post delta between two snapshot epochs."""
+    post_id: str
+    social_id: Optional[str] = Field(
+        default=None,
+        description="Unipile social_id required for list/reply comments API",
+    )
+    text: str
+    author_name: str
+    share_url: Optional[str] = None
+    reactions_delta: int = 0
+    comments_delta: int = 0
+    impressions_delta: int = 0
+    engagement_rate_now: float = 0.0
+    engagement_rate_before: float = 0.0
+
+
+class EngagementSummary(BaseModel):
+    """Aggregate summary across all posts for the comparison period."""
+    total_posts: int
+    reactions: MetricDelta
+    comments: MetricDelta
+    impressions: MetricDelta
+    avg_engagement_rate_before: float
+    avg_engagement_rate_now: float
+
+
+class PostAnalyticsHistoryResponse(BaseModel):
+    """Response model for GET /post-analytics/history."""
+    period: dict  # {"from": datetime, "to": datetime}
+    summary: EngagementSummary
+    top_gainers: list[PostDelta]
+    top_decliners: list[PostDelta]
+    last_synced_at: Optional[datetime] = Field(
+        default=None,
+        description="When post analytics were last fetched from LinkedIn",
+    )

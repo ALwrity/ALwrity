@@ -82,7 +82,7 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
     <div style={{ marginBottom: 8 }}>
       {/* Header row */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
-        <span style={{ fontSize: 9, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: 0.4 }}>
           Profile Growth
         </span>
         <div style={{ display: 'flex', gap: 2 }}>
@@ -92,8 +92,8 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
               type="button"
               onClick={() => setPreset(p.days)}
               style={{
-                padding: '1px 5px',
-                fontSize: 7,
+                padding: '2px 6px',
+                fontSize: 8,
                 fontWeight: 700,
                 borderRadius: 3,
                 border: 'none',
@@ -127,7 +127,7 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
 
       {/* Metrics grid */}
       {!loading && !error && data && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 4 }}>
           {METRIC_DEFS.map(m => {
             const raw = analytics[m.key as MetricKey];
             const formatted = m.format(raw);
@@ -138,12 +138,12 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
                   background: '#f8fafc',
                   border: '1px solid #e2e8f0',
                   borderRadius: 5,
-                  padding: '4px 5px',
+                  padding: '5px 6px',
                   textAlign: 'center',
                 }}
               >
-                <div style={{ fontSize: 7, color: '#64748b', marginBottom: 1, lineHeight: 1.2 }}>{m.label}</div>
-                <div style={{ fontSize: 11, fontWeight: 800, color: formatted === '—' ? '#94a3b8' : m.color }}>
+                <div style={{ fontSize: 8, color: '#64748b', marginBottom: 2, lineHeight: 1.2 }}>{m.label}</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: formatted === '—' ? '#94a3b8' : m.color }}>
                   {formatted}
                 </div>
               </div>

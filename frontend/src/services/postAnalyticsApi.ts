@@ -45,9 +45,67 @@ export interface FetchPostsParams {
   limit?: number;
 }
 
+// ── Engagement Trends ──────────────────────────────────────────────────
+
+export interface MetricDelta {
+  before: number;
+  now: number;
+  delta: number;
+  pct_change: number;
+}
+
+export interface PostDelta {
+  post_id: string;
+  /** Unipile social_id — required for list/reply comments API (Phase 2+). */
+  social_id?: string | null;
+  text: string;
+  author_name: string;
+  share_url: string | null;
+  reactions_delta: number;
+  comments_delta: number;
+  impressions_delta: number;
+  engagement_rate_now: number;
+  engagement_rate_before: number;
+}
+
+export interface EngagementSummary {
+  total_posts: number;
+  reactions: MetricDelta;
+  comments: MetricDelta;
+  impressions: MetricDelta;
+  avg_engagement_rate_before: number;
+  avg_engagement_rate_now: number;
+}
+
+export interface PostAnalyticsHistoryResponse {
+  period: { from: string; to: string };
+  summary: EngagementSummary;
+  top_gainers: PostDelta[];
+  top_decliners: PostDelta[];
+  /** ISO timestamp of the last successful LinkedIn analytics sync. */
+  last_synced_at?: string | null;
+}
+
 export const postAnalyticsApi = {
   async fetchPosts(params?: FetchPostsParams): Promise<PostListResponse> {
     const { data } = await aiApiClient.get<PostListResponse>(BASE, { params });
+    return data;
+  },
+
+  /** Fetch cached post analytics from the workspace DB.
+   *  Pass refresh=true to trigger a fresh sync from Unipile first. */
+  async fetchStoredAnalytics(refresh = false): Promise<PostListResponse> {
+    const { data } = await aiApiClient.get<PostListResponse>('/api/linkedin/post-analytics', {
+      params: { refresh },
+    });
+    return data;
+  },
+
+  /** Fetch engagement trends comparing the last two snapshot epochs. */
+  async fetchEngagementHistory(): Promise<PostAnalyticsHistoryResponse> {
+    const { data } = await aiApiClient.get<PostAnalyticsHistoryResponse>(
+      '/api/linkedin/post-analytics/history'
+    );
     return data;
   },
 };
