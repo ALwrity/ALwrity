@@ -65,7 +65,6 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         overflow: 'visible',
         position: 'relative',
         paddingTop: 0,
-        background: 'linear-gradient(180deg, #FFFFFF 0%, #E3F2FD 100%)',
       }}
     >
       <div

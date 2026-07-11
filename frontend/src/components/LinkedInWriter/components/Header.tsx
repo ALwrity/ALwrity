@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import { LinkedInPreferences } from '../utils/storageUtils';
 import { PersonaChip } from '../../TextEditor/ContentPreviewHeaderComponents';
 import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
@@ -49,7 +48,6 @@ export const Header: React.FC<HeaderProps> = ({
   onResetDraft,
   generatePost,
 }) => {
-  const navigate = useNavigate();
   const personaDropdownRef = useRef<HTMLDivElement>(null);
   const personaButtonRef = useRef<HTMLButtonElement>(null);
   const personaPanelRef = useRef<HTMLDivElement>(null);
@@ -226,35 +224,20 @@ export const Header: React.FC<HeaderProps> = ({
       className="linkedin-writer-header"
     >
       <div className="linkedin-writer-header-row">
-        {/* Left — logo (home) + product title + search */}
-        <div className="linkedin-writer-header-left">
+        <div className="linkedin-writer-header-brand">
           <button
             type="button"
+            className="linkedin-writer-header-brand-logo"
             onClick={handleLogoClick}
             title={hasDraft ? 'Back to LinkedIn Dashboard' : 'LinkedIn Studio home'}
             aria-label={hasDraft ? 'Back to LinkedIn Dashboard' : 'LinkedIn Studio home'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 6,
-              background: '#ffffff',
-              border: '1px solid rgba(10, 102, 194, 0.15)',
-              borderRadius: 8,
-              cursor: 'pointer',
-              flexShrink: 0,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
-            }}
           >
-            <img
-              src="/alwrity-icon.png"
-              alt="ALwrity"
-              style={{ height: 36, width: 36, objectFit: 'contain' }}
-            />
+            <img src="/alwrity-icon.png" alt="ALwrity" />
           </button>
-          <div style={{ minWidth: 0 }}>
-            <h1 className={NAV_TITLE_CLASS}>LinkedIn Studio</h1>
-          </div>
+          <h1 className={NAV_TITLE_CLASS}>LinkedIn Studio</h1>
+        </div>
+
+        <div className="linkedin-writer-header-left">
           <LinkedInSearchBar
             value={linkedInSearch.query}
             onChange={linkedInSearch.setQuery}
@@ -607,15 +590,6 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="linkedin-writer-header-controls">
-          <button
-            type="button"
-            className="linkedin-writer-header-pill-btn"
-            onClick={() => navigate('/asset-library?source_module=linkedin_writer')}
-            title="Saved posts and drafts"
-            aria-label="Open Asset Library"
-          >
-            📚 Library
-          </button>
           <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
         </div>
       </div>

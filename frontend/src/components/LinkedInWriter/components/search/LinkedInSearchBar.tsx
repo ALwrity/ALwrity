@@ -50,10 +50,11 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
         display: 'flex',
         alignItems: 'center',
         gap: 8,
-        minWidth: compact ? 40 : 200,
-        maxWidth: 280,
-        flex: '1 1 200px',
-        padding: '6px 14px',
+        minWidth: compact ? 40 : 140,
+        maxWidth: 200,
+        width: compact ? 40 : 180,
+        flex: '0 0 auto',
+        padding: '6px 12px',
         background: '#ffffff',
         border: '1px solid rgba(10, 102, 194, 0.15)',
         borderRadius: 24,
@@ -61,7 +62,7 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
         opacity: disabled ? 0.65 : 1,
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
       }}
-      title={disabled ? 'Connect LinkedIn to search' : 'Search LinkedIn'}
+      title={disabled ? 'Connect LinkedIn to search' : 'LinkedIn Search'}
     >
       <span style={{ display: 'flex', flexShrink: 0 }}>
         <SearchIcon />
@@ -73,8 +74,8 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        placeholder={compact ? '' : 'Search'}
-        aria-label="Search LinkedIn"
+        placeholder={compact ? '' : 'Search LinkedIn'}
+        aria-label="LinkedIn Search"
         style={{
           flex: 1,
           minWidth: 0,

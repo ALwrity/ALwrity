@@ -5,7 +5,7 @@ import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
 import { ProfileGrowthWidget } from './ProfileGrowthWidget';
 import { DailyDigestWidget } from './DailyDigestWidget';
 
-const SIDEBAR_WIDTH = 300;
+const SIDEBAR_WIDTH = 340;
 
 interface DashboardAnalyticsSidebarProps {
   onViewAll?: () => void;

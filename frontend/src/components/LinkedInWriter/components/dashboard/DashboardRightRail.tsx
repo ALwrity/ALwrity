@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardAnalyticsSidebar, DASHBOARD_RIGHT_RAIL_WIDTH } from './DashboardAnalyticsSidebar';
 import { KnowledgeCenterDock, type KnowledgeCenterAction } from './KnowledgeCenterDock';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
+import { LibraryRailButton } from './LibraryRailButton';
 
 interface DashboardRightRailProps {
   onViewAllAnalytics?: () => void;
@@ -21,8 +21,7 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
         width: DASHBOARD_RIGHT_RAIL_WIDTH,
         flexShrink: 0,
         alignSelf: 'stretch',
-        borderLeft: `2px solid ${FRAME_COLOR}`,
-        background: '#fafbfc',
+        background: 'transparent',
         padding: '10px 10px 12px',
         display: 'flex',
         flexDirection: 'column',
@@ -33,11 +32,12 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
     >
       <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
 
-      {onKnowledgeCenterAction && (
-        <div className="linkedin-dashboard-rail-knowledge">
+      <div className="linkedin-dashboard-rail-actions">
+        <LibraryRailButton />
+        {onKnowledgeCenterAction && (
           <KnowledgeCenterDock variant="rail" onFeatureAction={onKnowledgeCenterAction} />
-        </div>
-      )}
+        )}
+      </div>
     </aside>
   );
 };
