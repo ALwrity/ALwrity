@@ -528,7 +528,7 @@ class TxtaiIntelligenceService:
 
             logger.debug(f"Searching for query: '{query}' with limit: {limit}")
             # Phase 2.1: off-loop to keep the event loop free.
-            results = await self._search_with_ann_fallback(query, limit=limit)
+            results = await self._run_blocking(self._search_with_ann_fallback, query, limit=limit)
             
             # Cache the results if caching is enabled
             if self.enable_caching and self.cache_manager and results:
@@ -680,7 +680,7 @@ class TxtaiIntelligenceService:
             # Perform a search to get graph structure
             sample_query = "content marketing digital strategy"
             # Phase 2.1: graph_results is a blocking call; off-loop.
-            graph_results = await self._search_with_ann_fallback(sample_query, limit=10, graph=True)
+            graph_results = await self._run_blocking(self._search_with_ann_fallback, sample_query, limit=10, graph=True)
 
             if not graph_results:
                 logger.warning(f"No graph results for clustering user {self.user_id}")

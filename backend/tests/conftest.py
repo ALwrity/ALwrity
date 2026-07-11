@@ -15,7 +15,11 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-if "dotenv" not in sys.modules:
+try:
+    import dotenv
+    # Force load backend/.env at test setup time
+    dotenv.load_dotenv(BACKEND_ROOT / ".env")
+except ImportError:
     _dotenv = types.ModuleType("dotenv")
     _dotenv.load_dotenv = lambda *args, **kwargs: None
     sys.modules["dotenv"] = _dotenv
@@ -38,8 +42,63 @@ if "services.llm_providers.main_image_generation" not in sys.modules:
     async def generate_image_variation(*args, **kwargs):
         return {"url": "", "variations": []}
 
+    def generate_image(prompt: str, options=None, user_id=None):
+        from services.llm_providers.image_generation.base import ImageGenerationResult
+        return ImageGenerationResult(
+            image_bytes=b"mock_bytes",
+            width=1024,
+            height=1024,
+            provider="mock",
+            model="mock",
+        )
+
+    def generate_image_edit(*args, **kwargs):
+        from services.llm_providers.image_generation.base import ImageGenerationResult
+        return ImageGenerationResult(
+            image_bytes=b"mock_bytes",
+            width=1024,
+            height=1024,
+            provider="mock",
+            model="mock",
+        )
+
+    def generate_face_swap(*args, **kwargs):
+        from services.llm_providers.image_generation.base import ImageGenerationResult
+        return ImageGenerationResult(
+            image_bytes=b"mock_bytes",
+            width=1024,
+            height=1024,
+            provider="mock",
+            model="mock",
+        )
+
+    def generate_character_image(*args, **kwargs):
+        from services.llm_providers.image_generation.base import ImageGenerationResult
+        return ImageGenerationResult(
+            image_bytes=b"mock_bytes",
+            width=1024,
+            height=1024,
+            provider="mock",
+            model="mock",
+        )
+
+    def generate_image_with_provider(*args, **kwargs):
+        from services.llm_providers.image_generation.base import ImageGenerationResult
+        return ImageGenerationResult(
+            image_bytes=b"mock_bytes",
+            width=1024,
+            height=1024,
+            provider="mock",
+            model="mock",
+        )
+
     _llm_img.generate_image_variation = generate_image_variation
     _llm_img._enhance_image_prompt = _enhance_image_prompt
+    _llm_img.generate_image = generate_image
+    _llm_img.generate_image_edit = generate_image_edit
+    _llm_img.generate_face_swap = generate_face_swap
+    _llm_img.generate_character_image = generate_character_image
+    _llm_img.generate_image_with_provider = generate_image_with_provider
     sys.modules["services.llm_providers.main_image_generation"] = _llm_img
 
 # =========================================================================

@@ -2,7 +2,7 @@
 import re
 from pathlib import Path
 
-BACKEND_ROOT = Path(r"C:/Users/diksha rawat/Desktop/ALwrity_github/windsurf/ALwrity/backend")
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _read(rel: str) -> str:

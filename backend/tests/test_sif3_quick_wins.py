@@ -3,8 +3,8 @@ import ast
 import re
 from pathlib import Path
 
-BACKEND_ROOT = Path(r"C:/Users/diksha rawat/Desktop/ALwrity_github/windsurf/ALwrity/backend")
-FRONTEND_ROOT = Path(r"C:/Users/diksha rawat/Desktop/ALwrity_github/windsurf/ALwrity/frontend/src")
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_ROOT = Path(__file__).resolve().parents[2] / "frontend/src"
 
 
 def _read(rel: str) -> str:

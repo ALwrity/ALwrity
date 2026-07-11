@@ -407,7 +407,7 @@ def _resolve_backfill_provider(user_id: str) -> tuple:
         from services.llm_providers.tenant_provider_config import (
             tenant_provider_config_resolver,
         )
-        provider_cfg = tenant_provider_config_resolver.resolve(user_id)
+        provider_cfg = tenant_provider_config_resolver.resolve("text", user_id)
         provider = None
         if provider_cfg.selected_providers:
             first = provider_cfg.selected_providers[0]
@@ -470,12 +470,21 @@ def _build_single_task_for_missing_pillar(
             json_struct=schema,
             user_id=user_id,
             preferred_provider=preferred_provider,
-            model=preferred_model,
+            preferred_hf_models=[preferred_model] if preferred_model else None,
         )
         candidate = raw if isinstance(raw, dict) else json.loads(raw)
     except Exception as e:
         logger.warning(f"Failed to generate pillar backfill task for {pillar_id}: {e}")
-        return None
+        return {
+            "pillarId": pillar_id,
+            "title": f"Review {pillar_id.capitalize()} task",
+            "description": f"Daily review task for {pillar_id} pillar (LLM offline fallback)",
+            "priority": "medium",
+            "estimatedTime": 15,
+            "actionType": "navigate",
+            "enabled": True,
+            "metadata": {"source": "local_fallback_on_error"}
+        }
 
     candidate = _sanitize_task(candidate)
     if candidate:

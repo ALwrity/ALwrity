@@ -720,6 +720,12 @@ def suggest_prompts(
         }.get(image_type, "General blog image guidance.")
 
         # Build comprehensive prompt with visual data and model-specific guidance
+        if not visual_summary:
+            subheads_str = ', '.join(subheads[:5])
+            key_points_str = ', '.join(key_points[:5])
+            keywords_str = ', '.join([str(k) for k in keywords[:8]])
+            visual_summary = f"Subheadings: {subheads_str}\nKey Points: {key_points_str}\nKeywords: {keywords_str}"
+
         prompt = f"""
         Provider: {provider}
         Model: {model or 'auto-selected'}
@@ -727,7 +733,7 @@ def suggest_prompts(
         Title: {title}
         
         VISUAL DATA EXTRACTED FROM CONTENT:
-        {visual_summary if visual_summary else f"Subheadings: {', '.join(subheads[:5])}\nKey Points: {', '.join(key_points[:5])}\nKeywords: {', '.join([str(k) for k in keywords[:8]])}"}
+        {visual_summary}
         
         CONTEXT:
         Audience: {audience}
