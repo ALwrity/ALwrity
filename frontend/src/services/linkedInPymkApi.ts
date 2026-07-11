@@ -71,6 +71,8 @@ export interface FetchPymkParams {
   pageStart?: number;
   pageSize?: number;
   cohortId?: string;
+  /** When true, bypass workspace DB cache and fetch fresh LinkedIn data (page 0). */
+  refresh?: boolean;
 }
 
 const LICDN_MEDIA_HOST = 'media.licdn.com';
@@ -146,6 +148,7 @@ export const linkedInPymkApi = {
           page_start: params.pageStart ?? 0,
           page_size: params.pageSize ?? 10,
           ...(params.cohortId ? { cohort_id: params.cohortId } : {}),
+          ...(params.refresh ? { refresh: true } : {}),
         },
       },
     );

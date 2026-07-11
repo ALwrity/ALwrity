@@ -26,8 +26,10 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
   useEffect(() => {
     if (mountedRef.current) return;
     mountedRef.current = true;
-    void fetchSuggestions().catch(() => undefined);
-  }, [fetchSuggestions]);
+    if (!data) {
+      void fetchSuggestions().catch(() => undefined);
+    }
+  }, [fetchSuggestions, data]);
 
   const handleCohortChange = useCallback(
     (next: typeof cohort) => {

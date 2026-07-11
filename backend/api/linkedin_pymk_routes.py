@@ -13,9 +13,12 @@ from loguru import logger
 
 from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
 from models.linkedin_pymk_models import PymkCohortDefaultsResponse, PymkListResponse
+from services.database import get_db
 from services.integrations.linkedin.pymk_service import PymkService, PymkServiceError, get_pymk_service
 from services.integrations.linkedin.pymk_types import PymkCohort
 from services.integrations.linkedin.types import LinkedInNotConnectedError
+from services.linkedin_pymk_cache_service import LinkedInPymkCacheService
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn PYMK"])
 
@@ -170,28 +173,45 @@ async def get_people_you_may_know(
         default=None,
         description="school_id, super_title_id, or industry_id depending on cohort",
     ),
+    refresh: bool = Query(
+        False,
+        description="Fetch fresh data from LinkedIn before returning (page 0 only)",
+    ),
     current_user: dict = Depends(get_current_user),
     service: PymkService = Depends(get_pymk_service),
+    db: Session = Depends(get_db),
 ) -> PymkListResponse:
     """
     Fetch live LinkedIn People You May Know suggestions (view-only).
 
-  Cohort-specific IDs are required for same_school, same_job, and same_industry.
+    For ``page_start=0``, returns workspace DB cache unless ``refresh=true``.
+    Pagination requests (``page_start > 0``) always call LinkedIn live.
+
+    Cohort-specific IDs are required for same_school, same_job, and same_industry.
     """
     user_id = _user_id(current_user)
     parsed_cohort = _parse_cohort(cohort)
+    normalized_cohort_id = (cohort_id or "").strip()
 
     logger.info(
-        "[PYMK] request user_id={} cohort={} page_start={} page_size={} cohort_id={}",
+        "[PYMK] request user_id={} cohort={} page_start={} page_size={} cohort_id={} refresh={}",
         user_id,
         parsed_cohort.value,
         page_start,
         page_size,
         cohort_id,
+        refresh,
     )
 
+    cache_service = LinkedInPymkCacheService(db)
+
+    if page_start == 0 and not refresh:
+        cached = cache_service.get_cached(user_id, parsed_cohort.value, normalized_cohort_id)
+        if cached is not None:
+            return cached
+
     try:
-        return await service.get_suggestions(
+        result = await service.get_suggestions(
             user_id,
             cohort=parsed_cohort,
             page_start=page_start,
@@ -222,3 +242,8 @@ async def get_people_you_may_know(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"error_code": "PYMK_ERROR", "message": "Failed to fetch PYMK suggestions"},
         ) from exc
+
+    if page_start == 0:
+        cache_service.store(user_id, parsed_cohort.value, normalized_cohort_id, result)
+
+    return result
