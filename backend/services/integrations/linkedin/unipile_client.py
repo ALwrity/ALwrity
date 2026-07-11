@@ -705,3 +705,93 @@ class UnipileClient:
             f"next_cursor={'set' if next_cursor else 'none'}"
         )
         return data
+
+    async def linkedin_raw_data(self, request_body: dict[str, Any]) -> dict[str, Any]:
+        """
+        Call Unipile magic route ``POST /api/v1/linkedin`` for LinkedIn raw data.
+
+        Used for PYMK and other advanced LinkedIn endpoints not exposed as
+        first-class Unipile APIs.
+
+        Args:
+            request_body: Unipile linkedin raw data payload (account_id, request_url, etc.)
+
+        Returns:
+            Raw Unipile response dict (typically ``LinkedinRawData``)
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        account_id = request_body.get("account_id", "unknown")
+        request_url = request_body.get("request_url", "")
+        method = request_body.get("method", "GET")
+
+        logger.info(
+            "[UnipileClient] linkedin_raw_data account_id={} method={} url={}",
+            account_id,
+            method,
+            request_url[:120] if isinstance(request_url, str) else request_url,
+        )
+
+        url = self._get_full_url("/api/v1/linkedin")
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(
+                url,
+                json=request_body,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        obj_type = data.get("object") if isinstance(data, dict) else None
+        data_len = len(data.get("data", "")) if isinstance(data, dict) else 0
+        logger.info(
+            "[UnipileClient] linkedin_raw_data success account_id={} object={} data_len={}",
+            account_id,
+            obj_type,
+            data_len,
+        )
+        return data if isinstance(data, dict) else {"raw": data}
+
+    async def get_company_profile(
+        self,
+        account_id: str,
+        identifier: str,
+    ) -> dict[str, Any]:
+        """
+        Fetch a LinkedIn company profile by public slug, name, or company id.
+
+        Uses ``GET /api/v1/linkedin/company/{identifier}``.
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        encoded = quote(identifier.strip(), safe="")
+        url = self._get_full_url(f"/api/v1/linkedin/company/{encoded}")
+        params = {"account_id": account_id}
+
+        logger.debug(
+            "[UnipileClient] Fetching company profile account_id={} identifier={}",
+            account_id,
+            identifier,
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(url, params=params, headers=_auth_headers(self._api_key))
+            _raise_for_error(response)
+            data = response.json()
+
+        if isinstance(data, dict):
+            logger.info(
+                "[UnipileClient] Company profile fetched account_id={} identifier={} "
+                "name={!r} industry={}",
+                account_id,
+                identifier,
+                data.get("name"),
+                data.get("industry"),
+            )
+        return data if isinstance(data, dict) else {"raw": data}
