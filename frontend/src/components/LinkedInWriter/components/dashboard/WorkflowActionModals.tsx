@@ -107,7 +107,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const openQuickCreate     = (type: string) => { onClose(); dispatch('linkedinwriter:openQuickCreate', { type }); };
   const openCalendar        = () => { onClose(); navigate('/content-planning', { state: { activeTab: 1 } }); };
   const openProfileAnalytics = () => { onClose(); dispatch('linkedinwriter:openOptimiseProfile'); };
-  const openContentAnalytics = () => { onClose(); dispatch('linkedinwriter:switchTab', { tab: 'analytics' }); };
+  const openContentAnalytics = () => { onClose(); dispatch('linkedinwriter:openPostAnalytics'); };
   const openSeoAnalytics    = () => { onClose(); navigate('/seo-dashboard'); };
   const openGrowthEngine    = () => { onClose(); dispatch('linkedinwriter:switchTab', { tab: 'growth' }); };
 

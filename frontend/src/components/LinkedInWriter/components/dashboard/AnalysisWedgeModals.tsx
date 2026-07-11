@@ -85,7 +85,7 @@ function openInCreate(topic: string, keyPoints: string, type: string = 'post') {
 
 function switchToGrowthEngine() {
   window.dispatchEvent(
-    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'analytics' } })
+    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'growth' } })
   );
 }
 

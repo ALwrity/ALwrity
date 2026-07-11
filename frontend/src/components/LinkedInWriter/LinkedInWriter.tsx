@@ -17,7 +17,6 @@ import {
   WelcomeMessage,
   ProgressTracker,
   GrowthEnginePanel,
-  PostAnalyticsPanel,
   LinkedInWriterTabBar,
   type ProgressStep,
   type LinkedInWriterTab,
@@ -199,7 +198,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   useEffect(() => {
     const onSwitchTab = (event: Event) => {
       const tab = (event as CustomEvent<{ tab?: LinkedInWriterTab }>).detail?.tab;
-      if (tab === 'editor' || tab === 'growth' || tab === 'analytics') {
+      if (tab === 'editor' || tab === 'growth') {
         setActiveTab(tab);
       }
     };
@@ -543,13 +542,6 @@ Always use the most appropriate tool for the user's request.`.trim();
           <div style={{ flex: 1, overflow: 'auto' }}>
             <GrowthEnginePanel generatePost={generatePost} userPreferences={userPreferences} />
           </div>
-        ) : activeTab === 'analytics' ? (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <PostAnalyticsPanel
-              isActive={activeTab === 'analytics'}
-              onGenerateSimilarPost={handleGenerateSimilarPost}
-            />
-          </div>
         ) : draft || isGenerating ? (<>
           {draft && !isGenerating && (
             <div style={{ 
@@ -655,6 +647,7 @@ Always use the most appropriate tool for the user's request.`.trim();
             onGenerateOutline={generateOutline}
             outlineMode={outlineMode}
             userPreferences={userPreferences}
+            onGenerateSimilarPost={handleGenerateSimilarPost}
           />)
         )}
       </div>
