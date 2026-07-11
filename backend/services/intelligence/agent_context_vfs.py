@@ -161,6 +161,7 @@ class AgentContextVFS:
         "/steps/integrations": AgentFlatContextStore.STEP5_FILENAME,
     }
     HIGH_SIGNAL_MARKERS = ("agent_summary", "high_signal_terms", "quick_facts", "context_type")
+    LOW_CONFIDENCE_MARKER = "low_confidence"
 
     def __init__(self, user_id: str, project_id: Optional[str] = None):
         self.user_id = user_id
@@ -353,6 +354,101 @@ class AgentContextVFS:
             ),
         )
         return ranked[: max(1, top_k)]
+
+    @staticmethod
+    def _mnemonic_token(result: Dict[str, Any], rank: int) -> str:
+        """Create compressed mnemonic token with source reference."""
+        path = str(result.get("path") or "unknown")
+        reason = str(result.get("reason") or "match")
+        confidence = float(result.get("confidence") or 0.0)
+        low_flag = "!" if result.get(AgentContextVFS.LOW_CONFIDENCE_MARKER) else ""
+        src = path.replace(".json", "").replace("_", "-")[:28]
+        hint = reason.replace(" ", "-")[:20]
+        return f"M{rank}:{src}|{hint}|c{confidence:.2f}{low_flag}"
+
+    @staticmethod
+    def _detect_contradictions(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Detect contradictory learnings by path with conflicting reasons/relevance classes."""
+        by_path: Dict[str, List[Dict[str, Any]]] = {}
+        for item in results:
+            p = str(item.get("path") or "")
+            by_path.setdefault(p, []).append(item)
+
+        contradictions: List[Dict[str, Any]] = []
+        for path, rows in by_path.items():
+            reasons = {str(r.get("reason") or "").strip().lower() for r in rows}
+            relevance = {str(r.get("relevance") or "").strip().lower() for r in rows}
+            # contradictory if both high/supported or mixed summary/body signals in same source cluster
+            if len(reasons) > 1 and len(relevance) > 1:
+                contradictions.append(
+                    {
+                        "path": path,
+                        "reason_variants": sorted([r for r in reasons if r]),
+                        "relevance_variants": sorted([r for r in relevance if r]),
+                        "count": len(rows),
+                    }
+                )
+        return contradictions
+
+    def _run_synthesis_pipeline(
+        self, ranked_results: List[Dict[str, Any]], *, char_budget: int = 1200, top_k: int = 5
+    ) -> Dict[str, Any]:
+        """
+        Flat-context synthesis pipeline:
+        1) Compress telemetry into mnemonic tokens with source references
+        2) Detect contradictions and mark low-confidence heuristics
+        3) Select top-ranked, budget-fitting tokens for prompt injection
+        4) Persist synthesis + source lineage for explainability
+        """
+        contradictions = self._detect_contradictions(ranked_results)
+        contradiction_paths = {c["path"] for c in contradictions}
+
+        normalized: List[Dict[str, Any]] = []
+        for idx, item in enumerate(ranked_results, start=1):
+            row = dict(item)
+            low_conf = bool(row.get("low_probability")) or (str(row.get("path") or "") in contradiction_paths)
+            row[self.LOW_CONFIDENCE_MARKER] = low_conf
+            if low_conf:
+                row["confidence"] = round(max(0.05, float(row.get("confidence", 0.0)) * 0.7), 3)
+            row["mnemonic_token"] = self._mnemonic_token(row, idx)
+            normalized.append(row)
+
+        chosen: List[Dict[str, Any]] = []
+        used = 0
+        for row in normalized[: max(1, top_k * 3)]:
+            token = str(row.get("mnemonic_token") or "")
+            cost = len(token) + 8
+            if chosen and used + cost > char_budget:
+                continue
+            chosen.append(row)
+            used += cost
+            if len(chosen) >= top_k:
+                break
+
+        synthesis = {
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "top_k": top_k,
+            "char_budget": char_budget,
+            "char_budget_used": used,
+            "selected_mnemonics": [c.get("mnemonic_token") for c in chosen],
+            "source_lineage": [
+                {
+                    "mnemonic_token": c.get("mnemonic_token"),
+                    "path": c.get("path"),
+                    "reason": c.get("reason"),
+                    "confidence": c.get("confidence"),
+                    "low_confidence": c.get(self.LOW_CONFIDENCE_MARKER, False),
+                }
+                for c in chosen
+            ],
+            "contradictions": contradictions,
+        }
+        self.append_activity_log(
+            event_type="flat_context_synthesis",
+            actor="agent_context_vfs",
+            details=synthesis,
+        )
+        return {"ranked_results": normalized, "synthesis": synthesis}
 
     @staticmethod
     def _resolve_json_path(data: Any, path_query: str) -> Any:
@@ -578,15 +674,26 @@ class AgentContextVFS:
                 bounded_results.append(r)
                 used += cost
 
+            synthesis_bundle = self._run_synthesis_pipeline(
+                self._static_triage(bounded_results, normalized),
+                char_budget=1200,
+                top_k=5,
+            )
+            triaged_results = synthesis_bundle["ranked_results"]
+            synthesis = synthesis_bundle["synthesis"]
+
             result = {
                 "query": normalized,
                 "attempted_queries": attempted_queries,
                 "matched_files_count": len(matched_files),
-                "results": self._static_triage(bounded_results, normalized),
+                "results": triaged_results,
                 "notice": notice,
                 "char_budget_used": used,
                 "can_answer": bool(bounded_results),
+                "synthesis": synthesis,
+                "prompt_context_mnemonics": synthesis.get("selected_mnemonics", []),
             }
+            # Top-ranked, budget-fitting mnemonic tokens are the only ones intended for prompt context injection.
             result["triage_top5"] = self._llm_router_stub(result["results"], top_k=5)
             logger.info(
                 f"[vfs_audit] user={self.store.safe_user_id} action=search_context query={normalized!r} results={len(result['results'])}"
