@@ -846,7 +846,10 @@ class TxtaiIntelligenceService:
             return {"status": "error", "user_id": self.user_id, "error": str(e)}
 
     def is_initialized(self) -> bool:
-        """Check if the service is properly initialized, triggering lazy init if needed."""
-        if not self._initialized:
-            self._ensure_initialized()
-        return self._initialized and self.embeddings is not None
+       """Check if the service is currently initialized.
+
+    This is a synchronous, read-only check — it does not trigger
+    initialization. Callers that need to ensure the service is ready
+    should await `_ensure_initialized_async()` first.
+    """
+    return self._initialized and self.embeddings is not None
