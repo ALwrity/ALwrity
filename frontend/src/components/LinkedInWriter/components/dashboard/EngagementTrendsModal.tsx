@@ -18,6 +18,7 @@ import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
 import { ENGAGEMENT_TRENDS_MODAL_SIZE } from './engagementTrendsModalLayout';
 import { PostDeltaRow } from './PostDeltaRow';
 import { PostCommentsModal } from './PostCommentsModal';
+import { EngagementGrowthDriversSection } from './EngagementGrowthDriversSection';
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
   return (
@@ -350,19 +351,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
             )}
 
             {data.top_gainers.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#16a34a',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.6,
-                    marginBottom: 6,
-                  }}
-                >
-                  📈 Top Gainers
-                </div>
+              <EngagementGrowthDriversSection period={data.period} summary={data.summary}>
                 {data.top_gainers.map((post) => (
                   <PostDeltaRow
                     key={post.post_id}
@@ -371,7 +360,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                     onViewComments={setCommentsPost}
                   />
                 ))}
-              </div>
+              </EngagementGrowthDriversSection>
             )}
 
             {data.top_decliners.length > 0 && (
