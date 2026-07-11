@@ -942,9 +942,20 @@ async def serve_product_avatar(
         if current_user_id != user_id:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Locate video file
+        # Restrict to a filename only (no nested paths)
+        requested_name = Path(filename)
+        if requested_name.is_absolute() or requested_name.name != filename:
+            raise HTTPException(status_code=400, detail="Invalid filename")
+        
+        # Locate and validate video file path within user's avatar directory
         base_dir = Path(__file__).parent.parent.parent
-        video_path = base_dir / "product_avatars" / user_id / filename
+        user_root = (base_dir / "product_avatars" / current_user_id).resolve()
+        video_path = (user_root / requested_name).resolve()
+
+        try:
+            video_path.relative_to(user_root)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid filename")
         
         if not video_path.exists():
             raise HTTPException(status_code=404, detail="Video not found")
@@ -952,7 +963,7 @@ async def serve_product_avatar(
         return FileResponse(
             path=str(video_path),
             media_type="video/mp4",
-            filename=filename
+            filename=requested_name.name
         )
         
     except HTTPException:
