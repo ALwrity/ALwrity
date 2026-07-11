@@ -1,16 +1,16 @@
 /**
  * Viewport-relative layout for the Engagement Trends modal.
- * Compact size (~40% of screen) with scrollable body for all sections.
+ * Covers ~50% of the screen with a scrollable body for all sections.
  */
 import type { CSSProperties } from 'react';
 
 export const ENGAGEMENT_TRENDS_MODAL_SIZE = {
-  width: '40vw',
-  maxWidth: 'min(40vw, 520px)',
-  minWidth: 360,
-  height: '40vh',
-  maxHeight: '40vh',
-  minHeight: 320,
+  width: '50vw',
+  maxWidth: '50vw',
+  minWidth: 400,
+  height: '50vh',
+  maxHeight: '50vh',
+  minHeight: 380,
 } as const;
 
 export const ENGAGEMENT_TRENDS_BODY_STYLE: CSSProperties = {
