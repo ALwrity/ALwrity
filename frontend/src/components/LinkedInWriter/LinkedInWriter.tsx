@@ -16,10 +16,7 @@ import {
   LoadingIndicator,
   WelcomeMessage,
   ProgressTracker,
-  GrowthEnginePanel,
-  LinkedInWriterTabBar,
   type ProgressStep,
-  type LinkedInWriterTab,
 } from './components';
 import OutlineEditor from './components/OutlineEditor';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
@@ -192,19 +189,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Tab navigation ──
-  const [activeTab, setActiveTab] = useState<LinkedInWriterTab>('editor');
-
-  useEffect(() => {
-    const onSwitchTab = (event: Event) => {
-      const tab = (event as CustomEvent<{ tab?: LinkedInWriterTab }>).detail?.tab;
-      if (tab === 'editor' || tab === 'growth') {
-        setActiveTab(tab);
-      }
-    };
-    window.addEventListener('linkedinwriter:switchTab', onSwitchTab);
-    return () => window.removeEventListener('linkedinwriter:switchTab', onSwitchTab);
-  }, []);
 
   // ── Outline → Article handler ──
   const handleGenerateArticleFromOutline = useCallback(async () => {
@@ -214,10 +198,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
 
   // ── Generate similar post handler ──
   const handleGenerateSimilarPost = useCallback((prompt: string) => {
-    // Switch to editor tab and set context
-    setActiveTab('editor');
     handleContextChange(prompt);
-    // Optionally trigger generation immediately or let user review
   }, [handleContextChange]);
 
   // ── Share a Link (Quick Post from URL) ──
@@ -533,16 +514,10 @@ Always use the most appropriate tool for the user's request.`.trim();
         generatePost={generatePost}
       />
 
-      <LinkedInWriterTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
-          {/* Content Area */}
-        {activeTab === 'growth' ? (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <GrowthEnginePanel generatePost={generatePost} userPreferences={userPreferences} />
-          </div>
-        ) : draft || isGenerating ? (<>
+        {draft || isGenerating ? (<>
           {draft && !isGenerating && (
             <div style={{ 
               padding: '8px 24px', 

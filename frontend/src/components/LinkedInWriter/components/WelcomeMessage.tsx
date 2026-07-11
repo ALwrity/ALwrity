@@ -28,6 +28,11 @@ import {
   AskAlwrityModal,
 } from './dashboard/KnowledgeCenterModals';
 import { PostAnalyticsModal } from './dashboard/PostAnalyticsModal';
+import { GrowthEngineModal } from './dashboard/GrowthEngineModal';
+import {
+  OPEN_GROWTH_ENGINE_EVENT,
+  OPEN_POST_ANALYTICS_EVENT,
+} from '../utils/linkedInDashboardEvents';
 
 interface WelcomeMessageProps {
   draft: string;
@@ -59,6 +64,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [showFactCheckModal, setShowFactCheckModal] = useState(false);
   const [workflowModal, setWorkflowModal] = useState<WorkflowModalId | null>(null);
   const [postAnalyticsOpen, setPostAnalyticsOpen] = useState(false);
+  const [growthEngineOpen, setGrowthEngineOpen] = useState(false);
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -96,8 +102,13 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
   useEffect(() => {
     const onOpenPostAnalytics = () => setPostAnalyticsOpen(true);
-    window.addEventListener('linkedinwriter:openPostAnalytics', onOpenPostAnalytics);
-    return () => window.removeEventListener('linkedinwriter:openPostAnalytics', onOpenPostAnalytics);
+    const onOpenGrowthEngine = () => setGrowthEngineOpen(true);
+    window.addEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
+    window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
+    return () => {
+      window.removeEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
+      window.removeEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
+    };
   }, []);
 
   useEffect(() => {
@@ -379,6 +390,13 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         open={postAnalyticsOpen}
         onClose={() => setPostAnalyticsOpen(false)}
         onGenerateSimilarPost={onGenerateSimilarPost}
+      />
+
+      <GrowthEngineModal
+        open={growthEngineOpen}
+        onClose={() => setGrowthEngineOpen(false)}
+        generatePost={onGeneratePost}
+        userPreferences={userPreferences}
       />
 
       <DashboardSimpleErrorModal
