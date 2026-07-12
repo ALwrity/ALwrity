@@ -14,6 +14,8 @@ interface DashboardActionModalProps {
   minHeight?: number | string;
   zIndex?: number;
   disableClose?: boolean;
+  /** Slightly larger title for primary wedge modals (e.g. Plan). */
+  titleSize?: 'default' | 'lg';
 }
 
 export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
@@ -29,6 +31,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   minHeight,
   zIndex = 11000,
   disableClose = false,
+  titleSize = 'default',
 }) => {
   if (!open) return null;
 
@@ -86,7 +89,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         >
           <h2
             id="dashboard-action-modal-title"
-            style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#0a66c2', letterSpacing: '-0.01em' }}
+            style={{ margin: 0, fontSize: titleSize === 'lg' ? 18 : 15, fontWeight: 700, color: '#0a66c2', letterSpacing: '-0.01em' }}
           >
             {title}
           </h2>
