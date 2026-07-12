@@ -28,6 +28,9 @@ export { GrowthEnginePanel } from './GrowthEngine';
 export { PostAnalyticsPanel } from './PostAnalytics';
 export { EngagementSummary } from './PostAnalytics';
 
+// People You May Know (PYMK)
+export { PeopleYouMayKnowPanel, PeopleYouMayKnowModal } from './PeopleYouMayKnow';
+
 // Refactored Components
 export { default as BrainstormFlow } from './BrainstormFlow';
 export { useCopilotActions } from './CopilotActions';

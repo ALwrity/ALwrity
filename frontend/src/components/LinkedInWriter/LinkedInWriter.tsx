@@ -189,7 +189,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-
   // ── Outline → Article handler ──
   const handleGenerateArticleFromOutline = useCallback(async () => {
     await generateArticle();

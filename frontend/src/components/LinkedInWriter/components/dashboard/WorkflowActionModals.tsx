@@ -36,10 +36,11 @@ import {
   DraftLibraryModal,
   PublishNowModal,
 } from './PublishWedgeModals';
+import { PeopleYouMayKnowModal } from '../PeopleYouMayKnow/PeopleYouMayKnowModal';
 
 type PlanSub = 'weekly_plan' | null;
 type AnalysisSub = 'snapshot' | 'brand_score' | 'viral' | 'trends' | null;
-type EngagementSub = 'booster' | 'comment' | 'opportunities' | 'pulse' | 'network' | null;
+type EngagementSub = 'booster' | 'comment' | 'opportunities' | 'pulse' | 'network' | 'pymk' | null;
 type RemarkSub = 'repurpose' | 'transformer' | 'refresh' | 'reviver' | 'perf_plan' | null;
 type PublishSub = 'drafts' | 'post_today' | 'publish_now' | null;
 
@@ -430,6 +431,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             onClick={() => { onClose(); setEngagementSub('network'); }}
           />
           <DashboardToolTile
+            title="People You May Know"
+            description="Live LinkedIn network suggestions — discover connections in your industry"
+            icon="👥"
+            accent="#10b981"
+            onClick={() => { onClose(); setEngagementSub('pymk'); }}
+          />
+          <DashboardToolTile
             title="Growth Engine"
             description="Full growth engine with all 7 AI-powered insight cards"
             icon="🚀"
@@ -444,6 +452,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <OpportunitiesModal     open={engagementSub === 'opportunities'} onClose={() => setEngagementSub(null)} connected={connected} />
       <PostPulseModal         open={engagementSub === 'pulse'}         onClose={() => setEngagementSub(null)} connected={connected} />
       <NetworkAdvisorModal    open={engagementSub === 'network'}       onClose={() => setEngagementSub(null)} connected={connected} />
+      <PeopleYouMayKnowModal open={engagementSub === 'pymk'} onClose={() => setEngagementSub(null)} />
 
       {/* ── Remarket ── */}
       <DashboardActionModal open={activeModal === 'remarket'} title="Remarket" onClose={onClose} maxWidth={680}>
