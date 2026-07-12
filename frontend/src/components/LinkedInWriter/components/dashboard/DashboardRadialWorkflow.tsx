@@ -3,6 +3,7 @@ import {
   DASHBOARD_WORKFLOW_CARDS,
   FRAME_COLOR,
   WEDGE_PANEL_GAP_DEG,
+  resolveDashboardWorkflowIcon,
   type DashboardWorkflowCardId,
 } from './dashboardWorkflowConfig';
 import type { RadialLayout } from './dashboardRadialLayout';
@@ -259,8 +260,27 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
               boxSizing: 'border-box',
             }}
           >
-            <div style={{ fontSize: iconFontSize, lineHeight: 1.1, marginBottom: 2 }}>
-              {card.icon}
+            <div
+              style={{
+                width: iconFontSize,
+                height: iconFontSize,
+                marginBottom: 2,
+                color: isActive ? card.accent : '#334155',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'color 180ms ease',
+              }}
+            >
+              {React.createElement(resolveDashboardWorkflowIcon(card.icon), {
+                sx: {
+                  color: 'currentColor',
+                  fontSize: iconFontSize,
+                  display: 'block',
+                },
+                'aria-hidden': true,
+                focusable: false,
+              })}
             </div>
             <div
               style={{
