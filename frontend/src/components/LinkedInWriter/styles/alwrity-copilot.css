@@ -2059,3 +2059,25 @@ body.linkedin-dashboard-view cpk-web-inspector {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
 }
+
+/* LinkedIn dashboard radial workflow motion */
+@keyframes prominentBreathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+.radial-glow-breath {
+  animation: prominentBreathe 2.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .radial-glow-breath {
+    animation: none !important;
+  }
+}
