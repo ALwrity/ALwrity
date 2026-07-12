@@ -1180,6 +1180,372 @@
   }
 }
 
+/* ========================================
+   PLAN WEDGE MODAL
+   ======================================== */
+
+.plan-wedge {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.plan-wedge-brainstorm {
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.plan-wedge-brainstorm__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, #0a66c2 0%, #004182 100%);
+}
+
+.plan-wedge-brainstorm__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.plan-wedge-brainstorm__titles {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-wedge-brainstorm__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.plan-wedge-brainstorm__subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.35;
+}
+
+.plan-wedge-brainstorm__body {
+  padding: 14px 16px 16px;
+}
+
+.plan-wedge-brainstorm__input {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  outline: none;
+  font-size: 13px;
+  resize: vertical;
+  background: #fff;
+  padding: 10px 12px;
+  line-height: 1.5;
+  color: #111827;
+  font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.plan-wedge-brainstorm__input:focus {
+  border-color: #0a66c2;
+  box-shadow: 0 0 0 3px rgba(10, 102, 194, 0.12);
+}
+
+.plan-wedge-brainstorm__input::placeholder {
+  color: #9ca3af;
+}
+
+.plan-wedge-brainstorm__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.plan-wedge-source-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.plan-wedge-source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+
+.plan-wedge-source-chip:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.plan-wedge-source-chip--active {
+  background: #eff6ff;
+  border-color: rgba(10, 102, 194, 0.35);
+  color: #0a66c2;
+}
+
+.plan-wedge-source-chip--disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.plan-wedge-source-chip__icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.plan-wedge-brainstorm__generate {
+  padding: 9px 20px;
+  border-radius: 9px;
+  border: none;
+  background: #e5e7eb;
+  color: #9ca3af;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: not-allowed;
+  white-space: nowrap;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.plan-wedge-brainstorm__generate--active {
+  background: linear-gradient(135deg, #0a66c2 0%, #004182 100%);
+  color: #fff;
+  cursor: pointer;
+}
+
+.plan-wedge-brainstorm__generate--active:hover {
+  opacity: 0.92;
+}
+
+.plan-wedge-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0 12px;
+}
+
+.plan-wedge-divider::before,
+.plan-wedge-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.plan-wedge-divider span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #9ca3af;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.plan-wedge-tools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.plan-wedge-tool-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.plan-wedge-tool-card:hover {
+  background: #f8fbff;
+  border-color: rgba(10, 102, 194, 0.2);
+}
+
+.plan-wedge-tool-card__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.plan-wedge-tool-card__icon--watchdog {
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.plan-wedge-tool-card__icon--weekly {
+  background: rgba(10, 102, 194, 0.1);
+}
+
+.plan-wedge-tool-card__copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-wedge-tool-card__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.plan-wedge-tool-card__desc {
+  font-size: 11.5px;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.plan-wedge-tool-card__arrow {
+  color: #14b8a6;
+  font-size: 17px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.plan-wedge-calendar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.04) 0%, rgba(167, 139, 250, 0.06) 100%);
+}
+
+.plan-wedge-calendar__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(139, 92, 246, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.plan-wedge-calendar__copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-wedge-calendar__title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.plan-wedge-calendar__title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7c3aed;
+}
+
+.plan-wedge-calendar__badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.14);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.plan-wedge-calendar__desc {
+  margin: 3px 0 0;
+  font-size: 11.5px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.plan-wedge-calendar__notify {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: #fff;
+  color: #7c3aed;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.plan-wedge-calendar__notify:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: #8b5cf6;
+}
+
+.plan-wedge-calendar__notify--done {
+  opacity: 0.65;
+  cursor: default;
+}
+
+@media (max-width: 560px) {
+  .plan-wedge-tools-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-wedge-brainstorm__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .plan-wedge-brainstorm__generate {
+    width: 100%;
+    text-align: center;
+  }
+
+  .plan-wedge-calendar {
+    flex-wrap: wrap;
+  }
+
+  .plan-wedge-calendar__notify {
+    width: 100%;
+    text-align: center;
+  }
+}
+
 /* LinkedIn dashboard: hide default Co-Pilot launcher (Analytics FAB opens sidebar) */
 body.linkedin-dashboard-view .alwrity-copilot-sidebar.copilotKitSidebar .copilotKitButton,
 body.linkedin-dashboard-view .copilotKitSidebar .copilotKitButton,
