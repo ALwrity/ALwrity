@@ -5,6 +5,7 @@ import {
   type KnowledgeCenterFeature,
 } from './knowledgeCenterFeatures';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
+import { DashboardRailIconButton } from './DashboardRailIconButton';
 
 export type KnowledgeCenterAction =
   | 'featureMap'
@@ -40,6 +41,18 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
   const isRail = variant === 'rail';
 
   useEffect(() => {
+    if (!expanded) return;
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (anchorRef.current?.contains(target)) return;
+      if ((event.target as Element).closest?.('.linkedin-knowledge-center-portal')) return;
+      setExpanded(false);
+    };
+    document.addEventListener('mousedown', onDocumentClick);
+    return () => document.removeEventListener('mousedown', onDocumentClick);
+  }, [expanded]);
+
+  useEffect(() => {
     onExpandedChange?.(expanded);
   }, [expanded, onExpandedChange]);
 
@@ -50,7 +63,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     const width = Math.min(720, window.innerWidth - 32);
     const right = Math.max(16, window.innerWidth - rect.right);
     setGridPos({
-      bottom: window.innerHeight - rect.top + 8,
+      bottom: window.innerHeight - rect.top,
       right,
       width,
     });
@@ -160,28 +173,13 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
   );
 
   const triggerButton = (
-    <button
-      type="button"
+    <DashboardRailIconButton
+      label="Knowledge Center"
+      icon="knowledge"
       onClick={() => setExpanded((open) => !open)}
-      aria-expanded={expanded}
-      style={{
-        padding: isRail ? '8px 10px' : '8px 14px',
-        width: isRail ? '100%' : undefined,
-        background: '#ffffff',
-        border: `2px solid ${FRAME_COLOR}`,
-        borderRadius: expanded && !isRail ? '12px 12px 0 0' : 10,
-        boxShadow: '0 4px 16px rgba(10, 102, 194, 0.12)',
-        fontSize: isRail ? 10 : 11,
-        fontWeight: 700,
-        color: '#0a66c2',
-        cursor: 'pointer',
-        textTransform: 'uppercase',
-        letterSpacing: '0.04em',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      Knowledge center
-    </button>
+      open={expanded}
+      ariaExpanded={expanded}
+    />
   );
 
   const portaledGrid =
@@ -199,9 +197,9 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
           width: gridPos.width,
           zIndex: 12000,
           pointerEvents: 'auto',
+          paddingBottom: 8,
+          boxSizing: 'border-box',
         }}
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
       >
         {gridContent}
       </div>,
@@ -212,12 +210,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     return (
       <>
         {portaledGrid}
-        <div
-          ref={anchorRef}
-          className="linkedin-knowledge-center-rail"
-          onMouseEnter={() => setExpanded(true)}
-          onMouseLeave={() => setExpanded(false)}
-        >
+        <div ref={anchorRef} className="linkedin-knowledge-center-rail">
           {triggerButton}
         </div>
       </>
@@ -226,11 +219,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
 
   return (
     <div className="linkedin-knowledge-center-dock">
-      <div
-        className="linkedin-knowledge-center-dock-inner"
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
-      >
+      <div ref={anchorRef} className="linkedin-knowledge-center-dock-inner">
         {expanded && <div style={{ marginBottom: 8 }}>{gridContent}</div>}
         {triggerButton}
       </div>

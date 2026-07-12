@@ -68,19 +68,23 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [runStudioTour, setRunStudioTour] = useState(false);
-  // Knowledge Center modal states
-  const [kcContentCoach, setKcContentCoach] = useState(false);
-  const [kcQuickStart, setKcQuickStart] = useState(false);
-  const [kcBestPractices, setKcBestPractices] = useState(false);
-  const [kcFeatureMap, setKcFeatureMap] = useState(false);
-  const [kcAskAlwrity, setKcAskAlwrity] = useState(false);
   const social = useLinkedInSocialConnection();
   const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
   const { userId } = useAuth();
   const tourSeenKey = userId
     ? `${LINKEDIN_STUDIO_TOUR_SEEN_KEY}_${userId}`
     : LINKEDIN_STUDIO_TOUR_SEEN_KEY;
+  const [runStudioTour, setRunStudioTour] = useState(false);
+  const [tourCompact, setTourCompact] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return Boolean(localStorage.getItem(tourSeenKey));
+  });
+  // Knowledge Center modal states
+  const [kcContentCoach, setKcContentCoach] = useState(false);
+  const [kcQuickStart, setKcQuickStart] = useState(false);
+  const [kcBestPractices, setKcBestPractices] = useState(false);
+  const [kcFeatureMap, setKcFeatureMap] = useState(false);
+  const [kcAskAlwrity, setKcAskAlwrity] = useState(false);
 
   const handleDisconnect = useCallback(async () => {
     if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
@@ -130,6 +134,10 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   }, []);
 
   useEffect(() => {
+    setTourCompact(Boolean(localStorage.getItem(tourSeenKey)));
+  }, [tourSeenKey]);
+
+  useEffect(() => {
     if (isSocialLoading) return;
     if (localStorage.getItem(tourSeenKey)) return;
 
@@ -153,6 +161,16 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       window.removeEventListener('linkedinwriter:openOptimiseProfile', requireConnection, true);
     };
   }, [connected, connectWithOAuth]);
+
+  const handleTourRunChange = useCallback(
+    (run: boolean) => {
+      setRunStudioTour(run);
+      if (!run && localStorage.getItem(tourSeenKey)) {
+        setTourCompact(true);
+      }
+    },
+    [tourSeenKey],
+  );
 
   const handleOpenCopilot = useCallback(() => {
     const copilotToggle =
@@ -278,13 +296,15 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       >
         <button
           type="button"
-          className="linkedin-studio-tour-trigger"
+          className={`linkedin-studio-tour-trigger${tourCompact ? ' linkedin-studio-tour-trigger--compact' : ''}`}
           data-tour="li-tour-trigger"
           onClick={() => setRunStudioTour(true)}
-          aria-label="How to use LinkedIn Studio — start guided tour"
-          title="Tour guide — how to use LinkedIn Studio"
+          aria-label={tourCompact ? 'Tour Guide' : 'How to use LinkedIn Studio — start guided tour'}
+          title={tourCompact ? undefined : 'Tour guide — how to use LinkedIn Studio'}
         >
-          <span aria-hidden>?</span>
+          <span className="linkedin-studio-tour-trigger-icon" aria-hidden>
+            ?
+          </span>
           <span className="linkedin-studio-tour-trigger-label">Tour guide</span>
         </button>
 
@@ -406,7 +426,11 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         onClose={() => setCopilotError(null)}
       />
 
-      <LinkedInStudioTour run={runStudioTour} onRunChange={setRunStudioTour} storageKey={tourSeenKey} />
+      <LinkedInStudioTour
+        run={runStudioTour}
+        onRunChange={handleTourRunChange}
+        storageKey={tourSeenKey}
+      />
     </div>
   );
 };
