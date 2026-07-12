@@ -66,6 +66,8 @@ export interface PostDelta {
   impressions_delta: number;
   engagement_rate_now: number;
   engagement_rate_before: number;
+  /** Share of total positive engagement growth (top gainers only). */
+  growth_contribution_pct?: number | null;
 }
 
 export interface EngagementSummary {

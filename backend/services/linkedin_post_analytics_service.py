@@ -19,6 +19,7 @@ from models.linkedin_posts_models import (
     PostDelta,
 )
 from models.post_analytics_snapshot_model import PostAnalyticsSnapshot
+from services.engagement_growth_contribution import attach_growth_contributions
 
 # Max posts shown in top gainers / top decliners lists
 TOP_TREND_POSTS_LIMIT = 5
@@ -257,6 +258,14 @@ class LinkedInPostAnalyticsService:
         sorted_deltas = sorted(deltas, key=_sort_key, reverse=True)
         top_gainers = [d for d in sorted_deltas if _sort_key(d) > 0][:TOP_TREND_POSTS_LIMIT]
         top_decliners = [d for d in reversed(sorted_deltas) if _sort_key(d) < 0][:TOP_TREND_POSTS_LIMIT]
+        top_gainers = attach_growth_contributions(top_gainers, deltas)
+
+        logger.info(
+            "[PostAnalyticsService] Engagement trends user_id={} gainers={} with_contribution={}",
+            user_id,
+            len(top_gainers),
+            sum(1 for d in top_gainers if d.growth_contribution_pct is not None),
+        )
 
         return PostAnalyticsHistoryResponse(
             period={"from": _utc_iso(t2), "to": _utc_iso(t1)},

@@ -2,6 +2,7 @@ import React from 'react';
 
 import type { PostDelta } from '../../../../services/postAnalyticsApi';
 import { colors, rowBase } from '../GrowthEngine/styles';
+import { GrowthContributionBadge } from './GrowthContributionBadge';
 
 const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -16,11 +17,22 @@ const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) =
 export interface PostDeltaRowProps {
   post: PostDelta;
   gain: boolean;
+  showContribution?: boolean;
   onViewComments?: (post: PostDelta) => void;
 }
 
-export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({ post, gain, onViewComments }) => {
+export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
+  post,
+  gain,
+  showContribution = true,
+  onViewComments,
+}) => {
   const showViewComments = post.comments_delta > 0 && onViewComments;
+  const showContributionBadge =
+    showContribution &&
+    gain &&
+    post.growth_contribution_pct != null &&
+    post.growth_contribution_pct > 0;
 
   return (
     <div
@@ -30,8 +42,29 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({ post, gain, onViewCo
         borderLeft: `3px solid ${gain ? '#16a34a' : '#dc2626'}`,
       }}
     >
-      <div style={{ fontSize: 13, fontWeight: 600, color: colors.textDark, marginBottom: 6 }}>
-        {post.text ? `${post.text.slice(0, 100)}…` : '(no text)'}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 10,
+          marginBottom: 6,
+        }}
+      >
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 13,
+            fontWeight: 600,
+            color: colors.textDark,
+          }}
+        >
+          {post.text ? `${post.text.slice(0, 100)}…` : '(no text)'}
+        </div>
+        {showContributionBadge && (
+          <GrowthContributionBadge contributionPct={post.growth_contribution_pct!} />
+        )}
       </div>
       <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
         {post.author_name}

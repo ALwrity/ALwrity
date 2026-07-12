@@ -174,6 +174,13 @@ class PostDelta(BaseModel):
     impressions_delta: int = 0
     engagement_rate_now: float = 0.0
     engagement_rate_before: float = 0.0
+    growth_contribution_pct: Optional[float] = Field(
+        default=None,
+        description=(
+            "Share of total positive engagement growth contributed by this post "
+            "across the comparison period (reactions + comments + impressions deltas)"
+        ),
+    )
 
 
 class EngagementSummary(BaseModel):

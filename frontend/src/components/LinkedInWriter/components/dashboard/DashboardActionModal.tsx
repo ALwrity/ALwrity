@@ -10,6 +10,8 @@ interface DashboardActionModalProps {
   maxWidth?: number | string;
   height?: number | string;
   maxHeight?: string;
+  minWidth?: number | string;
+  minHeight?: number | string;
   zIndex?: number;
   disableClose?: boolean;
 }
@@ -23,6 +25,8 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   maxWidth = 720,
   height,
   maxHeight = 'min(90vh, 640px)',
+  minWidth,
+  minHeight,
   zIndex = 11000,
   disableClose = false,
 }) => {
@@ -57,6 +61,8 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
           maxWidth,
           height,
           maxHeight,
+          minWidth,
+          minHeight,
           display: 'flex',
           flexDirection: 'column',
           background: '#ffffff',
