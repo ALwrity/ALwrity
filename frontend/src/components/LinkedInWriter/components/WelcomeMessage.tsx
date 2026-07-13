@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction, CONNECT_WELCOME_DISMISSED_KEY } from './LinkedInConnectionPlaceholder';
+import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction } from './LinkedInConnectionPlaceholder';
 import { InfoModals } from './InfoModals';
 import { QuickCreate } from './QuickCreate';
 import { LinkedInPreferences } from '../utils/storageUtils';
@@ -68,6 +68,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [connectWelcomeHandled, setConnectWelcomeHandled] = useState(false);
   const social = useLinkedInSocialConnection();
   const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
   const { userId } = useAuth();
@@ -93,7 +94,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     setIsDisconnecting(true);
     try {
       await disconnect();
-      sessionStorage.removeItem(CONNECT_WELCOME_DISMISSED_KEY);
     } finally {
       setIsDisconnecting(false);
     }
@@ -134,18 +134,24 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   }, []);
 
   useEffect(() => {
+    setConnectWelcomeHandled(false);
+  }, [userId]);
+
+  useEffect(() => {
     setTourCompact(Boolean(localStorage.getItem(tourSeenKey)));
   }, [tourSeenKey]);
 
   useEffect(() => {
     if (isSocialLoading) return;
     if (localStorage.getItem(tourSeenKey)) return;
+    // Let the connect welcome popup show first for new/disconnected users.
+    if (!connected && !connectWelcomeHandled) return;
 
     const timer = window.setTimeout(() => {
       setRunStudioTour(true);
     }, 800);
     return () => window.clearTimeout(timer);
-  }, [isSocialLoading, tourSeenKey]);
+  }, [isSocialLoading, tourSeenKey, connected, connectWelcomeHandled]);
 
   useEffect(() => {
     const requireConnection = (event: Event) => {
@@ -319,11 +325,13 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           }
         >
           <LinkedInConnectionPlaceholder
+            key={userId ?? 'signed-out'}
             centered
             splitConnectAction
             socialConnection={social}
             isDisconnecting={isDisconnecting}
             onDisconnect={handleDisconnect}
+            onConnectWelcomeDismissed={() => setConnectWelcomeHandled(true)}
           />
         </LinkedInDashboardHero>
 
