@@ -16,6 +16,10 @@ interface DashboardActionModalProps {
   disableClose?: boolean;
   /** Slightly larger title for primary wedge modals (e.g. Plan). */
   titleSize?: 'default' | 'lg';
+  /** Text close control instead of ✕ (e.g. "Explore first"). */
+  closeLabel?: string;
+  /** Above studio tour / error overlays when set. */
+  elevated?: boolean;
 }
 
 export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
@@ -32,12 +36,16 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   zIndex = 11000,
   disableClose = false,
   titleSize = 'default',
+  closeLabel,
+  elevated = false,
 }) => {
   if (!open) return null;
 
   const handleBackdropClose = () => {
     if (!disableClose) onClose();
   };
+
+  const modalZIndex = elevated ? 14000 : zIndex;
 
   return createPortal(
     <div
@@ -47,7 +55,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex,
+        zIndex: modalZIndex,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -97,22 +105,31 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={closeLabel ?? 'Close'}
               style={{
                 background: 'transparent',
                 border: 'none',
-                fontSize: 18,
-                lineHeight: 1,
+                fontSize: closeLabel ? 13 : 18,
+                lineHeight: 1.2,
                 cursor: 'pointer',
-                color: '#9ca3af',
-                padding: '4px 8px',
+                color: closeLabel ? '#64748b' : '#9ca3af',
+                padding: closeLabel ? '6px 10px' : '4px 8px',
                 borderRadius: 6,
-                transition: 'background 0.15s',
+                fontWeight: closeLabel ? 600 : 400,
+                transition: 'background 0.15s, color 0.15s',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f3f4f6'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#f3f4f6';
+                if (closeLabel) e.currentTarget.style.color = '#0a66c2';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = closeLabel ? '#64748b' : '#9ca3af';
+              }}
             >
-              ✕
+              {closeLabel ?? '✕'}
             </button>
           )}
         </div>

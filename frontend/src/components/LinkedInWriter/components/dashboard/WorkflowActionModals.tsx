@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardActionModal } from './DashboardActionModal';
 import { DashboardToolTile } from './DashboardToolTile';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
-import { PlanWedgeModal } from './PlanWedgeModal';
+import { PlanWedgeModal } from '../Brainstorm/PlanWedgeModal';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import {
   openGrowthEngineModal,
