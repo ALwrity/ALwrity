@@ -34,6 +34,21 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
   const canGenerate =
     Boolean((brainstormSeed || '').trim()) || usePersona || includeTrending || remarketContent;
 
+  // Pre-fill brainstorm seed from growth task context
+  useEffect(() => {
+    if (!open) return;
+    try {
+      const ctx = sessionStorage.getItem('growth_task_context');
+      if (ctx) {
+        const parsed = JSON.parse(ctx);
+        if (parsed.pillar === 'plan' && parsed.title) {
+          setBrainstormSeed(parsed.title);
+        }
+        sessionStorage.removeItem('growth_task_context');
+      }
+    } catch { /* ignore parse errors */ }
+  }, [open]);
+
   const placeholder = corePersona?.core_belief
     ? `Ex: "${corePersona.core_belief}" for SMB founders`
     : 'Ex: "Sharing knowledge drives professional growth" for SMB founders';

@@ -14,7 +14,6 @@ from services.database import get_db
 from services.today_workflow_service import get_or_create_daily_workflow_plan, update_task_status, _today_date_str
 from models.daily_workflow_models import DailyWorkflowPlan, DailyWorkflowTask
 import asyncio
-from services.intelligence.txtai_service import TxtaiIntelligenceService
 
 
 router = APIRouter(prefix="/api/today-workflow", tags=["Today Workflow"])
@@ -53,6 +52,7 @@ class TaskStatusUpdateRequest(BaseModel):
 async def _index_tasks_to_sif(user_id: str, date: str, tasks: list[dict], label: str):
     """Index tasks to SIF in background without blocking the main API response."""
     try:
+        from services.intelligence.txtai_service import TxtaiIntelligenceService
         svc = TxtaiIntelligenceService(user_id)
         items = []
         for t in tasks:
@@ -119,9 +119,10 @@ def _build_workflow_payload(user_id: str, plan: DailyWorkflowPlan, tasks: list[D
     total_estimated = int(sum(int(t.get("estimatedTime") or 0) for t in response_tasks))
     plan_json = plan.plan_json or {}
 
+    prefix = "linkedin" if plan.workflow_type == "linkedin" else "daily"
     return {
         "workflow": {
-            "id": f"daily-{user_id}-{plan.date}",
+            "id": f"{prefix}-{user_id}-{plan.date}",
             "date": plan.date,
             "userId": user_id,
             "tasks": response_tasks,
@@ -163,6 +164,7 @@ def _build_workflow_payload(user_id: str, plan: DailyWorkflowPlan, tasks: list[D
 @router.get("")
 async def get_today_workflow(
     date: Optional[str] = None,
+    workflow_type: str = "main",
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -177,7 +179,11 @@ async def get_today_workflow(
     def _get_existing():
         return (
             db.query(DailyWorkflowPlan)
-            .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+            .filter(
+                DailyWorkflowPlan.user_id == user_id,
+                DailyWorkflowPlan.date == date_str,
+                DailyWorkflowPlan.workflow_type == workflow_type,
+            )
             .first()
         )
     
@@ -210,6 +216,7 @@ async def get_today_workflow(
 @router.get("/status")
 async def get_today_workflow_status(
     date: Optional[str] = None,
+    workflow_type: str = "main",
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -221,7 +228,11 @@ async def get_today_workflow_status(
     def _get_existing():
         return (
             db.query(DailyWorkflowPlan)
-            .filter(DailyWorkflowPlan.user_id == user_id, DailyWorkflowPlan.date == date_str)
+            .filter(
+                DailyWorkflowPlan.user_id == user_id,
+                DailyWorkflowPlan.date == date_str,
+                DailyWorkflowPlan.workflow_type == workflow_type,
+            )
             .first()
         )
 
@@ -241,9 +252,25 @@ async def get_today_workflow_status(
     }
 
 
+@router.get("/progress")
+async def get_generation_progress_endpoint(
+    date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    from services.linkedin_today_workflow_data import get_generation_progress
+    user_id = str(current_user.get("id"))
+    date_str = date or _today_date_str()
+    progress = get_generation_progress(user_id, date_str)
+    return {
+        "success": True,
+        "progress": progress,
+    }
+
+
 @router.post("/generate")
 async def generate_workflow(
     date: Optional[str] = None,
+    workflow_type: str = "main",
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
@@ -252,8 +279,19 @@ async def generate_workflow(
     or via a scheduled job at night.
     """
     from starlette.concurrency import run_in_threadpool
+    from services.linkedin_today_workflow_data import clear_generation_progress
     user_id = str(current_user.get("id"))
-    plan, created = await get_or_create_daily_workflow_plan(db, user_id, date=date, creation_source="manual")
+    date_str = date or _today_date_str()
+
+    try:
+        if workflow_type == "linkedin":
+            from services.linkedin_today_workflow_service import LinkedInTodayWorkflowService
+            svc = LinkedInTodayWorkflowService(user_id)
+            plan, created = await svc.get_or_create_plan(date=date, source="manual")
+        else:
+            plan, created = await get_or_create_daily_workflow_plan(db, user_id, date=date, creation_source="manual")
+    finally:
+        clear_generation_progress(user_id, date_str)
 
     # H5: threadpool helpers must not share the request's `db` Session.
     # Open a fresh Session per worker and close it deterministically.

@@ -36,6 +36,7 @@ from .utils.advertools_task_loader import load_due_advertools_tasks
 from .utils.sif_indexing_task_loader import load_due_sif_indexing_tasks
 from .utils.market_trends_task_loader import load_due_market_trends_tasks
 from services.daily_workflow_batch import generate_scheduled_daily_workflows
+from services.linkedin_today_workflow_batch import generate_scheduled_linkedin_workflows
 
 # Global scheduler instance (initialized on first access)
 _scheduler_instance: TaskScheduler = None
@@ -154,6 +155,18 @@ def get_scheduler() -> TaskScheduler:
             generate_scheduled_daily_workflows,
             trigger=CronTrigger(hour=today_workflow_hour_utc, minute=today_workflow_minute_utc, timezone='UTC'),
             id='generate_daily_workflows',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+
+        linkedin_workflow_hour_utc = int(os.getenv('LINKEDIN_WORKFLOW_SCHEDULE_HOUR_UTC', '3'))
+        linkedin_workflow_minute_utc = int(os.getenv('LINKEDIN_WORKFLOW_SCHEDULE_MINUTE_UTC', '0'))
+        _scheduler_instance.scheduler.add_job(
+            generate_scheduled_linkedin_workflows,
+            trigger=CronTrigger(hour=linkedin_workflow_hour_utc, minute=linkedin_workflow_minute_utc, timezone='UTC'),
+            id='generate_linkedin_workflows',
             replace_existing=True,
             max_instances=1,
             coalesce=True,

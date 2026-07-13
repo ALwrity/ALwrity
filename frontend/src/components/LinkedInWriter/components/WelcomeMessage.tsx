@@ -17,6 +17,7 @@ import {
 } from './dashboard/WorkflowActionModals';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
 import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
+import { TodayGrowthWalkthrough } from './dashboard/TodayGrowthWalkthrough';
 import { LINKEDIN_STUDIO_TOUR_SEEN_KEY } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
 import { useAuth } from '@clerk/clerk-react';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
@@ -68,6 +69,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [todayGrowthOpen, setTodayGrowthOpen] = useState(false);
   const social = useLinkedInSocialConnection();
   const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
   const { userId } = useAuth();
@@ -308,6 +310,17 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           <span className="linkedin-studio-tour-trigger-label">Tour guide</span>
         </button>
 
+        <button
+          type="button"
+          className="linkedin-growth-walkthrough-trigger"
+          onClick={() => setTodayGrowthOpen(true)}
+          aria-label="Today's Growth Tasks — guided walkthrough"
+          title="Walk through today's growth tasks pillar by pillar"
+        >
+          <span aria-hidden>🚀</span>
+          <span className="linkedin-growth-trigger-label">Today's Growth Tasks</span>
+        </button>
+
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
           planAnchorSlot={
@@ -431,6 +444,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         onRunChange={handleTourRunChange}
         storageKey={tourSeenKey}
       />
+      <TodayGrowthWalkthrough open={todayGrowthOpen} onClose={() => setTodayGrowthOpen(false)} />
     </div>
   );
 };

@@ -755,6 +755,14 @@ if _is_full_mode():
         "mounted": True,
         "reason": "Full mode",
     }
+elif _is_feature_enabled("linkedin"):
+    # LinkedIn-only mode: today workflow routes still needed
+    from api.today_workflow import router as today_workflow_router
+    app.include_router(today_workflow_router)
+    router_group_status["advanced_workflows"] = {
+        "mounted": True,
+        "reason": "LinkedIn feature enabled",
+    }
 else:
     router_group_status["advanced_workflows"] = {
         "mounted": False,
@@ -812,10 +820,16 @@ async def startup_event():
         else:
             logger.info(f"[FEATURE-MODE] Skipping startup health routine (features: {enabled_features})")
 
-        # Start task scheduler only in full mode
+        # Start task scheduler (required for daily workflow cron jobs)
         if _is_full_mode():
             from services.scheduler import get_scheduler
             await get_scheduler().start()
+        elif _is_feature_enabled("linkedin"):
+            logger.warning(
+                "[FEATURE-MODE] Scheduler DISABLED in linkedin-only mode — "
+                "daily workflow cron jobs will not run. Set ALWRITY_ENABLED_FEATURES=all "
+                "or remove the variable to enable scheduled generation."
+            )
         else:
             logger.info(f"[FEATURE-MODE] Skipping scheduler startup (features: {enabled_features})")
 

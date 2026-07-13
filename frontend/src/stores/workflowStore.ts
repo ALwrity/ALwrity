@@ -11,9 +11,10 @@ import {
   TodayWorkflowScheduleStatus
 } from '../types/workflow';
 import { taskWorkflowOrchestrator } from '../services/TaskWorkflowOrchestrator';
-import { apiClient } from '../api/client';
+import { aiApiClient as apiClient } from '../api/client';
 
 const isServerWorkflowId = (workflowId: string) => workflowId.startsWith('daily-');
+const DAILY_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 
 const normalizeDependencies = (dependencies: unknown): string[] => {
@@ -116,13 +117,15 @@ interface WorkflowState {
   isWorkflowModalOpen: boolean;
   isLoading: boolean;
   error: WorkflowError | null;
+  generationProgress: string | null;
   isDegradedMode: boolean;
   degradedModeReason: string | null;
+  lastCachedAt: number | null;
   
   // Actions
-  loadTodayWorkflow: (date?: string) => Promise<void>;
+  loadTodayWorkflow: (date?: string, workflowType?: string) => Promise<void>;
   refreshScheduleStatus: (date?: string) => Promise<void>;
-  generateDailyWorkflow: (userId: string, date?: string) => Promise<void>;
+  generateDailyWorkflow: (userId: string, date?: string, workflowType?: string) => Promise<void>;
   startWorkflow: (workflowId: string) => Promise<void>;
   pauseWorkflow: (workflowId: string) => Promise<void>;
   stopWorkflow: (workflowId: string) => Promise<void>;
@@ -160,14 +163,27 @@ export const useWorkflowStore = create<WorkflowState>()(
       isWorkflowModalOpen: false,
       isLoading: false,
       error: null,
+      generationProgress: null,
       isDegradedMode: false,
       degradedModeReason: null,
+      lastCachedAt: null,
 
-      loadTodayWorkflow: async (date?: string) => {
+      loadTodayWorkflow: async (date?: string, workflowType?: string) => {
+        const { currentWorkflow, lastCachedAt } = get();
+        if (currentWorkflow && lastCachedAt && (Date.now() - lastCachedAt < DAILY_CACHE_TTL)) {
+          const requestedDate = date || new Date().toISOString().slice(0, 10);
+          if (currentWorkflow.date === requestedDate) {
+            return;
+          }
+        }
+
         set({ isLoading: true, error: null });
 
         try {
-          const resp = await apiClient.get('/api/today-workflow', { params: date ? { date } : {} });
+          const params: Record<string, string> = {};
+          if (date) params.date = date;
+          if (workflowType) params.workflow_type = workflowType;
+          const resp = await apiClient.get('/api/today-workflow', { params });
           const serverWorkflow = resp?.data?.data?.workflow as DailyWorkflow | undefined;
           const planSummary = resp?.data?.data?.plan?.provenance_summary;
           const scheduleStatus = resp?.data?.data?.schedule_status as TodayWorkflowScheduleStatus | undefined;
@@ -186,6 +202,7 @@ export const useWorkflowStore = create<WorkflowState>()(
               isLoading: false,
               isDegradedMode: false,
               degradedModeReason: null,
+              lastCachedAt: Date.now(),
             });
             return;
           }
@@ -206,6 +223,7 @@ export const useWorkflowStore = create<WorkflowState>()(
               isLoading: false,
               isDegradedMode: false,
               degradedModeReason: null,
+              lastCachedAt: null,
             });
             await get().refreshScheduleStatus(date);
             return;
@@ -231,11 +249,39 @@ export const useWorkflowStore = create<WorkflowState>()(
       },
 
       // Generate daily workflow
-      generateDailyWorkflow: async (userId: string, date?: string) => {
-        set({ isLoading: true, error: null });
+      generateDailyWorkflow: async (userId: string, date?: string, workflowType?: string) => {
+        set({ isLoading: true, error: null, generationProgress: "Starting..." });
         
         try {
-          const resp = await apiClient.post('/api/today-workflow/generate', null, { params: date ? { date } : {} });
+          const params: Record<string, string> = {};
+          if (date) params.date = date;
+          if (workflowType) params.workflow_type = workflowType;
+
+          // Poll progress while generation runs
+          const pollDate = date || new Date().toISOString().slice(0, 10);
+          const abortCtrl = new AbortController();
+          let resp: any;
+
+          const pollProgress = async () => {
+            while (!abortCtrl.signal.aborted) {
+              await new Promise(r => setTimeout(r, 2000));
+              if (abortCtrl.signal.aborted) break;
+              try {
+                const p = await apiClient.get('/api/today-workflow/progress', { params: { date: pollDate } });
+                const msg = p?.data?.progress as string | undefined;
+                if (msg) set({ generationProgress: msg });
+              } catch { /* ignore polling errors */ }
+            }
+          };
+          pollProgress();
+
+          try {
+            resp = await apiClient.post('/api/today-workflow/generate', null, { params });
+          } finally {
+            abortCtrl.abort();
+            set({ generationProgress: null });
+          }
+
           const serverWorkflow = resp?.data?.data?.workflow as DailyWorkflow | undefined;
           const planSummary = resp?.data?.data?.plan?.provenance_summary;
           const scheduleStatus = resp?.data?.data?.schedule_status as TodayWorkflowScheduleStatus | undefined;
@@ -254,6 +300,7 @@ export const useWorkflowStore = create<WorkflowState>()(
               isLoading: false,
               isDegradedMode: false,
               degradedModeReason: null,
+              lastCachedAt: Date.now(),
             });
             return;
           }
@@ -268,9 +315,11 @@ export const useWorkflowStore = create<WorkflowState>()(
         } catch (error) {
           set({
             error: toWorkflowError(error, 'Failed to generate workflow from server.'),
+            generationProgress: null,
             isLoading: false,
             isDegradedMode: false,
             degradedModeReason: null,
+            lastCachedAt: null,
           });
         }
       },
@@ -562,7 +611,8 @@ export const useWorkflowStore = create<WorkflowState>()(
       name: 'workflow-store',
       partialize: (state) => ({
         userPreferences: state.userPreferences,
-        currentWorkflow: state.currentWorkflow
+        currentWorkflow: state.currentWorkflow,
+        lastCachedAt: state.lastCachedAt,
       })
     }
   )
