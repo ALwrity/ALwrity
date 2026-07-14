@@ -35,7 +35,6 @@ interface HeaderProps {
   onPreferencesChange: (prefs: Partial<LinkedInPreferences>) => void;
   hasDraft: boolean;
   onResetDraft: () => void;
-  generatePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -46,7 +45,6 @@ export const Header: React.FC<HeaderProps> = ({
   onPreferencesChange,
   hasDraft,
   onResetDraft,
-  generatePost,
 }) => {
   const personaDropdownRef = useRef<HTMLDivElement>(null);
   const personaButtonRef = useRef<HTMLButtonElement>(null);
@@ -57,7 +55,6 @@ export const Header: React.FC<HeaderProps> = ({
     maxHeight: number;
   } | null>(null);
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
-  const [searchBarCompact, setSearchBarCompact] = useState(false);
   const linkedInSearch = useLinkedInSearch({ connected });
   const [profileStrengthPercent, setProfileStrengthPercent] = useState<number | null>(null);
   const [profileValidation, setProfileValidation] = useState<LinkedInProfileValidation | null>(
@@ -65,13 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
   );
   const [profileStrengthLoading, setProfileStrengthLoading] = useState(false);
   const { corePersona, platformPersona } = usePlatformPersonaContext();
-
-  useEffect(() => {
-    const updateCompact = () => setSearchBarCompact(window.innerWidth < 900);
-    updateCompact();
-    window.addEventListener('resize', updateCompact);
-    return () => window.removeEventListener('resize', updateCompact);
-  }, []);
 
   // Broadcast persona snapshot to global components (e.g. UserBadge) that cannot
   // call usePlatformPersonaContext() directly because they live outside the provider.
@@ -234,20 +224,12 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <img src="/alwrity-icon.png" alt="ALwrity" />
           </button>
-          <h1 className={NAV_TITLE_CLASS}>LinkedIn Studio</h1>
+          <h1 className={NAV_TITLE_CLASS}>
+            <span className="linkedin-writer-header-brand-line">LinkedIn</span>
+            <span className="linkedin-writer-header-brand-subline">Studio</span>
+          </h1>
         </div>
 
-        <div className="linkedin-writer-header-left">
-          <LinkedInSearchBar
-            value={linkedInSearch.query}
-            onChange={linkedInSearch.setQuery}
-            onSearch={() => void linkedInSearch.runSearch()}
-            disabled={!connected}
-            compact={searchBarCompact}
-          />
-        </div>
-
-        {/* Center — profile tools & content settings */}
         <div className="linkedin-writer-header-center">
           <OptimiseProfileControl
             onOptimiseProfile={handleOpenOptimiseProfile}
@@ -589,8 +571,15 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="linkedin-writer-header-controls">
-          <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
+        <div className="linkedin-writer-header-right">
+          <LinkedInSearchBar
+            value={linkedInSearch.query}
+            onChange={linkedInSearch.setQuery}
+            onSearch={() => void linkedInSearch.runSearch()}
+            disabled={!connected}
+            size="nav"
+          />
+          <HeaderControls colorMode="light" showAlerts showUser />
         </div>
       </div>
       

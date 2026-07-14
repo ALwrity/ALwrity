@@ -1,22 +1,21 @@
 import React, { useId } from 'react';
 
-import { LINKEDIN_SEARCH_PRIMARY } from './linkedinSearchConstants';
-
 interface LinkedInSearchBarProps {
   value: string;
   onChange: (value: string) => void;
   onSearch: () => void;
   disabled?: boolean;
-  compact?: boolean;
+  /** Nav bar uses a smaller footprint before the alerts bell. */
+  size?: 'nav' | 'default';
 }
 
-const SearchIcon: React.FC = () => (
+const SearchIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
   <svg
-    width="16"
-    height="16"
+    width={size}
+    height={size}
     viewBox="0 0 24 24"
     fill="none"
-    stroke={LINKEDIN_SEARCH_PRIMARY}
+    stroke="currentColor"
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -32,9 +31,17 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
   onChange,
   onSearch,
   disabled = false,
-  compact = false,
+  size = 'default',
 }) => {
   const inputId = useId();
+  const isNav = size === 'nav';
+  const rootClass = [
+    'linkedin-search-bar',
+    isNav && 'linkedin-search-bar--nav',
+    disabled && 'linkedin-search-bar--disabled',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
@@ -45,47 +52,22 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
 
   return (
     <div
-      className="linkedin-search-bar"
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 8,
-        minWidth: compact ? 40 : 140,
-        maxWidth: 200,
-        width: compact ? 40 : 180,
-        flex: '0 0 auto',
-        padding: '6px 12px',
-        background: '#ffffff',
-        border: '1px solid rgba(10, 102, 194, 0.15)',
-        borderRadius: 24,
-        boxShadow: '0 1px 2px rgba(0, 0, 0, 0.04)',
-        opacity: disabled ? 0.65 : 1,
-        transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
-      }}
-      title={disabled ? 'Connect LinkedIn to search' : 'LinkedIn Search'}
+      className={rootClass}
+      title={disabled ? 'Connect LinkedIn to search' : 'Search people, companies, and posts on LinkedIn'}
     >
-      <span style={{ display: 'flex', flexShrink: 0 }}>
-        <SearchIcon />
+      <span className="linkedin-search-bar__icon" aria-hidden>
+        <SearchIcon size={isNav ? 14 : 16} />
       </span>
       <input
         id={inputId}
         type="search"
+        className="linkedin-search-bar__input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={handleKeyDown}
         disabled={disabled}
-        placeholder={compact ? '' : 'Search LinkedIn'}
+        placeholder="LinkedIn Search"
         aria-label="LinkedIn Search"
-        style={{
-          flex: 1,
-          minWidth: 0,
-          border: 'none',
-          outline: 'none',
-          background: 'transparent',
-          fontSize: 14,
-          color: '#1a1a2e',
-          padding: 0,
-        }}
       />
     </div>
   );

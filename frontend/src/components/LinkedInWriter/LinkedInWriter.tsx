@@ -510,7 +510,6 @@ Always use the most appropriate tool for the user's request.`.trim();
         onPreferencesChange={handlePreferencesChange}
         hasDraft={!!draft}
         onResetDraft={handleClear}
-        generatePost={generatePost}
       />
 
 
