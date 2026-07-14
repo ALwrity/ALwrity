@@ -125,9 +125,9 @@ export function computeRadialLayout(containerWidth: number, maxHeight?: number):
   const widthCap = maxOuterRadiusForWidth(centerX);
   const minOuter = innerR + Math.round(MIN_WEDGE_DEPTH * WEDGE_DEPTH_FRACTION);
 
-  const iconFontSize = Math.round(Math.min(24, Math.max(13, viewW * 0.019)));
-  const labelFontSize = Math.round(Math.min(13, Math.max(10, viewW * 0.012)));
-  const descFontSize = Math.round(Math.min(10, Math.max(8, viewW * 0.0095)));
+  const iconFontSize = Math.round(Math.min(28, Math.max(14, viewW * 0.023)));
+  const labelFontSize = Math.round(Math.min(16, Math.max(11, viewW * 0.014)));
+  const descFontSize = Math.round(Math.min(12, Math.max(9, viewW * 0.011)));
 
   let fitOuter = widthCap;
   if (maxHeight && maxHeight > 0) {
