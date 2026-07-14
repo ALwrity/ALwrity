@@ -536,8 +536,8 @@
 
 .linkedin-studio-tour-trigger {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  right: max(8px, env(safe-area-inset-right, 0px));
   z-index: 20;
   display: inline-flex;
   align-items: center;
@@ -598,12 +598,8 @@
   letter-spacing: 0.01em;
 }
 
-.linkedin-studio-tour-trigger--compact .linkedin-studio-tour-trigger-label {
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  transition: max-width 0.2s ease, opacity 0.15s ease;
+.linkedin-studio-tour-trigger-label--short {
+  display: none;
 }
 
 .linkedin-studio-tour-trigger--compact:hover {
@@ -611,18 +607,65 @@
   padding: 6px 12px;
 }
 
-.linkedin-studio-tour-trigger--compact:hover .linkedin-studio-tour-trigger-label {
+.linkedin-studio-tour-trigger--compact .linkedin-studio-tour-trigger-label--full {
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width 0.2s ease, opacity 0.15s ease;
+}
+
+.linkedin-studio-tour-trigger--compact:hover .linkedin-studio-tour-trigger-label--full {
   max-width: 88px;
   opacity: 1;
 }
 
+@media (min-width: 641px) and (max-width: 960px) {
+  .linkedin-studio-tour-trigger {
+    top: max(10px, calc(env(safe-area-inset-top, 0px) + 6px));
+    right: max(10px, calc(env(safe-area-inset-right, 0px) + 4px));
+  }
+}
+
 @media (max-width: 640px) {
-  .linkedin-studio-tour-trigger-label {
+  .linkedin-studio-tour-trigger {
+    top: max(12px, calc(env(safe-area-inset-top, 0px) + 8px));
+    right: max(10px, calc(env(safe-area-inset-right, 0px) + 6px));
+    padding: 8px 11px;
+    min-height: 44px;
+    min-width: 44px;
+    gap: 4px;
+    box-shadow: 0 2px 14px rgba(10, 102, 194, 0.24);
+  }
+
+  .linkedin-studio-tour-trigger-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
+  }
+
+  /* Always show a short label on mobile so replay stays easy to find */
+  .linkedin-studio-tour-trigger-label--full {
     display: none;
   }
 
-  .linkedin-studio-tour-trigger {
-    padding: 6px 8px;
+  .linkedin-studio-tour-trigger-label--short {
+    display: inline;
+    max-width: none;
+    opacity: 1;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .linkedin-studio-tour-trigger--compact {
+    flex-direction: row;
+    padding: 8px 11px;
+    min-width: 44px;
+    gap: 4px;
+  }
+
+  .linkedin-studio-tour-trigger--compact .linkedin-studio-tour-trigger-label--full {
+    display: none;
   }
 }
 

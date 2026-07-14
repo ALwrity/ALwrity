@@ -1,84 +1,127 @@
-import React, { useCallback } from 'react';
-import Joyride, { CallBackProps, STATUS } from 'react-joyride';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import Joyride, { ACTIONS, CallBackProps, EVENTS, STATUS } from 'react-joyride';
 import {
-  linkedInStudioTourSteps,
+  ALWRITY_JOYRIDE_LOCALE,
+  cleanupJoyrideOverlay,
+  focusJoyrideTooltip,
+  getAlwrityJoyrideStyles,
+  getTourViewportVariant,
+  isTourCompactViewport,
+  markTourFinished,
+  markTourSkipped,
+} from '../../../../utils/walkthroughs/alwrityJoyrideTheme';
+import {
   LINKEDIN_STUDIO_TOUR_SEEN_KEY,
+  buildLinkedInStudioTourSteps,
 } from '../../../../utils/walkthroughs/linkedInStudioTourSteps';
 
 interface LinkedInStudioTourProps {
   run: boolean;
   onRunChange: (run: boolean) => void;
   storageKey?: string;
+  connected?: boolean;
 }
 
-const JOYRIDE_STYLES = {
-  options: {
-    primaryColor: '#0a66c2',
-    textColor: '#1e293b',
-    backgroundColor: '#ffffff',
-    overlayColor: 'rgba(15, 23, 42, 0.55)',
-    zIndex: 13000,
-    arrowColor: '#ffffff',
-    width: 300,
-  },
-  tooltip: {
-    borderRadius: 12,
-    padding: '14px 16px',
-    boxShadow: '0 16px 48px rgba(10, 102, 194, 0.18)',
-    maxWidth: 300,
-  },
-  tooltipTitle: {
-    fontSize: 15,
-    fontWeight: 700,
-    marginBottom: 4,
-  },
-  tooltipContent: {
-    fontSize: 13,
-    lineHeight: 1.5,
-    padding: '2px 0 0',
-  },
-  buttonNext: {
-    borderRadius: 8,
-    fontSize: 13,
-    fontWeight: 700,
-    padding: '7px 12px',
-  },
-  buttonBack: {
-    color: '#64748b',
-    fontSize: 13,
-    marginRight: 8,
-  },
-  buttonSkip: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  spotlight: {
-    borderRadius: 12,
-  },
-} as const;
+function scrollTourTargetIntoView(target: string | HTMLElement | undefined) {
+  if (!target || typeof target !== 'string') return;
+  const el = document.querySelector(target);
+  el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+}
 
-export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({ run, onRunChange, storageKey }) => {
+export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
+  run,
+  onRunChange,
+  storageKey,
+  connected = false,
+}) => {
   const key = storageKey ?? LINKEDIN_STUDIO_TOUR_SEEN_KEY;
+  const [tourVariant, setTourVariant] = useState(getTourViewportVariant);
+  const [compactViewport, setCompactViewport] = useState(isTourCompactViewport);
+  const [tourInstance, setTourInstance] = useState(0);
+
+  const stopTour = useCallback(
+    (markSeen: 'finished' | 'skipped' | null) => {
+      if (markSeen === 'finished') {
+        markTourFinished(key);
+      } else if (markSeen === 'skipped') {
+        markTourSkipped(key);
+      }
+      onRunChange(false);
+      cleanupJoyrideOverlay();
+      setTourInstance((current) => current + 1);
+    },
+    [key, onRunChange],
+  );
+
+  useEffect(() => {
+    if (!run) {
+      cleanupJoyrideOverlay();
+    }
+  }, [run]);
+
+  useEffect(() => {
+    const mobileMq = window.matchMedia('(max-width: 640px)');
+    const tabletMq = window.matchMedia('(max-width: 960px)');
+    const sync = () => {
+      setTourVariant(getTourViewportVariant());
+      setCompactViewport(tabletMq.matches);
+    };
+    sync();
+    mobileMq.addEventListener('change', sync);
+    tabletMq.addEventListener('change', sync);
+    return () => {
+      mobileMq.removeEventListener('change', sync);
+      tabletMq.removeEventListener('change', sync);
+    };
+  }, []);
+
+  const steps = useMemo(
+    () => buildLinkedInStudioTourSteps({ connected, variant: tourVariant }),
+    [connected, tourVariant],
+  );
+
+  const joyrideStyles = useMemo(
+    () => getAlwrityJoyrideStyles(tourVariant, { primaryColor: '#0a66c2', zIndex: 13000 }),
+    [tourVariant],
+  );
+
   const handleCallback = useCallback(
     (data: CallBackProps) => {
-      const { status } = data;
-      if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-        localStorage.setItem(key, 'true');
-        onRunChange(false);
+      const { status, type, action, step } = data;
+
+      if (action === ACTIONS.CLOSE) {
+        stopTour('skipped');
+        return;
+      }
+
+      if (compactViewport && type === EVENTS.STEP_BEFORE && action !== ACTIONS.SKIP) {
+        scrollTourTargetIntoView(step.target);
+      }
+
+      if (type === EVENTS.STEP_AFTER || type === EVENTS.TOOLTIP) {
+        focusJoyrideTooltip();
+      }
+
+      if (status === STATUS.FINISHED) {
+        stopTour('finished');
+      } else if (status === STATUS.SKIPPED) {
+        stopTour('skipped');
       }
     },
-    [onRunChange, key]
+    [compactViewport, stopTour],
   );
 
   return (
     <Joyride
-      steps={linkedInStudioTourSteps}
+      key={`${tourInstance}-${tourVariant}-${connected ? 'linked' : 'guest'}`}
+      steps={steps}
       run={run}
       continuous
       showProgress
       showSkipButton
-      scrollToFirstStep={false}
-      disableScrolling
+      scrollToFirstStep={compactViewport}
+      disableScrolling={!compactViewport}
+      disableCloseOnEsc={false}
       spotlightPadding={8}
       spotlightClicks={false}
       disableOverlayClose
@@ -86,18 +129,12 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({ run, onR
         options: {
           preventOverflow: {
             boundariesElement: 'viewport',
-            padding: 12,
+            padding: compactViewport ? 16 : 12,
           },
         },
       }}
-      locale={{
-        back: 'Back',
-        close: 'Close',
-        last: 'Done',
-        next: 'Next',
-        skip: 'Skip tour',
-      }}
-      styles={JOYRIDE_STYLES}
+      locale={ALWRITY_JOYRIDE_LOCALE}
+      styles={joyrideStyles}
       callback={handleCallback}
     />
   );
