@@ -23,7 +23,7 @@ import {
   RadioButtonUnchecked,
   PhotoCamera,
 } from '@mui/icons-material';
-import Joyride, { CallBackProps, STATUS } from 'react-joyride';
+import Joyride, { ACTIONS, CallBackProps, EVENTS, STATUS } from 'react-joyride';
 import { motion } from 'framer-motion';
 import { ImageStudioLayout } from '../ImageStudio/ImageStudioLayout';
 import { GlassyCard } from '../ImageStudio/ui/GlassyCard';
@@ -37,6 +37,16 @@ import { PersonalizedRecommendations } from './PersonalizedRecommendations';
 import { useNavigate } from 'react-router-dom';
 import { productMarketingSteps } from '../../utils/walkthroughs/productMarketingSteps';
 import { campaignCreatorSteps } from '../../utils/walkthroughs/campaignCreatorSteps';
+import {
+  ALWRITY_JOYRIDE_LOCALE,
+  focusJoyrideTooltip,
+  getAlwrityJoyrideStyles,
+  getTourViewportVariant,
+  hasTourBeenSeen,
+  isTourCompactViewport,
+  markTourFinished,
+  markTourSkipped,
+} from '../../utils/walkthroughs/alwrityJoyrideTheme';
 
 const MotionCard = motion.create(Card);
 
@@ -74,7 +84,7 @@ export const ProductMarketingDashboard: React.FC = () => {
     // Load campaigns on mount
     listCampaigns();
     // Auto-run campaign tour for first-time visitors
-    const hasSeenCampaignTour = localStorage.getItem('pm_campaign_tour_seen');
+    const hasSeenCampaignTour = hasTourBeenSeen('pm_campaign_tour_seen');
     if (!hasSeenCampaignTour) {
       setTourType('campaign');
       setRunTour(true);
@@ -82,12 +92,22 @@ export const ProductMarketingDashboard: React.FC = () => {
   }, [brandDNA, getBrandDNA, listCampaigns]);
 
   const handleJoyrideCallback = (data: CallBackProps) => {
-    const { status } = data;
-    const finished = status === STATUS.FINISHED || status === STATUS.SKIPPED;
-    if (finished) {
+    const { status, type, action } = data;
+
+    if (type === EVENTS.STEP_AFTER || type === EVENTS.TOOLTIP) {
+      if (action !== ACTIONS.CLOSE && action !== ACTIONS.SKIP) {
+        focusJoyrideTooltip();
+      }
+    }
+
+    if (status === STATUS.FINISHED) {
       setRunTour(false);
       const key = tourType === 'campaign' ? 'pm_campaign_tour_seen' : 'pm_product_tour_seen';
-      localStorage.setItem(key, 'true');
+      markTourFinished(key);
+    } else if (status === STATUS.SKIPPED) {
+      setRunTour(false);
+      const key = tourType === 'campaign' ? 'pm_campaign_tour_seen' : 'pm_product_tour_seen';
+      markTourSkipped(key);
     }
   };
 
@@ -180,14 +200,14 @@ export const ProductMarketingDashboard: React.FC = () => {
           showSkipButton
           showProgress
           run={runTour}
-          scrollToFirstStep
-          disableScrolling={false}
-          styles={{
-            options: {
-              primaryColor: '#7c3aed',
-              zIndex: 3000,
-            },
-          }}
+          scrollToFirstStep={isTourCompactViewport()}
+          disableScrolling={!isTourCompactViewport()}
+          disableCloseOnEsc={false}
+          locale={ALWRITY_JOYRIDE_LOCALE}
+          styles={getAlwrityJoyrideStyles(getTourViewportVariant(), {
+            primaryColor: '#7c3aed',
+            zIndex: 3000,
+          })}
           callback={handleJoyrideCallback}
         />
 

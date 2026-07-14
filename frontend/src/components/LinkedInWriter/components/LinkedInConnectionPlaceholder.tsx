@@ -101,6 +101,7 @@ const DisconnectedState: React.FC<{
   centered?: boolean;
   splitConnectAction?: boolean;
   onConnectWelcomeDismissed?: () => void;
+  onConnectWelcomeOpenChange?: (open: boolean) => void;
 }> = ({
   isConnecting,
   connectError,
@@ -109,6 +110,7 @@ const DisconnectedState: React.FC<{
   centered = false,
   splitConnectAction = false,
   onConnectWelcomeDismissed,
+  onConnectWelcomeOpenChange,
 }) => {
   const connectCtaLabel = isConnecting ? 'Connecting...' : CONNECT_WELCOME_CTA;
   const displayStatusError = connectError ? null : statusError;
@@ -129,6 +131,10 @@ const DisconnectedState: React.FC<{
     if (!centered || welcomeDismissed) return;
     setShowConnectWelcomeModal(true);
   }, [centered, welcomeDismissed]);
+
+  useEffect(() => {
+    onConnectWelcomeOpenChange?.(centered && showConnectWelcomeModal);
+  }, [centered, showConnectWelcomeModal, onConnectWelcomeOpenChange]);
 
   const dismissConnectWelcome = () => {
     setWelcomeDismissed(true);
@@ -188,6 +194,7 @@ const DisconnectedState: React.FC<{
 
         <div
           className="linkedin-profile-hub-cluster"
+          data-tour="li-profile-hub"
           style={{
             width: '100%',
             display: 'flex',
@@ -483,6 +490,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   isDisconnecting?: boolean;
   onDisconnect?: () => Promise<void>;
   onConnectWelcomeDismissed?: () => void;
+  onConnectWelcomeOpenChange?: (open: boolean) => void;
 }> = ({
   centered = false,
   splitConnectAction = false,
@@ -490,6 +498,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   isDisconnecting: isDisconnectingProp = false,
   onDisconnect: onDisconnectProp,
   onConnectWelcomeDismissed,
+  onConnectWelcomeOpenChange,
 }) => {
   const internalSocial = useLinkedInSocialConnection();
   const {
@@ -536,15 +545,17 @@ export const LinkedInConnectionPlaceholder: React.FC<{
 
   if (connected) {
     return (
-      <LinkedInProfileSetupPanel
-        centered={centered}
-        displayName={displayName}
-        avatarUrl={avatarUrl}
-        onDisconnect={showDisconnect ? handleDisconnect : undefined}
-        isDisconnecting={isDisconnecting}
-        disconnectError={disconnectError}
-        hideDisconnectButton={centered && splitConnectAction}
-      />
+      <div data-tour="li-profile-hub" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+        <LinkedInProfileSetupPanel
+          centered={centered}
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          onDisconnect={showDisconnect ? handleDisconnect : undefined}
+          isDisconnecting={isDisconnecting}
+          disconnectError={disconnectError}
+          hideDisconnectButton={centered && splitConnectAction}
+        />
+      </div>
     );
   }
 
@@ -557,6 +568,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
       statusError={error}
       onConnect={handleConnect}
       onConnectWelcomeDismissed={onConnectWelcomeDismissed}
+      onConnectWelcomeOpenChange={onConnectWelcomeOpenChange}
     />
   );
 };

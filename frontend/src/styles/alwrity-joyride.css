@@ -1,0 +1,65 @@
+/* Shared Joyride tour footer controls across ALwrity product tours */
+
+/* Single row: Skip for now | Back | Next */
+.react-joyride__tooltip > div:nth-child(2) {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  margin-top: 12px !important;
+}
+
+.react-joyride__tooltip > div:nth-child(2) > div:first-child {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+.react-joyride__tooltip button[data-test-id='button-skip'],
+.react-joyride__tooltip button[data-test-id='button-back'],
+.react-joyride__tooltip button[data-test-id='button-primary'] {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.react-joyride__tooltip button[data-test-id='button-skip'],
+.react-joyride__tooltip button[data-test-id='button-back'] {
+  min-height: 28px !important;
+  padding: 5px 8px !important;
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+  border-radius: 6px !important;
+}
+
+.react-joyride__tooltip button[data-test-id='button-primary'] {
+  min-height: 28px !important;
+  padding: 5px 10px !important;
+  font-size: 11px !important;
+  line-height: 1.15 !important;
+  border-radius: 6px !important;
+}
+
+.react-joyride__tooltip button[data-test-id='button-skip'] {
+  max-width: 100%;
+}
+
+.react-joyride__tooltip button[data-test-id='button-skip']:hover,
+.react-joyride__tooltip button[data-test-id='button-back']:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #334155;
+}
+
+.react-joyride__tooltip button[data-test-id='button-skip']:focus-visible,
+.react-joyride__tooltip button[data-test-id='button-back']:focus-visible,
+.react-joyride__tooltip button[data-test-id='button-primary']:focus-visible {
+  outline: 2px solid #0a66c2;
+  outline-offset: 2px;
+}
+
+.react-joyride__tooltip button[data-test-id='button-primary']:hover {
+  filter: brightness(0.95);
+}
