@@ -248,7 +248,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   if (draft || isGenerating) return null;
 
   const openQuickCreatePost = () => {
-    setWorkflowModal('create');
     window.dispatchEvent(
       new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: 'post' } })
     );

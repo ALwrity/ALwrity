@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
 import type { LinkedInProfileAnalysisError } from '../../../../api/linkedinSocial';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 
@@ -30,7 +31,7 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 13000,
+        zIndex: LI_Z_TOUR,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

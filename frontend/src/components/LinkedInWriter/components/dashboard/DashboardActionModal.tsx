@@ -1,5 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { LI_Z_ELEVATED_MODAL, LI_Z_MODAL } from '../../utils/linkedInStudioZIndex';
+import { StudioModalCloseButton } from './StudioModalCloseButton';
 
 interface DashboardActionModalProps {
   open: boolean;
@@ -33,7 +35,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   maxHeight = 'min(90vh, 640px)',
   minWidth,
   minHeight,
-  zIndex = 11000,
+  zIndex = LI_Z_MODAL,
   disableClose = false,
   titleSize = 'default',
   closeLabel,
@@ -45,7 +47,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
     if (!disableClose) onClose();
   };
 
-  const modalZIndex = elevated ? 14000 : zIndex;
+  const modalZIndex = elevated ? LI_Z_ELEVATED_MODAL : zIndex;
 
   return createPortal(
     <div
@@ -102,35 +104,39 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
             {title}
           </h2>
           {!disableClose && (
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={closeLabel ?? 'Close'}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                fontSize: closeLabel ? 13 : 18,
-                lineHeight: 1.2,
-                cursor: 'pointer',
-                color: closeLabel ? '#64748b' : '#9ca3af',
-                padding: closeLabel ? '6px 10px' : '4px 8px',
-                borderRadius: 6,
-                fontWeight: closeLabel ? 600 : 400,
-                transition: 'background 0.15s, color 0.15s',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#f3f4f6';
-                if (closeLabel) e.currentTarget.style.color = '#0a66c2';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = closeLabel ? '#64748b' : '#9ca3af';
-              }}
-            >
-              {closeLabel ?? '✕'}
-            </button>
+            closeLabel ? (
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={closeLabel ?? 'Close'}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  fontSize: 13,
+                  lineHeight: 1.2,
+                  cursor: 'pointer',
+                  color: '#64748b',
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  fontWeight: 600,
+                  transition: 'background 0.15s, color 0.15s',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#f3f4f6';
+                  e.currentTarget.style.color = '#0a66c2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent';
+                  e.currentTarget.style.color = '#64748b';
+                }}
+              >
+                {closeLabel}
+              </button>
+            ) : (
+              <StudioModalCloseButton onClick={onClose} ariaLabel="Close" />
+            )
           )}
         </div>
         <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>

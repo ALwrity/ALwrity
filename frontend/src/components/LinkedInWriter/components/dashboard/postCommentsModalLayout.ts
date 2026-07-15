@@ -12,5 +12,5 @@ export const POST_COMMENTS_MODAL_SIZE = {
 /** Minimum height for the scrollable comments list so several cards are visible. */
 export const POST_COMMENTS_LIST_MIN_HEIGHT = '42vh';
 
-/** Above Engagement Trends modal (z-index 11000). */
-export const POST_COMMENTS_MODAL_Z_INDEX = 12000;
+/** Above Engagement Trends modal (tier: modal). Re-exported from linkedInStudioZIndex. */
+export { POST_COMMENTS_MODAL_Z_INDEX } from '../../utils/linkedInStudioZIndex';

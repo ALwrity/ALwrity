@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { OptimiseProfileControl } from './OptimiseProfileControl';
 import { getProfileStrengthLabel as getProfileStrengthLabelImpl } from '../../utils/profileStrengthUtils';
@@ -47,7 +48,7 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 13000,
+        zIndex: LI_Z_TOUR,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

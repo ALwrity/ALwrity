@@ -1,12 +1,14 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { LinkedInPreferences } from '../utils/storageUtils';
 import { linkedInWriterApi } from '../../../services/linkedInWriterApi';
 import { getPlatformPersona } from '../../../api/persona';
-import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/linkedInWriterUtils';
+import { mapTone, mapPostType, mapIndustry } from '../utils/linkedInWriterUtils';
 import DataSourceSelector from './Brainstorm/DataSourceSelector';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { KeyPointsSection } from './KeyPointsSection';
 import { VariationPicker, assembleFullContent, type VariationResult } from './VariationPicker';
+import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
 
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
@@ -426,13 +428,17 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
   useEffect(() => {
     if (!selectedType) return;
+    document.body.classList.add('linkedin-quick-create-open');
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         closeModal();
       }
     };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.classList.remove('linkedin-quick-create-open');
+      window.removeEventListener('keydown', onKeyDown);
+    };
   }, [selectedType, closeModal]);
 
   // Feature 3 — fetch LinkedIn persona when post modal opens
@@ -858,24 +864,33 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         </>
       )}
 
-      {/* Generation Modal */}
-      {selectedType && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10020, padding: 20 }}>
-          <div style={{ background: 'white', width: variationsPhase !== 'idle' ? 868 : 728, maxWidth: '100%', borderRadius: 16, boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden', transition: 'width 200ms ease' }}>
+      {/* Generation Modal — portaled to body so it layers above the right-rail tools */}
+      {selectedType && createPortal(
+        <div
+          className="linkedin-quick-create-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="linkedin-quick-create-title"
+          onClick={closeModal}
+        >
+          <div
+            className={`linkedin-quick-create-dialog${variationsPhase !== 'idle' ? ' linkedin-quick-create-dialog--variations' : ''}`}
+            onClick={(e) => e.stopPropagation()}
+          >
 
             {/* Modal header */}
-            <div style={{ padding: 16, borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontWeight: 800, fontSize: 15, color: '#111827' }}>
+            <div className="linkedin-quick-create-header">
+              <div id="linkedin-quick-create-title" className="linkedin-quick-create-title">
                 {CONTENT_TYPES.find(c => c.type === selectedType)?.icon}{' '}
                 {variationsPhase !== 'idle'
                   ? '3 Tone Variations'
                   : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
               </div>
-              <button onClick={closeModal} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#6b7280', padding: '4px 8px', borderRadius: 6 }}>✕</button>
+              <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" className="linkedin-quick-create-close" />
             </div>
 
             {/* Modal body — swaps to VariationPicker when in variations phase */}
-            <div style={{ padding: 16, maxHeight: '66vh', overflow: 'auto' }}>
+            <div className="linkedin-quick-create-body">
               {variationsPhase !== 'idle'
                 ? (
                   <VariationPicker
@@ -889,7 +904,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
             {/* Modal footer */}
             {variationsPhase === 'idle' && (
-              <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div className="linkedin-quick-create-footer">
                 {/* Feature 5 — variations toggle (posts only) */}
                 {selectedType === 'post' && (
                   <label
@@ -978,7 +993,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
             {/* Variations footer — only shown while results are ready */}
             {variationsPhase === 'ready' && (
-              <div style={{ padding: '10px 16px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'flex-end' }}>
+              <div className="linkedin-quick-create-footer linkedin-quick-create-footer--end">
                 <button
                   onClick={closeModal}
                   style={{ padding: '8px 18px', border: '1px solid #d1d5db', borderRadius: 8, background: 'white', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}
@@ -988,7 +1003,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <style>{`
