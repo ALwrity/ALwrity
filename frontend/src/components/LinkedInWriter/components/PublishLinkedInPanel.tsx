@@ -13,6 +13,7 @@ import {
   getLinkedInSocialErrorMessage,
   publishLinkedInPost,
 } from '../../../api/linkedinSocial';
+import { formatDraftForPublish } from '../utils/linkedInPublishFormatters';
 
 interface PublishLinkedInPanelProps {
   draft: string;
@@ -32,7 +33,8 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft, comp
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const trimmedDraft = draft.trim();
+  const publishContent = formatDraftForPublish(draft);
+  const trimmedDraft = publishContent.trim();
   const isOrgTarget = selectedTarget === 'organization';
   const canPublish =
     connected && !!trimmedDraft && !isOrgTarget && !isPublishing && !isLoading;
@@ -50,7 +52,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({ draft, comp
 
     try {
       const result = await publishLinkedInPost({
-        content: trimmedDraft,
+        content: publishContent,
         account_id: selectedAccountId || undefined,
       });
       setSuccessMessage(result.message || 'Published to LinkedIn.');

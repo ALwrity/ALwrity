@@ -1,9 +1,23 @@
 import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { formatDraftContent } from '../LinkedInWriter/utils/contentFormatters';
-import WritingAssistantCard from './WritingAssistantCard';
-import { WASuggestion } from '../../services/writingAssistantService';
 import MarkdownToolbar from './MarkdownToolbar';
 import { applyMarkdownFormat, type MarkdownFormatType } from './markdownFormatting';
+import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
+import type { LinkedInAssistiveSuggestion } from '../LinkedInWriter/services/linkedInAssistiveWritingApi';
+
+interface AssistiveWritingState {
+  suggestion: LinkedInAssistiveSuggestion | null;
+  error: string | null;
+  isGenerating: boolean;
+  showContinuePrompt: boolean;
+  suggestionIndex: number;
+  totalSuggestions: number;
+  onAccept: () => void;
+  onReject: () => void;
+  onNext: () => void;
+  onContinueWriting: () => void;
+  onDismiss: () => void;
+}
 
 interface ContentDisplayAreaProps {
   contentRef: React.RefObject<HTMLDivElement>;
@@ -13,16 +27,11 @@ interface ContentDisplayAreaProps {
   citations?: any[];
   researchSources?: any[];
   assistantOn: boolean;
-  waSuggestion: WASuggestion | null;
-  waError?: string | null;
-  showContinuePrompt?: boolean;
+  assistiveWriting?: AssistiveWritingState;
   onDraftChange: (value: string) => void;
-  onDismissSuggestion: () => void;
   onTextSelection: () => void;
   renderSelectionMenu: () => React.ReactNode;
-  onTriggerSuggestion?: (text: string, caretIndex?: number) => void;
-  onInsertWithPreview?: (text: string, caretIndex: number) => void;
-  onContinueWriting?: () => void;
+  onTypingChange?: (text: string, caretIndex?: number) => void;
 }
 
 const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
@@ -33,48 +42,16 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   citations,
   researchSources,
   assistantOn,
-  waSuggestion,
-  waError,
-  showContinuePrompt,
+  assistiveWriting,
   onDraftChange,
-  onDismissSuggestion,
   onTextSelection,
   renderSelectionMenu,
-  onTriggerSuggestion,
-  onInsertWithPreview,
-  onContinueWriting
+  onTypingChange,
 }) => {
   const [localDraft, setLocalDraft] = useState<string>(draft);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const suggestionTimerRef = useRef<NodeJS.Timeout | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [caretRect, setCaretRect] = useState<{ top: number; left: number } | null>(null);
-  const [currentCaretIndex, setCurrentCaretIndex] = useState<number>(0);
-
-  const updateCaretRect = (el: HTMLTextAreaElement) => {
-    const index = el.selectionStart ?? 0;
-    setCurrentCaretIndex(index);
-    
-    const container = contentRef.current as HTMLDivElement | null;
-    const containerRect = container?.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    const lineHeight = 22;
-    const textUntilCaret = el.value.slice(0, index);
-    const lines = textUntilCaret.split('\n');
-    const lastLine = lines[lines.length - 1];
-    const approxCharWidth = 7.2;
-
-    const caretTopViewport = elRect.top + 12 + (lines.length - 1) * lineHeight;
-    const caretLeftViewport = elRect.left + 12 + lastLine.length * approxCharWidth;
-
-    if (containerRect) {
-      const top = caretTopViewport - containerRect.top + (container?.scrollTop || 0);
-      const left = caretLeftViewport - containerRect.left + (container?.scrollLeft || 0);
-      setCaretRect({ top, left });
-    } else {
-      setCaretRect({ top: caretTopViewport + window.scrollY, left: caretLeftViewport + window.scrollX });
-    }
-  };
+  const lastEmittedDraftRef = useRef<string>(draft);
 
   const handleFormat = useCallback(
     (type: MarkdownFormatType) => {
@@ -85,33 +62,33 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
 
       setLocalDraft(newValue);
 
-      if (onDraftChange) onDraftChange(newValue);
+      if (onDraftChange) {
+        lastEmittedDraftRef.current = newValue;
+        onDraftChange(newValue);
+      }
 
       requestAnimationFrame(() => {
         if (textarea) {
           textarea.focus();
           textarea.setSelectionRange(cursorPos, cursorPos);
-          updateCaretRect(textarea);
         }
       });
     },
     [localDraft, onDraftChange],
   );
 
-  // Memoize the formatted content to prevent infinite re-rendering
   const formattedContent = useMemo(() => {
     if (!draft) return '';
     return formatDraftContent(draft, citations, researchSources);
   }, [draft, citations, researchSources]);
 
-  // Keep local textarea in sync with external updates (including confirmed diffs)
   useEffect(() => {
-    if (draft !== localDraft) {
+    if (draft !== lastEmittedDraftRef.current) {
       setLocalDraft(draft);
+      lastEmittedDraftRef.current = draft;
     }
-  }, [draft, localDraft]);
+  }, [draft]);
 
-  // Auto-size textarea to show all content
   useEffect(() => {
     if (textareaRef.current && assistantOn) {
       textareaRef.current.style.height = 'auto';
@@ -119,91 +96,83 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
     }
   }, [localDraft, assistantOn]);
 
-  // Cleanup debounced saver
   useEffect(() => {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
     };
   }, []);
 
+  const handleTextareaSelection = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea || textarea.selectionStart === textarea.selectionEnd) {
+      return;
+    }
+    onTextSelection();
+  }, [onTextSelection]);
+
   return (
-    <div 
+    <div
       ref={contentRef}
       onMouseUp={assistantOn ? undefined : onTextSelection}
-      style={{ 
+      style={{
         padding: '20px',
         lineHeight: '1.6',
         position: 'relative',
         userSelect: 'text',
         overflow: 'visible',
-        color: '#333'
+        color: '#333',
       }}
     >
-      {/* Inline Writing Suggestion Card (anchored near caret when editing) */}
-      <WritingAssistantCard
-        assistantOn={assistantOn}
-        waSuggestion={waSuggestion}
-        waError={waError}
-        showContinuePrompt={showContinuePrompt}
-        draft={draft}
-        onDraftChange={onDraftChange}
-        onDismissSuggestion={onDismissSuggestion}
-        anchor={assistantOn ? caretRect : null}
-        caretIndex={currentCaretIndex}
-        onInsertAtCaret={onInsertWithPreview}
-        onContinueWriting={onContinueWriting}
-      />
+      {assistiveWriting && (
+        <LinkedInAssistiveWritingCard
+          enabled={assistantOn}
+          suggestion={assistiveWriting.suggestion}
+          error={assistiveWriting.error}
+          isGenerating={assistiveWriting.isGenerating}
+          showContinuePrompt={assistiveWriting.showContinuePrompt}
+          suggestionIndex={assistiveWriting.suggestionIndex}
+          totalSuggestions={assistiveWriting.totalSuggestions}
+          onAccept={assistiveWriting.onAccept}
+          onReject={assistiveWriting.onReject}
+          onNext={assistiveWriting.onNext}
+          onContinueWriting={assistiveWriting.onContinueWriting}
+          onDismiss={assistiveWriting.onDismiss}
+        />
+      )}
 
-      {/* Loading State */}
       {isGenerating && (
-        <div style={{
-          position: 'absolute',
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          textAlign: 'center',
-          zIndex: 10
-        }}>
-          <div style={{
-            width: '40px',
-            height: '40px',
-            border: '3px solid #e1f5fe',
-            borderTop: '3px solid #0a66c2',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 16px auto'
-          }} />
-          <div style={{ 
-            color: '#0277bd', 
-            fontSize: '16px', 
-            fontWeight: '500',
-            marginBottom: '8px'
-          }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            zIndex: 10,
+          }}
+        >
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid #e1f5fe',
+              borderTop: '3px solid #0a66c2',
+              borderRadius: '50%',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto 16px auto',
+            }}
+          />
+          <div style={{ color: '#0277bd', fontSize: '16px', fontWeight: '500', marginBottom: '8px' }}>
             {loadingMessage || 'Generating LinkedIn content...'}
           </div>
-          <div style={{ 
-            color: '#666', 
-            fontSize: '14px',
-            maxWidth: '300px',
-            lineHeight: '1.4'
-          }}>
+          <div style={{ color: '#666', fontSize: '14px', maxWidth: '300px', lineHeight: '1.4' }}>
             Crafting professional content tailored to your industry and audience...
           </div>
-          <style>{`
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-          `}</style>
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       )}
 
-      {/* Content Display */}
-      <div style={{
-        opacity: isGenerating ? 0.3 : 1,
-        transition: 'opacity 0.3s ease'
-      }}>
+      <div style={{ opacity: isGenerating ? 0.3 : 1, transition: 'opacity 0.3s ease' }}>
         {draft ? (
           <div>
             {assistantOn ? (
@@ -217,29 +186,16 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                     setLocalDraft(value);
 
                     const caretIndex = e.target.selectionStart ?? value.length;
-                    // Debounce suggestion trigger to avoid per-keystroke calls
-                    if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
-                    if (onTriggerSuggestion) {
-                      suggestionTimerRef.current = setTimeout(() => {
-                        onTriggerSuggestion(value, caretIndex);
-                      }, 800);
-                    }
+                    onTypingChange?.(value, caretIndex);
 
-                    // Update caret rect for popover placement
-                    updateCaretRect(e.currentTarget);
-
-                    // If user is typing while a suggestion is visible, hide it immediately
-                    if (waSuggestion && onDismissSuggestion) {
-                      onDismissSuggestion();
-                    }
-
-                    // Debounce the draft save
                     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
                     saveTimerRef.current = setTimeout(() => {
+                      lastEmittedDraftRef.current = value;
                       onDraftChange(value);
                     }, 600);
                   }}
-                  onKeyUp={(e) => updateCaretRect(e.currentTarget)}
+                  onMouseUp={handleTextareaSelection}
+                  onKeyUp={handleTextareaSelection}
                   autoFocus
                   style={{
                     width: '100%',
@@ -254,7 +210,7 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                     fontSize: '14px',
                     lineHeight: '1.6',
                     whiteSpace: 'pre-wrap',
-                    resize: 'vertical'
+                    resize: 'vertical',
                   }}
                 />
               </div>
@@ -263,17 +219,11 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
             )}
           </div>
         ) : (
-          <p style={{
-            color: '#666', 
-            fontStyle: 'italic', 
-            textAlign: 'center', 
-            marginTop: '40px'
-          }}>
+          <p style={{ color: '#666', fontStyle: 'italic', textAlign: 'center', marginTop: '40px' }}>
             Content will appear here when generated. Use the AI assistant to create your LinkedIn content.
           </p>
         )}
-        
-        {/* Citation Styling */}
+
         <style>{`
           .liw-cite {
             display: inline-flex;
@@ -291,26 +241,9 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
             border-radius: 4px;
             cursor: pointer;
             vertical-align: super;
-            transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
-            box-shadow: 0 1px 3px rgba(10, 102, 194, 0.08);
-          }
-          .liw-cite:hover {
-            background: rgba(10, 102, 194, 0.18);
-            border-color: rgba(10, 102, 194, 0.4);
-            box-shadow: 0 2px 6px rgba(10, 102, 194, 0.15);
-          }
-          .liw-cite:active {
-            background: rgba(10, 102, 194, 0.25);
-            box-shadow: 0 1px 2px rgba(10, 102, 194, 0.1);
-          }
-          
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
           }
         `}</style>
 
-        {/* Text Selection Menu and Fact-Check Components (disabled while editing) */}
         {!assistantOn && renderSelectionMenu()}
       </div>
     </div>
