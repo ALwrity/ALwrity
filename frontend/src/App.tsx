@@ -91,6 +91,9 @@ const ProductAvatarStudio = React.lazy(() => import('./components/ProductMarketi
 // BacklinkOutreach barrel (1 export)
 const BacklinkOutreachDashboard = React.lazy(() => import('./components/BacklinkOutreach').then(m => ({ default: m.BacklinkOutreachDashboard })));
 
+// GifMaker — standalone, zero ALwrity dependencies
+const GifMakerPage = React.lazy(() => import('./components/GifMaker').then(m => ({ default: m.GifMaker })));
+
 // Root route that chooses Landing (signed out) or InitialRouteHandler (signed in)
 const RootRoute: React.FC = () => {
   const { isSignedIn } = useAuth();
@@ -264,6 +267,7 @@ const App: React.FC = () => {
                     <Route path="/bing/callback" element={<BingCallbackPage />} />
                     <Route path="/youtube/callback" element={<YouTubeCallbackPage />} />
                     <Route path="/bing-analytics-storage" element={<ProtectedRoute><FeatureRoute feature="bing"><BingAnalyticsStorage /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/gif-maker" element={<ProtectedRoute><GifMakerPage apiBaseUrl={process.env.REACT_APP_API_URL || ''} maxFrames={30} /></ProtectedRoute>} />
               </Routes>
             </Suspense>
           </ConditionalCopilotKit>
