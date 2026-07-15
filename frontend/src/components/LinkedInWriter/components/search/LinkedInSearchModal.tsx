@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { LI_Z_KNOWLEDGE_CENTER } from '../../utils/linkedInStudioZIndex';
 
 import { LinkedInSearchFilterBar } from './LinkedInSearchFilterBar';
 import { LinkedInSearchResultsList } from './LinkedInSearchResultsList';
@@ -92,7 +93,7 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 12000,
+        zIndex: LI_Z_KNOWLEDGE_CENTER,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

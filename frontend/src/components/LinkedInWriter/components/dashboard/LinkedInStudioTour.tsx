@@ -10,6 +10,7 @@ import {
   markTourFinished,
   markTourSkipped,
 } from '../../../../utils/walkthroughs/alwrityJoyrideTheme';
+import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
 import {
   LINKEDIN_STUDIO_TOUR_SEEN_KEY,
   buildLinkedInStudioTourSteps,
@@ -81,7 +82,7 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
   );
 
   const joyrideStyles = useMemo(
-    () => getAlwrityJoyrideStyles(tourVariant, { primaryColor: '#0a66c2', zIndex: 13000 }),
+    () => getAlwrityJoyrideStyles(tourVariant, { primaryColor: '#0a66c2', zIndex: LI_Z_TOUR }),
     [tourVariant],
   );
 
