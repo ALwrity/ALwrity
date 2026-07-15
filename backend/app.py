@@ -521,6 +521,10 @@ router_group_status["assets_serving"] = {
     "reason": "Required for podcast media assets",
 }
 
+# Include standalone GIF Maker router (zero ALwrity dependencies)
+from routers.gif_maker import router as gif_maker_router
+app.include_router(gif_maker_router)
+
 # SEO Dashboard endpoints (skip in feature-only modes)
 if _is_full_mode():
     @app.get("/api/seo-dashboard/data")
