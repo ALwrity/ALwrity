@@ -342,25 +342,28 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           color: '#666',
         }}
       >
-        <button
-          type="button"
-          className={`linkedin-studio-tour-trigger${tourCompact ? ' linkedin-studio-tour-trigger--compact' : ''}`}
-          data-tour="li-tour-trigger"
-          onClick={() => setRunStudioTour(true)}
-          aria-label="Tour guide — replay how to use LinkedIn Studio"
-          title="Tour guide — how to use LinkedIn Studio"
-        >
-          <span className="linkedin-studio-tour-trigger-icon" aria-hidden>
-            ?
-          </span>
-          <span className="linkedin-studio-tour-trigger-label linkedin-studio-tour-trigger-label--full">
-            Tour guide
-          </span>
-          <span className="linkedin-studio-tour-trigger-label linkedin-studio-tour-trigger-label--short">
-            Tour
-          </span>
-        </button>
+        <div className="linkedin-dashboard-topbar">
+          <button
+            type="button"
+            className={`linkedin-studio-tour-trigger${tourCompact ? ' linkedin-studio-tour-trigger--compact' : ''}`}
+            data-tour="li-tour-trigger"
+            onClick={() => setRunStudioTour(true)}
+            aria-label="Tour guide — replay how to use LinkedIn Studio"
+            title="Tour guide — how to use LinkedIn Studio"
+          >
+            <span className="linkedin-studio-tour-trigger-icon" aria-hidden>
+              ?
+            </span>
+            <span className="linkedin-studio-tour-trigger-label linkedin-studio-tour-trigger-label--full">
+              Tour guide
+            </span>
+            <span className="linkedin-studio-tour-trigger-label linkedin-studio-tour-trigger-label--short">
+              Tour
+            </span>
+          </button>
+        </div>
 
+        <div className="linkedin-dashboard-hero-stage">
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
           planAnchorSlot={
@@ -382,6 +385,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             onConnectWelcomeOpenChange={setConnectWelcomeOpen}
           />
         </LinkedInDashboardHero>
+        </div>
 
         <QuickCreate
           variant="hidden"

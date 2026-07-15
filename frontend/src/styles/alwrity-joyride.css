@@ -1,13 +1,33 @@
-/* Shared Joyride tour footer controls across ALwrity product tours */
+/* Shared Joyride tour cards across ALwrity product tours */
 
-/* Single row: Skip for now | Back | Next */
+/* Title + body stack (react-joyride uses h1, not h4) */
+.react-joyride__tooltip > div:first-child {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+}
+
+.react-joyride__tooltip h1 {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.3 !important;
+}
+
+.react-joyride__tooltip > div:first-child > div {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Footer row: Skip for now | Back | Next */
 .react-joyride__tooltip > div:nth-child(2) {
   display: flex !important;
   flex-wrap: nowrap !important;
   align-items: center !important;
   justify-content: flex-end !important;
-  gap: 6px !important;
-  margin-top: 12px !important;
+  gap: 10px !important;
+  margin-top: 24px !important;
+  padding-top: 2px !important;
 }
 
 .react-joyride__tooltip > div:nth-child(2) > div:first-child {
@@ -62,4 +82,15 @@
 
 .react-joyride__tooltip button[data-test-id='button-primary']:hover {
   filter: brightness(0.95);
+}
+
+@media (max-width: 640px) {
+  .react-joyride__tooltip > div:first-child {
+    gap: 18px !important;
+  }
+
+  .react-joyride__tooltip > div:nth-child(2) {
+    margin-top: 28px !important;
+    gap: 10px !important;
+  }
 }
