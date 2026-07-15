@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   CitationHoverHandler,
-  useTextSelectionHandler,
   DiffPreviewModal,
   ContentPreviewHeaderWithModals,
   ContentDisplayArea
@@ -11,6 +10,7 @@ import { readPrefs } from '../utils/linkedInWriterUtils';
 import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
 import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
 import { useLinkedInAssistiveWriting } from '../hooks/useLinkedInAssistiveWriting';
+import { useLinkedInEditorTextSelection } from '../hooks/useLinkedInEditorTextSelection';
 import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
 import { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
 
@@ -96,7 +96,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     industry: prefs.industry,
   });
 
-  const textSelectionHandler = useTextSelectionHandler(contentRef, {
+  const textSelectionHandler = useLinkedInEditorTextSelection(contentRef, {
+    enabled: assistantOn,
     onGenerateImage: selectionImage.openForSelection,
     isGeneratingImage: selectionImage.isGenerating,
     onGenerateVideo: selectionVideo.openForSelection,
@@ -199,7 +200,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
                 onDismiss: assistiveWriting.dismissSuggestion,
               }}
               onDraftChange={onDraftChange}
-              onTextSelection={textSelectionHandler.handleTextSelection}
+              onTextareaSelection={textSelectionHandler.handleTextareaSelection}
               renderSelectionMenu={textSelectionHandler.renderSelectionMenu}
               onTypingChange={assistiveWriting.handleTypingChange}
             />

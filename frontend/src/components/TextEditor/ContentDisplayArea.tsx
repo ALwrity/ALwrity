@@ -29,7 +29,7 @@ interface ContentDisplayAreaProps {
   assistantOn: boolean;
   assistiveWriting?: AssistiveWritingState;
   onDraftChange: (value: string) => void;
-  onTextSelection: () => void;
+  onTextareaSelection?: (textarea: HTMLTextAreaElement) => void;
   renderSelectionMenu: () => React.ReactNode;
   onTypingChange?: (text: string, caretIndex?: number) => void;
 }
@@ -44,7 +44,7 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   assistantOn,
   assistiveWriting,
   onDraftChange,
-  onTextSelection,
+  onTextareaSelection,
   renderSelectionMenu,
   onTypingChange,
 }) => {
@@ -102,18 +102,14 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
     };
   }, []);
 
-  const handleTextareaSelection = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea || textarea.selectionStart === textarea.selectionEnd) {
-      return;
-    }
-    onTextSelection();
-  }, [onTextSelection]);
+  const handleTextareaSelectionEvent = useCallback(() => {
+    if (!assistantOn || !textareaRef.current) return;
+    onTextareaSelection?.(textareaRef.current);
+  }, [assistantOn, onTextareaSelection]);
 
   return (
     <div
       ref={contentRef}
-      onMouseUp={assistantOn ? undefined : onTextSelection}
       style={{
         padding: '20px',
         lineHeight: '1.6',
@@ -194,8 +190,8 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                       onDraftChange(value);
                     }, 600);
                   }}
-                  onMouseUp={handleTextareaSelection}
-                  onKeyUp={handleTextareaSelection}
+                  onMouseUp={handleTextareaSelectionEvent}
+                  onKeyUp={handleTextareaSelectionEvent}
                   autoFocus
                   style={{
                     width: '100%',
@@ -215,7 +211,10 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                 />
               </div>
             ) : (
-              <div dangerouslySetInnerHTML={{ __html: formattedContent }} />
+              <div
+                dangerouslySetInnerHTML={{ __html: formattedContent }}
+                style={{ userSelect: 'text' }}
+              />
             )}
           </div>
         ) : (
@@ -244,7 +243,7 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
           }
         `}</style>
 
-        {!assistantOn && renderSelectionMenu()}
+        {assistantOn && renderSelectionMenu()}
       </div>
     </div>
   );
