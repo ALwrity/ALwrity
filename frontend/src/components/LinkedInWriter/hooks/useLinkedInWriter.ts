@@ -14,6 +14,16 @@ import {
 import { getContextAwareSuggestions, mapPostType, mapTone, mapIndustry, mapSearchEngine, readPrefs } from '../utils/linkedInWriterUtils';
 import { linkedInWriterApi, GroundingLevel, LinkedInOutlineSection } from '../../../services/linkedInWriterApi';
 import { CopilotPersistenceManager } from '../utils/enhancedPersistence';
+import { stripSourceCitations } from '../utils/linkedInPublishFormatters';
+
+function normalizeDraftDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && 'content' in detail) {
+    const content = (detail as { content?: unknown }).content;
+    return typeof content === 'string' ? content : '';
+  }
+  return '';
+}
 
 export function useLinkedInWriter() {
   // Core state
@@ -565,10 +575,12 @@ export function useLinkedInWriter() {
   // Handle draft updates from CopilotKit actions
   useEffect(() => {
     const handleUpdateDraft = (event: CustomEvent) => {
-      console.log('[LinkedIn Writer] Draft updated:', event.detail?.substring(0, 100) + '...');
-      console.log('[LinkedIn Writer] Draft length:', event.detail?.length);
+      const rawContent = normalizeDraftDetail(event.detail);
+      const cleanedContent = stripSourceCitations(rawContent);
+      console.log('[LinkedIn Writer] Draft updated:', cleanedContent?.substring(0, 100) + '...');
+      console.log('[LinkedIn Writer] Draft length:', cleanedContent?.length);
       console.log('[LinkedIn Writer] Setting draft and clearing loading state...');
-      setDraft(event.detail);
+      setDraft(cleanedContent);
       setIsGenerating(false);
       setLoadingMessage('');
       setCurrentAction(null);
@@ -579,7 +591,8 @@ export function useLinkedInWriter() {
     };
 
     const handleAppendDraft = (event: CustomEvent) => {
-      setDraft(prev => prev + event.detail);
+      const appendContent = typeof event.detail === 'string' ? event.detail : '';
+      setDraft(prev => stripSourceCitations(prev + appendContent));
     };
 
     const handleAssistantMessage = (event: CustomEvent) => {
