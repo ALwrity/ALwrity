@@ -1,5 +1,7 @@
-import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
-import { formatDraftContent } from '../LinkedInWriter/utils/contentFormatters';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { LinkedInDraftPreview } from '../LinkedInWriter/components/LinkedInDraftPreview';
+import { LinkedInAuthenticatedImage } from '../LinkedInWriter/components/LinkedInAuthenticatedImage';
+import { splitDraftByImageMarkdown } from '../LinkedInWriter/utils/linkedInImageDraftUtils';
 import MarkdownToolbar from './MarkdownToolbar';
 import { applyMarkdownFormat, type MarkdownFormatType } from './markdownFormatting';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
@@ -77,10 +79,10 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
     [localDraft, onDraftChange],
   );
 
-  const formattedContent = useMemo(() => {
-    if (!draft) return '';
-    return formatDraftContent(draft, citations, researchSources);
-  }, [draft, citations, researchSources]);
+  const draftImageSegments = useMemo(
+    () => splitDraftByImageMarkdown(draft).filter((segment) => segment.type === 'image'),
+    [draft],
+  );
 
   useEffect(() => {
     if (draft !== lastEmittedDraftRef.current) {
@@ -209,11 +211,25 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                     resize: 'vertical',
                   }}
                 />
+                {draftImageSegments.length > 0 && (
+                  <div style={{ marginTop: 12 }}>
+                    {draftImageSegments.map((segment, index) =>
+                      segment.type === 'image' && segment.imageId ? (
+                        <LinkedInAuthenticatedImage
+                          key={`assistive-image-${segment.imageId}-${index}`}
+                          imageId={segment.imageId}
+                          alt={segment.alt}
+                        />
+                      ) : null,
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
-              <div
-                dangerouslySetInnerHTML={{ __html: formattedContent }}
-                style={{ userSelect: 'text' }}
+              <LinkedInDraftPreview
+                draft={draft}
+                citations={citations}
+                researchSources={researchSources}
               />
             )}
           </div>

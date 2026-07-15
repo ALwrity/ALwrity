@@ -12,7 +12,7 @@ function citationBadge(num: string): string {
 
 // Format draft content with proper LinkedIn styling and inline citations
 export function formatDraftContent(content: string, citations?: any[], researchSources?: any[]): string {
-  if (!content) return '';
+  if (!content?.trim()) return '';
   
   let formatted = escapeHtml(content);
   
@@ -44,19 +44,22 @@ export function formatDraftContent(content: string, citations?: any[], researchS
       if (totalCitations > 0) {
         const sentences = formatted.split(/[.!?]+/).filter(s => s.trim().length > 0);
         const sentencesWithCitations: string[] = [];
-        
-        citationEntries.forEach(([reference, sourceNum], index) => {
-          const targetSentenceIndex = Math.floor((index / totalCitations) * sentences.length);
-          const targetSentence = sentences[targetSentenceIndex] || sentences[sentences.length - 1];
-          
-          const citeHtml = ` ${citationBadge(sourceNum)}`;
-          const sentenceWithCitation = targetSentence.trim() + citeHtml;
-          sentencesWithCitations[targetSentenceIndex] = sentenceWithCitation;
-        });
-        
-        formatted = sentences.map((sentence, index) => {
-          return sentencesWithCitations[index] || sentence;
-        }).join('. ') + '.';
+
+        if (sentences.length > 0) {
+          citationEntries.forEach(([reference, sourceNum], index) => {
+            const targetSentenceIndex = Math.floor((index / totalCitations) * sentences.length);
+            const targetSentence = sentences[targetSentenceIndex] || sentences[sentences.length - 1];
+            if (!targetSentence) return;
+
+            const citeHtml = ` ${citationBadge(sourceNum)}`;
+            const sentenceWithCitation = targetSentence.trim() + citeHtml;
+            sentencesWithCitations[targetSentenceIndex] = sentenceWithCitation;
+          });
+
+          formatted = sentences.map((sentence, index) => {
+            return sentencesWithCitations[index] || sentence;
+          }).join('. ') + '.';
+        }
       }
     }
   

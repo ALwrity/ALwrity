@@ -14,11 +14,13 @@ import type {
 interface UseLinkedInSelectionImageOptions {
   topic?: string;
   industry?: string;
+  onInsertImage?: (imageUrl: string) => void;
 }
 
 export function useLinkedInSelectionImage({
   topic,
   industry,
+  onInsertImage,
 }: UseLinkedInSelectionImageOptions) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedText, setSelectedText] = useState('');
@@ -96,7 +98,11 @@ export function useLinkedInSelectionImage({
           imageId: result.imageId,
         });
 
-        showToastNotification(`Image generated: ${imageUrl}`, 'success');
+        if (onInsertImage) {
+          onInsertImage(imageUrl);
+        }
+
+        showToastNotification('Image added to your post', 'success');
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Image generation failed';
@@ -105,7 +111,7 @@ export function useLinkedInSelectionImage({
         setIsGenerating(false);
       }
     },
-    [selectedText, topic, industry]
+    [selectedText, topic, industry, onInsertImage]
   );
 
   return {

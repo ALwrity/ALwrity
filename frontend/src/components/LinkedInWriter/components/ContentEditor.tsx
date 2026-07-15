@@ -11,6 +11,7 @@ import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
 import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
 import { useLinkedInAssistiveWriting } from '../hooks/useLinkedInAssistiveWriting';
 import { useLinkedInEditorTextSelection } from '../hooks/useLinkedInEditorTextSelection';
+import { appendImageMarkdownToDraft } from '../utils/linkedInImageDraftUtils';
 import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
 import { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
 
@@ -85,10 +86,19 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     onInsertWithPreview: handleInsertAtCaret,
   });
 
+  const insertGeneratedImage = useCallback(
+    (imageUrl: string) => {
+      const newDraft = appendImageMarkdownToDraft(draft, imageUrl);
+      onDraftChange(newDraft);
+    },
+    [draft, onDraftChange],
+  );
+
   const prefs = readPrefs();
   const selectionImage = useLinkedInSelectionImage({
     topic,
     industry: prefs.industry,
+    onInsertImage: insertGeneratedImage,
   });
 
   const selectionVideo = useLinkedInSelectionVideo({
