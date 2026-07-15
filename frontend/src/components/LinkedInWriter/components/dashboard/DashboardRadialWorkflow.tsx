@@ -186,6 +186,8 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
     const panelEndDeg = card.endAngle + PANEL_GAP_DEGREES;
     const polish = LABEL_POLISH[card.id] ?? { descWidthScale: 0.9 };
+    const iconHeaderGap = Math.max(5, Math.round(iconFontSize * 0.22));
+    const headerTextGap = Math.max(5, Math.round(descFontSize * 0.55));
     const box = wedgeLabelBox(
       centerX,
       centerY,
@@ -275,11 +277,11 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
               alignItems: 'center',
               justifyContent: 'center',
               textAlign: 'center',
-              padding: '2px 4px',
+              padding: '4px 6px',
               boxSizing: 'border-box',
             }}
           >
-            <div style={{ fontSize: iconFontSize, lineHeight: 1, marginBottom: 1 }}>
+            <div style={{ fontSize: iconFontSize, lineHeight: 1, marginBottom: iconHeaderGap }}>
               {card.icon}
             </div>
             <div
@@ -288,6 +290,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
                 fontWeight: 800,
                 color: isActive ? card.accent : '#0f172a',
                 lineHeight: 1.12,
+                marginBottom: headerTextGap,
                 transition: 'color 180ms ease',
               }}
             >
@@ -295,11 +298,10 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
             </div>
             <div
               style={{
-                marginTop: 2,
                 fontSize: descFontSize,
                 fontWeight: 500,
                 color: isActive ? '#334155' : '#475569',
-                lineHeight: 1.22,
+                lineHeight: 1.28,
                 maxWidth: '100%',
                 overflowWrap: 'break-word',
               }}

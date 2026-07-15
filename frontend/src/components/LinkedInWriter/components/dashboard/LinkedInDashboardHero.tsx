@@ -1,7 +1,14 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DashboardRadialWorkflow } from './DashboardRadialWorkflow';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
-import { computeRadialLayout, layoutYToPixel, PLAN_CONNECT_UI_LIFT_PX, ringSpotlightDiameter } from './dashboardRadialLayout';
+import {
+  computeRadialLayout,
+  layoutConnectAnchorY,
+  layoutHubCenterPercent,
+  layoutHubCenterY,
+  PLAN_CONNECT_UI_LIFT_PX,
+  ringSpotlightDiameter,
+} from './dashboardRadialLayout';
 
 interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
@@ -15,14 +22,18 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
   onWorkflowCardAction,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(640);
-  const [containerHeight, setContainerHeight] = useState(520);
+  const [containerHeight, setContainerHeight] = useState(640);
 
   const readSize = () => {
     const el = containerRef.current;
-    if (!el) return;
-    const width = el.clientWidth;
-    const height = el.clientHeight;
+    const canvas = canvasRef.current;
+    if (!el || !canvas) return;
+    const stage = el.closest('.linkedin-dashboard-hero-stage') as HTMLElement | null;
+    const width = canvas.clientWidth;
+    const stageHeight = stage?.clientHeight ?? 0;
+    const height = stageHeight > 0 ? stageHeight : Math.max(el.clientHeight, 400);
     if (width > 0) setContainerWidth(width);
     if (height > 0) setContainerHeight(height);
   };
@@ -35,8 +46,11 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     const el = containerRef.current;
     if (!el) return;
 
+    const stage = el.closest('.linkedin-dashboard-hero-stage');
     const ro = new ResizeObserver(() => readSize());
+    if (canvasRef.current) ro.observe(canvasRef.current);
     ro.observe(el);
+    if (stage) ro.observe(stage);
     return () => ro.disconnect();
   }, []);
 
@@ -44,10 +58,13 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     () => computeRadialLayout(containerWidth, containerHeight),
     [containerWidth, containerHeight]
   );
-  const hubTop = layoutYToPixel(layout.centerY + layout.hubOffsetY, layout.viewBoxY);
-  const planAnchorTop = layoutYToPixel(layout.planAnchorY, layout.viewBoxY);
-  const ringCenterTop = layoutYToPixel(layout.centerY, layout.viewBoxY);
+  const hubTop = layoutHubCenterY(layout);
+  const connectTop = layoutConnectAnchorY(layout);
+  const ringCenterTop = layoutHubCenterY(layout);
+  const hubCenterLeft = `${layoutHubCenterPercent(layout)}%`;
   const lifecycleSpotlightSize = ringSpotlightDiameter(layout.outerR);
+  const hubDiameter = layout.hubVisualR * 2;
+  const hubAvatarSize = Math.min(120, Math.round(layout.hubVisualR * 1.38));
 
   return (
     <div
@@ -55,22 +72,26 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
       className="linkedin-dashboard-hero"
       style={{
         width: '100%',
-        flex: 1,
-        minHeight: 240,
-        flexShrink: 1,
+        flex: '0 1 auto',
+        minHeight: 0,
+        height: 'auto',
+        flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
         alignItems: 'center',
-        overflow: 'visible',
+        overflow: 'hidden',
         position: 'relative',
         paddingTop: 0,
       }}
     >
       <div
+        ref={canvasRef}
+        className="linkedin-dashboard-hero-canvas"
         style={{
           position: 'relative',
           width: '100%',
+          maxWidth: '100%',
           height: layout.viewH,
           flexShrink: 0,
           zIndex: 1,
@@ -85,7 +106,7 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
           aria-hidden
           style={{
             position: 'absolute',
-            left: '50%',
+            left: hubCenterLeft,
             top: ringCenterTop,
             width: lifecycleSpotlightSize,
             height: lifecycleSpotlightSize,
@@ -97,15 +118,18 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
           className="linkedin-dashboard-hero-hub"
           style={{
             position: 'absolute',
-            left: '50%',
+            left: hubCenterLeft,
             top: hubTop,
             transform: 'translate(-50%, -50%)',
             zIndex: 10,
-            width: '100%',
-            maxWidth: Math.max(220, layout.innerR * 2),
+            width: hubDiameter,
+            maxWidth: hubDiameter,
+            ['--hub-inner-diameter' as string]: `${hubDiameter}px`,
+            ['--hub-avatar-size' as string]: `${hubAvatarSize}px`,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            justifyContent: 'center',
             pointerEvents: 'none',
             overflow: 'visible',
           }}
@@ -128,14 +152,15 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
             className="linkedin-dashboard-plan-anchor"
             style={{
               position: 'absolute',
-              left: layout.planAnchorX,
-              top: planAnchorTop,
-              transform: `translate(-50%, ${-PLAN_CONNECT_UI_LIFT_PX}px)`,
+              left: hubCenterLeft,
+              top: connectTop,
+              transform: `translate(-50%, calc(-1 * ${PLAN_CONNECT_UI_LIFT_PX}px))`,
               zIndex: 20,
               pointerEvents: 'auto',
               display: 'flex',
               justifyContent: 'center',
-              minWidth: 220,
+              alignItems: 'center',
+              minWidth: 0,
             }}
           >
             {planAnchorSlot}
