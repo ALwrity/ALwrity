@@ -2,14 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useBacklinkOutreachStore } from '../../stores/backlinkOutreachStore';
 import {
-  listEmailTemplates,
-  generateEmailTemplate,
-  generateSubjectLines,
-  generateFollowUp,
-  personalizeEmail,
-  createEmailTemplate,
-  EmailTemplateRecord,
-  GenerateEmailRequest,
   bulkUpdateLeadStatus,
   updateLeadStatus,
   addLeadToCampaign,
@@ -22,9 +14,13 @@ import {
   exportCampaignRepliesCsv,
 } from '../../api/backlinkOutreachApi';
 import { showToastNotification } from '../../utils/toastNotifications';
+import LeadsTab from './LeadsTab';
+import ComposerTab from './ComposerTab';
+import AiProspectModal from './AiProspectModal';
+import { useComposerState } from './useComposerState';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
-type Tab = 'campaigns' | 'discover' | 'leads' | 'composer' | 'analytics';
+type Tab = 'campaigns' | 'workspace' | 'composer' | 'analytics';
 
 const STATUS_OPTIONS = ['discovered', 'contacted', 'replied', 'placed', 'bounced', 'unsubscribed'] as const;
 
@@ -43,6 +39,12 @@ const GRADIENT_PRIMARY = 'linear-gradient(135deg, #667eea, #764ba2)';
 const GRADIENT_SECONDARY = 'linear-gradient(135deg, #f093fb, #f5576c)';
 const GRADIENT_SUCCESS = 'linear-gradient(135deg, #43e97b, #38f9d7)';
 const GRADIENT_WARNING = 'linear-gradient(135deg, #fa709a, #fee140)';
+
+// Readable text colors — bumped contrast against dark backgrounds
+const TXT_HEADING = '#fff';
+const TXT_BODY = 'rgba(255,255,255,0.88)';
+const TXT_MUTED = 'rgba(255,255,255,0.6)';
+const TXT_FAINT = 'rgba(255,255,255,0.42)';
 
 const TooltipWrap: React.FC<{ text: string; children: React.ReactNode }> = ({ text, children }) => {
   const [show, setShow] = useState(false);
@@ -95,49 +97,51 @@ const BacklinkOutreachDashboard: React.FC = () => {
   const workspaceId = userId || 'default';
   const {
     campaigns, selectedCampaign, discoveredOpportunities,
-    isLoading, isDiscovering, error,
+    discoveryQueries, discoveryEmailStats,
+    isLoading, isDiscovering, isAiProspecting, aiProspectResults, error,
     fetchCampaigns, createCampaign, selectCampaign,
-    deepDiscover, clearDiscoveries,
+    deepDiscover, clearDiscoveries, runAiProspect, clearAiProspect,
     attempts, replies, followups, analytics,
     fetchAttempts, fetchReplies, fetchFollowUps, fetchAnalytics,
+    suppressedList, fetchSuppressedList, addSuppressedRecipient, removeSuppressedRecipient,
   } = useBacklinkOutreachStore();
 
   const [activeTab, setActiveTab] = useState<Tab>('campaigns');
+  const [workspaceMode, setWorkspaceMode] = useState<'discover' | 'manage'>('discover');
+  const [saveConfirmation, setSaveConfirmation] = useState<{ count: number; campaignName: string } | null>(null);
   const [newCampaignName, setNewCampaignName] = useState('');
   const [keyword, setKeyword] = useState('');
   const [discoverCampaignId, setDiscoverCampaignId] = useState('');
 
-  const [templates, setTemplates] = useState<EmailTemplateRecord[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState('');
-  const [topic, setTopic] = useState('');
-  const [targetSite, setTargetSite] = useState('');
-  const [tone, setTone] = useState<'professional' | 'friendly' | 'casual' | 'formal'>('professional');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [subjectSuggestions, setSubjectSuggestions] = useState<string[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiProgressStep, setAiProgressStep] = useState(0);
+  const [aiProgressLabel, setAiProgressLabel] = useState('');
+  useEffect(() => {
+    if (!isAiProspecting) return;
+    setAiProgressStep(0);
+    setAiProgressLabel('Starting AI analysis...');
+    const labels = [
+      'Scraping page content...',
+      'Analyzing with AI for guest post signals...',
+      'Extracting editor names and contact info...',
+      'Scoring relevance to keyword...',
+      'Identifying risk flags...',
+      'Generating pitch angles...',
+    ];
+    const interval = setInterval(() => {
+      setAiProgressStep((prev) => {
+        const next = Math.min(prev + 1, labels.length);
+        setAiProgressLabel(labels[Math.min(next, labels.length - 1)]);
+        return next;
+      });
+    }, 4000);
+    return () => {
+      clearInterval(interval);
+      setAiProgressStep(7);
+      setAiProgressLabel('');
+    };
+  }, [isAiProspecting]);
 
-  const [senderName, setSenderName] = useState('');
-  const [senderEmail, setSenderEmail] = useState('');
-  const [senderOrganization, setSenderOrganization] = useState('');
-  const [senderAddress, setSenderAddress] = useState('');
-  const [unsubscribeUrl, setUnsubscribeUrl] = useState('');
-  const [oneClickUnsubscribe, setOneClickUnsubscribe] = useState(false);
-  const [legalBasis, setLegalBasis] = useState('legitimate_interest');
-  const [contactDiscoverySource, setContactDiscoverySource] = useState('');
-  const [recipientRegion, setRecipientRegion] = useState('unknown');
-  const [recipientRegionSource, setRecipientRegionSource] = useState('user_attested');
-  const [consentStatus, setConsentStatus] = useState('unknown');
-  const [approvedByHuman, setApprovedByHuman] = useState(false);
-
-  const [leadName, setLeadName] = useState('');
-  const [leadSite, setLeadSite] = useState('');
-  const [leadContentTopic, setLeadContentTopic] = useState('');
-
-  const [followUpDays, setFollowUpDays] = useState(7);
-  const [replyContext, setReplyContext] = useState('');
-
-  const [templateName, setTemplateName] = useState('');
+  const composer = useComposerState({ userId, workspaceId, fetchAttempts, selectCampaign });
 
   const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
   const [bulkStatus, setBulkStatus] = useState<'discovered' | 'contacted' | 'replied' | 'placed' | 'bounced' | 'unsubscribed'>('contacted');
@@ -146,16 +150,32 @@ const BacklinkOutreachDashboard: React.FC = () => {
   const [funnelData, setFunnelData] = useState<FunnelStage[]>([]);
   const [analyticsDays, setAnalyticsDays] = useState(30);
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
+  const [discoverPhase, setDiscoverPhase] = useState('');
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
   const [isExporting, setIsExporting] = useState<string | null>(null);
+
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState({ emailFilter: 'all', guidelinesOnly: false, minQuality: 0 });
+
+  const filteredOpportunities = React.useMemo(() => {
+    return discoveredOpportunities.filter(opp => {
+      if (filters.emailFilter === 'with_email' && !opp.email) return false;
+      if (filters.emailFilter === 'no_email' && opp.email) return false;
+      if (filters.guidelinesOnly && !opp.has_guest_post_guidelines) return false;
+      if (filters.minQuality > 0 && (opp.quality_score * 100) < filters.minQuality) return false;
+      return true;
+    });
+  }, [discoveredOpportunities, filters]);
+
+  const qualifiedCount = React.useMemo(() => {
+    return discoveredOpportunities.filter(opp =>
+      opp.email && opp.quality_score > 0.3
+    ).length;
+  }, [discoveredOpportunities]);
 
   useEffect(() => {
     fetchCampaigns(workspaceId);
   }, [fetchCampaigns, workspaceId]);
-
-  useEffect(() => {
-    listEmailTemplates().then(r => setTemplates(r.templates)).catch(() => showToastNotification('Failed to load email templates', 'error'));
-  }, []);
 
   useEffect(() => {
     if (selectedCampaign) {
@@ -189,23 +209,54 @@ const BacklinkOutreachDashboard: React.FC = () => {
     return () => { cancelled = true; };
   }, [analyticsDays, selectedCampaign?.campaign_id]);
 
+  useEffect(() => {
+    if (!isDiscovering) {
+      setDiscoverPhase('');
+      return;
+    }
+    const phases = [
+      'Generating guest post search queries...',
+      'Searching Exa neural index and DuckDuckGo...',
+      'Scraping page content for guest post signals...',
+      'Extracting contact emails and contact pages...',
+      'Scoring, deduplicating, and ranking opportunities...',
+    ];
+    let idx = 0;
+    setDiscoverPhase(phases[0]);
+    const interval = setInterval(() => {
+      idx = (idx + 1) % phases.length;
+      setDiscoverPhase(phases[idx]);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isDiscovering]);
+
   const handleCreateCampaign = useCallback(async () => {
     if (!newCampaignName.trim()) return;
-    const id = await createCampaign(workspaceId, newCampaignName.trim());
+    const name = newCampaignName.trim();
+    const id = await createCampaign(workspaceId, name);
     if (id) {
       setNewCampaignName('');
-      setActiveTab('discover');
+      setKeyword(name);
+      setDiscoverCampaignId(id);
+      await selectCampaign(id);
+      setActiveTab('workspace');
+      setWorkspaceMode('discover');
     }
-  }, [newCampaignName, createCampaign]);
+  }, [newCampaignName, createCampaign, selectCampaign]);
 
   const handleDiscover = useCallback(async () => {
     if (!keyword.trim()) return;
-    await deepDiscover(keyword.trim(), 15);
-  }, [keyword, deepDiscover]);
+    await deepDiscover(keyword.trim(), 15, discoverCampaignId || undefined);
+    if (discoverCampaignId) {
+      selectCampaign(discoverCampaignId);
+      showToastNotification('Discover complete — leads saved to campaign', 'success');
+    }
+  }, [keyword, deepDiscover, discoverCampaignId, selectCampaign]);
 
   const handleDiscoverAndSave = useCallback(async () => {
-    if (!keyword.trim() || !discoverCampaignId || discoveredOpportunities.length === 0) return;
-    for (const opp of discoveredOpportunities) {
+    const toSave = showFilters ? filteredOpportunities : discoveredOpportunities;
+    if (!keyword.trim() || !discoverCampaignId || toSave.length === 0) return;
+    for (const opp of toSave) {
       try {
         await addLeadToCampaign(discoverCampaignId, {
           campaign_id: discoverCampaignId,
@@ -215,113 +266,32 @@ const BacklinkOutreachDashboard: React.FC = () => {
           snippet: opp.snippet,
           email: opp.email ?? undefined,
           confidence_score: opp.confidence_score,
+          exa_author: opp.exa_author ?? undefined,
+          exa_published_date: opp.exa_published_date ?? undefined,
+          exa_summary: opp.exa_summary ?? undefined,
+          ai_editor_name: opp.ai_editor_name ?? undefined,
+          ai_pitch_angle: opp.ai_pitch_angle ?? undefined,
+          ai_guidelines_summary: opp.ai_guidelines_summary ?? undefined,
+          ai_relevance_score: opp.ai_relevance_score ?? undefined,
+          ai_risk_flags: opp.ai_risk_flags ? JSON.stringify(opp.ai_risk_flags) : undefined,
         });
       } catch (e) {
         // skip duplicates
       }
     }
-    showToastNotification(`Saved ${discoveredOpportunities.length} leads to campaign`, 'success');
-  }, [keyword, discoverCampaignId, discoveredOpportunities]);
+    await selectCampaign(discoverCampaignId);
+    const campaign = campaigns.find(c => c.campaign_id === discoverCampaignId);
+    setSaveConfirmation({ count: toSave.length, campaignName: campaign?.name || discoverCampaignId });
+    showToastNotification(`Saved ${toSave.length} leads to campaign`, 'success');
+    setActiveTab('workspace');
+    setWorkspaceMode('manage');
+  }, [keyword, discoverCampaignId, discoveredOpportunities, filteredOpportunities, showFilters, selectCampaign, campaigns]);
 
   const handleSelectCampaign = useCallback(async (campaignId: string) => {
     await selectCampaign(campaignId);
-    setActiveTab('leads');
+    setActiveTab('workspace');
+    setWorkspaceMode('manage');
   }, [selectCampaign]);
-
-  const handleGenerate = useCallback(async () => {
-    if (!topic.trim()) return;
-    setIsGenerating(true);
-    try {
-      const payload: GenerateEmailRequest = {
-        topic: topic.trim(),
-        target_site: targetSite.trim() || undefined,
-        tone,
-        existing_template_id: selectedTemplateId || undefined,
-      };
-      const result = await generateEmailTemplate(payload);
-      setSubject(result.subject);
-      setBody(result.body);
-      setSubjectSuggestions([]);
-    } catch (e) {
-      showToastNotification('Email generation failed', 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [topic, targetSite, tone, selectedTemplateId]);
-
-  const handleSuggestSubjects = useCallback(async () => {
-    if (!body.trim()) return;
-    setIsGenerating(true);
-    try {
-      const result = await generateSubjectLines({ body: body.trim() });
-      setSubjectSuggestions(result.subjects);
-    } catch (e) {
-      showToastNotification('Failed to generate subject lines', 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [body]);
-
-  const handlePersonalize = useCallback(async () => {
-    if (!leadName.trim() || !leadSite.trim() || !leadContentTopic.trim() || !topic.trim()) return;
-    setIsGenerating(true);
-    try {
-      const result = await personalizeEmail({
-        lead_name: leadName.trim(),
-        lead_site: leadSite.trim(),
-        lead_content_topic: leadContentTopic.trim(),
-        pitch_topic: topic.trim(),
-        existing_body: body,
-      });
-      setSubject(result.subject);
-      setBody(result.body);
-    } catch (e) {
-      showToastNotification('Personalization failed', 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [leadName, leadSite, leadContentTopic, topic, body]);
-
-  const handleFollowUp = useCallback(async () => {
-    if (!subject.trim() || !body.trim()) return;
-    setIsGenerating(true);
-    try {
-      const result = await generateFollowUp({
-        original_subject: subject.trim(),
-        original_body: body.trim(),
-        days_elapsed: followUpDays,
-        reply_context: replyContext.trim() || undefined,
-      });
-      setSubject(result.subject);
-      setBody(result.body);
-    } catch (e) {
-      showToastNotification('Follow-up generation failed', 'error');
-    } finally {
-      setIsGenerating(false);
-    }
-  }, [subject, body, followUpDays, replyContext]);
-
-  const handleSaveTemplate = useCallback(async () => {
-    if (!templateName.trim() || !subject.trim() || !body.trim()) return;
-    try {
-      await createEmailTemplate({
-        name: templateName.trim(),
-        subject_template: subject,
-        body_template: body,
-        variables: ['lead_name', 'lead_site', 'pitch_topic'],
-      });
-      setTemplateName('');
-      const updated = await listEmailTemplates();
-      setTemplates(updated.templates);
-    } catch (e) {
-      showToastNotification('Failed to save template', 'error');
-    }
-  }, [templateName, subject, body]);
-
-  const applySuggestion = (s: string) => {
-    setSubject(s);
-    setSubjectSuggestions([]);
-  };
 
   const toggleLeadSelection = (leadId: string) => {
     setSelectedLeadIds(prev => {
@@ -333,7 +303,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
   };
 
   const toggleAllLeads = () => {
-    if (!selectedCampaign) return;
+    if (!selectedCampaign || !selectedCampaign.leads) return;
     const all = selectedCampaign.leads;
     setSelectedLeadIds(prev =>
       prev.size === all.length ? new Set() : new Set(all.map(l => l.lead_id))
@@ -399,7 +369,11 @@ const BacklinkOutreachDashboard: React.FC = () => {
     }
   }, [selectedCampaign, isExporting]);
 
-  const handleTabChange = useCallback((tab: Tab) => {
+  const handleSendToLead = useCallback((lead: any) => {
+    return composer.handleSendToLead(lead, selectedCampaign);
+  }, [composer.handleSendToLead, selectedCampaign]);
+
+const handleTabChange = useCallback((tab: Tab) => {
     setActiveTab(tab);
   }, []);
 
@@ -425,33 +399,16 @@ const BacklinkOutreachDashboard: React.FC = () => {
 
   const tabMeta: { key: Tab; label: string; desc: string }[] = [
     { key: 'campaigns', label: 'Campaigns', desc: 'Create and manage outreach campaigns' },
-    { key: 'discover', label: 'Discover', desc: 'AI-powered search for guest post opportunities' },
-    { key: 'leads', label: 'Leads', desc: 'Track leads, send outreach, and manage replies' },
+    { key: 'workspace', label: 'Workspace', desc: 'Discover opportunities and manage leads in one view' },
     { key: 'composer', label: 'Composer', desc: 'AI email composer with compliance metadata' },
     { key: 'analytics', label: 'Analytics', desc: 'Campaign performance metrics and exports' },
   ];
 
 
-  const complianceReasons = [
-    !unsubscribeUrl.trim() && !oneClickUnsubscribe ? 'Add an unsubscribe URL or enable one-click unsubscribe.' : '',
-    !senderName.trim() ? 'Add the sender name.' : '',
-    !senderEmail.trim() ? 'Add the sender email.' : '',
-    !senderOrganization.trim() ? 'Add the sender organization.' : '',
-    !senderAddress.trim() ? 'Add a physical mailing address.' : '',
-    !legalBasis.trim() ? 'Record the legal basis.' : '',
-    !contactDiscoverySource.trim() ? 'Record where the contact was discovered.' : '',
-    recipientRegion === 'unknown' && !approvedByHuman ? 'Unknown recipient region requires manual review.' : '',
-    recipientRegionSource === 'tld_inference' && !approvedByHuman ? 'TLD-only region inference requires manual review.' : '',
-    ['eu', 'eea', 'uk', 'ca'].includes(recipientRegion) && (legalBasis !== 'consent' || consentStatus !== 'explicit')
-      ? 'Selected recipient region requires recorded explicit consent.' : '',
-  ].filter(Boolean);
-
-  const complianceReady = complianceReasons.length === 0;
-
   const SectionHeader: React.FC<{ title: string; subtitle: string }> = ({ title, subtitle }) => (
     <div style={{ marginBottom: '16px' }}>
       <h3 style={{ margin: 0, background: GRADIENT_PRIMARY, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', fontSize: '18px' }}>{title}</h3>
-      <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.5)' }}>{subtitle}</p>
+      <p style={{ margin: '4px 0 0', fontSize: '14px', color: TXT_BODY }}>{subtitle}</p>
     </div>
   );
 
@@ -468,7 +425,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
             margin: 0, fontSize: '28px', fontWeight: 700,
             background: GRADIENT_PRIMARY, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           }}>Backlink Outreach</h1>
-          <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.45)', fontSize: '14px' }}>
+          <p style={{ margin: '6px 0 0', color: TXT_BODY, fontSize: '15px' }}>
             AI-powered guest post outreach platform — discover opportunities, manage campaigns, compose emails, and track results.
           </p>
         </div>
@@ -512,7 +469,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
               </TooltipWrap>
             </div>
             {campaigns.length === 0 && !isLoading && (
-              <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px 0' }}>
+              <p style={{ color: TXT_FAINT, textAlign: 'center', padding: '40px 0' }}>
                 No campaigns yet. Create one above to get started.
               </p>
             )}
@@ -525,20 +482,34 @@ const BacklinkOutreachDashboard: React.FC = () => {
                     transition: 'all 0.2s',
                   }}>
                   <div style={{ fontWeight: 600, color: '#fff' }}>{c.name}</div>
-                  <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginTop: '4px' }}>
+                  <div style={{ fontSize: '13px', color: TXT_MUTED, marginTop: '4px' }}>
                     Status: {c.status} {c.created_at && <> &middot; Created {new Date(c.created_at).toLocaleDateString()}</>}
                   </div>
                 </div>
               </TooltipWrap>
             ))}
-            {isLoading && <p style={{ color: 'rgba(255,255,255,0.4)' }}>Loading...</p>}
+            {isLoading && <p style={{ color: TXT_MUTED }}>Loading...</p>}
           </div>
         )}
 
-        {/* === DISCOVER TAB === */}
-        {activeTab === 'discover' && (
-          <div style={{ ...cardSx, padding: '24px' }}>
-            <SectionHeader title="Discover Opportunities" subtitle="AI searches the web using Exa neural search + DuckDuckGo to find websites accepting guest posts in your niche." />
+        {/* === WORKSPACE TAB === */}
+        {activeTab === 'workspace' && (
+          <div>
+            {/* Sub-mode toggle */}
+            <div style={{ display: 'inline-flex', gap: '4px', marginBottom: '16px', padding: '4px', background: 'rgba(255,255,255,0.04)', borderRadius: '10px' }}>
+              <button onClick={() => setWorkspaceMode('discover')}
+                style={{ ...btnBase, padding: '8px 20px', fontSize: '13px', background: workspaceMode === 'discover' ? GRADIENT_PRIMARY : 'transparent', color: workspaceMode === 'discover' ? '#fff' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                Discover
+              </button>
+              <button onClick={() => setWorkspaceMode('manage')}
+                style={{ ...btnBase, padding: '8px 20px', fontSize: '13px', background: workspaceMode === 'manage' ? GRADIENT_PRIMARY : 'transparent', color: workspaceMode === 'manage' ? '#fff' : 'rgba(255,255,255,0.5)', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                Manage Leads
+              </button>
+            </div>
+
+            {workspaceMode === 'discover' && (
+              <div style={{ ...cardSx, padding: '24px' }}>
+                <SectionHeader title="Discover Opportunities" subtitle="AI searches the web using Exa neural search + DuckDuckGo to find websites accepting guest posts in your niche." />
             <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
               <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)}
                 placeholder="e.g. 'AI marketing', 'SaaS growth', 'digital nomad'"
@@ -550,16 +521,191 @@ const BacklinkOutreachDashboard: React.FC = () => {
                 </button>
               </TooltipWrap>
             </div>
+
+            {/* Search queries used */}
+            {keyword.trim() && !isDiscovering && discoveryQueries.length > 0 && (
+              <details style={{ marginBottom: '16px', fontSize: '13px', color: TXT_MUTED }}>
+                <summary style={{ cursor: 'pointer', marginBottom: '6px', fontWeight: 500 }}>Search queries used ({discoveryQueries.length})</summary>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                  {discoveryQueries.map((q, i) => (
+                    <span key={i} style={{
+                      padding: '4px 10px', borderRadius: '6px', fontSize: '12px',
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)',
+                      color: TXT_BODY,
+                    }}>{q}</span>
+                  ))}
+                </div>
+              </details>
+            )}
+
+            {/* Email extraction methodology info */}
+            {keyword.trim() && !isDiscovering && (
+              <details style={{ marginBottom: '16px', fontSize: '13px', color: TXT_MUTED }}>
+                <summary style={{ cursor: 'pointer', marginBottom: '6px', fontWeight: 500 }}>How email extraction works</summary>
+                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', lineHeight: 1.6 }}>
+                  <p style={{ margin: '0 0 8px', color: TXT_BODY }}>Emails are extracted in 3 stages for each discovered page:</p>
+                  <ol style={{ margin: 0, paddingLeft: '20px', color: TXT_MUTED }}>
+                    <li><strong style={{ color: TXT_HEADING }}>Page text scan</strong> — regex for standard emails, <code>mailto:</code> links, and obfuscated patterns (e.g. <code>user [at] example [dot] com</code>)</li>
+                    <li><strong style={{ color: TXT_HEADING }}>Contact page follow</strong> — if a /contact, /about, or /team page is found, it's scraped for additional emails</li>
+                    <li><strong style={{ color: TXT_HEADING }}>Tavily search</strong> — if no email found yet, searches <code>{`"{domain} email address contact"`}</code> via Tavily API</li>
+                  </ol>
+                </div>
+              </details>
+            )}
+            {discoveredOpportunities.length > 0 && !isDiscovering && (
+              <details style={{ marginBottom: '16px', cursor: 'pointer' }}>
+                <summary style={{ color: TXT_MUTED, fontSize: '13px', padding: '8px 0', userSelect: 'none' }}>
+                  Deep analysis details — {discoveredOpportunities.length} URLs scanned
+                  {showFilters && <span style={{ marginLeft: '8px', color: '#8b9cf7' }}>({filteredOpportunities.length} shown)</span>}
+                </summary>
+                <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' }}>
+                  {discoveryEmailStats && (
+                    <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '12px', padding: '10px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px' }}>
+                      <span>Total URLs: <strong style={{ color: '#fff' }}>{discoveryEmailStats.total}</strong></span>
+                      <span>With emails: <strong style={{ color: '#43e97b' }}>{discoveryEmailStats.with_email}</strong></span>
+                      <span>Total emails found: <strong style={{ color: '#8b9cf7' }}>{discoveryEmailStats.total_emails_found}</strong></span>
+                      <span>From page text: <strong style={{ color: '#f39c12' }}>{discoveryEmailStats.from_regex}</strong></span>
+                      <span>From contact pages: <strong style={{ color: '#43e97b' }}>{discoveryEmailStats.from_contact_page}</strong></span>
+                      <span>From Tavily search: <strong style={{ color: '#8b9cf7' }}>{discoveryEmailStats.from_tavily}</strong></span>
+                      {discoveryEmailStats.from_guessed > 0 && <span>From AI guess: <strong style={{ color: '#e74c3c' }}>{discoveryEmailStats.from_guessed}</strong></span>}
+                      {discoveryEmailStats.total > 0 && (
+                        <span>Success rate: <strong style={{ color: (discoveryEmailStats.with_email / discoveryEmailStats.total) > 0.3 ? '#43e97b' : '#f39c12' }}>
+                          {(discoveryEmailStats.with_email / discoveryEmailStats.total * 100).toFixed(0)}%
+                        </strong></span>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ maxHeight: '300px', overflowY: 'auto', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(255,255,255,0.06)', position: 'sticky', top: 0 }}>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>#</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'left', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Domain</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Email</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Contact</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Guidelines</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Source</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Quality</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Score</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Published</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>Author</th>
+                          <th style={{ padding: '8px 10px', textAlign: 'center', color: TXT_MUTED, fontWeight: 500, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>AI</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredOpportunities.map((opp, i) => {
+                          const src = opp.discovery_source || '';
+                          let srcLabel = src;
+                          if (src.startsWith('exa')) srcLabel = src.replace(/^exa[+]?/, '') || 'Exa search';
+                          else if (src.startsWith('duckduckgo')) srcLabel = src.replace(/^duckduckgo[+]?/, '') || 'DuckDuckGo';
+                          if (srcLabel && src.includes('+ai')) srcLabel += ' + AI';
+                          return (
+                          <tr key={i} style={{
+                            borderBottom: '1px solid rgba(255,255,255,0.04)',
+                            background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.015)',
+                          }}>
+                            <td style={{ padding: '6px 10px', color: TXT_FAINT }}>{i + 1}</td>
+                            <td style={{ padding: '6px 10px', color: TXT_BODY, maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <TooltipWrap text={opp.url}>
+                                <span>{opp.domain}</span>
+                              </TooltipWrap>
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', color: opp.email ? '#43e97b' : TXT_FAINT }}>
+                              {opp.email ? '✓' : '—'}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', color: opp.contact_page ? '#8b9cf7' : TXT_FAINT }}>
+                              {opp.contact_page ? '✓' : '—'}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', color: opp.has_guest_post_guidelines ? '#43e97b' : TXT_FAINT }}>
+                              {opp.has_guest_post_guidelines ? '✓' : '—'}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', color: TXT_MUTED, fontSize: '11px' }}>
+                              {srcLabel || 'exa'}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                              <span style={{ color: opp.quality_score > 0.5 ? '#43e97b' : '#f39c12' }}>
+                                {(opp.quality_score * 100).toFixed(0)}%
+                              </span>
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                              {opp.exa_score !== undefined ? (
+                                <span style={{ color: opp.exa_score > 0.5 ? '#43e97b' : '#f39c12', fontSize: '11px' }}>
+                                  {(opp.exa_score * 100).toFixed(0)}%
+                                </span>
+                              ) : <span style={{ color: TXT_FAINT }}>—</span>}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', color: TXT_MUTED, fontSize: '11px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {opp.exa_published_date ? (
+                                <TooltipWrap text={opp.exa_published_date}>
+                                  <span>{new Date(opp.exa_published_date).toLocaleDateString()}</span>
+                                </TooltipWrap>
+                              ) : <span style={{ color: TXT_FAINT }}>—</span>}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center', color: TXT_MUTED, fontSize: '11px', maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {opp.exa_author ? (
+                                <TooltipWrap text={opp.exa_author}>
+                                  <span>{opp.exa_author}</span>
+                                </TooltipWrap>
+                              ) : <span style={{ color: TXT_FAINT }}>—</span>}
+                            </td>
+                            <td style={{ padding: '6px 10px', textAlign: 'center' }}>
+                              {opp.ai_prospected ? <span style={{ color: '#8b9cf7', fontSize: '11px' }}>✓</span> : <span style={{ color: TXT_FAINT }}>—</span>}
+                            </td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+            )}
+
             {isDiscovering && (
-              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px' }}>
-                Searching across Exa (neural) + DuckDuckGo... This may take 10–20 seconds.
-              </p>
+              <div style={{ padding: '20px', textAlign: 'center' }}>
+                <div style={{ fontSize: '28px', marginBottom: '8px' }}>🔍</div>
+                <div style={{ color: TXT_BODY, fontSize: '13px' }}>
+                  {discoverPhase || 'Searching...'}
+                </div>
+                <div style={{ color: TXT_FAINT, fontSize: '12px', marginTop: '6px' }}>
+                  This may take 15–30 seconds depending on results
+                </div>
+              </div>
             )}
             {discoveredOpportunities.length > 0 && (
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px', flexWrap: 'wrap' }}>
-                  <span style={{ fontWeight: 600, color: '#fff' }}>{discoveredOpportunities.length} opportunities found</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '12px', flexWrap: 'wrap' }}>
+                  <div>
+                    <span style={{ fontWeight: 600, color: '#fff' }}>{discoveredOpportunities.length} opportunities</span>
+                    <span style={{ marginLeft: '8px', fontSize: '13px', color: '#43e97b' }}>
+                      {qualifiedCount} qualified
+                    </span>
+                    {discoveryEmailStats && (
+                      <span style={{ marginLeft: '12px', fontSize: '13px', color: TXT_MUTED }}>
+                        {discoveryEmailStats.with_email > 0
+                          ? `${discoveryEmailStats.with_email} with emails · ${discoveryEmailStats.total_emails_found} total · ${discoveryEmailStats.from_regex} text, ${discoveryEmailStats.from_contact_page} contact, ${discoveryEmailStats.from_tavily} search, ${discoveryEmailStats.from_guessed} guessed`
+                          : 'No emails found yet'}
+                      </span>
+                    )}
+                  </div>
+                  {/* Next-steps guidance */}
+                  <div style={{
+                    padding: '10px 14px', marginBottom: '12px', borderRadius: '8px',
+                    background: 'rgba(102,126,234,0.08)', border: '1px solid rgba(102,126,234,0.2)',
+                    fontSize: '13px', color: TXT_MUTED, lineHeight: 1.5,
+                  }}>
+                    <strong style={{ color: '#8b9cf7' }}>Next steps:</strong>{' '}
+                    Select a campaign above, then click <strong style={{ color: '#fff' }}>Save to Campaign</strong> to store leads, or{' '}
+                    <strong style={{ color: '#fff' }}>AI Prospecting</strong> for deeper LLM analysis.
+                    Use <strong style={{ color: '#fff' }}>Filters</strong> to narrow results.
+                  </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <TooltipWrap text="Toggle filter panel to narrow down opportunities">
+                      <button onClick={() => setShowFilters(p => !p)}
+                        style={{ ...btnBase, padding: '8px 12px', fontSize: '13px', background: showFilters ? 'rgba(102,126,234,0.2)' : 'rgba(255,255,255,0.06)', color: showFilters ? '#8b9cf7' : TXT_BODY, border: showFilters ? '1px solid rgba(102,126,234,0.3)' : '1px solid transparent' }}>
+                        Filters {showFilters ? '▲' : '▼'}
+                      </button>
+                    </TooltipWrap>
                     <TooltipWrap text="Save discovered leads directly to a campaign for tracking">
                       <select value={discoverCampaignId} onChange={(e) => setDiscoverCampaignId(e.target.value)}
                         style={{ ...selectSx, padding: '8px 12px', fontSize: '13px', minWidth: '160px' }}>
@@ -567,22 +713,73 @@ const BacklinkOutreachDashboard: React.FC = () => {
                         {campaigns.map((c) => <option key={c.campaign_id} value={c.campaign_id}>{c.name}</option>)}
                       </select>
                     </TooltipWrap>
-                    <TooltipWrap text="Saves all discovered leads to your selected campaign">
+                    <TooltipWrap text={showFilters ? `Saves ${filteredOpportunities.length} visible leads` : 'Saves all discovered leads'}>
                       <button onClick={handleDiscoverAndSave}
-                        disabled={!keyword.trim() || !discoverCampaignId}
-                        style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: GRADIENT_PRIMARY, color: '#fff', opacity: discoverCampaignId ? 1 : 0.4 }}>
-                        Save to Campaign
+                        disabled={!keyword.trim() || !discoverCampaignId || (showFilters && filteredOpportunities.length === 0)}
+                        style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: GRADIENT_PRIMARY, color: '#fff', opacity: discoverCampaignId && (!showFilters || filteredOpportunities.length > 0) ? 1 : 0.4 }}>
+                        {showFilters ? `Save ${filteredOpportunities.length} to Campaign` : 'Save to Campaign'}
+                      </button>
+                    </TooltipWrap>
+                    <TooltipWrap text="Uses AI to deep-analyze each opportunity — extract emails, assess site activity, get pitch angles">
+                      <button onClick={() => runAiProspect(keyword)}
+                        disabled={isAiProspecting}
+                        style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: 'linear-gradient(135deg, #667eea, #764ba2)', color: '#fff', opacity: isAiProspecting ? 0.6 : 1 }}>
+                        {isAiProspecting ? 'AI Analyzing...' : 'AI Prospecting'}
                       </button>
                     </TooltipWrap>
                     <TooltipWrap text="Clears current search results">
                       <button onClick={clearDiscoveries}
-                        style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)' }}>
+                        style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: 'rgba(255,255,255,0.06)', color: TXT_BODY }}>
                         Clear
                       </button>
                     </TooltipWrap>
                   </div>
                 </div>
-                {discoveredOpportunities.map((opp, i) => (
+
+                {showFilters && (
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', padding: '10px 14px', marginBottom: '12px', borderRadius: '8px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', fontSize: '13px' }}>
+                    <span style={{ color: TXT_MUTED }}>Email:</span>
+                    <select value={filters.emailFilter} onChange={(e) => setFilters(f => ({ ...f, emailFilter: e.target.value }))}
+                      style={{ ...selectSx, padding: '6px 10px', fontSize: '13px', minWidth: '100px', width: 'auto' }}>
+                      <option value="all">All</option>
+                      <option value="with_email">Has email</option>
+                      <option value="no_email">No email</option>
+                    </select>
+                    <label style={{ color: TXT_MUTED, display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={filters.guidelinesOnly}
+                        onChange={(e) => setFilters(f => ({ ...f, guidelinesOnly: e.target.checked }))}
+                        style={{ accentColor: '#667eea' }} />
+                      Guidelines only
+                    </label>
+                    <span style={{ color: TXT_MUTED }}>Min Quality:</span>
+                    <input type="range" min={0} max={100} value={filters.minQuality}
+                      onChange={(e) => setFilters(f => ({ ...f, minQuality: Number(e.target.value) }))}
+                      style={{ width: '120px', accentColor: '#667eea', verticalAlign: 'middle' }} />
+                    <span style={{ color: '#fff', minWidth: '32px' }}>{filters.minQuality}%</span>
+                    {filters.emailFilter !== 'all' || filters.guidelinesOnly || filters.minQuality > 0 ? (
+                      <button onClick={() => setFilters({ emailFilter: 'all', guidelinesOnly: false, minQuality: 0 })}
+                        style={{ ...btnBase, padding: '6px 12px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: TXT_MUTED }}>
+                        Reset
+                      </button>
+                    ) : null}
+                    <span style={{ color: TXT_FAINT, marginLeft: 'auto', fontSize: '12px' }}>
+                      Showing {filteredOpportunities.length} of {discoveredOpportunities.length}
+                    </span>
+                  </div>
+                )}
+
+                {filteredOpportunities.map((opp, i) => {
+                  const aiRiskFlags = opp.ai_risk_flags;
+                  const aiSiteActive = opp.ai_site_active;
+                  const aiAcceptsGuestPosts = opp.ai_accepts_guest_posts;
+                  const aiPitchAngle = opp.ai_pitch_angle;
+                  const aiEditorName = opp.ai_editor_name;
+                  const aiGuidelinesSummary = opp.ai_guidelines_summary;
+                  const aiRelevanceScore = opp.ai_relevance_score;
+                  const aiProspected = opp.ai_prospected;
+                  const hasAiData = aiProspected && (aiRiskFlags || aiSiteActive !== undefined || aiAcceptsGuestPosts !== undefined || aiPitchAngle);
+
+                  return (
                   <div key={`${opp.url}-${i}`} style={{
                     padding: '16px', marginBottom: '8px', borderRadius: '10px',
                     background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
@@ -592,515 +789,190 @@ const BacklinkOutreachDashboard: React.FC = () => {
                         style={{ color: '#8b9cf7', textDecoration: 'none' }}>
                         {opp.page_title || opp.domain}
                       </a>
+                      {aiProspected && <span style={{ marginLeft: '8px', fontSize: '10px', padding: '2px 6px', borderRadius: '4px', background: 'rgba(102,126,234,0.2)', color: '#8b9cf7' }}>AI</span>}
                     </div>
-                    <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>{opp.domain}</div>
-                    {opp.snippet && <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', marginBottom: '8px' }}>{opp.snippet.slice(0, 200)}...</div>}
-                    <div style={{ display: 'flex', gap: '16px', fontSize: '12px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '13px', color: TXT_MUTED, marginBottom: '4px' }}>{opp.domain}</div>
+                    {opp.snippet && <div style={{ fontSize: '13px', color: TXT_BODY, marginBottom: '8px' }}>{opp.snippet.slice(0, 200)}...</div>}
+                    <div style={{ display: 'flex', gap: '16px', fontSize: '13px', flexWrap: 'wrap' }}>
                       <TooltipWrap text="How relevant this site is to your keyword based on content analysis">
-                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Quality: <strong style={{ color: '#43e97b' }}>{(opp.quality_score * 100).toFixed(0)}%</strong></span>
+                        <span style={{ color: TXT_MUTED }}>Quality: <strong style={{ color: '#43e97b' }}>{(opp.quality_score * 100).toFixed(0)}%</strong></span>
                       </TooltipWrap>
+                      {opp.exa_score !== undefined && (
+                        <TooltipWrap text="Exa relevance score (0–1) from semantic search">
+                          <span style={{ color: TXT_MUTED }}>Exa Score: <strong style={{ color: opp.exa_score > 0.5 ? '#43e97b' : '#f39c12' }}>{(opp.exa_score * 100).toFixed(0)}%</strong></span>
+                        </TooltipWrap>
+                      )}
                       <TooltipWrap text="Confidence that this site accepts guest posts, based on page signals">
-                        <span style={{ color: 'rgba(255,255,255,0.5)' }}>Confidence: <strong style={{ color: '#8b9cf7' }}>{(opp.confidence_score * 100).toFixed(0)}%</strong></span>
+                        <span style={{ color: TXT_MUTED }}>Confidence: <strong style={{ color: '#8b9cf7' }}>{(opp.confidence_score * 100).toFixed(0)}%</strong></span>
                       </TooltipWrap>
+                      {hasAiData && aiRelevanceScore !== undefined && (
+                        <TooltipWrap text="AI-assessed relevance to your search keyword">
+                          <span style={{ color: TXT_MUTED }}>AI Relevance: <strong style={{ color: aiRelevanceScore > 0.5 ? '#43e97b' : '#f39c12' }}>{(aiRelevanceScore * 100).toFixed(0)}%</strong></span>
+                        </TooltipWrap>
+                      )}
                       {opp.has_guest_post_guidelines && (
                         <TooltipWrap text="This site has a dedicated guest post guidelines page">
                           <span style={{ color: '#43e97b' }}>Has guidelines</span>
                         </TooltipWrap>
                       )}
-                      {opp.email && (
-                        <TooltipWrap text="Contact email found on the site">
-                          <span style={{ color: '#8b9cf7' }}>Email found</span>
+                      {hasAiData && aiAcceptsGuestPosts !== undefined && (
+                        <TooltipWrap text="AI assessment: whether this site accepts guest posts">
+                          <span style={{ color: aiAcceptsGuestPosts ? '#43e97b' : TXT_FAINT }}>
+                            {aiAcceptsGuestPosts ? 'Accepts guest posts' : 'No guest post signal'}
+                          </span>
+                        </TooltipWrap>
+                      )}
+                      {opp.email ? (
+                        <TooltipWrap text={`Email found via ${opp.discovery_source || 'page text'}: ${opp.email}`}>
+                          <span style={{ color: '#8b9cf7' }}>Email: {opp.email}</span>
+                        </TooltipWrap>
+                      ) : (
+                        <TooltipWrap text="No email address found on this page. Try AI Prospecting for deeper extraction.">
+                          <span style={{ color: TXT_FAINT }}>No email found</span>
+                        </TooltipWrap>
+                      )}
+                      {opp.contact_page && (
+                        <TooltipWrap text="Contact page URL detected — will be scraped for emails on save">
+                          <span style={{ color: TXT_MUTED, fontSize: '12px' }}>Contact page found</span>
                         </TooltipWrap>
                       )}
                     </div>
+                    {(opp.exa_published_date || opp.exa_author || opp.exa_summary || (opp.exa_highlights && opp.exa_highlights.length > 0)) && (
+                      <div style={{ marginTop: '8px', padding: '10px', borderRadius: '8px', background: 'rgba(139,156,247,0.06)', border: '1px solid rgba(139,156,247,0.12)', fontSize: '13px' }}>
+                        {opp.exa_published_date && <div style={{ color: TXT_MUTED, marginBottom: '4px' }}>Published: {opp.exa_published_date}</div>}
+                        {opp.exa_author && <div style={{ color: TXT_MUTED, marginBottom: '4px' }}>Author: {opp.exa_author}</div>}
+                        {opp.exa_summary && <div style={{ color: TXT_BODY, marginBottom: '4px' }}>{opp.exa_summary}</div>}
+                        {opp.exa_highlights && opp.exa_highlights.length > 0 && (
+                          <ul style={{ margin: '4px 0 0 0', paddingLeft: '18px', color: TXT_BODY }}>
+                            {opp.exa_highlights.slice(0, 3).map((h: string, hi: number) => (
+                              <li key={hi} style={{ marginBottom: '2px' }}>{h}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    {hasAiData && (
+                      <div style={{ marginTop: '10px', padding: '10px', borderRadius: '8px', background: 'rgba(102,126,234,0.08)', border: '1px solid rgba(102,126,234,0.15)', fontSize: '13px' }}>
+                        {aiPitchAngle && <div style={{ color: TXT_HEADING, marginBottom: '6px', fontStyle: 'italic' }}>"{aiPitchAngle}"</div>}
+                        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                          {aiSiteActive !== undefined && (
+                            <span style={{ color: aiSiteActive ? '#43e97b' : '#e74c3c' }}>
+                              {aiSiteActive ? 'Active site' : 'Inactive'}
+                            </span>
+                          )}
+                          {aiEditorName && <span style={{ color: TXT_BODY }}>Editor: {aiEditorName}</span>}
+                          {aiRiskFlags && aiRiskFlags.length > 0 && aiRiskFlags.map((flag: string) => (
+                            <span key={flag} style={{ padding: '2px 6px', borderRadius: '4px', background: 'rgba(231,76,60,0.15)', color: '#e74c3c', fontSize: '12px' }}>
+                              {flag.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                        {aiGuidelinesSummary && <div style={{ marginTop: '6px', color: TXT_MUTED }}>{aiGuidelinesSummary}</div>}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
             {!isDiscovering && discoveredOpportunities.length === 0 && (
-              <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px 0', fontSize: '13px' }}>
-                Enter a keyword above and click Discover to find guest post opportunities.
+              <p style={{ color: TXT_FAINT, textAlign: 'center', padding: '20px 0', fontSize: '13px' }}>
+                No results yet.
+              </p>
+            )}
+            {!isDiscovering && discoveredOpportunities.length > 0 && filteredOpportunities.length === 0 && (
+              <p style={{ color: TXT_FAINT, textAlign: 'center', padding: '20px 0', fontSize: '13px' }}>
+                No opportunities match the current filters.
+                <button onClick={() => setFilters({ emailFilter: 'all', guidelinesOnly: false, minQuality: 0 })}
+                  style={{ marginLeft: '8px', ...btnBase, padding: '4px 10px', fontSize: '12px', background: 'rgba(255,255,255,0.06)', color: '#8b9cf7' }}>
+                  Reset filters
+                </button>
               </p>
             )}
           </div>
         )}
 
-        {/* === LEADS TAB === */}
-        {activeTab === 'leads' && (
-          <div style={{ ...cardSx, padding: '24px' }}>
-            {selectedCampaign ? (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                  <div>
-                    <h3 style={{ margin: 0, color: '#fff' }}>{selectedCampaign.name}</h3>
-                    <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', margin: '4px 0 0' }}>
-                      {selectedCampaign.lead_count} leads &middot; Status: {selectedCampaign.status}
-                    </p>
-                  </div>
-                  <TooltipWrap text="Switch to a different campaign">
-                    <select onChange={(e) => { const c = campaigns.find(x => x.campaign_id === e.target.value); if (c) handleSelectCampaign(c.campaign_id); }}
-                      value={selectedCampaign.campaign_id} style={{ ...selectSx, padding: '8px 12px', fontSize: '13px', minWidth: '180px' }}>
-                      {campaigns.map((c) => <option key={c.campaign_id} value={c.campaign_id}>{c.name}</option>)}
-                    </select>
-                  </TooltipWrap>
-                </div>
-
-                {/* Analytics cards */}
-                {analytics && (
-                  <div style={{ display: 'flex', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                    {[{ label: 'Sent', value: analytics.send_volume, grad: GRADIENT_PRIMARY },
-                      { label: 'Response Rate', value: `${(analytics.response_rate * 100).toFixed(1)}%`, grad: GRADIENT_SUCCESS },
-                      { label: 'Replies', value: analytics.reply_count, grad: GRADIENT_WARNING },
-                      { label: 'Placement', value: `${(analytics.placement_rate * 100).toFixed(1)}%`, grad: 'linear-gradient(135deg, #a18cd1, #fbc2eb)' },
-                      { label: 'Blocked', value: analytics.blocked_count, grad: GRADIENT_SECONDARY },
-                    ].map(({ label, value, grad }) => (
-                      <TooltipWrap key={label} text={`${label}: ${value}`}>
-                        <div style={{
-                          flex: 1, minWidth: '100px', padding: '14px', borderRadius: '10px', textAlign: 'center',
-                          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                        }}>
-                          <div style={{ fontSize: '22px', fontWeight: 700, background: grad, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{value}</div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
-                        </div>
-                      </TooltipWrap>
-                    ))}
-                  </div>
-                )}
-
-                {/* Reply classification */}
-                {analytics && Object.keys(analytics.reply_classification).length > 0 && (
-                  <div style={{ marginBottom: '16px', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px' }}>
-                    <div style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Reply Classification</div>
-                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                      {Object.entries(analytics.reply_classification).map(([cls, count]) => (
-                        <TooltipWrap key={cls} text={`${count} replies classified as "${cls}"`}>
-                          <span style={{ padding: '4px 12px', background: 'rgba(255,255,255,0.06)', borderRadius: '8px', fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>
-                            <strong>{cls}</strong>: {count}
-                          </span>
-                        </TooltipWrap>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Bulk actions */}
-                {selectedCampaign.leads.length > 0 && (
+            {workspaceMode === 'manage' && (
+              <>
+                {saveConfirmation && (
                   <div style={{
-                    display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px',
-                    padding: '10px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '10px', flexWrap: 'wrap',
+                    padding: '16px 20px', marginBottom: '16px',
+                    background: 'linear-gradient(135deg, rgba(67,233,123,0.12), rgba(56,249,215,0.08))',
+                    border: '1px solid rgba(67,233,123,0.25)',
+                    borderRadius: '12px',
                   }}>
-                    <label style={{ fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'rgba(255,255,255,0.7)' }}>
-                      <input type="checkbox" checked={selectedLeadIds.size === selectedCampaign.leads.length && selectedCampaign.leads.length > 0}
-                        onChange={toggleAllLeads} style={{ accentColor: '#667eea' }} />
-                      {selectedLeadIds.size > 0 ? `${selectedLeadIds.size} selected` : 'Select all'}
-                    </label>
-                    {selectedLeadIds.size > 0 && (
-                      <>
-                        <TooltipWrap text="Choose the new status for all selected leads">
-                          <select value={bulkStatus} onChange={(e) => setBulkStatus(e.target.value as typeof bulkStatus)}
-                            style={{ ...selectSx, padding: '6px 10px', fontSize: '12px', minWidth: '130px' }}>
-                            {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                          </select>
-                        </TooltipWrap>
-                        <TooltipWrap text="Updates the status of all selected leads in one click">
-                          <button onClick={handleBulkStatusUpdate} disabled={isStatusUpdating}
-                            style={{ ...btnBase, padding: '6px 16px', fontSize: '12px', background: GRADIENT_PRIMARY, color: '#fff', opacity: isStatusUpdating ? 0.5 : 1 }}>
-                            {isStatusUpdating ? 'Updating...' : 'Update Status'}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: '16px', color: '#43e97b', marginBottom: '4px' }}>
+                          {saveConfirmation.count} leads saved to "{saveConfirmation.campaignName}"
+                        </div>
+                        <div style={{ fontSize: '13px', color: TXT_BODY, lineHeight: 1.5, marginBottom: '10px' }}>
+                          What would you like to do next?
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <button onClick={() => { setActiveTab('composer'); setSaveConfirmation(null); }}
+                            style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: GRADIENT_PRIMARY, color: '#fff' }}>
+                            Compose Email to Send
                           </button>
-                        </TooltipWrap>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {selectedCampaign.leads.length === 0 && (
-                  <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px 0', fontSize: '13px' }}>
-                    No leads yet. Go to the <strong>Discover</strong> tab to find and save opportunities.
-                  </p>
-                )}
-
-                {/* Lead cards */}
-                {selectedCampaign.leads.map((lead) => (
-                  <div key={lead.lead_id} style={{
-                    padding: '16px', marginBottom: '8px', borderRadius: '10px',
-                    background: selectedLeadIds.has(lead.lead_id) ? 'rgba(102,126,234,0.1)' : 'rgba(255,255,255,0.03)',
-                    border: selectedLeadIds.has(lead.lead_id) ? '1px solid rgba(102,126,234,0.3)' : '1px solid rgba(255,255,255,0.06)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                      <input type="checkbox" checked={selectedLeadIds.has(lead.lead_id)}
-                        onChange={() => toggleLeadSelection(lead.lead_id)} style={{ marginTop: '4px', accentColor: '#667eea' }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, color: '#fff', marginBottom: '2px' }}>{lead.page_title || lead.domain}</div>
-                        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', marginBottom: '4px' }}>
-                          {lead.url && <a href={lead.url} target="_blank" rel="noopener noreferrer" style={{ color: '#8b9cf7' }}>{lead.url}</a>}
+                          <button onClick={() => setSaveConfirmation(null)}
+                            style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: 'rgba(255,255,255,0.08)', color: TXT_BODY }}>
+                            Review Saved Leads
+                          </button>
+                          <button onClick={() => { setWorkspaceMode('discover'); setSaveConfirmation(null); }}
+                            style={{ ...btnBase, padding: '8px 16px', fontSize: '13px', background: 'rgba(255,255,255,0.06)', color: TXT_MUTED }}>
+                            Find More Opportunities
+                          </button>
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', fontSize: '12px', color: 'rgba(255,255,255,0.4)', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {renderStatusBadge(lead.status)}
-                          {lead.email && <span>Email: {lead.email}</span>}
-                          <span>Source: {lead.discovery_source}</span>
-                        </div>
-                        <div style={{ display: 'flex', gap: '4px', marginTop: '10px', flexWrap: 'wrap' }}>
-                          {STATUS_OPTIONS.map((s) => (
-                            <TooltipWrap key={s} text={STATUS_EXPLANATIONS[s] || ''}>
-                              <button onClick={() => handleSingleStatusUpdate(lead.lead_id, s)}
-                                disabled={lead.status === s || isStatusUpdating}
-                                style={{
-                                  padding: '4px 12px', fontSize: '11px', borderRadius: '20px', border: '1px solid',
-                                  borderColor: lead.status === s ? '#667eea' : 'rgba(255,255,255,0.15)',
-                                  background: lead.status === s ? GRADIENT_PRIMARY : 'transparent',
-                                  color: lead.status === s ? '#fff' : 'rgba(255,255,255,0.5)',
-                                  cursor: lead.status === s ? 'default' : 'pointer', fontWeight: lead.status === s ? 600 : 400,
-                                  transition: 'all 0.2s',
-                                }}>
-                                {s}
-                              </button>
-                            </TooltipWrap>
-                          ))}
-                        </div>
-                        {attempts.filter(a => a.lead_id === lead.lead_id).slice(0, 1).map(a => (
-                          <div key={a.attempt_id} style={{ marginTop: '8px', padding: '8px 12px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px', fontSize: '12px' }}>
-                            <span style={{ color: 'rgba(255,255,255,0.5)' }}>Latest: {a.subject} — </span>
-                            {renderStatusBadge(a.status)}
-                            {a.sender_email && <span style={{ color: 'rgba(255,255,255,0.35)', marginLeft: '8px' }}>From: {a.sender_email}</span>}
-                            {a.sent_at && <span style={{ color: 'rgba(255,255,255,0.3)', marginLeft: '8px' }}>{new Date(a.sent_at).toLocaleString()}</span>}
-                          </div>
-                        ))}
                       </div>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Attempt history */}
-                {attempts.length > 0 && (
-                  <div style={{ marginTop: '24px' }}>
-                    <SectionHeader title="Attempt History" subtitle="Record of all outreach emails sent and their delivery statuses." />
-                    <div style={{ overflowX: 'auto' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                        <thead>
-                          <tr style={{ background: 'rgba(255,255,255,0.04)' }}>
-                            {['Subject', 'Status', 'Effective Sender', 'Sent At'].map(h => (
-                              <th key={h} style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.08)', textAlign: 'left', color: 'rgba(255,255,255,0.4)', fontWeight: 500, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {attempts.map((a) => (
-                            <tr key={a.attempt_id}>
-                              <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', color: '#fff', maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.subject}</td>
-                              <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>{renderStatusBadge(a.status)}</td>
-                              <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{a.sender_email}</td>
-                              <td style={{ padding: '10px 12px', borderBottom: '1px solid rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{a.sent_at ? new Date(a.sent_at).toLocaleDateString() : '-'}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <button onClick={() => setSaveConfirmation(null)}
+                        style={{ ...btnBase, padding: '4px 10px', fontSize: '16px', background: 'transparent', color: TXT_FAINT, lineHeight: 1 }}>
+                        x
+                      </button>
                     </div>
                   </div>
                 )}
-
-                {/* Reply inbox */}
-                {replies.length > 0 && (
-                  <div style={{ marginTop: '24px' }}>
-                    <SectionHeader title="Reply Inbox" subtitle={`${replies.length} replies received. Each reply is auto-classified by sentiment for quick triage.`} />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {replies.map((r) => (
-                        <div key={r.reply_id} style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                            <span style={{ fontWeight: 600, color: '#fff', fontSize: '13px' }}>{r.subject}</span>
-                            <TooltipWrap text={`Auto-classified as "${r.classification}"`}>
-                              <span style={{
-                                padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
-                                background: r.classification === 'positive' ? 'rgba(67,233,123,0.15)' : r.classification === 'negative' ? 'rgba(245,87,108,0.15)' : 'rgba(254,225,64,0.1)',
-                                color: r.classification === 'positive' ? '#43e97b' : r.classification === 'negative' ? '#f5576c' : '#fee140',
-                                border: `1px solid ${r.classification === 'positive' ? '#43e97b33' : r.classification === 'negative' ? '#f5576c33' : '#fee14033'}`,
-                              }}>
-                                {r.classification}
-                              </span>
-                            </TooltipWrap>
-                          </div>
-                          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.3)', marginBottom: '6px' }}>From: {r.from_email} &middot; {r.received_at ? new Date(r.received_at).toLocaleString() : ''}</div>
-                          <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', whiteSpace: 'pre-wrap', maxHeight: '80px', overflow: 'hidden' }}>{r.body.slice(0, 300)}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Follow-up schedule */}
-                {followups.length > 0 && (
-                  <div style={{ marginTop: '24px' }}>
-                    <SectionHeader title="Follow-up Schedule" subtitle="Automated follow-up emails scheduled to re-engage leads who haven't replied." />
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      {followups.map((f) => (
-                        <div key={f.schedule_id} style={{
-                          padding: '12px 16px', borderRadius: '8px',
-                          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                          fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                        }}>
-                          <span style={{ color: '#fff' }}>{f.subject}</span>
-                          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                            {f.scheduled_for && <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>{new Date(f.scheduled_for).toLocaleDateString()}</span>}
-                            <TooltipWrap text={f.sent ? 'This follow-up has been sent' : 'Awaiting scheduled send date'}>
-                              <span style={{
-                                padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: 600,
-                                background: f.sent ? 'rgba(67,233,123,0.15)' : 'rgba(254,225,64,0.1)',
-                                color: f.sent ? '#43e97b' : '#fee140',
-                                border: `1px solid ${f.sent ? '#43e97b33' : '#fee14033'}`,
-                              }}>
-                                {f.sent ? 'Sent' : 'Pending'}
-                              </span>
-                            </TooltipWrap>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px 0' }}>
-                Select a campaign from the <strong>Campaigns</strong> tab to view its leads.
-              </p>
+                <LeadsTab
+                  campaigns={campaigns}
+                  selectedCampaign={selectedCampaign}
+                  analytics={analytics}
+                  attempts={attempts}
+                  replies={replies}
+                  followups={followups}
+                  selectedLeadIds={selectedLeadIds}
+                  bulkStatus={bulkStatus}
+                  isStatusUpdating={isStatusUpdating}
+                  isExporting={isExporting}
+                   sendingLeadId={composer.sendingLeadId}
+                   subject={composer.subject}
+                   body={composer.body}
+                  onSelectCampaign={handleSelectCampaign}
+                  onSendToLead={handleSendToLead}
+                  onSingleStatusUpdate={handleSingleStatusUpdate}
+                  onBulkStatusUpdate={handleBulkStatusUpdate}
+                  onToggleLeadSelection={toggleLeadSelection}
+                  onToggleAllLeads={toggleAllLeads}
+                  onExportCsv={handleExportCsv}
+                  onGoToCampaigns={() => setActiveTab('campaigns')}
+                  onGoToDiscover={() => { setActiveTab('workspace'); setWorkspaceMode('discover'); }}
+                  onSetBulkStatus={setBulkStatus as any}
+                />
+              </>
             )}
           </div>
         )}
 
         {/* === COMPOSER TAB === */}
         {activeTab === 'composer' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-            <div style={{ ...cardSx, padding: '24px' }}>
-              <SectionHeader title="AI Email Composer" subtitle="Generate personalized outreach emails with AI. Choose a tone, pick a template, and let AI craft your message." />
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Template</label>
-                <TooltipWrap text="Optional: start from an existing saved template to maintain consistent branding">
-                  <select value={selectedTemplateId} onChange={(e) => setSelectedTemplateId(e.target.value)} style={selectSx}>
-                    <option value="">-- No template (start fresh) --</option>
-                    {templates.map((t) => <option key={t.template_id} value={t.template_id}>{t.name}</option>)}
-                  </select>
-                </TooltipWrap>
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Topic / Keyword</label>
-                <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)}
-                  placeholder="e.g. AI marketing trends, SaaS growth strategies"
-                  style={inputSx} />
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Target Site (optional)</label>
-                <TooltipWrap text="Mentioning the target site helps AI tailor the pitch to that specific publication">
-                  <input type="text" value={targetSite} onChange={(e) => setTargetSite(e.target.value)}
-                    placeholder="e.g. example.com"
-                    style={inputSx} />
-                </TooltipWrap>
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Tone</label>
-                <TooltipWrap text="Controls the writing style — Professional (formal), Friendly (conversational), Casual (relaxed), or Formal (highly polished)">
-                  <select value={tone} onChange={(e) => setTone(e.target.value as any)} style={selectSx}>
-                    <option value="professional">Professional — Formal & polished</option>
-                    <option value="friendly">Friendly — Warm & conversational</option>
-                    <option value="casual">Casual — Relaxed & informal</option>
-                    <option value="formal">Formal — Highly structured & official</option>
-                  </select>
-                </TooltipWrap>
-              </div>
-
-              <TooltipWrap text="Generates a complete outreach email with subject + body using AI">
-                <button onClick={handleGenerate} disabled={!topic.trim() || isGenerating}
-                  style={{ ...btnBase, width: '100%', padding: '14px', background: GRADIENT_PRIMARY, color: '#fff', marginBottom: '20px', opacity: !topic.trim() || isGenerating ? 0.5 : 1 }}>
-                  {isGenerating ? 'Generating with AI...' : 'Generate with AI'}
-                </button>
-              </TooltipWrap>
-
-              <div style={{ marginBottom: '14px' }}>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', flex: 1 }}>Subject Line</label>
-                  <TooltipWrap text="AI suggests multiple subject line variants based on your email body">
-                    <button onClick={handleSuggestSubjects} disabled={!body.trim() || isGenerating}
-                      style={{ ...btnBase, padding: '6px 14px', fontSize: '12px', background: 'rgba(102,126,234,0.2)', color: '#8b9cf7', border: '1px solid rgba(102,126,234,0.3)' }}>
-                      Suggest
-                    </button>
-                  </TooltipWrap>
-                </div>
-                <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Email subject line" style={inputSx} />
-                {subjectSuggestions.length > 0 && (
-                  <div style={{ marginTop: '8px', padding: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}>
-                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Click a suggestion to apply</div>
-                    {subjectSuggestions.map((s, i) => (
-                      <div key={i} onClick={() => applySuggestion(s)}
-                        style={{ padding: '6px 10px', cursor: 'pointer', borderRadius: '6px', fontSize: '13px', color: '#8b9cf7', transition: 'background 0.2s' }}>
-                        {s}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ fontSize: '12px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.5px', display: 'block', marginBottom: '6px' }}>Email Body</label>
-                <textarea value={body} onChange={(e) => setBody(e.target.value)} rows={10}
-                  placeholder="Your email content — or let AI generate it above"
-                  style={{ ...inputSx, fontFamily: 'monospace', fontSize: '13px', resize: 'vertical', lineHeight: 1.6 }} />
-              </div>
-
-              {/* Compliance metadata */}
-              <div style={{ marginTop: '20px', padding: '16px', borderRadius: '10px', background: complianceReady ? 'rgba(67,233,123,0.08)' : 'rgba(245,87,108,0.08)', border: `1px solid ${complianceReady ? 'rgba(67,233,123,0.22)' : 'rgba(245,87,108,0.22)'}` }}>
-                <h4 style={{ margin: '0 0 4px', color: '#fff', fontSize: '14px' }}>Send Compliance Metadata</h4>
-                <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.45)', fontSize: '12px' }}>Policy checks require unsubscribe, sender identity, legal basis, contact source, and region-aware consent/review details before a send can be approved.</p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                  <input type="text" value={senderName} onChange={(e) => setSenderName(e.target.value)} placeholder="Sender name" style={inputSx} />
-                  <input type="email" value={senderEmail} onChange={(e) => setSenderEmail(e.target.value)} placeholder="Sender email" style={inputSx} />
-                  <input type="text" value={senderOrganization} onChange={(e) => setSenderOrganization(e.target.value)} placeholder="Organization / brand" style={inputSx} />
-                  <input type="text" value={senderAddress} onChange={(e) => setSenderAddress(e.target.value)} placeholder="Physical mailing address" style={inputSx} />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                  <input type="url" value={unsubscribeUrl} onChange={(e) => setUnsubscribeUrl(e.target.value)} placeholder="Unsubscribe URL" style={inputSx} />
-                  <label style={{ ...inputSx, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={oneClickUnsubscribe} onChange={(e) => setOneClickUnsubscribe(e.target.checked)} />
-                    One-click unsubscribe available
-                  </label>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                  <select value={legalBasis} onChange={(e) => setLegalBasis(e.target.value)} style={selectSx}>
-                    <option value="legitimate_interest">Legitimate interest</option>
-                    <option value="consent">Consent</option>
-                    <option value="contract">Contract</option>
-                  </select>
-                  <input type="text" value={contactDiscoverySource} onChange={(e) => setContactDiscoverySource(e.target.value)} placeholder="Contact discovery source (e.g. contact page URL)" style={inputSx} />
-                  <select value={recipientRegion} onChange={(e) => setRecipientRegion(e.target.value)} style={selectSx}>
-                    <option value="unknown">Recipient region unknown</option>
-                    <option value="us">United States</option>
-                    <option value="eu">EU / EEA</option>
-                    <option value="uk">United Kingdom</option>
-                    <option value="ca">Canada</option>
-                    <option value="au">Australia</option>
-                    <option value="br">Brazil</option>
-                    <option value="other">Other</option>
-                  </select>
-                  <select value={recipientRegionSource} onChange={(e) => setRecipientRegionSource(e.target.value)} style={selectSx}>
-                    <option value="user_attested">Region user-attested</option>
-                    <option value="crm_record">Region from CRM/contact record</option>
-                    <option value="billing_or_profile">Region from profile/billing data</option>
-                    <option value="tld_inference">Region inferred from TLD only</option>
-                    <option value="unknown">Region source unknown</option>
-                  </select>
-                  <select value={consentStatus} onChange={(e) => setConsentStatus(e.target.value)} style={selectSx}>
-                    <option value="unknown">Consent status unknown</option>
-                    <option value="explicit">Explicit consent recorded</option>
-                    <option value="implied">Implied consent / soft opt-in</option>
-                    <option value="not_required">Not required for selected basis</option>
-                  </select>
-                  <label style={{ ...inputSx, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={approvedByHuman} onChange={(e) => setApprovedByHuman(e.target.checked)} />
-                    Manual review approved
-                  </label>
-                </div>
-
-                <div style={{ padding: '10px 12px', borderRadius: '8px', background: complianceReady ? 'rgba(67,233,123,0.12)' : 'rgba(245,87,108,0.12)', color: complianceReady ? '#43e97b' : '#f5576c', fontSize: '12px' }}>
-                  {complianceReady ? 'Compliance metadata is complete for policy validation.' : (
-                    <ul style={{ margin: 0, paddingLeft: '18px' }}>
-                      {complianceReasons.map((reason) => <li key={reason}>{reason}</li>)}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Personalize */}
-              <div style={{ marginTop: '24px', padding: '16px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <h4 style={{ margin: '0 0 4px', color: '#fff', fontSize: '14px' }}>Personalize for Lead</h4>
-                <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Tailor the email to a specific lead by filling in their details.</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                  <input type="text" value={leadName} onChange={(e) => setLeadName(e.target.value)} placeholder="Lead name" style={inputSx} />
-                  <input type="text" value={leadSite} onChange={(e) => setLeadSite(e.target.value)} placeholder="Their site" style={inputSx} />
-                </div>
-                <input type="text" value={leadContentTopic} onChange={(e) => setLeadContentTopic(e.target.value)}
-                  placeholder="Topic of their relevant content"
-                  style={{ ...inputSx, marginBottom: '10px' }} />
-                <TooltipWrap text="Rewrites your email to reference the specific lead's name, site, and content">
-                  <button onClick={handlePersonalize} disabled={!leadName.trim() || !leadSite.trim() || !leadContentTopic.trim() || isGenerating}
-                    style={{ ...btnBase, width: '100%', padding: '10px', background: GRADIENT_WARNING, color: '#1a1a2e', opacity: leadName.trim() && leadSite.trim() && leadContentTopic.trim() && !isGenerating ? 1 : 0.5 }}>
-                    Personalize Email
-                  </button>
-                </TooltipWrap>
-              </div>
-
-              {/* Follow-up */}
-              <div style={{ marginTop: '16px', padding: '16px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <h4 style={{ margin: '0 0 4px', color: '#fff', fontSize: '14px' }}>Draft Follow-up</h4>
-                <p style={{ margin: '0 0 12px', color: 'rgba(255,255,255,0.4)', fontSize: '12px' }}>Generate a polite follow-up email to re-engage a lead who hasn't responded.</p>
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <input type="number" value={followUpDays} onChange={(e) => setFollowUpDays(Number(e.target.value))} min={1} max={90}
-                    style={{ ...inputSx, width: '80px' }} />
-                  <span style={{ padding: '10px 0', color: 'rgba(255,255,255,0.4)', fontSize: '13px' }}>days since original email</span>
-                </div>
-                <input type="text" value={replyContext} onChange={(e) => setReplyContext(e.target.value)}
-                  placeholder="Their reply (if any) — leave blank for no-response follow-up"
-                  style={{ ...inputSx, marginBottom: '10px' }} />
-                <TooltipWrap text="Creates a follow-up email that references the original and any reply context">
-                  <button onClick={handleFollowUp} disabled={!subject.trim() || !body.trim() || isGenerating}
-                    style={{ ...btnBase, width: '100%', padding: '10px', background: GRADIENT_SECONDARY, color: '#fff', opacity: subject.trim() && body.trim() && !isGenerating ? 1 : 0.5 }}>
-                    Generate Follow-up
-                  </button>
-                </TooltipWrap>
-              </div>
-
-              {/* Save template */}
-              <div style={{ marginTop: '16px', display: 'flex', gap: '8px', padding: '16px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <input type="text" value={templateName} onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="Template name (e.g. 'Cold outreach v1')"
-                  style={{ ...inputSx, flex: 1 }} />
-                <TooltipWrap text="Saves the current subject + body as a reusable template">
-                  <button onClick={handleSaveTemplate} disabled={!templateName.trim() || !subject.trim() || !body.trim()}
-                    style={{ ...btnBase, background: GRADIENT_SUCCESS, color: '#1a1a2e', opacity: templateName.trim() && subject.trim() && body.trim() ? 1 : 0.5 }}>
-                    Save as Template
-                  </button>
-                </TooltipWrap>
-              </div>
-
-              {selectedCampaign && subject.trim() && body.trim() && (
-                <div style={{ marginTop: '16px', padding: '14px', borderRadius: '10px', background: complianceReady ? 'rgba(67,233,123,0.1)' : 'rgba(245,87,108,0.1)', border: `1px solid ${complianceReady ? 'rgba(67,233,123,0.2)' : 'rgba(245,87,108,0.2)'}` }}>
-                  <p style={{ margin: '0 0 8px', fontSize: '13px', color: complianceReady ? '#43e97b' : '#f5576c' }}>
-                    {complianceReady ? <>Ready to send this email to leads in <strong>{selectedCampaign.name}</strong>.</> : <>Complete compliance metadata before sending to <strong>{selectedCampaign.name}</strong> leads.</>}
-                  </p>
-                  <TooltipWrap text={complianceReady ? 'Go to the Leads tab to select recipients and send' : 'Policy validation will block sends until all listed compliance fields are complete'}>
-                    <button onClick={() => setActiveTab('leads')} disabled={!complianceReady}
-                      style={{ ...btnBase, padding: '8px 20px', background: GRADIENT_SUCCESS, color: '#1a1a2e', fontSize: '13px', opacity: complianceReady ? 1 : 0.5 }}>
-                      Go to Campaign Leads
-                    </button>
-                  </TooltipWrap>
-                </div>
-              )}
-            </div>
-
-            {/* Preview pane */}
-            <div style={{ ...cardSx, padding: '24px' }}>
-              <SectionHeader title="Preview" subtitle="See how your email will look when received." />
-              <div style={{ padding: '24px', minHeight: '400px', borderRadius: '8px', background: '#fff' }}>
-                {subject || body ? (
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '18px', marginBottom: '16px', padding: '0 0 12px', borderBottom: '2px solid #eee', color: '#333' }}>
-                      {subject || '(no subject)'}
-                    </div>
-                    <div style={{ whiteSpace: 'pre-wrap', fontSize: '14px', lineHeight: 1.7, color: '#555' }}>
-                      {body || '(no body)'}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
-                    <p>Generate an email to see a live preview here.</p>
-                    <p style={{ fontSize: '12px', color: '#bbb' }}>Use the AI tools on the left to create your message.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
+          <ComposerTab
+            composer={composer}
+            keyword={keyword}
+            suppressedList={suppressedList}
+            selectedCampaign={selectedCampaign}
+            onFetchSuppressedList={fetchSuppressedList}
+            onAddSuppressedRecipient={addSuppressedRecipient}
+            onRemoveSuppressedRecipient={removeSuppressedRecipient}
+            onGoToLeads={() => { setActiveTab('workspace'); setWorkspaceMode('manage'); }}
+          />
         )}
 
         {/* === ANALYTICS TAB === */}
@@ -1111,7 +983,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '8px' }}>
                   <div>
                     <h3 style={{ margin: 0, color: '#fff' }}>{selectedCampaign.name}</h3>
-                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>Performance analytics & reporting</p>
+                    <p style={{ margin: '4px 0 0', fontSize: '13px', color: TXT_MUTED }}>Performance analytics & reporting</p>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <TooltipWrap text="Choose the time range for send volume data">
@@ -1146,14 +1018,14 @@ const BacklinkOutreachDashboard: React.FC = () => {
                           background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
                         }}>
                           <div style={{ fontSize: '24px', fontWeight: 700, background: grad, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{value}</div>
-                          <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
+                          <div style={{ fontSize: '11px', color: TXT_MUTED, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{label}</div>
                         </div>
                       </TooltipWrap>
                     ))}
                   </div>
                 )}
 
-                {isAnalyticsLoading && <p style={{ color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '20px' }}>Loading analytics data...</p>}
+                {isAnalyticsLoading && <p style={{ color: TXT_MUTED, textAlign: 'center', padding: '20px' }}>Loading analytics data...</p>}
 
                 {/* Volume chart */}
                 {volumeData.length > 0 && (
@@ -1200,7 +1072,7 @@ const BacklinkOutreachDashboard: React.FC = () => {
                         <TooltipWrap key={cls} text={`${count} replies classified as "${cls}"`}>
                           <div style={{ padding: '14px 20px', borderRadius: '10px', background: 'rgba(255,255,255,0.04)', minWidth: '100px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.08)' }}>
                             <div style={{ fontSize: '22px', fontWeight: 700, background: GRADIENT_PRIMARY, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>{count}</div>
-                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)', textTransform: 'capitalize', marginTop: '2px' }}>{cls}</div>
+                            <div style={{ fontSize: '12px', color: TXT_MUTED, textTransform: 'capitalize', marginTop: '2px' }}>{cls}</div>
                           </div>
                         </TooltipWrap>
                       ))}
@@ -1234,13 +1106,21 @@ const BacklinkOutreachDashboard: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <p style={{ color: 'rgba(255,255,255,0.3)', textAlign: 'center', padding: '40px 0' }}>
+              <p style={{ color: TXT_FAINT, textAlign: 'center', padding: '40px 0' }}>
                 Select a campaign from the <strong>Campaigns</strong> tab to view analytics.
               </p>
             )}
           </div>
         )}
       </div>
+
+      <AiProspectModal
+        isOpen={isAiProspecting}
+        currentStep={aiProgressStep}
+        progressLabel={aiProgressLabel}
+        totalOpportunities={discoveredOpportunities.length}
+        onClose={() => {}}
+      />
     </div>
   );
 };

@@ -1,10 +1,11 @@
 """Backlink outreach router with Clerk auth."""
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
 
 from services.backlink_outreach_models import (
+    AiProspectRequest, AiProspectResponse, AiProspectResult,
     BacklinkDiscoveryResponse, BacklinkKeywordInput, DeepKeywordInput,
     LeadCreateRequest, LeadStatusUpdateRequest,
     PolicyValidationRequest, PolicyValidationResponse,
@@ -26,7 +27,8 @@ from services.backlink_outreach_storage import (
     BacklinkCampaignNotFoundError,
     BacklinkOutreachStorageService,
 )
-from services.backlink_outreach_sender import backlink_outreach_sender
+from services.backlink_outreach_sender import backlink_outreach_sender, BacklinkOutreachSender
+from services.backlink_outreach_followup_processor import process_due_followups
 from services.backlink_outreach_reply_monitor import backlink_outreach_reply_monitor
 from services.backlink_outreach_template_generator import (
     generate_outreach_email,
@@ -43,6 +45,17 @@ router = APIRouter(prefix="/api/backlink-outreach", tags=["backlink-outreach"])
 class BacklinkCampaignCreateRequest(BaseModel):
     workspace_id: str = Field(..., min_length=1)
     name: str = Field(..., min_length=3)
+
+
+class SmtpConfigUpdateRequest(BaseModel):
+    host: str = Field(default="smtp.gmail.com")
+    port: int = Field(default=587, ge=1, le=65535)
+    username: str = Field(default="")
+    password: str = Field(default="")
+    from_email: str = Field(default="")
+    use_tls: bool = Field(default=True)
+    verify_tls: bool = Field(default=True)
+    timeout: int = Field(default=30, ge=1, le=120)
 
 
 def _resolve_user_id(current_user: Dict[str, Any]) -> str:
@@ -120,6 +133,9 @@ async def discover_deep_backlink_opportunities(
                     email=opp.get("email"),
                     confidence_score=opp.get("confidence_score", 0.0),
                     discovery_source=opp.get("discovery_source", "duckduckgo"),
+                    exa_author=opp.get("exa_author"),
+                    exa_published_date=opp.get("exa_published_date"),
+                    exa_summary=opp.get("exa_summary"),
                 )
                 saved += 1
             except Exception:
@@ -127,6 +143,47 @@ async def discover_deep_backlink_opportunities(
         result["saved_to_campaign"] = saved
         result["save_failed"] = save_failed
     return result
+
+
+@router.post("/ai-prospect", response_model=AiProspectResponse)
+async def ai_prospect_leads(
+    payload: AiProspectRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Run LLM-powered analysis on discovered opportunities to extract emails and enrichment data."""
+    user_id = _resolve_user_id(current_user)
+    opportunities = [opp.model_dump() for opp in payload.opportunities]
+    enriched = await backlink_outreach_service.ai_prospect(
+        keyword=payload.keyword,
+        opportunities=opportunities,
+        user_id=user_id,
+    )
+    results = []
+    emails_found = 0
+    for opp in enriched:
+        result = AiProspectResult(
+            url=opp.get("url", ""),
+            email=opp.get("email"),
+            contact_page_url=opp.get("ai_contact_page") or opp.get("contact_page"),
+            site_active=opp.get("ai_site_active"),
+            accepts_guest_posts=opp.get("ai_accepts_guest_posts"),
+            guidelines_summary=opp.get("ai_guidelines_summary", ""),
+            relevance_score=opp.get("ai_relevance_score", opp.get("quality_score", 0.5)),
+            editor_name=opp.get("ai_editor_name", ""),
+            pitch_angle=opp.get("ai_pitch_angle", ""),
+            risk_flags=opp.get("ai_risk_flags", []),
+            ai_prospected=opp.get("ai_prospected", True),
+        )
+        if result.email:
+            emails_found += 1
+        results.append(result)
+
+    return AiProspectResponse(
+        keyword=payload.keyword,
+        total_analyzed=len(enriched),
+        total_emails_found=emails_found,
+        results=results,
+    )
 
 
 @router.post("/campaigns")
@@ -197,6 +254,14 @@ async def add_campaign_lead(
             email=payload.email,
             confidence_score=payload.confidence_score,
             notes=payload.notes,
+            exa_author=payload.exa_author,
+            exa_published_date=payload.exa_published_date,
+            exa_summary=payload.exa_summary,
+            ai_editor_name=payload.ai_editor_name,
+            ai_pitch_angle=payload.ai_pitch_angle,
+            ai_guidelines_summary=payload.ai_guidelines_summary,
+            ai_relevance_score=payload.ai_relevance_score,
+            ai_risk_flags=payload.ai_risk_flags,
         )
         return lead
     except BacklinkCampaignNotFoundError:
@@ -383,7 +448,9 @@ async def send_outreach(
             result.status = "blocked"
             result.policy_reasons = reasons
         else:
-            send_result = await backlink_outreach_sender.send_email(
+            user_smtp = storage.get_smtp_config(user_id)
+            sender = BacklinkOutreachSender(smtp_config=user_smtp) if user_smtp else backlink_outreach_sender
+            send_result = await sender.send_email(
                 to_email=lead_email,
                 subject=subject,
                 body=body,
@@ -515,11 +582,22 @@ async def list_followups(
     limit: int = Query(50),
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """List scheduled follow-ups for a campaign."""
+    """List scheduled follow-ups for a campaign. Processes due follow-ups before returning."""
     user_id = _resolve_user_id(current_user)
+    process_due_followups(user_id=user_id)
     storage = BacklinkOutreachStorageService()
     followups = storage.list_followups(campaign_id, limit, user_id=user_id)
     return {"followups": followups, "total": len(followups)}
+
+
+@router.post("/followups/process")
+async def process_due_followups_endpoint(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Manually trigger processing of due follow-ups."""
+    user_id = _resolve_user_id(current_user)
+    sent_count = process_due_followups(user_id=user_id)
+    return {"processed": True, "sent_count": sent_count}
 
 
 # -- Email Templates --
@@ -607,7 +685,7 @@ async def generate_personalized_email_endpoint(
     payload: PersonalizeEmailRequest,
     current_user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Personalize an outreach email for a specific lead."""
+    """Generate a personalized outreach email for a specific lead with contextual data."""
     user_id = _resolve_user_id(current_user)
     result = generate_personalized_email(
         lead_name=payload.lead_name,
@@ -616,6 +694,12 @@ async def generate_personalized_email_endpoint(
         pitch_topic=payload.pitch_topic,
         existing_body=payload.existing_body,
         user_id=user_id,
+        tone=payload.tone,
+        lead_summary=payload.lead_summary,
+        lead_highlights=payload.lead_highlights,
+        lead_guidelines=payload.lead_guidelines,
+        lead_pitch_angle=payload.lead_pitch_angle,
+        lead_published_date=payload.lead_published_date,
     )
     return result
 
@@ -673,6 +757,57 @@ async def add_suppression(
     user_id = _resolve_user_id(current_user)
     storage = BacklinkOutreachStorageService()
     return storage.add_suppressed(email=payload.email, domain=payload.domain, reason=payload.reason, user_id=user_id)
+
+
+@router.delete("/suppression/{suppression_id}")
+async def delete_suppression(
+    suppression_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Remove a recipient from the suppression list."""
+    user_id = _resolve_user_id(current_user)
+    storage = BacklinkOutreachStorageService()
+    if not storage.delete_suppressed(suppression_id, user_id=user_id):
+        raise HTTPException(status_code=404, detail="Suppression entry not found")
+    return {"deleted": True}
+
+
+# -- User SMTP Config --
+
+@router.get("/smtp-config")
+async def get_user_smtp_config(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Get the authenticated user's SMTP configuration."""
+    user_id = _resolve_user_id(current_user)
+    storage = BacklinkOutreachStorageService()
+    cfg = storage.get_smtp_config(user_id)
+    if not cfg:
+        return {}
+    return cfg
+
+
+@router.put("/smtp-config")
+async def set_user_smtp_config(
+    payload: SmtpConfigUpdateRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Create or update the authenticated user's SMTP configuration."""
+    user_id = _resolve_user_id(current_user)
+    storage = BacklinkOutreachStorageService()
+    return storage.set_smtp_config(user_id=user_id, **payload.model_dump())
+
+
+@router.delete("/smtp-config")
+async def delete_user_smtp_config(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Delete the authenticated user's SMTP configuration (revert to env defaults)."""
+    user_id = _resolve_user_id(current_user)
+    storage = BacklinkOutreachStorageService()
+    if not storage.delete_smtp_config(user_id):
+        raise HTTPException(status_code=404, detail="SMTP config not found")
+    return {"deleted": True}
 
 
 @router.get("/campaigns/{campaign_id}/analytics/volume", response_model=CampaignVolumeResponse)

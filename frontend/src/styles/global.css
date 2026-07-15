@@ -439,4 +439,10 @@ cpk-web-inspector {
 .cpk-announcement {
   display: none !important;
   visibility: hidden !important;
+}
+
+/* Light placeholder text on dark inputs */
+input::placeholder,
+textarea::placeholder {
+  color: rgba(255, 255, 255, 0.38) !important;
 } 

@@ -516,6 +516,10 @@ router_manager.include_router_safely(subscription_router, "subscription")
 
 # Include assets serving router (must be mounted to serve generated images)
 app.include_router(assets_serving_router)
+
+# Include standalone GIF Maker router (zero ALwrity dependencies)
+from routers.gif_maker import router as gif_maker_router
+app.include_router(gif_maker_router)
 router_group_status["assets_serving"] = {
     "mounted": True,
     "reason": "Required for podcast media assets",

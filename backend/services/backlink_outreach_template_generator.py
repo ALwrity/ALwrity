@@ -4,10 +4,32 @@ from __future__ import annotations
 
 import json
 import re
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Union
 from loguru import logger
 
 from services.llm_providers.main_text_generation import llm_text_gen
+
+
+EMAIL_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "subject": {"type": "string", "description": "Email subject line"},
+        "body": {"type": "string", "description": "Email body content"},
+    },
+    "required": ["subject", "body"],
+}
+
+SUBJECTS_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "subjects": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "List of subject line suggestions",
+        }
+    },
+    "required": ["subjects"],
+}
 
 
 SYSTEM_PROMPT = """You are an expert outreach copywriter specializing in guest post and backlink pitch emails.
@@ -17,16 +39,14 @@ Follow these rules:
 - Keep it under 200 words
 - Include a clear call to action
 - Sound human, not templated
-- Never use spammy phrases
-- Output ONLY valid JSON with "subject" and "body" keys"""
+- Never use spammy phrases"""
 
 SUBJECT_LINES_PROMPT = """You are an expert email subject line writer.
 Given an outreach email body, generate subject lines that are:
 - Intriguing but not clickbait
 - Personalized when possible
 - Under 60 characters
-- Varied in style (question, curiosity, value-prop)
-Output ONLY valid JSON with a "subjects" key containing an array of strings."""
+- Varied in style (question, curiosity, value-prop)"""
 
 FOLLOW_UP_PROMPT = """You are an expert outreach copywriter.
 Write a polite follow-up email for a guest post pitch that hasn't received a response.
@@ -35,17 +55,70 @@ Rules:
 - Keep it shorter than the original (under 100 words)
 - Add a new angle or piece of value
 - Include a clear call to action
-- Sound human and respectful, never pushy
-- Output ONLY valid JSON with "subject" and "body" keys"""
+- Sound human and respectful, never pushy"""
 
 PERSONALIZATION_PROMPT = """You are an expert outreach personalization specialist.
-Given a lead's information and a draft outreach email, personalize it for that specific lead.
+Write a personalized guest post pitch email for a specific lead.
 Rules:
-- Mention their specific content or website
-- Reference something relevant from their site
-- Keep the core pitch but make it feel custom-written
-- Under 200 words
-- Output ONLY valid JSON with "subject" and "body" keys"""
+- Address the lead by name
+- Reference their specific content or website naturally
+- Mention something relevant from their published work
+- Keep it under 200 words
+- Sound human and specific, not templated
+- Include a clear call to action"""
+
+
+def _parse_llm_response(
+    raw: Union[str, Dict[str, Any], None],
+    expected_keys: Optional[List[str]] = None,
+) -> Optional[Dict[str, Any]]:
+    """Parse llm_text_gen response following blog writer pattern.
+
+    llm_text_gen with json_struct may return:
+      - dict (from Gemini structured output)
+      - str  (from providers that return JSON text)
+
+    Args:
+        raw: Raw response from llm_text_gen.
+        expected_keys: Keys that must be present (e.g. ["subject", "body"]).
+
+    Returns:
+        Parsed dict or None.
+    """
+    if not raw:
+        return None
+
+    result = raw
+    if isinstance(result, str):
+        text = result.strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text)
+            text = re.sub(r"\s*```$", "", text)
+        try:
+            result = json.loads(text)
+        except json.JSONDecodeError:
+            logger.warning(f"Failed to parse LLM response as JSON: {text[:200]}")
+            return None
+
+    if not isinstance(result, dict):
+        logger.warning(f"Unexpected response type: {type(result)}")
+        return None
+
+    if expected_keys:
+        missing = [k for k in expected_keys if k not in result]
+        if missing:
+            logger.warning(f"Response missing expected keys: {missing}")
+            return None
+        cleaned = {}
+        for k in expected_keys:
+            v = result.get(k)
+            if isinstance(v, str):
+                cleaned[k] = v.strip()
+            else:
+                cleaned[k] = v
+        return cleaned
+
+    return result
 
 
 def generate_outreach_email(
@@ -74,29 +147,28 @@ def generate_outreach_email(
             f"{f'Target website: {target_site}. ' if target_site else ''}"
             f"Keep the core message but make it more effective. "
             f"Original email:\n\n{existing_body}\n\n"
-            f"Return ONLY valid JSON with 'subject' and 'body' keys."
         )
     else:
         prompt = (
             f"Write a {tone} outreach email for a guest post opportunity about: {topic}. "
             f"{f'We are pitching this to: {target_site}. ' if target_site else ''}"
             f"Mention specific value the guest post would bring to their audience. "
-            f"Return ONLY valid JSON with 'subject' and 'body' keys."
         )
 
     try:
         raw = llm_text_gen(
             prompt=prompt,
             system_prompt=SYSTEM_PROMPT,
+            json_struct=EMAIL_SCHEMA,
             user_id=user_id,
             temperature=0.7,
         )
 
-        result = _parse_json_response(raw)
+        result = _parse_llm_response(raw, expected_keys=["subject", "body"])
         if result:
             return result
 
-        return _fallback_extract(raw, topic)
+        return _fallback_extract(raw, topic) if isinstance(raw, str) else _fallback_extract("", topic)
 
     except Exception as e:
         logger.error(f"Failed to generate outreach email: {e}")
@@ -114,8 +186,17 @@ def generate_personalized_email(
     pitch_topic: str,
     existing_body: str = "",
     user_id: str = "default",
+    tone: str = "professional",
+    lead_summary: Optional[str] = None,
+    lead_highlights: Optional[str] = None,
+    lead_guidelines: Optional[str] = None,
+    lead_pitch_angle: Optional[str] = None,
+    lead_published_date: Optional[str] = None,
 ) -> dict:
-    """Personalize an outreach email for a specific lead.
+    """Generate or personalize an outreach email for a specific lead.
+
+    When existing_body is provided, personalizes the draft. Otherwise generates
+    a fully personalized email from scratch using all available lead context.
 
     Args:
         lead_name: Contact name or site owner name.
@@ -124,41 +205,67 @@ def generate_personalized_email(
         pitch_topic: The topic we want to pitch.
         existing_body: Optional draft to personalize further.
         user_id: Clerk user ID for subscription check.
+        tone: professional, friendly, casual, or formal.
+        lead_summary: Exa AI summary of their article.
+        lead_highlights: Key highlights from their article (joined string).
+        lead_guidelines: Guest post guidelines summary.
+        lead_pitch_angle: AI-suggested pitch angle.
+        lead_published_date: Article publication date.
 
     Returns:
         dict with "subject" and "body" keys.
     """
+    context_parts = []
+    if lead_summary:
+        context_parts.append(f"Article summary: {lead_summary}")
+    if lead_highlights:
+        context_parts.append(f"Key highlights from their article: {lead_highlights}")
+    if lead_guidelines:
+        context_parts.append(f"Their guest post guidelines: {lead_guidelines}")
+    if lead_pitch_angle:
+        context_parts.append(f"Suggested pitch angle: {lead_pitch_angle}")
+    if lead_published_date:
+        context_parts.append(f"Their relevant article was published: {lead_published_date}")
+
+    context_str = "\n".join(context_parts)
+    if context_str:
+        context_str = f"\n\nAdditional context about this lead:\n{context_str}\n"
+
     if existing_body:
         prompt = (
             f"Personalize this outreach email for {lead_name} from {lead_site}. "
             f"They have content about '{lead_content_topic}'. "
+            f"{context_str}"
             f"We want to pitch: {pitch_topic}. "
-            f"Mention something specific about their content on {lead_content_topic} "
+            f"Mention something specific about their content "
             f"to show we've done our research. "
             f"Draft email to personalize:\n\n{existing_body}\n\n"
-            f"Return ONLY valid JSON with 'subject' and 'body' keys."
         )
     else:
         prompt = (
-            f"Write a personalized outreach email to {lead_name} at {lead_site}. "
+            f"Write a {tone} personalized outreach email to {lead_name} at {lead_site}. "
             f"They have published content about '{lead_content_topic}'. "
+            f"{context_str}"
             f"We want to pitch a guest post about: {pitch_topic}. "
-            f"Reference their article on {lead_content_topic} and explain how our pitch "
+            f"Reference their specific content and explain how our pitch "
             f"would provide value to their audience. "
-            f"Return ONLY valid JSON with 'subject' and 'body' keys."
         )
 
     try:
         raw = llm_text_gen(
             prompt=prompt,
             system_prompt=PERSONALIZATION_PROMPT,
+            json_struct=EMAIL_SCHEMA,
             user_id=user_id,
             temperature=0.7,
         )
-        result = _parse_json_response(raw)
+
+        result = _parse_llm_response(raw, expected_keys=["subject", "body"])
         if result:
             return result
-        return _fallback_extract(raw, pitch_topic)
+
+        return _fallback_extract(raw, lead_content_topic) if isinstance(raw, str) else _fallback_extract("", lead_content_topic)
+
     except Exception as e:
         logger.error(f"Failed to personalize email: {e}")
         return {"subject": f"Question about your content on {lead_content_topic}", "body": existing_body or f"Hi {lead_name},\n\nI enjoyed your article about {lead_content_topic}..."}
@@ -183,32 +290,29 @@ def generate_subject_lines(
         f"Generate {count} subject lines for the following outreach email. "
         f"Make them varied in style and optimized for open rates.\n\n"
         f"Email body:\n{body}\n\n"
-        f"Return ONLY valid JSON with a 'subjects' key containing an array of strings."
     )
 
     try:
         raw = llm_text_gen(
             prompt=prompt,
             system_prompt=SUBJECT_LINES_PROMPT,
+            json_struct=SUBJECTS_SCHEMA,
             user_id=user_id,
             temperature=0.8,
         )
-        if raw:
-            text = raw.strip()
-            if text.startswith("```"):
-                text = re.sub(r"^```(?:json)?\s*", "", text)
-                text = re.sub(r"\s*```$", "", text)
-            try:
-                data = json.loads(text)
-                if isinstance(data, dict) and "subjects" in data and isinstance(data["subjects"], list):
-                    return [s.strip() for s in data["subjects"][:count]]
-            except json.JSONDecodeError:
-                pass
-        lines = [l.strip("- ").strip() for l in raw.strip().split("\n") if l.strip() and not l.strip().startswith("```")]
-        return [l for l in lines if len(l) > 10][:count]
+
+        result = _parse_llm_response(raw, expected_keys=["subjects"])
+        if result and isinstance(result["subjects"], list):
+            return [s.strip() for s in result["subjects"] if isinstance(s, str)][:count]
+
+        if isinstance(raw, str):
+            lines = [l.strip("- ").strip() for l in raw.strip().split("\n") if l.strip() and not l.strip().startswith("```")]
+            return [l for l in lines if len(l) > 10][:count]
+
     except Exception as e:
         logger.error(f"Failed to generate subject lines: {e}")
-        return [f"Guest post opportunity", f"Question about your content", f"Collaboration idea"]
+
+    return [f"Guest post opportunity", f"Question about your content", f"Collaboration idea"]
 
 
 def generate_follow_up(
@@ -236,7 +340,6 @@ def generate_follow_up(
             f"Write a follow-up email that addresses their response and keeps the conversation moving. "
             f"Original subject: {original_subject}.\n\n"
             f"Original email:\n{original_body}\n\n"
-            f"Return ONLY valid JSON with 'subject' and 'body' keys."
         )
     else:
         prompt = (
@@ -244,20 +347,23 @@ def generate_follow_up(
             f"Do not apologize for following up. Add a new piece of value or angle. "
             f"Original subject: {original_subject}.\n\n"
             f"Original email:\n{original_body}\n\n"
-            f"Return ONLY valid JSON with 'subject' and 'body' keys."
         )
 
     try:
         raw = llm_text_gen(
             prompt=prompt,
             system_prompt=FOLLOW_UP_PROMPT,
+            json_struct=EMAIL_SCHEMA,
             user_id=user_id,
             temperature=0.7,
         )
-        result = _parse_json_response(raw)
+
+        result = _parse_llm_response(raw, expected_keys=["subject", "body"])
         if result:
             return result
-        return _fallback_extract(raw, original_subject)
+
+        return _fallback_extract(raw, original_subject) if isinstance(raw, str) else _fallback_extract("", original_subject)
+
     except Exception as e:
         logger.error(f"Failed to generate follow-up: {e}")
         return {
@@ -267,29 +373,10 @@ def generate_follow_up(
         }
 
 
-def _parse_json_response(raw: str) -> Optional[dict]:
-    """Try to parse JSON from LLM response, handling markdown fences."""
-    if not raw:
-        return None
-
-    text = raw.strip()
-
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-
-    try:
-        data = json.loads(text)
-        if isinstance(data, dict) and "subject" in data and "body" in data:
-            return {"subject": data["subject"].strip(), "body": data["body"].strip()}
-    except json.JSONDecodeError:
-        pass
-
-    return None
-
-
 def _fallback_extract(raw: str, topic: str) -> dict:
     """Fallback: try to extract subject line and body from unstructured text."""
+    if not raw:
+        return {"subject": topic, "body": ""}
     lines = [l.strip() for l in raw.strip().split("\n") if l.strip()]
     subject = topic
     body_lines = []

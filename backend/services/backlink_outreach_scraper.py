@@ -7,6 +7,8 @@ opportunities with full-page content extraction and quality scoring.
 from __future__ import annotations
 
 import asyncio
+import base64
+import json
 import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote, urlparse
@@ -29,6 +31,7 @@ class BacklinkOutreachScraper:
     def __init__(self, user_id: Optional[str] = None):
         self.user_id = user_id
         self._exa_svc = None
+        self._exa_provider = None  # ExaResearchProvider (richer search)
 
     # -- Public API --
 
@@ -92,64 +95,22 @@ class BacklinkOutreachScraper:
         self._exa_svc._try_initialize()
         return self._exa_svc.exa if self._exa_svc.enabled else None
 
-    # -- Preflight & Usage Tracking --
-
-    def _preflight_subscription_check(self, user_id: str) -> bool:
-        """Check Exa usage limits. Returns True if allowed."""
-        if not user_id:
-            return True
-        try:
-            from services.database import get_session_for_user
-            from services.subscription import PricingService
-            from models.subscription_models import APIProvider
-            db = get_session_for_user(user_id)
-            if not db:
-                return True
+    def _get_exa_provider(self):
+        """Lazy-init ExaResearchProvider (canonical Exa integration with preflight/tracking)."""
+        if self._exa_provider is None:
             try:
-                pricing = PricingService(db)
-                allowed, _, _ = pricing.check_usage_limits(
-                    user_id=user_id, provider=APIProvider.EXA, tokens_requested=0,
-                )
-                return allowed
-            finally:
-                db.close()
-        except Exception as e:
-            logger.warning(f"[BacklinkScraper] Preflight check failed: {e}")
-            return True
-
-    def _track_exa_usage(self, user_id: str, cost: float = 0.005):
-        """Record Exa usage after successful search."""
-        if not user_id:
-            return
-        try:
-            from services.database import get_session_for_user
-            from services.subscription import PricingService
-            from sqlalchemy import text as sql_text
-            db = get_session_for_user(user_id)
-            if not db:
-                return
-            try:
-                pricing = PricingService(db)
-                period = pricing.get_current_billing_period(user_id)
-                db.execute(sql_text("""
-                    UPDATE usage_summaries
-                    SET exa_calls = COALESCE(exa_calls, 0) + 1,
-                        exa_cost = COALESCE(exa_cost, 0) + :cost,
-                        total_calls = total_calls + 1,
-                        total_cost = total_cost + :cost
-                    WHERE user_id = :user_id AND billing_period = :period
-                """), {"cost": cost, "user_id": user_id, "period": period})
-                db.commit()
-            finally:
-                db.close()
-        except Exception as e:
-            logger.warning(f"[BacklinkScraper] Usage tracking failed: {e}")
+                from services.research.exa_research_provider import ExaResearchProvider
+                self._exa_provider = ExaResearchProvider()
+            except Exception as e:
+                logger.warning(f"[BacklinkScraper] ExaResearchProvider unavailable: {e}")
+                return None
+        return self._exa_provider
 
     # -- Exa Discovery --
 
     async def _discover_with_exa(self, keyword: str, max_results: int) -> Dict[str, Any]:
-        exa = self._get_exa_sdk()
-        if not exa:
+        provider = self._get_exa_provider()
+        if not provider:
             return await self._discover_with_duckduckgo(keyword, max_results)
 
         queries = self._generate_search_queries(keyword)
@@ -157,7 +118,12 @@ class BacklinkOutreachScraper:
         results_per_query = max(1, max_results // len(queries))
 
         for query in queries[:4]:
-            rows = await self._exa_search_and_contents(exa, query, results_per_query)
+            rows = await provider.search_contents(
+                query,
+                num_results=results_per_query,
+                user_id=self.user_id,
+                text_max_characters=5000,
+            )
             for row in rows:
                 norm_url = self._normalize_url(row.get("url", ""))
                 if not norm_url or norm_url in dedup:
@@ -167,50 +133,20 @@ class BacklinkOutreachScraper:
                 break
 
         opportunities = self._build_enriched_opportunities(dedup, keyword, "exa")
-        self._track_exa_usage(self.user_id)
+        opportunities = await asyncio.gather(*[
+            self._enhance_email_discovery(opp) for opp in opportunities
+        ])
+
+        email_stats = self._compute_email_stats(opportunities)
 
         return {
             "keyword": keyword,
             "source": "exa",
             "total_found": len(opportunities),
+            "queries": queries,
+            "email_stats": email_stats,
             "opportunities": opportunities,
         }
-
-    async def _exa_search_and_contents(
-        self, exa, query: str, num_results: int
-    ) -> List[Dict[str, Any]]:
-        """Run Exa search_and_contents in executor to avoid blocking."""
-        loop = asyncio.get_running_loop()
-        try:
-            result = await loop.run_in_executor(
-                None,
-                lambda: exa.search_and_contents(
-                    query,
-                    type="auto",
-                    num_results=num_results,
-                    text={"max_characters": 3000},
-                    highlights={"num_sentences": 3, "highlights_per_url": 3},
-                ),
-            )
-            return self._parse_search_and_contents_result(result)
-        except Exception as e:
-            logger.warning(f"[BacklinkScraper] Exa search_and_contents failed: {e}")
-            return []
-
-    def _parse_search_and_contents_result(self, result) -> List[Dict[str, Any]]:
-        rows = []
-        results = getattr(result, "results", [])
-        for r in results:
-            rows.append({
-                "url": getattr(r, "url", ""),
-                "title": getattr(r, "title", ""),
-                "text": getattr(r, "text", ""),
-                "highlights": getattr(r, "highlights", []),
-                "summary": getattr(r, "summary", ""),
-                "score": getattr(r, "score", 0.5),
-                "published_date": getattr(r, "publishedDate", None),
-            })
-        return rows
 
     def _parse_get_contents_result(self, result) -> List[Dict[str, Any]]:
         rows = []
@@ -273,11 +209,19 @@ class BacklinkOutreachScraper:
             }
 
         opportunities = self._build_enriched_opportunities(merged, keyword, "duckduckgo")
+        opportunities = await asyncio.gather(*[
+            self._enhance_email_discovery(opp) for opp in opportunities
+        ])
+
+        email_stats = self._compute_email_stats(opportunities)
+        queries = self._generate_search_queries(keyword)
 
         return {
             "keyword": keyword,
             "source": "duckduckgo",
             "total_found": len(opportunities),
+            "queries": queries,
+            "email_stats": email_stats,
             "opportunities": opportunities,
         }
 
@@ -373,15 +317,41 @@ class BacklinkOutreachScraper:
                 "snippet": row.get("snippet") or (text[:300] if text else ""),
                 "full_text": text[:5000],
                 "email": contacts.get("email"),
+                "all_emails": contacts.get("all_emails", []),
                 "contact_page": contacts.get("contact_page"),
                 "confidence_score": min(1.0, quality + 0.1),
                 "quality_score": quality,
                 "word_count": len(text.split()),
                 "has_guest_post_guidelines": has_guidelines,
                 "discovery_source": source,
+                "exa_score": row.get("score"),
+                "exa_author": row.get("author"),
+                "exa_published_date": row.get("published_date"),
+                "exa_summary": (row.get("summary") or "")[:500],
+                "exa_highlights": row.get("highlights", []),
             })
         opportunities.sort(key=lambda x: x["quality_score"], reverse=True)
         return opportunities
+
+    def _compute_email_stats(self, opportunities: List[Dict[str, Any]]) -> Dict[str, Any]:
+        total = len(opportunities)
+        with_email = sum(1 for opp in opportunities if opp.get("email"))
+        from_contact = sum(1 for opp in opportunities if opp.get("discovery_source", "").endswith("+contact_page"))
+        from_tavily = sum(1 for opp in opportunities if opp.get("discovery_source", "").endswith("+tavily"))
+        from_guessed = sum(1 for opp in opportunities if opp.get("discovery_source", "").endswith("+guessed"))
+        from_ai = sum(1 for opp in opportunities if opp.get("discovery_source", "").endswith("+ai"))
+        from_regex = with_email - from_contact - from_tavily - from_guessed - from_ai
+        total_emails = sum(len(opp.get("all_emails", [])) for opp in opportunities)
+        return {
+            "total": total,
+            "with_email": with_email,
+            "total_emails_found": total_emails,
+            "from_regex": max(0, from_regex),
+            "from_contact_page": from_contact,
+            "from_tavily": from_tavily,
+            "from_guessed": from_guessed,
+            "from_ai": from_ai,
+        }
 
     def _extract_domain(self, url: str) -> str:
         try:
@@ -399,20 +369,448 @@ class BacklinkOutreachScraper:
             return ""
         return u.split("#")[0].rstrip("/")
 
-    def _extract_contacts(self, text: str) -> Dict[str, Optional[str]]:
-        result: Dict[str, Optional[str]] = {"email": None, "contact_page": None}
+    def _extract_contacts(self, text: str) -> Dict[str, Any]:
+        result: Dict[str, Any] = {"email": None, "contact_page": None, "all_emails": []}
         if not text:
             return result
-        email_match = re.search(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
-        if email_match:
-            result["email"] = email_match.group(0)
+
+        # -- Collect ALL email addresses from all patterns --
+        all_found: List[str] = []
+
+        # 1. Standard email addresses
+        all_found.extend(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text))
+
+        # 2. mailto: links (common in HTML)
+        all_found.extend(
+            re.findall(r'mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})', text)
+        )
+
+        # 3. Obfuscated emails — handle [at], (at), {at}, <at>, etc.
+        for match in re.finditer(
+            r'([A-Za-z0-9._%+-]+)\s*[\[({<]?\s*at\s*[])}>]?\s*([A-Za-z0-9.-]+)\s*[\[({<]?\s*dot\s*[])}>]?\s*([A-Za-z]{2,})',
+            text, re.IGNORECASE,
+        ):
+            all_found.append(f"{match.group(1)}@{match.group(2)}.{match.group(3)}")
+        # 4. 'user at domain.com' — at without dot TLD separator (min 3-char username to reduce false positives)
+        for match in re.finditer(
+            r'([A-Za-z0-9._%+-]{3,})\s*[\[({<]?\s*at\s*[])}>]?\s*@?\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})',
+            text, re.IGNORECASE,
+        ):
+            all_found.append(f"{match.group(1)}@{match.group(2)}")
+        # 5. Unicode fullwidth obfuscation (e.g. ｕｓｅｒ＠ｄｏｍａｉｎ．ｃｏｍ)
+        for match in re.finditer(
+            r'([Ａ-Ｚａ-ｚ０-９._%+-]+)＠([Ａ-Ｚａ-ｚ０-９.-]+)．([Ａ-Ｚａ-ｚ]{2,})',
+            text,
+        ):
+            local = match.group(1).translate(str.maketrans(
+                "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ"
+                "ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ"
+                "０１２３４５６７８９._%+-",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "abcdefghijklmnopqrstuvwxyz"
+                "0123456789._%+-"
+            ))
+            domain = match.group(2).translate(str.maketrans(
+                "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺ"
+                "ａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ"
+                "０１２３４５６７８９.-",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "abcdefghijklmnopqrstuvwxyz"
+                "0123456789.-"
+            ))
+            tld = match.group(3).translate(str.maketrans(
+                "ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ",
+                "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            ))
+            all_found.append(f"{local}@{domain}.{tld}")
+
+        # Deduplicate and pick first as primary, keep top 5
+        seen: set = set()
+        unique: List[str] = []
+        for e in all_found:
+            e_clean = e.strip().lower()
+            if e_clean and e_clean not in seen:
+                seen.add(e_clean)
+                unique.append(e.strip())
+        result["all_emails"] = unique[:5]
+        result["email"] = unique[0] if unique else None
+
+        # Contact page URLs (expanded patterns)
         contact_match = re.search(
-            r"(https?://[^\s\"'<>]*(?:contact|about|team|write-for-us|guest-post)[^\s\"'<>]*)",
+            r"(https?://[^\s\"'<>]*(?:"
+            r"contact|about|team|staff|authors?|contributors?|"
+            r"write-for-us|guest-post|submissions?|editorial|"
+            r"about-us|our-team|meet-the-team|leadership"
+            r")[^\s\"'<>]*)",
             text, re.IGNORECASE,
         )
         if contact_match:
             result["contact_page"] = contact_match.group(1).rstrip("/")
         return result
+
+    async def _scrape_url_for_emails(self, url: str, timeout_seconds: float = 15.0) -> Optional[str]:
+        """Scrape a URL and extract the first email found (Tavily Extract + fallback httpx/BS4)."""
+        content = await self._scrape_url_for_content(url, timeout_seconds=timeout_seconds)
+        if content:
+            contacts = self._extract_contacts(content)
+            return contacts.get("email")
+        return None
+
+    async def _scrape_url_with_tavily(self, url: str) -> Optional[str]:
+        """Use Tavily Extract to get clean markdown content from a URL.
+        Returns clean markdown with boilerplate removed, or None if unavailable.
+        """
+        try:
+            from services.research.tavily_service import TavilyService
+            tavily = TavilyService()
+            if not tavily.enabled:
+                return None
+            result = await tavily.extract(urls=url, extract_depth="basic")
+            if result.get("success") and result.get("results"):
+                raw = result["results"][0].get("raw_content", "")
+                if raw and len(raw.strip()) > 100:
+                    return raw
+            return None
+        except Exception as e:
+            logger.debug(f"[BacklinkScraper] Tavily Extract failed for {url}: {e}")
+            return None
+
+    async def _scrape_url_for_content(self, url: str, timeout_seconds: float = 15.0) -> Optional[str]:
+        """Scrape a URL for full page text. Tries Tavily Extract first (clean markdown),
+        falls back to httpx + BeautifulSoup.
+        In both paths, also fetches raw HTML for CF/base64 email decoding.
+        """
+        tavily_content = await self._scrape_url_with_tavily(url)
+
+        # Always try raw HTML for CF/base64-protected emails
+        raw_text = None
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(timeout_seconds), follow_redirects=True) as client:
+                headers = {"User-Agent": "Mozilla/5.0 ALwrityBacklinkBot/1.0"}
+                resp = await client.get(url, headers=headers)
+                resp.raise_for_status()
+                raw_html = resp.text
+                hidden_emails = []
+                hidden_emails.extend(self._decode_cf_email(raw_html))
+                hidden_emails.extend(self._decode_base64_emails(raw_html))
+                soup = BeautifulSoup(raw_html, "html.parser")
+                raw_text = soup.get_text(separator=" ", strip=True)
+                if hidden_emails:
+                    raw_text += " " + " ".join(hidden_emails)
+        except Exception as e:
+            logger.debug(f"[BacklinkScraper] Raw HTML fetch failed for {url}: {e}")
+
+        if tavily_content and raw_text:
+            return tavily_content + "\n" + raw_text[:3000]
+        if tavily_content:
+            return tavily_content
+        return raw_text
+
+    async def _tavily_search_for_contact(self, domain: str) -> Optional[str]:
+        """Use Tavily to search for contact email for a domain."""
+        try:
+            from services.research.tavily_service import TavilyService
+            tavily = TavilyService()
+            if not tavily.enabled:
+                return None
+            query = f"{domain} email address contact"
+            result = await tavily.search(query, max_results=5, include_raw_content="text")
+            sources = result.get("results", [])
+            for src in sources:
+                content = src.get("content", "") or src.get("raw_content", "") or ""
+                if content:
+                    contacts = self._extract_contacts(content)
+                    if contacts.get("email"):
+                        return contacts["email"]
+        except Exception as e:
+            logger.debug(f"[BacklinkScraper] Tavily contact search failed for {domain}: {e}")
+        return None
+
+    _COMMON_EMAIL_PREFIXES = [
+        "info", "hello", "contact", "editor", "team", "support",
+        "admin", "hi", "hey", "editorial", "submissions",
+        "contributors", "writers", "pitch", "tips", "press",
+    ]
+
+    @staticmethod
+    def _decode_cf_email(html: str) -> List[str]:
+        """Decode CloudFlare email-protected emails from raw HTML.
+        Looks for data-cfemail attributes and decrypts them.
+        """
+        found: List[str] = []
+        for match in re.finditer(r'data-cfemail=["\']([A-Fa-f0-9]+)["\']', html):
+            hex_str = match.group(1)
+            try:
+                raw_bytes = bytes.fromhex(hex_str)
+                if len(raw_bytes) < 2:
+                    continue
+                key = raw_bytes[0]
+                decrypted = []
+                for i, b in enumerate(raw_bytes[1:]):
+                    decrypted.append(b ^ ((key + i) & 0xFF))
+                email = bytes(decrypted).decode("utf-8", errors="replace")
+                if "@" in email and "." in email.split("@")[-1]:
+                    found.append(email.strip())
+            except Exception:
+                continue
+        return found
+
+    @staticmethod
+    def _decode_base64_emails(text: str) -> List[str]:
+        """Extract emails from base64-encoded JS atob() calls in HTML."""
+        found: List[str] = []
+        for match in re.finditer(r"""(?:window\.)?atob\s*\(\s*['"]([A-Za-z0-9+/=]+)['"]\s*\)""", text):
+            try:
+                decoded = base64.b64decode(match.group(1)).decode("utf-8", errors="replace")
+                if "@" in decoded and "." in decoded.split("@")[-1]:
+                    found.append(decoded.strip())
+            except Exception:
+                continue
+        return found
+
+    @staticmethod
+    def _guess_common_email(domain: str) -> Optional[str]:
+        """Try common email prefixes for a domain (e.g. info@domain.com)."""
+        if not domain or "." not in domain:
+            return None
+        domain = domain.strip().lower()
+        # Skip generic TLD-only (just in case)
+        if len(domain.split(".")) < 2:
+            return None
+        # Try the most likely prefixes
+        for prefix in ["info", "hello", "contact", "editor", "team"]:
+            candidate = f"{prefix}@{domain}"
+            # Basic sanity — must look like a valid email
+            if re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", candidate):
+                return candidate
+        return None
+
+    async def _enhance_email_discovery(self, opportunity: Dict[str, Any]) -> Dict[str, Any]:
+        """Async enhancement: scrape contact pages + Tavily search for missing emails."""
+        if opportunity.get("email"):
+            return opportunity
+        domain = opportunity.get("domain", "")
+        contact_page = opportunity.get("contact_page", "")
+
+        # Try scraping the contact page first
+        if contact_page:
+            email = await self._scrape_url_for_emails(contact_page)
+            if email:
+                opportunity["email"] = email
+                opportunity["discovery_source"] = opportunity.get("discovery_source", "") + "+contact_page"
+                return opportunity
+
+        # Fall back to scraping the main domain URL
+        url = opportunity.get("url", "")
+        if url and url != contact_page:
+            email = await self._scrape_url_for_emails(url)
+            if email:
+                opportunity["email"] = email
+                opportunity["discovery_source"] = opportunity.get("discovery_source", "") + "+url_scrape"
+                return opportunity
+
+        # Try Tavily search for the domain
+        if domain:
+            email = await self._tavily_search_for_contact(domain)
+            if email:
+                opportunity["email"] = email
+                opportunity["discovery_source"] = opportunity.get("discovery_source", "") + "+tavily"
+                return opportunity
+
+        # Last resort: guess common email prefixes (info@, contact@, hello@, etc.)
+        if domain:
+            guessed = self._guess_common_email(domain)
+            if guessed:
+                opportunity["email"] = guessed
+                opportunity["discovery_source"] = opportunity.get("discovery_source", "") + "+guessed"
+                return opportunity
+
+        return opportunity
+
+    # -- AI Prospecting (LLM-powered analysis) --
+
+    _AI_PROSPECT_STRUCT = {
+        "type": "object",
+        "properties": {
+            "results": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string"},
+                        "email": {"type": "string"},
+                        "contact_page_url": {"type": "string"},
+                        "site_active": {"type": "boolean"},
+                        "accepts_guest_posts": {"type": "boolean"},
+                        "guidelines_summary": {"type": "string"},
+                        "relevance_score": {"type": "number"},
+                        "editor_name": {"type": "string"},
+                        "pitch_angle": {"type": "string"},
+                        "risk_flags": {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["url", "site_active", "accepts_guest_posts", "relevance_score", "risk_flags"],
+                },
+            }
+        },
+        "required": ["results"],
+    }
+
+    _AI_PROSPECT_SYSTEM_PROMPT = """You are an expert backlink outreach research assistant.
+Analyze each website opportunity and extract structured details.
+- ONLY return an email if it is explicitly visible in the content. NEVER guess or construct an email.
+- Set site_active to false if the site appears abandoned (no recent posts).
+- Set accepts_guest_posts based on explicit signals like "write for us", "guest post guidelines", etc.
+- relevance_score: 0.0 (completely irrelevant) to 1.0 (perfect match for the keyword).
+  Use Exa Score as a strong prior — if Exa Score is high (>=0.7), the site is likely highly topical even if the snippet is short.
+- Rank opportunities within each batch relative to each other: the batch's strongest candidate should get the highest relevance_score.
+- risk_flags: include "no_email", "site_inactive", "no_guest_post_signal", "low_relevance" as appropriate.
+- pitch_angle: a one-sentence hook based on the site's apparent content gaps.
+- editor_name: the name of an editor or author found on the page, if any.
+Return ONLY valid JSON matching the schema."""
+
+    async def ai_prospect_opportunities(
+        self,
+        opportunities: List[Dict[str, Any]],
+        keyword: str,
+        user_id: str,
+        batch_size: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """Run LLM analysis on opportunities to extract emails and enrichment data.
+        Batches into groups of `batch_size` for efficiency.
+        """
+        from services.llm_providers.main_text_generation import llm_text_gen
+
+        # Ensure full_text is populated for all opportunities
+        # _scrape_url_for_content now tries Tavily Extract first (clean markdown),
+        # then falls back to httpx+BeautifulSoup
+        scrape_tasks: List[asyncio.Task] = []
+        scrape_map: List[Dict[str, Any]] = []
+        for opp in opportunities:
+            if not opp.get("full_text"):
+                url = opp.get("url", "")
+                if url:
+                    scrape_tasks.append(asyncio.ensure_future(self._scrape_url_for_content(url)))
+                    scrape_map.append(opp)
+        if scrape_tasks:
+            results = await asyncio.gather(*scrape_tasks)
+            for scraped, target_opp in zip(results, scrape_map):
+                if scraped:
+                    target_opp["full_text"] = scraped[:5000]
+
+        enriched: List[Dict[str, Any]] = []
+
+        # Stratified batching: sort by exa_score (preferred) or quality_score,
+        # split into 3 quality tiers, then round-robin into batches so each
+        # batch has a mix of high/mid/low opportunities. This gives the LLM
+        # a calibration anchor for relative ranking.
+        sorted_opps = sorted(
+            opportunities,
+            key=lambda o: o.get("exa_score") if o.get("exa_score") is not None else o.get("quality_score", 0),
+            reverse=True,
+        )
+        n = len(sorted_opps)
+        top_end = max(1, int(n * 0.2))
+        bot_start = min(n, int(n * 0.8))
+        tiers = [
+            sorted_opps[:top_end],          # top 20%
+            sorted_opps[top_end:bot_start],  # middle 60%
+            sorted_opps[bot_start:],         # bottom 20%
+        ]
+
+        batches: List[List[Dict[str, Any]]] = []
+        tier_order = [0, 1, 2, 1, 1]  # top → mid → low → mid → mid per 5
+        pointers = [0, 0, 0]
+        batch: List[Dict[str, Any]] = []
+        any_remaining = True
+        while any_remaining:
+            any_remaining = False
+            for ti in tier_order:
+                if pointers[ti] < len(tiers[ti]):
+                    batch.append(tiers[ti][pointers[ti]])
+                    pointers[ti] += 1
+                    any_remaining = True
+                    if len(batch) == batch_size:
+                        batches.append(batch)
+                        batch = []
+        if batch:
+            batches.append(batch)
+
+        for batch in batches:
+            batch_prompt_parts = []
+            for idx, opp in enumerate(batch):
+                text = (opp.get("full_text") or opp.get("snippet") or "")[:2500]
+                highlights = opp.get("exa_highlights", [])
+                exa_summary = (opp.get("exa_summary") or "")[:200]
+                gps_count = sum(1 for cue in self.GUEST_POST_KEYWORDS if cue in text.lower())
+                batch_prompt_parts.append(
+                    f"[{idx + 1}]\n"
+                    f"URL: {opp.get('url', '')}\n"
+                    f"Domain: {opp.get('domain', '')}\n"
+                    f"Title: {opp.get('page_title', '')}\n"
+                    f"Exa Score: {opp.get('exa_score', 'N/A')}\n"
+                    f"Exa Highlights: {'; '.join(highlights[:2]) if highlights else 'N/A'}\n"
+                    f"Exa Summary: {exa_summary if exa_summary else 'N/A'}\n"
+                    f"Published: {opp.get('exa_published_date', 'N/A')}\n"
+                    f"Author: {opp.get('exa_author', 'N/A')}\n"
+                    f"Word Count: {opp.get('word_count', 0)}\n"
+                    f"Guest Post Signal Count: {gps_count}\n"
+                    f"Content: {text}\n"
+                )
+            prompt = (
+                f"Backlink outreach for keyword: {keyword}\n\n"
+                f"Analyze the following {len(batch)} opportunities and return structured JSON:\n\n"
+                + "\n---\n".join(batch_prompt_parts)
+            )
+
+            try:
+                raw = llm_text_gen(
+                    prompt=prompt,
+                    system_prompt=self._AI_PROSPECT_SYSTEM_PROMPT,
+                    json_struct=self._AI_PROSPECT_STRUCT,
+                    user_id=user_id,
+                    temperature=0.3,
+                    max_tokens=2000,
+                )
+                if isinstance(raw, dict):
+                    parsed = raw
+                else:
+                    parsed = json.loads(raw)
+                llm_results = parsed.get("results", [])
+            except Exception as e:
+                logger.warning(f"[BacklinkScraper] AI prospect batch failed: {e}")
+                llm_results = []
+
+            # Merge LLM results back into opportunities
+            llm_by_url: Dict[str, Dict[str, Any]] = {}
+            for r in llm_results:
+                url = (r.get("url") or "").strip().rstrip("/")
+                if url:
+                    llm_by_url[url] = r
+
+            for opp in batch:
+                norm_url = (opp.get("url") or "").strip().rstrip("/")
+                llm_data = llm_by_url.get(norm_url, {})
+                if llm_data:
+                    # Only overwrite email if LLM found one (LLM is more reliable than regex)
+                    llm_email = (llm_data.get("email") or "").strip()
+                    if llm_email and re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", llm_email):
+                        opp["email"] = llm_email
+                        opp["discovery_source"] = opp.get("discovery_source", "") + "+ai"
+                    opp["ai_contact_page"] = llm_data.get("contact_page_url") or opp.get("contact_page")
+                    opp["ai_site_active"] = llm_data.get("site_active", True)
+                    opp["ai_accepts_guest_posts"] = llm_data.get("accepts_guest_posts", False)
+                    opp["ai_guidelines_summary"] = llm_data.get("guidelines_summary", "")
+                    opp["ai_relevance_score"] = llm_data.get("relevance_score", opp.get("quality_score", 0.5))
+                    opp["ai_editor_name"] = llm_data.get("editor_name", "")
+                    opp["ai_pitch_angle"] = llm_data.get("pitch_angle", "")
+                    opp["ai_risk_flags"] = llm_data.get("risk_flags", [])
+                else:
+                    # Mark as LLM-processed but no data returned
+                    opp["ai_risk_flags"] = opp.get("ai_risk_flags", []) + ["ai_analysis_failed"]
+                opp["ai_prospected"] = True
+                enriched.append(opp)
+
+        return enriched
 
     def _score_quality(self, text: str, title: str) -> float:
         score = 0.3

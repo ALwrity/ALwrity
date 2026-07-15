@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, aiApiClient } from './client';
 
 // -- Shared Types --
 
@@ -53,12 +53,29 @@ export interface EnrichedOpportunity {
   snippet: string;
   full_text: string;
   email: string | null;
+  all_emails: string[];
   contact_page: string | null;
   confidence_score: number;
   quality_score: number;
   word_count: number;
   has_guest_post_guidelines: boolean;
   discovery_source: string;
+  // Exa enrichment
+  exa_score?: number;
+  exa_author?: string | null;
+  exa_published_date?: string | null;
+  exa_summary?: string;
+  exa_highlights?: string[];
+  // AI Prospecting enrichment (set after AI pass)
+  ai_prospected?: boolean;
+  ai_site_active?: boolean;
+  ai_accepts_guest_posts?: boolean;
+  ai_guidelines_summary?: string;
+  ai_relevance_score?: number;
+  ai_editor_name?: string;
+  ai_pitch_angle?: string;
+  ai_risk_flags?: string[];
+  ai_contact_page?: string;
 }
 
 export interface DeepDiscoveryRequest {
@@ -71,7 +88,57 @@ export interface DeepDiscoveryResponse {
   keyword: string;
   source: string;
   total_found: number;
+  queries?: string[];
+  email_stats?: {
+    total: number;
+    with_email: number;
+    total_emails_found: number;
+    from_regex: number;
+    from_contact_page: number;
+    from_tavily: number;
+    from_guessed: number;
+  };
   opportunities: EnrichedOpportunity[];
+}
+
+// -- AI Prospecting --
+
+export interface AiProspectOpportunityInput {
+  url: string;
+  domain?: string;
+  page_title?: string;
+  snippet?: string;
+  full_text?: string;
+  email?: string | null;
+  contact_page?: string | null;
+  quality_score?: number;
+  discovery_source?: string;
+}
+
+export interface AiProspectRequest {
+  keyword: string;
+  opportunities: AiProspectOpportunityInput[];
+}
+
+export interface AiProspectResult {
+  url: string;
+  email: string | null;
+  contact_page_url: string | null;
+  site_active: boolean | null;
+  accepts_guest_posts: boolean | null;
+  guidelines_summary: string;
+  relevance_score: number;
+  editor_name: string;
+  pitch_angle: string;
+  risk_flags: string[];
+  ai_prospected: boolean;
+}
+
+export interface AiProspectResponse {
+  keyword: string;
+  total_analyzed: number;
+  total_emails_found: number;
+  results: AiProspectResult[];
 }
 
 // -- Policy --
@@ -161,6 +228,14 @@ export interface LeadRecord {
   status: LeadStatus;
   notes: string | null;
   created_at: string | null;
+  exa_author?: string | null;
+  exa_published_date?: string | null;
+  exa_summary?: string | null;
+  ai_editor_name?: string | null;
+  ai_pitch_angle?: string | null;
+  ai_guidelines_summary?: string | null;
+  ai_relevance_score?: number | null;
+  ai_risk_flags?: string | null;
 }
 
 export interface LeadListResponse {
@@ -177,6 +252,14 @@ export interface LeadCreateRequest {
   snippet?: string;
   confidence_score?: number;
   notes?: string;
+  exa_author?: string;
+  exa_published_date?: string;
+  exa_summary?: string;
+  ai_editor_name?: string;
+  ai_pitch_angle?: string;
+  ai_guidelines_summary?: string;
+  ai_relevance_score?: number;
+  ai_risk_flags?: string;
 }
 
 export type LeadStatus = 'discovered' | 'contacted' | 'replied' | 'placed' | 'bounced' | 'unsubscribed';
@@ -201,17 +284,19 @@ export interface CampaignDetailResponse {
 export interface SendOutreachRequest {
   lead_id: string;
   campaign_id: string;
+  user_id: string;
+  workspace_id: string;
   sender_email: string;
   subject: string;
   body: string;
   idempotency_key: string;
-  sender_identity: SenderIdentity;
-  legal_basis: string;
-  contact_discovery_source: string;
-  recipient_region: string;
-  recipient_region_source: string;
-  consent_status: string;
-  approved_by_human: boolean;
+  sender_identity?: SenderIdentity;
+  legal_basis?: string;
+  contact_discovery_source?: string;
+  recipient_region?: string;
+  recipient_region_source?: string;
+  consent_status?: string;
+  approved_by_human?: boolean;
   unsubscribe_url?: string;
   one_click_unsubscribe?: OneClickUnsubscribe;
   template_id?: string;
@@ -315,6 +400,12 @@ export interface PersonalizeEmailRequest {
   lead_content_topic: string;
   pitch_topic: string;
   existing_body?: string;
+  tone?: 'professional' | 'friendly' | 'casual' | 'formal';
+  lead_summary?: string;
+  lead_highlights?: string;
+  lead_guidelines?: string;
+  lead_pitch_angle?: string;
+  lead_published_date?: string;
 }
 
 export interface SubjectLinesRequest {
@@ -389,6 +480,7 @@ export const fetchBacklinkMigrationCoverage = async (): Promise<BacklinkCoverage
 export const fetchBacklinkQueryTemplates = async (keyword: string): Promise<BacklinkQueryTemplatesResponse> => (await apiClient.get('/api/backlink-outreach/query-templates', { params: { keyword } })).data;
 export const discoverBacklinkOpportunities = async (payload: BacklinkDiscoveryRequest): Promise<BacklinkDiscoveryResponse> => (await apiClient.post('/api/backlink-outreach/discover', payload)).data;
 export const discoverDeepBacklinkOpportunities = async (payload: DeepDiscoveryRequest): Promise<DeepDiscoveryResponse> => (await apiClient.post('/api/backlink-outreach/discover/deep', payload)).data;
+export const aiProspectOpportunities = async (payload: AiProspectRequest): Promise<AiProspectResponse> => (await aiApiClient.post('/api/backlink-outreach/ai-prospect', payload)).data;
 
 // Policy & Reporting
 export const validateBacklinkPolicy = async (payload: BacklinkPolicyValidationRequest): Promise<BacklinkPolicyValidationResponse> => (await apiClient.post('/api/backlink-outreach/policy-validate', payload)).data;
@@ -418,10 +510,10 @@ export const createEmailTemplate = async (payload: EmailTemplateRequest): Promis
 export const listEmailTemplates = async (): Promise<{ templates: EmailTemplateRecord[] }> => (await apiClient.get('/api/backlink-outreach/templates')).data;
 export const fetchEmailTemplate = async (template_id: string): Promise<EmailTemplateRecord> => (await apiClient.get(`/api/backlink-outreach/templates/${template_id}`)).data;
 export const deleteEmailTemplate = async (template_id: string): Promise<{ deleted: boolean }> => (await apiClient.delete(`/api/backlink-outreach/templates/${template_id}`)).data;
-export const generateEmailTemplate = async (payload: GenerateEmailRequest): Promise<GeneratedEmailResponse> => (await apiClient.post('/api/backlink-outreach/templates/generate', payload)).data;
-export const personalizeEmail = async (payload: PersonalizeEmailRequest): Promise<GeneratedEmailResponse> => (await apiClient.post('/api/backlink-outreach/generate/personalized', payload)).data;
-export const generateSubjectLines = async (payload: SubjectLinesRequest): Promise<SubjectLinesResponse> => (await apiClient.post('/api/backlink-outreach/generate/subject-lines', payload)).data;
-export const generateFollowUp = async (payload: FollowUpRequest): Promise<GeneratedEmailResponse> => (await apiClient.post('/api/backlink-outreach/generate/follow-up', payload)).data;
+export const generateEmailTemplate = async (payload: GenerateEmailRequest): Promise<GeneratedEmailResponse> => (await aiApiClient.post('/api/backlink-outreach/templates/generate', payload)).data;
+export const personalizeEmail = async (payload: PersonalizeEmailRequest): Promise<GeneratedEmailResponse> => (await aiApiClient.post('/api/backlink-outreach/generate/personalized', payload)).data;
+export const generateSubjectLines = async (payload: SubjectLinesRequest): Promise<SubjectLinesResponse> => (await aiApiClient.post('/api/backlink-outreach/generate/subject-lines', payload)).data;
+export const generateFollowUp = async (payload: FollowUpRequest): Promise<GeneratedEmailResponse> => (await aiApiClient.post('/api/backlink-outreach/generate/follow-up', payload)).data;
 
 // Campaign Analytics
 export const fetchCampaignAnalytics = async (campaign_id: string): Promise<CampaignAnalyticsResponse> => (await apiClient.get(`/api/backlink-outreach/campaigns/${campaign_id}/analytics`)).data;
@@ -452,3 +544,9 @@ export const exportCampaignRepliesCsv = async (campaign_id: string): Promise<Blo
 // Suppression
 export const fetchSuppressionList = async (): Promise<{ suppressed: any[] }> => (await apiClient.get('/api/backlink-outreach/suppression')).data;
 export const addSuppression = async (email: string, reason?: string): Promise<any> => (await apiClient.post('/api/backlink-outreach/suppression', null, { params: { email, reason } })).data;
+export const removeSuppression = async (id: string): Promise<any> => (await apiClient.delete(`/api/backlink-outreach/suppression/${id}`)).data;
+
+// SMTP Config
+export const fetchSmtpConfig = async (): Promise<any> => (await apiClient.get('/api/backlink-outreach/smtp-config')).data;
+export const updateSmtpConfig = async (payload: any): Promise<any> => (await apiClient.put('/api/backlink-outreach/smtp-config', payload)).data;
+export const deleteSmtpConfig = async (): Promise<any> => (await apiClient.delete('/api/backlink-outreach/smtp-config')).data;

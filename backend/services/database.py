@@ -61,6 +61,9 @@ from models.post_analytics_snapshot_model import Base as PostAnalyticsSnapshotBa
 # LinkedIn PYMK cache persistence (DB cache for suggestion lists)
 from models.linkedin_pymk_cache_model import Base as LinkedInPymkCacheBase
 
+# Backlink Outreach persistence
+from models.backlink_outreach_models import Base as BacklinkOutreachBase
+
 from services.workspace_paths import get_workspace_root, get_user_workspace_dir
 
 # Database configuration
@@ -711,6 +714,7 @@ def init_user_database(user_id: str):
         LinkedInPostAnalyticsBase.metadata.create_all(bind=engine)
         PostAnalyticsSnapshotBase.metadata.create_all(bind=engine)
         LinkedInPymkCacheBase.metadata.create_all(bind=engine)
+        BacklinkOutreachBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)
         _ensure_task_history_unique_index(engine, user_id)
         # Phase 3.4: ensure the SIF indexing watermark table exists.
@@ -770,7 +774,8 @@ def init_database():
         # Create tables with checkfirst=True explicitly to handle existing objects
         for base in [OnboardingBase, SEOAnalysisBase, ContentPlanningBase, 
                      EnhancedStrategyBase, MonitoringBase, APIMonitoringBase, 
-                     PersonaBase, SubscriptionBase, UserBusinessInfoBase, ContentAssetBase]:
+                     PersonaBase, SubscriptionBase, UserBusinessInfoBase, ContentAssetBase,
+                     BacklinkOutreachBase]:
             base.metadata.create_all(bind=default_engine, checkfirst=True)
         logger.info("Global database initialized successfully")
     except SQLAlchemyError as e:

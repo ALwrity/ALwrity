@@ -232,6 +232,91 @@ class ExaResearchProvider:
         return sources
 
     # ═══════════════════════════════════════════════════════════════
+    # Public: Flexible content search (for discovery / backlinking)
+    # ═══════════════════════════════════════════════════════════════
+
+    async def search_contents(
+        self,
+        query: str,
+        num_results: int = 10,
+        user_id: str = None,
+        text_max_characters: int = 5000,
+        highlights_num_sentences: int = 3,
+        highlights_per_url: int = 3,
+        include_domains: List[str] = None,
+        exclude_domains: List[str] = None,
+        search_type: str = "auto",
+    ) -> List[Dict[str, Any]]:
+        """Flexible Exa search with full content, highlights, and summary.
+        Designed for discovery use cases (backlink outreach, research)
+        that need more text and richer highlights than simple_search.
+        """
+        self._preflight_check(user_id)
+
+        search_kwargs: Dict[str, Any] = {
+            "type": search_type,
+            "num_results": num_results,
+            "text": {"max_characters": text_max_characters},
+            "highlights": {
+                "num_sentences": highlights_num_sentences,
+                "highlights_per_url": highlights_per_url,
+            },
+        }
+        if include_domains:
+            search_kwargs["include_domains"] = include_domains
+        if exclude_domains:
+            search_kwargs["exclude_domains"] = exclude_domains
+
+        try:
+            loop = asyncio.get_running_loop()
+            results = await loop.run_in_executor(
+                None,
+                lambda: self.exa.search_and_contents(query, **search_kwargs),
+            )
+        except Exception as e:
+            logger.error(f"[Exa search_contents] API call failed: {e}")
+            retry_kwargs: Dict[str, Any] = {
+                "type": search_type,
+                "num_results": num_results,
+                "text": True,
+            }
+            if include_domains:
+                retry_kwargs["include_domains"] = include_domains
+            if exclude_domains:
+                retry_kwargs["exclude_domains"] = exclude_domains
+            try:
+                logger.info("[Exa search_contents] Retrying with simplified parameters")
+                results = await loop.run_in_executor(
+                    None,
+                    lambda: self.exa.search_and_contents(query, **retry_kwargs),
+                )
+            except Exception as retry_error:
+                logger.error(f"[Exa search_contents] Retry also failed: {retry_error}")
+                raise RuntimeError(f"Exa search failed: {str(retry_error)}") from retry_error
+
+        sources = []
+        for result in results.results:
+            highlights = getattr(result, "highlights", [])
+            sources.append({
+                "url": getattr(result, "url", ""),
+                "title": getattr(result, "title", ""),
+                "text": getattr(result, "text", ""),
+                "highlights": highlights if isinstance(highlights, list) else [],
+                "summary": getattr(result, "summary", ""),
+                "score": (lambda v: v if v is not None else 0.5)(
+                    getattr(result, "score", 0.5)
+                ),
+                "published_date": getattr(result, "publishedDate", None),
+                "author": getattr(result, "author", None),
+            })
+
+        if user_id:
+            self.track_usage(user_id, 0.005)
+
+        logger.info(f"[Exa search_contents] Found {len(sources)} sources for: {query[:80]}...")
+        return sources
+
+    # ═══════════════════════════════════════════════════════════════
     # Public: Vertical searches (news, company, people)
     # ═══════════════════════════════════════════════════════════════
 

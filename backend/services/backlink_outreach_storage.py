@@ -7,6 +7,7 @@ from uuid import uuid4
 from typing import List, Optional
 from sqlalchemy import text as sql_text, func as sa_func
 from sqlalchemy.exc import IntegrityError
+from loguru import logger
 
 LEAD_VALID_STATUSES = frozenset({"discovered", "contacted", "replied", "placed", "bounced", "unsubscribed"})
 
@@ -15,7 +16,7 @@ from models.backlink_outreach_models import (
     Base, BacklinkCampaign, BacklinkLead,
     OutreachAttempt, OutreachReply, FollowUpSchedule, EmailTemplate,
     SuppressedRecipient, SentIdempotencyKey, AuditLogEntry,
-    SendCounterUser, SendCounterDomain,
+    SendCounterUser, SendCounterDomain, UserSmtpConfig,
 )
 
 
@@ -23,15 +24,13 @@ class BacklinkCampaignNotFoundError(RuntimeError):
     """Raised when a backlink campaign is missing or not owned by the user."""
 
 
-DEFAULT_USER_DAILY_CAP = 100
-DEFAULT_DOMAIN_DAILY_CAP = 20
+import os
+
+DEFAULT_USER_DAILY_CAP = int(os.getenv("BACKLINK_USER_DAILY_CAP", "100"))
+DEFAULT_DOMAIN_DAILY_CAP = int(os.getenv("BACKLINK_DOMAIN_DAILY_CAP", "20"))
 
 
 class BacklinkOutreachStorageService:
-    _NEW_LEAD_COLUMNS = [
-        "url", "page_title", "snippet", "confidence_score", "discovery_source", "notes"
-    ]
-
     def _ensure_tables(self, user_id: str) -> None:
         db = get_session_for_user(user_id)
         if not db:
@@ -43,21 +42,47 @@ class BacklinkOutreachStorageService:
             db.close()
 
     def _migrate_lead_columns(self, db) -> None:
-        """Add new columns to backlink_leads if they don't exist (dev migration)."""
+        """Add new columns to backlink_leads if missing.
+
+        Uses PRAGMA table_info (compatible with all SQLite versions) instead of
+        the newer ADD COLUMN IF NOT EXISTS syntax which requires SQLite ≥ 3.37.
+        """
+        LEAD_BACKFILL_COLUMNS: list[tuple[str, str, str]] = [
+            # (column_name, column_type, default_expr)
+            ("exa_author", "TEXT", ""),
+            ("exa_published_date", "TEXT", ""),
+            ("exa_summary", "TEXT", ""),
+            ("ai_editor_name", "TEXT", ""),
+            ("ai_pitch_angle", "TEXT", ""),
+            ("ai_guidelines_summary", "TEXT", ""),
+            ("ai_risk_flags", "TEXT", ""),
+            ("ai_relevance_score", "FLOAT", ""),
+        ]
         try:
-            valid_columns = {"url", "page_title", "snippet", "confidence_score", "discovery_source", "notes"}
-            for col in self._NEW_LEAD_COLUMNS:
-                if col not in valid_columns:
+            table_check = db.execute(sql_text(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='backlink_leads'"
+            )).fetchone()
+            if not table_check:
+                return
+
+            existing = {
+                row[1]
+                for row in db.execute(sql_text("PRAGMA table_info(backlink_leads)")).fetchall()
+            }
+
+            for col_name, col_type, col_default in LEAD_BACKFILL_COLUMNS:
+                if col_name in existing:
                     continue
-                safe_col = col.replace('"', "").replace(";", "")
+                default_clause = f" DEFAULT {col_default}" if col_default else ""
+                safe_name = col_name.replace('"', "").replace(";", "")
                 db.execute(sql_text(
-                    f"ALTER TABLE backlink_leads ADD COLUMN IF NOT EXISTS \"{safe_col}\" TEXT"
+                    f'ALTER TABLE backlink_leads ADD COLUMN "{safe_name}" {col_type}{default_clause}'
                 ))
-            db.execute(sql_text(
-                "ALTER TABLE backlink_leads ADD COLUMN IF NOT EXISTS confidence_score FLOAT DEFAULT 0.0"
-            ))
+                logger.warning(f"Auto-migrated backlink_leads column '{col_name}' ({col_type})")
+
             db.commit()
-        except Exception:
+        except Exception as exc:
+            logger.error(f"Failed to backfill backlink_leads columns: {exc}")
             db.rollback()
 
     def create_campaign(self, user_id: str, workspace_id: str, name: str) -> dict:
@@ -110,14 +135,19 @@ class BacklinkOutreachStorageService:
             )
             if not campaign:
                 return None
-            lead_count = db.query(BacklinkLead).filter(BacklinkLead.campaign_id == campaign_id).count()
-            leads = (
-                db.query(BacklinkLead)
-                .filter(BacklinkLead.campaign_id == campaign_id)
-                .order_by(BacklinkLead.created_at.desc())
-                .limit(50)
-                .all()
-            )
+            lead_count = 0
+            leads: list = []
+            try:
+                lead_count = db.query(BacklinkLead).filter(BacklinkLead.campaign_id == campaign_id).count()
+                leads = (
+                    db.query(BacklinkLead)
+                    .filter(BacklinkLead.campaign_id == campaign_id)
+                    .order_by(BacklinkLead.created_at.desc())
+                    .limit(50)
+                    .all()
+                )
+            except Exception as query_err:
+                logger.error(f"Failed to query leads for campaign {campaign_id}: {query_err}")
             return {
                 "campaign_id": campaign.id,
                 "name": campaign.name,
@@ -151,6 +181,14 @@ class BacklinkOutreachStorageService:
         confidence_score: float = 0.0,
         discovery_source: str = "duckduckgo",
         notes: Optional[str] = None,
+        exa_author: Optional[str] = None,
+        exa_published_date: Optional[str] = None,
+        exa_summary: Optional[str] = None,
+        ai_editor_name: Optional[str] = None,
+        ai_pitch_angle: Optional[str] = None,
+        ai_guidelines_summary: Optional[str] = None,
+        ai_relevance_score: Optional[float] = None,
+        ai_risk_flags: Optional[str] = None,
     ) -> dict:
         self._ensure_tables(user_id)
         db = get_session_for_user(user_id)
@@ -181,6 +219,14 @@ class BacklinkOutreachStorageService:
                 status="discovered",
                 notes=notes,
                 created_at=datetime.utcnow(),
+                exa_author=exa_author,
+                exa_published_date=exa_published_date,
+                exa_summary=exa_summary,
+                ai_editor_name=ai_editor_name,
+                ai_pitch_angle=ai_pitch_angle,
+                ai_guidelines_summary=ai_guidelines_summary,
+                ai_relevance_score=ai_relevance_score,
+                ai_risk_flags=ai_risk_flags,
             )
             db.add(lead)
             db.commit()
@@ -222,6 +268,14 @@ class BacklinkOutreachStorageService:
                     status="discovered",
                     notes=data.get("notes"),
                     created_at=datetime.utcnow(),
+                    exa_author=data.get("exa_author"),
+                    exa_published_date=data.get("exa_published_date"),
+                    exa_summary=data.get("exa_summary"),
+                    ai_editor_name=data.get("ai_editor_name"),
+                    ai_pitch_angle=data.get("ai_pitch_angle"),
+                    ai_guidelines_summary=data.get("ai_guidelines_summary"),
+                    ai_relevance_score=data.get("ai_relevance_score"),
+                    ai_risk_flags=data.get("ai_risk_flags"),
                 )
                 db.add(lead)
                 added.append(lead)
@@ -326,7 +380,7 @@ class BacklinkOutreachStorageService:
 
     @staticmethod
     def _lead_to_dict(lead) -> dict:
-        return {
+        base = {
             "lead_id": lead.id,
             "campaign_id": lead.campaign_id,
             "url": lead.url,
@@ -340,6 +394,14 @@ class BacklinkOutreachStorageService:
             "notes": lead.notes,
             "created_at": lead.created_at.isoformat() if lead.created_at else None,
         }
+        for attr in ("exa_author", "exa_published_date", "exa_summary",
+                     "ai_editor_name", "ai_pitch_angle", "ai_guidelines_summary",
+                     "ai_relevance_score", "ai_risk_flags"):
+            try:
+                base[attr] = getattr(lead, attr)
+            except Exception:
+                base[attr] = None
+        return base
 
     # -- Outreach Attempt CRUD --
 
@@ -851,6 +913,23 @@ class BacklinkOutreachStorageService:
         finally:
             db.close()
 
+    def delete_suppressed(self, id: str, user_id: str = "default") -> bool:
+        db = get_session_for_user(user_id)
+        if not db:
+            return False
+        try:
+            entry = db.query(SuppressedRecipient).filter(
+                SuppressedRecipient.id == id,
+                SuppressedRecipient.user_id == user_id,
+            ).first()
+            if not entry:
+                return False
+            db.delete(entry)
+            db.commit()
+            return True
+        finally:
+            db.close()
+
     def list_suppressed(self, user_id: str = "default", limit: int = 100) -> List[dict]:
         db = get_session_for_user(user_id)
         if not db:
@@ -863,6 +942,78 @@ class BacklinkOutreachStorageService:
                 .all()
             )
             return [{"id": r.id, "email": r.email, "domain": r.domain, "reason": r.reason, "created_at": r.created_at.isoformat() if r.created_at else None} for r in rows]
+        finally:
+            db.close()
+
+    # -- User SMTP Config --
+
+    def get_smtp_config(self, user_id: str = "default") -> Optional[dict]:
+        self._ensure_tables(user_id)
+        db = get_session_for_user(user_id)
+        if not db:
+            return None
+        try:
+            cfg = db.query(UserSmtpConfig).filter(UserSmtpConfig.user_id == user_id).first()
+            if not cfg:
+                return None
+            return {
+                "id": cfg.id,
+                "host": cfg.host,
+                "port": cfg.port,
+                "username": cfg.username,
+                "from_email": cfg.from_email,
+                "use_tls": cfg.use_tls,
+                "verify_tls": cfg.verify_tls,
+                "timeout": cfg.timeout,
+            }
+        finally:
+            db.close()
+
+    def set_smtp_config(self, user_id: str = "default", **kwargs) -> dict:
+        self._ensure_tables(user_id)
+        db = get_session_for_user(user_id)
+        if not db:
+            raise RuntimeError("Database session unavailable")
+        try:
+            cfg = db.query(UserSmtpConfig).filter(UserSmtpConfig.user_id == user_id).first()
+            if not cfg:
+                cfg = UserSmtpConfig(
+                    id=f"smtp_{uuid4().hex[:16]}",
+                    user_id=user_id,
+                )
+                db.add(cfg)
+            if "host" in kwargs:
+                cfg.host = kwargs["host"]
+            if "port" in kwargs:
+                cfg.port = int(kwargs["port"])
+            if "username" in kwargs:
+                cfg.username = kwargs["username"]
+            if "password" in kwargs:
+                cfg.password = kwargs["password"]
+            if "from_email" in kwargs:
+                cfg.from_email = kwargs["from_email"]
+            if "use_tls" in kwargs:
+                cfg.use_tls = bool(kwargs["use_tls"])
+            if "verify_tls" in kwargs:
+                cfg.verify_tls = bool(kwargs["verify_tls"])
+            if "timeout" in kwargs:
+                cfg.timeout = int(kwargs["timeout"])
+            db.commit()
+            return {"id": cfg.id, "host": cfg.host, "username": cfg.username, "from_email": cfg.from_email}
+        finally:
+            db.close()
+
+    def delete_smtp_config(self, user_id: str = "default") -> bool:
+        db = get_session_for_user(user_id)
+        if not db:
+            return False
+        try:
+            cfg = db.query(UserSmtpConfig).filter(UserSmtpConfig.user_id == user_id).first()
+            if not cfg:
+                return False
+            db.delete(cfg)
+            db.commit()
+            return True
         finally:
             db.close()
 

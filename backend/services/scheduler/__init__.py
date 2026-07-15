@@ -7,6 +7,7 @@ import os
 
 from sqlalchemy.orm import Session
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from .core.scheduler import TaskScheduler
 from .core.executor_interface import TaskExecutor, TaskExecutionResult
@@ -36,6 +37,7 @@ from .utils.advertools_task_loader import load_due_advertools_tasks
 from .utils.sif_indexing_task_loader import load_due_sif_indexing_tasks
 from .utils.market_trends_task_loader import load_due_market_trends_tasks
 from services.daily_workflow_batch import generate_scheduled_daily_workflows
+from services.backlink_outreach_followup_processor import process_due_followups
 
 # Global scheduler instance (initialized on first access)
 _scheduler_instance: TaskScheduler = None
@@ -158,6 +160,17 @@ def get_scheduler() -> TaskScheduler:
             max_instances=1,
             coalesce=True,
             misfire_grace_time=3600,
+        )
+
+        # Register backlink follow-up processing job (runs every 5 minutes)
+        _scheduler_instance.scheduler.add_job(
+            process_due_followups,
+            trigger=IntervalTrigger(minutes=5),
+            id='backlink_process_followups',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
         )
     
     return _scheduler_instance

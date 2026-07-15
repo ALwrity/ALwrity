@@ -537,7 +537,7 @@ app.include_router(images_router)
 app.include_router(image_studio_router)
 app.include_router(product_marketing_router)
 app.include_router(campaign_creator_router)
-app.include_router(backlink_outreach_router)
+router_manager.include_router_safely(backlink_outreach_router, "backlinking")
 
 # Include content assets router
 from api.content_assets.router import router as content_assets_router

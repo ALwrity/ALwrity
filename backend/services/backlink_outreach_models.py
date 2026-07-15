@@ -60,6 +60,45 @@ class DeepDiscoveryResponse(BaseModel):
     opportunities: List[EnrichedOpportunity]
 
 
+# -- AI Prospecting Models --
+
+class AiProspectOpportunityInput(BaseModel):
+    url: str
+    domain: str = ""
+    page_title: str = ""
+    snippet: str = ""
+    full_text: str = ""
+    email: Optional[str] = None
+    contact_page: Optional[str] = None
+    quality_score: float = Field(default=0.5, ge=0.0, le=1.0)
+    discovery_source: str = ""
+
+class AiProspectRequest(BaseModel):
+    keyword: str = Field(..., min_length=2, max_length=120)
+    opportunities: List[AiProspectOpportunityInput] = Field(..., min_length=1, max_length=50)
+
+
+class AiProspectResult(BaseModel):
+    url: str
+    email: Optional[str] = None
+    contact_page_url: Optional[str] = None
+    site_active: Optional[bool] = None
+    accepts_guest_posts: Optional[bool] = None
+    guidelines_summary: str = ""
+    relevance_score: float = Field(default=0.5, ge=0.0, le=1.0)
+    editor_name: str = ""
+    pitch_angle: str = ""
+    risk_flags: List[str] = Field(default_factory=list)
+    ai_prospected: bool = True
+
+
+class AiProspectResponse(BaseModel):
+    keyword: str
+    total_analyzed: int
+    total_emails_found: int
+    results: List[AiProspectResult]
+
+
 # -- Lead Models --
 
 class LeadCreateRequest(BaseModel):
@@ -71,6 +110,14 @@ class LeadCreateRequest(BaseModel):
     snippet: Optional[str] = None
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0)
     notes: Optional[str] = None
+    exa_author: Optional[str] = None
+    exa_published_date: Optional[str] = None
+    exa_summary: Optional[str] = None
+    ai_editor_name: Optional[str] = None
+    ai_pitch_angle: Optional[str] = None
+    ai_guidelines_summary: Optional[str] = None
+    ai_relevance_score: Optional[float] = None
+    ai_risk_flags: Optional[str] = None
 
 
 class LeadRecord(BaseModel):
@@ -86,6 +133,14 @@ class LeadRecord(BaseModel):
     status: str = "discovered"
     notes: Optional[str] = None
     created_at: Optional[str] = None
+    exa_author: Optional[str] = None
+    exa_published_date: Optional[str] = None
+    exa_summary: Optional[str] = None
+    ai_editor_name: Optional[str] = None
+    ai_pitch_angle: Optional[str] = None
+    ai_guidelines_summary: Optional[str] = None
+    ai_relevance_score: Optional[float] = None
+    ai_risk_flags: Optional[str] = None
 
 
 class LeadListResponse(BaseModel):
@@ -126,6 +181,12 @@ class PersonalizeEmailRequest(BaseModel):
     lead_content_topic: str = Field(..., min_length=1, max_length=500)
     pitch_topic: str = Field(..., min_length=2, max_length=500)
     existing_body: str = Field(default="", max_length=10000)
+    tone: str = Field(default="professional", pattern="^(professional|friendly|casual|formal)$")
+    lead_summary: Optional[str] = Field(None, max_length=3000)
+    lead_highlights: Optional[str] = Field(None, max_length=3000)
+    lead_guidelines: Optional[str] = Field(None, max_length=3000)
+    lead_pitch_angle: Optional[str] = Field(None, max_length=2000)
+    lead_published_date: Optional[str] = Field(None, max_length=200)
 
 
 class SubjectLinesRequest(BaseModel):

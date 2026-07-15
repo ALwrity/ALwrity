@@ -530,3 +530,74 @@ class TavilyService:
             "publishing_frequency": "unknown"
         }
 
+    async def extract(
+        self,
+        urls: Union[str, List[str]],
+        extract_depth: str = "basic",
+        query: Optional[str] = None,
+        chunks_per_source: Optional[int] = None,
+        include_images: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Extract clean markdown/text content from URLs using Tavily Extract.
+
+        Handles JavaScript-rendered pages, removes boilerplate (ads, nav, footers),
+        and returns structured content ready for LLM consumption.
+
+        Args:
+            urls: Single URL string or list of URLs (max 20)
+            extract_depth: 'basic' (1 credit/5 URLs) or 'advanced' (2 credits/5 URLs)
+            query: Optional query to rerank content chunks by relevance
+            chunks_per_source: Number of relevant chunks to return (1-5, requires query)
+            include_images: Whether to include image data in results
+
+        Returns:
+            Dict with keys: results (list of {url, raw_content}), failed_results (list of {url, error})
+        """
+        try:
+            self._try_initialize()
+            if not self.enabled:
+                return {"results": [], "failed_results": [{"url": str(urls), "error": "Tavily not enabled"}], "success": False}
+
+            url_list = [urls] if isinstance(urls, str) else urls
+            logger.info(f"Tavily Extract: {len(url_list)} URLs, depth={extract_depth}")
+
+            payload: Dict[str, Any] = {
+                "api_key": self.api_key,
+                "urls": url_list[:20],
+                "extract_depth": extract_depth,
+            }
+            if query:
+                payload["query"] = query
+            if chunks_per_source is not None:
+                payload["chunks_per_source"] = min(max(chunks_per_source, 1), 5)
+            if include_images:
+                payload["include_images"] = True
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    f"{self.base_url}/extract",
+                    json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=60)
+                ) as response:
+                    if response.status == 200:
+                        result = await response.json()
+                        logger.info(f"Tavily Extract completed. {len(result.get('results', []))} pages extracted.")
+                        return {
+                            "success": True,
+                            "results": result.get("results", []),
+                            "failed_results": result.get("failed_results", []),
+                        }
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Tavily Extract API error: {response.status} - {error_text}")
+                        return {
+                            "success": False,
+                            "results": [],
+                            "failed_results": [{"url": u, "error": f"API error {response.status}"} for u in url_list],
+                        }
+        except Exception as e:
+            logger.error(f"Tavily Extract failed: {e}")
+            return {"success": False, "results": [], "failed_results": [{"url": str(urls), "error": str(e)}]}
+

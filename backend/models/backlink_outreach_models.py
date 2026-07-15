@@ -31,6 +31,14 @@ class BacklinkLead(Base):
     status = Column(String(32), nullable=False, default="discovered", index=True)
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    exa_author = Column(Text, nullable=True)
+    exa_published_date = Column(Text, nullable=True)
+    exa_summary = Column(Text, nullable=True)
+    ai_editor_name = Column(Text, nullable=True)
+    ai_pitch_angle = Column(Text, nullable=True)
+    ai_guidelines_summary = Column(Text, nullable=True)
+    ai_relevance_score = Column(Float, nullable=True)
+    ai_risk_flags = Column(Text, nullable=True)
 
 
 class OutreachAttempt(Base):
@@ -126,6 +134,22 @@ class SendCounterDomain(Base):
     domain = Column(String(255), nullable=False, index=True)
     date = Column(Date, nullable=False, index=True)
     count = Column(Integer, default=0)
+
+
+class UserSmtpConfig(Base):
+    __tablename__ = "backlink_user_smtp_config"
+    id = Column(String(64), primary_key=True)
+    user_id = Column(String(255), nullable=False, unique=True, index=True)
+    host = Column(String(255), nullable=False, default="smtp.gmail.com")
+    port = Column(Integer, nullable=False, default=587)
+    username = Column(String(255), nullable=False, default="")
+    password = Column(String(512), nullable=False, default="")
+    from_email = Column(String(255), nullable=True)
+    use_tls = Column(Boolean, default=True)
+    verify_tls = Column(Boolean, default=True)
+    timeout = Column(Integer, default=30)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 Index("idx_backlink_campaign_user_date", BacklinkCampaign.user_id, BacklinkCampaign.created_at)

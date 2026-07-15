@@ -41,16 +41,27 @@ class SendEmailResult:
 
 
 class BacklinkOutreachSender:
-    def __init__(self):
-        self._host = SMTP_HOST
-        self._port = SMTP_PORT
-        self._username = SMTP_USERNAME
-        self._password = SMTP_PASSWORD
-        self._from_email = SMTP_FROM_EMAIL or SMTP_USERNAME
-        self._allowed_from_emails = SMTP_ALLOWED_FROM_EMAILS
-        self._use_tls = SMTP_USE_TLS
-        self._verify_tls = SMTP_VERIFY_TLS
-        self._timeout = SMTP_SEND_TIMEOUT
+    def __init__(self, smtp_config: Optional[dict] = None):
+        if smtp_config:
+            self._host = smtp_config.get("host", SMTP_HOST)
+            self._port = int(smtp_config.get("port", SMTP_PORT))
+            self._username = smtp_config.get("username", SMTP_USERNAME)
+            self._password = smtp_config.get("password", SMTP_PASSWORD)
+            self._from_email = smtp_config.get("from_email") or smtp_config.get("username", SMTP_FROM_EMAIL or SMTP_USERNAME)
+            self._allowed_from_emails = SMTP_ALLOWED_FROM_EMAILS
+            self._use_tls = bool(smtp_config.get("use_tls", SMTP_USE_TLS))
+            self._verify_tls = bool(smtp_config.get("verify_tls", SMTP_VERIFY_TLS))
+            self._timeout = int(smtp_config.get("timeout", SMTP_SEND_TIMEOUT))
+        else:
+            self._host = SMTP_HOST
+            self._port = SMTP_PORT
+            self._username = SMTP_USERNAME
+            self._password = SMTP_PASSWORD
+            self._from_email = SMTP_FROM_EMAIL or SMTP_USERNAME
+            self._allowed_from_emails = SMTP_ALLOWED_FROM_EMAILS
+            self._use_tls = SMTP_USE_TLS
+            self._verify_tls = SMTP_VERIFY_TLS
+            self._timeout = SMTP_SEND_TIMEOUT
 
     def is_configured(self) -> bool:
         return bool(self._username and self._password)

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import {
+  AiProspectResult,
   BacklinkCampaignRecord,
   BacklinkCoverageResponse,
   BacklinkModuleRecord,
@@ -24,6 +25,10 @@ import {
   OutreachReplyRecord,
   fetchCampaignReplies,
   fetchFollowUps as apiFetchFollowUps,
+  fetchSuppressionList,
+  addSuppression,
+  removeSuppression,
+  aiProspectOpportunities,
 } from '../api/backlinkOutreachApi';
 
 async function withRetry<T>(fn: () => Promise<T>, retries = 1, delayMs = 1000): Promise<T> {
@@ -49,6 +54,8 @@ interface BacklinkOutreachStore {
   campaigns: BacklinkCampaignRecord[];
   selectedCampaign: CampaignDetailResponse | null;
   discoveredOpportunities: EnrichedOpportunity[];
+  discoveryQueries: string[];
+  discoveryEmailStats: { total: number; with_email: number; total_emails_found: number; from_regex: number; from_contact_page: number; from_tavily: number; from_guessed: number } | null;
   leads: LeadRecord[];
   attempts: OutreachAttemptRecord[];
   replies: OutreachReplyRecord[];
@@ -56,21 +63,29 @@ interface BacklinkOutreachStore {
   analytics: CampaignAnalyticsResponse | null;
   isLoading: boolean;
   isDiscovering: boolean;
+  isAiProspecting: boolean;
+  aiProspectResults: AiProspectResult[];
   isAttemptsLoading: boolean;
   isRepliesLoading: boolean;
   isAnalyticsLoading: boolean;
   error: string | null;
+  suppressedList: { id: string; email: string; domain: string; reason: string; created_at: string }[];
   refreshBacklinkRegistry: () => Promise<void>;
   fetchCampaigns: (workspaceId: string) => Promise<void>;
   createCampaign: (workspaceId: string, name: string) => Promise<string | null>;
   selectCampaign: (campaignId: string) => Promise<void>;
   deepDiscover: (keyword: string, maxResults?: number, campaignId?: string) => Promise<EnrichedOpportunity[]>;
   clearDiscoveries: () => void;
+  runAiProspect: (keyword: string) => Promise<void>;
+  clearAiProspect: () => void;
   sendOutreachEmail: (req: SendOutreachRequest) => Promise<SendOutreachResponse | null>;
   fetchAttempts: (campaignId: string) => Promise<void>;
   fetchReplies: (campaignId: string) => Promise<void>;
   fetchFollowUps: (campaignId: string) => Promise<void>;
   fetchAnalytics: (campaignId: string) => Promise<void>;
+  fetchSuppressedList: () => Promise<void>;
+  addSuppressedRecipient: (email: string, reason?: string) => Promise<void>;
+  removeSuppressedRecipient: (id: string) => Promise<void>;
 }
 
 export const useBacklinkOutreachStore = create<BacklinkOutreachStore>((set) => ({
@@ -79,6 +94,8 @@ export const useBacklinkOutreachStore = create<BacklinkOutreachStore>((set) => (
   campaigns: [],
   selectedCampaign: null,
   discoveredOpportunities: [],
+  discoveryQueries: [],
+  discoveryEmailStats: null,
   leads: [],
   attempts: [],
   replies: [],
@@ -86,10 +103,13 @@ export const useBacklinkOutreachStore = create<BacklinkOutreachStore>((set) => (
   analytics: null,
   isLoading: false,
   isDiscovering: false,
+  isAiProspecting: false,
+  aiProspectResults: [],
   isAttemptsLoading: false,
   isRepliesLoading: false,
   isAnalyticsLoading: false,
   error: null,
+  suppressedList: [],
   refreshBacklinkRegistry: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -150,17 +170,72 @@ export const useBacklinkOutreachStore = create<BacklinkOutreachStore>((set) => (
     set({ isDiscovering: true, error: null });
     try {
       const result = await discoverDeepBacklinkOpportunities({ keyword, max_results: maxResults, campaign_id: campaignId });
-      set({ discoveredOpportunities: result.opportunities, isDiscovering: false });
+      set({
+        discoveredOpportunities: result.opportunities,
+        discoveryQueries: result.queries ?? [],
+        discoveryEmailStats: result.email_stats ?? null,
+        isDiscovering: false,
+      });
       return result.opportunities;
     } catch (error: any) {
       set({
         isDiscovering: false,
-        error: error?.message ?? 'Discovery failed',
+        error: error?.message ?? 'Failed to discover opportunities',
       });
       return [];
     }
   },
-  clearDiscoveries: () => set({ discoveredOpportunities: [] }),
+  clearDiscoveries: () => set({ discoveredOpportunities: [], discoveryQueries: [], discoveryEmailStats: null, aiProspectResults: [] }),
+  clearAiProspect: () => set({ aiProspectResults: [] }),
+  runAiProspect: async (keyword: string) => {
+    const snapshot = useBacklinkOutreachStore.getState();
+    if (snapshot.discoveredOpportunities.length === 0) {
+      set({ isAiProspecting: false, error: 'No opportunities to analyze' });
+      return;
+    }
+    set({ isAiProspecting: true, error: null });
+    try {
+      const state = useBacklinkOutreachStore.getState();
+      const opportunities = state.discoveredOpportunities.map((opp) => ({
+        url: opp.url,
+        domain: opp.domain,
+        page_title: opp.page_title,
+        snippet: opp.snippet,
+        full_text: opp.full_text,
+        email: opp.email,
+        contact_page: opp.contact_page,
+        quality_score: opp.quality_score,
+        discovery_source: opp.discovery_source,
+      }));
+      const result = await aiProspectOpportunities({ keyword, opportunities });
+      set({
+        aiProspectResults: result.results,
+        discoveredOpportunities: state.discoveredOpportunities.map((opp) => {
+          const enriched = result.results.find((r) => r.url === opp.url);
+          if (!enriched) return opp;
+          return {
+            ...opp,
+            email: enriched.email || opp.email,
+            ai_site_active: enriched.site_active ?? undefined,
+            ai_accepts_guest_posts: enriched.accepts_guest_posts ?? undefined,
+            ai_guidelines_summary: enriched.guidelines_summary,
+            ai_relevance_score: enriched.relevance_score,
+            ai_editor_name: enriched.editor_name,
+            ai_pitch_angle: enriched.pitch_angle,
+            ai_risk_flags: enriched.risk_flags,
+            ai_contact_page: enriched.contact_page_url ?? undefined,
+            ai_prospected: true,
+          } as EnrichedOpportunity;
+        }),
+        isAiProspecting: false,
+      });
+    } catch (error: any) {
+      set({
+        isAiProspecting: false,
+        error: error?.message ?? 'AI prospecting failed',
+      });
+    }
+  },
   sendOutreachEmail: async (req: SendOutreachRequest) => {
     set({ isLoading: true, error: null });
     try {
@@ -218,6 +293,33 @@ export const useBacklinkOutreachStore = create<BacklinkOutreachStore>((set) => (
         isAnalyticsLoading: false,
         error: error?.message ?? 'Failed to load analytics',
       });
+    }
+  },
+  fetchSuppressedList: async () => {
+    try {
+      const result = await fetchSuppressionList();
+      set({ suppressedList: result.suppressed });
+    } catch (error: any) {
+      set({ error: error?.message ?? 'Failed to load suppression list' });
+    }
+  },
+  addSuppressedRecipient: async (email: string, reason?: string) => {
+    try {
+      await addSuppression(email, reason);
+      const result = await fetchSuppressionList();
+      set({ suppressedList: result.suppressed });
+    } catch (error: any) {
+      set({ error: error?.message ?? 'Failed to add suppression' });
+    }
+  },
+  removeSuppressedRecipient: async (id: string) => {
+    try {
+      await removeSuppression(id);
+      set((state) => ({
+        suppressedList: state.suppressedList.filter((s) => s.id !== id),
+      }));
+    } catch (error: any) {
+      set({ error: error?.message ?? 'Failed to remove suppression' });
     }
   },
 }));

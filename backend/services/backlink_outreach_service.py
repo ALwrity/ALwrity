@@ -499,5 +499,16 @@ class BacklinkOutreachService:
             "planned": planned,
         }
 
+    async def ai_prospect(
+        self,
+        keyword: str,
+        opportunities: List[Dict[str, Any]],
+        user_id: str,
+    ) -> List[Dict[str, Any]]:
+        """Run AI-powered analysis on discovered opportunities to extract deeper insights."""
+        from services.backlink_outreach_scraper import BacklinkOutreachScraper
+        scraper = BacklinkOutreachScraper(user_id=user_id)
+        return await scraper.ai_prospect_opportunities(opportunities, keyword, user_id)
+
 
 backlink_outreach_service = BacklinkOutreachService()
