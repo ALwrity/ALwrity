@@ -1,3 +1,11 @@
+import type { SvgIconComponent } from '@mui/icons-material';
+import AnalyticsIcon from '@mui/icons-material/Analytics';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import AutorenewIcon from '@mui/icons-material/Autorenew';
+import EventNoteIcon from '@mui/icons-material/EventNote';
+import PublishIcon from '@mui/icons-material/Publish';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
+
 export type DashboardWorkflowCardId =
   | 'plan'
   | 'create'
@@ -6,11 +14,28 @@ export type DashboardWorkflowCardId =
   | 'engagement'
   | 'remarket';
 
+export type DashboardWorkflowIconKey = DashboardWorkflowCardId;
+
+export type DashboardWorkflowIcon = DashboardWorkflowIconKey | SvgIconComponent;
+
+export const DASHBOARD_WORKFLOW_ICONS: Record<DashboardWorkflowIconKey, SvgIconComponent> = {
+  plan: EventNoteIcon,
+  create: AutoAwesomeIcon,
+  publish: PublishIcon,
+  analysis: AnalyticsIcon,
+  engagement: TrendingUpIcon,
+  remarket: AutorenewIcon,
+};
+
+export function resolveDashboardWorkflowIcon(icon: DashboardWorkflowIcon): SvgIconComponent {
+  return typeof icon === 'string' ? DASHBOARD_WORKFLOW_ICONS[icon] : icon;
+}
+
 export interface DashboardWorkflowCard {
   id: DashboardWorkflowCardId;
   title: string;
   description: string;
-  icon: string;
+  icon: DashboardWorkflowIcon;
   accent: string;
   /** Wedge start angle (degrees, 0 = right, 90 = top, 180 = left) */
   startAngle: number;
@@ -32,42 +57,42 @@ const CARD_DEFS: Omit<DashboardWorkflowCard, 'startAngle' | 'endAngle'>[] = [
     id: 'plan',
     title: 'Plan',
     description: 'Brainstorming, industry watchdog, and content strategy',
-    icon: '📅',
+    icon: 'plan',
     accent: '#6366f1',
   },
   {
     id: 'create',
     title: 'Create',
     description: 'Post, article, video, and carousel content',
-    icon: '✍️',
+    icon: 'create',
     accent: '#ec4899',
   },
   {
     id: 'publish',
     title: 'Publish',
     description: 'Save drafts and schedule on your content calendar',
-    icon: '📤',
+    icon: 'publish',
     accent: '#0ea5e9',
   },
   {
     id: 'analysis',
     title: 'Analysis',
     description: 'Profile, existing content, and SEO insights',
-    icon: '📊',
+    icon: 'analysis',
     accent: '#8b5cf6',
   },
   {
     id: 'engagement',
     title: 'Engagement',
     description: 'Growth engine to enhance reach and interaction',
-    icon: '📈',
+    icon: 'engagement',
     accent: '#10b981',
   },
   {
     id: 'remarket',
     title: 'Remarket',
     description: 'Refresh and improve high-performing content',
-    icon: '♻️',
+    icon: 'remarket',
     accent: '#f59e0b',
   },
 ];

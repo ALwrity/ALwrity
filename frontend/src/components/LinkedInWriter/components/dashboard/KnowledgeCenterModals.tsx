@@ -9,7 +9,7 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { DashboardActionModal } from './DashboardActionModal';
-import { DASHBOARD_WORKFLOW_CARDS } from './dashboardWorkflowConfig';
+import { DASHBOARD_WORKFLOW_CARDS, resolveDashboardWorkflowIcon } from './dashboardWorkflowConfig';
 import { linkedInGrowthApi, type PostPreviewDimension } from '../../../../services/linkedInGrowthApi';
 import { linkedInWriterApi } from '../../../../services/linkedInWriterApi';
 import type { ConsolidatedGrowthResponse } from '../../../../services/linkedInGrowthApi';
@@ -589,7 +589,13 @@ export const FeatureMapModal: React.FC<FeatureMapModalProps> = ({ open, onClose,
       {DASHBOARD_WORKFLOW_CARDS.map(card => (
         <div key={card.id} style={{ background: '#fff', border: `1.5px solid ${card.accent}44`, borderLeft: `4px solid ${card.accent}`, borderRadius: 10, padding: '12px 14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 5 }}>
-            <span style={{ fontSize: 18 }}>{card.icon}</span>
+            <span style={{ display: 'inline-flex', color: card.accent, lineHeight: 1 }}>
+              {React.createElement(resolveDashboardWorkflowIcon(card.icon), {
+                sx: { fontSize: 18, display: 'block' },
+                'aria-hidden': true,
+                focusable: false,
+              })}
+            </span>
             <div style={{ fontWeight: 800, fontSize: 13, color: C.textDark }}>{card.title}</div>
           </div>
           <div style={{ fontSize: 11, color: C.textSecondary, lineHeight: 1.4, marginBottom: 8 }}>{card.description}</div>
