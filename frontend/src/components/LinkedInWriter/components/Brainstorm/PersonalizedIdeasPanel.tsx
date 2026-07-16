@@ -10,7 +10,7 @@ export interface PersonalizedIdeaItem {
 interface PersonalizedIdeasPanelProps {
   ideas: PersonalizedIdeaItem[];
   dataSummary: string;
-  onGeneratePost: (title: string) => void;
+  onGeneratePost: (title: string, contentType?: string) => void;
   onRefresh: () => void;
   onBack?: () => void;
 }
@@ -84,7 +84,7 @@ const PersonalizedIdeasPanel: React.FC<PersonalizedIdeasPanelProps> = ({
               <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center' }}>
                 <button
                   type="button"
-                  onClick={() => onGeneratePost(idea.title)}
+                  onClick={() => onGeneratePost(idea.title, 'post')}
                   style={{
                     padding: '4px 12px',
                     borderRadius: 6,
@@ -96,7 +96,23 @@ const PersonalizedIdeasPanel: React.FC<PersonalizedIdeasPanelProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  Generate post
+                  Generate Post
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onGeneratePost(idea.title, 'article')}
+                  style={{
+                    padding: '4px 12px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: '#057642',
+                    color: 'white',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Generate Article
                 </button>
                 <span style={{ fontSize: 10, color: '#9ca3af', background: '#f3f4f6', padding: '2px 8px', borderRadius: 4 }}>
                   {dataSourceLabel}

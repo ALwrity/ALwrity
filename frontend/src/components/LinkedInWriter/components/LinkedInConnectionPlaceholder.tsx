@@ -42,6 +42,12 @@ const CONNECT_WELCOME_REASSURANCE =
 const CONNECT_WELCOME_SIGN_IN_HINT = 'Sign in via LinkedIn and choose your personal profile';
 const CONNECT_WELCOME_CTA = 'Connect LinkedIn⚡';
 const CONNECT_WELCOME_DISMISS_LABEL = 'Explore first';
+const CONNECT_WELCOME_DISMISSED_KEY = 'linkedin_connect_welcome_dismissed';
+
+function getConnectWelcomeDismissedKey(userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  return `${CONNECT_WELCOME_DISMISSED_KEY}_${userId}`;
+}
 
 const ConnectWelcomeBenefitsList: React.FC = () => (
   <ul
@@ -102,6 +108,7 @@ const DisconnectedState: React.FC<{
   splitConnectAction?: boolean;
   onConnectWelcomeDismissed?: () => void;
   onConnectWelcomeOpenChange?: (open: boolean) => void;
+  userId?: string | null;
 }> = ({
   isConnecting,
   connectError,
@@ -111,18 +118,32 @@ const DisconnectedState: React.FC<{
   splitConnectAction = false,
   onConnectWelcomeDismissed,
   onConnectWelcomeOpenChange,
+  userId,
 }) => {
   const connectCtaLabel = isConnecting ? 'Connecting...' : CONNECT_WELCOME_CTA;
   const displayStatusError = connectError ? null : statusError;
   // On the dashboard, keep the welcome popup visible — don't overlay a status-check error modal.
   const activeError = connectError || (centered ? null : displayStatusError);
   const { showErrorModal, dismissError } = useDismissibleError(activeError);
-  const [showConnectWelcomeModal, setShowConnectWelcomeModal] = useState(centered);
-  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+  const initialWelcomeDismissed = (() => {
+    const storageKey = getConnectWelcomeDismissedKey(userId);
+    if (!storageKey) return false;
+    try { return localStorage.getItem(storageKey) !== null; } catch { return false; }
+  })();
+  const [showConnectWelcomeModal, setShowConnectWelcomeModal] = useState(centered && !initialWelcomeDismissed);
+  const [welcomeDismissed, setWelcomeDismissed] = useState(initialWelcomeDismissed);
+
+  const persistDismissal = () => {
+    const storageKey = getConnectWelcomeDismissedKey(userId);
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, 'true'); } catch { /* ignore */ }
+    }
+  };
 
   const handleWelcomeConnect = () => {
     setWelcomeDismissed(true);
     setShowConnectWelcomeModal(false);
+    persistDismissal();
     onConnectWelcomeDismissed?.();
     onConnect();
   };
@@ -139,6 +160,7 @@ const DisconnectedState: React.FC<{
   const dismissConnectWelcome = () => {
     setWelcomeDismissed(true);
     setShowConnectWelcomeModal(false);
+    persistDismissal();
     onConnectWelcomeDismissed?.();
   };
 
@@ -499,6 +521,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   onDisconnect?: () => Promise<void>;
   onConnectWelcomeDismissed?: () => void;
   onConnectWelcomeOpenChange?: (open: boolean) => void;
+  userId?: string | null;
 }> = ({
   centered = false,
   splitConnectAction = false,
@@ -507,6 +530,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   onDisconnect: onDisconnectProp,
   onConnectWelcomeDismissed,
   onConnectWelcomeOpenChange,
+  userId,
 }) => {
   const internalSocial = useLinkedInSocialConnection();
   const {
@@ -577,6 +601,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
       onConnect={handleConnect}
       onConnectWelcomeDismissed={onConnectWelcomeDismissed}
       onConnectWelcomeOpenChange={onConnectWelcomeOpenChange}
+      userId={userId}
     />
   );
 };

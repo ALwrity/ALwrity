@@ -3,8 +3,46 @@
  * Separate from linkedInWriterApi.ts (content generation).
  */
 
-import { apiClient, aiApiClient, ConnectionError, NetworkError, RequestTimeoutError } from './client';
+import { apiClient, aiApiClient, getAuthTokenGetter, ConnectionError, NetworkError, RequestTimeoutError } from './client';
 import { getApiBaseUrl } from '../utils/apiUrl';
+
+// ── Auth token cache for avatar proxy URLs (synchronous access for <img> tags) ──
+let cachedSocialAuthToken: string | null = null;
+
+const socialTokenGetter = getAuthTokenGetter();
+if (socialTokenGetter) {
+  socialTokenGetter()
+    .then((token) => {
+      if (token) {
+        cachedSocialAuthToken = token;
+      }
+    })
+    .catch(() => { /* token will be captured from first API call */ });
+}
+
+/** Check whether a URL points to a LinkedIn CDN that needs proxying. */
+export function isLinkedInCdnUrl(url?: string | null): url is string {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'media.licdn.com' || host.endsWith('.licdn.com');
+  } catch {
+    return false;
+  }
+}
+
+/** Build a proxy URL for LinkedIn CDN images, authenticated for <img> tag use. */
+export function buildAvatarProxyUrl(cdnUrl: string | null | undefined): string | null {
+  if (!cdnUrl || !isLinkedInCdnUrl(cdnUrl)) return null;
+
+  const token = cachedSocialAuthToken;
+  if (!token) return null;
+
+  const baseUrl = getApiBaseUrl();
+  return `${baseUrl}/api/linkedin-social/avatar-proxy?url=${encodeURIComponent(cdnUrl)}&token=${encodeURIComponent(token)}`;
+}
 
 export interface LinkedInConnectionStatus {
   connected: boolean;
@@ -452,9 +490,24 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
 /** @deprecated Use getLinkedInSocialErrorMessage */
 export const getLinkedInConnectErrorMessage = getLinkedInSocialErrorMessage;
 
+/** In-flight promise cache so 4+ hook mounts share one request */
+let accountsPromiseCache: Promise<LinkedInAccountsResponse> | null = null;
+let accountsCacheExpiry = 0;
+const ACCOUNTS_CACHE_TTL = 3000;
+
 export async function listLinkedInAccounts(): Promise<LinkedInAccountsResponse> {
-  const response = await apiClient.get(`${BASE}/accounts`);
-  return response.data;
+  if (accountsPromiseCache && Date.now() < accountsCacheExpiry) {
+    return accountsPromiseCache;
+  }
+  const promise = apiClient.get(`${BASE}/accounts`).then((r) => r.data);
+  accountsPromiseCache = promise;
+  accountsCacheExpiry = Date.now() + ACCOUNTS_CACHE_TTL;
+  promise.finally(() => {
+    if (Date.now() >= accountsCacheExpiry) {
+      accountsPromiseCache = null;
+    }
+  });
+  return promise;
 }
 
 export async function listLinkedInOrganizations(

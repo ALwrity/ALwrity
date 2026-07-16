@@ -991,7 +991,7 @@ body.linkedin-quick-create-open {
 .linkedin-dashboard-right-rail {
   position: relative;
   z-index: var(--li-z-rail, 5);
-  overflow: visible !important;
+  overflow: hidden;
   background: transparent;
   border-left: none;
 }
@@ -1157,6 +1157,12 @@ body.linkedin-quick-create-open {
   }
 }
 
+@media (min-width: 961px) {
+  .linkedin-dashboard-right-rail {
+    position: relative !important;
+  }
+}
+
 .linkedin-analytics-panel {
   flex-shrink: 0;
   background: #ffffff;
@@ -1211,6 +1217,46 @@ body.linkedin-quick-create-open {
   width: 100%;
   display: flex;
   justify-content: flex-end;
+}
+
+/* ── Resume Draft Rail Chip ── */
+.linkedin-resume-draft-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border: 1.5px solid #fdba74;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  cursor: default;
+  box-shadow: 0 2px 8px rgba(234, 88, 12, 0.18);
+  transition: box-shadow 0.15s ease, background 0.15s ease;
+  align-self: flex-end;
+}
+
+.linkedin-resume-draft-chip:hover {
+  background: linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%);
+  box-shadow: 0 4px 14px rgba(234, 88, 12, 0.28);
+}
+
+.linkedin-resume-draft-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ea580c;
+  flex-shrink: 0;
+}
+
+.linkedin-resume-draft-chip-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #c2410c;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .linkedin-rail-icon-trigger {
@@ -1344,6 +1390,58 @@ body.linkedin-quick-create-open {
   .linkedin-knowledge-center-grid > button {
     min-width: 76px;
   }
+}
+
+.linkedin-mobile-resume-bar {
+  display: none;
+  margin: 8px 0 4px;
+  padding: 8px 12px;
+  width: 100%;
+  border: 1.5px solid #fdba74;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+  box-sizing: border-box;
+  align-items: center;
+  gap: 8px;
+}
+
+.linkedin-mobile-resume-bar-preview {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c2410c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.linkedin-mobile-resume-bar-btn {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 6px;
+  background: #ea580c;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkedin-mobile-resume-bar-discard {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #fed7aa;
+  border-radius: 50%;
+  background: transparent;
+  color: #c2410c;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1;
 }
 
 .linkedin-mobile-analytics-teaser {
@@ -1728,6 +1826,10 @@ body.linkedin-quick-create-open {
     justify-content: center;
   }
 
+  .linkedin-dashboard-right-rail {
+    display: none !important;
+  }
+
   .linkedin-dashboard-rail-actions {
     flex-direction: row;
     align-items: stretch;
@@ -1780,6 +1882,10 @@ body.linkedin-quick-create-open {
 
   .linkedin-mobile-analytics-teaser {
     display: none !important;
+  }
+
+  .linkedin-mobile-resume-bar {
+    display: flex;
   }
 
   /* Hide legacy circular FAB — Phase 4 uses full-width bar */
@@ -2000,7 +2106,6 @@ body.linkedin-quick-create-open {
   .linkedin-dashboard-right-rail .linkedin-analytics-panel-body {
     max-height: min(280px, 38vh) !important;
   }
-
   .linkedin-dashboard-rail-actions {
     flex-direction: column;
     gap: 8px;

@@ -335,7 +335,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
       viewBox={`0 ${viewBoxY} ${viewW} ${viewH}`}
       width="100%"
       height={viewH}
-      style={{ display: 'block', overflow: 'visible' }}
+      style={{ display: 'block', overflow: 'hidden' }}
       aria-label="LinkedIn workflow"
     >
       <defs>
