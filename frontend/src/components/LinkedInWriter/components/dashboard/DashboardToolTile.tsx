@@ -55,6 +55,7 @@ export const DashboardToolTile: React.FC<DashboardToolTileProps> = ({
     return (
       <button
         type="button"
+        className="linkedin-dashboard-tool-pill"
         onClick={handleClick}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -86,6 +87,7 @@ export const DashboardToolTile: React.FC<DashboardToolTileProps> = ({
   return (
     <button
       type="button"
+      className="linkedin-dashboard-tool-tile"
       onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}

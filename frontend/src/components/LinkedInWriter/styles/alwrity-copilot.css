@@ -513,6 +513,34 @@
   box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.3) !important; /* Reduced from 4px */
 }
 
+
+/* ===== LINKEDIN DASHBOARD KEYBOARD FOCUS STATES ===== */
+:root {
+  --linkedin-dashboard-focus-ring: #0a66c2;
+  --linkedin-dashboard-focus-ring-contrast: #ffffff;
+  --linkedin-dashboard-focus-shadow: rgba(10, 102, 194, 0.35);
+  --linkedin-dashboard-focus-offset: 3px;
+}
+
+.workflow-wedge:focus-visible {
+  outline: none;
+}
+
+.workflow-wedge:focus-visible .workflow-wedge-base {
+  stroke: var(--linkedin-dashboard-focus-ring) !important;
+  stroke-width: 5px !important;
+  filter: drop-shadow(0 0 0 var(--linkedin-dashboard-focus-ring-contrast))
+    drop-shadow(0 0 8px var(--linkedin-dashboard-focus-shadow)) !important;
+}
+
+.linkedin-dashboard-tool-tile:focus-visible,
+.linkedin-dashboard-tool-pill:focus-visible {
+  outline: 3px solid var(--linkedin-dashboard-focus-ring);
+  outline-offset: var(--linkedin-dashboard-focus-offset);
+  box-shadow: 0 0 0 6px var(--linkedin-dashboard-focus-ring-contrast),
+    0 0 0 9px var(--linkedin-dashboard-focus-shadow);
+}
+
 /* ===== COMPACT ACCESSIBILITY ===== */
 @media (prefers-reduced-motion: reduce) {
   .alwrity-copilot-sidebar * {
