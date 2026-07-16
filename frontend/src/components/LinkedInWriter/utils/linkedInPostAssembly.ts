@@ -6,6 +6,7 @@
  */
 
 import { getHashtagReadiness } from './linkedInPublishReadiness';
+import { normalizeLinkedInPostSpacing } from './linkedInPostSpacing';
 
 const CTA_PATTERN =
   /\?|call to action|comment below|what do you think|share your|let me know|drop a|tell me|agree\?/i;
@@ -31,6 +32,7 @@ function bodyAlreadyHasCta(body: string): boolean {
 /**
  * Merge LLM content with optional CTA and hashtag fields.
  * Skips CTA/hashtag append when the body already includes them.
+ * Applies Best Practices spacing (paragraph gaps, bullets on own lines).
  */
 export function assembleLinkedInPostContent(options: AssembleLinkedInPostOptions): string {
   const body = (options.content || '').trim();
@@ -52,7 +54,7 @@ export function assembleLinkedInPostContent(options: AssembleLinkedInPostOptions
     result = `${result}\n\n${tags}`;
   }
 
-  return result;
+  return normalizeLinkedInPostSpacing(result);
 }
 
 /** Normalize hashtag list from API into a single space-joined string. */

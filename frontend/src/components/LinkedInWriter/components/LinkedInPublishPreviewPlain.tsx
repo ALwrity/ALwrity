@@ -1,9 +1,9 @@
 /**
  * Publish-only plain-text preview — shows what LinkedIn will actually receive.
- * Does not replace LinkedInDraftPreview (research/citations Studio view).
+ * Renders paragraph gaps like the LinkedIn feed (blank line between blocks).
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert, Box, Typography } from '@mui/material';
 import {
   LINKEDIN_PUBLISH_PLAIN_NOTE,
@@ -53,6 +53,11 @@ export const LinkedInPublishPreviewPlain: React.FC<LinkedInPublishPreviewPlainPr
   const seeMoreCaption = getSeeMoreCaption(chars);
   const image = resolvePreviewImage(attachment);
 
+  const paragraphs = useMemo(
+    () => (text ? text.split(/\n\n+/).map((p) => p.trim()).filter(Boolean) : []),
+    [text],
+  );
+
   return (
     <Box
       sx={{
@@ -97,25 +102,42 @@ export const LinkedInPublishPreviewPlain: React.FC<LinkedInPublishPreviewPlainPr
         </Typography>
       </Box>
 
-      <Box sx={{ p: compact ? 1.25 : 1.5 }}>
-        {text ? (
-          <Typography
-            component="pre"
+      <Box
+        sx={{
+          p: compact ? 1.25 : 1.75,
+          maxHeight: compact ? 280 : 480,
+          overflow: 'auto',
+        }}
+      >
+        {paragraphs.length > 0 ? (
+          <Box
             sx={{
-              m: 0,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
               fontFamily:
                 '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-              fontSize: compact ? 13 : 14,
-              lineHeight: 1.55,
+              fontSize: compact ? 14 : 15,
+              lineHeight: 1.45,
               color: '#191919',
-              maxHeight: compact ? 180 : 260,
-              overflow: 'auto',
             }}
           >
-            {text}
-          </Typography>
+            {paragraphs.map((paragraph, index) => (
+              <Typography
+                key={`p-${index}`}
+                component="p"
+                sx={{
+                  m: 0,
+                  mb: index === paragraphs.length - 1 ? 0 : compact ? 1.5 : 1.75,
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  fontSize: 'inherit',
+                  lineHeight: 'inherit',
+                  color: 'inherit',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {paragraph}
+              </Typography>
+            ))}
+          </Box>
         ) : (
           <Typography variant="body2" sx={{ color: '#94a3b8', fontStyle: 'italic' }}>
             Nothing to preview yet. Add post text first.

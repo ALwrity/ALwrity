@@ -1,5 +1,7 @@
 // Content formatting utilities for LinkedIn Writer
 
+import { normalizeLinkedInPostSpacing } from './linkedInPostSpacing';
+
 // Escape HTML characters to prevent XSS
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -10,95 +12,105 @@ function citationBadge(num: string): string {
   return `<span class="liw-cite" data-source-index="${num}">${num}</span>`;
 }
 
-// Format draft content with proper LinkedIn styling and inline citations
-export function formatDraftContent(content: string, citations?: any[], researchSources?: any[]): string {
+/**
+ * Format draft content with LinkedIn-style paragraph spacing and optional citation badges.
+ * Preserves newlines (Best Practices: short paragraphs separated by blank lines).
+ */
+export function formatDraftContent(
+  content: string,
+  citations?: any[],
+  researchSources?: any[],
+): string {
   if (!content?.trim()) return '';
-  
-  let formatted = escapeHtml(content);
-  
-  // Always convert [Source N] markers when present in content (supports persisted drafts)
-  if (/\[Source \d+\]/.test(formatted)) {
-    // Normalize: [Source N] [M] → badge(N) badge(M) (handles adjacent bare [M] shorthand)
+
+  // Normalize spacing first so Studio preview matches LinkedIn readability.
+  let formatted = escapeHtml(normalizeLinkedInPostSpacing(content));
+
+  // Convert [Source N] markers when present (supports persisted drafts).
+  // Do not invent citation placements that rewrite the whole body (that destroyed newlines).
+  if (/\[Source \d+\]/i.test(formatted)) {
     formatted = formatted.replace(
-      /\[Source\s+(\d+)\]\s*\[(\d+)\]/g,
-      (_, n1, n2) => `${citationBadge(n1)} ${citationBadge(n2)}`
+      /\[Source\s+(\d+)\]\s*\[(\d+)\]/gi,
+      (_, n1, n2) => `${citationBadge(n1)} ${citationBadge(n2)}`,
     );
-    // Convert remaining [Source N] markers to badges
     formatted = formatted.replace(
-      /\[Source\s+(\d+)\]/g,
-      (_, n) => citationBadge(n)
+      /\[Source\s+(\d+)\]/gi,
+      (_, n) => citationBadge(n),
     );
-  } else if (citations && citations.length > 0 && researchSources && researchSources.length > 0) {
-    // Fallback: content has no markers — distribute citations across sentences
-    const citationMap = new Map();
-      citations.forEach((citation) => {
-        if (citation.reference && citation.reference.startsWith('Source ')) {
-          const sourceNum = citation.reference.replace('Source ', '');
-          citationMap.set(citation.reference, sourceNum);
+  } else if (
+    citations &&
+    citations.length > 0 &&
+    researchSources &&
+    researchSources.length > 0
+  ) {
+    // Soft fallback: append one badge after the first sentence only.
+    const sourceNums = citations
+      .map((citation) => {
+        if (citation?.reference && String(citation.reference).startsWith('Source ')) {
+          return String(citation.reference).replace('Source ', '');
         }
-      });
+        return null;
+      })
+      .filter(Boolean) as string[];
 
-      const citationEntries = Array.from(citationMap.entries());
-      const totalCitations = citationEntries.length;
-      
-      if (totalCitations > 0) {
-        const sentences = formatted.split(/[.!?]+/).filter(s => s.trim().length > 0);
-        const sentencesWithCitations: string[] = [];
-
-        if (sentences.length > 0) {
-          citationEntries.forEach(([reference, sourceNum], index) => {
-            const targetSentenceIndex = Math.floor((index / totalCitations) * sentences.length);
-            const targetSentence = sentences[targetSentenceIndex] || sentences[sentences.length - 1];
-            if (!targetSentence) return;
-
-            const citeHtml = ` ${citationBadge(sourceNum)}`;
-            const sentenceWithCitation = targetSentence.trim() + citeHtml;
-            sentencesWithCitations[targetSentenceIndex] = sentenceWithCitation;
-          });
-
-          formatted = sentences.map((sentence, index) => {
-            return sentencesWithCitations[index] || sentence;
-          }).join('. ') + '.';
-        }
+    if (sourceNums.length > 0) {
+      const firstSentenceEnd = formatted.search(/[.!?]/);
+      if (firstSentenceEnd >= 0) {
+        const badge = ` ${citationBadge(sourceNums[0])}`;
+        formatted =
+          formatted.slice(0, firstSentenceEnd + 1) +
+          badge +
+          formatted.slice(firstSentenceEnd + 1);
       }
     }
-  
-  // Format hashtags
-  formatted = formatted.replace(/#(\w+)/g, '<span style="color: #0a66c2; font-weight: 600;">#$1</span>');
-  
-  // Format mentions
-  formatted = formatted.replace(/@(\w+)/g, '<span style="color: #0a66c2; font-weight: 600;">@$1</span>');
-  
-  // Format headers (lines starting with #)
-  formatted = formatted.replace(/^# (.+)$/gm, '<h1 style="font-size: 24px; font-weight: 700; color: #1d1d1f; margin: 16px 0 12px 0; line-height: 1.3;">$1</h1>');
-  formatted = formatted.replace(/^## (.+)$/gm, '<h2 style="font-size: 20px; font-weight: 600; color: #1d1d1f; margin: 14px 0 10px 0; line-height: 1.3;">$1</h2>');
-  formatted = formatted.replace(/^### (.+)$/gm, '<h3 style="font-size: 18px; font-weight: 600; color: #1d1d1f; margin: 12px 0 8px 0; line-height: 1.3;">$1</h3>');
-  
-  // Format bold text
+  }
+
+  formatted = formatted.replace(
+    /#(\w+)/g,
+    '<span style="color: #0a66c2; font-weight: 600;">#$1</span>',
+  );
+
+  formatted = formatted.replace(
+    /@(\w+)/g,
+    '<span style="color: #0a66c2; font-weight: 600;">@$1</span>',
+  );
+
+  formatted = formatted.replace(
+    /^# (.+)$/gm,
+    '<h1 style="font-size: 24px; font-weight: 700; color: #1d1d1f; margin: 16px 0 12px 0; line-height: 1.3;">$1</h1>',
+  );
+  formatted = formatted.replace(
+    /^## (.+)$/gm,
+    '<h2 style="font-size: 20px; font-weight: 600; color: #1d1d1f; margin: 14px 0 10px 0; line-height: 1.3;">$1</h2>',
+  );
+  formatted = formatted.replace(
+    /^### (.+)$/gm,
+    '<h3 style="font-size: 18px; font-weight: 600; color: #1d1d1f; margin: 12px 0 8px 0; line-height: 1.3;">$1</h3>',
+  );
+
   formatted = formatted.replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight: 600;">$1</strong>');
-  
-  // Format italic text
   formatted = formatted.replace(/\*(.+?)\*/g, '<em style="font-style: italic;">$1</em>');
-  
-  // Format bullet points
-  formatted = formatted.replace(/^[•·-] (.+)$/gm, '<div style="margin: 4px 0; padding-left: 16px; color: #333;">• $1</div>');
-  
-  // Format numbered lists
-  formatted = formatted.replace(/^\d+\. (.+)$/gm, (match, content, offset, string) => {
+
+  formatted = formatted.replace(
+    /^[•·-] (.+)$/gm,
+    '<div style="margin: 6px 0; padding-left: 4px; color: #191919; line-height: 1.5;">• $1</div>',
+  );
+
+  formatted = formatted.replace(/^\d+\. (.+)$/gm, (match, itemContent, offset, string) => {
     const lines = string.substring(0, offset).split('\n');
-    const currentLineIndex = lines.length - 1;
-    const currentLine = lines[currentLineIndex];
+    const currentLine = lines[lines.length - 1];
     const number = currentLine.match(/^(\d+)\./)?.[1] || '1';
-    return `<div style="margin: 4px 0; padding-left: 16px; color: #333;">${number}. ${content}</div>`;
+    return `<div style="margin: 6px 0; padding-left: 4px; color: #191919; line-height: 1.5;">${number}. ${itemContent}</div>`;
   });
-  
-  // Format line breaks
-  formatted = formatted.replace(/\n\n/g, '</p><p style="margin: 12px 0; line-height: 1.6; color: #333;">');
+
+  formatted = formatted.replace(
+    /\n\n/g,
+    '</p><p style="margin: 0 0 14px 0; line-height: 1.55; color: #191919;">',
+  );
   formatted = formatted.replace(/\n/g, '<br/>');
-  
-  // Wrap in paragraph tags
-  formatted = `<p style="margin: 12px 0; line-height: 1.6; color: #333;">${formatted}</p>`;
-  
+
+  formatted = `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;"><p style="margin: 0 0 14px 0; line-height: 1.55; color: #191919;">${formatted}</p></div>`;
+
   return formatted;
 }
 
@@ -107,23 +119,26 @@ export function diffMarkup(oldText: string, newText: string): string {
   const MAX = 4000;
   const a = (oldText || '').slice(0, MAX);
   const b = (newText || '').slice(0, MAX);
-  const n = a.length, m = b.length;
+  const n = a.length;
+  const m = b.length;
   const dp: number[][] = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0));
-  
+
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
       if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
       else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
-  
-  let i = 0, j = 0;
+
+  let i = 0;
+  let j = 0;
   let out = '';
-  
+
   while (i < n && j < m) {
     if (a[i] === b[j]) {
       out += a[i];
-      i++; j++;
+      i++;
+      j++;
     } else if (dp[i + 1][j] >= dp[i][j + 1]) {
       out += `<s class="liw-del">${escapeHtml(a[i])}</s>`;
       i++;
@@ -132,11 +147,15 @@ export function diffMarkup(oldText: string, newText: string): string {
       j++;
     }
   }
-  
-  while (i < n) { out += `<s class="liw-del">${escapeHtml(a[i++])}</s>`; }
-  while (j < m) { out += `<em class="liw-add">${escapeHtml(b[j++])}</em>`; }
-  
+
+  while (i < n) {
+    out += `<s class="liw-del">${escapeHtml(a[i++])}</s>`;
+  }
+  while (j < m) {
+    out += `<em class="liw-add">${escapeHtml(b[j++])}</em>`;
+  }
+
   if (oldText.length > MAX || newText.length > MAX) out += '<span class="liw-more"> …</span>';
-  
+
   return out;
 }

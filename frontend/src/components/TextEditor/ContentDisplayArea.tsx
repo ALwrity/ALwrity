@@ -52,7 +52,7 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   onTypingChange,
   assistiveEditorRef,
 }) => {
-  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('studio');
+  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('linkedin');
 
   return (
     <div

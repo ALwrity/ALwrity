@@ -10,10 +10,16 @@ import {
   type LinkedInEditorImageBlock,
 } from '../utils/linkedInEditorDraftUtils';
 import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from '../utils/linkedInPublishMediaConstants';
+import { normalizeLinkedInPostSpacing } from '../utils/linkedInPostSpacing';
 
 export interface LinkedInAssistiveEditorHandle {
   /** Flush pending edits and return the merged draft markdown. */
   flushDraft: () => string;
+}
+
+/** Always apply Best Practices spacing (idempotent for already-spaced posts). */
+function maybeNormalizeAssistiveText(text: string): string {
+  return normalizeLinkedInPostSpacing(text);
 }
 
 interface LinkedInAssistiveEditorProps {
@@ -44,7 +50,9 @@ export const LinkedInAssistiveEditor = forwardRef<
   const lastEmittedDraftRef = useRef<string>(draft);
 
   const initial = splitDraftForAssistiveEditor(draft);
-  const [textContent, setTextContent] = useState(initial.textContent);
+  const [textContent, setTextContent] = useState(() =>
+    maybeNormalizeAssistiveText(initial.textContent),
+  );
   const [images, setImages] = useState<LinkedInEditorImageBlock[]>(initial.images);
   const [isDragOver, setIsDragOver] = useState(false);
 
@@ -92,13 +100,30 @@ export const LinkedInAssistiveEditor = forwardRef<
   );
 
   useEffect(() => {
-    if (draft !== lastEmittedDraftRef.current) {
-      const parsed = splitDraftForAssistiveEditor(draft);
-      setTextContent(parsed.textContent);
-      setImages(parsed.images);
+    if (draft === lastEmittedDraftRef.current) return;
+
+    const parsed = splitDraftForAssistiveEditor(draft);
+    const nextText = maybeNormalizeAssistiveText(parsed.textContent);
+    setTextContent(nextText);
+    setImages(parsed.images);
+
+    if (nextText !== parsed.textContent) {
+      // Persist Best Practices spacing back into the draft once for dense posts.
+      emitDraft(nextText, parsed.images, true);
+    } else {
       lastEmittedDraftRef.current = draft;
     }
-  }, [draft]);
+  }, [draft, emitDraft]);
+
+  // On first mount, persist auto-spacing if the initial draft was dense.
+  useEffect(() => {
+    const parsed = splitDraftForAssistiveEditor(draft);
+    const nextText = maybeNormalizeAssistiveText(parsed.textContent);
+    if (nextText !== parsed.textContent) {
+      emitDraft(nextText, parsed.images, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot mount sync
+  }, []);
 
   useEffect(() => {
     if (textareaRef.current) {

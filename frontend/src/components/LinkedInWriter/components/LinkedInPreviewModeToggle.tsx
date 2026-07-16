@@ -1,6 +1,7 @@
 /**
  * Studio vs LinkedIn-style preview toggle.
- * Default = Studio (markdown + citations). LinkedIn-style = plain publish preview.
+ * Default = LinkedIn-style (plain, Best Practices spacing, no citation chips).
+ * Studio keeps research citations for power users.
  */
 
 import React from 'react';
@@ -46,17 +47,17 @@ export const LinkedInPreviewModeToggle: React.FC<LinkedInPreviewModeToggleProps>
           }}
           aria-label="Preview mode"
         >
-          <ToggleButton value="studio" sx={{ textTransform: 'none', px: 1.5, fontSize: 12 }}>
-            Studio preview
-          </ToggleButton>
           <ToggleButton value="linkedin" sx={{ textTransform: 'none', px: 1.5, fontSize: 12 }}>
-            LinkedIn-style (plain)
+            LinkedIn-style
+          </ToggleButton>
+          <ToggleButton value="studio" sx={{ textTransform: 'none', px: 1.5, fontSize: 12 }}>
+            Studio (citations)
           </ToggleButton>
         </ToggleButtonGroup>
-        <Typography variant="caption" sx={{ color: '#64748b', maxWidth: 280 }}>
-          {mode === 'studio'
-            ? 'Studio shows draft formatting and citations.'
-            : 'Plain text as LinkedIn typically displays posts.'}
+        <Typography variant="caption" sx={{ color: '#64748b', maxWidth: 300 }}>
+          {mode === 'linkedin'
+            ? 'How the post reads on LinkedIn — plain text, line breaks, no citation chips.'
+            : 'Studio view keeps research citation markers for editing.'}
         </Typography>
       </Box>
 
@@ -67,7 +68,10 @@ export const LinkedInPreviewModeToggle: React.FC<LinkedInPreviewModeToggleProps>
           researchSources={researchSources}
         />
       ) : (
-        <LinkedInPublishPreviewPlain draft={draft} />
+        <LinkedInPublishPreviewPlain
+          draft={draft}
+          title="LinkedIn-style preview"
+        />
       )}
     </Box>
   );

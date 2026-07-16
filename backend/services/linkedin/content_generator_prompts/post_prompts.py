@@ -93,9 +93,10 @@ class PostPromptBuilder:
 
         FORMATTING (LINKEDIN IS PLAIN TEXT):
         - Do NOT use markdown: no **bold**, no # headers, no [links](url), no image markdown
-        - Use plain-text bullet lines (• or -) or numbered lists for key insights
+        - Use plain-text bullet lines (• or -) or numbered lists for key insights — each bullet MUST be on its own line
         - Include relevant emojis to enhance visual appeal
-        - Break text into digestible paragraphs (2–3 lines max)
+        - Break text into digestible paragraphs of 1–2 sentences, separated by a blank line (LinkedIn Best Practice)
+        - Never return the entire post as one continuous paragraph
         - Structure order: hook + body → CTA/question → blank line → hashtags
         - Leave space for engagement (don't fill the entire character limit)
 
