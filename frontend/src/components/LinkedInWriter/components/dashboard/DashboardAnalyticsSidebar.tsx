@@ -87,7 +87,7 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
   return (
     <div className="linkedin-analytics-panel">
       <div className="linkedin-analytics-panel-header">
-        <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Analytics</h3>
+        <h3 className="linkedin-analytics-panel-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Analytics</h3>
         {onViewAll && (
           <button type="button" className="linkedin-analytics-panel-link" onClick={onViewAll}>
             View all posts
@@ -100,8 +100,10 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
         style={{ maxHeight: 480, overflowY: 'auto' }}
       >
         {!connected ? (
-          <div style={{ fontSize: 10, color: '#64748b', lineHeight: 1.4, marginBottom: 6 }}>
-            Connect LinkedIn to see your post stats here.
+          <div className="linkedin-analytics-panel-disconnected">
+            <p className="linkedin-analytics-panel-disconnected-text">
+              Connect your LinkedIn account to unlock post stats, follower growth, and content insights.
+            </p>
           </div>
         ) : (
           <>
@@ -116,14 +118,15 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
             ) : (
               <>
                 {posts.length > 0 && (
-                  <>
+                  <div className="linkedin-analytics-panel-mini-chart">
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
                       Post engagement
                     </div>
                     <MiniBarChart posts={posts} />
-                  </>
+                  </div>
                 )}
                 <div
+                  className="linkedin-analytics-panel-stat-grid"
                   style={{
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr',
@@ -155,6 +158,7 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
         {!connected && (
           <button
             type="button"
+            className="linkedin-analytics-panel-connect-btn"
             onClick={() => void connectWithOAuth()}
             style={{
               width: '100%',
