@@ -369,7 +369,11 @@ const ConnectionLoadingState: React.FC<{ centered?: boolean }> = ({ centered = f
 );
 
 const ConnectTourAnchor: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div data-tour="li-connect-action" style={{ display: 'inline-flex' }}>
+  <div
+    className="linkedin-plan-connect-anchor"
+    data-tour="li-connect-action"
+    style={{ display: 'inline-flex', width: '100%', maxWidth: 360, justifyContent: 'center' }}
+  >
     {children}
   </div>
 );
@@ -400,6 +404,7 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
       <ConnectTourAnchor>
         <button
           type="button"
+          className="linkedin-plan-connect-btn"
           disabled
           aria-busy="true"
           style={{
@@ -426,6 +431,7 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
         <ConnectTourAnchor>
           <button
             type="button"
+            className="linkedin-plan-connect-btn linkedin-plan-connect-btn--disconnect"
             onClick={() => void onDisconnect()}
             disabled={isDisconnecting}
             title={isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
@@ -433,6 +439,7 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
             style={{
               display: 'inline-flex',
               alignItems: 'center',
+              justifyContent: 'center',
               gap: 8,
               padding: '10px 24px',
               borderRadius: 10,
@@ -467,6 +474,7 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
       <ConnectTourAnchor>
         <button
           type="button"
+          className="linkedin-plan-connect-btn"
           onClick={handleConnect}
           disabled={isConnecting}
           style={{

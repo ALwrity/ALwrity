@@ -8,6 +8,7 @@ import {
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { DashboardRailIconButton } from './DashboardRailIconButton';
 import { StudioModalCloseButton } from './StudioModalCloseButton';
+import { useDesktopViewport } from '../../hooks/useDesktopViewport';
 
 export type KnowledgeCenterAction =
   | 'featureMap'
@@ -40,7 +41,10 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     null
   );
   const anchorRef = useRef<HTMLDivElement>(null);
+  const desktopViewport = useDesktopViewport();
   const isRail = variant === 'rail';
+  /** Phase 7 — on mobile, expand inline in the analytics section (no floating portal). */
+  const useInlinePanel = !isRail || !desktopViewport;
 
   useEffect(() => {
     if (!expanded) return;
@@ -72,7 +76,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
   }, []);
 
   useLayoutEffect(() => {
-    if (!isRail || !expanded) {
+    if (!isRail || useInlinePanel || !expanded) {
       setGridPos(null);
       return;
     }
@@ -83,7 +87,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
       window.removeEventListener('resize', updateGridPosition);
       window.removeEventListener('scroll', updateGridPosition, true);
     };
-  }, [isRail, expanded, updateGridPosition]);
+  }, [isRail, useInlinePanel, expanded, updateGridPosition]);
 
   const handleFeatureClick = (feature: KnowledgeCenterFeature) => {
     onFeatureAction(feature.action);
@@ -194,6 +198,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
 
   const portaledGrid =
     isRail &&
+    !useInlinePanel &&
     expanded &&
     gridPos &&
     typeof document !== 'undefined' &&
@@ -221,6 +226,11 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
       <>
         {portaledGrid}
         <div ref={anchorRef} className="linkedin-knowledge-center-rail">
+          {useInlinePanel && expanded && (
+            <div className="linkedin-knowledge-center-inline" style={{ marginBottom: 8 }}>
+              {knowledgeCenterPanel}
+            </div>
+          )}
           {triggerButton}
         </div>
       </>

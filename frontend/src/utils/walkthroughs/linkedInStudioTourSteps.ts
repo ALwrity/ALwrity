@@ -198,6 +198,18 @@ const DONE_STEP: Step = {
   styles: DESKTOP_TOOLTIP_STYLE,
 };
 
+const MOBILE_WORKFLOW_STEP: Step = {
+  target: '[data-tour="li-mobile-workflow"]',
+  title: 'Your action grid',
+  content:
+    'Six Studio actions in a 2-column grid — Plan, Create, Publish, Analysis, Engagement, and Remarket. Tap any card to open its tools.',
+  placement: 'bottom',
+  disableBeacon: true,
+  spotlightPadding: 8,
+  styles: MOBILE_TOOLTIP_STYLE,
+  floaterProps: VIEWPORT_FLOATER,
+};
+
 const MOBILE_PLAN_STEP: Step = {
   target: '[data-tour="li-wedge-plan"]',
   title: 'Plan — start here',
@@ -222,6 +234,28 @@ const MOBILE_PUBLISH_STEP: Step = {
   title: 'Publish — go live',
   content: 'Open saved drafts, schedule posts, and ship content when your audience is most active.',
   placement: 'bottom',
+  styles: MOBILE_TOOLTIP_STYLE,
+  floaterProps: VIEWPORT_FLOATER,
+};
+
+const MOBILE_ANALYTICS_STEP: Step = {
+  target: '[data-tour="li-mobile-analytics"]',
+  title: 'Analytics & Knowledge',
+  content:
+    'Scroll for your Analytics card and Knowledge Center — view post stats, open your library, and explore ALwrity features.',
+  placement: 'top',
+  spotlightPadding: 10,
+  styles: MOBILE_TOOLTIP_STYLE,
+  floaterProps: VIEWPORT_FLOATER,
+};
+
+const MOBILE_COPILOT_STEP: Step = {
+  target: '[data-tour="li-mobile-copilot-bar"]',
+  title: 'Ask ALwrity Co-Pilot',
+  content:
+    'Your sticky chat bar stays in the thumb zone. Tap anytime to ask for help drafting, refining, or planning LinkedIn content.',
+  placement: 'top',
+  spotlightPadding: 6,
   styles: MOBILE_TOOLTIP_STYLE,
   floaterProps: VIEWPORT_FLOATER,
 };
@@ -277,10 +311,13 @@ export function buildLinkedInStudioTourSteps({
   if (variant === 'mobile') {
     return [
       adaptStepForCompact(WELCOME_STEP, MOBILE_TOOLTIP_STYLE),
-      adaptStepForCompact(LIFECYCLE_STEP, MOBILE_TOOLTIP_STYLE),
+      { ...accountStep, styles: MOBILE_TOOLTIP_STYLE, floaterProps: VIEWPORT_FLOATER, placement: 'bottom' },
+      MOBILE_WORKFLOW_STEP,
       MOBILE_PLAN_STEP,
       MOBILE_CREATE_STEP,
       MOBILE_PUBLISH_STEP,
+      MOBILE_ANALYTICS_STEP,
+      MOBILE_COPILOT_STEP,
       COMPACT_DONE_STEP,
     ];
   }
@@ -288,11 +325,18 @@ export function buildLinkedInStudioTourSteps({
   if (variant === 'tablet') {
     return [
       adaptStepForCompact(WELCOME_STEP, TABLET_TOOLTIP_STYLE),
-      adaptStepForCompact(LIFECYCLE_STEP, TABLET_TOOLTIP_STYLE),
+      {
+        ...accountStep,
+        styles: TABLET_TOOLTIP_STYLE,
+        floaterProps: VIEWPORT_FLOATER,
+        placement: 'bottom' as const,
+      },
+      { ...MOBILE_WORKFLOW_STEP, styles: TABLET_TOOLTIP_STYLE },
       { ...MOBILE_PLAN_STEP, styles: TABLET_TOOLTIP_STYLE },
       { ...MOBILE_CREATE_STEP, styles: TABLET_TOOLTIP_STYLE },
       { ...MOBILE_PUBLISH_STEP, styles: TABLET_TOOLTIP_STYLE },
       TABLET_ANALYTICS_STEP,
+      { ...MOBILE_COPILOT_STEP, styles: TABLET_TOOLTIP_STYLE },
       TABLET_DONE_STEP,
     ];
   }

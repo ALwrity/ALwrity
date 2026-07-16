@@ -54,6 +54,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-labelledby="dashboard-action-modal-title"
+      className="linkedin-dashboard-action-modal-backdrop"
       style={{
         position: 'fixed',
         inset: 0,
@@ -68,6 +69,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       onClick={handleBackdropClose}
     >
       <div
+        className="linkedin-dashboard-action-modal"
         onClick={(e) => e.stopPropagation()}
         style={{
           width: width ?? '100%',
@@ -86,6 +88,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         }}
       >
         <div
+          className="linkedin-dashboard-action-modal-header"
           style={{
             padding: '14px 20px',
             borderBottom: '1px solid #e5e7eb',
@@ -139,7 +142,12 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
             )
           )}
         </div>
-        <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>{children}</div>
+        <div
+          className="linkedin-dashboard-action-modal-body"
+          style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}
+        >
+          {children}
+        </div>
       </div>
     </div>,
     document.body
