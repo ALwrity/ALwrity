@@ -454,13 +454,15 @@ export function getSmartFollowUpSuggestions(
 
 export function validateLinkedInContent(content: string): { isValid: boolean; issues: string[] } {
   const issues: string[] = [];
-  
+  // Keep in sync with linkedInPostFormatConstants.LINKEDIN_POST_HARD_LIMIT
+  const HARD_LIMIT = 3000;
+
   if (!content || content.trim().length === 0) {
     issues.push('Content cannot be empty');
   }
   
-  if (content.length > 3000) {
-    issues.push('Content exceeds LinkedIn post limit (3000 characters)');
+  if (content.length > HARD_LIMIT) {
+    issues.push(`Content exceeds LinkedIn post limit (${HARD_LIMIT} characters)`);
   }
   
   if (content.length < 50) {

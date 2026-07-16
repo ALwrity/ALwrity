@@ -14,18 +14,29 @@ import {
 import {
   Image as ImageIcon,
   LinkedIn as LinkedInIcon,
+  Visibility as PreviewIcon,
 } from '@mui/icons-material';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { getLinkedInPublishErrorMessage } from '../../../api/linkedinSocial';
-import { formatDraftForPublish } from '../utils/linkedInPublishFormatters';
 import { useLinkedInPublishMedia } from '../hooks/useLinkedInPublishMedia';
 import { LinkedInPublishMediaSection } from './LinkedInPublishMediaSection';
+import { LinkedInPublishPreviewPlain } from './LinkedInPublishPreviewPlain';
 import {
   buildLinkedInPublishSuccessMessage,
   getLinkedInPublishButtonLabel,
   publishLinkedInWithMedia,
 } from '../utils/linkedInPublishHandler';
-import { getLastDraftImageForPublish } from '../utils/linkedInPublishMediaUtils';
+import {
+  getLastDraftImageForPublish,
+  resolvePublishMediaAttachment,
+} from '../utils/linkedInPublishMediaUtils';
+import {
+  assertHardPublishLimits,
+  formatCharCountLabel,
+  getCharReadiness,
+  getPublishPlainText,
+  getSeeMoreCaption,
+} from '../utils/linkedInPublishReadiness';
 
 interface PublishLinkedInPanelProps {
   draft: string;
@@ -59,16 +70,23 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   const [successState, setSuccessState] = useState<PublishSuccessState | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mediaAnchor, setMediaAnchor] = useState<HTMLElement | null>(null);
+  const [previewAnchor, setPreviewAnchor] = useState<HTMLElement | null>(null);
 
   const publishMedia = useLinkedInPublishMedia({ draft, autoDetectFromDraft: true });
 
-  const publishContent = formatDraftForPublish(draft);
+  const publishContent = getPublishPlainText(draft);
+  const chars = getCharReadiness(publishContent);
+  const seeMoreCaption = getSeeMoreCaption(chars);
   const draftHasImage = Boolean(getLastDraftImageForPublish(draft));
   const hasPublishMedia = publishMedia.hasAttachment || draftHasImage;
-  const trimmedDraft = publishContent.trim();
+  const previewAttachment = resolvePublishMediaAttachment(draft, publishMedia.attachment);
   const isOrgTarget = selectedTarget === 'organization';
   const canPublish =
-    connected && !!trimmedDraft && !isOrgTarget && !isPublishing && !isLoading;
+    connected &&
+    chars.hardOk &&
+    !isOrgTarget &&
+    !isPublishing &&
+    !isLoading;
 
   const connectionLabel = connected
     ? `Connected via ${provider}`
@@ -82,14 +100,21 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   const handlePublish = async () => {
     if (!canPublish) return;
 
+    const draftForPublish = getDraftForPublish?.() ?? draft;
+    const contentForPublish = getPublishPlainText(draftForPublish);
+    const hardCheck = assertHardPublishLimits(contentForPublish);
+    if (!hardCheck.ok) {
+      setErrorMessage(hardCheck.error || 'Cannot publish this post.');
+      setSuccessState(null);
+      return;
+    }
+
     setIsPublishing(true);
     publishMedia.beginPublishing();
     setSuccessState(null);
     setErrorMessage(null);
 
     try {
-      const draftForPublish = getDraftForPublish?.() ?? draft;
-      const contentForPublish = formatDraftForPublish(draftForPublish);
       const result = await publishLinkedInWithMedia({
         content: contentForPublish,
         accountId: selectedAccountId || undefined,
@@ -135,27 +160,50 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
     </Box>
   ) : null;
 
+  const charCaption = (
+    <Typography
+      variant="caption"
+      sx={{
+        color: chars.hardOk ? '#64748b' : '#dc2626',
+        display: 'block',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {formatCharCountLabel(chars.count)}
+      {seeMoreCaption ? ' · see more' : ''}
+    </Typography>
+  );
+
   const mediaControls = (
     <>
-      <Tooltip title={publishMedia.hasAttachment ? 'Image attached' : 'Add post image'}>
+      <Tooltip title={hasPublishMedia ? 'Image attached' : 'Add post image'}>
         <IconButton
           size="small"
           onClick={(event) => setMediaAnchor(event.currentTarget)}
           sx={{
-            color: publishMedia.hasAttachment ? '#0A66C2' : '#64748b',
+            color: hasPublishMedia ? '#0A66C2' : '#64748b',
             border: '1px solid #e2e8f0',
           }}
         >
           <ImageIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      {publishMedia.hasAttachment || draftHasImage ? (
+      {hasPublishMedia ? (
         <Chip
           size="small"
           label="1 image"
           sx={{ height: 24, fontSize: 11, bgcolor: '#e8f4fd', color: '#0A66C2' }}
         />
       ) : null}
+      <Tooltip title="Preview what LinkedIn will see">
+        <IconButton
+          size="small"
+          onClick={(event) => setPreviewAnchor(event.currentTarget)}
+          sx={{ color: '#64748b', border: '1px solid #e2e8f0' }}
+        >
+          <PreviewIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
       <Popover
         open={Boolean(mediaAnchor)}
         anchorEl={mediaAnchor}
@@ -175,12 +223,30 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           media={publishMedia}
         />
       </Popover>
+      <Popover
+        open={Boolean(previewAnchor)}
+        anchorEl={previewAnchor}
+        onClose={() => setPreviewAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: { p: 1.5, width: 380, maxWidth: '94vw' },
+          },
+        }}
+      >
+        <LinkedInPublishPreviewPlain
+          draft={draft}
+          attachment={previewAttachment}
+          compact
+        />
+      </Popover>
     </>
   );
 
   if (compact) {
     return (
-      <Box display="flex" alignItems="center" gap={1}>
+      <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
         <Chip
           size="small"
           label={isLoading ? 'Checking...' : connected ? 'Connected' : 'Not connected'}
@@ -188,6 +254,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           variant="outlined"
         />
         {mediaControls}
+        {charCaption}
         <Button
           variant="contained"
           disabled={!canPublish}
@@ -199,7 +266,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         </Button>
         {successDetails}
         {errorMessage && (
-          <Typography variant="caption" sx={{ color: '#dc2626', maxWidth: 200 }}>
+          <Typography variant="caption" sx={{ color: '#dc2626', maxWidth: 220 }}>
             {errorMessage}
           </Typography>
         )}
@@ -246,6 +313,24 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
       </Typography>
 
       <LinkedInPublishMediaSection draft={draft} topic={topic} media={publishMedia} />
+
+      <Box sx={{ mb: 1.5 }}>
+        <LinkedInPublishPreviewPlain
+          draft={draft}
+          attachment={previewAttachment}
+        />
+      </Box>
+
+      <Box sx={{ mb: 1.5 }}>
+        <Typography variant="caption" sx={{ color: chars.hardOk ? '#64748b' : '#dc2626' }}>
+          {formatCharCountLabel(chars.count)}
+        </Typography>
+        {seeMoreCaption && (
+          <Alert severity="warning" sx={{ mt: 1, py: 0, fontSize: 12 }}>
+            {seeMoreCaption}
+          </Alert>
+        )}
+      </Box>
 
       {isOrgTarget && (
         <Alert severity="info" sx={{ mb: 1.5 }}>

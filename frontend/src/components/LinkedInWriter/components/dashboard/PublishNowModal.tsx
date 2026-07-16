@@ -2,7 +2,7 @@
  * F5 — Publish Now Modal
  *
  * Extracted from PublishWedgeModals.tsx (file > 500 lines) for maintainability.
- * Phase 3 wires publish media to backend (text + optional image).
+ * Phases 0–2: shared limits, see-more soft warning, plain “what LinkedIn will see” preview.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -12,12 +12,27 @@ import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocial
 import { formatDraftForPublish } from '../../utils/linkedInPublishFormatters';
 import { useLinkedInPublishMedia } from '../../hooks/useLinkedInPublishMedia';
 import { LinkedInPublishMediaSection } from '../LinkedInPublishMediaSection';
+import { LinkedInPublishPreviewPlain } from '../LinkedInPublishPreviewPlain';
 import {
   buildLinkedInPublishSuccessMessage,
   getLinkedInPublishConfirmLabel,
   publishLinkedInWithMedia,
 } from '../../utils/linkedInPublishHandler';
-import { getLastDraftImageForPublish } from '../../utils/linkedInPublishMediaUtils';
+import {
+  getLastDraftImageForPublish,
+  resolvePublishMediaAttachment,
+} from '../../utils/linkedInPublishMediaUtils';
+import {
+  LINKEDIN_POST_HARD_LIMIT,
+  LINKEDIN_POST_SEE_MORE_SOFT,
+} from '../../utils/linkedInPostFormatConstants';
+import {
+  assertHardPublishLimits,
+  formatCharCountLabel,
+  getCharReadiness,
+  getPublishPlainText,
+  getSeeMoreCaption,
+} from '../../utils/linkedInPublishReadiness';
 
 const DRAFT_STORAGE_KEY = 'alwrity-copilot-draft-content';
 
@@ -139,26 +154,31 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reset media only when modal opens
   }, [open]);
 
-  const charCount = content.length;
-  const charOk = charCount > 0 && charCount <= 3000;
+  const chars = getCharReadiness(content);
+  const seeMoreCaption = getSeeMoreCaption(chars);
   const draftHasImage = Boolean(getLastDraftImageForPublish(rawDraft));
   const hasPublishMedia = publishMedia.hasAttachment || draftHasImage;
+  const previewAttachment = resolvePublishMediaAttachment(rawDraft, publishMedia.attachment);
+  const canConfirm = connected && chars.hardOk && !publishing;
 
   const handlePublish = async () => {
     if (!connected) {
       setError('LinkedIn is not connected. Please connect your account first.');
       return;
     }
-    if (!charOk) {
-      setError(charCount === 0 ? 'Post content cannot be empty.' : "Post exceeds LinkedIn's 3000 character limit.");
+
+    const publishContent = getPublishPlainText(content);
+    const hardCheck = assertHardPublishLimits(publishContent);
+    if (!hardCheck.ok) {
+      setError(hardCheck.error || 'Cannot publish this post.');
       return;
     }
+
     setPublishing(true);
     publishMedia.beginPublishing();
     setError('');
     abortRef.current = new AbortController();
     try {
-      const publishContent = formatDraftForPublish(content);
       const result = await publishLinkedInWithMedia({
         content: publishContent,
         accountId: selectedAccountId || undefined,
@@ -182,11 +202,11 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
 
   if (phase === 'published' && postResult) {
     return (
-      <DashboardActionModal open={open} title="Post Published!" onClose={onClose} maxWidth={440}>
+      <DashboardActionModal open={open} title="Published!" onClose={onClose} maxWidth={440}>
         <div style={{ textAlign: 'center', padding: '16px 0' }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🚀</div>
           <div style={{ fontWeight: 700, fontSize: 16, color: '#111827', marginBottom: 6 }}>
-            Successfully published to LinkedIn!
+            Your post is live on LinkedIn
           </div>
           <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>
             {postResult.message}
@@ -209,12 +229,24 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
             </div>
           )}
           {postResult.urn && postResult.urn !== 'published' && (
-            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20 }}>
-              Post URN:{' '}
-              <code style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>
-                {postResult.urn}
-              </code>
-            </div>
+            <details style={{ marginBottom: 16, textAlign: 'left' }}>
+              <summary
+                style={{
+                  fontSize: 12,
+                  color: '#9ca3af',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                Technical details
+              </summary>
+              <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8 }}>
+                Post ID:{' '}
+                <code style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>
+                  {postResult.urn}
+                </code>
+              </div>
+            </details>
           )}
           <button style={panelBtn(true)} onClick={onClose}>
             Done
@@ -230,7 +262,7 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
       title="Publish to LinkedIn"
       onClose={onClose}
       maxWidth={540}
-      maxHeight="min(92vh, 700px)"
+      maxHeight="min(92vh, 760px)"
     >
       <div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
@@ -248,10 +280,25 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
           />
 
           <PreflightRow
-            icon={charOk ? '🟢' : charCount === 0 ? '⚪' : '🔴'}
+            icon={chars.hardOk ? '🟢' : chars.isEmpty ? '⚪' : '🔴'}
             label="Character count"
-            value={`${charCount} / 3000 chars${!charOk && charCount > 3000 ? ' — exceeds limit' : ''}`}
-            ok={charOk}
+            value={`${formatCharCountLabel(chars.count)}${
+              !chars.hardOk && !chars.isEmpty ? ' — exceeds limit' : ''
+            }`}
+            ok={chars.hardOk}
+          />
+
+          <PreflightRow
+            icon={chars.isEmpty ? '⚪' : chars.seeMoreSoftOk ? '🟢' : '🟡'}
+            label="See more length"
+            value={
+              chars.isEmpty
+                ? `Soft tip: keep under ~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()} characters for full feed visibility`
+                : chars.seeMoreSoftOk
+                  ? `Under ~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()} characters — full post visible in feed`
+                  : `Past see more (~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()}) — still publishable`
+            }
+            ok={chars.isEmpty ? null : chars.seeMoreSoftOk ? true : null}
           />
 
           <PreflightRow
@@ -284,12 +331,18 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write or paste your LinkedIn post here…"
-          rows={7}
+          rows={6}
           style={{
             width: '100%',
             padding: '10px 12px',
             borderRadius: 8,
-            border: `1.5px solid ${!charOk && charCount > 0 ? (charCount > 3000 ? '#ef4444' : '#d1d5db') : '#d1d5db'}`,
+            border: `1.5px solid ${
+              !chars.hardOk && chars.count > 0
+                ? chars.count > LINKEDIN_POST_HARD_LIMIT
+                  ? '#ef4444'
+                  : '#d1d5db'
+                : '#d1d5db'
+            }`,
             fontSize: 13,
             lineHeight: 1.6,
             resize: 'vertical',
@@ -301,14 +354,24 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
         <div
           style={{
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
+            gap: 8,
             fontSize: 11,
-            color: charCount > 3000 ? '#ef4444' : '#9ca3af',
+            color: chars.count > LINKEDIN_POST_HARD_LIMIT ? '#ef4444' : '#9ca3af',
             marginTop: 4,
-            marginBottom: 14,
+            marginBottom: 12,
           }}
         >
-          {charCount} / 3000
+          <span>{seeMoreCaption || ''}</span>
+          <span>{formatCharCountLabel(chars.count)}</span>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <LinkedInPublishPreviewPlain
+            draft={rawDraft}
+            plainText={content}
+            attachment={previewAttachment}
+          />
         </div>
 
         {error && (
@@ -330,7 +393,7 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
           <button
             style={panelBtn(true, false)}
             onClick={handlePublish}
-            disabled={publishing || !connected || !charOk}
+            disabled={!canConfirm}
           >
             {publishing ? (
               <>
