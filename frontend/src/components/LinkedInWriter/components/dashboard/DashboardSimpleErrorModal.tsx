@@ -1,5 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
+import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 
 interface DashboardSimpleErrorModalProps {
@@ -29,7 +30,7 @@ export const DashboardSimpleErrorModal: React.FC<DashboardSimpleErrorModalProps>
       style={{
         position: 'fixed',
         inset: 0,
-        zIndex: 13000,
+        zIndex: LI_Z_TOUR,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

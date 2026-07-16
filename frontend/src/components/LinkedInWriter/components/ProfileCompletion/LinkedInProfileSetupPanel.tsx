@@ -530,7 +530,6 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           maxWidth={640}
           maxHeight="min(90vh, 720px)"
           zIndex={12100}
-          disableClose={isAnalyzing}
         >
           <TopicRecommendationsPanel
             recommendations={recommendations}

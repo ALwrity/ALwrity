@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction, CONNECT_WELCOME_DISMISSED_KEY } from './LinkedInConnectionPlaceholder';
+import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction } from './LinkedInConnectionPlaceholder';
 import { InfoModals } from './InfoModals';
 import { QuickCreate } from './QuickCreate';
 import { LinkedInPreferences } from '../utils/storageUtils';
 import { LinkedInDashboardHero } from './dashboard/LinkedInDashboardHero';
 import { DashboardRightRail } from './dashboard/DashboardRightRail';
 import { DashboardCopilotFab } from './dashboard/DashboardCopilotFab';
+import { DashboardMobileCopilotBar } from './dashboard/DashboardMobileCopilotBar';
 import { WatchdogDashboard } from './WatchdogDashboard';
 import type { KnowledgeCenterAction } from './dashboard/KnowledgeCenterDock';
 import type { DashboardWorkflowCardId } from './dashboard/dashboardWorkflowConfig';
@@ -18,9 +19,10 @@ import {
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
 import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
 import { TodayGrowthWalkthrough } from './dashboard/TodayGrowthWalkthrough';
-import { LINKEDIN_STUDIO_TOUR_SEEN_KEY } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
+import { LINKEDIN_STUDIO_TOUR_SEEN_KEY, getLinkedInStudioTourSeenKey, hasSeenLinkedInStudioTour, getTourAutoStartDelayMs, shouldShowLinkedInStudioSkipReminder, markLinkedInStudioSkipReminderShown, LINKEDIN_STUDIO_TOUR_SKIP_REMINDER_MESSAGE } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
 import { useAuth } from '@clerk/clerk-react';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
+import { showToastNotification } from '../../../utils/toastNotifications';
 import {
   ContentCoachModal,
   QuickStartWizardModal,
@@ -70,17 +72,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [todayGrowthOpen, setTodayGrowthOpen] = useState(false);
+  const [connectWelcomeHandled, setConnectWelcomeHandled] = useState(false);
+  const [connectWelcomeOpen, setConnectWelcomeOpen] = useState(false);
   const social = useLinkedInSocialConnection();
   const { connected, connectWithOAuth, disconnect, isLoading: isSocialLoading } = social;
-  const { userId } = useAuth();
-  const tourSeenKey = userId
-    ? `${LINKEDIN_STUDIO_TOUR_SEEN_KEY}_${userId}`
-    : LINKEDIN_STUDIO_TOUR_SEEN_KEY;
+  const { userId, isLoaded, isSignedIn } = useAuth();
+  const tourSeenKey = getLinkedInStudioTourSeenKey(userId);
   const [runStudioTour, setRunStudioTour] = useState(false);
-  const [tourCompact, setTourCompact] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return Boolean(localStorage.getItem(tourSeenKey));
-  });
+  const [tourCompact, setTourCompact] = useState(() => hasSeenLinkedInStudioTour(userId));
   // Knowledge Center modal states
   const [kcContentCoach, setKcContentCoach] = useState(false);
   const [kcQuickStart, setKcQuickStart] = useState(false);
@@ -95,11 +94,18 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     setIsDisconnecting(true);
     try {
       await disconnect();
-      sessionStorage.removeItem(CONNECT_WELCOME_DISMISSED_KEY);
     } finally {
       setIsDisconnecting(false);
     }
   }, [disconnect]);
+
+  const planConnectAction = (
+    <LinkedInPlanConnectAction
+      social={social}
+      isDisconnecting={isDisconnecting}
+      onDisconnect={handleDisconnect}
+    />
+  );
 
   useEffect(() => {
     document.body.classList.add('linkedin-dashboard-view');
@@ -136,18 +142,69 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   }, []);
 
   useEffect(() => {
-    setTourCompact(Boolean(localStorage.getItem(tourSeenKey)));
-  }, [tourSeenKey]);
+    setConnectWelcomeHandled(false);
+  }, [userId]);
 
   useEffect(() => {
+    if (connected) {
+      setConnectWelcomeHandled(true);
+    }
+  }, [connected]);
+
+  useEffect(() => {
+    setTourCompact(hasSeenLinkedInStudioTour(userId));
+  }, [userId]);
+
+  // Auto-start tour only for signed-in first-time studio visitors (after connect welcome closes).
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !userId) return;
     if (isSocialLoading) return;
-    if (localStorage.getItem(tourSeenKey)) return;
+    if (hasSeenLinkedInStudioTour(userId)) return;
+    if (!connected && !connectWelcomeHandled) return;
+    if (connectWelcomeOpen) return;
+    if (workflowModal || postAnalyticsOpen || growthEngineOpen || watchdogOpen || copilotError) return;
 
     const timer = window.setTimeout(() => {
       setRunStudioTour(true);
-    }, 800);
+    }, getTourAutoStartDelayMs());
     return () => window.clearTimeout(timer);
-  }, [isSocialLoading, tourSeenKey]);
+  }, [
+    isLoaded,
+    isSignedIn,
+    userId,
+    isSocialLoading,
+    connected,
+    connectWelcomeHandled,
+    connectWelcomeOpen,
+    workflowModal,
+    postAnalyticsOpen,
+    growthEngineOpen,
+    watchdogOpen,
+    copilotError,
+  ]);
+
+  // One gentle reminder on the visit after a skipped tour (not every visit).
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !userId) return;
+    if (isSocialLoading) return;
+    if (!shouldShowLinkedInStudioSkipReminder(userId)) return;
+    if (connectWelcomeOpen) return;
+    if (!connected && !connectWelcomeHandled) return;
+
+    const timer = window.setTimeout(() => {
+      showToastNotification(LINKEDIN_STUDIO_TOUR_SKIP_REMINDER_MESSAGE, 'info');
+      markLinkedInStudioSkipReminderShown(userId);
+    }, getTourAutoStartDelayMs() + 400);
+    return () => window.clearTimeout(timer);
+  }, [
+    isLoaded,
+    isSignedIn,
+    userId,
+    isSocialLoading,
+    connectWelcomeOpen,
+    connected,
+    connectWelcomeHandled,
+  ]);
 
   useEffect(() => {
     const requireConnection = (event: Event) => {
@@ -167,11 +224,11 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const handleTourRunChange = useCallback(
     (run: boolean) => {
       setRunStudioTour(run);
-      if (!run && localStorage.getItem(tourSeenKey)) {
+      if (!run && userId && hasSeenLinkedInStudioTour(userId)) {
         setTourCompact(true);
       }
     },
-    [tourSeenKey],
+    [userId],
   );
 
   const handleOpenCopilot = useCallback(() => {
@@ -202,7 +259,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   if (draft || isGenerating) return null;
 
   const openQuickCreatePost = () => {
-    setWorkflowModal('create');
     window.dispatchEvent(
       new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: 'post' } })
     );
@@ -272,43 +328,28 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   };
 
   return (
-    <div
-      className="linkedin-dashboard-layout"
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'stretch',
-        minHeight: 0,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        className="linkedin-dashboard-main"
-        style={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          padding: '0 8px 0',
-          color: '#666',
-        }}
-      >
-        <button
-          type="button"
-          className={`linkedin-studio-tour-trigger${tourCompact ? ' linkedin-studio-tour-trigger--compact' : ''}`}
-          data-tour="li-tour-trigger"
-          onClick={() => setRunStudioTour(true)}
-          aria-label={tourCompact ? 'Tour Guide' : 'How to use LinkedIn Studio — start guided tour'}
-          title={tourCompact ? undefined : 'Tour guide — how to use LinkedIn Studio'}
-        >
-          <span className="linkedin-studio-tour-trigger-icon" aria-hidden>
-            ?
-          </span>
-          <span className="linkedin-studio-tour-trigger-label">Tour guide</span>
-        </button>
+    <div className="linkedin-dashboard-layout">
+      <div className="linkedin-dashboard-main">
+        <div className="linkedin-dashboard-topbar">
+          <button
+            type="button"
+            className={`linkedin-studio-tour-trigger${tourCompact ? ' linkedin-studio-tour-trigger--compact' : ''}`}
+            data-tour="li-tour-trigger"
+            onClick={() => setRunStudioTour(true)}
+            aria-label="Tour guide — replay how to use LinkedIn Studio"
+            title="Tour guide — how to use LinkedIn Studio"
+          >
+            <span className="linkedin-studio-tour-trigger-icon" aria-hidden>
+              ?
+            </span>
+            <span className="linkedin-studio-tour-trigger-label linkedin-studio-tour-trigger-label--full">
+              Tour guide
+            </span>
+            <span className="linkedin-studio-tour-trigger-label linkedin-studio-tour-trigger-label--short">
+              Tour
+            </span>
+          </button>
+        </div>
 
         <button
           type="button"
@@ -321,24 +362,23 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           <span className="linkedin-growth-trigger-label">Today's Growth Tasks</span>
         </button>
 
+        <div className="linkedin-dashboard-hero-stage">
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
-          planAnchorSlot={
-            <LinkedInPlanConnectAction
-              social={social}
-              isDisconnecting={isDisconnecting}
-              onDisconnect={handleDisconnect}
-            />
-          }
+          planAnchorSlot={planConnectAction}
         >
           <LinkedInConnectionPlaceholder
+            key={userId ?? 'signed-out'}
             centered
             splitConnectAction
             socialConnection={social}
             isDisconnecting={isDisconnecting}
             onDisconnect={handleDisconnect}
+            onConnectWelcomeDismissed={() => setConnectWelcomeHandled(true)}
+            onConnectWelcomeOpenChange={setConnectWelcomeOpen}
           />
         </LinkedInDashboardHero>
+        </div>
 
         <QuickCreate
           variant="hidden"
@@ -355,14 +395,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
         />
-
-        <button
-          type="button"
-          className="linkedin-mobile-analytics-teaser"
-          onClick={openPostAnalytics}
-        >
-          View Post Analytics →
-        </button>
 
         <InfoModals
           showCopilotModal={showCopilotModal}
@@ -394,13 +426,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         />
         <AskAlwrityModal open={kcAskAlwrity} onClose={() => setKcAskAlwrity(false)} />
 
-        <div className="linkedin-dashboard-copilot-fab">
-          <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="corner" />
+        <div className="linkedin-dashboard-bottom-dock" aria-label="Dashboard actions">
+          <div className="linkedin-dashboard-copilot-fab">
+            <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="corner" />
+          </div>
         </div>
 
-        <div className="linkedin-mobile-copilot-fab">
-          <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="fixed" />
-        </div>
+        {/* Phase 4 — full-width Co-Pilot bar (replaces floating FAB on mobile) */}
+        <DashboardMobileCopilotBar onOpenCopilot={handleOpenCopilot} />
 
         {watchdogOpen &&
           createPortal(
@@ -442,7 +475,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       <LinkedInStudioTour
         run={runStudioTour}
         onRunChange={handleTourRunChange}
-        storageKey={tourSeenKey}
+        storageKey={tourSeenKey ?? LINKEDIN_STUDIO_TOUR_SEEN_KEY}
+        connected={connected}
       />
       <TodayGrowthWalkthrough open={todayGrowthOpen} onClose={() => setTodayGrowthOpen(false)} />
     </div>

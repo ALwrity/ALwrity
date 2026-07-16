@@ -1,11 +1,14 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { LI_Z_KNOWLEDGE_CENTER } from '../../utils/linkedInStudioZIndex';
 import {
   KNOWLEDGE_CENTER_FEATURES,
   type KnowledgeCenterFeature,
 } from './knowledgeCenterFeatures';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { DashboardRailIconButton } from './DashboardRailIconButton';
+import { StudioModalCloseButton } from './StudioModalCloseButton';
+import { useDesktopViewport } from '../../hooks/useDesktopViewport';
 
 export type KnowledgeCenterAction =
   | 'featureMap'
@@ -38,7 +41,10 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     null
   );
   const anchorRef = useRef<HTMLDivElement>(null);
+  const desktopViewport = useDesktopViewport();
   const isRail = variant === 'rail';
+  /** Phase 7 — on mobile, expand inline in the analytics section (no floating portal). */
+  const useInlinePanel = !isRail || !desktopViewport;
 
   useEffect(() => {
     if (!expanded) return;
@@ -70,7 +76,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
   }, []);
 
   useLayoutEffect(() => {
-    if (!isRail || !expanded) {
+    if (!isRail || useInlinePanel || !expanded) {
       setGridPos(null);
       return;
     }
@@ -81,12 +87,14 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
       window.removeEventListener('resize', updateGridPosition);
       window.removeEventListener('scroll', updateGridPosition, true);
     };
-  }, [isRail, expanded, updateGridPosition]);
+  }, [isRail, useInlinePanel, expanded, updateGridPosition]);
 
   const handleFeatureClick = (feature: KnowledgeCenterFeature) => {
     onFeatureAction(feature.action);
     setExpanded(false);
   };
+
+  const closePanel = () => setExpanded(false);
 
   const gridContent = (
     <div
@@ -96,10 +104,6 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
         gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))',
         gap: 8,
         padding: 10,
-        background: '#ffffff',
-        border: `2px solid ${FRAME_COLOR}`,
-        borderRadius: 14,
-        boxShadow: '0 12px 40px rgba(10, 102, 194, 0.18)',
         width: '100%',
         boxSizing: 'border-box',
       }}
@@ -172,6 +176,16 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     </div>
   );
 
+  const knowledgeCenterPanel = (
+    <div className="linkedin-knowledge-center-panel">
+      <div className="linkedin-knowledge-center-panel-header">
+        <h3 className="linkedin-knowledge-center-panel-title">Knowledge Center</h3>
+        <StudioModalCloseButton onClick={closePanel} ariaLabel="Close Knowledge Center" />
+      </div>
+      {gridContent}
+    </div>
+  );
+
   const triggerButton = (
     <DashboardRailIconButton
       label="Knowledge Center"
@@ -184,6 +198,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
 
   const portaledGrid =
     isRail &&
+    !useInlinePanel &&
     expanded &&
     gridPos &&
     typeof document !== 'undefined' &&
@@ -195,13 +210,13 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
           bottom: gridPos.bottom,
           right: gridPos.right,
           width: gridPos.width,
-          zIndex: 12000,
+          zIndex: LI_Z_KNOWLEDGE_CENTER,
           pointerEvents: 'auto',
           paddingBottom: 8,
           boxSizing: 'border-box',
         }}
       >
-        {gridContent}
+        {knowledgeCenterPanel}
       </div>,
       document.body
     );
@@ -211,6 +226,11 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
       <>
         {portaledGrid}
         <div ref={anchorRef} className="linkedin-knowledge-center-rail">
+          {useInlinePanel && expanded && (
+            <div className="linkedin-knowledge-center-inline" style={{ marginBottom: 8 }}>
+              {knowledgeCenterPanel}
+            </div>
+          )}
           {triggerButton}
         </div>
       </>
@@ -220,7 +240,7 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
   return (
     <div className="linkedin-knowledge-center-dock">
       <div ref={anchorRef} className="linkedin-knowledge-center-dock-inner">
-        {expanded && <div style={{ marginBottom: 8 }}>{gridContent}</div>}
+        {expanded && <div style={{ marginBottom: 8 }}>{knowledgeCenterPanel}</div>}
         {triggerButton}
       </div>
     </div>

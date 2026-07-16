@@ -15,8 +15,9 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
 }) => {
   return (
     <aside
-      className="linkedin-dashboard-right-rail"
+      className="linkedin-dashboard-right-rail linkedin-dashboard-data-section"
       aria-label="Dashboard tools"
+      data-tour="li-mobile-analytics"
       style={{
         width: DASHBOARD_RIGHT_RAIL_WIDTH,
         flexShrink: 0,
@@ -30,6 +31,8 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
         overflow: 'visible',
       }}
     >
+      <h2 className="linkedin-dashboard-data-section-title">Analytics &amp; Knowledge</h2>
+
       <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
 
       <div className="linkedin-dashboard-rail-actions">

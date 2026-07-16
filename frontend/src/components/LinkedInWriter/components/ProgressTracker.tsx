@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
 
 type ProgressStatus = 'pending' | 'active' | 'completed' | 'error';
 
@@ -44,11 +45,22 @@ const HEADER_SUBTITLE_ERROR = 'Something went wrong during generation. Please tr
 
 export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active }) => {
   const [mounted, setMounted] = useState(false);
+  const [userDismissed, setUserDismissed] = useState(false);
   const isOpen = (steps && steps.length > 0);
+  const sessionKey = useMemo(
+    () => steps.map((step) => `${step.id}:${step.status}`).join('|'),
+    [steps]
+  );
+
+  useEffect(() => {
+    setUserDismissed(false);
+  }, [sessionKey]);
+
+  const dismiss = () => setUserDismissed(true);
 
   // Delay mount for entrance animation + lock body scroll while open
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !userDismissed) {
       const t = setTimeout(() => setMounted(true), 10);
       document.body.style.overflow = 'hidden';
       return () => {
@@ -58,9 +70,18 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active 
     }
     setMounted(false);
     return () => { document.body.style.overflow = ''; };
-  }, [isOpen]);
+  }, [isOpen, userDismissed]);
 
-  if (!steps || steps.length === 0) return null;
+  useEffect(() => {
+    if (!isOpen || userDismissed) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') dismiss();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, userDismissed]);
+
+  if (!steps || steps.length === 0 || userDismissed) return null;
 
   const completedSteps = steps.filter((step) => step.status === 'completed').length;
   const progressPercentage = Math.round((completedSteps / steps.length) * 100);
@@ -153,23 +174,25 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active 
           </div>
 
           {/* Percentage pill */}
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 700,
-              color: hasError ? '#ef4444' : progressPercentage === 100 ? '#10b981' : '#0a66c2',
-              padding: '6px 14px',
-              background: hasError
-                ? 'rgba(239, 68, 68, 0.08)'
-                : progressPercentage === 100
-                  ? 'rgba(16, 185, 129, 0.08)'
-                  : 'rgba(10, 102, 194, 0.08)',
-              borderRadius: 24,
-              whiteSpace: 'nowrap',
-              flexShrink: 0,
-            }}
-          >
-            {hasError ? '!' : `${progressPercentage}%`}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: hasError ? '#ef4444' : progressPercentage === 100 ? '#10b981' : '#0a66c2',
+                padding: '6px 14px',
+                background: hasError
+                  ? 'rgba(239, 68, 68, 0.08)'
+                  : progressPercentage === 100
+                    ? 'rgba(16, 185, 129, 0.08)'
+                    : 'rgba(10, 102, 194, 0.08)',
+                borderRadius: 24,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {hasError ? '!' : `${progressPercentage}%`}
+            </div>
+            <StudioModalCloseButton onClick={dismiss} ariaLabel="Close progress" />
           </div>
         </div>
 
@@ -375,16 +398,34 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({ steps, active 
           )}
 
           {!active && !hasError && (
-            <div
-              style={{
-                textAlign: 'center',
-                fontSize: 13,
-                fontWeight: 600,
-                color: '#10b981',
-                padding: '4px 0',
-              }}
-            >
-              ✓ Your LinkedIn post is ready — check it out below
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#10b981',
+                  padding: '4px 0',
+                }}
+              >
+                ✓ Your LinkedIn post is ready — check it out below
+              </div>
+              <button
+                type="button"
+                onClick={dismiss}
+                style={{
+                  padding: '8px 18px',
+                  borderRadius: 8,
+                  border: '1px solid #d1d5db',
+                  background: '#ffffff',
+                  color: '#374151',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
             </div>
           )}
         </div>

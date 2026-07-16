@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { DashboardActionModal } from './DashboardActionModal';
-import DataSourceSelector from '../Brainstorm/DataSourceSelector';
+import { DashboardActionModal } from '../dashboard/DashboardActionModal';
+import DataSourceSelector from './DataSourceSelector';
+import type { BrainstormOptions } from './DataSourceSelector';
 import { usePlatformPersonaContext } from '../../../shared/PersonaContext/PlatformPersonaProvider';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import { showToastNotification } from '../../../../utils/toastNotifications';
@@ -85,6 +86,19 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     );
   };
 
+  const handleBrainstormOptionsChange = (upd: Partial<BrainstormOptions>) => {
+    if (upd.usePersona !== undefined) setUsePersona(upd.usePersona);
+    if (upd.includeTrending !== undefined) setIncludeTrending(upd.includeTrending);
+    if (upd.remarketContent !== undefined) setRemarketContent(upd.remarketContent);
+  };
+
+  const generateBtnClass = [
+    'plan-wedge-brainstorm__generate',
+    canGenerate && 'plan-wedge-brainstorm__generate--active',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <DashboardActionModal open={open} title="Plan" onClose={onClose} maxWidth={680} titleSize="lg">
       <div className="plan-wedge">
@@ -115,16 +129,12 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
               <DataSourceSelector
                 variant="pill"
                 options={{ usePersona, includeTrending, remarketContent }}
-                onChange={(upd) => {
-                  if (upd.usePersona !== undefined) setUsePersona(upd.usePersona);
-                  if (upd.includeTrending !== undefined) setIncludeTrending(upd.includeTrending);
-                  if (upd.remarketContent !== undefined) setRemarketContent(upd.remarketContent);
-                }}
+                onChange={handleBrainstormOptionsChange}
                 connected={connected}
               />
               <button
                 type="button"
-                className={`plan-wedge-brainstorm__generate${canGenerate ? ' plan-wedge-brainstorm__generate--active' : ''}`}
+                className={generateBtnClass}
                 onClick={runBrainstorm}
                 disabled={!canGenerate}
               >

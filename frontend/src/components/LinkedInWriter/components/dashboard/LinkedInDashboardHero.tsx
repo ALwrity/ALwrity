@@ -1,7 +1,15 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { DashboardRadialWorkflow } from './DashboardRadialWorkflow';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
-import { computeRadialLayout, layoutYToPixel, PLAN_CONNECT_UI_LIFT_PX, ringSpotlightDiameter } from './dashboardRadialLayout';
+import {
+  computeRadialLayout,
+  layoutHubCenterLeftCss,
+  layoutHubCenterY,
+  ringSpotlightDiameter,
+} from './dashboardRadialLayout';
+import { DashboardMobileWorkflowGrid } from './DashboardMobileWorkflowGrid';
+import { useDesktopViewport } from '../../hooks/useDesktopViewport';
+import { HUB_CENTER_LEFT_CSS_VAR } from './dashboardLayoutConstants';
 
 interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
@@ -15,133 +23,191 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
   onWorkflowCardAction,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const desktopViewport = useDesktopViewport();
   const [containerWidth, setContainerWidth] = useState(640);
-  const [containerHeight, setContainerHeight] = useState(520);
+  const [containerHeight, setContainerHeight] = useState(640);
 
-  const readSize = () => {
+  const readSize = useCallback(() => {
     const el = containerRef.current;
-    if (!el) return;
-    const width = el.clientWidth;
-    const height = el.clientHeight;
+    const canvas = canvasRef.current;
+    if (!el || !canvas) return;
+    const stage = el.closest('.linkedin-dashboard-hero-stage') as HTMLElement | null;
+    const width = canvas.clientWidth;
+    const stageHeight = stage?.clientHeight ?? 0;
+    const viewportStageFallback =
+      typeof window !== 'undefined' ? Math.max(window.innerHeight - 152, 520) : 640;
+    const height =
+      stageHeight > 0
+        ? stageHeight
+        : desktopViewport
+          ? viewportStageFallback
+          : Math.max(el.clientHeight, 400);
     if (width > 0) setContainerWidth(width);
     if (height > 0) setContainerHeight(height);
-  };
+  }, [desktopViewport]);
+
+  const layout = useMemo(
+    () => computeRadialLayout(containerWidth, containerHeight, desktopViewport),
+    [containerWidth, containerHeight, desktopViewport]
+  );
+  const hubTop = layoutHubCenterY(layout);
+  const ringCenterTop = layoutHubCenterY(layout);
+  const hubCenterLeft = layoutHubCenterLeftCss(layout);
+  const hubAxisLeft = desktopViewport ? `var(${HUB_CENTER_LEFT_CSS_VAR})` : hubCenterLeft;
+  const lifecycleSpotlightSize = desktopViewport ? ringSpotlightDiameter(layout.outerR) : 0;
+  const hubDiameter = layout.hubVisualR * 2;
+  const hubAvatarSize = Math.min(120, Math.round(layout.hubVisualR * 1.38));
+
+  const syncHubAxis = useCallback(() => {
+    const stage = containerRef.current?.closest('.linkedin-dashboard-hero-stage') as HTMLElement | null;
+    if (!stage) return;
+    if (desktopViewport) {
+      stage.style.setProperty(HUB_CENTER_LEFT_CSS_VAR, hubCenterLeft);
+    } else {
+      stage.style.removeProperty(HUB_CENTER_LEFT_CSS_VAR);
+    }
+  }, [desktopViewport, hubCenterLeft]);
 
   useLayoutEffect(() => {
     readSize();
-  }, []);
+    syncHubAxis();
+  }, [readSize, syncHubAxis]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const ro = new ResizeObserver(() => readSize());
+    const stage = el.closest('.linkedin-dashboard-hero-stage');
+    const ro = new ResizeObserver(() => {
+      readSize();
+      syncHubAxis();
+    });
+    if (canvasRef.current) ro.observe(canvasRef.current);
     ro.observe(el);
+    if (stage) ro.observe(stage);
     return () => ro.disconnect();
-  }, []);
-
-  const layout = useMemo(
-    () => computeRadialLayout(containerWidth, containerHeight),
-    [containerWidth, containerHeight]
-  );
-  const hubTop = layoutYToPixel(layout.centerY + layout.hubOffsetY, layout.viewBoxY);
-  const planAnchorTop = layoutYToPixel(layout.planAnchorY, layout.viewBoxY);
-  const ringCenterTop = layoutYToPixel(layout.centerY, layout.viewBoxY);
-  const lifecycleSpotlightSize = ringSpotlightDiameter(layout.outerR);
+  }, [readSize, syncHubAxis]);
 
   return (
-    <div
-      ref={containerRef}
-      className="linkedin-dashboard-hero"
-      style={{
-        width: '100%',
-        flex: 1,
-        minHeight: 240,
-        flexShrink: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'flex-start',
-        alignItems: 'center',
-        overflow: 'visible',
-        position: 'relative',
-        paddingTop: 0,
-      }}
-    >
+    <>
       <div
+        ref={containerRef}
+        className="linkedin-dashboard-hero"
         style={{
-          position: 'relative',
           width: '100%',
-          height: layout.viewH,
+          flex: '0 1 auto',
+          minHeight: 0,
+          height: 'auto',
           flexShrink: 0,
-          zIndex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+          alignItems: 'center',
+          overflow: 'hidden',
+          position: desktopViewport ? 'static' : 'relative',
+          paddingTop: 0,
         }}
       >
-        <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
-
-        {/* Invisible tour anchors — tight bounds for Joyride spotlight */}
         <div
-          data-tour="li-content-lifecycle"
-          className="linkedin-tour-lifecycle-spotlight"
-          aria-hidden
+          ref={canvasRef}
+          className={`linkedin-dashboard-hero-canvas${desktopViewport ? '' : ' linkedin-dashboard-hero-canvas--mobile'}`}
           style={{
-            position: 'absolute',
-            left: '50%',
-            top: ringCenterTop,
-            width: lifecycleSpotlightSize,
-            height: lifecycleSpotlightSize,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <div
-          className="linkedin-dashboard-hero-hub"
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: hubTop,
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10,
+            position: 'relative',
             width: '100%',
-            maxWidth: Math.max(220, layout.innerR * 2),
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            pointerEvents: 'none',
-            overflow: 'visible',
+            maxWidth: '100%',
+            height: desktopViewport ? layout.viewH : 'auto',
+            flexShrink: 0,
+            zIndex: 1,
           }}
         >
+          {/* Desktop-only radial ring — never mount on mobile (≤960px) */}
+          {desktopViewport && (
+            <>
+              <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
+              <div
+                data-tour="li-content-lifecycle"
+                className="linkedin-tour-lifecycle-spotlight"
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  left: hubAxisLeft,
+                  top: ringCenterTop,
+                  width: lifecycleSpotlightSize,
+                  height: lifecycleSpotlightSize,
+                  transform: 'translate(-50%, -50%)',
+                  pointerEvents: 'none',
+                }}
+              />
+            </>
+          )}
           <div
+            className="linkedin-dashboard-hero-hub"
             style={{
-              pointerEvents: 'auto',
-              width: '100%',
+              position: desktopViewport ? 'absolute' : 'relative',
+              left: desktopViewport ? hubAxisLeft : 'auto',
+              top: desktopViewport ? hubTop : 'auto',
+              transform: desktopViewport ? 'translate(-50%, -50%)' : 'none',
+              zIndex: 10,
+              width: hubDiameter,
+              maxWidth: hubDiameter,
+              ['--hub-inner-diameter' as string]: `${hubDiameter}px`,
+              ['--hub-avatar-size' as string]: `${hubAvatarSize}px`,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              overflow: 'visible',
-            }}
-          >
-            {children}
-          </div>
-        </div>
-        {planAnchorSlot && (
-          <div
-            className="linkedin-dashboard-plan-anchor"
-            style={{
-              position: 'absolute',
-              left: layout.planAnchorX,
-              top: planAnchorTop,
-              transform: `translate(-50%, ${-PLAN_CONNECT_UI_LIFT_PX}px)`,
-              zIndex: 20,
-              pointerEvents: 'auto',
-              display: 'flex',
               justifyContent: 'center',
-              minWidth: 220,
+              pointerEvents: 'none',
+              overflow: 'visible',
+              margin: desktopViewport ? undefined : '0 auto',
             }}
           >
-            {planAnchorSlot}
+            <div
+              style={{
+                pointerEvents: 'auto',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                overflow: 'visible',
+              }}
+            >
+              {children}
+            </div>
           </div>
-        )}
+          {planAnchorSlot && !desktopViewport && (
+            <div
+              className="linkedin-dashboard-plan-anchor"
+              style={{
+                position: 'relative',
+                left: 'auto',
+                top: 'auto',
+                transform: 'none',
+                zIndex: 20,
+                pointerEvents: 'auto',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minWidth: 0,
+                marginTop: 6,
+              }}
+            >
+              {planAnchorSlot}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile-only 2-column workflow grid */}
+        <div className="linkedin-dashboard-mobile-workflow-wrap">
+          <DashboardMobileWorkflowGrid onCardAction={onWorkflowCardAction} />
+        </div>
       </div>
-    </div>
+
+      {planAnchorSlot && desktopViewport && (
+        <div className="linkedin-dashboard-plan-anchor linkedin-dashboard-plan-anchor--hub-bottom">
+          {planAnchorSlot}
+        </div>
+      )}
+    </>
   );
 };

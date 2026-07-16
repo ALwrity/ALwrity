@@ -4,6 +4,8 @@ import { apiClient, aiApiClient } from '../../../api/client';
 import '../../../types/linkedinWriterEvents';
 import MySavedIdeas, { type SavedBrainstormIdea } from './Brainstorm/MySavedIdeas';
 import PersonalizedIdeasPanel, { type PersonalizedIdeaItem } from './Brainstorm/PersonalizedIdeasPanel';
+import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
+import { LI_Z_MODAL } from '../utils/linkedInStudioZIndex';
 
 interface BrainstormOptions {
   usePersona: boolean;
@@ -327,8 +329,15 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
 
   return (
     <>
-      <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10010, padding: 20 }}>
-        <div style={{
+      <div
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: LI_Z_MODAL, padding: 20 }}
+        onClick={handleClose}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Brainstorm ideas"
+      >
+        <div
+          style={{
           background: 'white',
           width: 800,
           maxWidth: '100%',
@@ -338,7 +347,9 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column'
-        }}>
+        }}
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Fixed Header */}
           <div style={{
             padding: '16px 20px',
@@ -380,9 +391,11 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
               >
                 🗑️
               </button>
-              <button onClick={handleClose} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}>
-                ✕
-              </button>
+              <StudioModalCloseButton
+                onClick={handleClose}
+                ariaLabel="Close brainstorm"
+                className="linkedin-studio-modal-close linkedin-studio-modal-close--on-dark"
+              />
             </div>
           </div>
 

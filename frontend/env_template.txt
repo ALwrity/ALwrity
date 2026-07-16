@@ -1,6 +1,9 @@
 # Clerk Authentication
 REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key_here
 REACT_APP_CLERK_JWT_TEMPLATE=
+# Load Clerk JS locally when CDN/DNS is blocked (run: npm run sync-clerk)
+# sync-clerk copies clerk.browser.js and all lazy-loaded chunk files to public/
+REACT_APP_CLERK_JS_URL=/clerk.browser.js
 
 # API Configuration
 REACT_APP_API_BASE_URL=http://localhost:8000
