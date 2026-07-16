@@ -836,39 +836,6 @@ body.linkedin-quick-create-open {
   overflow: visible !important;
 }
 
-/* Profile hub slot: absolutely centered over the radial ring on desktop, in-flow on mobile */
-.linkedin-dashboard-hero-profile-slot {
-  position: absolute;
-  top: var(--hero-hub-top);
-  left: var(--hero-hub-left);
-  transform: translate(-50%, -50%);
-  z-index: 10;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-}
-
-.linkedin-dashboard-hero-profile-slot > * {
-  pointer-events: auto;
-}
-
-/* Plan connect anchor — mirrors the original desktop absolute positioning */
-.linkedin-dashboard-plan-anchor-slot {
-  position: absolute;
-  top: var(--hero-connect-top);
-  left: var(--hero-hub-left);
-  transform: translate(-50%, calc(-1 * var(--plan-connect-lift)));
-  z-index: 20;
-  margin-top: 0;
-  pointer-events: auto;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-width: 0;
-}
-
 /* Mobile workflow grid: hidden on desktop, shown via media query on mobile */
 .linkedin-dashboard-mobile-workflow-wrap {
   display: none;
@@ -1363,36 +1330,39 @@ body.linkedin-quick-create-open {
     gap: 12px;
   }
 
-  /* Hide desktop radial on mobile; show profile hub in-flow and mobile grid */
+  /* Collapse canvas to in-flow column; hide radial ring only */
+  .linkedin-dashboard-hero-canvas {
+    height: auto !important;
+    margin: 0 !important;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
   .linkedin-dashboard-radial-desktop {
     display: none;
   }
 
-  .linkedin-dashboard-hero-profile-slot {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
+  .linkedin-dashboard-hero-hub {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
     margin: 0 auto;
     z-index: auto;
     pointer-events: auto;
-    padding-top: 4px;
+    --hub-inner-diameter: min(156px, 38vw) !important;
+    --hub-avatar-size: min(90px, 22vw) !important;
+    width: min(156px, 38vw) !important;
+    max-width: min(156px, 38vw) !important;
   }
 
-  .linkedin-dashboard-hero-profile-slot > * {
-    pointer-events: auto;
-  }
-
-  .linkedin-dashboard-hero-hub {
-    --hero-hub-size: min(156px, 38vw) !important;
-    --hero-avatar-size: min(90px, 22vw) !important;
-  }
-
-  .linkedin-dashboard-plan-anchor-slot {
-    position: relative;
-    top: auto;
-    left: auto;
-    transform: none;
+  .linkedin-dashboard-plan-anchor {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    transform: none !important;
     margin-top: 6px;
   }
 

@@ -84,28 +84,23 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         overflow: 'hidden',
         position: 'relative',
         paddingTop: 0,
-        ['--hero-hub-left' as string]: hubCenterLeft,
-        ['--hero-hub-top' as string]: `${hubTop}px`,
-        ['--hero-connect-top' as string]: `${connectTop}px`,
-        ['--hero-hub-size' as string]: `${hubDiameter}px`,
-        ['--hero-avatar-size' as string]: `${hubAvatarSize}px`,
-        ['--plan-connect-lift' as string]: `${PLAN_CONNECT_UI_LIFT_PX}px`,
       }}
     >
-      {/* Desktop-only radial ring */}
-      <div className="linkedin-dashboard-radial-desktop" aria-hidden="true">
-        <div
-          ref={canvasRef}
-          className="linkedin-dashboard-hero-canvas"
-          style={{
-            position: 'relative',
-            width: '100%',
-            maxWidth: '100%',
-            height: layout.viewH,
-            flexShrink: 0,
-            zIndex: 1,
-          }}
-        >
+      {/* PR #96 canvas — hub/plan overlays share the same coordinate space as the radial ring */}
+      <div
+        ref={canvasRef}
+        className="linkedin-dashboard-hero-canvas"
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth: '100%',
+          height: layout.viewH,
+          flexShrink: 0,
+          zIndex: 1,
+        }}
+      >
+        {/* Desktop radial ring + tour anchor (hidden on mobile via CSS) */}
+        <div className="linkedin-dashboard-radial-desktop">
           <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
 
           <div
@@ -123,27 +118,62 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
             }}
           />
         </div>
-      </div>
 
-      {/* Profile hub — single mount; positioned over radial on desktop, in-flow on mobile */}
-      <div className="linkedin-dashboard-hero-profile-slot">
+        {/* Profile hub — absolute inside canvas on desktop; in-flow on mobile */}
         <div
           className="linkedin-dashboard-hero-hub"
           style={{
-            width: 'var(--hero-hub-size)',
-            maxWidth: 'var(--hero-hub-size)',
-            ['--hub-inner-diameter' as string]: 'var(--hero-hub-size)',
-            ['--hub-avatar-size' as string]: 'var(--hero-avatar-size)',
+            position: 'absolute',
+            left: hubCenterLeft,
+            top: hubTop,
+            transform: 'translate(-50%, -50%)',
+            zIndex: 10,
+            width: hubDiameter,
+            maxWidth: hubDiameter,
+            ['--hub-inner-diameter' as string]: `${hubDiameter}px`,
+            ['--hub-avatar-size' as string]: `${hubAvatarSize}px`,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            overflow: 'visible',
           }}
         >
-          {children}
+          <div
+            style={{
+              pointerEvents: 'auto',
+              width: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              overflow: 'visible',
+            }}
+          >
+            {children}
+          </div>
         </div>
-      </div>
 
-      {/* Plan connect anchor — positioned below the radial ring on desktop, below hub on mobile */}
-      {planAnchorSlot && (
-        <div className="linkedin-dashboard-plan-anchor-slot">{planAnchorSlot}</div>
-      )}
+        {planAnchorSlot && (
+          <div
+            className="linkedin-dashboard-plan-anchor"
+            style={{
+              position: 'absolute',
+              left: hubCenterLeft,
+              top: connectTop,
+              transform: `translate(-50%, calc(-1 * ${PLAN_CONNECT_UI_LIFT_PX}px))`,
+              zIndex: 20,
+              pointerEvents: 'auto',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minWidth: 0,
+            }}
+          >
+            {planAnchorSlot}
+          </div>
+        )}
+      </div>
 
       {/* Mobile-only 2-column workflow grid */}
       <div className="linkedin-dashboard-mobile-workflow-wrap">
