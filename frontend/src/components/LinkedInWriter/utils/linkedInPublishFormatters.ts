@@ -79,3 +79,6 @@ export function formatDraftForPublish(content: string): string {
   const withoutCitations = stripSourceCitations(content);
   return markdownToPlainText(withoutCitations).trim();
 }
+
+/** Extract LinkedIn image IDs from draft markdown for publish media (Phase 3). */
+export { extractPublishImageIds } from './linkedInPublishMediaUtils';

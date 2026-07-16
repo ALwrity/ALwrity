@@ -311,15 +311,19 @@ export interface LinkedInProfileCompleteResponse {
 export interface LinkedInPublishPostRequest {
   content: string;
   account_id?: string;
+  /** AI-generated stored image IDs (Phase 3 backend). */
+  image_ids?: string[];
 }
 
 export interface LinkedInPublishPostResponse {
   success: boolean;
   post_id?: string | null;
   post_urn?: string | null;
+  share_url?: string | null;
   provider: string;
   message: string;
   debug_id: string;
+  has_media?: boolean;
 }
 
 const BASE = '/api/linkedin-social';

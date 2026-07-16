@@ -575,7 +575,7 @@ Always use the most appropriate tool for the user's request.`.trim();
 
               <div style={{ flex: 1 }} />
 
-              <PublishLinkedInPanel draft={draft} compact />
+              <PublishLinkedInPanel draft={draft} topic={context ? context.split('\n')[0].substring(0, 50) : undefined} compact />
             </div>
           )}
 

@@ -1,9 +1,6 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React from 'react';
 import { LinkedInDraftPreview } from '../LinkedInWriter/components/LinkedInDraftPreview';
-import { LinkedInAuthenticatedImage } from '../LinkedInWriter/components/LinkedInAuthenticatedImage';
-import { splitDraftByImageMarkdown } from '../LinkedInWriter/utils/linkedInImageDraftUtils';
-import MarkdownToolbar from './MarkdownToolbar';
-import { applyMarkdownFormat, type MarkdownFormatType } from './markdownFormatting';
+import { LinkedInAssistiveEditor } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
 import type { LinkedInAssistiveSuggestion } from '../LinkedInWriter/services/linkedInAssistiveWritingApi';
 
@@ -50,65 +47,6 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   renderSelectionMenu,
   onTypingChange,
 }) => {
-  const [localDraft, setLocalDraft] = useState<string>(draft);
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const lastEmittedDraftRef = useRef<string>(draft);
-
-  const handleFormat = useCallback(
-    (type: MarkdownFormatType) => {
-      const textarea = textareaRef.current;
-      const result = applyMarkdownFormat(textarea, localDraft, type);
-      if (!result) return;
-      const { newValue, cursorPos } = result;
-
-      setLocalDraft(newValue);
-
-      if (onDraftChange) {
-        lastEmittedDraftRef.current = newValue;
-        onDraftChange(newValue);
-      }
-
-      requestAnimationFrame(() => {
-        if (textarea) {
-          textarea.focus();
-          textarea.setSelectionRange(cursorPos, cursorPos);
-        }
-      });
-    },
-    [localDraft, onDraftChange],
-  );
-
-  const draftImageSegments = useMemo(
-    () => splitDraftByImageMarkdown(draft).filter((segment) => segment.type === 'image'),
-    [draft],
-  );
-
-  useEffect(() => {
-    if (draft !== lastEmittedDraftRef.current) {
-      setLocalDraft(draft);
-      lastEmittedDraftRef.current = draft;
-    }
-  }, [draft]);
-
-  useEffect(() => {
-    if (textareaRef.current && assistantOn) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
-  }, [localDraft, assistantOn]);
-
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    };
-  }, []);
-
-  const handleTextareaSelectionEvent = useCallback(() => {
-    if (!assistantOn || !textareaRef.current) return;
-    onTextareaSelection?.(textareaRef.current);
-  }, [assistantOn, onTextareaSelection]);
-
   return (
     <div
       ref={contentRef}
@@ -174,57 +112,12 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
         {draft ? (
           <div>
             {assistantOn ? (
-              <div>
-                <MarkdownToolbar onFormat={handleFormat} />
-                <textarea
-                  ref={textareaRef}
-                  value={localDraft}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setLocalDraft(value);
-
-                    const caretIndex = e.target.selectionStart ?? value.length;
-                    onTypingChange?.(value, caretIndex);
-
-                    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-                    saveTimerRef.current = setTimeout(() => {
-                      lastEmittedDraftRef.current = value;
-                      onDraftChange(value);
-                    }, 600);
-                  }}
-                  onMouseUp={handleTextareaSelectionEvent}
-                  onKeyUp={handleTextareaSelectionEvent}
-                  autoFocus
-                  style={{
-                    width: '100%',
-                    outline: 'none',
-                    border: '1px solid #e2e8f0',
-                    borderTop: 'none',
-                    borderRadius: '0 0 8px 8px',
-                    padding: '12px',
-                    background: '#fff',
-                    color: '#333',
-                    fontFamily: 'inherit',
-                    fontSize: '14px',
-                    lineHeight: '1.6',
-                    whiteSpace: 'pre-wrap',
-                    resize: 'vertical',
-                  }}
-                />
-                {draftImageSegments.length > 0 && (
-                  <div style={{ marginTop: 12 }}>
-                    {draftImageSegments.map((segment, index) =>
-                      segment.type === 'image' && segment.imageId ? (
-                        <LinkedInAuthenticatedImage
-                          key={`assistive-image-${segment.imageId}-${index}`}
-                          imageId={segment.imageId}
-                          alt={segment.alt}
-                        />
-                      ) : null,
-                    )}
-                  </div>
-                )}
-              </div>
+              <LinkedInAssistiveEditor
+                draft={draft}
+                onDraftChange={onDraftChange}
+                onTypingChange={onTypingChange}
+                onTextareaSelection={onTextareaSelection}
+              />
             ) : (
               <LinkedInDraftPreview
                 draft={draft}
