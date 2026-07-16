@@ -571,7 +571,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="linkedin-writer-header-right">
+        <div className="linkedin-writer-header-controls">
           <LinkedInSearchBar
             value={linkedInSearch.query}
             onChange={linkedInSearch.setQuery}
@@ -579,7 +579,32 @@ export const Header: React.FC<HeaderProps> = ({
             disabled={!connected}
             size="nav"
           />
-          <HeaderControls colorMode="light" showAlerts showUser />
+          <button
+            type="button"
+            onClick={() => { window.location.href = '/gif-maker'; }}
+            title="GIF Maker — Record UI flows for marketing"
+            aria-label="Open GIF Maker"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 36,
+              height: 36,
+              border: 'none',
+              borderRadius: 8,
+              background: 'transparent',
+              cursor: 'pointer',
+              fontSize: 18,
+              lineHeight: 1,
+              transition: 'all 0.2s ease',
+              marginRight: 4,
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = '#e8f5e9'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            🎬
+          </button>
+          <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
         </div>
       </div>
       
