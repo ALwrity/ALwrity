@@ -26,8 +26,12 @@ function normalizeDraftDetail(detail: unknown): string {
 }
 
 export function useLinkedInWriter() {
-  // Core state
-  const [draft, setDraft] = useState('');
+  // Core state — restore draft from sessionStorage to survive dev HMR reloads
+  const [draft, setDraft] = useState(() => {
+    try { return sessionStorage.getItem('li_draft') || ''; } catch { return ''; }
+  });
+  // Controls whether the editor view is shown (false = show dashboard even when draft exists)
+  const [showEditor, setShowEditor] = useState(false);
   const [context, setContext] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -571,6 +575,17 @@ export function useLinkedInWriter() {
       saveCurrentContext(context);
     }
   }, [context]);
+
+  // Persist draft to sessionStorage so it survives dev HMR page reloads
+  useEffect(() => {
+    try {
+      if (draft) {
+        sessionStorage.setItem('li_draft', draft);
+      } else {
+        sessionStorage.removeItem('li_draft');
+      }
+    } catch { /* ignore */ }
+  }, [draft]);
   
   // Handle draft updates from CopilotKit actions
   useEffect(() => {
@@ -582,6 +597,7 @@ export function useLinkedInWriter() {
       console.log('[LinkedIn Writer] Setting draft and clearing loading state...');
       setDraft(cleanedContent);
       setIsGenerating(false);
+      setShowEditor(true);
       setLoadingMessage('');
       setCurrentAction(null);
       // Auto-show preview when new content is generated
@@ -665,6 +681,7 @@ export function useLinkedInWriter() {
     setOutlineSections([]);
     setOutlineTitleSuggestions([]);
     setOutlineMode(false);
+    try { sessionStorage.removeItem('li_draft'); } catch { /* ignore */ }
   }, []);
 
   const handleCopy = useCallback(async () => {
@@ -745,6 +762,7 @@ export function useLinkedInWriter() {
   return {
     // State
     draft,
+    showEditor,
     context,
     isGenerating,
     isPreviewing,
@@ -764,6 +782,7 @@ export function useLinkedInWriter() {
     
     // Setters
     setDraft,
+    setShowEditor,
     setContext,
     setIsGenerating,
     setIsPreviewing,

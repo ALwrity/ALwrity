@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import DataSourceSelector from './DataSourceSelector';
 import type { BrainstormOptions } from './DataSourceSelector';
+import MySavedIdeas from './MySavedIdeas';
 import { usePlatformPersonaContext } from '../../../shared/PersonaContext/PlatformPersonaProvider';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import { showToastNotification } from '../../../../utils/toastNotifications';
+import { apiClient } from '../../../../api/client';
 
 const CALENDAR_NOTIFY_KEY = 'linkedin_plan_calendar_notify_requested';
 
@@ -29,8 +31,24 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     () => localStorage.getItem(CALENDAR_NOTIFY_KEY) === '1'
   );
 
+  const [myIdeasOpen, setMyIdeasOpen] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+
   const { corePersona } = usePlatformPersonaContext();
   const { connected } = useLinkedInSocialConnection();
+
+  const refreshSavedCount = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/brainstorm/saved-ideas', {
+        params: { limit: 100, offset: 0 },
+      });
+      setSavedCount(Number(res.data?.total) || 0);
+    } catch { /* best-effort */ }
+  }, []);
+
+  useEffect(() => {
+    if (open) void refreshSavedCount();
+  }, [open, refreshSavedCount]);
 
   const canGenerate =
     Boolean((brainstormSeed || '').trim()) || usePersona || includeTrending || remarketContent;
@@ -100,6 +118,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     .join(' ');
 
   return (
+    <>
     <DashboardActionModal open={open} title="Plan" onClose={onClose} maxWidth={680} titleSize="lg">
       <div className="plan-wedge">
         <section className="plan-wedge-brainstorm">
@@ -113,6 +132,25 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
                 Get 5 AI ideas in seconds from your persona and trending topics
               </p>
             </div>
+            <button
+              type="button"
+              onClick={() => setMyIdeasOpen(true)}
+              style={{
+                marginLeft: 'auto',
+                padding: '4px 10px',
+                borderRadius: 6,
+                border: '1px solid #6366f1',
+                background: 'white',
+                color: '#6366f1',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+            </button>
           </header>
 
           <div className="plan-wedge-brainstorm__body">
@@ -200,5 +238,17 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
         </div>
       </div>
     </DashboardActionModal>
+
+    <MySavedIdeas
+      open={myIdeasOpen}
+      onClose={() => setMyIdeasOpen(false)}
+      onAfterDelete={() => void refreshSavedCount()}
+      onUseInCopilot={(prompt: string) => {
+        window.dispatchEvent(new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } }));
+        setMyIdeasOpen(false);
+        onClose();
+      }}
+    />
+    </>
   );
 };

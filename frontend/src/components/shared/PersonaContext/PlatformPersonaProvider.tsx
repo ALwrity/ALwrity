@@ -316,7 +316,8 @@ export const PlatformPersonaProvider: React.FC<PlatformPersonaProviderProps> = (
         const results = await Promise.all([
           getUserPersonas(),
           getPlatformPersona(platform).catch(err => {
-            if (err.message && err.message.includes('No persona found')) {
+            const detail = err?.response?.data?.detail || err?.message || '';
+            if (detail.includes('No persona found') || err?.response?.status === 404) {
               console.warn(`⚠️ No ${platform} persona found - user can still generate content`);
               return null;
             }

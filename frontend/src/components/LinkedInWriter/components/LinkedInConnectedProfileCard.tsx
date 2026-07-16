@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { getInitials } from '../utils/linkedInProfileSummary';
 import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
+import { buildAvatarProxyUrl } from '../../../api/linkedinSocial';
 
 interface LinkedInConnectedProfileCardProps {
   displayName: string;
@@ -35,6 +36,7 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
   hideDisconnectButton = false,
 }) => {
   const initials = getInitials(displayName);
+  const proxiedAvatarUrl = useMemo(() => buildAvatarProxyUrl(avatarUrl), [avatarUrl]);
   const showDisconnect = Boolean(onDisconnect) && !hideDisconnectButton;
   const avatarSize = centered ? CENTERED_AVATAR_SIZE : AVATAR_SIZE;
   const [dismissedDisconnectError, setDismissedDisconnectError] = useState<string | null>(null);
@@ -130,8 +132,9 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
           />
           {avatarUrl ? (
             <img
-              src={avatarUrl}
+              src={proxiedAvatarUrl ?? avatarUrl}
               alt="LinkedIn profile"
+              fetchPriority="high"
               style={{
                 width: avatarSize,
                 height: avatarSize,
@@ -261,8 +264,9 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
             <div style={{ position: 'relative', flexShrink: 0 }}>
               {avatarUrl ? (
                 <img
-                  src={avatarUrl}
+                  src={proxiedAvatarUrl ?? avatarUrl}
                   alt="LinkedIn profile"
+                  loading="lazy"
                   style={{
                     width: AVATAR_SIZE,
                     height: AVATAR_SIZE,

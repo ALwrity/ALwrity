@@ -76,7 +76,14 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   };
 
   const openWatchdog        = () => { onClose(); dispatch('linkedinwriter:openWatchdog'); };
-  const openTopicIdeas      = () => { onClose(); dispatch('linkedinwriter:getTopicIdeas'); };
+  const openTopicIdeas      = () => {
+    onClose();
+    if (connected) {
+      dispatch('linkedinwriter:getTopicIdeas');
+    } else {
+      dispatch('linkedinwriter:openBrainstorm');
+    }
+  };
   const openQuickCreate     = (type: string) => {
     onClose();
     const detail: Record<string, unknown> = { type };
