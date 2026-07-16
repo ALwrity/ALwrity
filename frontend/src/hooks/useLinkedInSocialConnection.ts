@@ -44,6 +44,41 @@ const LEGACY_STORAGE_ACCOUNT = 'linkedin_social_selected_account';
 const LEGACY_STORAGE_TARGET = 'linkedin_social_selected_target';
 const LEGACY_STORAGE_ORG = 'linkedin_social_selected_org';
 
+const AVATAR_CACHE_TTL = 24 * 60 * 60 * 1000;
+
+function readCachedAvatar(uid: string): string | null {
+  try {
+    const key = storageKey('avatar_url', uid);
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const { url, cachedAt } = JSON.parse(raw);
+    if (!cachedAt || Date.now() - cachedAt > AVATAR_CACHE_TTL) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedAvatar(uid: string, url: string) {
+  if (!url || !uid) return;
+  try {
+    localStorage.setItem(
+      storageKey('avatar_url', uid),
+      JSON.stringify({ url, cachedAt: Date.now() })
+    );
+  } catch { /* storage full */ }
+}
+
+function clearCachedAvatar(uid: string) {
+  if (!uid) return;
+  try {
+    localStorage.removeItem(storageKey('avatar_url', uid));
+  } catch { /* ignore */ }
+}
+
 
 
 function statusAccountsToLinkedInAccounts(
@@ -73,6 +108,10 @@ export const useLinkedInSocialConnection = () => {
   const uid = userId || '';
 
   const [status, setStatus] = useState<LinkedInConnectionStatus | null>(null);
+
+  const [cachedAvatarUrl, setCachedAvatarUrl] = useState<string | null>(() =>
+    uid ? readCachedAvatar(uid) : null
+  );
 
   const [accounts, setAccounts] = useState<LinkedInAccount[]>([]);
 
@@ -210,6 +249,10 @@ export const useLinkedInSocialConnection = () => {
 
       setIsProfileLoading(false);
 
+      clearCachedAvatar(uid);
+
+      setCachedAvatarUrl(null);
+
       return;
 
     }
@@ -235,6 +278,15 @@ export const useLinkedInSocialConnection = () => {
       accountList = accountsResponse.accounts || [];
 
       setAccounts(accountList);
+
+      const freshAvatar =
+        accountList.find((a) => a.account_type === 'personal')?.avatar_url ||
+        accountList[0]?.avatar_url;
+
+      if (freshAvatar) {
+        writeCachedAvatar(uid, freshAvatar);
+        setCachedAvatarUrl(freshAvatar);
+      }
 
     } catch (accountsErr) {
 
@@ -606,8 +658,8 @@ export const useLinkedInSocialConnection = () => {
       accounts.find((a) => a.account_type === 'personal') ||
       accounts.find((a) => a.account_type !== 'organization') ||
       accounts[0];
-    return personalAccount?.avatar_url ?? null;
-  }, [accounts]);
+    return personalAccount?.avatar_url ?? cachedAvatarUrl;
+  }, [accounts, cachedAvatarUrl]);
 
 
 

@@ -3,8 +3,10 @@ import { createPortal } from 'react-dom';
 import { LinkedInPreferences } from '../utils/storageUtils';
 import { linkedInWriterApi } from '../../../services/linkedInWriterApi';
 import { getPlatformPersona } from '../../../api/persona';
-import { mapTone, mapPostType, mapIndustry } from '../utils/linkedInWriterUtils';
+import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/linkedInWriterUtils';
+import { apiClient } from '../../../api/client';
 import DataSourceSelector from './Brainstorm/DataSourceSelector';
+import MySavedIdeas from './Brainstorm/MySavedIdeas';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { KeyPointsSection } from './KeyPointsSection';
 import { VariationPicker, assembleFullContent, type VariationResult } from './VariationPicker';
@@ -303,6 +305,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [formData, setFormData] = useState(defaultForm);
   const [generating, setGenerating] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const [outlinePlanMode, setOutlinePlanMode] = useState(false);
 
   // Feature 3 — Persona badge
@@ -316,6 +319,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const brainstormTimeoutRef = useRef<number | null>(null);
   const brainstromActiveRef = useRef(false);
 
+  const [myIdeasOpen, setMyIdeasOpen] = useState(false);
+  const [savedCount, setSavedCount] = useState(0);
+
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [topicFocused, setTopicFocused] = useState(false);
   const [usePersona, setUsePersona] = useState(false);
@@ -323,12 +329,26 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [remarketContent, setRemarketContent] = useState(false);
   const { connected } = useLinkedInSocialConnection();
 
+  const refreshSavedCount = useCallback(async () => {
+    try {
+      const res = await apiClient.get('/api/brainstorm/saved-ideas', {
+        params: { limit: 100, offset: 0 },
+      });
+      setSavedCount(Number(res.data?.total) || 0);
+    } catch { /* best-effort */ }
+  }, []);
+
+  useEffect(() => {
+    if (selectedType) void refreshSavedCount();
+  }, [selectedType, refreshSavedCount]);
+
   const openModal = useCallback((type: ContentType) => {
     if (brainstormTimeoutRef.current) {
       window.clearTimeout(brainstormTimeoutRef.current);
       brainstormTimeoutRef.current = null;
     }
     brainstromActiveRef.current = false;
+    setGenerating(false);
     setFormData({
       ...defaultForm,
       industry: userPreferences?.industry || '',
@@ -339,6 +359,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setVariationsMode(false);
     setVariationsPhase('idle');
     setVariations([]);
+    setGenerationError(null);
     setAdvancedOpen(false);
     setUsePersona(false);
     setIncludeTrending(false);
@@ -355,6 +376,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setSelectedType(null);
     setFormData(defaultForm);
     setTopicError(null);
+    setGenerationError(null);
     setVariationsMode(false);
     setVariationsPhase('idle');
     setVariations([]);
@@ -387,6 +409,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           brainstormTimeoutRef.current = null;
         }
         brainstromActiveRef.current = false;
+        setGenerating(false);
 
         // Open modal with defaults first, then overlay any pre-fill data from the event
         setFormData({
@@ -400,6 +423,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         });
         setSelectedType(type);
         setTopicError(null);
+        setGenerationError(null);
         setVariationsMode(false);
         setVariationsPhase('idle');
         setVariations([]);
@@ -413,8 +437,15 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     return () => window.removeEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
   }, [userPreferences]);
 
-  // Cancel brainstorm safety timeout when BrainstormFlow is manually closed
+  // Cancel brainstorm safety timeout when BrainstormFlow starts (it's actively processing)
   useEffect(() => {
+    const onBrainstormStarted = () => {
+      if (brainstormTimeoutRef.current) {
+        window.clearTimeout(brainstormTimeoutRef.current);
+        brainstormTimeoutRef.current = null;
+      }
+    };
+    // Cancel brainstorm safety timeout when BrainstormFlow is manually closed
     const onCancelBrainstorm = () => {
       if (brainstormTimeoutRef.current) {
         window.clearTimeout(brainstormTimeoutRef.current);
@@ -422,8 +453,12 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       }
       brainstromActiveRef.current = false;
     };
+    window.addEventListener('linkedinwriter:brainstormStarted', onBrainstormStarted);
     window.addEventListener('linkedinwriter:cancelBrainstorm', onCancelBrainstorm);
-    return () => window.removeEventListener('linkedinwriter:cancelBrainstorm', onCancelBrainstorm);
+    return () => {
+      window.removeEventListener('linkedinwriter:brainstormStarted', onBrainstormStarted);
+      window.removeEventListener('linkedinwriter:cancelBrainstorm', onCancelBrainstorm);
+    };
   }, []);
 
   useEffect(() => {
@@ -441,12 +476,13 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     };
   }, [selectedType, closeModal]);
 
-  // Feature 3 — fetch LinkedIn persona when post modal opens
+  // Feature 3 — fetch LinkedIn persona when post modal opens (skip for non-connected users)
   useEffect(() => {
     if (selectedType !== 'post') {
       setPersonaInfo(null);
       return;
     }
+    if (!connected) return;
     let cancelled = false;
     getPlatformPersona('linkedin')
       .then((data: any) => {
@@ -463,7 +499,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [selectedType]);
+  }, [selectedType, connected]);
 
   const handleGenerate = async () => {
     if (!selectedType || generating) return;
@@ -540,6 +576,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     }
 
     // Normal single-generation path
+    setGenerationError(null);
     setGenerating(true);
     const params = {
       ...formData,
@@ -554,8 +591,14 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         carousel: onGenerateCarousel,
         video_script: onGenerateVideoScript
       };
-      await generators[selectedType](params);
-      closeModal();
+      const result = await generators[selectedType](params);
+      if (result.success) {
+        closeModal();
+      } else {
+        setGenerationError(result.error || 'Generation failed. Please try again.');
+      }
+    } catch (e: any) {
+      setGenerationError(e?.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setGenerating(false);
     }
@@ -593,7 +636,6 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                 onClick={() => {
                   const topic = formData.topic.trim();
                   const brainstormType = selectedType;
-                  console.log('[Brainstorm] clicked, topic:', JSON.stringify(topic), 'type:', brainstormType);
                   if (!topic) {
                     setTopicError('Enter a topic first to brainstorm ideas.');
                     return;
@@ -608,20 +650,21 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
                   // Safety timeout: reopen same modal type if BrainstormFlow closes without selecting an idea
                   brainstormTimeoutRef.current = window.setTimeout(() => {
-                    console.log('[Brainstorm] safety timeout fired, active:', brainstromActiveRef.current);
                     if (brainstromActiveRef.current) {
                       brainstromActiveRef.current = false;
                       openModal(brainstormType);
                     }
                   }, 15000);
 
-                  console.log('[Brainstorm] dispatching event with seed:', topic, 'options:', { usePersona, includeTrending, remarketContent });
                   window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
                     detail: {
                       seed: topic,
                       type: brainstormType,
                       options: { usePersona, includeTrending, remarketContent },
                       forceRefresh: false,
+                      industry: formData.industry,
+                      tone: formData.tone,
+                      target_audience: formData.target_audience,
                     },
                   }));
                   console.log('[Brainstorm] event dispatched');
@@ -642,6 +685,33 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           {topicError && (
             <p style={{ margin: '6px 0 0', color: '#b91c1c', fontSize: 12 }}>{topicError}</p>
           )}
+        </div>
+
+        {/* Saved Ideas — quick access to previously saved brainstorm ideas */}
+        <div style={{ marginBottom: 14 }}>
+          <button
+            type="button"
+            onClick={() => setMyIdeasOpen(true)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 12px',
+              border: '1px solid #e0e7ff',
+              borderRadius: 8,
+              background: '#eef2ff',
+              cursor: 'pointer',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#4338ca',
+              transition: 'background 0.1s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#e0e7ff'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#eef2ff'; }}
+          >
+            📚 Browse Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+          </button>
         </div>
 
         {/* DataSourceSelector — Post only, always visible */}
@@ -819,7 +889,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const showInlineGrid = variant === 'default';
 
   return (
-    <div style={{ width: '100%', marginTop: showInlineGrid ? 8 : 0 }}>
+    <><div style={{ width: '100%', marginTop: showInlineGrid ? 8 : 0 }}>
       {showInlineGrid && (
         <>
           <div style={{ fontSize: 14, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, textAlign: 'center' }}>Quick Create</div>
@@ -886,7 +956,28 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                   ? '3 Tone Variations'
                   : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
               </div>
-              <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" className="linkedin-quick-create-close" />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {variationsPhase === 'idle' && (
+                  <button
+                    type="button"
+                    onClick={() => setMyIdeasOpen(true)}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 6,
+                      border: '1px solid #6366f1',
+                      background: 'white',
+                      color: '#6366f1',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+                  </button>
+                )}
+                <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" className="linkedin-quick-create-close" />
+              </div>
             </div>
 
             {/* Modal body — swaps to VariationPicker when in variations phase */}
@@ -1013,5 +1104,16 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         }
       `}</style>
     </div>
+
+      <MySavedIdeas
+        open={myIdeasOpen}
+        onClose={() => setMyIdeasOpen(false)}
+        onAfterDelete={() => void refreshSavedCount()}
+        onUseInCopilot={(prompt: string) => {
+          setMyIdeasOpen(false);
+          setField('topic', prompt);
+        }}
+      />
+    </>
   );
 };

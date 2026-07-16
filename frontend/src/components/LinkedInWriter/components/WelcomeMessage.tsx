@@ -47,6 +47,8 @@ interface WelcomeMessageProps {
   outlineMode: boolean;
   userPreferences: LinkedInPreferences;
   onGenerateSimilarPost?: (prompt: string) => void;
+  onResumeDraft?: () => void;
+  onClear?: () => void;
 }
 
 export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
@@ -60,6 +62,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   outlineMode,
   userPreferences,
   onGenerateSimilarPost,
+  onResumeDraft,
+  onClear,
 }) => {
   const [showCopilotModal, setShowCopilotModal] = useState(false);
   const [showAssistiveModal, setShowAssistiveModal] = useState(false);
@@ -254,7 +258,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     return false;
   }, []);
 
-  if (draft || isGenerating) return null;
+  if (isGenerating) return null;
 
   const openQuickCreatePost = () => {
     window.dispatchEvent(
@@ -363,9 +367,34 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             onDisconnect={handleDisconnect}
             onConnectWelcomeDismissed={() => setConnectWelcomeHandled(true)}
             onConnectWelcomeOpenChange={setConnectWelcomeOpen}
+            userId={userId}
           />
         </LinkedInDashboardHero>
         </div>
+
+        {/* ── Mobile-only Resume Draft bar (rail chip is hidden on mobile) ── */}
+        {draft && (
+          <div className="linkedin-mobile-resume-bar">
+            <span className="linkedin-mobile-resume-bar-preview">
+              {draft.split('\n')[0].replace(/^#\s*/, '').substring(0, 60) || 'Untitled draft'}
+            </span>
+            <button
+              type="button"
+              className="linkedin-mobile-resume-bar-btn"
+              onClick={onResumeDraft}
+            >
+              Edit →
+            </button>
+            <button
+              type="button"
+              className="linkedin-mobile-resume-bar-discard"
+              onClick={onClear}
+              aria-label="Discard draft"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         <QuickCreate
           variant="hidden"
@@ -437,6 +466,9 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       <DashboardRightRail
         onViewAllAnalytics={openPostAnalytics}
         onKnowledgeCenterAction={handleKnowledgeCenterAction}
+        draft={draft}
+        onResumeDraft={onResumeDraft}
+        onClear={onClear}
       />
 
       <PostAnalyticsModal
