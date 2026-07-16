@@ -317,30 +317,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   };
 
   return (
-    <div
-      className="linkedin-dashboard-layout"
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'row',
-        alignItems: 'stretch',
-        minHeight: 0,
-        overflow: 'hidden',
-      }}
-    >
-      <div
-        className="linkedin-dashboard-main"
-        style={{
-          flex: 1,
-          minWidth: 0,
-          minHeight: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-          padding: '0 8px 0',
-          color: '#666',
-        }}
-      >
+    <div className="linkedin-dashboard-layout">
+      <div className="linkedin-dashboard-main">
         <div className="linkedin-dashboard-topbar">
           <button
             type="button"
@@ -401,16 +379,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
         />
-
-        <button
-          type="button"
-          className="linkedin-mobile-analytics-teaser"
-          data-tour="li-mobile-analytics"
-          onClick={openPostAnalytics}
-          aria-label="View post analytics"
-        >
-          View Post Analytics →
-        </button>
 
         <InfoModals
           showCopilotModal={showCopilotModal}

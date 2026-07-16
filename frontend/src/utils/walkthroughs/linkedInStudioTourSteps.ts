@@ -228,9 +228,9 @@ const MOBILE_PUBLISH_STEP: Step = {
 
 const TABLET_ANALYTICS_STEP: Step = {
   target: '[data-tour="li-mobile-analytics"]',
-  title: 'Post analytics on tablet',
+  title: 'Analytics & Knowledge',
   content:
-    'On tablet and mobile, tap View Post Analytics here for performance insights — no side panel needed.',
+    'Scroll down to find your Analytics card and Knowledge Center tools — view post stats, open your library, and explore ALwrity features.',
   placement: 'top',
   styles: TABLET_TOOLTIP_STYLE,
   floaterProps: VIEWPORT_FLOATER,

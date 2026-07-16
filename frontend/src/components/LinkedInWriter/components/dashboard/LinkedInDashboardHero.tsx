@@ -9,6 +9,7 @@ import {
   PLAN_CONNECT_UI_LIFT_PX,
   ringSpotlightDiameter,
 } from './dashboardRadialLayout';
+import { DashboardMobileWorkflowGrid } from './DashboardMobileWorkflowGrid';
 
 interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
@@ -79,93 +80,72 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
-        alignItems: 'center',
+        alignItems: 'stretch',
         overflow: 'hidden',
         position: 'relative',
         paddingTop: 0,
+        ['--hero-hub-left' as string]: hubCenterLeft,
+        ['--hero-hub-top' as string]: `${hubTop}px`,
+        ['--hero-connect-top' as string]: `${connectTop}px`,
+        ['--hero-hub-size' as string]: `${hubDiameter}px`,
+        ['--hero-avatar-size' as string]: `${hubAvatarSize}px`,
+        ['--plan-connect-lift' as string]: `${PLAN_CONNECT_UI_LIFT_PX}px`,
       }}
     >
-      <div
-        ref={canvasRef}
-        className="linkedin-dashboard-hero-canvas"
-        style={{
-          position: 'relative',
-          width: '100%',
-          maxWidth: '100%',
-          height: layout.viewH,
-          flexShrink: 0,
-          zIndex: 1,
-        }}
-      >
-        <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
-
-        {/* Invisible tour anchors — tight bounds for Joyride spotlight */}
+      {/* Desktop-only radial ring */}
+      <div className="linkedin-dashboard-radial-desktop" aria-hidden="true">
         <div
-          data-tour="li-content-lifecycle"
-          className="linkedin-tour-lifecycle-spotlight"
-          aria-hidden
+          ref={canvasRef}
+          className="linkedin-dashboard-hero-canvas"
           style={{
-            position: 'absolute',
-            left: hubCenterLeft,
-            top: ringCenterTop,
-            width: lifecycleSpotlightSize,
-            height: lifecycleSpotlightSize,
-            transform: 'translate(-50%, -50%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <div
-          className="linkedin-dashboard-hero-hub"
-          style={{
-            position: 'absolute',
-            left: hubCenterLeft,
-            top: hubTop,
-            transform: 'translate(-50%, -50%)',
-            zIndex: 10,
-            width: hubDiameter,
-            maxWidth: hubDiameter,
-            ['--hub-inner-diameter' as string]: `${hubDiameter}px`,
-            ['--hub-avatar-size' as string]: `${hubAvatarSize}px`,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-            overflow: 'visible',
+            position: 'relative',
+            width: '100%',
+            maxWidth: '100%',
+            height: layout.viewH,
+            flexShrink: 0,
+            zIndex: 1,
           }}
         >
+          <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
+
           <div
-            style={{
-              pointerEvents: 'auto',
-              width: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              overflow: 'visible',
-            }}
-          >
-            {children}
-          </div>
-        </div>
-        {planAnchorSlot && (
-          <div
-            className="linkedin-dashboard-plan-anchor"
+            data-tour="li-content-lifecycle"
+            className="linkedin-tour-lifecycle-spotlight"
+            aria-hidden
             style={{
               position: 'absolute',
               left: hubCenterLeft,
-              top: connectTop,
-              transform: `translate(-50%, calc(-1 * ${PLAN_CONNECT_UI_LIFT_PX}px))`,
-              zIndex: 20,
-              pointerEvents: 'auto',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              minWidth: 0,
+              top: ringCenterTop,
+              width: lifecycleSpotlightSize,
+              height: lifecycleSpotlightSize,
+              transform: 'translate(-50%, -50%)',
+              pointerEvents: 'none',
             }}
-          >
-            {planAnchorSlot}
-          </div>
+          />
+        </div>
+      </div>
+
+      {/* Profile hub — single mount; positioned over radial on desktop, in-flow on mobile */}
+      <div className="linkedin-dashboard-hero-profile-slot">
+        <div
+          className="linkedin-dashboard-hero-hub"
+          style={{
+            width: 'var(--hero-hub-size)',
+            maxWidth: 'var(--hero-hub-size)',
+            ['--hub-inner-diameter' as string]: 'var(--hero-hub-size)',
+            ['--hub-avatar-size' as string]: 'var(--hero-avatar-size)',
+          }}
+        >
+          {children}
+        </div>
+        {planAnchorSlot && (
+          <div className="linkedin-dashboard-plan-anchor-slot">{planAnchorSlot}</div>
         )}
+      </div>
+
+      {/* Mobile-only 2-column workflow grid */}
+      <div className="linkedin-dashboard-mobile-workflow-wrap">
+        <DashboardMobileWorkflowGrid onCardAction={onWorkflowCardAction} />
       </div>
     </div>
   );

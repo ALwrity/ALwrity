@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import {
   DASHBOARD_WORKFLOW_CARDS,
   FRAME_COLOR,
+  PLAN_PINNED_HINT_KEY,
+  RECOMMENDED_WORKFLOW_CARD_ID,
   WEDGE_PANEL_GAP_DEG,
   type DashboardWorkflowCardId,
 } from './dashboardWorkflowConfig';
@@ -26,8 +28,7 @@ const LABEL_POLISH: Partial<Record<DashboardWorkflowCardId, LabelPolish>> = {
   remarket: { descWidthScale: 0.96 },
 };
 
-const RECOMMENDED_CARD_ID: DashboardWorkflowCardId = 'plan';
-const PLAN_PINNED_HINT_KEY = 'linkedin_dashboard_plan_hint_dismissed';
+const RECOMMENDED_CARD_ID = RECOMMENDED_WORKFLOW_CARD_ID;
 const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
 const OUTER_BULGE_FACTOR = 0.14;
 const HOVER_POP_PX = 10;
