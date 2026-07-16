@@ -1146,11 +1146,14 @@ body.linkedin-quick-create-open {
 
 @media (max-width: 640px) {
   .linkedin-quick-create-dialog {
-    max-height: calc(100dvh - 24px);
+    max-height: min(92dvh, calc(100dvh - 12px));
   }
 
   .linkedin-quick-create-body {
-    max-height: calc(100dvh - 200px);
+    max-height: none;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -1362,6 +1365,11 @@ body.linkedin-quick-create-open {
   display: none;
 }
 
+/* Phase 4 bar — hidden on desktop; shown in ≤960px media query */
+.linkedin-mobile-copilot-bar {
+  display: none;
+}
+
 .linkedin-dashboard-bottom-dock {
   display: none;
 }
@@ -1392,7 +1400,8 @@ body.linkedin-quick-create-open {
 
 @media (max-width: 960px) {
   body.linkedin-dashboard-view {
-    --li-mobile-bottom-inset: 88px;
+    /* Room for Phase 4 sticky Co-Pilot bar + safe area */
+    --li-mobile-bottom-inset: 96px;
   }
 
   .linkedin-dashboard-layout {
@@ -1417,29 +1426,37 @@ body.linkedin-quick-create-open {
 
   .linkedin-dashboard-hero-stage {
     flex: 0 0 auto;
-    min-height: auto;
+    min-height: 0 !important;
+    height: auto !important;
     overflow: visible;
-    padding: 8px 0 clamp(16px, 4vw, 24px);
+    padding: 8px 0 0;
+    margin-bottom: 24px;
   }
 
   .linkedin-dashboard-hero {
     align-items: center !important;
     gap: 12px;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    overflow: visible !important;
   }
 
-  /* Collapse canvas to in-flow column; hide radial ring only */
-  .linkedin-dashboard-hero-canvas {
+  /* Mobile canvas: profile + connect only — radial never mounts (see LinkedInDashboardHero) */
+  .linkedin-dashboard-hero-canvas,
+  .linkedin-dashboard-hero-canvas--mobile {
     height: auto !important;
+    min-height: 0 !important;
     margin: 0 !important;
-    display: flex;
+    display: flex !important;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
   }
 
   .linkedin-dashboard-hero-canvas > svg,
+  .linkedin-dashboard-hero-canvas .linkedin-tour-lifecycle-spotlight,
   .linkedin-tour-lifecycle-spotlight {
-    display: none;
+    display: none !important;
   }
 
   .linkedin-dashboard-hero-hub {
@@ -1447,7 +1464,7 @@ body.linkedin-quick-create-open {
     top: auto !important;
     left: auto !important;
     transform: none !important;
-    margin: 0 auto;
+    margin: 0 auto !important;
     z-index: auto;
     pointer-events: auto;
     --hub-inner-diameter: min(156px, 38vw) !important;
@@ -1461,11 +1478,33 @@ body.linkedin-quick-create-open {
     top: auto !important;
     left: auto !important;
     transform: none !important;
-    margin-top: 6px;
+    margin-top: 4px;
+    width: 100%;
+    max-width: min(360px, 100%);
+    display: flex !important;
+    justify-content: center;
+  }
+
+  /* Phase 5 — connect / disconnect touch targets */
+  .linkedin-plan-connect-anchor {
+    width: 100% !important;
+    max-width: min(360px, 100%) !important;
+  }
+
+  .linkedin-plan-connect-btn {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 48px !important;
+    padding: 12px 16px !important;
+    white-space: normal !important;
+    box-sizing: border-box;
   }
 
   .linkedin-dashboard-mobile-workflow-wrap {
     display: block;
+    width: 100%;
+    margin-top: 8px;
+    margin-bottom: 24px;
   }
 
   .linkedin-dashboard-mobile-workflow {
@@ -1743,20 +1782,205 @@ body.linkedin-quick-create-open {
     display: none !important;
   }
 
+  /* Hide legacy circular FAB — Phase 4 uses full-width bar */
   .linkedin-mobile-copilot-fab {
-    display: block;
-    position: fixed;
-    left: 20px;
-    right: auto;
-    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-    z-index: var(--li-z-mobile-fab, 1200);
+    display: none !important;
   }
 
-  .linkedin-copilot-fab-fixed-inner {
+  /* Phase 4 — sticky Co-Pilot bar (thumb zone) */
+  .linkedin-mobile-copilot-bar {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--li-z-mobile-fab, 1200);
+    padding: 10px clamp(12px, 4vw, 16px) calc(10px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.92) 28%, #ffffff 100%);
+    pointer-events: none;
+    box-sizing: border-box;
+  }
+
+  .linkedin-mobile-copilot-bar-btn {
+    pointer-events: auto;
+    width: 100%;
+    min-height: 52px;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 10px;
+    padding: 8px 10px 8px 8px;
+    border: 1.5px solid #bce0fd;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 6px 20px rgba(10, 102, 194, 0.14);
+    cursor: pointer;
+    text-align: left;
+    box-sizing: border-box;
+  }
+
+  .linkedin-mobile-copilot-bar-btn:active {
+    transform: scale(0.99);
+  }
+
+  .linkedin-mobile-copilot-bar-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    object-position: center top;
+    border: 2px solid #0a66c2;
+    flex-shrink: 0;
+  }
+
+  .linkedin-mobile-copilot-bar-placeholder {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: clamp(13px, 3.6vw, 15px);
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.3;
+  }
+
+  .linkedin-mobile-copilot-bar-cta {
+    flex-shrink: 0;
+    min-height: 36px;
+    min-width: 52px;
+    padding: 0 14px;
+    border-radius: 999px;
+    background: #0a66c2;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Phase 6 — fluid type, declutter, section spacing */
+  .linkedin-dashboard-mobile-workflow-title {
+    font-size: clamp(14px, 4vw, 18px) !important;
+    line-height: 1.35;
+    margin-bottom: 14px !important;
+  }
+
+  .linkedin-dashboard-mobile-workflow-label {
+    font-size: clamp(13px, 3.6vw, 15px) !important;
+    line-height: 1.35 !important;
+  }
+
+  .linkedin-dashboard-mobile-workflow-desc {
+    font-size: clamp(12px, 3.3vw, 14px) !important;
+    line-height: 1.45 !important;
+  }
+
+  .linkedin-dashboard-mobile-workflow-card {
+    border-width: 1px !important;
+    box-shadow: none !important;
+    min-height: 96px !important;
+  }
+
+  .linkedin-dashboard-data-section {
+    margin-top: 8px;
+    margin-bottom: 24px;
+  }
+
+  .linkedin-dashboard-data-section-title {
+    font-size: clamp(12px, 3.4vw, 13px) !important;
+    margin-bottom: 10px;
+  }
+
+  .linkedin-dashboard-right-rail {
+    border: none !important;
+    box-shadow: none !important;
+    gap: 14px !important;
+  }
+
+  .linkedin-analytics-panel,
+  .linkedin-dashboard-right-rail .linkedin-analytics-panel {
+    box-shadow: 0 2px 10px rgba(15, 23, 42, 0.06) !important;
+  }
+
+  .radial-glow-breath {
+    display: none !important;
+  }
+
+  /* Phase 7 — action modals as bottom sheets on phone/tablet */
+  .linkedin-dashboard-action-modal-backdrop {
+    align-items: flex-end !important;
+    justify-content: center !important;
+    padding: 0 !important;
+  }
+
+  .linkedin-dashboard-action-modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: auto !important;
+    max-height: min(92dvh, 100%) !important;
+    min-height: 0 !important;
+    border-radius: 16px 16px 0 0 !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+  }
+
+  .linkedin-dashboard-action-modal-header {
+    padding: 12px 14px !important;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  .linkedin-dashboard-action-modal-body {
+    padding: 12px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Phase 7 — Quick Create: single-column feel + sticky footer */
+  .linkedin-quick-create-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .linkedin-quick-create-dialog,
+  .linkedin-quick-create-dialog--variations {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: min(92dvh, 100%) !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
+
+  .linkedin-quick-create-footer,
+  .linkedin-quick-create-footer--end {
+    position: sticky;
+    bottom: 0;
+    background: #ffffff;
+    border-top: 1px solid #e2e8f0;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    z-index: 2;
+  }
+
+  .linkedin-knowledge-center-inline {
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  .linkedin-knowledge-center-inline .linkedin-knowledge-center-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+  }
+
+  /* Phase 9 — reduced motion / calm interactions */
+  @media (prefers-reduced-motion: reduce) {
+    .linkedin-dashboard-mobile-workflow-card,
+    .linkedin-dashboard-mobile-workflow-card:hover,
+    .linkedin-dashboard-mobile-workflow-card:active,
+    .linkedin-mobile-copilot-bar-btn,
+    .linkedin-mobile-copilot-bar-btn:active {
+      transition: none !important;
+      transform: none !important;
+      animation: none !important;
+    }
   }
 }
 
@@ -1766,7 +1990,7 @@ body.linkedin-quick-create-open {
   }
 
   .linkedin-dashboard-hero-stage {
-    min-height: min(85vw, 360px);
+    min-height: 0 !important;
   }
 
   .linkedin-dashboard-right-rail {
@@ -1786,11 +2010,6 @@ body.linkedin-quick-create-open {
   .linkedin-rail-icon-trigger:hover,
   .linkedin-rail-icon-trigger--open {
     width: 100%;
-  }
-
-  .linkedin-mobile-copilot-fab {
-    left: 16px;
-    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
 }
 

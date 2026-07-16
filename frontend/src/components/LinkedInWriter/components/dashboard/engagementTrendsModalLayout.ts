@@ -1,16 +1,16 @@
 /**
  * Viewport-relative layout for the Engagement Trends modal.
- * Covers ~50% of the screen with a scrollable body for all sections.
+ * Desktop ~50% viewport; mobile uses full usable width via min().
  */
 import type { CSSProperties } from 'react';
 
 export const ENGAGEMENT_TRENDS_MODAL_SIZE = {
-  width: '50vw',
-  maxWidth: '50vw',
-  minWidth: 400,
-  height: '50vh',
-  maxHeight: '50vh',
-  minHeight: 380,
+  width: 'min(100vw - 24px, 50vw)',
+  maxWidth: 'min(100vw - 24px, 720px)',
+  minWidth: 'min(400px, calc(100vw - 24px))',
+  height: 'min(85dvh, 50vh)',
+  maxHeight: 'min(85dvh, 640px)',
+  minHeight: 'min(380px, 70dvh)',
 } as const;
 
 export const ENGAGEMENT_TRENDS_BODY_STYLE: CSSProperties = {

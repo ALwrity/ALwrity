@@ -3,10 +3,8 @@ import { DashboardRadialWorkflow } from './DashboardRadialWorkflow';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
 import {
   computeRadialLayout,
-  layoutConnectAnchorY,
   layoutHubCenterLeftCss,
   layoutHubCenterY,
-  PLAN_CONNECT_UI_LIFT_PX,
   ringSpotlightDiameter,
 } from './dashboardRadialLayout';
 import { DashboardMobileWorkflowGrid } from './DashboardMobileWorkflowGrid';
@@ -54,11 +52,10 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     [containerWidth, containerHeight, desktopViewport]
   );
   const hubTop = layoutHubCenterY(layout);
-  const connectTop = layoutConnectAnchorY(layout);
   const ringCenterTop = layoutHubCenterY(layout);
   const hubCenterLeft = layoutHubCenterLeftCss(layout);
   const hubAxisLeft = desktopViewport ? `var(${HUB_CENTER_LEFT_CSS_VAR})` : hubCenterLeft;
-  const lifecycleSpotlightSize = ringSpotlightDiameter(layout.outerR);
+  const lifecycleSpotlightSize = desktopViewport ? ringSpotlightDiameter(layout.outerR) : 0;
   const hubDiameter = layout.hubVisualR * 2;
   const hubAvatarSize = Math.min(120, Math.round(layout.hubVisualR * 1.38));
 
@@ -114,40 +111,43 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
       >
         <div
           ref={canvasRef}
-          className="linkedin-dashboard-hero-canvas"
+          className={`linkedin-dashboard-hero-canvas${desktopViewport ? '' : ' linkedin-dashboard-hero-canvas--mobile'}`}
           style={{
             position: 'relative',
             width: '100%',
             maxWidth: '100%',
-            height: layout.viewH,
+            height: desktopViewport ? layout.viewH : 'auto',
             flexShrink: 0,
             zIndex: 1,
           }}
         >
-          <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
-
-          {/* Invisible tour anchors — tight bounds for Joyride spotlight */}
-          <div
-            data-tour="li-content-lifecycle"
-            className="linkedin-tour-lifecycle-spotlight"
-            aria-hidden
-            style={{
-              position: 'absolute',
-              left: hubAxisLeft,
-              top: ringCenterTop,
-              width: lifecycleSpotlightSize,
-              height: lifecycleSpotlightSize,
-              transform: 'translate(-50%, -50%)',
-              pointerEvents: 'none',
-            }}
-          />
+          {/* Desktop-only radial ring — never mount on mobile (≤960px) */}
+          {desktopViewport && (
+            <>
+              <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
+              <div
+                data-tour="li-content-lifecycle"
+                className="linkedin-tour-lifecycle-spotlight"
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  left: hubAxisLeft,
+                  top: ringCenterTop,
+                  width: lifecycleSpotlightSize,
+                  height: lifecycleSpotlightSize,
+                  transform: 'translate(-50%, -50%)',
+                  pointerEvents: 'none',
+                }}
+              />
+            </>
+          )}
           <div
             className="linkedin-dashboard-hero-hub"
             style={{
-              position: 'absolute',
-              left: hubAxisLeft,
-              top: hubTop,
-              transform: 'translate(-50%, -50%)',
+              position: desktopViewport ? 'absolute' : 'relative',
+              left: desktopViewport ? hubAxisLeft : 'auto',
+              top: desktopViewport ? hubTop : 'auto',
+              transform: desktopViewport ? 'translate(-50%, -50%)' : 'none',
               zIndex: 10,
               width: hubDiameter,
               maxWidth: hubDiameter,
@@ -159,6 +159,7 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
               justifyContent: 'center',
               pointerEvents: 'none',
               overflow: 'visible',
+              margin: desktopViewport ? undefined : '0 auto',
             }}
           >
             <div
@@ -178,16 +179,17 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
             <div
               className="linkedin-dashboard-plan-anchor"
               style={{
-                position: 'absolute',
-                left: hubAxisLeft,
-                top: connectTop,
-                transform: `translate(-50%, calc(-1 * ${PLAN_CONNECT_UI_LIFT_PX}px))`,
+                position: 'relative',
+                left: 'auto',
+                top: 'auto',
+                transform: 'none',
                 zIndex: 20,
                 pointerEvents: 'auto',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
                 minWidth: 0,
+                marginTop: 6,
               }}
             >
               {planAnchorSlot}

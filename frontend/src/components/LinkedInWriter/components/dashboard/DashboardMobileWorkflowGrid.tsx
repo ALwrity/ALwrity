@@ -45,7 +45,11 @@ export const DashboardMobileWorkflowGrid: React.FC<DashboardMobileWorkflowGridPr
   };
 
   return (
-    <section className="linkedin-dashboard-mobile-workflow" aria-label="Studio actions">
+    <section
+      className="linkedin-dashboard-mobile-workflow"
+      aria-label="Studio actions"
+      data-tour="li-mobile-workflow"
+    >
       <h2 className="linkedin-dashboard-mobile-workflow-title">What would you like to do?</h2>
       <div className="linkedin-dashboard-mobile-workflow-grid">
         {DASHBOARD_WORKFLOW_CARDS.map((card) => {

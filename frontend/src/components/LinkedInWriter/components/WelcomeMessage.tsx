@@ -7,6 +7,7 @@ import { LinkedInPreferences } from '../utils/storageUtils';
 import { LinkedInDashboardHero } from './dashboard/LinkedInDashboardHero';
 import { DashboardRightRail } from './dashboard/DashboardRightRail';
 import { DashboardCopilotFab } from './dashboard/DashboardCopilotFab';
+import { DashboardMobileCopilotBar } from './dashboard/DashboardMobileCopilotBar';
 import { WatchdogDashboard } from './WatchdogDashboard';
 import type { KnowledgeCenterAction } from './dashboard/KnowledgeCenterDock';
 import type { DashboardWorkflowCardId } from './dashboard/dashboardWorkflowConfig';
@@ -418,9 +419,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           </div>
         </div>
 
-        <div className="linkedin-mobile-copilot-fab">
-          <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="fixed" />
-        </div>
+        {/* Phase 4 — full-width Co-Pilot bar (replaces floating FAB on mobile) */}
+        <DashboardMobileCopilotBar onOpenCopilot={handleOpenCopilot} />
 
         {watchdogOpen &&
           createPortal(
