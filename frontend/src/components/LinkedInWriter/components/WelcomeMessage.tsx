@@ -96,6 +96,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     }
   }, [disconnect]);
 
+  const planConnectAction = (
+    <LinkedInPlanConnectAction
+      social={social}
+      isDisconnecting={isDisconnecting}
+      onDisconnect={handleDisconnect}
+    />
+  );
+
   useEffect(() => {
     document.body.classList.add('linkedin-dashboard-view');
     return () => document.body.classList.remove('linkedin-dashboard-view');
@@ -343,13 +351,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         <div className="linkedin-dashboard-hero-stage">
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
-          planAnchorSlot={
-            <LinkedInPlanConnectAction
-              social={social}
-              isDisconnecting={isDisconnecting}
-              onDisconnect={handleDisconnect}
-            />
-          }
+          planAnchorSlot={planConnectAction}
         >
           <LinkedInConnectionPlaceholder
             key={userId ?? 'signed-out'}
@@ -410,8 +412,10 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         />
         <AskAlwrityModal open={kcAskAlwrity} onClose={() => setKcAskAlwrity(false)} />
 
-        <div className="linkedin-dashboard-copilot-fab">
-          <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="corner" />
+        <div className="linkedin-dashboard-bottom-dock" aria-label="Dashboard actions">
+          <div className="linkedin-dashboard-copilot-fab">
+            <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="corner" />
+          </div>
         </div>
 
         <div className="linkedin-mobile-copilot-fab">
