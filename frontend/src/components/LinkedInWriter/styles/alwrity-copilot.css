@@ -873,6 +873,53 @@ body.linkedin-quick-create-open {
   }
 }
 
+/* ─── Today's Growth Walkthrough Trigger Button ──────────────────────── */
+
+.linkedin-growth-walkthrough-trigger {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 25;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
+  transition: all 0.2s ease;
+  letter-spacing: 0.01em;
+}
+
+.linkedin-growth-walkthrough-trigger:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4);
+}
+
+.linkedin-growth-walkthrough-trigger:active {
+  transform: translateY(0);
+}
+
+.linkedin-growth-walkthrough-trigger span[aria-hidden] {
+  font-size: 16px;
+  line-height: 1;
+}
+
+@media (max-width: 640px) {
+  .linkedin-growth-trigger-label {
+    display: none;
+  }
+
+  .linkedin-growth-walkthrough-trigger {
+    padding: 8px 12px;
+  }
+}
+
 .linkedin-tour-lifecycle-spotlight {
   box-sizing: border-box;
 }

@@ -73,6 +73,8 @@ _user_engines = {}
 def _ensure_daily_workflow_schema(engine, user_id: str) -> None:
     """Backfill required daily_workflow_plans columns for legacy tenant DBs."""
     required_columns = {
+        "workflow_type": "VARCHAR(20) NOT NULL DEFAULT 'main'",
+        "source": "VARCHAR(30) NOT NULL DEFAULT 'agent'",
         "generation_mode": "VARCHAR(30) NOT NULL DEFAULT 'llm_generation'",
         "committee_agent_count": "INTEGER NOT NULL DEFAULT 0",
         "fallback_used": "BOOLEAN NOT NULL DEFAULT 0",
@@ -96,20 +98,48 @@ def _ensure_daily_workflow_schema(engine, user_id: str) -> None:
                     conn.exec_driver_sql(
                         f"ALTER TABLE daily_workflow_plans ADD COLUMN {col_name} {col_def}"
                     )
-                    logger.warning(
+                    logger.info(
                         f"Auto-migrated daily_workflow_plans column '{col_name}' for user {user_id}"
                     )
     except Exception as e:
         logger.error(f"Failed daily_workflow_plans schema compatibility check for user {user_id}: {e}")
+
+    # Also ensure daily_workflow_tasks has workflow_type column
+    task_required_columns = {
+        "workflow_type": "VARCHAR(20) NOT NULL DEFAULT 'main'",
+        "decided_at": "DATETIME",
+        "completion_notes": "TEXT",
+    }
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='daily_workflow_tasks'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_cols = {
+                row[1] for row in conn.exec_driver_sql("PRAGMA table_info(daily_workflow_tasks)").fetchall()
+            }
+
+            for col_name, col_def in task_required_columns.items():
+                if col_name not in existing_cols:
+                    conn.exec_driver_sql(
+                        f"ALTER TABLE daily_workflow_tasks ADD COLUMN {col_name} {col_def}"
+                    )
+                    logger.info(
+                        f"Auto-migrated daily_workflow_tasks column '{col_name}' for user {user_id}"
+                    )
+    except Exception as e:
+        logger.error(f"Failed daily_workflow_tasks schema compatibility check for user {user_id}: {e}")
 
 
 def _ensure_task_history_unique_index(engine, user_id: str) -> None:
     """Enforce unique index on task_history(user_id, task_hash).
 
     For SQLite, indexes cannot be altered in place; we drop and recreate
-    the index. If duplicate rows exist, the new unique index will fail —
-    in that case, log a warning and skip. Pre-existing duplicates should
-    be rare (only from buggy code paths) and won't block functionality.
+    the index. Duplicate rows are removed first (keeping the earliest rowid)
+    so the unique index constraint can be applied.
     """
     index_name = "ix_task_history_user_hash"
     try:
@@ -128,13 +158,29 @@ def _ensure_task_history_unique_index(engine, user_id: str) -> None:
             if target_idx and target_idx[2] == 1:
                 return
 
+            # De-duplicate: keep the row with the smallest rowid per (user_id, task_hash)
+            cursor = conn.exec_driver_sql(
+                """
+                DELETE FROM task_history WHERE rowid NOT IN (
+                    SELECT MIN(rowid) FROM task_history
+                    WHERE user_id = ?
+                    GROUP BY user_id, task_hash
+                ) AND user_id = ?
+                """,
+                (user_id, user_id)
+            )
+            if cursor.rowcount > 0:
+                logger.warning(
+                    f"Removed {cursor.rowcount} duplicate task_history rows for user {user_id}"
+                )
+
             if target_idx:
                 conn.exec_driver_sql(f"DROP INDEX {index_name}")
 
             conn.exec_driver_sql(
-                f"CREATE UNIQUE INDEX {index_name} ON task_history (user_id, task_hash)"
+                f"CREATE UNIQUE INDEX IF NOT EXISTS {index_name} ON task_history (user_id, task_hash)"
             )
-            logger.warning(
+            logger.info(
                 f"Auto-migrated task_history unique index '{index_name}' for user {user_id}"
             )
     except Exception as e:

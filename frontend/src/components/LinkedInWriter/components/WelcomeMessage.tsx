@@ -18,6 +18,7 @@ import {
 } from './dashboard/WorkflowActionModals';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
 import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
+import { TodayGrowthWalkthrough } from './dashboard/TodayGrowthWalkthrough';
 import { LINKEDIN_STUDIO_TOUR_SEEN_KEY, getLinkedInStudioTourSeenKey, hasSeenLinkedInStudioTour, getTourAutoStartDelayMs, shouldShowLinkedInStudioSkipReminder, markLinkedInStudioSkipReminderShown, LINKEDIN_STUDIO_TOUR_SKIP_REMINDER_MESSAGE } from '../../../utils/walkthroughs/linkedInStudioTourSteps';
 import { useAuth } from '@clerk/clerk-react';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
@@ -74,6 +75,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [todayGrowthOpen, setTodayGrowthOpen] = useState(false);
   const [connectWelcomeHandled, setConnectWelcomeHandled] = useState(false);
   const [connectWelcomeOpen, setConnectWelcomeOpen] = useState(false);
   const social = useLinkedInSocialConnection();
@@ -353,6 +355,17 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           </button>
         </div>
 
+        <button
+          type="button"
+          className="linkedin-growth-walkthrough-trigger"
+          onClick={() => setTodayGrowthOpen(true)}
+          aria-label="Today's Growth Tasks — guided walkthrough"
+          title="Walk through today's growth tasks pillar by pillar"
+        >
+          <span aria-hidden>🚀</span>
+          <span className="linkedin-growth-trigger-label">Today's Growth Tasks</span>
+        </button>
+
         <div className="linkedin-dashboard-hero-stage">
         <LinkedInDashboardHero
           onWorkflowCardAction={handleWorkflowCardAction}
@@ -497,6 +510,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         storageKey={tourSeenKey ?? LINKEDIN_STUDIO_TOUR_SEEN_KEY}
         connected={connected}
       />
+      <TodayGrowthWalkthrough open={todayGrowthOpen} onClose={() => setTodayGrowthOpen(false)} />
     </div>
   );
 };

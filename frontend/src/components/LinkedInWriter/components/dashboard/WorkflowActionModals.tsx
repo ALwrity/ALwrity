@@ -84,7 +84,19 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       dispatch('linkedinwriter:openBrainstorm');
     }
   };
-  const openQuickCreate     = (type: string) => { onClose(); dispatch('linkedinwriter:openQuickCreate', { type }); };
+  const openQuickCreate     = (type: string) => {
+    onClose();
+    const detail: Record<string, unknown> = { type };
+    try {
+      const ctx = sessionStorage.getItem('growth_task_context');
+      if (ctx) {
+        const parsed = JSON.parse(ctx);
+        if (parsed.pillar === 'create' && parsed.title) detail.topic = parsed.title;
+        sessionStorage.removeItem('growth_task_context');
+      }
+    } catch { /* ignore */ }
+    dispatch('linkedinwriter:openQuickCreate', detail);
+  };
   const openProfileAnalytics = () => { onClose(); dispatch('linkedinwriter:openOptimiseProfile'); };
   const openContentAnalytics = () => { onClose(); openPostAnalyticsModal(); };
   const openSeoAnalytics    = () => { onClose(); navigate('/seo-dashboard'); };

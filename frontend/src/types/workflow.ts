@@ -39,6 +39,9 @@ export interface TodayTask {
     source_agent?: string;
     reasoning?: string;
     context_data?: any;
+    tool_action?: string;
+    roi_score?: number;
+    impact_label?: string;
     [key: string]: any;
   };
   icon?: string | React.ComponentType<any>; // icon name or component reference
