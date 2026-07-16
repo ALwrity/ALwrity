@@ -365,7 +365,13 @@ export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionS
   if (statusPromiseCache && Date.now() < statusCacheExpiry) {
     return statusPromiseCache;
   }
-  const promise = apiClient.get(`${BASE}/connection/status`).then((r) => r.data);
+  const promise = apiClient
+    .get(`${BASE}/connection/status`)
+    .then((r) => r.data)
+    .catch((err) => {
+      statusPromiseCache = null;
+      throw err;
+    });
   statusPromiseCache = promise;
   statusCacheExpiry = Date.now() + STATUS_CACHE_TTL;
   promise.finally(() => {
@@ -408,13 +414,17 @@ export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> 
   return response.data;
 }
 
-/** Publish the LinkedIn Writer draft as a text-only post to the personal profile. */
+/** Publish the LinkedIn Writer draft as a post to the personal profile (text or text + image). */
 export async function publishLinkedInPost(
   payload: LinkedInPublishPostRequest
 ): Promise<LinkedInPublishPostResponse> {
-  const response = await apiClient.post(`${BASE}/posts/publish`, payload);
+  const response = await apiClient.post(`${BASE}/posts/publish`, payload, {
+    timeout: 180_000,
+  });
   return response.data;
 }
+
+export { publishLinkedInPostWithFile, getLinkedInPublishErrorMessage } from './linkedinPublishApi';
 
 export function getLinkedInSocialErrorMessage(err: unknown): string {
   if (err instanceof RequestTimeoutError) {

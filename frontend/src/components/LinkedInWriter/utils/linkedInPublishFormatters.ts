@@ -43,8 +43,11 @@ export function markdownToPlainText(content: string): string {
   text = text.replace(/```[\s\S]*?```/g, '');
   text = text.replace(/`([^`]+)`/g, '$1');
 
-  // Links and images — keep link text only
+  // Links and images — keep link text only; strip image markdown entirely
   text = text.replace(/!\[[^\]]*\]\([^)]+\)/g, '');
+  text = text.replace(/!\[[^\]]*\]\([^\)]*\)/g, '');
+  text = text.replace(/https?:\/\/[^\s]*\/api\/linkedin\/images\/[^\s)\]]+/gi, '');
+  text = text.replace(/\[\s*https?:\/\/[^\]\)]+\)\]/gi, '');
   text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 
   // Headers

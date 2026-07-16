@@ -174,13 +174,6 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
         </Alert>
       )}
 
-      {publishMedia.hasAttachment && (
-        <Alert severity="info" sx={{ mt: 1, py: 0, fontSize: 12 }}>
-          Image attached for preview. Media will be sent with your post when backend publishing
-          is enabled (Phase 3). Text-only publish remains available now.
-        </Alert>
-      )}
-
       <LinkedInSelectionImageModal
         open={selectionImage.modalOpen}
         onClose={selectionImage.closeModal}

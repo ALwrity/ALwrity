@@ -129,6 +129,15 @@ export function useLinkedInPublishMedia({
     attachment,
     validationError,
     hasAttachment: attachment !== null,
+    resolve: () => {
+      if (!attachment) {
+        return { source: 'none' as const };
+      }
+      if (attachment.source === 'ai') {
+        return { source: 'ai' as const, imageId: attachment.imageId };
+      }
+      return { source: 'upload' as const, localFile: attachment.localFile };
+    },
     attachAiImage,
     attachLocalFile,
     clearAttachment,

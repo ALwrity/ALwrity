@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import { Alert, Box } from '@mui/material';
 import { applyMarkdownFormat, type MarkdownFormatType } from '../../TextEditor/markdownFormatting';
 import { LinkedInEditorToolbar } from './LinkedInEditorToolbar';
@@ -11,6 +11,11 @@ import {
 } from '../utils/linkedInEditorDraftUtils';
 import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from '../utils/linkedInPublishMediaConstants';
 
+export interface LinkedInAssistiveEditorHandle {
+  /** Flush pending edits and return the merged draft markdown. */
+  flushDraft: () => string;
+}
+
 interface LinkedInAssistiveEditorProps {
   draft: string;
   onDraftChange: (value: string) => void;
@@ -21,12 +26,18 @@ interface LinkedInAssistiveEditorProps {
 /**
  * LinkedIn-native-style assistive editor: clean text area + inline photo strip + toolbar upload.
  */
-export const LinkedInAssistiveEditor: React.FC<LinkedInAssistiveEditorProps> = ({
+export const LinkedInAssistiveEditor = forwardRef<
+  LinkedInAssistiveEditorHandle,
+  LinkedInAssistiveEditorProps
+>(function LinkedInAssistiveEditor(
+  {
   draft,
   onDraftChange,
   onTypingChange,
   onTextareaSelection,
-}) => {
+  },
+  ref,
+) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,6 +70,25 @@ export const LinkedInAssistiveEditor: React.FC<LinkedInAssistiveEditorProps> = (
       saveTimerRef.current = setTimeout(commit, 600);
     },
     [onDraftChange],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      flushDraft: () => {
+        const merged = mergeAssistiveEditorDraft(textContent, images);
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+        if (merged !== lastEmittedDraftRef.current) {
+          lastEmittedDraftRef.current = merged;
+          onDraftChange(merged);
+        }
+        return merged;
+      },
+    }),
+    [textContent, images, onDraftChange],
   );
 
   useEffect(() => {
@@ -245,4 +275,6 @@ export const LinkedInAssistiveEditor: React.FC<LinkedInAssistiveEditorProps> = (
       )}
     </Box>
   );
-};
+});
+
+LinkedInAssistiveEditor.displayName = 'LinkedInAssistiveEditor';

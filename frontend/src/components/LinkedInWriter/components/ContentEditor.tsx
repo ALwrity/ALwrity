@@ -12,6 +12,7 @@ import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
 import { useLinkedInAssistiveWriting } from '../hooks/useLinkedInAssistiveWriting';
 import { useLinkedInEditorTextSelection } from '../hooks/useLinkedInEditorTextSelection';
 import { appendImageMarkdownToDraft } from '../utils/linkedInImageDraftUtils';
+import type { LinkedInAssistiveEditorHandle } from './LinkedInAssistiveEditor';
 import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
 import { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
 
@@ -33,6 +34,7 @@ interface ContentEditorProps {
   onDraftChange: (value: string) => void;
   onPreviewToggle: () => void;
   topic?: string;
+  assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
 }
 
 const ContentEditor: React.FC<ContentEditorProps> = ({
@@ -52,7 +54,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   onDiscardChanges,
   onDraftChange,
   onPreviewToggle,
-  topic
+  topic,
+  assistiveEditorRef,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [assistantOn, setAssistantOn] = useState(false);
@@ -213,6 +216,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               onTextareaSelection={textSelectionHandler.handleTextareaSelection}
               renderSelectionMenu={textSelectionHandler.renderSelectionMenu}
               onTypingChange={assistiveWriting.handleTypingChange}
+              assistiveEditorRef={assistiveEditorRef}
             />
 
             <GroundingDataDisplay

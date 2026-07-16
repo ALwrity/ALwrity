@@ -47,20 +47,43 @@ export function extractPublishImageIds(draft: string): string[] {
 /** Return the last AI-generated image segment from a draft (publish v1 uses one image). */
 export function getLastDraftImageForPublish(draft: string): LinkedInDraftImageAttachment | null {
   const imageSegments = splitDraftByImageMarkdown(draft).filter(
-    (segment) => segment.type === 'image' && segment.imageId,
+    (segment) => segment.type === 'image',
   );
 
   if (imageSegments.length === 0) return null;
 
   const last = imageSegments[imageSegments.length - 1];
-  if (last.type !== 'image' || !last.imageId) return null;
+  if (last.type !== 'image') return null;
+
+  const imageId = last.imageId || extractLinkedInImageId(last.url);
+  if (!imageId) return null;
 
   return {
     source: 'ai',
-    imageId: last.imageId,
+    imageId,
     imageUrl: last.url,
     alt: last.alt,
   };
+}
+
+/**
+ * Resolve the media attachment to send on publish.
+ * Always re-reads the draft so preview/editor images are not missed.
+ */
+export function resolvePublishMediaAttachment(
+  draft: string,
+  hookAttachment: LinkedInPublishMediaAttachment | null,
+): LinkedInPublishMediaAttachment | null {
+  if (hookAttachment?.source === 'upload' && hookAttachment.localFile) {
+    return hookAttachment;
+  }
+
+  const fromDraft = getLastDraftImageForPublish(draft);
+  if (fromDraft) {
+    return fromDraft;
+  }
+
+  return hookAttachment;
 }
 
 /** Validate a local image file before attach (client-side preflight). */
@@ -86,7 +109,7 @@ export function validatePublishImageFile(file: File): LinkedInPublishImageValida
   return { valid: true };
 }
 
-/** Build Phase 3 publish payload metadata from current attachment (UI preview only in Phase 1). */
+/** Build publish payload metadata from current attachment (UI preview). */
 export function describePublishMediaAttachment(
   attachment: LinkedInPublishMediaAttachment | null,
 ): string {

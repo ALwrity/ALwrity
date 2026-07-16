@@ -12,6 +12,7 @@ import os
 from typing import Any, Optional
 
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from services.integrations.linkedin.protocol import LinkedInSocialProvider
 from services.integrations.linkedin.types import (
@@ -597,16 +598,17 @@ class UnipileProvider:
         return await self._resolve_avatar_url(account.account_id)
 
     async def create_post(
-        self, user_id: str, request: CreatePostRequest
+        self, user_id: str, request: CreatePostRequest, *, db: Optional[Session] = None
     ) -> CreatePostResult:
         """
-        Publish a text-only post to the user's connected LinkedIn personal profile.
+        Publish a post to the user's connected LinkedIn personal profile.
 
-        v1: personal profile only; no first comment, media, or organization posting.
+        Supports optional single-image attachments via request.media_urls (v1).
         """
+        media_count = len(request.media_urls or [])
         logger.info(
             f"[UnipileProvider] create_post user_id={user_id} "
-            f"content_len={len(request.content or '')}"
+            f"content_len={len(request.content or '')} media_count={media_count}"
         )
 
         creds = self._oauth.resolve_credentials(user_id)
@@ -624,15 +626,26 @@ class UnipileProvider:
                 "Organization posting is not supported yet. Switch to personal profile."
             )
 
+        if media_count > 1:
+            raise ValueError("Maximum 1 image allowed per post")
+
         text = (request.content or "").strip()
         if not text:
             raise ValueError("Post content cannot be empty")
 
-        publish_request = CreatePostRequest(account_id=account_id, content=text)
-        await run_publish_preflight(user_id, publish_request)
+        publish_request = CreatePostRequest(
+            account_id=account_id,
+            content=text,
+            media_urls=list(request.media_urls or []),
+        )
+        await run_publish_preflight(user_id, publish_request, db=db)
 
         try:
-            raw = await self._client.create_post(account_id, text)
+            raw = await self._client.create_post(
+                account_id,
+                text,
+                attachment_paths=publish_request.media_urls or None,
+            )
         except UnipileAPIError as exc:
             logger.error(
                 f"[UnipileProvider] create_post Unipile error user_id={user_id} "
@@ -647,7 +660,7 @@ class UnipileProvider:
 
         logger.info(
             f"[UnipileProvider] create_post success user_id={user_id} "
-            f"post_id={post_id} post_urn={post_urn}"
+            f"post_id={post_id} post_urn={post_urn} media_count={media_count}"
         )
 
         return CreatePostResult(

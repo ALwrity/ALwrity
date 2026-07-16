@@ -1,10 +1,6 @@
 /**
- * Feature flag for LinkedIn publish media UI (Phase 1–3).
- * Set REACT_APP_LINKEDIN_PUBLISH_MEDIA_ENABLED=false to hide media controls.
- * Backend media publish wiring lands in Phase 3; Phase 1 is UI-only.
+ * LinkedIn publish media constants (aligned with backend LinkedInMediaValidator).
  */
-export const LINKEDIN_PUBLISH_MEDIA_ENABLED =
-  process.env.REACT_APP_LINKEDIN_PUBLISH_MEDIA_ENABLED !== 'false';
 
 /** Max image size aligned with backend LinkedInMediaValidator (8 MB). */
 export const LINKEDIN_PUBLISH_MAX_IMAGE_BYTES = 8 * 1024 * 1024;

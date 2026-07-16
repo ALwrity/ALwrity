@@ -2,17 +2,22 @@
  * F5 — Publish Now Modal
  *
  * Extracted from PublishWedgeModals.tsx (file > 500 lines) for maintainability.
- * Phase 1 adds publish media attachment UI (backend wiring in Phase 3).
+ * Phase 3 wires publish media to backend (text + optional image).
  */
 
 import React, { useState, useEffect, useRef } from 'react';
 import { DashboardActionModal } from './DashboardActionModal';
-import { publishLinkedInPost } from '../../../../api/linkedinSocial';
+import { getLinkedInPublishErrorMessage } from '../../../../api/linkedinSocial';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import { formatDraftForPublish } from '../../utils/linkedInPublishFormatters';
-import { LINKEDIN_PUBLISH_MEDIA_ENABLED } from '../../utils/linkedInPublishMediaConstants';
 import { useLinkedInPublishMedia } from '../../hooks/useLinkedInPublishMedia';
 import { LinkedInPublishMediaSection } from '../LinkedInPublishMediaSection';
+import {
+  buildLinkedInPublishSuccessMessage,
+  getLinkedInPublishConfirmLabel,
+  publishLinkedInWithMedia,
+} from '../../utils/linkedInPublishHandler';
+import { getLastDraftImageForPublish } from '../../utils/linkedInPublishMediaUtils';
 
 const DRAFT_STORAGE_KEY = 'alwrity-copilot-draft-content';
 
@@ -97,19 +102,26 @@ export interface PublishNowModalProps {
   onClose: () => void;
 }
 
+interface PublishResultState {
+  urn: string;
+  message: string;
+  shareUrl?: string | null;
+  hasMedia?: boolean;
+}
+
 export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose }) => {
-  const { connected, accountName } = useLinkedInSocialConnection();
+  const { connected, accountName, selectedAccountId } = useLinkedInSocialConnection();
   const [rawDraft, setRawDraft] = useState('');
   const [content, setContent] = useState('');
   const [phase, setPhase] = useState<'preflight' | 'published'>('preflight');
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState('');
-  const [postResult, setPostResult] = useState<{ urn: string; message: string } | null>(null);
+  const [postResult, setPostResult] = useState<PublishResultState | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const publishMedia = useLinkedInPublishMedia({
     draft: rawDraft,
-    autoDetectFromDraft: LINKEDIN_PUBLISH_MEDIA_ENABLED,
+    autoDetectFromDraft: true,
   });
 
   useEffect(() => {
@@ -129,6 +141,8 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
 
   const charCount = content.length;
   const charOk = charCount > 0 && charCount <= 3000;
+  const draftHasImage = Boolean(getLastDraftImageForPublish(rawDraft));
+  const hasPublishMedia = publishMedia.hasAttachment || draftHasImage;
 
   const handlePublish = async () => {
     if (!connected) {
@@ -145,19 +159,21 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
     abortRef.current = new AbortController();
     try {
       const publishContent = formatDraftForPublish(content);
-      const result = await publishLinkedInPost({ content: publishContent });
-      const suffix =
-        publishMedia.hasAttachment && LINKEDIN_PUBLISH_MEDIA_ENABLED
-          ? ' (text published; image attachment ships in Phase 3)'
-          : '';
+      const result = await publishLinkedInWithMedia({
+        content: publishContent,
+        accountId: selectedAccountId || undefined,
+        draft: rawDraft,
+        attachment: publishMedia.attachment,
+      });
       setPostResult({
         urn: result.post_urn ?? result.post_id ?? 'published',
-        message: (result.message || 'Published successfully.') + suffix,
+        message: buildLinkedInPublishSuccessMessage(result),
+        shareUrl: result.share_url,
+        hasMedia: result.has_media,
       });
       setPhase('published');
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail ?? err?.message ?? 'Publishing failed. Please try again.';
-      setError(msg);
+    } catch (err: unknown) {
+      setError(getLinkedInPublishErrorMessage(err));
     } finally {
       setPublishing(false);
       publishMedia.endPublishing();
@@ -175,6 +191,23 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
           <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>
             {postResult.message}
           </div>
+          {postResult.hasMedia && (
+            <div style={{ fontSize: 13, color: '#059669', marginBottom: 8 }}>
+              Published with image
+            </div>
+          )}
+          {postResult.shareUrl && (
+            <div style={{ marginBottom: 16 }}>
+              <a
+                href={postResult.shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ fontSize: 13, color: '#0a66c2', fontWeight: 600 }}
+              >
+                View on LinkedIn
+              </a>
+            </div>
+          )}
           {postResult.urn && postResult.urn !== 'published' && (
             <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20 }}>
               Post URN:{' '}
@@ -221,20 +254,18 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
             ok={charOk}
           />
 
-          {LINKEDIN_PUBLISH_MEDIA_ENABLED && (
-            <PreflightRow
-              icon={publishMedia.hasAttachment ? '🟢' : '🟡'}
-              label="Post image"
-              value={
-                publishMedia.hasAttachment
-                  ? publishMedia.attachment?.source === 'ai'
-                    ? 'AI-generated image attached'
-                    : `Uploaded: ${publishMedia.attachment?.source === 'upload' ? publishMedia.attachment.fileName : ''}`
-                  : 'Optional — generate with AI or upload from your device'
-              }
-              ok={publishMedia.hasAttachment ? true : null}
-            />
-          )}
+          <PreflightRow
+            icon={hasPublishMedia ? '🟢' : '🟡'}
+            label="Post image"
+            value={
+              hasPublishMedia
+                ? publishMedia.attachment?.source === 'ai' || draftHasImage
+                  ? 'AI-generated image attached'
+                  : `Uploaded: ${publishMedia.attachment?.source === 'upload' ? publishMedia.attachment.fileName : ''}`
+                : 'Optional — generate with AI or upload from your device'
+            }
+            ok={hasPublishMedia ? true : null}
+          />
 
           <PreflightRow
             icon="🟡"
@@ -244,11 +275,9 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
           />
         </div>
 
-        {LINKEDIN_PUBLISH_MEDIA_ENABLED && (
-          <div style={{ marginBottom: 16 }}>
-            <LinkedInPublishMediaSection draft={rawDraft} media={publishMedia} />
-          </div>
-        )}
+        <div style={{ marginBottom: 16 }}>
+          <LinkedInPublishMediaSection draft={rawDraft} media={publishMedia} />
+        </div>
 
         <div style={sectionLabel}>Post content</div>
         <textarea
@@ -305,10 +334,11 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
           >
             {publishing ? (
               <>
-                <Spinner /> Publishing…
+                <Spinner />{' '}
+                {hasPublishMedia ? 'Publishing text + image…' : 'Publishing…'}
               </>
             ) : (
-              `🚀 Confirm & Publish${publishMedia.hasAttachment && LINKEDIN_PUBLISH_MEDIA_ENABLED ? ' (text + image)' : ''}`
+              getLinkedInPublishConfirmLabel(hasPublishMedia)
             )}
           </button>
           <button style={panelBtn()} onClick={onClose}>

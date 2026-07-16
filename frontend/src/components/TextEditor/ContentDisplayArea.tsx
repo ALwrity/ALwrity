@@ -1,6 +1,6 @@
 import React from 'react';
 import { LinkedInDraftPreview } from '../LinkedInWriter/components/LinkedInDraftPreview';
-import { LinkedInAssistiveEditor } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
+import { LinkedInAssistiveEditor, type LinkedInAssistiveEditorHandle } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
 import type { LinkedInAssistiveSuggestion } from '../LinkedInWriter/services/linkedInAssistiveWritingApi';
 
@@ -31,6 +31,7 @@ interface ContentDisplayAreaProps {
   onTextareaSelection?: (textarea: HTMLTextAreaElement) => void;
   renderSelectionMenu: () => React.ReactNode;
   onTypingChange?: (text: string, caretIndex?: number) => void;
+  assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
 }
 
 const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
@@ -46,6 +47,7 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   onTextareaSelection,
   renderSelectionMenu,
   onTypingChange,
+  assistiveEditorRef,
 }) => {
   return (
     <div
@@ -113,6 +115,7 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
           <div>
             {assistantOn ? (
               <LinkedInAssistiveEditor
+                ref={assistiveEditorRef}
                 draft={draft}
                 onDraftChange={onDraftChange}
                 onTypingChange={onTypingChange}
