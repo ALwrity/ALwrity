@@ -13,6 +13,7 @@ import {
 } from '@mui/material';
 import {
   Image as ImageIcon,
+  LightbulbOutlined as TipsIcon,
   LinkedIn as LinkedInIcon,
   Visibility as PreviewIcon,
 } from '@mui/icons-material';
@@ -21,6 +22,7 @@ import { getLinkedInPublishErrorMessage } from '../../../api/linkedinSocial';
 import { useLinkedInPublishMedia } from '../hooks/useLinkedInPublishMedia';
 import { LinkedInPublishMediaSection } from './LinkedInPublishMediaSection';
 import { LinkedInPublishPreviewPlain } from './LinkedInPublishPreviewPlain';
+import { LinkedInPublishChecklist } from './LinkedInPublishChecklist';
 import {
   buildLinkedInPublishSuccessMessage,
   getLinkedInPublishButtonLabel,
@@ -31,6 +33,7 @@ import {
   resolvePublishMediaAttachment,
 } from '../utils/linkedInPublishMediaUtils';
 import {
+  areHardPublishChecksOk,
   assertHardPublishLimits,
   formatCharCountLabel,
   getCharReadiness,
@@ -71,6 +74,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mediaAnchor, setMediaAnchor] = useState<HTMLElement | null>(null);
   const [previewAnchor, setPreviewAnchor] = useState<HTMLElement | null>(null);
+  const [tipsAnchor, setTipsAnchor] = useState<HTMLElement | null>(null);
 
   const publishMedia = useLinkedInPublishMedia({ draft, autoDetectFromDraft: true });
 
@@ -81,9 +85,10 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   const hasPublishMedia = publishMedia.hasAttachment || draftHasImage;
   const previewAttachment = resolvePublishMediaAttachment(draft, publishMedia.attachment);
   const isOrgTarget = selectedTarget === 'organization';
+  const hardChecksOk = areHardPublishChecksOk(publishContent);
   const canPublish =
     connected &&
-    chars.hardOk &&
+    hardChecksOk &&
     !isOrgTarget &&
     !isPublishing &&
     !isLoading;
@@ -204,6 +209,15 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           <PreviewIcon fontSize="small" />
         </IconButton>
       </Tooltip>
+      <Tooltip title="Post tips (Best Practices)">
+        <IconButton
+          size="small"
+          onClick={(event) => setTipsAnchor(event.currentTarget)}
+          sx={{ color: '#b45309', border: '1px solid #fde68a' }}
+        >
+          <TipsIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
       <Popover
         open={Boolean(mediaAnchor)}
         anchorEl={mediaAnchor}
@@ -238,6 +252,24 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         <LinkedInPublishPreviewPlain
           draft={draft}
           attachment={previewAttachment}
+          compact
+        />
+      </Popover>
+      <Popover
+        open={Boolean(tipsAnchor)}
+        anchorEl={tipsAnchor}
+        onClose={() => setTipsAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        slotProps={{
+          paper: {
+            sx: { p: 1.5, width: 360, maxWidth: '94vw', maxHeight: 420, overflowY: 'auto' },
+          },
+        }}
+      >
+        <LinkedInPublishChecklist
+          draft={publishContent}
+          hasMedia={hasPublishMedia}
           compact
         />
       </Popover>
@@ -322,14 +354,18 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
       </Box>
 
       <Box sx={{ mb: 1.5 }}>
-        <Typography variant="caption" sx={{ color: chars.hardOk ? '#64748b' : '#dc2626' }}>
+        <LinkedInPublishChecklist
+          draft={publishContent}
+          hasMedia={hasPublishMedia}
+          compact
+        />
+        <Typography
+          variant="caption"
+          sx={{ color: chars.hardOk ? '#64748b' : '#dc2626', display: 'block', mt: 1 }}
+        >
           {formatCharCountLabel(chars.count)}
+          {seeMoreCaption ? ` · ${seeMoreCaption}` : ''}
         </Typography>
-        {seeMoreCaption && (
-          <Alert severity="warning" sx={{ mt: 1, py: 0, fontSize: 12 }}>
-            {seeMoreCaption}
-          </Alert>
-        )}
       </Box>
 
       {isOrgTarget && (

@@ -135,10 +135,10 @@ Prefs / HITL (max_length default ~2000)
 
 ### Tasks
 
-- [ ] **P3.1** Checklist component (consumes `getPublishChecklist` only)  
-- [ ] **P3.2** Soft vs hard styling (green / amber / red); tooltips from BP copy  
-- [ ] **P3.3** Confirm / Publish enabled only when hard items pass (already partly true — unify)  
-- [ ] **P3.4** Do not duplicate char/see-more logic outside readiness helpers  
+- [x] **P3.1** Checklist component (consumes `getPublishChecklist` only)  
+- [x] **P3.2** Soft vs hard styling (green / amber / red); tooltips from BP copy  
+- [x] **P3.3** Confirm / Publish enabled only when hard items pass (already partly true — unify)  
+- [x] **P3.4** Do not duplicate char/see-more logic outside readiness helpers  
 
 **Risk:** Low.
 
@@ -164,9 +164,9 @@ Prefs / HITL (max_length default ~2000)
 
 ### Tasks
 
-- [ ] **P4.1** Toolbar disclaimer  
-- [ ] **P4.2** Optional LinkedIn-style preview toggle (default = Studio)  
-- [ ] **P4.3** Citations unchanged in Studio preview  
+- [x] **P4.1** Toolbar disclaimer  
+- [x] **P4.2** Optional LinkedIn-style preview toggle (default = Studio)  
+- [x] **P4.3** Citations unchanged in Studio preview  
 
 **Risk:** Low.
 
@@ -219,9 +219,9 @@ Files that append tags/CTA today:
 
 ### Tasks
 
-- [ ] **P5.1** Prompt updates (no markdown / tags at end / see-more / first-2-line hook)  
-- [ ] **P5.2** Dedupe hashtag + CTA assembly helper; wire all generate-post entry points  
-- [ ] **P5.3** Safer default `max_length` (document in prefs HITL)  
+- [x] **P5.1** Prompt updates (no markdown / tags at end / see-more / first-2-line hook)  
+- [x] **P5.2** Dedupe hashtag + CTA assembly helper; wire all generate-post entry points  
+- [x] **P5.3** Safer default `max_length` (document in prefs HITL)  
 - [ ] **P5.4** Manual A/B: generate 3 posts before/after; confirm no double CTA/tags  
 
 **Risk:** Medium-low (prompt + assembly only).

@@ -102,7 +102,7 @@ export function getPublishChecklist(
     },
     {
       id: 'hard_limit',
-      label: 'Character limit',
+      label: 'LinkedIn character limit',
       detail: chars.isEmpty
         ? `0 / ${LINKEDIN_POST_HARD_LIMIT}`
         : chars.hardOk
@@ -113,40 +113,40 @@ export function getPublishChecklist(
     },
     {
       id: 'see_more',
-      label: 'See more length',
+      label: 'Stay under 1,300 characters',
       detail: chars.seeMoreSoftOk
-        ? `Under ~${LINKEDIN_POST_SEE_MORE_SOFT} characters (full post visible in feed).`
-        : `Past ~${LINKEDIN_POST_SEE_MORE_SOFT} characters — LinkedIn may show “see more”. Still publishable.`,
+        ? `Under ~${LINKEDIN_POST_SEE_MORE_SOFT} characters — full post visible in feed.`
+        : `Posts over ${LINKEDIN_POST_SEE_MORE_SOFT} chars are truncated with a “see more” break. Still publishable.`,
       ok: chars.isEmpty ? null : chars.seeMoreSoftOk ? true : null,
       severity: 'soft',
     },
     {
       id: 'hook',
-      label: 'Opening hook',
+      label: 'Start with a strong hook',
       detail: hasHookInFirstLines(plain)
-        ? 'First line looks strong enough to earn a click.'
-        : 'Tip: lead with a surprising claim, question, or outcome in the first line.',
+        ? 'First line looks strong enough to earn a “see more” click.'
+        : 'The first line determines if readers click “see more”. Use a surprising claim, question, or outcome.',
       ok: chars.isEmpty ? null : hasHookInFirstLines(plain) ? true : null,
       severity: 'soft',
     },
     {
       id: 'cta',
-      label: 'Call to action',
+      label: 'End with a clear CTA',
       detail: hasCtaSignal(plain)
         ? 'Includes a question or clear ask.'
-        : 'Tip: end with a question or invite readers to comment.',
+        : 'Ask a specific question or invite a reaction. Posts that drive comments get more reach.',
       ok: chars.isEmpty ? null : hasCtaSignal(plain) ? true : null,
       severity: 'soft',
     },
     {
       id: 'hashtags',
-      label: 'Hashtags',
+      label: 'Use 3–5 hashtags maximum',
       detail:
         tags.count === 0
-          ? 'Optional — 3–5 relevant hashtags work well.'
+          ? 'Optional — place 3–5 relevant hashtags at the end, never inline.'
           : tags.softOk
             ? `${tags.count} hashtag${tags.count === 1 ? '' : 's'} (within the usual 3–5).`
-            : `${tags.count} hashtags — consider keeping ≤ ${LINKEDIN_HASHTAG_SOFT_MAX}.`,
+            : `${tags.count} hashtags — more than ${LINKEDIN_HASHTAG_SOFT_MAX} can look spammy.`,
       ok: tags.count === 0 ? null : tags.softOk ? true : null,
       severity: 'soft',
     },
@@ -160,6 +160,13 @@ export function getPublishChecklist(
       severity: 'info',
     },
   ];
+}
+
+/** True when all hard checklist items pass for the given draft/plain text. */
+export function areHardPublishChecksOk(draftOrPlain: string): boolean {
+  return getPublishChecklist(draftOrPlain, false)
+    .filter((item) => item.severity === 'hard')
+    .every((item) => item.ok === true);
 }
 
 /** Hard gate only: empty content or over LinkedIn’s 3000-character limit. */

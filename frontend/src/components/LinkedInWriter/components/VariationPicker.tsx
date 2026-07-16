@@ -1,4 +1,8 @@
 import React from 'react';
+import {
+  assembleLinkedInPostContent,
+  joinHashtagSuggestions,
+} from '../utils/linkedInPostAssembly';
 
 // ── Variation Result types + helpers ──────────────────────────────────────────
 export interface VariationResult {
@@ -9,15 +13,11 @@ export interface VariationResult {
 }
 
 export function assembleFullContent(data: any): string {
-  const content = data?.content || '';
-  const hashtags = (data?.hashtags || []).map((h: any) =>
-    typeof h === 'string' ? h : h?.hashtag || ''
-  ).filter(Boolean).join(' ');
-  const cta = data?.call_to_action || '';
-  let full = content;
-  if (hashtags) full += `\n\n${hashtags}`;
-  if (cta) full += `\n\n${cta}`;
-  return full;
+  return assembleLinkedInPostContent({
+    content: data?.content || '',
+    hashtags: joinHashtagSuggestions(data?.hashtags),
+    callToAction: data?.call_to_action || '',
+  });
 }
 
 const VARIATION_TONES = [

@@ -1,5 +1,8 @@
-import React from 'react';
-import { LinkedInDraftPreview } from '../LinkedInWriter/components/LinkedInDraftPreview';
+import React, { useState } from 'react';
+import {
+  LinkedInPreviewModeToggle,
+  type LinkedInPreviewMode,
+} from '../LinkedInWriter/components/LinkedInPreviewModeToggle';
 import { LinkedInAssistiveEditor, type LinkedInAssistiveEditorHandle } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
 import type { LinkedInAssistiveSuggestion } from '../LinkedInWriter/services/linkedInAssistiveWritingApi';
@@ -49,6 +52,8 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   onTypingChange,
   assistiveEditorRef,
 }) => {
+  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('studio');
+
   return (
     <div
       ref={contentRef}
@@ -122,10 +127,12 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                 onTextareaSelection={onTextareaSelection}
               />
             ) : (
-              <LinkedInDraftPreview
+              <LinkedInPreviewModeToggle
                 draft={draft}
                 citations={citations}
                 researchSources={researchSources}
+                mode={previewMode}
+                onModeChange={setPreviewMode}
               />
             )}
           </div>

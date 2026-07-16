@@ -2,7 +2,7 @@
  * F5 — Publish Now Modal
  *
  * Extracted from PublishWedgeModals.tsx (file > 500 lines) for maintainability.
- * Phases 0–2: shared limits, see-more soft warning, plain “what LinkedIn will see” preview.
+ * Phase 3: Best Practices checklist via LinkedInPublishChecklist (hard + soft).
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -13,6 +13,7 @@ import { formatDraftForPublish } from '../../utils/linkedInPublishFormatters';
 import { useLinkedInPublishMedia } from '../../hooks/useLinkedInPublishMedia';
 import { LinkedInPublishMediaSection } from '../LinkedInPublishMediaSection';
 import { LinkedInPublishPreviewPlain } from '../LinkedInPublishPreviewPlain';
+import { LinkedInPublishChecklist } from '../LinkedInPublishChecklist';
 import {
   buildLinkedInPublishSuccessMessage,
   getLinkedInPublishConfirmLabel,
@@ -22,11 +23,9 @@ import {
   getLastDraftImageForPublish,
   resolvePublishMediaAttachment,
 } from '../../utils/linkedInPublishMediaUtils';
+import { LINKEDIN_POST_HARD_LIMIT } from '../../utils/linkedInPostFormatConstants';
 import {
-  LINKEDIN_POST_HARD_LIMIT,
-  LINKEDIN_POST_SEE_MORE_SOFT,
-} from '../../utils/linkedInPostFormatConstants';
-import {
+  areHardPublishChecksOk,
   assertHardPublishLimits,
   formatCharCountLabel,
   getCharReadiness,
@@ -159,7 +158,8 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
   const draftHasImage = Boolean(getLastDraftImageForPublish(rawDraft));
   const hasPublishMedia = publishMedia.hasAttachment || draftHasImage;
   const previewAttachment = resolvePublishMediaAttachment(rawDraft, publishMedia.attachment);
-  const canConfirm = connected && chars.hardOk && !publishing;
+  const hardChecksOk = areHardPublishChecksOk(content);
+  const canConfirm = connected && hardChecksOk && !publishing;
 
   const handlePublish = async () => {
     if (!connected) {
@@ -279,40 +279,7 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
             ok={connected}
           />
 
-          <PreflightRow
-            icon={chars.hardOk ? '🟢' : chars.isEmpty ? '⚪' : '🔴'}
-            label="Character count"
-            value={`${formatCharCountLabel(chars.count)}${
-              !chars.hardOk && !chars.isEmpty ? ' — exceeds limit' : ''
-            }`}
-            ok={chars.hardOk}
-          />
-
-          <PreflightRow
-            icon={chars.isEmpty ? '⚪' : chars.seeMoreSoftOk ? '🟢' : '🟡'}
-            label="See more length"
-            value={
-              chars.isEmpty
-                ? `Soft tip: keep under ~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()} characters for full feed visibility`
-                : chars.seeMoreSoftOk
-                  ? `Under ~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()} characters — full post visible in feed`
-                  : `Past see more (~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()}) — still publishable`
-            }
-            ok={chars.isEmpty ? null : chars.seeMoreSoftOk ? true : null}
-          />
-
-          <PreflightRow
-            icon={hasPublishMedia ? '🟢' : '🟡'}
-            label="Post image"
-            value={
-              hasPublishMedia
-                ? publishMedia.attachment?.source === 'ai' || draftHasImage
-                  ? 'AI-generated image attached'
-                  : `Uploaded: ${publishMedia.attachment?.source === 'upload' ? publishMedia.attachment.fileName : ''}`
-                : 'Optional — generate with AI or upload from your device'
-            }
-            ok={hasPublishMedia ? true : null}
-          />
+          <LinkedInPublishChecklist draft={content} hasMedia={hasPublishMedia} />
 
           <PreflightRow
             icon="🟡"
@@ -391,7 +358,11 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
 
         <div style={{ display: 'flex', gap: 10 }}>
           <button
-            style={panelBtn(true, false)}
+            style={{
+              ...panelBtn(true, false),
+              opacity: canConfirm ? 1 : 0.55,
+              cursor: canConfirm ? 'pointer' : 'not-allowed',
+            }}
             onClick={handlePublish}
             disabled={!canConfirm}
           >

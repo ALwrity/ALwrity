@@ -77,22 +77,26 @@ class PostPromptBuilder:
 {key_points_section}
 
         CONTENT REQUIREMENTS:
-        - Start with a compelling hook that addresses a pain point or opportunity
+        - Start with a strong hook in the first 1–2 lines (front-load before LinkedIn's "see more" fold). "Bold hook" means a strong opening line — NOT markdown bold.
         - Use storytelling elements to make it relatable and memorable
         - Include industry-specific examples or case studies when relevant
-        - End with a thought-provoking question or clear call-to-action
+        - End the body with a clear call-to-action or question as the last text block BEFORE hashtags
         - Use professional yet conversational language that encourages discussion
+        - Prefer ≤ 1,300 characters so the full post stays visible in feed, unless MAX LENGTH is higher and a longer post is clearly needed. Never exceed MAX LENGTH ({request.max_length} characters).
 
         ENGAGEMENT STRATEGY:
-        - Include 3-5 highly relevant, industry-specific hashtags (mix of broad and niche)
+        - Include 3–5 highly relevant, industry-specific hashtags (mix of broad and niche)
+        - Place ALL hashtags only at the very end of the post — never inline mid-sentence
         - Use line breaks and emojis strategically for readability
         - Encourage comments by asking for opinions or experiences
         - Make it shareable by providing genuine value
 
-        FORMATTING:
-        - Use bullet points or numbered lists for key insights
+        FORMATTING (LINKEDIN IS PLAIN TEXT):
+        - Do NOT use markdown: no **bold**, no # headers, no [links](url), no image markdown
+        - Use plain-text bullet lines (• or -) or numbered lists for key insights
         - Include relevant emojis to enhance visual appeal
-        - Break text into digestible paragraphs (2-3 lines max)
+        - Break text into digestible paragraphs (2–3 lines max)
+        - Structure order: hook + body → CTA/question → blank line → hashtags
         - Leave space for engagement (don't fill the entire character limit)
 
         CITATION FORMAT:
