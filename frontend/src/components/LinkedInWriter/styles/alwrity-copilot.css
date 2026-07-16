@@ -854,11 +854,13 @@ body.linkedin-quick-create-open {
   pointer-events: auto;
 }
 
+/* Plan connect anchor — mirrors the original desktop absolute positioning */
 .linkedin-dashboard-plan-anchor-slot {
   position: absolute;
-  top: calc(var(--hero-connect-top) - var(--hero-hub-top));
-  left: 50%;
+  top: var(--hero-connect-top);
+  left: var(--hero-hub-left);
   transform: translate(-50%, calc(-1 * var(--plan-connect-lift)));
+  z-index: 20;
   margin-top: 0;
   pointer-events: auto;
   display: flex;

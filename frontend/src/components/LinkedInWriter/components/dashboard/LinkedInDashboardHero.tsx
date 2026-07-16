@@ -80,7 +80,7 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
-        alignItems: 'stretch',
+        alignItems: 'center',
         overflow: 'hidden',
         position: 'relative',
         paddingTop: 0,
@@ -138,10 +138,12 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         >
           {children}
         </div>
-        {planAnchorSlot && (
-          <div className="linkedin-dashboard-plan-anchor-slot">{planAnchorSlot}</div>
-        )}
       </div>
+
+      {/* Plan connect anchor — positioned below the radial ring on desktop, below hub on mobile */}
+      {planAnchorSlot && (
+        <div className="linkedin-dashboard-plan-anchor-slot">{planAnchorSlot}</div>
+      )}
 
       {/* Mobile-only 2-column workflow grid */}
       <div className="linkedin-dashboard-mobile-workflow-wrap">
