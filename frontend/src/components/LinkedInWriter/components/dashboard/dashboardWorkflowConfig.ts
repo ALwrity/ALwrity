@@ -111,3 +111,17 @@ export const DASHBOARD_WORKFLOW_CARDS: DashboardWorkflowCard[] = CARD_DEFS.map((
 
 export const FRAME_COLOR = '#BCE0FD';
 
+export const RECOMMENDED_WORKFLOW_CARD_ID: DashboardWorkflowCardId = 'plan';
+
+export const PLAN_PINNED_HINT_KEY = 'linkedin_dashboard_plan_hint_dismissed';
+
+/** Shorter copy for the mobile 2-column workflow grid (≤960px). */
+export const WORKFLOW_MOBILE_DESCRIPTIONS: Record<DashboardWorkflowCardId, string> = {
+  plan: 'Brainstorm ideas, Watchdog news, and weekly plans',
+  create: 'Posts, articles, carousels, and video scripts',
+  publish: 'Drafts, scheduling, and publishing',
+  analysis: 'Profile insights, trends, and SEO',
+  engagement: 'Boost reach and grow your network',
+  remarket: 'Refresh and repurpose top content',
+};
+

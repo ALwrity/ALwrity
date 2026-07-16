@@ -14,10 +14,24 @@ import {
 import { getContextAwareSuggestions, mapPostType, mapTone, mapIndustry, mapSearchEngine, readPrefs } from '../utils/linkedInWriterUtils';
 import { linkedInWriterApi, GroundingLevel, LinkedInOutlineSection } from '../../../services/linkedInWriterApi';
 import { CopilotPersistenceManager } from '../utils/enhancedPersistence';
+import { stripSourceCitations } from '../utils/linkedInPublishFormatters';
+
+function normalizeDraftDetail(detail: unknown): string {
+  if (typeof detail === 'string') return detail;
+  if (detail && typeof detail === 'object' && 'content' in detail) {
+    const content = (detail as { content?: unknown }).content;
+    return typeof content === 'string' ? content : '';
+  }
+  return '';
+}
 
 export function useLinkedInWriter() {
-  // Core state
-  const [draft, setDraft] = useState('');
+  // Core state — restore draft from sessionStorage to survive dev HMR reloads
+  const [draft, setDraft] = useState(() => {
+    try { return sessionStorage.getItem('li_draft') || ''; } catch { return ''; }
+  });
+  // Controls whether the editor view is shown (false = show dashboard even when draft exists)
+  const [showEditor, setShowEditor] = useState(false);
   const [context, setContext] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -561,15 +575,29 @@ export function useLinkedInWriter() {
       saveCurrentContext(context);
     }
   }, [context]);
+
+  // Persist draft to sessionStorage so it survives dev HMR page reloads
+  useEffect(() => {
+    try {
+      if (draft) {
+        sessionStorage.setItem('li_draft', draft);
+      } else {
+        sessionStorage.removeItem('li_draft');
+      }
+    } catch { /* ignore */ }
+  }, [draft]);
   
   // Handle draft updates from CopilotKit actions
   useEffect(() => {
     const handleUpdateDraft = (event: CustomEvent) => {
-      console.log('[LinkedIn Writer] Draft updated:', event.detail?.substring(0, 100) + '...');
-      console.log('[LinkedIn Writer] Draft length:', event.detail?.length);
+      const rawContent = normalizeDraftDetail(event.detail);
+      const cleanedContent = stripSourceCitations(rawContent);
+      console.log('[LinkedIn Writer] Draft updated:', cleanedContent?.substring(0, 100) + '...');
+      console.log('[LinkedIn Writer] Draft length:', cleanedContent?.length);
       console.log('[LinkedIn Writer] Setting draft and clearing loading state...');
-      setDraft(event.detail);
+      setDraft(cleanedContent);
       setIsGenerating(false);
+      setShowEditor(true);
       setLoadingMessage('');
       setCurrentAction(null);
       // Auto-show preview when new content is generated
@@ -579,7 +607,8 @@ export function useLinkedInWriter() {
     };
 
     const handleAppendDraft = (event: CustomEvent) => {
-      setDraft(prev => prev + event.detail);
+      const appendContent = typeof event.detail === 'string' ? event.detail : '';
+      setDraft(prev => stripSourceCitations(prev + appendContent));
     };
 
     const handleAssistantMessage = (event: CustomEvent) => {
@@ -652,6 +681,7 @@ export function useLinkedInWriter() {
     setOutlineSections([]);
     setOutlineTitleSuggestions([]);
     setOutlineMode(false);
+    try { sessionStorage.removeItem('li_draft'); } catch { /* ignore */ }
   }, []);
 
   const handleCopy = useCallback(async () => {
@@ -732,6 +762,7 @@ export function useLinkedInWriter() {
   return {
     // State
     draft,
+    showEditor,
     context,
     isGenerating,
     isPreviewing,
@@ -751,6 +782,7 @@ export function useLinkedInWriter() {
     
     // Setters
     setDraft,
+    setShowEditor,
     setContext,
     setIsGenerating,
     setIsPreviewing,

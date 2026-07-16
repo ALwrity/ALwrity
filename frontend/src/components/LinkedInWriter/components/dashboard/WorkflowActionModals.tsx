@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardActionModal } from './DashboardActionModal';
 import { DashboardToolTile } from './DashboardToolTile';
 import type { DashboardWorkflowCardId } from './dashboardWorkflowConfig';
-import DataSourceSelector from '../Brainstorm/DataSourceSelector';
-import { usePlatformPersonaContext } from '../../../shared/PersonaContext/PlatformPersonaProvider';
+import { PlanWedgeModal } from '../Brainstorm/PlanWedgeModal';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import {
   openGrowthEngineModal,
@@ -69,38 +68,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const [remarkSub, setRemarkSub]         = useState<RemarkSub>(null);
   const [publishSub, setPublishSub] = useState<PublishSub>(null);
 
-  const [brainstormSeed, setBrainstormSeed] = useState('');
-  const [usePersona, setUsePersona] = useState(false);
-  const [includeTrending, setIncludeTrending] = useState(false);
-  const [remarketContent, setRemarketContent] = useState(false);
-
-  const { corePersona } = usePlatformPersonaContext();
   const { connected } = useLinkedInSocialConnection();
-
-  // Listen for external remarket event to pre-toggle the remarket option
-  useEffect(() => {
-    const onOpenBrainstormRemarket = () => {
-      setRemarketContent(true);
-    };
-    window.addEventListener('linkedinwriter:openBrainstormRemarket', onOpenBrainstormRemarket);
-    return () => {
-      window.removeEventListener('linkedinwriter:openBrainstormRemarket', onOpenBrainstormRemarket);
-    };
-  }, []);
-
-  const runBrainstorm = () => {
-    const finalSeed = (brainstormSeed || '').trim();
-    const hasOptions = usePersona || includeTrending || remarketContent;
-    if (!finalSeed && !hasOptions) return;
-    window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
-      detail: {
-        seed: finalSeed || '',
-        options: { usePersona, includeTrending, remarketContent },
-        forceRefresh: false,
-      },
-    }));
-    onClose();
-  };
 
   // ── shared dispatchers ─────────────────────────────────────────────────────
   const dispatch = (evt: string, detail?: Record<string, unknown>) => {
@@ -108,9 +76,15 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   };
 
   const openWatchdog        = () => { onClose(); dispatch('linkedinwriter:openWatchdog'); };
-  const openTopicIdeas      = () => { onClose(); dispatch('linkedinwriter:getTopicIdeas'); };
+  const openTopicIdeas      = () => {
+    onClose();
+    if (connected) {
+      dispatch('linkedinwriter:getTopicIdeas');
+    } else {
+      dispatch('linkedinwriter:openBrainstorm');
+    }
+  };
   const openQuickCreate     = (type: string) => { onClose(); dispatch('linkedinwriter:openQuickCreate', { type }); };
-  const openCalendar        = () => { onClose(); navigate('/content-planning', { state: { activeTab: 1 } }); };
   const openProfileAnalytics = () => { onClose(); dispatch('linkedinwriter:openOptimiseProfile'); };
   const openContentAnalytics = () => { onClose(); openPostAnalyticsModal(); };
   const openSeoAnalytics    = () => { onClose(); navigate('/seo-dashboard'); };
@@ -119,209 +93,12 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   return (
     <>
       {/* ── Plan ── */}
-      <DashboardActionModal open={activeModal === 'plan'} title="Plan" onClose={onClose} maxWidth={600}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {/* Brainstorm Card */}
-          <div style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            background: '#fff',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}>
-            {/* Card header — LinkedIn blue */}
-            <div style={{
-              padding: '10px 16px',
-              background: 'linear-gradient(135deg, #0a66c2 0%, #004182 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-              <div style={{
-                width: 30, height: 30,
-                borderRadius: 7,
-                background: 'rgba(255,255,255,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 15, flexShrink: 0,
-              }}>
-                🧠
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#fff', fontSize: 14, letterSpacing: '-0.01em' }}>Brainstorm</div>
-                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', marginTop: 1 }}>Generate ideas from persona, trending topics & past content</div>
-              </div>
-            </div>
-            {/* Card body */}
-            <div style={{ padding: '12px 14px 14px' }}>
-              <textarea
-                value={brainstormSeed}
-                onChange={(e) => setBrainstormSeed(e.target.value)}
-                placeholder={corePersona?.core_belief ? `Ex: "${corePersona.core_belief}" for SMB founders` : 'Optional: theme, problem, or audience'}
-                rows={2}
-                style={{
-                  width: '100%', border: '1px solid #d1d5db', borderRadius: 8,
-                  outline: 'none', fontSize: 13, resize: 'vertical',
-                  background: '#fff', padding: '8px 10px', lineHeight: 1.5, color: '#111827',
-                  transition: 'border-color 0.12s, box-shadow 0.12s',
-                }}
-                onFocus={(e) => { e.target.style.borderColor = '#0a66c2'; e.target.style.boxShadow = '0 0 0 2px rgba(10,102,194,0.1)'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#d1d5db'; e.target.style.boxShadow = 'none'; }}
-              />
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                <DataSourceSelector
-                  options={{ usePersona, includeTrending, remarketContent }}
-                  onChange={(upd) => {
-                    if (upd.usePersona !== undefined) setUsePersona(upd.usePersona);
-                    if (upd.includeTrending !== undefined) setIncludeTrending(upd.includeTrending);
-                    if (upd.remarketContent !== undefined) setRemarketContent(upd.remarketContent);
-                  }}
-                  connected={connected}
-                />
-                <button
-                  onClick={runBrainstorm}
-                  disabled={!(brainstormSeed || '').trim() && !usePersona && !includeTrending && !remarketContent}
-                  style={{
-                    padding: '7px 16px',
-                    borderRadius: 7,
-                    border: 'none',
-                    background: (brainstormSeed || '').trim() || usePersona || includeTrending || remarketContent
-                      ? 'linear-gradient(135deg, #0a66c2 0%, #004182 100%)'
-                      : '#e5e7eb',
-                    color: (brainstormSeed || '').trim() || usePersona || includeTrending || remarketContent ? '#fff' : '#9ca3af',
-                    fontWeight: 700,
-                    fontSize: 13,
-                    cursor: (brainstormSeed || '').trim() || usePersona || includeTrending || remarketContent ? 'pointer' : 'not-allowed',
-                    transition: 'opacity 0.12s',
-                    whiteSpace: 'nowrap',
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!((brainstormSeed || '').trim() || usePersona || includeTrending || remarketContent)) return;
-                    e.currentTarget.style.opacity = '0.9';
-                  }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
-                >
-                  Generate Ideas
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 0 10px' }}>
-            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
-            <span style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Other Tools</span>
-            <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
-          </div>
-
-          {/* Watchdog Card */}
-          <div style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            background: '#fff',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-          }}>
-            <div style={{
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              cursor: 'pointer',
-            }}
-              onClick={openWatchdog}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f9ff'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
-            >
-              <div style={{
-                width: 30, height: 30,
-                borderRadius: 7,
-                background: 'rgba(14,165,233,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 15, flexShrink: 0,
-              }}>
-                🔍
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#1f2937', fontSize: 14 }}>Watchdog</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>Industry trends, news monitoring & growth insights</div>
-              </div>
-              <span style={{ color: '#0ea5e9', fontSize: 16, fontWeight: 600 }}>→</span>
-            </div>
-          </div>
-
-          {/* Weekly Plan Card */}
-          <div style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            background: '#fff',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            marginTop: 10,
-          }}>
-            <div style={{
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              cursor: 'pointer',
-            }}
-              onClick={() => { onClose(); setPlanSub('weekly_plan'); }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = '#f0fdf4'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
-            >
-              <div style={{
-                width: 30, height: 30,
-                borderRadius: 7,
-                background: 'rgba(5,150,105,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 15, flexShrink: 0,
-              }}>
-                📅
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#1f2937', fontSize: 14 }}>Weekly Plan</div>
-                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 1 }}>Mon–Fri AI content plan with Create Now + Schedule CTAs</div>
-              </div>
-              <span style={{ color: '#059669', fontSize: 16, fontWeight: 600 }}>→</span>
-            </div>
-          </div>
-
-          {/* Content Calendar Card (WIP) */}
-          <div style={{
-            border: '1px solid #e5e7eb',
-            borderRadius: 12,
-            background: '#f9fafb',
-            overflow: 'hidden',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-            marginTop: 10,
-            opacity: 0.6,
-          }}>
-            <div style={{
-              padding: '10px 16px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              cursor: 'default',
-            }}>
-              <div style={{
-                width: 30, height: 30,
-                borderRadius: 7,
-                background: 'rgba(156,163,175,0.15)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 15, flexShrink: 0,
-              }}>
-                🗓️
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: '#9ca3af', fontSize: 14 }}>
-                  Content Calendar <span style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', background: '#e5e7eb', padding: '1px 5px', borderRadius: 3, marginLeft: 4 }}>WIP</span>
-                </div>
-                <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 1 }}>Full calendar view of all scheduled content</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </DashboardActionModal>
+      <PlanWedgeModal
+        open={activeModal === 'plan'}
+        onClose={onClose}
+        onOpenWatchdog={openWatchdog}
+        onOpenWeeklyPlan={() => { onClose(); setPlanSub('weekly_plan'); }}
+      />
 
       {/* ── Plan sub-modals ── */}
       <WeeklyPlanModal open={planSub === 'weekly_plan'} onClose={() => setPlanSub(null)} />

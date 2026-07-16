@@ -215,9 +215,9 @@ const useTextSelectionHandler = (
           return; 
         }
         
-        const x = Math.max(8, rect.left - container.left + (rect.width / 2));
-        const y = Math.max(8, rect.top - container.top);
-        
+        const x = Math.max(8, rect.left + rect.width / 2);
+        const y = Math.max(8, rect.top);
+
         const menuPosition = { x, y, text };
         console.log('🔍 [TextSelectionHandler] Setting selection menu at position (debounced):', menuPosition);
         setSelectionMenu(menuPosition);
@@ -249,9 +249,9 @@ const useTextSelectionHandler = (
               e.stopPropagation();
             }}
             style={{
-              position: 'absolute',
-              top: selectionMenu.y - 40,
-              left: selectionMenu.x - 200,
+              position: 'fixed',
+              top: Math.max(8, selectionMenu.y - 40),
+              left: Math.max(8, Math.min(selectionMenu.x - 100, window.innerWidth - 240)),
               background: 'rgba(10, 102, 194, 0.95)',
               border: '1px solid rgba(255, 255, 255, 0.25)',
               borderRadius: '8px',

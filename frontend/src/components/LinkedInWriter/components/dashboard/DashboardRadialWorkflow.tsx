@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   DASHBOARD_WORKFLOW_CARDS,
   FRAME_COLOR,
@@ -19,12 +19,12 @@ interface LabelPolish {
 }
 
 const LABEL_POLISH: Partial<Record<DashboardWorkflowCardId, LabelPolish>> = {
-  plan: { descWidthScale: 0.92 },
-  create: { descWidthScale: 0.9 },
-  publish: { descWidthScale: 0.9 },
-  analysis: { descWidthScale: 0.88 },
-  engagement: { descWidthScale: 0.86 },
-  remarket: { descWidthScale: 0.9 },
+  plan: { descWidthScale: 0.98 },
+  create: { descWidthScale: 0.96 },
+  publish: { descWidthScale: 0.98 },
+  analysis: { descWidthScale: 0.96 },
+  engagement: { descWidthScale: 0.98 },
+  remarket: { descWidthScale: 0.96 },
 };
 
 const RECOMMENDED_CARD_ID: DashboardWorkflowCardId = 'plan';
@@ -33,6 +33,23 @@ const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
 const OUTER_BULGE_FACTOR = 0.14;
 const HOVER_POP_PX = 10;
 const HOVER_SCALE = 1.06;
+
+function usePrefersReducedMotion(): boolean {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  return prefersReducedMotion;
+}
 
 function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
@@ -113,7 +130,7 @@ function wedgeLabelBox(
 ) {
   const mid = (startDeg + endDeg) / 2;
   const center = polar(cx, cy, (innerR + outerR) / 2, mid);
-  const height = Math.max(52, (outerR - innerR) * 0.92);
+  const height = Math.max(76, (outerR - innerR) * 0.98);
   return {
     x: center.x - labelBoxWidth / 2,
     y: center.y - height / 2,
@@ -131,6 +148,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
   const [showPlanPinnedHint, setShowPlanPinnedHint] = useState(
     () => !sessionStorage.getItem(PLAN_PINNED_HINT_KEY)
   );
+  const prefersReducedMotion = usePrefersReducedMotion();
   const {
     viewW,
     viewH,
@@ -169,6 +187,8 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
     const panelEndDeg = card.endAngle + PANEL_GAP_DEGREES;
     const polish = LABEL_POLISH[card.id] ?? { descWidthScale: 0.9 };
+    const iconHeaderGap = Math.max(5, Math.round(iconFontSize * 0.22));
+    const headerTextGap = Math.max(5, Math.round(descFontSize * 0.55));
     const box = wedgeLabelBox(
       centerX,
       centerY,
@@ -199,12 +219,14 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
           outerR,
           card.startAngle,
           card.endAngle,
-          isActive
+          isActive && !prefersReducedMotion
         )}
         style={{
           cursor: 'pointer',
           outline: 'none',
-          transition: 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
+          transition: prefersReducedMotion
+            ? 'fill 180ms ease, stroke 180ms ease, filter 180ms ease'
+            : 'transform 200ms cubic-bezier(0.22, 1, 0.36, 1)',
         }}
         onMouseEnter={() => setHoveredId(card.id)}
         onMouseLeave={() => setHoveredId(null)}
@@ -243,7 +265,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
           style={{
             pointerEvents: 'none',
             userSelect: 'none',
-            overflow: card.id === 'plan' ? 'visible' : 'hidden',
+            overflow: 'visible',
           }}
         >
           <div
@@ -256,7 +278,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
               alignItems: 'center',
               justifyContent: 'center',
               textAlign: 'center',
-              padding: '2px 5px',
+              padding: '4px 6px',
               boxSizing: 'border-box',
             }}
           >
@@ -264,7 +286,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
               style={{
                 width: iconFontSize,
                 height: iconFontSize,
-                marginBottom: 2,
+                marginBottom: iconHeaderGap,
                 color: isActive ? card.accent : '#334155',
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -287,7 +309,8 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
                 fontSize: labelFontSize,
                 fontWeight: 800,
                 color: isActive ? card.accent : '#0f172a',
-                lineHeight: 1.15,
+                lineHeight: 1.12,
+                marginBottom: headerTextGap,
                 transition: 'color 180ms ease',
               }}
             >
@@ -295,11 +318,12 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
             </div>
             <div
               style={{
-                marginTop: 3,
                 fontSize: descFontSize,
                 fontWeight: 500,
                 color: isActive ? '#334155' : '#475569',
-                lineHeight: 1.3,
+                lineHeight: 1.28,
+                maxWidth: '100%',
+                overflowWrap: 'break-word',
               }}
             >
               {card.description}
@@ -331,7 +355,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
       viewBox={`0 ${viewBoxY} ${viewW} ${viewH}`}
       width="100%"
       height={viewH}
-      style={{ display: 'block', overflow: 'visible' }}
+      style={{ display: 'block', overflow: 'hidden' }}
       aria-label="LinkedIn workflow"
     >
       <defs>
@@ -357,7 +381,6 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
         className="radial-glow-breath"
         style={{
           transformOrigin: `${centerX}px ${centerY}px`,
-          animation: 'prominentBreathe 2.5s ease-in-out infinite',
         }}
       >
         <circle
@@ -372,16 +395,6 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
       <style>{`
         .workflow-wedge:focus-visible .workflow-wedge-base {
           stroke-width: 3px;
-        }
-        @keyframes prominentBreathe {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.6;
-          }
-          50% {
-            transform: scale(1.04);
-            opacity: 1;
-          }
         }
       `}</style>
       {orderedCards.map(renderWedge)}

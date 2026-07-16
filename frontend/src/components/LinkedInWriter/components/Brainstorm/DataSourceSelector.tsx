@@ -10,6 +10,8 @@ interface DataSourceSelectorProps {
   options: BrainstormOptions;
   onChange: (updated: Partial<BrainstormOptions>) => void;
   connected: boolean;
+  /** Pill chips for Plan wedge modal; default compact chips elsewhere. */
+  variant?: 'default' | 'pill';
 }
 
 interface CheckboxDef {
@@ -48,12 +50,35 @@ const CHECKBOXES: CheckboxDef[] = [
   },
 ];
 
-const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ options, onChange, connected }) => {
+const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
+  options,
+  onChange,
+  connected,
+  variant = 'default',
+}) => {
+  const isPill = variant === 'pill';
+
   return (
-    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+    <div className={isPill ? 'plan-wedge-source-chips' : undefined} style={isPill ? undefined : { display: 'flex', gap: 5, flexWrap: 'wrap' }}>
       {CHECKBOXES.map((cb) => {
         const disabled = cb.requiresConnected && !connected;
         const checked = options[cb.key];
+
+        if (isPill) {
+          return (
+            <button
+              key={cb.key}
+              type="button"
+              title={disabled ? cb.disabledTooltip : cb.tooltip}
+              disabled={disabled}
+              onClick={() => onChange({ [cb.key]: !checked })}
+              className={`plan-wedge-source-chip${checked ? ' plan-wedge-source-chip--active' : ''}${disabled ? ' plan-wedge-source-chip--disabled' : ''}`}
+            >
+              <span className="plan-wedge-source-chip__icon" aria-hidden>{cb.icon}</span>
+              <span>{cb.label}</span>
+            </button>
+          );
+        }
 
         return (
           <div

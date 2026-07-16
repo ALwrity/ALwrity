@@ -17,6 +17,7 @@ import type { PostPreviewScoreResponse } from '../../../../services/linkedInGrow
 import { contentPlanningApi } from '../../../../services/contentPlanningApi';
 import { publishLinkedInPost } from '../../../../api/linkedinSocial';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
+import { formatDraftForPublish } from '../../utils/linkedInPublishFormatters';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -873,7 +874,7 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
 
   useEffect(() => {
     if (open) {
-      setContent(readDraftFromStorage());
+      setContent(formatDraftForPublish(readDraftFromStorage()));
       setPhase('preflight');
       setError('');
       setPostResult(null);
@@ -898,7 +899,8 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose 
     setError('');
     abortRef.current = new AbortController();
     try {
-      const result = await publishLinkedInPost({ content });
+      const publishContent = formatDraftForPublish(content);
+      const result = await publishLinkedInPost({ content: publishContent });
       setPostResult({ urn: result.post_urn ?? result.post_id ?? 'published', message: result.message });
       setPhase('published');
     } catch (err: any) {

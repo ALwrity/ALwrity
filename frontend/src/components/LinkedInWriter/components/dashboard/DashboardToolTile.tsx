@@ -1,5 +1,22 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
+
+function usePrefersReducedMotion(): boolean {
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+
+    handleChange();
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
+  return prefersReducedMotion;
+}
 
 interface DashboardToolTileProps {
   title: string;
@@ -24,6 +41,10 @@ export const DashboardToolTile: React.FC<DashboardToolTileProps> = ({
   disabledReason,
 }) => {
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
+  const isInteractive = !disabled;
+  const isActive = isInteractive && (hovered || focused);
 
   const handleClick = () => {
     if (disabled) return;
@@ -37,18 +58,23 @@ export const DashboardToolTile: React.FC<DashboardToolTileProps> = ({
         onClick={handleClick}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         title={disabled ? (disabledReason || title) : title}
         style={{
           padding: '10px 22px',
           borderRadius: 999,
           border: `2px solid ${disabled ? '#d1d5db' : accent}`,
-          background: disabled ? '#f9fafb' : hovered ? '#f0f9ff' : '#ffffff',
+          background: disabled ? '#f9fafb' : isActive ? '#f0f9ff' : '#ffffff',
           color: disabled ? '#9ca3af' : accent,
           fontSize: 14,
           fontWeight: 700,
           cursor: disabled ? 'not-allowed' : 'pointer',
-          transition: 'background 160ms ease, transform 160ms ease',
-          transform: hovered && !disabled ? 'translateY(-2px)' : 'none',
+          boxShadow: isActive ? `0 0 0 3px ${accent}22` : 'none',
+          transition: prefersReducedMotion
+            ? 'background 160ms ease, box-shadow 160ms ease'
+            : 'background 160ms ease, transform 160ms ease, box-shadow 160ms ease',
+          transform: isActive && !prefersReducedMotion ? 'translateY(-2px)' : 'none',
           whiteSpace: 'nowrap',
         }}
       >
@@ -63,6 +89,8 @@ export const DashboardToolTile: React.FC<DashboardToolTileProps> = ({
       onClick={handleClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       title={disabled ? (disabledReason || title) : title}
       style={{
         display: 'flex',
@@ -73,14 +101,16 @@ export const DashboardToolTile: React.FC<DashboardToolTileProps> = ({
         padding: '14px 10px',
         minHeight: 132,
         width: '100%',
-        background: disabled ? '#f9fafb' : '#ffffff',
-        border: `2px solid ${disabled ? '#e5e7eb' : FRAME_COLOR}`,
+        background: disabled ? '#f9fafb' : isActive ? '#f8fbff' : '#ffffff',
+        border: `2px solid ${disabled ? '#e5e7eb' : isActive ? accent : FRAME_COLOR}`,
         borderRadius: 12,
         cursor: disabled ? 'not-allowed' : 'pointer',
         textAlign: 'center',
-        boxShadow: disabled ? 'none' : hovered ? `0 8px 24px ${accent}22` : '0 2px 8px rgba(0,0,0,0.04)',
-        transform: hovered && !disabled ? 'translateY(-4px) scale(1.02)' : 'none',
-        transition: 'transform 160ms ease, box-shadow 160ms ease',
+        boxShadow: disabled ? 'none' : isActive ? `0 8px 24px ${accent}22` : '0 2px 8px rgba(0,0,0,0.04)',
+        transform: isActive && !prefersReducedMotion ? 'translateY(-4px) scale(1.02)' : 'none',
+        transition: prefersReducedMotion
+          ? 'border-color 160ms ease, background 160ms ease, box-shadow 160ms ease'
+          : 'transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease',
         opacity: disabled ? 0.55 : 1,
       }}
     >

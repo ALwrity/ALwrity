@@ -113,8 +113,12 @@ class LinkedInService:
                     user_id=effective_user_id
                 )
             else:
-                logger.error("Grounding not enabled, Error generating LinkedIn post")
-                raise Exception("Grounding not enabled, Error generating LinkedIn post")
+                logger.warning("Grounding not enabled — generating post without research sources")
+                content_result = await content_generator.generate_grounded_post_content(
+                    request=request,
+                    research_sources=[],
+                    user_id=effective_user_id
+                )
             
             # Step 3-5: Use content generator for processing and response building
             return await content_generator.generate_post(
@@ -173,8 +177,12 @@ class LinkedInService:
                     user_id=effective_user_id
                 )
             else:
-                logger.error("Grounding not enabled - cannot generate LinkedIn article without AI provider")
-                raise Exception("Grounding not enabled - cannot generate LinkedIn article without AI provider")
+                logger.warning("Grounding not enabled — generating article without research sources")
+                content_result = await content_generator.generate_grounded_article_content(
+                    request=request,
+                    research_sources=[],
+                    user_id=effective_user_id
+                )
             
             # Step 3-5: Use content generator for processing and response building
             return await content_generator.generate_article(
@@ -233,8 +241,12 @@ class LinkedInService:
                     user_id=effective_user_id
                 )
             else:
-                logger.error("Grounding not enabled - cannot generate LinkedIn carousel without AI provider")
-                raise Exception("Grounding not enabled - cannot generate LinkedIn carousel without AI provider")
+                logger.warning("Grounding not enabled — generating carousel without research sources")
+                content_result = await content_generator.generate_grounded_carousel_content(
+                    request=request,
+                    research_sources=[],
+                    user_id=effective_user_id
+                )
             
             # Step 3-5: Use content generator for processing and response building
             
@@ -328,8 +340,12 @@ class LinkedInService:
                     user_id=effective_user_id
                 )
             else:
-                logger.error("Grounding not enabled - cannot generate LinkedIn video script without AI provider")
-                raise Exception("Grounding not enabled - cannot generate LinkedIn video script without AI provider")
+                logger.warning("Grounding not enabled — generating video script without research sources")
+                content_result = await content_generator.generate_grounded_video_script_content(
+                    request=request,
+                    research_sources=[],
+                    user_id=effective_user_id
+                )
             
             # Step 3-5: Use content generator for processing and response building
             
@@ -415,8 +431,12 @@ class LinkedInService:
                     user_id=effective_user_id
                 )
             else:
-                logger.error("Grounding not enabled - cannot generate LinkedIn comment response without AI provider")
-                raise Exception("Grounding not enabled - cannot generate LinkedIn comment response without AI provider")
+                logger.warning("Grounding not enabled — generating comment response without research sources")
+                response_result = await content_generator.generate_grounded_comment_response(
+                    request=request,
+                    research_sources=[],
+                    user_id=effective_user_id
+                )
             
             # Step 3-5: Use content generator for processing and response building
             

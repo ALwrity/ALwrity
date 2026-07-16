@@ -2,7 +2,9 @@
 Brainstorming endpoints: search Exa for topic context and generate persona-aware
 LinkedIn content ideas using the common LLM infrastructure (llm_text_gen).
 """
+import json
 import uuid
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +16,7 @@ from models.linkedin_brainstorm_saved_ideas_db_models import BrainstormSavedIdea
 from services.brainstorm.personalized_service import (
     PERSONALIZED_JSON_STRUCT,
     PERSONALIZED_SYSTEM_PROMPT,
+    PersonalizedIdeaOutputItem,
     format_personalized_prompt,
     gather_personalization_data,
 )
@@ -50,12 +53,20 @@ class IdeasRequest(BaseModel):
 
 
 class IdeaItem(BaseModel):
-    prompt: str
-    rationale: Optional[str] = None
+    prompt: str = Field(..., description="Short, specific post topic headline (5–15 words, no markdown, no emojis)")
+    rationale: Optional[str] = Field(None, description="1–2 sentence why this angle works for the audience")
+    evidence: Optional[str] = Field(None, description="Source-backed data point, formatted as 'Source [N]: ...'")
+
+
+class SourceInfo(BaseModel):
+    title: str
+    url: str
+    snippet: str
 
 
 class IdeasResponse(BaseModel):
     ideas: List[IdeaItem]
+    sources: List[SourceInfo] = []
 
 
 class PersonalizedIdeasRequest(BaseModel):
@@ -66,16 +77,10 @@ class PersonalizedIdeasRequest(BaseModel):
     use_persona: bool = False
 
 
-class PersonalizedIdeaItem(BaseModel):
-    title: str
-    rationale: str
-    suggested_hook: Optional[str] = None
-    data_source: str
-
-
 class PersonalizedIdeasResponse(BaseModel):
-    ideas: List[PersonalizedIdeaItem]
+    ideas: List[PersonalizedIdeaOutputItem]
     data_summary: str = ""
+    sources: List[SourceInfo] = []
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -92,6 +97,56 @@ def _resolve_user_id(current_user: Optional[Dict[str, Any]]) -> str:
     )
 
 
+def _parse_llm_ideas(raw_response: Any, cls: type) -> list:
+    """Parse LLM response into validated idea items.
+
+    Handles dict (Gemini structured output), str (HuggingFace with optional
+    markdown fences), and None/error responses — matching the robust pattern
+    used in content_generator.py.
+
+    Returns a list of validated Pydantic model instances (empty on failure).
+    """
+    if raw_response is None:
+        logger.error("[Brainstorm] LLM returned None")
+        return []
+
+    if isinstance(raw_response, dict):
+        if "error" in raw_response:
+            logger.error(f"[Brainstorm] LLM returned error: {raw_response['error']}")
+            return []
+        parsed = raw_response
+    else:
+        cleaned = str(raw_response).strip()
+        if cleaned.startswith("```json"):
+            cleaned = cleaned[7:]
+        elif cleaned.startswith("```"):
+            cleaned = cleaned[3:]
+        if cleaned.endswith("```"):
+            cleaned = cleaned[:-3]
+        try:
+            parsed = json.loads(cleaned)
+        except json.JSONDecodeError as e:
+            logger.error(f"[Brainstorm] Failed to parse LLM response as JSON: {e}")
+            return []
+
+    items = parsed.get("ideas", [])
+    if not isinstance(items, list):
+        logger.error("[Brainstorm] LLM response 'ideas' is not a list")
+        return []
+
+    validated = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        try:
+            validated.append(cls(**item))
+        except Exception as e:
+            logger.warning(f"[Brainstorm] Skipping invalid idea item: {e}")
+            continue
+
+    return validated
+
+
 # ── POST /ideas (Exa-based seed brainstorming) ────────────────────────
 
 
@@ -103,11 +158,11 @@ async def generate_brainstorm_ideas(
     """Search Exa for topic context and generate persona-aware brainstorm ideas."""
     try:
         user_id = _resolve_user_id(current_user)
+        logger.info(f"[Brainstorm] /ideas request — seed={req.seed!r}, count={req.count}, persona={req.persona.persona_name if req.persona else None}")
 
-        sources = await search_exa(req.seed)
-        sources_block = "\n".join(
-            [f"- {s['title']} | {s['url']} | {s['snippet']}" for s in sources[:5]]
-        ) or "(no sources found)"
+        sources, content = await search_exa(req.seed)
+        logger.info(f"[Brainstorm] Exa returned {len(sources)} source(s)")
+        sources_block = content or "(no web sources found)"
 
         persona_block = ""
         if req.persona:
@@ -123,74 +178,71 @@ async def generate_brainstorm_ideas(
             limit = req.platformPersona.content_format_rules.get("character_limit")
             platform_block = f"LinkedIn character limit: {limit}" if limit else ""
 
+        today_str = date.today().strftime("%B %d, %Y")
         sys_prompt = (
-            "You are an enterprise-grade LinkedIn strategist. Generate specific, non-generic "
-            "brainstorm prompts suitable for LinkedIn posts or carousels. Use the provided web "
-            "sources to ground ideas and the persona to align tone and style."
+            "You are an enterprise-grade LinkedIn strategist who proposes specific, non-generic "
+            "content angles that executives can immediately use as post topics. "
+            "You ground every angle in real evidence from the provided web sources. "
+            "You never use markdown, emojis, or bullet points in the topic headline. "
+            "You prefer thought-leadership, contrarian takes backed by data, and practical playbooks. "
+            f"Today's date is {today_str}. Every angle must feel current as of this date."
         )
 
-        prompt = f"""SEED IDEA: {req.seed}
+        prompt = f"""TODAY'S DATE: {today_str}
+
+SEED IDEA: {req.seed}
 {persona_block}{platform_block}
-RECENT WEB SOURCES (top {len(sources[:5])}):
+RECENT WEB SOURCES (numbered list):
 {sources_block}
 
-TASK:
-- Propose {req.count} LinkedIn-ready brainstorm prompts tailored to the persona and grounded in the sources.
-- Each prompt should be specific and actionable.
-- Prefer thought-leadership angles, contrarian takes with evidence, or practical playbooks.
-- Avoid generic phrases like "latest trends" unless qualified by entities.
+Generate exactly {req.count} LinkedIn post angles in JSON.
 
-Return JSON with an array named ideas where each item has:
-- prompt: the exact text the user can use to generate a post
-- rationale: 1–2 sentence why this works for the audience/persona"""
+Each angle must be a JSON object with these fields:
+- prompt: short, specific headline (5-15 words, no markdown, no emojis, no bullets)
+- rationale: 1-2 sentences explaining why this resonates now
+- evidence: specific finding from a source above formatted as "Source [N]: <data point>", or null if none
 
-        json_struct = {
-            "type": "object",
-            "properties": {
-                "ideas": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "prompt": {"type": "string"},
-                            "rationale": {"type": "string"},
-                        },
-                    },
-                }
-            },
-        }
+Rules:
+- Avoid: latest trends, the future of, why you should, mastering, unlocking.
+- Prefer: contrarian with evidence, how-to with steps, or opinion with data.
+- Every angle must feel specific to {req.seed}, not generic."""
 
         result = llm_text_gen(
             prompt=prompt,
             system_prompt=sys_prompt,
-            json_struct=json_struct,
+            json_struct={
+                "type": "object",
+                "properties": {
+                    "ideas": {
+                        "type": "array",
+                        "items": IdeaItem.model_json_schema(),
+                    }
+                },
+            },
             user_id=user_id,
             flow_type="brainstorm_ideas",
             temperature=0.7,
+            max_tokens=3072,
         )
 
-        ideas: List[IdeaItem] = []
-        if isinstance(result, dict) and isinstance(result.get("ideas"), list):
-            for item in result["ideas"]:
-                if isinstance(item, dict) and item.get("prompt"):
-                    ideas.append(
-                        IdeaItem(prompt=item["prompt"], rationale=item.get("rationale"))
-                    )
+        ideas = _parse_llm_ideas(result, IdeaItem)
+        logger.info(f"[Brainstorm] LLM returned type={type(result).__name__}, parsed {len(ideas)} idea(s)")
 
         if not ideas:
-            ideas = [
-                IdeaItem(prompt=f"Explain why {req.seed} matters now with 2 recent stats", rationale="Timely and data-backed."),
-                IdeaItem(prompt=f"Common pitfalls in {req.seed} and how to avoid them", rationale="Actionable and experience-based."),
-                IdeaItem(prompt=f"A step-by-step playbook to implement {req.seed}", rationale="Practical value."),
-                IdeaItem(prompt=f"Case study: measurable impact of {req.seed}", rationale="Story + ROI."),
-                IdeaItem(prompt=f"Contrarian take: what most get wrong about {req.seed}", rationale="Thought leadership."),
-            ]
+            logger.warning(f"[Brainstorm] No ideas parsed from LLM response (type={type(result).__name__})")
+            raise HTTPException(
+                status_code=502,
+                detail="The AI model failed to generate brainstorm ideas. Please try again or rephrase your topic.",
+            )
 
-        return IdeasResponse(ideas=ideas[: req.count])
+        return IdeasResponse(
+            ideas=ideas[: req.count],
+            sources=[SourceInfo(title=s["title"], url=s["url"], snippet=s["snippet"]) for s in sources[:5]],
+        )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating brainstorm ideas: {e}")
+        logger.error(f"[Brainstorm] Error generating brainstorm ideas: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -229,28 +281,32 @@ async def generate_personalized_ideas(
             )
 
         # Gather personalization data
+        logger.info(f"[Brainstorm] /personalized-ideas request — seed={req.seed!r}, count={req.count}, "
+                     f"trending={req.include_trending}, remarket={req.remarket_content}, persona={req.use_persona}")
         data = await gather_personalization_data(
             user_id,
             include_trending=req.include_trending,
             remarket_content=req.remarket_content,
             use_persona=req.use_persona,
         )
+        logger.info(f"[Brainstorm] Personalization data has_data={data.get('has_data')}, "
+                     f"keys={list(data.keys())}")
 
         # Combine with Exa search if seed provided
         exa_sources: list[dict] = []
+        exa_content = ""
         if req.seed:
-            exa_sources = await search_exa(req.seed)
+            exa_sources, exa_content = await search_exa(req.seed)
+            logger.info(f"[Brainstorm] Exa returned {len(exa_sources)} source(s)")
 
         if not data.get("has_data") and not exa_sources:
+            logger.warning(f"[Brainstorm] No data or sources — returning empty")
             return PersonalizedIdeasResponse(ideas=[], data_summary=data.get("message", "No data available."))
 
         # Build prompt
         prompt = format_personalized_prompt(data, req.count, seed=req.seed)
-        if exa_sources:
-            exa_block = "\n".join(
-                [f"- {s['title']} | {s['url']} | {s['snippet']}" for s in exa_sources[:5]]
-            )
-            prompt += f"\n\n## Web Sources (from seed topic)\n{exa_block}"
+        if exa_content:
+            prompt += f"\n\n## Web Sources (from seed topic)\n{exa_content}"
 
         result = llm_text_gen(
             prompt=prompt,
@@ -259,32 +315,28 @@ async def generate_personalized_ideas(
             user_id=user_id,
             flow_type="brainstorm_personalized",
             temperature=0.75,
+            max_tokens=3072,
         )
 
-        ideas: List[PersonalizedIdeaItem] = []
-        if isinstance(result, dict) and isinstance(result.get("ideas"), list):
-            for item in result["ideas"]:
-                if isinstance(item, dict) and item.get("title"):
-                    ideas.append(
-                        PersonalizedIdeaItem(
-                            title=item["title"],
-                            rationale=item.get("rationale", ""),
-                            suggested_hook=item.get("suggested_hook"),
-                            data_source=item.get("data_source", "profile"),
-                        )
-                    )
+        ideas = _parse_llm_ideas(result, PersonalizedIdeaOutputItem)
+        logger.info(f"[Brainstorm] Personalize LLM returned type={type(result).__name__}, parsed {len(ideas)} idea(s)")
 
         if not ideas:
             summary = data.get("data_summary", "")
             msg = summary or "Could not generate ideas from available data."
+            logger.warning(f"[Brainstorm] No personalized ideas — summary={summary!r}")
             return PersonalizedIdeasResponse(ideas=[], data_summary=msg)
 
-        return PersonalizedIdeasResponse(ideas=ideas[: req.count], data_summary=data.get("data_summary", ""))
+        return PersonalizedIdeasResponse(
+            ideas=ideas[: req.count],
+            data_summary=data.get("data_summary", ""),
+            sources=[SourceInfo(title=s["title"], url=s["url"], snippet=s["snippet"]) for s in exa_sources[:5]],
+        )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error generating personalized ideas: {e}")
+        logger.error(f"[Brainstorm] Error generating personalized ideas: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

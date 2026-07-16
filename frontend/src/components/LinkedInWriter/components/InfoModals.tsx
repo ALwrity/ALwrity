@@ -1,4 +1,6 @@
 import React from 'react';
+import { LI_Z_MODAL } from '../utils/linkedInStudioZIndex';
+import { createPortal } from 'react-dom';
 
 interface InfoModalsProps {
   showCopilotModal: boolean;
@@ -31,13 +33,13 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 11000,
+    zIndex: LI_Z_MODAL,
     backdropFilter: 'blur(5px)',
   };
   return (
     <>
       {/* Copilot Modal */}
-      {showCopilotModal && (
+      {showCopilotModal && createPortal(
         <div style={infoModalOverlayStyle}>
           <div style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
@@ -54,6 +56,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
           }}>
             <button
               onClick={onCloseCopilotModal}
+              aria-label="Close"
               style={{
                 position: 'absolute',
                 top: '16px',
@@ -195,11 +198,12 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Assistive Research Modal */}
-      {showAssistiveModal && (
+      {showAssistiveModal && createPortal(
         <div style={infoModalOverlayStyle}>
           <div style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
@@ -216,6 +220,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
           }}>
             <button
               onClick={onCloseAssistiveModal}
+              aria-label="Close"
               style={{
                 position: 'absolute',
                 top: '16px',
@@ -310,11 +315,12 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Fact Check Modal */}
-      {showFactCheckModal && (
+      {showFactCheckModal && createPortal(
         <div style={infoModalOverlayStyle}>
           <div style={{
             background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
@@ -331,6 +337,7 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
           }}>
             <button
               onClick={onCloseFactCheckModal}
+              aria-label="Close"
               style={{
                 position: 'absolute',
                 top: '16px',
@@ -477,7 +484,8 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

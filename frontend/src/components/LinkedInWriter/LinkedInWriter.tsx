@@ -61,6 +61,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   const {
     // State
     draft,
+    showEditor,
     context,
     isGenerating,
     isPreviewing,
@@ -87,6 +88,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     
     // Setters
     setDraft,
+    setShowEditor,
     setChatHistory,
     setIsPreviewing,
     setLivePreviewHtml,
@@ -510,13 +512,12 @@ Always use the most appropriate tool for the user's request.`.trim();
         onPreferencesChange={handlePreferencesChange}
         hasDraft={!!draft}
         onResetDraft={handleClear}
-        generatePost={generatePost}
       />
 
 
       {/* Main Content */}
       <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
-        {draft || isGenerating ? (<>
+        {(showEditor && draft) || isGenerating ? (<>
           {draft && !isGenerating && (
             <div style={{ 
               padding: '8px 24px', 
@@ -530,7 +531,7 @@ Always use the most appropriate tool for the user's request.`.trim();
               <Button
                 type="button"
                 variant="contained"
-                onClick={() => setDraft('')}
+                onClick={() => setShowEditor(false)}
                 startIcon={<span style={{ fontSize: 18, lineHeight: 1 }}>←</span>}
                 sx={{ 
                   fontWeight: 700,
@@ -610,7 +611,7 @@ Always use the most appropriate tool for the user's request.`.trim();
               isGenerating={isGenerating}
             />
           ) : (
-          /* Welcome Message - Show when no content */
+          /* Welcome Message - Show when no content or draft exists but editor is hidden */
           <WelcomeMessage
             draft={draft}
             isGenerating={isGenerating}
@@ -622,6 +623,8 @@ Always use the most appropriate tool for the user's request.`.trim();
             outlineMode={outlineMode}
             userPreferences={userPreferences}
             onGenerateSimilarPost={handleGenerateSimilarPost}
+            onResumeDraft={() => setShowEditor(true)}
+            onClear={handleClear}
           />)
         )}
       </div>
