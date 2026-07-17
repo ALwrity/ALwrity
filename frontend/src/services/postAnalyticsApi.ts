@@ -98,6 +98,9 @@ export interface PostAnalyticsHistoryResponse {
   top_posts?: PostDelta[] | null;
   rising_posts?: PostDelta[] | null;
   falling_posts?: PostDelta[] | null;
+  period_key?: string | null;
+  baseline_reason?: string | null;
+  recommended_sync_cooldown_seconds?: number | null;
 }
 
 export const postAnalyticsApi = {

@@ -19,9 +19,17 @@ from models.linkedin_posts_models import (
     PostDelta,
 )
 from models.post_analytics_snapshot_model import PostAnalyticsSnapshot
-from services.engagement_growth_contribution import attach_growth_contributions
+from services.engagement_growth_contribution import (
+    attach_growth_contributions,
+    post_growth_score_from_delta,
+)
+from services.engagement_trends_period import (
+    RECOMMENDED_SYNC_COOLDOWN_SECONDS,
+    metric_delta,
+    normalize_period_key,
+    select_baseline_epoch,
+)
 
-# Max posts shown in top gainers / top decliners lists
 TOP_TREND_POSTS_LIMIT = 5
 
 
@@ -32,6 +40,12 @@ def _utc_iso(dt: Optional[datetime]) -> Optional[str]:
     if dt.tzinfo is not None:
         dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
     return dt.isoformat() + "Z"
+
+
+def _as_naive_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
 
 
 class LinkedInPostAnalyticsService:
@@ -80,10 +94,7 @@ class LinkedInPostAnalyticsService:
     # ── Persist ────────────────────────────────────────────────────────────
 
     def store_posts(self, user_id: str, posts: list[LinkedInPost]) -> int:
-        """Upsert a batch of LinkedInPost models into the analytics table.
-
-        Returns the number of rows upserted (inserted + updated).
-        """
+        """Upsert posts; write initial + daily-anchor snapshots for Trends windows."""
         now = datetime.utcnow()
         upserted = 0
 
@@ -109,191 +120,241 @@ class LinkedInPostAnalyticsService:
         )
         return upserted
 
-    # ── Engagement Trends (time-series) ────────────────────────────────────
+    # ── Engagement Trends (period windows) ─────────────────────────────────
 
-    def get_engagement_trends(self, user_id: str) -> PostAnalyticsHistoryResponse:
-        """Compare the latest two snapshot epochs and return deltas."""
-        # 1. Find the two most recent distinct snapshot timestamps
-        epochs = (
-            self.db.query(PostAnalyticsSnapshot.snapshot_at)
-            .filter(PostAnalyticsSnapshot.user_id == user_id)
-            .distinct()
-            .order_by(PostAnalyticsSnapshot.snapshot_at.desc())
-            .limit(2)
-            .all()
-        )
-        if len(epochs) < 2:
-            now = datetime.utcnow()
-            return PostAnalyticsHistoryResponse(
-                period={"from": _utc_iso(now), "to": _utc_iso(now)},
-                summary=EngagementSummary(
-                    total_posts=0,
-                    reactions=MetricDelta(before=0, now=0, delta=0, pct_change=0.0),
-                    comments=MetricDelta(before=0, now=0, delta=0, pct_change=0.0),
-                    impressions=MetricDelta(before=0, now=0, delta=0, pct_change=0.0),
-                    avg_engagement_rate_before=0.0,
-                    avg_engagement_rate_now=0.0,
-                ),
-                top_gainers=[],
-                top_decliners=[],
-                last_synced_at=self.get_last_synced_at(user_id),
-            )
+    def get_engagement_trends(
+        self,
+        user_id: str,
+        period: str = "since_joining",
+    ) -> PostAnalyticsHistoryResponse:
+        """Compare current metrics vs a period baseline (not last two syncs)."""
+        period_key = normalize_period_key(period)
+        now = datetime.utcnow()
+        last_synced = self.get_last_synced_at(user_id)
+        now_ts = _as_naive_utc(last_synced) if last_synced else now
 
-        t1, t2 = epochs[0][0], epochs[1][0]  # t1 = latest, t2 = previous
-        # Ensure t1 is the later timestamp
-        if t1 < t2:
-            t1, t2 = t2, t1
-
-        # 2. Fetch snapshots for both epochs, keyed by post_id
-        latest_rows = (
-            self.db.query(PostAnalyticsSnapshot)
-            .filter(
-                PostAnalyticsSnapshot.user_id == user_id,
-                PostAnalyticsSnapshot.snapshot_at == t1,
-            )
-            .all()
-        )
-        prev_rows = (
-            self.db.query(PostAnalyticsSnapshot)
-            .filter(
-                PostAnalyticsSnapshot.user_id == user_id,
-                PostAnalyticsSnapshot.snapshot_at == t2,
-            )
-            .all()
-        )
-
-        latest_map: dict[str, PostAnalyticsSnapshot] = {r.post_id: r for r in latest_rows}
-        prev_map: dict[str, PostAnalyticsSnapshot] = {r.post_id: r for r in prev_rows}
-        all_post_ids = set(latest_map.keys()) | set(prev_map.keys())
-
-        # 3. Compute per-post deltas (only for posts in both epochs)
-        deltas: list[PostDelta] = []
-        for pid in all_post_ids:
-            latest = latest_map.get(pid)
-            prev = prev_map.get(pid)
-            if not latest or not prev:
-                continue
-            deltas.append(PostDelta(
-                post_id=pid,
-                text="",
-                author_name="",
-                share_url=None,
-                reactions_delta=latest.reactions - prev.reactions,
-                comments_delta=latest.comments - prev.comments,
-                impressions_delta=latest.impressions - prev.impressions,
-                engagement_rate_now=latest.engagement_rate or 0.0,
-                engagement_rate_before=prev.engagement_rate or 0.0,
-            ))
-
-        # 4. Enrich with post text/author from main analytics table
-        if deltas:
-            pid_list = [d.post_id for d in deltas]
-            post_rows = (
-                self.db.query(LinkedInPostAnalytics)
-                .filter(
-                    LinkedInPostAnalytics.user_id == user_id,
-                    LinkedInPostAnalytics.post_id.in_(pid_list),
-                )
+        epochs = [
+            _as_naive_utc(row[0])
+            for row in (
+                self.db.query(PostAnalyticsSnapshot.snapshot_at)
+                .filter(PostAnalyticsSnapshot.user_id == user_id)
+                .distinct()
                 .all()
             )
-            post_map = {r.post_id: r for r in post_rows}
-            for d in deltas:
-                row = post_map.get(d.post_id)
-                if row:
-                    d.text = (row.text or "")[:200]
-                    d.author_name = row.author_name or ""
-                    d.share_url = row.share_url
-                    d.social_id = row.social_id
+            if row[0] is not None
+        ]
 
-        # 5. Aggregate summary stats (O(n) via dict lookups)
-        total = len(deltas)
-        if total > 0:
-            sum_reactions_before = sum((prev_map.get(d.post_id).reactions or 0) for d in deltas)
-            sum_reactions_now = sum((latest_map.get(d.post_id).reactions or 0) for d in deltas)
-            sum_comments_before = sum((prev_map.get(d.post_id).comments or 0) for d in deltas)
-            sum_comments_now = sum((latest_map.get(d.post_id).comments or 0) for d in deltas)
-            sum_impressions_before = sum((prev_map.get(d.post_id).impressions or 0) for d in deltas)
-            sum_impressions_now = sum((latest_map.get(d.post_id).impressions or 0) for d in deltas)
-            avg_er_before = sum(d.engagement_rate_before for d in deltas) / total
-            avg_er_now = sum(d.engagement_rate_now for d in deltas) / total
-        else:
-            sum_reactions_before = sum_reactions_now = 0
-            sum_comments_before = sum_comments_now = 0
-            sum_impressions_before = sum_impressions_now = 0
-            avg_er_before = avg_er_now = 0.0
+        baseline_at, baseline_reason = select_baseline_epoch(epochs, now_ts, period_key)
+        if baseline_at is None:
+            return self._empty_trends(
+                user_id=user_id,
+                period_key=period_key,
+                baseline_reason=baseline_reason,
+                now_ts=now_ts,
+            )
 
-        def _pct(b: int, n: int) -> float:
-            if b == 0:
-                return 0.0
-            return round((n - b) / b * 100, 1)
-
-        summary = EngagementSummary(
-            total_posts=total,
-            reactions=MetricDelta(
-                before=sum_reactions_before,
-                now=sum_reactions_now,
-                delta=sum_reactions_now - sum_reactions_before,
-                pct_change=_pct(sum_reactions_before, sum_reactions_now),
-            ),
-            comments=MetricDelta(
-                before=sum_comments_before,
-                now=sum_comments_now,
-                delta=sum_comments_now - sum_comments_before,
-                pct_change=_pct(sum_comments_before, sum_comments_now),
-            ),
-            impressions=MetricDelta(
-                before=sum_impressions_before,
-                now=sum_impressions_now,
-                delta=sum_impressions_now - sum_impressions_before,
-                pct_change=_pct(sum_impressions_before, sum_impressions_now),
-            ),
-            avg_engagement_rate_before=round(avg_er_before, 4),
-            avg_engagement_rate_now=round(avg_er_now, 4),
+        current_rows = (
+            self.db.query(LinkedInPostAnalytics)
+            .filter(LinkedInPostAnalytics.user_id == user_id)
+            .all()
         )
+        if not current_rows:
+            return self._empty_trends(
+                user_id=user_id,
+                period_key=period_key,
+                baseline_reason="no_current_posts",
+                now_ts=now_ts,
+            )
 
-        # 6. Sort by total delta magnitude → gainers / decliners
-        def _sort_key(d: PostDelta) -> int:
-            return d.reactions_delta + d.comments_delta + d.impressions_delta
+        baseline_rows = (
+            self.db.query(PostAnalyticsSnapshot)
+            .filter(
+                PostAnalyticsSnapshot.user_id == user_id,
+                PostAnalyticsSnapshot.snapshot_at == baseline_at,
+            )
+            .all()
+        )
+        # If exact epoch miss (clock skew), fall back to nearest snapshot per post.
+        prev_map: dict[str, PostAnalyticsSnapshot] = {r.post_id: r for r in baseline_rows}
+        if not prev_map:
+            prev_map = self._nearest_snapshots_at_or_before(user_id, baseline_at)
 
-        sorted_deltas = sorted(deltas, key=_sort_key, reverse=True)
-        top_gainers = [d for d in sorted_deltas if _sort_key(d) > 0][:TOP_TREND_POSTS_LIMIT]
-        top_decliners = [d for d in reversed(sorted_deltas) if _sort_key(d) < 0][:TOP_TREND_POSTS_LIMIT]
-        top_gainers = attach_growth_contributions(top_gainers, deltas)
+        now_map = {r.post_id: r for r in current_rows}
+        deltas: list[PostDelta] = []
+        for pid, current in now_map.items():
+            prev = prev_map.get(pid)
+            if not prev:
+                continue
+            deltas.append(
+                PostDelta(
+                    post_id=pid,
+                    social_id=current.social_id,
+                    text=(current.text or "")[:200],
+                    author_name=current.author_name or "",
+                    share_url=current.share_url,
+                    reactions_delta=(current.reactions or 0) - (prev.reactions or 0),
+                    comments_delta=(current.comments or 0) - (prev.comments or 0),
+                    impressions_delta=(current.impressions or 0) - (prev.impressions or 0),
+                    followers_delta=(current.followers_gained or 0) - (prev.followers_gained or 0),
+                    clicks_delta=(current.clicks or 0) - (prev.clicks or 0),
+                    reposts_delta=(current.reposts or 0) - (prev.reposts or 0),
+                    engagement_rate_now=current.engagement_rate or 0.0,
+                    engagement_rate_before=prev.engagement_rate or 0.0,
+                    impressions_now=current.impressions or 0,
+                    reactions_now=current.reactions or 0,
+                )
+            )
+
+        summary = self._build_summary(deltas, prev_map, now_map)
+        rising = sorted(
+            [d for d in deltas if post_growth_score_from_delta(d) > 0],
+            key=post_growth_score_from_delta,
+            reverse=True,
+        )[:TOP_TREND_POSTS_LIMIT]
+        falling = sorted(
+            [d for d in deltas if post_growth_score_from_delta(d) < 0],
+            key=post_growth_score_from_delta,
+        )[:TOP_TREND_POSTS_LIMIT]
+        rising = attach_growth_contributions(rising, deltas)
+
+        top_posts = sorted(
+            deltas,
+            key=lambda d: (d.impressions_now, d.reactions_now),
+            reverse=True,
+        )[:TOP_TREND_POSTS_LIMIT]
 
         logger.info(
-            "[PostAnalyticsService] Engagement trends user_id={} gainers={} with_contribution={}",
-            user_id,
-            len(top_gainers),
-            sum(1 for d in top_gainers if d.growth_contribution_pct is not None),
+            "[PostAnalyticsService] Trends period={} baseline={} reason={} "
+            "comparable={} rising={} falling={}",
+            period_key,
+            baseline_at,
+            baseline_reason,
+            len(deltas),
+            len(rising),
+            len(falling),
         )
 
         return PostAnalyticsHistoryResponse(
-            period={"from": _utc_iso(t2), "to": _utc_iso(t1)},
+            period={"from": _utc_iso(baseline_at), "to": _utc_iso(now_ts)},
             summary=summary,
-            top_gainers=top_gainers,
-            top_decliners=top_decliners,
-            last_synced_at=self.get_last_synced_at(user_id),
+            top_gainers=rising,
+            top_decliners=falling,
+            top_posts=top_posts,
+            rising_posts=rising,
+            falling_posts=falling,
+            period_key=period_key,
+            baseline_reason=baseline_reason,
+            recommended_sync_cooldown_seconds=RECOMMENDED_SYNC_COOLDOWN_SECONDS,
+            last_synced_at=last_synced,
         )
 
     # ── Internal helpers ───────────────────────────────────────────────────
 
-    def _snapshot_if_changed(
-        self, row: LinkedInPostAnalytics, post: LinkedInPost, now: datetime
-    ) -> None:
-        """Snapshot old values if any metric changed vs the incoming post."""
-        eng = post.engagement
-        if (row.reactions == eng.reactions and
-                row.comments == eng.comments and
-                row.reposts == eng.reposts and
-                row.impressions == eng.impressions and
-                row.clicks == eng.clicks and
-                row.followers_gained == eng.followers_gained and
-                abs((row.engagement_rate or 0.0) - (eng.engagement_rate or 0.0)) < 1e-9):
-            return
-        snapshot = PostAnalyticsSnapshot(
+    def _empty_trends(
+        self,
+        user_id: str,
+        period_key: str,
+        baseline_reason: str,
+        now_ts: datetime,
+    ) -> PostAnalyticsHistoryResponse:
+        zero = MetricDelta(before=0, now=0, delta=0, pct_change=0.0)
+        return PostAnalyticsHistoryResponse(
+            period={"from": _utc_iso(now_ts), "to": _utc_iso(now_ts)},
+            summary=EngagementSummary(
+                total_posts=0,
+                reactions=zero,
+                comments=zero,
+                impressions=zero,
+                followers=zero,
+                clicks=zero,
+                reposts=zero,
+                avg_engagement_rate_before=0.0,
+                avg_engagement_rate_now=0.0,
+            ),
+            top_gainers=[],
+            top_decliners=[],
+            top_posts=[],
+            rising_posts=[],
+            falling_posts=[],
+            period_key=period_key,
+            baseline_reason=baseline_reason,
+            recommended_sync_cooldown_seconds=RECOMMENDED_SYNC_COOLDOWN_SECONDS,
+            last_synced_at=self.get_last_synced_at(user_id),
+        )
+
+    def _nearest_snapshots_at_or_before(
+        self, user_id: str, baseline_at: datetime
+    ) -> dict[str, PostAnalyticsSnapshot]:
+        """Best-effort map: latest snapshot per post at or before baseline_at."""
+        rows = (
+            self.db.query(PostAnalyticsSnapshot)
+            .filter(
+                PostAnalyticsSnapshot.user_id == user_id,
+                PostAnalyticsSnapshot.snapshot_at <= baseline_at,
+            )
+            .order_by(PostAnalyticsSnapshot.snapshot_at.desc())
+            .all()
+        )
+        out: dict[str, PostAnalyticsSnapshot] = {}
+        for row in rows:
+            if row.post_id not in out:
+                out[row.post_id] = row
+        return out
+
+    def _build_summary(
+        self,
+        deltas: list[PostDelta],
+        prev_map: dict[str, PostAnalyticsSnapshot],
+        now_map: dict[str, LinkedInPostAnalytics],
+    ) -> EngagementSummary:
+        total = len(deltas)
+        if total == 0:
+            zero = MetricDelta(before=0, now=0, delta=0, pct_change=0.0)
+            return EngagementSummary(
+                total_posts=0,
+                reactions=zero,
+                comments=zero,
+                impressions=zero,
+                followers=zero,
+                clicks=zero,
+                reposts=zero,
+                avg_engagement_rate_before=0.0,
+                avg_engagement_rate_now=0.0,
+            )
+
+        def _sums(attr_prev: str, attr_now: str) -> tuple[int, int]:
+            before = sum(getattr(prev_map[d.post_id], attr_prev) or 0 for d in deltas)
+            now_v = sum(getattr(now_map[d.post_id], attr_now) or 0 for d in deltas)
+            return before, now_v
+
+        r_b, r_n = _sums("reactions", "reactions")
+        c_b, c_n = _sums("comments", "comments")
+        i_b, i_n = _sums("impressions", "impressions")
+        f_b, f_n = _sums("followers_gained", "followers_gained")
+        k_b, k_n = _sums("clicks", "clicks")
+        p_b, p_n = _sums("reposts", "reposts")
+        avg_er_before = sum(d.engagement_rate_before for d in deltas) / total
+        avg_er_now = sum(d.engagement_rate_now for d in deltas) / total
+
+        return EngagementSummary(
+            total_posts=total,
+            reactions=MetricDelta(**metric_delta(r_b, r_n)),
+            comments=MetricDelta(**metric_delta(c_b, c_n)),
+            impressions=MetricDelta(**metric_delta(i_b, i_n)),
+            followers=MetricDelta(**metric_delta(f_b, f_n)),
+            clicks=MetricDelta(**metric_delta(k_b, k_n)),
+            reposts=MetricDelta(**metric_delta(p_b, p_n)),
+            avg_engagement_rate_before=round(avg_er_before, 4),
+            avg_engagement_rate_now=round(avg_er_now, 4),
+        )
+
+    def _snapshot_from_row(
+        self, row: LinkedInPostAnalytics, snapshot_at: datetime
+    ) -> PostAnalyticsSnapshot:
+        return PostAnalyticsSnapshot(
             user_id=row.user_id,
             post_id=row.post_id,
-            snapshot_at=now,
+            snapshot_at=snapshot_at,
             reactions=row.reactions or 0,
             comments=row.comments or 0,
             reposts=row.reposts or 0,
@@ -302,12 +363,53 @@ class LinkedInPostAnalyticsService:
             followers_gained=row.followers_gained or 0,
             engagement_rate=row.engagement_rate or 0.0,
         )
-        self.db.add(snapshot)
+
+    def _has_snapshot_on_utc_day(
+        self, user_id: str, post_id: str, day: datetime
+    ) -> bool:
+        day_start = datetime(day.year, day.month, day.day)
+        day_end = day_start.replace(hour=23, minute=59, second=59, microsecond=999999)
+        exists = (
+            self.db.query(PostAnalyticsSnapshot.id)
+            .filter(
+                PostAnalyticsSnapshot.user_id == user_id,
+                PostAnalyticsSnapshot.post_id == post_id,
+                PostAnalyticsSnapshot.snapshot_at >= day_start,
+                PostAnalyticsSnapshot.snapshot_at <= day_end,
+            )
+            .first()
+        )
+        return exists is not None
+
+    def _metrics_unchanged(self, row: LinkedInPostAnalytics, post: LinkedInPost) -> bool:
+        eng = post.engagement
+        return (
+            row.reactions == eng.reactions
+            and row.comments == eng.comments
+            and row.reposts == eng.reposts
+            and row.impressions == eng.impressions
+            and row.clicks == eng.clicks
+            and row.followers_gained == eng.followers_gained
+            and abs((row.engagement_rate or 0.0) - (eng.engagement_rate or 0.0)) < 1e-9
+        )
+
+    def _snapshot_if_changed(
+        self, row: LinkedInPostAnalytics, post: LinkedInPost, now: datetime
+    ) -> bool:
+        """Snapshot old values if metrics changed. Returns True when snapshot written."""
+        if self._metrics_unchanged(row, post):
+            return False
+        self.db.add(self._snapshot_from_row(row, now))
+        return True
 
     def _update_row(
         self, row: LinkedInPostAnalytics, post: LinkedInPost, now: datetime
     ) -> None:
-        self._snapshot_if_changed(row, post, now)
+        wrote_change = self._snapshot_if_changed(row, post, now)
+        if not wrote_change and not self._has_snapshot_on_utc_day(row.user_id, row.post_id, now):
+            # Daily anchor even when metrics are flat — enables period windows.
+            self.db.add(self._snapshot_from_row(row, now))
+
         row.text = post.text
         row.title = post.title
         row.created_at = post.created_at
@@ -355,6 +457,9 @@ class LinkedInPostAnalyticsService:
             stored_at=now,
         )
         self.db.add(row)
+        self.db.flush()
+        # Initial baseline so "since joining" can start after the next sync.
+        self.db.add(self._snapshot_from_row(row, now))
         return row
 
     def clear_user_analytics(self, user_id: str) -> int:
@@ -369,9 +474,6 @@ class LinkedInPostAnalyticsService:
             f"[PostAnalyticsService] Cleared {deleted} analytics rows for user={user_id}"
         )
         return deleted
-
-
-# ── Helpers ────────────────────────────────────────────────────────────────
 
 
 def _row_to_linkedin_post(row: LinkedInPostAnalytics) -> LinkedInPost:

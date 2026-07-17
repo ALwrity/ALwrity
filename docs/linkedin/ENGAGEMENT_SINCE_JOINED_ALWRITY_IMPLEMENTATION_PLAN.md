@@ -2,7 +2,7 @@
 
 ## Implementation Plan (Issue #118)
 
-**Status:** Phase 1 implemented (frontend UI shell); Phases 2–4 planned  
+**Status:** Phase 1 shipped + pushed; Phase 2 backend implemented (manual QA); Phases 3–4 planned  
 **Last updated:** 2026-07-17  
 **GitHub:** [#118](https://github.com/ALwrity/ALwrity-prod/issues/118)  
 **Related:** [#75](https://github.com/ALwrity/ALwrity-prod/pull/75) (growth contribution %), [#120](https://github.com/ALwrity/ALwrity-prod/issues/120) (logging gaps), [#119](https://github.com/ALwrity/ALwrity-prod/issues/119) (media isolation — out of scope here)
@@ -232,11 +232,21 @@ Keep `reactions + comments + impressions` **or** include `followers_gained` in t
 
 **Phase 2 exit criteria**
 
-- [ ] History with `period=7d` uses baseline near 7 days ago, not last sync.  
-- [ ] Two syncs 1 minute apart do not wipe Trends when older history exists.  
-- [ ] Response includes Top / Rising / Falling + followers metrics.  
-- [ ] New account / insufficient history returns structured empty + clear reason field (for UI).
+- [x] History with `period=7d` uses baseline near 7 days ago, not last sync.  
+- [x] Two syncs 1 minute apart do not wipe Trends when older history exists.  
+- [x] Response includes Top / Rising / Falling + followers metrics.  
+- [x] New account / insufficient history returns structured empty + clear reason field (for UI).
 
+**Phase 2 shipped notes (2026-07-17)**
+
+- `GET /api/linkedin/post-analytics/history?period=1d|7d|15d|30d|since_joining`  
+- Baseline min gap: **6 hours** (`engagement_trends_period.py`)  
+- Snapshots: initial on insert + daily UTC anchor when metrics flat  
+- Contribution score includes **followers_delta**  
+- `recommended_sync_cooldown_seconds=300` on response  
+- No new `requirements.txt` dependencies  
+- Unit tests added (not auto-run): `backend/tests/test_engagement_trends_period.py`  
+- Phase 3 still needed to pass selected chip as `?period=` from the modal
 ---
 
 ### Phase 3 — Wire frontend ↔ backend
