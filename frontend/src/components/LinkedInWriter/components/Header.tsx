@@ -35,6 +35,7 @@ interface HeaderProps {
   onPreferencesChange: (prefs: Partial<LinkedInPreferences>) => void;
   hasDraft: boolean;
   onResetDraft: () => void;
+  onOpenGifMaker?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -581,7 +582,7 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <button
             type="button"
-            onClick={() => { window.location.href = '/gif-maker'; }}
+            onClick={() => onOpenGifMaker?.()}
             title="GIF Maker — Record UI flows for marketing"
             aria-label="Open GIF Maker"
             style={{

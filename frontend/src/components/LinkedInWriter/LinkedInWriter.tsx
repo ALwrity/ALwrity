@@ -20,6 +20,7 @@ import {
 } from './components';
 import OutlineEditor from './components/OutlineEditor';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
+import { GifMakerFloatingPanel } from '../GifMaker/GifMakerFloatingPanel';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
@@ -125,6 +126,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     generateOutline,
     refineOutline,
   } = useLinkedInWriter();
+
+  const [showGifMaker, setShowGifMaker] = useState(false);
 
   // Get persona context for enhanced AI assistance
   const { corePersona, platformPersona } = usePlatformPersonaContext();
@@ -512,6 +515,7 @@ Always use the most appropriate tool for the user's request.`.trim();
         onPreferencesChange={handlePreferencesChange}
         hasDraft={!!draft}
         onResetDraft={handleClear}
+        onOpenGifMaker={() => setShowGifMaker(true)}
       />
 
 
@@ -784,6 +788,12 @@ Always use the most appropriate tool for the user's request.`.trim();
 
       {/* Progress overlay — renders as fixed-position modal via portal */}
       <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
+
+      {/* GIF Maker floating overlay */}
+      <GifMakerFloatingPanel
+        open={showGifMaker}
+        onClose={() => setShowGifMaker(false)}
+      />
     </div>
   );
 };
