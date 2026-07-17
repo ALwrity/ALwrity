@@ -1,8 +1,7 @@
 /**
  * F6 — Engagement Since You Joined ALwrity
  *
- * Phase 1 UI shell: title, period chips, Top/Rising/Falling tabs, plain copy.
- * Still loads existing history API; period filter is client-only until Phase 3.
+ * Phase 3: period chips refetch `?period=`; tabs bind Top/Rising/Falling from API.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -13,7 +12,6 @@ import {
   type PostDelta,
 } from '../../../../services/postAnalyticsApi';
 import { colors } from '../GrowthEngine/styles';
-import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
 import {
   ENGAGEMENT_TRENDS_BODY_STYLE,
   ENGAGEMENT_TRENDS_MODAL_SIZE,
@@ -32,20 +30,21 @@ import {
   ENGAGEMENT_SINCE_TITLE,
 } from './engagementTrendsCopy';
 import {
+  insufficientHistoryMessage,
+  isInsufficientHistory,
   isSyncOnCooldown,
   postsForTab,
   resolveDefaultPeriod,
+  resolveSyncCooldownMs,
   syncCooldownRemainingLabel,
   type EngagementPeriodKey,
   type EngagementPostTab,
 } from './engagementTrendsPeriodUtils';
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
-  return (
-    data.summary.total_posts === 0 &&
-    data.top_gainers.length === 0 &&
-    data.top_decliners.length === 0
-  );
+  const rising = data.rising_posts?.length ? data.rising_posts : data.top_gainers;
+  const falling = data.falling_posts?.length ? data.falling_posts : data.top_decliners;
+  return data.summary.total_posts === 0 && rising.length === 0 && falling.length === 0;
 }
 
 function extractErrorMessage(err: unknown): string {
@@ -163,88 +162,94 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [commentsPost, setCommentsPost] = useState<PostDelta | null>(null);
-  const [period, setPeriod] = useState<EngagementPeriodKey>('1d');
+  const [period, setPeriod] = useState<EngagementPeriodKey>('since_joining');
   const [activeTab, setActiveTab] = useState<EngagementPostTab>('rising');
   const [nowTick, setNowTick] = useState(() => Date.now());
   const mountedRef = useRef(true);
   const periodInitializedRef = useRef(false);
+  const periodRef = useRef(period);
+  periodRef.current = period;
 
-  const fetchData = useCallback(async (refreshFirst = false) => {
-    setLoading(true);
-    setError('');
-    try {
-      if (refreshFirst) {
-        await postAnalyticsApi.fetchStoredAnalytics(true);
-      }
-      const result = await postAnalyticsApi.fetchEngagementHistory();
-      if (mountedRef.current) {
-        setData(result);
-        if (!periodInitializedRef.current) {
-          setPeriod(resolveDefaultPeriod(result));
+  const fetchData = useCallback(
+    async (opts: {
+      periodKey: EngagementPeriodKey;
+      refreshFirst?: boolean;
+      initDefault?: boolean;
+    }) => {
+      setLoading(true);
+      setError('');
+      try {
+        if (opts.refreshFirst) {
+          await postAnalyticsApi.fetchStoredAnalytics(true);
+        }
+        let result = await postAnalyticsApi.fetchEngagementHistory(opts.periodKey);
+        if (!mountedRef.current) return;
+
+        if (opts.initDefault && !periodInitializedRef.current) {
+          const preferred = resolveDefaultPeriod(result);
           periodInitializedRef.current = true;
+          setPeriod(preferred);
+          if (preferred !== opts.periodKey) {
+            result = await postAnalyticsApi.fetchEngagementHistory(preferred);
+            if (!mountedRef.current) return;
+          }
+        }
+
+        setData(result);
+      } catch (err: unknown) {
+        if (mountedRef.current) setError(extractErrorMessage(err));
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+          setNowTick(Date.now());
         }
       }
-    } catch (err: unknown) {
-      if (mountedRef.current) setError(extractErrorMessage(err));
-    } finally {
-      if (mountedRef.current) {
-        setLoading(false);
-        setNowTick(Date.now());
-      }
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
     if (!open) return;
     periodInitializedRef.current = false;
-    setLoading(true);
-    setError('');
-    postAnalyticsApi
-      .fetchEngagementHistory()
-      .then((result) => {
-        if (mountedRef.current) {
-          setData(result);
-          setPeriod(resolveDefaultPeriod(result));
-          periodInitializedRef.current = true;
-        }
-      })
-      .catch((err) => {
-        if (mountedRef.current) setError(extractErrorMessage(err));
-      })
-      .finally(() => {
-        if (mountedRef.current) {
-          setLoading(false);
-          setNowTick(Date.now());
-        }
-      });
+    void fetchData({ periodKey: 'since_joining', initDefault: true });
     return () => {
       mountedRef.current = false;
     };
-  }, [open]);
+  }, [open, fetchData]);
 
-  const handleLoad = () => void fetchData(false);
-  const syncOnCooldown = isSyncOnCooldown(data?.last_synced_at, nowTick);
-  const cooldownHint = syncCooldownRemainingLabel(data?.last_synced_at, nowTick);
-  const handleSync = () => {
-    if (syncOnCooldown) return;
-    void fetchData(true);
+  const handlePeriodChange = (next: EngagementPeriodKey) => {
+    setPeriod(next);
+    void fetchData({ periodKey: next });
   };
 
+  const handleLoad = () => void fetchData({ periodKey: periodRef.current });
+  const cooldownMs = resolveSyncCooldownMs(data);
+  const syncOnCooldown = isSyncOnCooldown(data?.last_synced_at, nowTick, cooldownMs);
+  const cooldownHint = syncCooldownRemainingLabel(data?.last_synced_at, nowTick, cooldownMs);
+  const handleSync = () => {
+    if (syncOnCooldown) return;
+    void fetchData({ periodKey: periodRef.current, refreshFirst: true });
+  };
+
+  const insufficient = Boolean(data && !loading && isInsufficientHistory(data));
   const showNoChanges =
-    data && !loading && hasNoComparableChanges(data) && !hasInsufficientSnapshots(data.period);
-  const showInsufficientSnapshots =
-    data && !loading && hasInsufficientSnapshots(data.period) && hasNoComparableChanges(data);
+    Boolean(data && !loading && !insufficient && hasNoComparableChanges(data));
+  const risingList = data ? postsForTab('rising', data) : [];
   const hasTrendData =
-    data &&
-    !loading &&
-    (data.summary.total_posts > 0 ||
-      data.top_gainers.length > 0 ||
-      data.top_decliners.length > 0);
+    Boolean(
+      data &&
+        !loading &&
+        !insufficient &&
+        (data.summary.total_posts > 0 ||
+          postsForTab('top', data).length > 0 ||
+          risingList.length > 0 ||
+          postsForTab('falling', data).length > 0),
+    );
 
   const showContributionBadges = useMemo(
-    () => (data ? shouldShowContributionBadges(data.top_gainers) : false),
-    [data],
+    () => shouldShowContributionBadges(risingList),
+    [risingList],
   );
 
   const tabPosts = useMemo(() => (data ? postsForTab(activeTab, data) : []), [activeTab, data]);
@@ -252,8 +257,8 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
     if (!data) return undefined;
     return {
       top: postsForTab('top', data).length,
-      rising: data.top_gainers.length,
-      falling: data.top_decliners.length,
+      rising: postsForTab('rising', data).length,
+      falling: postsForTab('falling', data).length,
     };
   }, [data]);
 
@@ -269,7 +274,11 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
           {ENGAGEMENT_SINCE_SUBTITLE}
         </p>
 
-        <EngagementTrendsPeriodChips value={period} onChange={setPeriod} disabled={loading} />
+        <EngagementTrendsPeriodChips
+          value={period}
+          onChange={handlePeriodChange}
+          disabled={loading}
+        />
 
         {!connected && !data && !loading && (
           <CacheEmptyPrompt
@@ -319,18 +328,18 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 
         {data && !loading && (
           <>
-            {showInsufficientSnapshots && !data.last_synced_at && (
+            {insufficient && !data.last_synced_at && (
               <CacheEmptyPrompt
                 icon="📈"
                 title={EMPTY_COPY.noDataTitle}
-                description={EMPTY_COPY.noDataDescription}
+                description={insufficientHistoryMessage(data)}
                 buttonLabel={EMPTY_COPY.syncButton}
                 onLoad={handleSync}
                 disabled={loading || syncOnCooldown}
               />
             )}
 
-            {showInsufficientSnapshots && data.last_synced_at && (
+            {insufficient && data.last_synced_at && (
               <div
                 style={{
                   textAlign: 'center',
@@ -346,7 +355,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   {EMPTY_COPY.insufficientTitle}
                 </div>
                 <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
-                  {EMPTY_COPY.insufficientDescription}
+                  {insufficientHistoryMessage(data)}
                 </div>
               </div>
             )}
@@ -366,7 +375,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   disabled={loading}
                 />
 
-                {activeTab === 'rising' && data.top_gainers.length > 0 && (
+                {activeTab === 'rising' && risingList.length > 0 && (
                   <EngagementGrowthDriversSection
                     period={data.period}
                     summary={data.summary}
@@ -381,7 +390,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   </EngagementGrowthDriversSection>
                 )}
 
-                {(activeTab !== 'rising' || data.top_gainers.length === 0) && (
+                {(activeTab !== 'rising' || risingList.length === 0) && (
                   <EngagementTrendsPostList
                     tab={activeTab}
                     posts={tabPosts}
@@ -434,7 +443,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
             <EngagementTrendsMetadataFooter
               lastSyncedAt={data.last_synced_at}
               period={data.period}
-              showComparison={!hasInsufficientSnapshots(data.period)}
+              showComparison={!insufficient}
               onRefresh={handleSync}
               loading={loading}
               syncDisabled={syncOnCooldown}

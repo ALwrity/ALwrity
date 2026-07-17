@@ -72,6 +72,8 @@ export interface PostDelta {
   followers_delta?: number | null;
   clicks_delta?: number | null;
   reposts_delta?: number | null;
+  impressions_now?: number | null;
+  reactions_now?: number | null;
 }
 
 export interface EngagementSummary {
@@ -118,10 +120,13 @@ export const postAnalyticsApi = {
     return data;
   },
 
-  /** Fetch engagement trends comparing the last two snapshot epochs. */
-  async fetchEngagementHistory(): Promise<PostAnalyticsHistoryResponse> {
+  /** Fetch engagement trends for a period window (Phase 2+). */
+  async fetchEngagementHistory(
+    period: string = 'since_joining',
+  ): Promise<PostAnalyticsHistoryResponse> {
     const { data } = await aiApiClient.get<PostAnalyticsHistoryResponse>(
-      '/api/linkedin/post-analytics/history'
+      '/api/linkedin/post-analytics/history',
+      { params: { period } },
     );
     return data;
   },

@@ -2,7 +2,7 @@
 
 ## Implementation Plan (Issue #118)
 
-**Status:** Phase 1 shipped + pushed; Phase 2 backend implemented (manual QA); Phases 3–4 planned  
+**Status:** Phases 1–2 shipped + pushed; Phase 3 frontend↔API wiring implemented (manual QA); Phase 4 planned  
 **Last updated:** 2026-07-17  
 **GitHub:** [#118](https://github.com/ALwrity/ALwrity-prod/issues/118)  
 **Related:** [#75](https://github.com/ALwrity/ALwrity-prod/pull/75) (growth contribution %), [#120](https://github.com/ALwrity/ALwrity-prod/issues/120) (logging gaps), [#119](https://github.com/ALwrity/ALwrity-prod/issues/119) (media isolation — out of scope here)
@@ -265,11 +265,19 @@ Keep `reactions + comments + impressions` **or** include `followers_gained` in t
 
 **Phase 3 exit criteria**
 
-- [ ] Changing filter updates numbers and lists from API.  
-- [ ] Top shows absolute leaders; Rising/Falling show deltas.  
-- [ ] Followers + contribution visible and correct for sample posts.  
-- [ ] Non-tech copy matches §2.5 in live UI.
+- [x] Changing filter updates numbers and lists from API.  
+- [x] Top shows absolute leaders; Rising/Falling show deltas.  
+- [x] Followers + contribution visible and correct for sample posts.  
+- [x] Non-tech copy matches §2.5 in live UI.
 
+**Phase 3 shipped notes (2026-07-17)**
+
+- `fetchEngagementHistory(period)` passes `?period=`  
+- Period chip change refetches history; Sync refreshes then refetches **current** period  
+- Empty states use `baseline_reason` copy  
+- Tabs prefer `top_posts` / `rising_posts` / `falling_posts`  
+- Sync cooldown uses `recommended_sync_cooldown_seconds` when present  
+- Manual QA still required on personal LinkedIn accounts
 ---
 
 ### Phase 4 — Debugging logs & exception handling

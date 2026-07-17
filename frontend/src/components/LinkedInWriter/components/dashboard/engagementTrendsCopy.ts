@@ -12,12 +12,12 @@ export const ENGAGEMENT_SINCE_TILE_DESCRIPTION =
   'Track growth since you joined — Top, Rising, and Falling posts';
 
 export const GROWTH_CONTRIBUTION_TOOLTIP =
-  "Each percentage is that post's share of growth this period (reactions + comments + impressions).";
+  "Each percentage is that post's share of growth this period (reactions + comments + impressions + followers).";
 
 export const GROWTH_CONTRIBUTION_BADGE_SUBLABEL = 'Share of growth';
 
 export const GROWTH_DRIVERS_CONTRIBUTION_HINT =
-  'Share of growth = how much of your total positive change came from this post.';
+  'Share of growth = how much of your total positive change came from this post (including followers from posts).';
 
 export const METRIC_LABELS = {
   reactions: 'Reactions',
@@ -56,6 +56,16 @@ export const EMPTY_COPY = {
   syncCooldownPrefix: 'Last updated recently — wait a bit before syncing again',
   retry: 'Retry',
 } as const;
+
+/** Plain-language messages for API baseline_reason codes (Phase 2+). */
+export const BASELINE_REASON_COPY: Record<string, string> = {
+  no_snapshots: 'We do not have saved snapshots yet. Sync your posts to start tracking growth.',
+  insufficient_history:
+    'We need an earlier snapshot for this time range. Sync again later or pick a shorter range.',
+  baseline_too_close:
+    'Your last syncs are too close together to compare. Wait a few hours (or a day), then sync again.',
+  no_current_posts: 'No saved posts yet. Sync your LinkedIn posts to load growth.',
+};
 
 export const TAB_COPY = {
   top: { label: 'Top', hint: 'Strongest posts right now' },
