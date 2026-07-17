@@ -14,6 +14,16 @@ from models.linkedin_post_comments_models import PostCommentAuthor
 CommentAssistantPriority = Literal["needs_reply", "active", "older", "all"]
 
 
+class CommentAssistantReplyPreview(BaseModel):
+    """Nested reply preview (often the connected user's reply)."""
+
+    id: str
+    text: str
+    author_name: str = "You"
+    created_at: str = ""
+    is_mine: bool = False
+
+
 class CommentAssistantCommentItem(BaseModel):
     """Inbox comment with priority flags for triage tabs."""
 
@@ -30,6 +40,10 @@ class CommentAssistantCommentItem(BaseModel):
     user_reacted: Optional[str] = None
     needs_reply: bool = False
     priority: Literal["needs_reply", "active", "older"] = "needs_reply"
+    my_replies: list[CommentAssistantReplyPreview] = Field(
+        default_factory=list,
+        description="Replies authored by the connected user (best-effort first page)",
+    )
 
 
 class CommentAssistantPostGroup(BaseModel):
@@ -38,6 +52,10 @@ class CommentAssistantPostGroup(BaseModel):
     post_id: str
     social_id: str
     post_snippet: str
+    post_text: str = Field(
+        default="",
+        description="Full post text for See more expand in the UI",
+    )
     comment_count_hint: int = Field(
         default=0,
         description="Engagement comment count from post analytics (hint only)",

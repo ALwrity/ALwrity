@@ -7,6 +7,8 @@ import type {
   CommentAssistantCommentView,
   CommentAssistantPostGroupApi,
   CommentAssistantPostGroupView,
+  CommentAssistantReplyApi,
+  CommentAssistantReplyView,
 } from './commentAssistantTypes';
 
 export function formatTimeLabel(iso: string | undefined): string {
@@ -28,25 +30,41 @@ export function formatTimeLabel(iso: string | undefined): string {
   }
 }
 
+function mapReplyToView(reply: CommentAssistantReplyApi): CommentAssistantReplyView {
+  return {
+    id: reply.id,
+    text: reply.text || '',
+    authorName: reply.is_mine ? 'You' : reply.author_name || 'Someone',
+    timeLabel: formatTimeLabel(reply.created_at),
+    isMine: Boolean(reply.is_mine),
+  };
+}
+
 export function mapCommentToView(
   comment: CommentAssistantCommentApi
 ): CommentAssistantCommentView {
   return {
     id: comment.id,
     authorName: comment.author?.name || 'Unknown',
+    headline: comment.author?.headline || null,
+    avatarUrl: comment.author?.avatar_url || null,
     text: comment.text || '',
     timeLabel: formatTimeLabel(comment.created_at),
     liked: Boolean(comment.user_reacted),
+    replyCount: comment.reply_count ?? 0,
+    myReplies: (comment.my_replies || []).map(mapReplyToView),
   };
 }
 
 export function mapGroupToView(
   group: CommentAssistantPostGroupApi
 ): CommentAssistantPostGroupView {
+  const fullText = (group.post_text || group.post_snippet || '').trim();
   return {
     postId: group.post_id,
     socialId: group.social_id,
     postSnippet: group.post_snippet || '',
+    postText: fullText,
     comments: (group.comments || []).map(mapCommentToView),
     error: group.error || null,
     hasMoreComments: Boolean(group.has_more_comments),

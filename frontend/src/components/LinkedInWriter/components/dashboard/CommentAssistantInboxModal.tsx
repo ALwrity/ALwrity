@@ -1,8 +1,8 @@
 /**
- * Comment Assistant inbox — wired to backend inbox / like / reply (Phase 3).
- * Manual tab keeps paste → Generate Reply.
+ * Comment Assistant inbox — wired to backend inbox / like / reply (Phase 3+).
+ * Compact accordion groups; Manual tab keeps paste → Generate Reply.
  */
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { DashboardActionModal } from './DashboardActionModal';
 import { colors } from '../GrowthEngine/styles';
 import {
@@ -51,7 +51,21 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     handleSendReply,
     handleDraftAi,
     handleLoadMore,
+    handleShowThreadReplies,
   } = useCommentAssistantInbox(open, connected);
+
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || groups.length === 0) {
+      setExpandedPostId(null);
+      return;
+    }
+    setExpandedPostId((prev) => {
+      if (prev && groups.some((g) => g.postId === prev)) return prev;
+      return groups[0].postId;
+    });
+  }, [open, groups]);
 
   const emptyCopy = tab === 'manual' ? null : COMMENT_ASSISTANT_EMPTY[tab];
   const showGroups =
@@ -231,6 +245,10 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
                 <CommentAssistantPostGroup
                   key={g.postId}
                   group={g}
+                  expanded={expandedPostId === g.postId}
+                  onToggleExpanded={() =>
+                    setExpandedPostId((prev) => (prev === g.postId ? null : g.postId))
+                  }
                   actionsEnabled={connected && !g.error}
                   onLike={(commentId) => void handleLike(g.postId, g.socialId, commentId)}
                   onSendReply={(commentId, text) =>
@@ -239,13 +257,21 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
                   onDraftAi={(commentId) => {
                     const comment = g.comments?.find((c) => c.id === commentId);
                     if (!comment) return;
-                    void handleDraftAi(g.postId, g.postSnippet, commentId, comment.text);
+                    void handleDraftAi(
+                      g.postId,
+                      g.postText || g.postSnippet,
+                      commentId,
+                      comment.text
+                    );
                   }}
                   onRetry={g.error ? () => retryPost() : undefined}
                   onLoadMore={
                     g.hasMoreComments && g.commentsCursor
                       ? () => void handleLoadMore(g.postId, g.socialId, g.commentsCursor!)
                       : undefined
+                  }
+                  onShowThreadReplies={(commentId) =>
+                    void handleShowThreadReplies(g.postId, g.socialId, commentId)
                   }
                 />
               ))}

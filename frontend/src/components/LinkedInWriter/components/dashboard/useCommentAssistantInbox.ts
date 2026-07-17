@@ -14,6 +14,7 @@ import { formatTimeLabel, mapGroupToView } from './commentAssistantMappers';
 import type {
   CommentAssistantCommentView,
   CommentAssistantPostGroupView,
+  CommentAssistantReplyView,
   CommentAssistantTab,
 } from './commentAssistantTypes';
 
@@ -183,7 +184,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   const handleDraftAi = useCallback(
     async (
       postId: string,
-      postSnippet: string,
+      postText: string,
       commentId: string,
       commentText: string
     ) => {
@@ -191,7 +192,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       updateComment(postId, commentId, { draftBusy: true });
       try {
         const res = await linkedInWriterApi.generateCommentResponse({
-          original_post: postSnippet,
+          original_post: postText,
           comment: commentText,
           response_type: 'professional',
           include_question: false,
@@ -225,9 +226,12 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
               .map((item) => ({
                 id: item.id,
                 authorName: item.author?.name || 'Unknown',
+                headline: item.author?.headline || null,
+                avatarUrl: item.author?.avatar_url || null,
                 text: item.text || '',
                 timeLabel: formatTimeLabel(item.created_at),
                 liked: Boolean(item.user_reacted),
+                replyCount: item.reply_count ?? 0,
               }));
             return {
               ...g,
@@ -242,6 +246,30 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       }
     },
     []
+  );
+
+  /** Lazy-load full thread (same Unipile path as Engagement Trends). */
+  const handleShowThreadReplies = useCallback(
+    async (postId: string, socialId: string, commentId: string) => {
+      setActionError('');
+      try {
+        const page = await postCommentsApi.fetchPostComments(socialId, {
+          commentId,
+          limit: 50,
+        });
+        const threadReplies: CommentAssistantReplyView[] = (page.items || []).map((item) => ({
+          id: item.id,
+          text: item.text || '',
+          authorName: item.author?.name || 'Someone',
+          timeLabel: formatTimeLabel(item.created_at),
+          isMine: false,
+        }));
+        updateComment(postId, commentId, { threadReplies });
+      } catch (err) {
+        setActionError(getCommentAssistantErrorMessage(err));
+      }
+    },
+    [updateComment]
   );
 
   return {
@@ -261,5 +289,6 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     handleSendReply,
     handleDraftAi,
     handleLoadMore,
+    handleShowThreadReplies,
   };
 }

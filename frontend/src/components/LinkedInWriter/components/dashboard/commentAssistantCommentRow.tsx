@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { colors, rowBase } from '../GrowthEngine/styles';
+import { colors } from '../GrowthEngine/styles';
+import { CommentAssistantAuthorRow } from './commentAssistantAuthorRow';
 import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
 import type { CommentAssistantCommentView } from './commentAssistantTypes';
 
@@ -9,10 +10,11 @@ interface CommentAssistantCommentRowProps {
   onLike?: (commentId: string) => void;
   onSendReply?: (commentId: string, text: string) => void;
   onDraftAi?: (commentId: string) => void;
+  onShowThreadReplies?: (commentId: string) => void;
 }
 
 const actionBtn = (primary?: boolean): React.CSSProperties => ({
-  padding: '4px 10px',
+  padding: '3px 8px',
   borderRadius: 5,
   fontSize: 11,
   fontWeight: 600,
@@ -28,9 +30,11 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
   onLike,
   onSendReply,
   onDraftAi,
+  onShowThreadReplies,
 }) => {
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
+  const [repliesOpen, setRepliesOpen] = useState(Boolean(comment.myReplies?.length));
 
   useEffect(() => {
     if (comment.draftText != null && comment.draftText !== '') {
@@ -39,8 +43,16 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
     }
   }, [comment.draftText]);
 
+  useEffect(() => {
+    if (comment.myReplies && comment.myReplies.length > 0) {
+      setRepliesOpen(true);
+    }
+  }, [comment.myReplies]);
+
   const busy = Boolean(comment.replyBusy || comment.draftBusy || comment.likeBusy);
   const canAct = actionsEnabled && !busy;
+  const myReplies = comment.myReplies || [];
+  const replyCount = comment.replyCount ?? 0;
 
   const handleSend = () => {
     const text = replyText.trim();
@@ -49,15 +61,134 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
   };
 
   return (
-    <div style={{ ...rowBase, marginBottom: 8, padding: '10px 12px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
-        <div style={{ fontWeight: 700, fontSize: 12, color: colors.textDark }}>{comment.authorName}</div>
-        <div style={{ fontSize: 11, color: colors.textTertiary, flexShrink: 0 }}>{comment.timeLabel}</div>
-      </div>
-      <div style={{ fontSize: 12, color: colors.textBody, lineHeight: 1.55, marginBottom: 8, whiteSpace: 'pre-wrap' }}>
+    <div
+      style={{
+        marginBottom: 6,
+        padding: '8px 10px',
+        borderRadius: 7,
+        border: `1px solid ${colors.border}`,
+        background: '#fff',
+      }}
+    >
+      <CommentAssistantAuthorRow
+        name={comment.authorName}
+        headline={comment.headline}
+        avatarUrl={comment.avatarUrl}
+        timeLabel={comment.timeLabel}
+        size={28}
+      />
+
+      <div
+        style={{
+          fontSize: 12,
+          color: colors.textBody,
+          lineHeight: 1.45,
+          marginTop: 6,
+          marginBottom: 6,
+          whiteSpace: 'pre-wrap',
+        }}
+      >
         {comment.text}
       </div>
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+
+      {myReplies.length > 0 && (
+        <div style={{ marginBottom: 6 }}>
+          <button
+            type="button"
+            onClick={() => setRepliesOpen((v) => !v)}
+            style={{
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              fontSize: 11,
+              fontWeight: 700,
+              color: colors.primary,
+              cursor: 'pointer',
+            }}
+          >
+            {repliesOpen
+              ? myReplies.length > 1
+                ? 'Hide your replies'
+                : 'Hide your reply'
+              : myReplies.length > 1
+                ? `Your replies (${myReplies.length})`
+                : 'Your reply'}
+          </button>
+          {repliesOpen && (
+            <div
+              style={{
+                marginTop: 6,
+                marginLeft: 4,
+                paddingLeft: 10,
+                borderLeft: `2px solid ${colors.primary}`,
+              }}
+            >
+              {myReplies.map((r) => (
+                <div key={r.id} style={{ marginBottom: 6 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: colors.primary, marginBottom: 2 }}>
+                    {r.authorName}
+                    {r.timeLabel ? (
+                      <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {r.timeLabel}</span>
+                    ) : null}
+                  </div>
+                  <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                    {r.text}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {replyCount > 0 && onShowThreadReplies && !comment.threadReplies && (
+        <button
+          type="button"
+          onClick={() => onShowThreadReplies(comment.id)}
+          style={{
+            background: 'none',
+            border: 'none',
+            padding: 0,
+            marginBottom: 6,
+            fontSize: 11,
+            fontWeight: 600,
+            color: colors.primary,
+            cursor: 'pointer',
+          }}
+        >
+          Show all replies ({replyCount})
+        </button>
+      )}
+
+      {comment.threadReplies && comment.threadReplies.length > 0 && (
+        <div
+          style={{
+            marginBottom: 6,
+            marginLeft: 4,
+            paddingLeft: 10,
+            borderLeft: `2px solid ${colors.border}`,
+          }}
+        >
+          <div style={{ fontSize: 10, fontWeight: 700, color: colors.textTertiary, marginBottom: 4 }}>
+            Thread replies
+          </div>
+          {comment.threadReplies.map((r) => (
+            <div key={r.id} style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textDark }}>
+                {r.authorName}
+                {r.timeLabel ? (
+                  <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {r.timeLabel}</span>
+                ) : null}
+              </div>
+              <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                {r.text}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
         <button
           type="button"
           disabled={!canAct || comment.liked}
@@ -104,28 +235,28 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
       </div>
 
       {replyOpen && (
-        <div style={{ marginTop: 10 }}>
+        <div style={{ marginTop: 8 }}>
           <textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             placeholder="Write a short reply…"
-            rows={3}
+            rows={2}
             disabled={busy}
             style={{
               width: '100%',
               boxSizing: 'border-box',
-              padding: '8px 10px',
-              borderRadius: 7,
+              padding: '7px 9px',
+              borderRadius: 6,
               border: `1px solid ${colors.border}`,
               fontSize: 12,
               fontFamily: 'inherit',
-              lineHeight: 1.5,
+              lineHeight: 1.45,
               resize: 'vertical',
               color: colors.textBody,
-              marginBottom: 8,
+              marginBottom: 6,
             }}
           />
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
             <button
               type="button"
               disabled={!replyText.trim() || busy || !actionsEnabled}

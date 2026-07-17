@@ -21,6 +21,7 @@ from models.linkedin_comment_assistant_models import (
     CommentAssistantLikeResponse,
     CommentAssistantPostGroup,
     CommentAssistantPriority,
+    CommentAssistantReplyPreview,
 )
 from models.linkedin_post_comments_models import PostCommentAuthor
 from models.linkedin_posts_models import LinkedInPost
@@ -147,12 +148,32 @@ def _post_snippet(text: str) -> str:
     return cleaned[: POST_SNIPPET_LEN - 1].rstrip() + "…"
 
 
+def _normalize_reply_preview(
+    raw: dict[str, Any],
+    *,
+    me_ids: set[str],
+) -> Optional[CommentAssistantReplyPreview]:
+    reply_id = raw.get("id") or raw.get("provider_id")
+    if not reply_id:
+        return None
+    author_id = _raw_author_id(raw)
+    is_mine = _is_me(author_id, me_ids)
+    return CommentAssistantReplyPreview(
+        id=str(reply_id),
+        text=str(raw.get("text") or ""),
+        author_name="You" if is_mine else _raw_author_name(raw),
+        created_at=_iso_timestamp(raw.get("date") or raw.get("created_at")),
+        is_mine=is_mine,
+    )
+
+
 def _normalize_inbox_comment(
     raw: dict[str, Any],
     *,
     me_ids: set[str],
     older_cutoff: datetime,
     i_replied: bool,
+    my_replies: Optional[list[CommentAssistantReplyPreview]] = None,
 ) -> Optional[CommentAssistantCommentItem]:
     comment_id = raw.get("id") or raw.get("provider_id")
     if not comment_id:
@@ -206,17 +227,18 @@ def _normalize_inbox_comment(
         user_reacted=user_reacted,
         needs_reply=needs_reply,
         priority=priority,  # type: ignore[arg-type]
+        my_replies=my_replies or [],
     )
 
 
-async def _user_replied_in_thread(
+async def _fetch_my_replies_in_thread(
     client: UnipilePostCommentsClient,
     account_id: str,
     social_id: str,
     parent_comment_id: str,
     me_ids: set[str],
-) -> bool:
-    """Best-effort: first page of replies includes an author matching me."""
+) -> list[CommentAssistantReplyPreview]:
+    """Best-effort: first page of replies authored by the connected user."""
     try:
         raw = await client.list_post_comments(
             account_id,
@@ -232,15 +254,20 @@ async def _user_replied_in_thread(
             parent_comment_id,
             exc,
         )
-        return False
+        return []
 
     items = raw.get("items") if isinstance(raw, dict) else None
     if not isinstance(items, list):
-        return False
+        return []
+
+    mine: list[CommentAssistantReplyPreview] = []
     for item in items:
-        if isinstance(item, dict) and _is_me(_raw_author_id(item), me_ids):
-            return True
-    return False
+        if not isinstance(item, dict):
+            continue
+        preview = _normalize_reply_preview(item, me_ids=me_ids)
+        if preview and preview.is_mine:
+            mine.append(preview)
+    return mine
 
 
 async def _load_post_group(
@@ -252,11 +279,13 @@ async def _load_post_group(
     semaphore: asyncio.Semaphore,
 ) -> CommentAssistantPostGroup:
     social_id = (post.social_id or "").strip()
-    snippet = _post_snippet(post.text)
+    full_text = (post.text or "").strip()
+    snippet = _post_snippet(full_text)
     base = CommentAssistantPostGroup(
         post_id=post.id,
         social_id=social_id,
         post_snippet=snippet,
+        post_text=full_text,
         comment_count_hint=int(post.engagement.comments or 0),
     )
 
@@ -294,10 +323,10 @@ async def _load_post_group(
             continue
         comment_id = str(item.get("id") or item.get("provider_id") or "")
         reply_count = int(item.get("reply_counter") or item.get("child_comment_count") or 0)
-        i_replied = False
+        my_replies: list[CommentAssistantReplyPreview] = []
         if comment_id and reply_count > 0 and reply_checks < MAX_REPLY_CHECKS_PER_POST:
             reply_checks += 1
-            i_replied = await _user_replied_in_thread(
+            my_replies = await _fetch_my_replies_in_thread(
                 client, account_id, social_id, comment_id, me_ids
             )
 
@@ -305,7 +334,8 @@ async def _load_post_group(
             item,
             me_ids=me_ids,
             older_cutoff=older_cutoff,
-            i_replied=i_replied,
+            i_replied=bool(my_replies),
+            my_replies=my_replies,
         )
         if normalized:
             comments.append(normalized)
