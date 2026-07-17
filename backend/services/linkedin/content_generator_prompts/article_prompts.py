@@ -12,12 +12,13 @@ class ArticlePromptBuilder:
     """Builder class for LinkedIn article generation prompts."""
     
     @staticmethod
-    def build_article_prompt(request: Any, persona: Optional[Dict[str, Any]] = None) -> str:
+    def build_article_prompt(request: Any, persona: Optional[Dict[str, Any]] = None, article_title: Optional[str] = None) -> str:
         """
         Build prompt for article generation.
         
         Args:
             request: LinkedInArticleRequest object containing generation parameters
+            article_title: Pre-generated article title (from dedicated LLM call)
             
         Returns:
             Formatted prompt string for article generation
@@ -43,8 +44,18 @@ class ArticlePromptBuilder:
             except Exception:
                 persona_block = ""
 
+        title_block = ""
+        if article_title:
+            title_block = f"""
+        THE TITLE IS ALREADY SET TO: "{article_title}"
+        
+        You MUST write the article body to match this exact title. The title field in your JSON output should reflect this title."""
+        else:
+            title_block = """
+        TITLE: Generate a compelling, specific headline (40-60 characters). Do NOT include [Source N] citations in the title."""
+
         prompt = f"""
-        You are a senior content strategist and industry expert specializing in {request.industry}. Create a comprehensive, thought-provoking LinkedIn article that establishes authority, drives engagement, and provides genuine value to professionals in this field.
+        You are a senior content strategist and industry expert specializing in {request.industry}. Write a LinkedIn article that establishes authority and provides genuine value to professionals in this field.
 
         TOPIC: {request.topic}
         INDUSTRY: {request.industry}
@@ -53,41 +64,32 @@ class ArticlePromptBuilder:
         WORD COUNT: {request.word_count} words
 
         {persona_block}
+        {title_block}
 
-        CONTENT STRUCTURE:
-        - Compelling headline that promises specific value
-        - Engaging introduction with a hook and clear value proposition
-        - Data-driven insights with proper citations
-        - Practical takeaways and next steps
-        - Strong conclusion with a call-to-action
-
-        {self._build_outline_block(request)}
+        {ArticlePromptBuilder._build_outline_block(request)}
 
         CONTENT QUALITY REQUIREMENTS:
+        - Start with a strong hook in the first 2 lines that challenges an assumption or poses a problem the reader recognizes
         - Include statistics and trends from the research sources provided
         - Provide real-world examples and case studies
-        - Address common challenges and pain points
-        - Offer actionable strategies and frameworks
-        - Use industry-specific terminology appropriately
-        - Include expert quotes or insights when relevant
-
-        LINKEDIN-SPECIFIC FORMATTING:
-        - Write short paragraphs (2-3 sentences max) — LinkedIn readers scan on mobile
-        - Place the strongest hook in the first 2 lines (the "see more" cutoff)
-        - Use line breaks between sections for visual breathing room
-        - Use bold sparingly for key phrases, not entire sentences
-        - Avoid hashtags — LinkedIn articles don't use them; rely on headline keywords for discovery
-
-        ENGAGEMENT OPTIMIZATION:
-        - Open with a hook that challenges a common assumption or poses a problem the reader recognizes
-        - Use subheadings every 200-300 words for scannability
-        - Include bullet points and numbered lists for key insights
         - End each major section with a one-sentence takeaway the reader can apply immediately
         - Close with a specific call-to-action that invites comments (question, poll, or "what am I missing?")
 
+        FORMATTING RULES — CRITICAL: The content will be rendered in a plain-text editor. Follow these rules EXACTLY:
+        - NO markdown tables — do not use | pipes or dashes to create tables
+        - NO markdown code blocks — do not use ``` or indented code blocks
+        - NO raw HTML tags — do not use <div>, <br>, or any HTML
+        - Subheadings: use plain text on its own line, NOT markdown ## headers. Just write the heading as a line of text, leave a blank line, then continue.
+        - Bold: do NOT use ** or __ markdown. Use plain text only.
+        - Bullet lists: use a single - or • per line for each item, with each bullet on its own line
+        - Numbered lists: use 1. 2. 3. format, each on its own line
+        - Paragraphs: 2-3 sentences max, separated by a blank line
+        - Use line breaks between sections for visual breathing room
+        - Avoid hashtags — LinkedIn articles do not use them
+
         KEY SECTIONS TO COVER: {', '.join(request.key_sections) if request.key_sections else 'Industry overview, current challenges, emerging trends, practical solutions, future outlook'}
 
-        {self._build_outline_override_block(request)}
+        {ArticlePromptBuilder._build_outline_override_block(request)}
 
         CITATION FORMAT:
         - When you reference a specific data point, statistic, or claim from the research sources above, add [Source N] immediately after the claim, where N is the source number from the RESEARCH CONTEXT.

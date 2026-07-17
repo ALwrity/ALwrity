@@ -13,7 +13,7 @@ from loguru import logger
 from models.linkedin_models import (
     LinkedInPostRequest, LinkedInArticleRequest, LinkedInPostResponse, LinkedInArticleResponse,
     PostContent, ArticleContent, GroundingLevel, ResearchSource, LinkedInPostOutput, Citation,
-    HashtagSuggestion, LinkedInArticleOutput, LinkedInCarouselOutput, LinkedInVideoScriptOutput
+    HashtagSuggestion, LinkedInArticleOutput, LinkedInArticleTitleOutput, LinkedInCarouselOutput, LinkedInVideoScriptOutput
 )
 from services.linkedin.quality_handler import QualityHandler
 from services.linkedin.content_generator_prompts import (
@@ -88,8 +88,42 @@ class ContentGenerator:
         except Exception as e:
             logger.warning(f"Could not load persona data for {platform} content generation: {e}")
             return None
-    
-    def _clear_persona_cache(self, user_id: int = None):
+
+    def _generate_article_title(self, request, research_sources: List, user_id: str = None) -> str:
+        """Generate article title via llm_text_gen with structured JSON schema.
+
+        Uses a dedicated LLM call with LinkedInArticleTitleOutput schema to ensure
+        the title is 40-60 characters, compelling, and specific.
+        """
+        try:
+            title_prompt = f"""You are an expert content strategist. Generate a compelling LinkedIn article headline.
+            TOPIC: {request.topic}
+            INDUSTRY: {request.industry}
+            TONE: {request.tone}
+            TARGET AUDIENCE: {request.target_audience or 'Industry professionals, executives, and thought leaders'}
+
+            RULES:
+            - 40-60 characters maximum
+            - Compelling and specific, not generic or clickbait
+            - Must communicate the core value or insight of the article
+            - Do NOT include [Source N] citations in the title
+            - Do NOT use quotes or special characters
+            - Single sentence that makes the reader want to click
+            """
+            raw = llm_text_gen(
+                prompt=title_prompt,
+                json_struct=LinkedInArticleTitleOutput.model_json_schema(),
+                user_id=user_id,
+                flow_type="linkedin_article_title",
+                temperature=0.7
+            )
+            parsed = raw if isinstance(raw, dict) else json.loads(str(raw).strip())
+            return parsed.get('title', '').strip()
+        except Exception as e:
+            logger.warning(f"Article title generation failed, falling back to topic: {e}")
+            return ""
+
+    def _clear_persona_cache(self, user_id: str = None):
         """
         Clear persona cache for a specific user or all users.
         
@@ -588,9 +622,15 @@ Return ONLY the synthesized findings in clear bullet points under each category 
     async def generate_grounded_article_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
         """Generate article content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
+            # Generate title first via dedicated structured call
+            article_title = self._generate_article_title(request, research_sources, user_id)
+            if not article_title:
+                article_title = getattr(request, 'topic', 'LinkedIn Article').strip()
+            
             # Build the prompt using persona if available
-            uid = int(getattr(request, "user_id", 0) or 0)
-            persona_data = self._get_cached_persona_data(uid, 'linkedin')
+            persona_data = None
+            if user_id:
+                persona_data = self._get_cached_persona_data(user_id, 'linkedin')
             if getattr(request, 'persona_override', None):
                 try:
                     override = request.persona_override
@@ -607,19 +647,12 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                         persona_data = override
                 except Exception:
                     pass
-            prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data)
+            prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data, article_title=article_title)
             
-            # Step A: Inject raw research context (highlights/summary prioritized)
+            # Inject research context (highlights/summary prioritized)
             research_context = self._build_research_context(research_sources)
             if research_context:
                 prompt += research_context
-            
-            # Step B: Synthesize research into structured bullet points
-            research_synthesis = await self._synthesize_research(
-                research_sources, request.topic, user_id
-            )
-            if research_synthesis:
-                prompt += research_synthesis
             
             # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(
@@ -645,7 +678,7 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                 parsed = json.loads(cleaned)
             
             content_text = parsed.get('content', '').strip()
-            title = parsed.get('title', request.topic or "LinkedIn Article")
+            title = article_title or parsed.get('title', request.topic or "LinkedIn Article")
             sections = parsed.get('sections', [])
             seo_metadata = parsed.get('seo_metadata')
             reading_time = parsed.get('reading_time')
