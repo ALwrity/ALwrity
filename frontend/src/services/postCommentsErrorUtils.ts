@@ -94,7 +94,9 @@ export function getPostCommentsErrorMessage(err: unknown): string {
     if (detailText) return detailText;
   }
 
-  if (err instanceof Error && err.message) return err.message;
+  if (err instanceof Error && err.message && !err.message.includes('[object Object]')) {
+    return err.message;
+  }
   return POST_COMMENTS_NOT_CONNECTED;
 }
 

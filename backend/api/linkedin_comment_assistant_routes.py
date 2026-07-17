@@ -28,10 +28,12 @@ from models.linkedin_posts_models import PostsErrorResponse
 from services.database import get_db
 from services.integrations.linkedin.types import LinkedInNotConnectedError
 from services.integrations.linkedin.unipile_client import UnipileAPIError
-from services.linkedin_comment_assistant_service import (
-    get_comment_assistant_inbox,
-    like_comment,
+from services.linkedin_comment_assistant_cache_service import (
+    LinkedInCommentAssistantCacheService,
+    mask_user_id,
 )
+from services.linkedin_comment_assistant_inbox import get_comment_assistant_inbox
+from services.linkedin_comment_assistant_service import like_comment
 from services.linkedin_post_comments_service import (
     LinkedInPostCommentsNotAvailableError,
     LinkedInPostCommentsValidationError,
@@ -53,12 +55,13 @@ def _user_id(current_user: dict) -> str:
 
 def _raise_inbox_http_error(exc: Exception, *, user_id: str, operation: str) -> None:
     """Map Comment Assistant failures to structured HTTP responses (no mocks)."""
+    uid = mask_user_id(user_id)
     if isinstance(exc, LinkedInPostCommentsNotAvailableError):
         logger.warning(
-            "[CommentAssistant] {} unavailable user_id={}: {}",
+            "[CommentAssistant] {} unavailable user={}: {}",
             operation,
-            user_id,
-            exc,
+            uid,
+            type(exc).__name__,
         )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -70,10 +73,9 @@ def _raise_inbox_http_error(exc: Exception, *, user_id: str, operation: str) -> 
 
     if isinstance(exc, LinkedInNotConnectedError):
         logger.warning(
-            "[CommentAssistant] {} not connected user_id={}: {}",
+            "[CommentAssistant] {} not_connected user={}",
             operation,
-            user_id,
-            exc,
+            uid,
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -85,10 +87,10 @@ def _raise_inbox_http_error(exc: Exception, *, user_id: str, operation: str) -> 
 
     if isinstance(exc, LinkedInPostCommentsValidationError):
         logger.warning(
-            "[CommentAssistant] {} validation user_id={}: {}",
+            "[CommentAssistant] {} validation user={} message={}",
             operation,
-            user_id,
-            exc,
+            uid,
+            str(exc)[:200],
         )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -98,6 +100,12 @@ def _raise_inbox_http_error(exc: Exception, *, user_id: str, operation: str) -> 
     if isinstance(exc, UnipileAPIError):
         message = str(exc).lower()
         http_status = exc.status_code
+        logger.warning(
+            "[CommentAssistant] {} unipile_error user={} status={}",
+            operation,
+            uid,
+            http_status,
+        )
         if http_status == 429:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -119,7 +127,7 @@ def _raise_inbox_http_error(exc: Exception, *, user_id: str, operation: str) -> 
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
                     "error_code": "UNIPILE_FORBIDDEN",
-                    "message": str(exc),
+                    "message": "LinkedIn denied this action. Try again or reconnect.",
                 },
             ) from exc
         if http_status == 404:
@@ -127,19 +135,21 @@ def _raise_inbox_http_error(exc: Exception, *, user_id: str, operation: str) -> 
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail={
                     "error_code": "NOT_FOUND",
-                    "message": "Comment or post not found. Verify identifiers and try again.",
+                    "message": "Comment or post not found. Sync comments and try again.",
                 },
             ) from exc
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail={"error_code": "UNIPILE_ERROR", "message": str(exc)},
+            detail={
+                "error_code": "UNIPILE_ERROR",
+                "message": "Unable to reach LinkedIn for Comment Assistant. Please try again.",
+            },
         ) from exc
 
     logger.exception(
-        "[CommentAssistant] {} unexpected error user_id={}: {}",
+        "[CommentAssistant] {} unexpected error user={}",
         operation,
-        user_id,
-        exc,
+        uid,
     )
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -174,7 +184,7 @@ async def get_inbox(
     ),
     refresh: bool = Query(
         False,
-        description="Reserved for cache bust (Phase 4); Phase 2 always loads comments live",
+        description="Bypass workspace cache and refetch comments from LinkedIn (Sync)",
     ),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -182,18 +192,26 @@ async def get_inbox(
     """Return post-grouped inbox comments for the connected user."""
     user_id = _user_id(current_user)
     logger.info(
-        "[CommentAssistant] GET inbox user_id={} priority={} refresh={}",
-        user_id,
+        "[CommentAssistant] GET inbox user={} priority={} refresh={}",
+        mask_user_id(user_id),
         priority,
         refresh,
     )
     try:
-        return await get_comment_assistant_inbox(
+        result = await get_comment_assistant_inbox(
             user_id,
             db,
             priority=priority,
             refresh=refresh,
         )
+        logger.info(
+            "[CommentAssistant] GET inbox ok user={} from_cache={} groups={} counts={}",
+            mask_user_id(user_id),
+            result.from_cache,
+            len(result.groups),
+            result.counts,
+        )
+        return result
     except (
         LinkedInPostCommentsNotAvailableError,
         LinkedInNotConnectedError,
@@ -232,6 +250,7 @@ async def post_inbox_comment_reply(
     ),
     attachment: Optional[UploadFile] = File(None),
     current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> PostCommentReplyResponse:
     """Reply with Unipile mentions and optional image (Comment Assistant)."""
     user_id = _user_id(current_user)
@@ -273,16 +292,16 @@ async def post_inbox_comment_reply(
             attachment_tuple = (attachment.filename, content, content_type)
 
     logger.info(
-        "[CommentAssistant] POST reply user_id={} social_id={} comment_id={} "
+        "[CommentAssistant] POST reply user={} social_id={} comment_id={} "
         "mentions={} has_attachment={}",
-        user_id,
+        mask_user_id(user_id),
         social_id,
         comment_id,
         len(mention_models),
         attachment_tuple is not None,
     )
     try:
-        return await reply_to_comment(
+        result = await reply_to_comment(
             user_id,
             social_id,
             comment_id,
@@ -290,14 +309,32 @@ async def post_inbox_comment_reply(
             mentions=mention_models or None,
             attachment=attachment_tuple,
         )
+        # Reply changes thread classification — invalidate so next load rebuilds.
+        LinkedInCommentAssistantCacheService(db).clear(user_id)
+        logger.info(
+            "[CommentAssistant] POST reply ok user={} comment_id={} cache_cleared=true",
+            mask_user_id(user_id),
+            comment_id,
+        )
+        return result
     except (
         LinkedInPostCommentsNotAvailableError,
         LinkedInNotConnectedError,
         LinkedInPostCommentsValidationError,
         UnipileAPIError,
     ) as exc:
+        logger.warning(
+            "[CommentAssistant] POST reply fail user={} comment_id={}",
+            mask_user_id(user_id),
+            comment_id,
+        )
         _raise_inbox_http_error(exc, user_id=user_id, operation="reply_comment")
     except Exception as exc:
+        logger.warning(
+            "[CommentAssistant] POST reply fail user={} comment_id={}",
+            mask_user_id(user_id),
+            comment_id,
+        )
         _raise_inbox_http_error(exc, user_id=user_id, operation="reply_comment")
 
 
@@ -322,27 +359,50 @@ async def post_comment_like(
     comment_id: str,
     body: CommentAssistantLikeRequest,
     current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ) -> CommentAssistantLikeResponse:
     """Like a comment via Unipile v1 reaction endpoint."""
     user_id = _user_id(current_user)
     logger.info(
-        "[CommentAssistant] POST like user_id={} comment_id={}",
-        user_id,
+        "[CommentAssistant] POST like user={} comment_id={}",
+        mask_user_id(user_id),
         comment_id,
     )
     try:
-        return await like_comment(
+        result = await like_comment(
             user_id,
             comment_id,
             body.post_social_id,
             reaction_type=body.reaction_type,
         )
+        LinkedInCommentAssistantCacheService(db).patch_reaction(
+            user_id,
+            comment_id,
+            result.reaction_type,
+        )
+        logger.info(
+            "[CommentAssistant] POST like ok user={} comment_id={} type={}",
+            mask_user_id(user_id),
+            comment_id,
+            result.reaction_type,
+        )
+        return result
     except (
         LinkedInPostCommentsNotAvailableError,
         LinkedInNotConnectedError,
         LinkedInPostCommentsValidationError,
         UnipileAPIError,
     ) as exc:
+        logger.warning(
+            "[CommentAssistant] POST like fail user={} comment_id={}",
+            mask_user_id(user_id),
+            comment_id,
+        )
         _raise_inbox_http_error(exc, user_id=user_id, operation="like_comment")
     except Exception as exc:
+        logger.warning(
+            "[CommentAssistant] POST like fail user={} comment_id={}",
+            mask_user_id(user_id),
+            comment_id,
+        )
         _raise_inbox_http_error(exc, user_id=user_id, operation="like_comment")

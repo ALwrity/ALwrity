@@ -10,6 +10,7 @@ import {
   COMMENT_ASSISTANT_EMPTY,
   COMMENT_ASSISTANT_INBOX_HINT,
   COMMENT_ASSISTANT_INTRO,
+  COMMENT_ASSISTANT_LAST_UPDATED,
   COMMENT_ASSISTANT_LOADING,
   COMMENT_ASSISTANT_NOT_CONNECTED,
   COMMENT_ASSISTANT_SYNC,
@@ -22,6 +23,7 @@ import {
   CommentAssistantPostGroupSkeleton,
 } from './commentAssistantPostGroup';
 import { CommentAssistantPriorityTabs } from './commentAssistantPriorityTabs';
+import { formatLocalizedRelativeTime } from './engagementTrendsLocaleFormat';
 import { useCommentAssistantInbox } from './useCommentAssistantInbox';
 
 export interface CommentAssistantModalProps {
@@ -45,6 +47,7 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     actionError,
     statusMessage,
     cooldownLeft,
+    lastSyncedAt,
     syncDisabled,
     handleSync,
     retryPost,
@@ -110,6 +113,11 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
           >
             <div style={{ fontSize: 11, color: colors.textTertiary, lineHeight: 1.4 }}>
               {COMMENT_ASSISTANT_INBOX_HINT}
+              {lastSyncedAt ? (
+                <span style={{ display: 'block', marginTop: 2 }}>
+                  {COMMENT_ASSISTANT_LAST_UPDATED(formatLocalizedRelativeTime(lastSyncedAt))}
+                </span>
+              ) : null}
             </div>
             <button
               type="button"

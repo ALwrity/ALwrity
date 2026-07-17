@@ -36,6 +36,7 @@ from services.integrations.linkedin.unipile_post_comments_client import (
 )
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.linkedin_post_analytics_service import LinkedInPostAnalyticsService
+from services.linkedin_comment_assistant_cache_service import mask_user_id
 from services.linkedin_post_comments_service import (
     LinkedInPostCommentsNotAvailableError,
     LinkedInPostCommentsValidationError,
@@ -300,9 +301,9 @@ async def _load_post_group(
 
     async with semaphore:
         logger.info(
-            "[CommentAssistant] loading comments post_id={} social_id={}",
-            post.id,
+            "[CommentAssistant] Unipile list comments social_id={} limit={}",
             social_id,
+            COMMENTS_PER_POST,
         )
         try:
             raw = await client.list_post_comments(
@@ -313,10 +314,9 @@ async def _load_post_group(
             )
         except Exception as exc:
             logger.warning(
-                "[CommentAssistant] soft-fail list comments post_id={} social_id={}: {}",
-                post.id,
+                "[CommentAssistant] Unipile list fail soft social_id={} err={}",
                 social_id,
-                exc,
+                type(exc).__name__,
             )
             base.error = "Could not load comments for this post. Try again later."
             return base
@@ -354,27 +354,31 @@ async def _load_post_group(
     base.comments = comments
     base.has_more_comments = bool(cursor_str)
     base.comments_cursor = cursor_str
+    logger.info(
+        "[CommentAssistant] Unipile list ok social_id={} comments={} soft_error={}",
+        social_id,
+        len(comments),
+        bool(base.error),
+    )
     return base
 
 
-def _filter_groups_by_priority(
+def filter_groups_by_priority(
     groups: list[CommentAssistantPostGroup],
     priority: CommentAssistantPriority,
 ) -> list[CommentAssistantPostGroup]:
+    """Filter cached/live groups for a priority tab (soft-fail shells kept)."""
     if priority == "all":
         return groups
 
     filtered: list[CommentAssistantPostGroup] = []
     for group in groups:
         if group.error and not group.comments:
-            # Keep soft-fail shells visible on every priority tab.
             filtered.append(group)
             continue
         matching = [c for c in group.comments if c.priority == priority]
         if matching or group.error:
-            filtered.append(
-                group.model_copy(update={"comments": matching})
-            )
+            filtered.append(group.model_copy(update={"comments": matching}))
     return filtered
 
 
@@ -386,19 +390,16 @@ def _count_priorities(groups: list[CommentAssistantPostGroup]) -> dict[str, int]
     return counts
 
 
-async def get_comment_assistant_inbox(
+async def build_comment_assistant_inbox_live(
     user_id: str,
     db: Session,
     *,
-    priority: CommentAssistantPriority = "needs_reply",
-    refresh: bool = False,
     oauth: Optional[LinkedInOAuthService] = None,
 ) -> CommentAssistantInboxResponse:
     """
-    Build inbox payload from cached posts + live Unipile comment lists.
+    Build full (unfiltered) inbox from post-analytics posts + Unipile comments.
 
-    ``refresh`` is reserved for Phase 4 cache busting; Phase 2 always loads
-    comments live and re-reads the post-analytics cache.
+    Soft-fails per post. Caller applies priority filter and cache storage.
     """
     _ensure_unipile_provider()
     oauth_service = oauth or LinkedInOAuthService()
@@ -409,26 +410,25 @@ async def get_comment_assistant_inbox(
     candidates = _select_candidate_posts(stored.posts)
 
     logger.info(
-        "[CommentAssistant] inbox start user_id={} priority={} refresh={} "
-        "stored_posts={} candidates={}",
-        user_id,
-        priority,
-        refresh,
+        "[CommentAssistant] live build start user={} stored_posts={} candidates={} cap={}",
+        mask_user_id(user_id),
         len(stored.posts),
         len(candidates),
+        MAX_POSTS,
     )
 
     if not candidates:
         logger.info(
-            "[CommentAssistant] inbox empty user_id={} (no posts with comments+social_id)",
-            user_id,
+            "[CommentAssistant] live build empty user={} (no posts with comments+social_id)",
+            mask_user_id(user_id),
         )
         return CommentAssistantInboxResponse(
             groups=[],
-            priority=priority,
+            priority="all",
             posts_considered=0,
             older_days=OLDER_DAYS,
             counts={"needs_reply": 0, "active": 0, "older": 0},
+            from_cache=False,
         )
 
     client = UnipilePostCommentsClient()
@@ -437,16 +437,16 @@ async def get_comment_assistant_inbox(
         owner = await UnipileClient().get_own_profile(account_id)
         me_ids = _collect_me_ids(owner if isinstance(owner, dict) else {})
         logger.info(
-            "[CommentAssistant] resolved me_ids_count={} user_id={}",
+            "[CommentAssistant] me_ids_count={} user={}",
             len(me_ids),
-            user_id,
+            mask_user_id(user_id),
         )
     except Exception as exc:
         logger.warning(
-            "[CommentAssistant] get_own_profile failed user_id={}: {} "
-            "(classification will be best-effort without self ids)",
-            user_id,
-            exc,
+            "[CommentAssistant] get_own_profile failed user={} err={} "
+            "(classification best-effort without self ids)",
+            mask_user_id(user_id),
+            type(exc).__name__,
         )
 
     older_cutoff = datetime.now(timezone.utc) - timedelta(days=OLDER_DAYS)
@@ -462,21 +462,21 @@ async def get_comment_assistant_inbox(
 
     all_groups = list(groups)
     counts = _count_priorities(all_groups)
-    filtered = _filter_groups_by_priority(all_groups, priority)
-
+    soft_fails = sum(1 for g in all_groups if g.error)
     logger.info(
-        "[CommentAssistant] inbox done user_id={} groups={} filtered={} counts={}",
-        user_id,
+        "[CommentAssistant] live build done user={} groups={} soft_fails={} counts={}",
+        mask_user_id(user_id),
         len(all_groups),
-        len(filtered),
+        soft_fails,
         counts,
     )
     return CommentAssistantInboxResponse(
-        groups=filtered,
-        priority=priority,
+        groups=all_groups,
+        priority="all",
         posts_considered=len(candidates),
         older_days=OLDER_DAYS,
         counts=counts,
+        from_cache=False,
     )
 
 
@@ -505,8 +505,8 @@ async def like_comment(
     normalized_type = (reaction_type or "like").strip().lower() or "like"
 
     logger.info(
-        "[CommentAssistant] like_comment user_id={} comment_id={} social_id={} type={}",
-        user_id,
+        "[CommentAssistant] Unipile like start user={} comment_id={} social_id={} type={}",
+        mask_user_id(user_id),
         parent_id,
         social_id,
         normalized_type,
@@ -521,7 +521,27 @@ async def like_comment(
             reaction_type=normalized_type,
         )
     except ValueError as exc:
+        logger.warning(
+            "[CommentAssistant] Unipile like validation user={} err={}",
+            mask_user_id(user_id),
+            exc,
+        )
         raise LinkedInPostCommentsValidationError(str(exc)) from exc
+    except Exception:
+        logger.warning(
+            "[CommentAssistant] Unipile like fail user={} comment_id={} social_id={}",
+            mask_user_id(user_id),
+            parent_id,
+            social_id,
+        )
+        raise
+
+    logger.info(
+        "[CommentAssistant] Unipile like ok user={} comment_id={} type={}",
+        mask_user_id(user_id),
+        parent_id,
+        normalized_type,
+    )
     return CommentAssistantLikeResponse(
         success=True,
         comment_id=parent_id,
@@ -531,7 +551,8 @@ async def like_comment(
 
 # Re-export errors used by routes for a single import surface.
 __all__ = [
-    "get_comment_assistant_inbox",
+    "build_comment_assistant_inbox_live",
+    "filter_groups_by_priority",
     "like_comment",
     "LinkedInPostCommentsNotAvailableError",
     "LinkedInPostCommentsValidationError",

@@ -111,6 +111,10 @@ export interface CommentAssistantInboxResponse {
   posts_considered: number;
   older_days: number;
   counts: Record<string, number>;
+  /** ISO timestamp when inbox was last fetched from LinkedIn. */
+  last_synced_at?: string | null;
+  /** True when served from workspace cache within TTL. */
+  from_cache?: boolean;
 }
 
 export interface CommentAssistantLikeResponse {

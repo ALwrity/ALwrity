@@ -94,6 +94,14 @@ class CommentAssistantInboxResponse(BaseModel):
         default_factory=dict,
         description="Totals across loaded comments: needs_reply, active, older",
     )
+    last_synced_at: Optional[str] = Field(
+        default=None,
+        description="ISO timestamp when inbox was last fetched from LinkedIn",
+    )
+    from_cache: bool = Field(
+        default=False,
+        description="True when served from workspace cache within TTL",
+    )
 
 
 class CommentAssistantLikeRequest(BaseModel):

@@ -42,6 +42,9 @@ export const COMMENT_ASSISTANT_SYNCING = 'Syncing…';
 export const COMMENT_ASSISTANT_COOLDOWN = (seconds: number) =>
   `Please wait ${seconds}s before syncing again.`;
 
+export const COMMENT_ASSISTANT_LAST_UPDATED = (relative: string) =>
+  `Last updated ${relative}`;
+
 export const COMMENT_ASSISTANT_ACTIONS = {
   like: 'Like',
   liked: 'Liked',

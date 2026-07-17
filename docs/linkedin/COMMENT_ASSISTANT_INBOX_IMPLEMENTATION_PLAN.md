@@ -2,7 +2,7 @@
 
 ## Implementation Plan
 
-**Status:** Phase 1–3 complete (UI + backend + frontend wiring); Phases 4–5 pending  
+**Status:** Phase 1–5 complete (UI + backend + wiring + workspace cache + logging)  
 **Last updated:** 2026-07-18  
 **GitHub:** [#73](https://github.com/ALwrity/ALwrity-prod/issues/73) — Centralized Comment & Reply Dashboard  
 **Related (separate, not in this plan):** [#122](https://github.com/ALwrity/ALwrity-prod/issues/122) — comments I left on others’ posts (networking)  
@@ -273,10 +273,20 @@ Mental model for users: **Sync once → work from the list.**
 
 **Phase 4 exit criteria**
 
-- [ ] Second open within TTL does not re-hit Unipile for every post.  
-- [ ] Sync refreshes cache; UI shows last updated.  
-- [ ] Reply/Like update cached row so UI stays consistent.  
-- [ ] Cache is per-user workspace only (privacy).
+- [x] Second open within TTL does not re-hit Unipile for every post.  
+- [x] Sync refreshes cache; UI shows last updated.  
+- [x] Reply/Like update cached row so UI stays consistent.  
+- [x] Cache is per-user workspace only (privacy).
+
+**Phase 4 delivered**
+
+| Piece | Location |
+|-------|----------|
+| Cache model | `linkedin_comment_assistant_cache_model.py` → `comment_assistant_inbox_cache` |
+| Cache service | `linkedin_comment_assistant_cache_service.py` (TTL 300s, store / fresh / patch / clear) |
+| Inbox gate | `linkedin_comment_assistant_inbox.py` |
+| Live build | `build_comment_assistant_inbox_live` in `linkedin_comment_assistant_service.py` |
+| UI last updated | `CommentAssistantInboxModal` + `last_synced_at` |
 
 ---
 
@@ -295,9 +305,9 @@ Mental model for users: **Sync once → work from the list.**
 
 **Phase 5 exit criteria**
 
-- [ ] Logs distinguish: not connected / cache hit / Unipile fail per post / like fail / reply fail.  
-- [ ] UI errors are plain language.  
-- [ ] One bad post cannot crash Comment Assistant.
+- [x] Logs distinguish: not connected / cache hit / Unipile fail per post / like fail / reply fail.  
+- [x] UI errors are plain language.  
+- [x] One bad post cannot crash Comment Assistant.
 
 ---
 

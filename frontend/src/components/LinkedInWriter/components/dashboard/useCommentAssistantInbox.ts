@@ -20,7 +20,8 @@ import type {
   CommentAssistantTab,
 } from './commentAssistantTypes';
 
-const SYNC_COOLDOWN_MS = 30_000;
+/** Client spam guard; server cache TTL is 5 minutes. */
+const SYNC_COOLDOWN_MS = 60_000;
 
 type InboxLoadState = 'idle' | 'loading' | 'ready';
 
@@ -71,6 +72,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   } | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const requestIdRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
 
@@ -104,6 +106,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     setError('');
     setActionError('');
     setStatusMessage(null);
+    setLastSyncedAt(null);
   }, [clearStatusTimer]);
 
   const loadInbox = useCallback(
@@ -129,11 +132,13 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           active: data.counts?.active ?? 0,
           older: data.counts?.older ?? 0,
         });
+        setLastSyncedAt(data.last_synced_at || null);
         setLoadState('ready');
       } catch (err) {
         if (reqId !== requestIdRef.current) return;
         setGroups([]);
         setCounts({});
+        setLastSyncedAt(null);
         setError(getCommentAssistantErrorMessage(err));
         setLoadState('ready');
       }
@@ -395,6 +400,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     actionError,
     statusMessage,
     cooldownLeft,
+    lastSyncedAt,
     syncDisabled:
       !connected || loadState === 'loading' || cooldownLeft > 0 || tab === 'manual',
     handleSync,

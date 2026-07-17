@@ -60,6 +60,10 @@ from models.linkedin_post_analytics_model import Base as LinkedInPostAnalyticsBa
 from models.post_analytics_snapshot_model import Base as PostAnalyticsSnapshotBase
 # LinkedIn PYMK cache persistence (DB cache for suggestion lists)
 from models.linkedin_pymk_cache_model import Base as LinkedInPymkCacheBase
+# Comment Assistant inbox cache (DB cache for cross-post comments)
+from models.linkedin_comment_assistant_cache_model import (
+    Base as LinkedInCommentAssistantCacheBase,
+)
 
 from services.workspace_paths import get_workspace_root, get_user_workspace_dir
 
@@ -757,6 +761,7 @@ def init_user_database(user_id: str):
         LinkedInPostAnalyticsBase.metadata.create_all(bind=engine)
         PostAnalyticsSnapshotBase.metadata.create_all(bind=engine)
         LinkedInPymkCacheBase.metadata.create_all(bind=engine)
+        LinkedInCommentAssistantCacheBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)
         _ensure_task_history_unique_index(engine, user_id)
         # Phase 3.4: ensure the SIF indexing watermark table exists.
