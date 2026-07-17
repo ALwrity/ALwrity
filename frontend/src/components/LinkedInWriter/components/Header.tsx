@@ -581,7 +581,7 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <button
             type="button"
-            onClick={() => { window.location.href = '/gif-maker'; }}
+            onClick={() => window.dispatchEvent(new CustomEvent('open-gif-maker'))}
             title="GIF Maker — Record UI flows for marketing"
             aria-label="Open GIF Maker"
             style={{

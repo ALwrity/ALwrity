@@ -14,6 +14,7 @@ import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
 import PricingPage from './components/Pricing/PricingPage';
 import ContactPage from './components/Landing/ContactPage';
+import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
 
 // ─── Lazy loaded route components ───────────────────────────────────────────
 // Default exports
@@ -124,6 +125,16 @@ const App: React.FC = () => {
   // Initialize app - loading state will be managed by InitialRouteHandler
   useEffect(() => {
     setLoading(false);
+  }, []);
+
+  // GIF Maker floating overlay state
+  const [showGifMaker, setShowGifMaker] = useState(false);
+
+  // Listen for global open-gif-maker event
+  useEffect(() => {
+    const handler = () => setShowGifMaker(true);
+    window.addEventListener('open-gif-maker', handler);
+    return () => window.removeEventListener('open-gif-maker', handler);
   }, []);
 
   // Listen for CopilotKit key updates
@@ -269,6 +280,11 @@ const App: React.FC = () => {
                     <Route path="/bing-analytics-storage" element={<ProtectedRoute><FeatureRoute feature="bing"><BingAnalyticsStorage /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/gif-maker" element={<ProtectedRoute><GifMakerPage apiBaseUrl={process.env.REACT_APP_API_URL || ''} maxFrames={30} /></ProtectedRoute>} />
               </Routes>
+
+              <GifMakerFloatingPanel
+                open={showGifMaker}
+                onClose={() => setShowGifMaker(false)}
+              />
             </Suspense>
           </ConditionalCopilotKit>
         </AuthenticatedCopilotWrapper>
