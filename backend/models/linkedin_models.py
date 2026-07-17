@@ -307,6 +307,19 @@ class LinkedInPostOutput(BaseModel):
         }
 
 
+# Structured output schema for LLM article title generation (separate call)
+class LinkedInArticleTitleOutput(BaseModel):
+    """Structured JSON schema for dedicated LinkedIn article title generation."""
+    title: str = Field(..., description="Compelling, specific LinkedIn article headline (40-60 characters)", min_length=40, max_length=60)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "AI in Enterprise: Key Trends Reshaping 2026"
+            }
+        }
+
+
 # Structured output schema for LLM article generation
 class LinkedInArticleOutput(BaseModel):
     """Structured JSON schema enforced on the LLM for grounded LinkedIn article generation."""
