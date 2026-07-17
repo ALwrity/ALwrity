@@ -2,7 +2,7 @@
 
 ## Implementation Plan
 
-**Status:** Phase 1 complete (UI shell); Phases 2–5 pending  
+**Status:** Phase 1–2 complete (UI shell + backend foundation); Phases 3–5 pending  
 **Last updated:** 2026-07-18  
 **GitHub:** [#73](https://github.com/ALwrity/ALwrity-prod/issues/73) — Centralized Comment & Reply Dashboard  
 **Related (separate, not in this plan):** [#122](https://github.com/ALwrity/ALwrity-prod/issues/122) — comments I left on others’ posts (networking)  
@@ -205,10 +205,20 @@ Mental model for users: **Sync once → work from the list.**
 
 **Phase 2 exit criteria**
 
-- [ ] Inbox endpoint returns posts grouped with comments under caps.  
-- [ ] Like comment works via v1 `POST /posts/reaction` + `comment_id`.  
-- [ ] Reply still uses existing comment reply API.  
-- [ ] Invalid/missing connection returns structured error (no mocks).
+- [x] Inbox endpoint returns posts grouped with comments under caps.  
+- [x] Like comment works via v1 `POST /posts/reaction` + `comment_id`.  
+- [x] Reply still uses existing comment reply API.  
+- [x] Invalid/missing connection returns structured error (no mocks).
+
+**Phase 2 delivered**
+
+| Piece | Location |
+|-------|----------|
+| Reactions client | `UnipilePostCommentsClient.list_post_reactions` / `add_post_reaction` |
+| Inbox service | `linkedin_comment_assistant_service.py` |
+| Models | `linkedin_comment_assistant_models.py` |
+| Routes | `GET /api/linkedin/comment-assistant/inbox`, `POST .../comments/{id}/like` |
+| Registry | `CORE_ROUTER_REGISTRY` → `linkedin_comment_assistant` |
 
 ---
 

@@ -162,3 +162,114 @@ class UnipilePostCommentsClient(UnipileClient):
             reply_id,
         )
         return data if isinstance(data, dict) else {}
+
+    async def list_post_reactions(
+        self,
+        account_id: str,
+        post_social_id: str,
+        *,
+        comment_id: Optional[str] = None,
+        cursor: Optional[str] = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        """
+        List reactions on a post or comment via ``GET /api/v1/posts/{post_id}/reactions``.
+
+        Pass ``comment_id`` to list reactions on that comment (v1).
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        safe_limit = max(1, min(limit, 100))
+        encoded_post_id = quote(post_social_id, safe="")
+        url = self._get_full_url(f"/api/v1/posts/{encoded_post_id}/reactions")
+        params: dict[str, str | int] = {
+            "account_id": account_id,
+            "limit": safe_limit,
+        }
+        if comment_id:
+            params["comment_id"] = comment_id
+        if cursor:
+            params["cursor"] = cursor
+
+        logger.info(
+            "[UnipilePostCommentsClient] list_post_reactions account_id={} "
+            "post_social_id={} comment_id={} limit={}",
+            account_id,
+            post_social_id,
+            comment_id or "none",
+            safe_limit,
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.get(
+                url,
+                params=params,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        item_count = 0
+        if isinstance(data, dict):
+            items = data.get("items")
+            if isinstance(items, list):
+                item_count = len(items)
+
+        logger.info(
+            "[UnipilePostCommentsClient] list_post_reactions success account_id={} items={}",
+            account_id,
+            item_count,
+        )
+        return data if isinstance(data, dict) else {}
+
+    async def add_post_reaction(
+        self,
+        account_id: str,
+        post_social_id: str,
+        *,
+        comment_id: Optional[str] = None,
+        reaction_type: str = "like",
+    ) -> dict[str, Any]:
+        """
+        React to a post or comment via ``POST /api/v1/posts/reaction``.
+
+        Body uses post ``social_id`` as ``post_id``. Pass ``comment_id`` to like a comment.
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        normalized_type = (reaction_type or "like").strip().lower() or "like"
+        payload: dict[str, str] = {
+            "account_id": account_id,
+            "post_id": post_social_id,
+            "reaction_type": normalized_type,
+        }
+        if comment_id:
+            payload["comment_id"] = comment_id
+
+        url = self._get_full_url("/api/v1/posts/reaction")
+        logger.info(
+            "[UnipilePostCommentsClient] add_post_reaction account_id={} "
+            "post_social_id={} comment_id={} reaction_type={}",
+            account_id,
+            post_social_id,
+            comment_id or "none",
+            normalized_type,
+        )
+
+        async with httpx.AsyncClient(timeout=self._timeout) as client:
+            response = await client.post(
+                url,
+                json=payload,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json() if response.content else {}
+
+        logger.info(
+            "[UnipilePostCommentsClient] add_post_reaction success account_id={} status={}",
+            account_id,
+            response.status_code,
+        )
+        return data if isinstance(data, dict) else {}
