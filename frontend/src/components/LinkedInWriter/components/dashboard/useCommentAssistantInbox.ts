@@ -295,6 +295,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
                 timeLabel: formatTimeLabel(item.created_at),
                 liked: Boolean(item.user_reacted),
                 replyCount: item.reply_count ?? 0,
+                imageUrl: item.image_url || null,
               }));
             return {
               ...g,
@@ -326,6 +327,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           authorName: item.author?.name || 'Someone',
           timeLabel: formatTimeLabel(item.created_at),
           isMine: false,
+          imageUrl: item.image_url || null,
         }));
         updateComment(postId, commentId, { threadReplies });
       } catch (err) {

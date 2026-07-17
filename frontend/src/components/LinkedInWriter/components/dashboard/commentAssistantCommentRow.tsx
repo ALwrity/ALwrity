@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { colors } from '../GrowthEngine/styles';
+import { CommentAssistantAttachedImage } from './commentAssistantAttachedImage';
 import { CommentAssistantAuthorRow } from './commentAssistantAuthorRow';
 import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
 import { CommentAssistantReactionPicker } from './commentAssistantReactionPicker';
@@ -8,7 +9,26 @@ import {
   type CommentAssistantReplyPayload,
 } from './commentAssistantReplyComposer';
 import type { CommentAssistantReactionType } from './commentAssistantReactions';
-import type { CommentAssistantCommentView } from './commentAssistantTypes';
+import type { CommentAssistantCommentView, CommentAssistantReplyView } from './commentAssistantTypes';
+
+function ReplyBody({ reply }: { reply: CommentAssistantReplyView }) {
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: colors.primary, marginBottom: 2 }}>
+        {reply.authorName}
+        {reply.timeLabel ? (
+          <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {reply.timeLabel}</span>
+        ) : null}
+      </div>
+      {reply.text ? (
+        <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+          {reply.text}
+        </div>
+      ) : null}
+      {reply.imageUrl ? <CommentAssistantAttachedImage src={reply.imageUrl} /> : null}
+    </div>
+  );
+}
 
 interface CommentAssistantCommentRowProps {
   comment: CommentAssistantCommentView;
@@ -88,6 +108,7 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
       >
         {comment.text}
       </div>
+      {comment.imageUrl ? <CommentAssistantAttachedImage src={comment.imageUrl} /> : null}
 
       {myReplies.length > 0 && (
         <div style={{ marginBottom: 6 }}>
@@ -122,17 +143,7 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
               }}
             >
               {myReplies.map((r) => (
-                <div key={r.id} style={{ marginBottom: 6 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: colors.primary, marginBottom: 2 }}>
-                    {r.authorName}
-                    {r.timeLabel ? (
-                      <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {r.timeLabel}</span>
-                    ) : null}
-                  </div>
-                  <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                    {r.text}
-                  </div>
-                </div>
+                <ReplyBody key={r.id} reply={r} />
               ))}
             </div>
           )}
@@ -178,9 +189,12 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
                   <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {r.timeLabel}</span>
                 ) : null}
               </div>
-              <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                {r.text}
-              </div>
+              {r.text ? (
+                <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
+                  {r.text}
+                </div>
+              ) : null}
+              {r.imageUrl ? <CommentAssistantAttachedImage src={r.imageUrl} /> : null}
             </div>
           ))}
         </div>

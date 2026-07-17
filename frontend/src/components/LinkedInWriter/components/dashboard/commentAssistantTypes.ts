@@ -12,6 +12,8 @@ export interface CommentAssistantReplyView {
   authorName: string;
   timeLabel: string;
   isMine: boolean;
+  /** Attached image URL when the reply includes media. */
+  imageUrl?: string | null;
 }
 
 export interface CommentAssistantCommentView {
@@ -27,6 +29,8 @@ export interface CommentAssistantCommentView {
   userReacted?: string | null;
   reactionCount?: number;
   replyCount?: number;
+  /** Attached image URL when the comment includes media. */
+  imageUrl?: string | null;
   draftText?: string;
   replyBusy?: boolean;
   draftBusy?: boolean;
@@ -56,6 +60,7 @@ export interface CommentAssistantReplyApi {
   author_name?: string;
   created_at?: string;
   is_mine?: boolean;
+  image_url?: string | null;
 }
 
 /** Backend inbox comment item. */
@@ -73,6 +78,7 @@ export interface CommentAssistantCommentApi {
   reply_count?: number;
   reaction_count?: number;
   user_reacted?: string | null;
+  image_url?: string | null;
   needs_reply?: boolean;
   priority?: 'needs_reply' | 'active' | 'older';
   my_replies?: CommentAssistantReplyApi[];

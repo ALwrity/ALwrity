@@ -37,6 +37,7 @@ function mapReplyToView(reply: CommentAssistantReplyApi): CommentAssistantReplyV
     authorName: reply.is_mine ? 'You' : reply.author_name || 'Someone',
     timeLabel: formatTimeLabel(reply.created_at),
     isMine: Boolean(reply.is_mine),
+    imageUrl: reply.image_url || null,
   };
 }
 
@@ -55,6 +56,7 @@ export function mapCommentToView(
     userReacted: comment.user_reacted || null,
     reactionCount: comment.reaction_count ?? 0,
     replyCount: comment.reply_count ?? 0,
+    imageUrl: comment.image_url || null,
     myReplies: (comment.my_replies || []).map(mapReplyToView),
   };
 }

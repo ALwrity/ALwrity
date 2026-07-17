@@ -22,6 +22,10 @@ class CommentAssistantReplyPreview(BaseModel):
     author_name: str = "You"
     created_at: str = ""
     is_mine: bool = False
+    image_url: Optional[str] = Field(
+        default=None,
+        description="Attached image URL when the reply includes media",
+    )
 
 
 class CommentAssistantCommentItem(BaseModel):
@@ -38,6 +42,10 @@ class CommentAssistantCommentItem(BaseModel):
     reply_count: int = 0
     reaction_count: int = 0
     user_reacted: Optional[str] = None
+    image_url: Optional[str] = Field(
+        default=None,
+        description="Attached image URL when the comment includes media",
+    )
     needs_reply: bool = False
     priority: Literal["needs_reply", "active", "older"] = "needs_reply"
     my_replies: list[CommentAssistantReplyPreview] = Field(

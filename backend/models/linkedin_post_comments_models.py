@@ -36,6 +36,10 @@ class PostCommentItem(BaseModel):
         default=None,
         description="Parent comment id when this item is a nested reply",
     )
+    image_url: Optional[str] = Field(
+        default=None,
+        description="Attached image URL when the comment includes media",
+    )
 
 
 class PostCommentsListResponse(BaseModel):

@@ -92,6 +92,28 @@ def _iso_timestamp(value: Any) -> str:
     return str(value)
 
 
+def extract_comment_image_url(raw: dict[str, Any]) -> Optional[str]:
+    """Return attached image URL from a Unipile comment payload (v1/v2 shapes)."""
+    picture = raw.get("picture_url")
+    if isinstance(picture, str) and picture.strip():
+        return picture.strip()
+
+    attachments = raw.get("attachments")
+    if not isinstance(attachments, list):
+        return None
+
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        url = att.get("url")
+        if not isinstance(url, str) or not url.strip():
+            continue
+        att_type = str(att.get("type") or "img").lower()
+        if att_type in ("img", "image", "photo") or not att.get("type"):
+            return url.strip()
+    return None
+
+
 def _normalize_comment_item(
     raw: dict[str, Any],
     *,
@@ -107,6 +129,7 @@ def _normalize_comment_item(
 
     text = raw.get("text") or ""
     created_at = _iso_timestamp(raw.get("date") or raw.get("created_at"))
+    image_url = extract_comment_image_url(raw)
 
     reply_count = 0
     reaction_count = 0
@@ -124,7 +147,8 @@ def _normalize_comment_item(
     author_details = raw.get("author_details")
     if isinstance(author_details, dict):
         headline = author_details.get("headline")
-        avatar_url = author_details.get("profile_picture_url") or raw.get("picture_url")
+        # Do not use picture_url as avatar — that field is the comment image.
+        avatar_url = author_details.get("profile_picture_url")
         profile_url = author_details.get("profile_url")
         author_name = (
             (raw.get("author") if isinstance(raw.get("author"), str) else None)
@@ -176,6 +200,7 @@ def _normalize_comment_item(
         impressions_count=impressions_count,
         user_reacted=user_reacted,
         parent_comment_id=resolved_parent,
+        image_url=image_url,
     )
 
 

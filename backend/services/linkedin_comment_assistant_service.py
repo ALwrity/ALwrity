@@ -42,6 +42,7 @@ from services.linkedin_post_comments_service import (
     _ensure_unipile_provider,
     _iso_timestamp,
     _resolve_account_id,
+    extract_comment_image_url,
 )
 
 # Guardrails from the implementation plan (safe Unipile fan-out).
@@ -164,6 +165,7 @@ def _normalize_reply_preview(
         author_name="You" if is_mine else _raw_author_name(raw),
         created_at=_iso_timestamp(raw.get("date") or raw.get("created_at")),
         is_mine=is_mine,
+        image_url=extract_comment_image_url(raw),
     )
 
 
@@ -193,11 +195,8 @@ def _normalize_inbox_comment(
     author = PostCommentAuthor(
         name=_raw_author_name(raw),
         headline=details.get("headline") if details else None,
-        avatar_url=(
-            details.get("profile_picture_url")
-            if details
-            else None
-        ) or raw.get("picture_url"),
+        # Do not use picture_url as avatar — that field is the comment image.
+        avatar_url=details.get("profile_picture_url") if details else None,
         profile_url=details.get("profile_url") if details else None,
     )
 
@@ -225,6 +224,7 @@ def _normalize_inbox_comment(
         reply_count=reply_count,
         reaction_count=reaction_count,
         user_reacted=user_reacted,
+        image_url=extract_comment_image_url(raw),
         needs_reply=needs_reply,
         priority=priority,  # type: ignore[arg-type]
         my_replies=my_replies or [],

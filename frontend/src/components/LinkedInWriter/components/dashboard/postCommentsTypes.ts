@@ -21,6 +21,8 @@ export interface PostComment {
   user_reacted?: string | null;
   /** Set when this item is a nested reply under a parent comment. */
   parent_comment_id?: string | null;
+  /** Attached image URL when the comment includes media. */
+  image_url?: string | null;
 }
 
 export interface PostCommentsListResponse {
