@@ -5,7 +5,7 @@
  * F1  QualityCheckModal      — pre-publish 6-dim score card
  * F2  TimingAdvisorModal     — week-grid optimal posting times
  * F3  ScheduleQuickModal     — calendar quick-add
- * F5  PublishNowModal        — direct LinkedIn publish with pre-flight
+ * F5  PublishNowModal        — direct LinkedIn publish with pre-flight (see PublishNowModal.tsx)
  */
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,9 +15,9 @@ import { apiClient } from '../../../../api/client';
 import { linkedInGrowthApi } from '../../../../services/linkedInGrowthApi';
 import type { PostPreviewScoreResponse } from '../../../../services/linkedInGrowthApi';
 import { contentPlanningApi } from '../../../../services/contentPlanningApi';
-import { publishLinkedInPost } from '../../../../api/linkedinSocial';
-import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
 import { formatDraftForPublish } from '../../utils/linkedInPublishFormatters';
+
+export { PublishNowModal } from './PublishNowModal';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -852,173 +852,10 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
-// F5 — Publish Now Modal
-// ---------------------------------------------------------------------------
-
-type PreflightStatus = 'idle' | 'checking' | 'ready' | 'error';
-
-interface PublishNowModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export const PublishNowModal: React.FC<PublishNowModalProps> = ({ open, onClose }) => {
-  const { connected, accountName } = useLinkedInSocialConnection();
-  const [content, setContent] = useState('');
-  const [phase, setPhase] = useState<'preflight' | 'published'>('preflight');
-  const [publishing, setPublishing] = useState(false);
-  const [error, setError] = useState('');
-  const [postResult, setPostResult] = useState<{ urn: string; message: string } | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-
-  useEffect(() => {
-    if (open) {
-      setContent(formatDraftForPublish(readDraftFromStorage()));
-      setPhase('preflight');
-      setError('');
-      setPostResult(null);
-      setPublishing(false);
-    }
-    return () => abortRef.current?.abort();
-  }, [open]);
-
-  const charCount = content.length;
-  const charOk = charCount > 0 && charCount <= 3000;
-
-  const handlePublish = async () => {
-    if (!connected) {
-      setError('LinkedIn is not connected. Please connect your account first.');
-      return;
-    }
-    if (!charOk) {
-      setError(charCount === 0 ? 'Post content cannot be empty.' : "Post exceeds LinkedIn's 3000 character limit.");
-      return;
-    }
-    setPublishing(true);
-    setError('');
-    abortRef.current = new AbortController();
-    try {
-      const publishContent = formatDraftForPublish(content);
-      const result = await publishLinkedInPost({ content: publishContent });
-      setPostResult({ urn: result.post_urn ?? result.post_id ?? 'published', message: result.message });
-      setPhase('published');
-    } catch (err: any) {
-      const msg = err?.response?.data?.detail ?? err?.message ?? 'Publishing failed. Please try again.';
-      setError(msg);
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  if (phase === 'published' && postResult) {
-    return (
-      <DashboardActionModal open={open} title="Post Published!" onClose={onClose} maxWidth={440}>
-        <div style={{ textAlign: 'center', padding: '16px 0' }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🚀</div>
-          <div style={{ fontWeight: 700, fontSize: 16, color: '#111827', marginBottom: 6 }}>
-            Successfully published to LinkedIn!
-          </div>
-          <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>
-            {postResult.message}
-          </div>
-          {postResult.urn && postResult.urn !== 'published' && (
-            <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 20 }}>
-              Post URN: <code style={{ background: '#f1f5f9', padding: '1px 6px', borderRadius: 4 }}>{postResult.urn}</code>
-            </div>
-          )}
-          <button style={panelBtn(true)} onClick={onClose}>Done</button>
-        </div>
-      </DashboardActionModal>
-    );
-  }
-
-  return (
-    <DashboardActionModal open={open} title="Publish to LinkedIn" onClose={onClose} maxWidth={540} maxHeight="min(92vh, 700px)">
-      <div>
-        {/* Pre-flight summary — 3 checks */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-          <div style={sectionLabel}>Pre-flight checklist</div>
-
-          {/* 1. Connection */}
-          <PreflightRow
-            icon={connected ? '🟢' : '🔴'}
-            label="LinkedIn connection"
-            value={connected ? `Connected as ${accountName ?? 'your account'}` : 'Not connected — please connect in Settings'}
-            ok={connected}
-          />
-
-          {/* 2. Character count */}
-          <PreflightRow
-            icon={charOk ? '🟢' : charCount === 0 ? '⚪' : '🔴'}
-            label="Character count"
-            value={`${charCount} / 3000 chars${!charOk && charCount > 3000 ? ' — exceeds limit' : ''}`}
-            ok={charOk}
-          />
-
-          {/* 3. Duplicate check */}
-          <PreflightRow
-            icon="🟡"
-            label="Duplicate detection"
-            value="Content will be checked against your last 30 published posts on confirm"
-            ok={null}
-          />
-        </div>
-
-        {/* Draft preview */}
-        <div style={sectionLabel}>Post content</div>
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Write or paste your LinkedIn post here…"
-          rows={7}
-          style={{
-            width: '100%',
-            padding: '10px 12px',
-            borderRadius: 8,
-            border: `1.5px solid ${!charOk && charCount > 0 ? (charCount > 3000 ? '#ef4444' : '#d1d5db') : '#d1d5db'}`,
-            fontSize: 13,
-            lineHeight: 1.6,
-            resize: 'vertical',
-            fontFamily: 'inherit',
-            boxSizing: 'border-box',
-            color: '#111827',
-          }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', fontSize: 11, color: charCount > 3000 ? '#ef4444' : '#9ca3af', marginTop: 4, marginBottom: 14 }}>
-          {charCount} / 3000
-        </div>
-
-        {error && (
-          <div style={{ padding: '8px 12px', background: '#fef2f2', borderRadius: 7, color: '#dc2626', fontSize: 13, marginBottom: 12 }}>
-            {error}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            style={panelBtn(true, false)}
-            onClick={handlePublish}
-            disabled={publishing || !connected || !charOk}
-          >
-            {publishing ? <><Spinner /> Publishing…</> : '🚀 Confirm & Publish'}
-          </button>
-          <button style={panelBtn()} onClick={onClose}>Cancel</button>
-        </div>
-
-        {!connected && (
-          <div style={{ marginTop: 12, fontSize: 12, color: '#6b7280' }}>
-            Connect your LinkedIn account in{' '}
-            <strong>Settings → Integrations</strong> to enable publishing.
-          </div>
-        )}
-      </div>
-    </DashboardActionModal>
-  );
-};
+// PublishNowModal moved to ./PublishNowModal.tsx (Phase 1 media UI)
 
 // ---------------------------------------------------------------------------
-// PreflightRow helper
+// PreflightRow helper (used by other modals in this file)
 // ---------------------------------------------------------------------------
 interface PreflightRowProps {
   icon: string;

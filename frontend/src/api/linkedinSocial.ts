@@ -311,15 +311,19 @@ export interface LinkedInProfileCompleteResponse {
 export interface LinkedInPublishPostRequest {
   content: string;
   account_id?: string;
+  /** AI-generated stored image IDs (Phase 3 backend). */
+  image_ids?: string[];
 }
 
 export interface LinkedInPublishPostResponse {
   success: boolean;
   post_id?: string | null;
   post_urn?: string | null;
+  share_url?: string | null;
   provider: string;
   message: string;
   debug_id: string;
+  has_media?: boolean;
 }
 
 const BASE = '/api/linkedin-social';
@@ -361,7 +365,13 @@ export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionS
   if (statusPromiseCache && Date.now() < statusCacheExpiry) {
     return statusPromiseCache;
   }
-  const promise = apiClient.get(`${BASE}/connection/status`).then((r) => r.data);
+  const promise = apiClient
+    .get(`${BASE}/connection/status`)
+    .then((r) => r.data)
+    .catch((err) => {
+      statusPromiseCache = null;
+      throw err;
+    });
   statusPromiseCache = promise;
   statusCacheExpiry = Date.now() + STATUS_CACHE_TTL;
   promise.finally(() => {
@@ -404,13 +414,17 @@ export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> 
   return response.data;
 }
 
-/** Publish the LinkedIn Writer draft as a text-only post to the personal profile. */
+/** Publish the LinkedIn Writer draft as a post to the personal profile (text or text + image). */
 export async function publishLinkedInPost(
   payload: LinkedInPublishPostRequest
 ): Promise<LinkedInPublishPostResponse> {
-  const response = await apiClient.post(`${BASE}/posts/publish`, payload);
+  const response = await apiClient.post(`${BASE}/posts/publish`, payload, {
+    timeout: 180_000,
+  });
   return response.data;
 }
+
+export { publishLinkedInPostWithFile, getLinkedInPublishErrorMessage } from './linkedinPublishApi';
 
 export function getLinkedInSocialErrorMessage(err: unknown): string {
   if (err instanceof RequestTimeoutError) {

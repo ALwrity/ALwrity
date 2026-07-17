@@ -242,11 +242,12 @@ class ZernioProvider:
         return None
 
     async def create_post(
-        self, user_id: str, request: CreatePostRequest
+        self, user_id: str, request: CreatePostRequest, *, db: Any = None
     ) -> CreatePostResult:
         await run_publish_preflight(
             user_id,
             request,
+            db=db,
             deduplicator=self._deduplicator,
             media_validator=self._media_validator,
         )

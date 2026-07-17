@@ -55,6 +55,7 @@ export const DashboardMobileWorkflowGrid: React.FC<DashboardMobileWorkflowGridPr
       <div className="linkedin-dashboard-mobile-workflow-grid">
         {DASHBOARD_WORKFLOW_CARDS.map((card) => {
           const isRecommended = card.id === RECOMMENDED_WORKFLOW_CARD_ID && showPlanHint;
+          const Icon = resolveDashboardWorkflowIcon(card.icon);
           return (
             <button
               key={card.id}
@@ -75,7 +76,7 @@ export const DashboardMobileWorkflowGrid: React.FC<DashboardMobileWorkflowGridPr
                 <span className="linkedin-dashboard-mobile-workflow-badge">Start here</span>
               )}
               <span className="linkedin-dashboard-mobile-workflow-icon" aria-hidden>
-                {React.createElement(resolveDashboardWorkflowIcon(card.icon))}
+                <Icon fontSize="inherit" />
               </span>
               <span className="linkedin-dashboard-mobile-workflow-label">{card.title}</span>
               <span className="linkedin-dashboard-mobile-workflow-desc">

@@ -7,6 +7,11 @@ import {
   mapSearchEngine,
   readPrefs
 } from './utils/linkedInWriterUtils';
+import {
+  assembleLinkedInPostContent,
+  DEFAULT_LINKEDIN_POST_MAX_LENGTH,
+  joinHashtagSuggestions,
+} from './utils/linkedInPostAssembly';
 import { usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
 import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
@@ -100,7 +105,10 @@ const RegisterLinkedInActionsEnhanced: React.FC = () => {
       }
       
       // Apply persona constraints to parameters
-      const maxLength = platformPersona?.content_format_rules?.character_limit || prefs.max_length || 2000;
+      const maxLength =
+        platformPersona?.content_format_rules?.character_limit ||
+        prefs.max_length ||
+        DEFAULT_LINKEDIN_POST_MAX_LENGTH;
       const optimalLength = platformPersona?.content_format_rules?.optimal_length || '150-300 words';
       
       console.log(`🎭 Persona constraints applied: Max ${maxLength} chars, Optimal: ${optimalLength}`);
@@ -148,12 +156,13 @@ const RegisterLinkedInActionsEnhanced: React.FC = () => {
           });
         }
         
-        // Append hashtags and CTA if present
-        const hashtags = res.data.hashtags?.map((h: any) => h.hashtag).join(' ') || '';
-        const cta = res.data.call_to_action || '';
-        let fullContent = enhancedContent;
-        if (hashtags) fullContent += `\n\n${hashtags}`;
-        if (cta) fullContent += `\n\n${cta}`;
+        const fullContent = assembleLinkedInPostContent({
+          content: enhancedContent,
+          hashtags: joinHashtagSuggestions(res.data.hashtags),
+          callToAction: res.data.call_to_action || '',
+          includeHashtags: args?.include_hashtags ?? (prefs.include_hashtags ?? true),
+          includeCallToAction: args?.include_call_to_action ?? (prefs.include_call_to_action ?? true),
+        });
         
         // Update progress with persona validation
         window.dispatchEvent(new CustomEvent('linkedinwriter:progressStep', { 

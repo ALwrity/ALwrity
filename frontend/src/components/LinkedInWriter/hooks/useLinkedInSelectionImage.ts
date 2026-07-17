@@ -14,11 +14,16 @@ import type {
 interface UseLinkedInSelectionImageOptions {
   topic?: string;
   industry?: string;
+  onInsertImage?: (imageUrl: string) => void;
+  /** Called after a successful generation (publish flow attaches without draft insert). */
+  onImageGenerated?: (preview: GeneratedLinkedInImagePreview) => void;
 }
 
 export function useLinkedInSelectionImage({
   topic,
   industry,
+  onInsertImage,
+  onImageGenerated,
 }: UseLinkedInSelectionImageOptions) {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedText, setSelectedText] = useState('');
@@ -41,6 +46,17 @@ export function useLinkedInSelectionImage({
       const trimmed = text.trim();
       setSelectedText(trimmed);
       setInitialPrompt(buildPromptFromSelection(trimmed, topic, industry));
+      setGeneratedPreview(null);
+      setModalOpen(true);
+    },
+    [topic, industry]
+  );
+
+  const openForDraft = useCallback(
+    (seedText: string, prompt?: string) => {
+      const trimmed = seedText.trim();
+      setSelectedText(trimmed);
+      setInitialPrompt(prompt || buildPromptFromSelection(trimmed, topic, industry));
       setGeneratedPreview(null);
       setModalOpen(true);
     },
@@ -96,7 +112,22 @@ export function useLinkedInSelectionImage({
           imageId: result.imageId,
         });
 
-        showToastNotification(`Image generated: ${imageUrl}`, 'success');
+        const preview = {
+          blobUrl,
+          imageUrl,
+          imageId: result.imageId,
+        };
+
+        if (onInsertImage) {
+          onInsertImage(imageUrl);
+        }
+
+        onImageGenerated?.(preview);
+
+        showToastNotification(
+          onInsertImage ? 'Image added to your post' : 'Image generated successfully',
+          'success',
+        );
       } catch (error) {
         const message =
           error instanceof Error ? error.message : 'Image generation failed';
@@ -105,7 +136,7 @@ export function useLinkedInSelectionImage({
         setIsGenerating(false);
       }
     },
-    [selectedText, topic, industry]
+    [selectedText, topic, industry, onInsertImage, onImageGenerated]
   );
 
   return {
@@ -114,6 +145,7 @@ export function useLinkedInSelectionImage({
     isGenerating,
     generatedPreview,
     openForSelection,
+    openForDraft,
     closeModal,
     closePreview,
     handleGenerate,

@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote
 
@@ -191,6 +192,17 @@ class HostedAuthLinkResult:
 
     auth_url: str
     expires_at: datetime
+
+
+def _mime_for_attachment(path: str) -> str:
+    ext = Path(path).suffix.lower()
+    return {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }.get(ext, "application/octet-stream")
 
 
 class UnipileClient:
@@ -516,13 +528,19 @@ class UnipileClient:
             logger.error(f"[UnipileClient] Error deleting account {account_id}: {e}")
             return False
 
-    async def create_post(self, account_id: str, text: str) -> dict[str, Any]:
+    async def create_post(
+        self,
+        account_id: str,
+        text: str,
+        attachment_paths: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """
-        Publish a text-only LinkedIn post via Unipile.
+        Publish a LinkedIn post via Unipile.
 
         Args:
             account_id: Unipile account ID for the connected LinkedIn profile
             text: Post body text
+            attachment_paths: Optional local image file paths to attach
 
         Returns:
             Raw Unipile post response (includes id, social_id, share_url)
@@ -535,15 +553,31 @@ class UnipileClient:
             raise ValueError("Unipile API key is required")
 
         url = self._get_full_url("/api/v1/posts")
-        # Unipile POST /api/v1/posts requires multipart/form-data (not JSON).
-        # Send only account_id + text — omit attachments / video_thumbnail entirely.
-        form_fields = {
-            "account_id": (None, account_id),
-            "text": (None, text),
-        }
+        form_fields: list[tuple[str, tuple]] = [
+            ("account_id", (None, account_id)),
+            ("text", (None, text)),
+        ]
+
+        attachment_count = 0
+        for attachment_path in attachment_paths or []:
+            file_path = Path(attachment_path)
+            if not file_path.exists():
+                raise ValueError(f"Attachment file not found: {attachment_path}")
+            form_fields.append(
+                (
+                    "attachments",
+                    (
+                        file_path.name,
+                        file_path.read_bytes(),
+                        _mime_for_attachment(str(file_path)),
+                    ),
+                )
+            )
+            attachment_count += 1
 
         logger.info(
-            f"[UnipileClient] create_post account_id={account_id} text_len={len(text)}"
+            f"[UnipileClient] create_post account_id={account_id} text_len={len(text)} "
+            f"attachments={attachment_count}"
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:

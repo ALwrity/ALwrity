@@ -207,11 +207,11 @@ export const useLinkedInSocialConnection = () => {
       const isExpectedMissingEndpoint = e?.response?.status === 404;
       if (isExpectedMissingEndpoint) {
         console.debug('[LinkedInConnect] status endpoint not mounted (404); treating as not connected');
+        setError(null);
       } else {
         console.error('[LinkedInConnect] status fetch failed:', e);
+        setError('Could not verify LinkedIn connection. Please refresh and try again.');
       }
-
-      setError('Could not verify LinkedIn connection. Please refresh and try again.');
 
       setStatus({
 
@@ -417,9 +417,9 @@ export const useLinkedInSocialConnection = () => {
 
 
   useEffect(() => {
-
-    checkStatus();
-
+    void checkStatus().catch((err) => {
+      console.error('[LinkedInConnect] unexpected checkStatus failure:', err);
+    });
   }, [checkStatus]);
 
   useEffect(() => {
@@ -435,9 +435,9 @@ export const useLinkedInSocialConnection = () => {
   useEffect(() => {
 
     const onOAuthSuccess = () => {
-
-      checkStatus();
-
+      void checkStatus().catch((err) => {
+        console.error('[LinkedInConnect] unexpected checkStatus failure:', err);
+      });
     };
 
     window.addEventListener('linkedin-oauth-success', onOAuthSuccess);

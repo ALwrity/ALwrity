@@ -11,6 +11,7 @@ import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialCon
 import { KeyPointsSection } from './KeyPointsSection';
 import { VariationPicker, assembleFullContent, type VariationResult } from './VariationPicker';
 import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
+import { DEFAULT_LINKEDIN_POST_MAX_LENGTH } from '../utils/linkedInPostAssembly';
 
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
@@ -525,7 +526,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         include_hashtags: true,
         include_call_to_action: true,
         research_enabled: true,
-        max_length: 2000,
+        max_length: DEFAULT_LINKEDIN_POST_MAX_LENGTH,
         grounding_level: 'enhanced' as any,
         include_citations: true,
       };

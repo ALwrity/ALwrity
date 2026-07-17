@@ -14,6 +14,11 @@ import {
   VALID_INDUSTRIES,
   VALID_SEARCH_ENGINES
 } from '../utils/linkedInWriterUtils';
+import {
+  assembleLinkedInPostContent,
+  DEFAULT_LINKEDIN_POST_MAX_LENGTH,
+  joinHashtagSuggestions,
+} from '../utils/linkedInPostAssembly';
 
 interface PostHITLProps {
   args: any;
@@ -33,7 +38,7 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
     include_call_to_action: args?.include_call_to_action ?? (prefs.include_call_to_action ?? true),
     research_enabled: args?.research_enabled ?? (prefs.research_enabled ?? true),
     search_engine: args?.search_engine || prefs.search_engine || 'google',
-    max_length: args?.max_length || prefs.max_length || 2000
+    max_length: args?.max_length || prefs.max_length || DEFAULT_LINKEDIN_POST_MAX_LENGTH
   });
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -77,13 +82,13 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
       const res = await linkedInWriterApi.generatePost(payload);
       
       if (res.success && res.data) {
-        const content = res.data.content;
-        const hashtags = res.data.hashtags?.map(h => h.hashtag).join(' ') || '';
-        const cta = res.data.call_to_action || '';
-        
-        let fullContent = content;
-        if (hashtags) fullContent += `\n\n${hashtags}`;
-        if (cta) fullContent += `\n\n${cta}`;
+        const fullContent = assembleLinkedInPostContent({
+          content: res.data.content,
+          hashtags: joinHashtagSuggestions(res.data.hashtags),
+          callToAction: res.data.call_to_action || '',
+          includeHashtags: payload.include_hashtags,
+          includeCallToAction: payload.include_call_to_action,
+        });
         
         // Emit loading end event
         window.dispatchEvent(new CustomEvent('linkedinwriter:loadingEnd', { detail: {} }));
@@ -352,7 +357,9 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
             min="100"
             max="3000"
             value={form.max_length}
-            onChange={e => set('max_length', parseInt(e.target.value) || 2000)}
+            onChange={e =>
+              set('max_length', parseInt(e.target.value) || DEFAULT_LINKEDIN_POST_MAX_LENGTH)
+            }
             style={{
               width: '100%',
               padding: '8px 12px',
@@ -361,6 +368,10 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
               fontSize: 14
             }}
           />
+          <div style={{ marginTop: 4, fontSize: 12, color: '#64748b' }}>
+            Default {DEFAULT_LINKEDIN_POST_MAX_LENGTH} keeps posts near the “see more” soft limit;
+            LinkedIn hard max is 3,000. Longer posts are allowed if you raise this.
+          </div>
         </div>
       </div>
 
