@@ -6,7 +6,7 @@ import sys
 from contextlib import contextmanager
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from cryptography.fernet import Fernet
@@ -67,65 +67,58 @@ _routes = _load_linkedin_social_routes()
 
 @pytest.mark.anyio
 async def test_publish_linkedin_post_returns_success() -> None:
-    provider = SimpleNamespace(
-        provider_name="unipile",
-        create_post=AsyncMock(
-            return_value=SimpleNamespace(
-                success=True,
-                post_id="123",
-                post_urn="urn:li:activity:123",
-                raw={"id": "123", "social_id": "urn:li:activity:123"},
-            )
-        ),
+    expected = _routes.LinkedInPublishPostResponse(
+        success=True,
+        post_id="123",
+        post_urn="urn:li:activity:123",
+        provider="unipile",
+        message="Published to LinkedIn.",
+        debug_id="debug123",
+        has_media=False,
     )
 
     with (
-        patch.object(_routes, "get_linkedin_provider", return_value=provider),
         patch.object(
-            _routes._oauth_service,
-            "resolve_credentials",
-            return_value=SimpleNamespace(
-                provider_mode="unipile",
-                unipile_account_id="acct-1",
-                primary_account_id="acct-1",
-            ),
+            _routes,
+            "parse_publish_request",
+            AsyncMock(return_value=("Hello LinkedIn", "acct-1", None, None, None)),
+        ),
+        patch.object(
+            _routes,
+            "execute_linkedin_publish",
+            AsyncMock(return_value=expected),
         ),
     ):
         response = await _routes.publish_linkedin_post(
-            body=_routes.LinkedInPublishPostRequest(
-                content="Hello LinkedIn",
-                account_id="acct-1",
-            ),
+            request=AsyncMock(),
             current_user={"id": "user_1"},
+            db=MagicMock(),
         )
 
     assert response.success is True
     assert response.post_urn == "urn:li:activity:123"
-    assert response.debug_id
-    provider.create_post.assert_awaited_once()
+    assert response.debug_id == "debug123"
 
 
 @pytest.mark.anyio
 async def test_publish_linkedin_post_returns_401_when_not_connected() -> None:
-    from services.integrations.linkedin.types import LinkedInNotConnectedError
-
-    provider = SimpleNamespace(provider_name="unipile")
-
     with (
-        patch.object(_routes, "get_linkedin_provider", return_value=provider),
         patch.object(
-            _routes._oauth_service,
-            "resolve_credentials",
-            side_effect=LinkedInNotConnectedError("No LinkedIn credentials available"),
+            _routes,
+            "parse_publish_request",
+            AsyncMock(return_value=("Hello LinkedIn", "acct-1", None, None, None)),
+        ),
+        patch.object(
+            _routes,
+            "execute_linkedin_publish",
+            AsyncMock(side_effect=HTTPException(status_code=401, detail="No LinkedIn credentials available")),
         ),
     ):
         with pytest.raises(HTTPException) as exc_info:
             await _routes.publish_linkedin_post(
-                body=_routes.LinkedInPublishPostRequest(
-                    content="Hello LinkedIn",
-                    account_id="acct-1",
-                ),
+                request=AsyncMock(),
                 current_user={"id": "user_1"},
+                db=MagicMock(),
             )
 
     assert exc_info.value.status_code == 401
@@ -134,13 +127,115 @@ async def test_publish_linkedin_post_returns_401_when_not_connected() -> None:
 
 @pytest.mark.anyio
 async def test_publish_linkedin_post_returns_400_for_empty_content() -> None:
-    provider = SimpleNamespace(provider_name="unipile")
-
-    with patch.object(_routes, "get_linkedin_provider", return_value=provider):
+    with (
+        patch.object(
+            _routes,
+            "parse_publish_request",
+            AsyncMock(return_value=("   ", None, None, None, None)),
+        ),
+        patch.object(
+            _routes,
+            "execute_linkedin_publish",
+            AsyncMock(side_effect=HTTPException(status_code=400, detail="Post content cannot be empty")),
+        ),
+    ):
         with pytest.raises(HTTPException) as exc_info:
             await _routes.publish_linkedin_post(
-                body=_routes.LinkedInPublishPostRequest(content="   "),
+                request=AsyncMock(),
                 current_user={"id": "user_1"},
+                db=MagicMock(),
             )
 
     assert exc_info.value.status_code == 400
+
+
+@pytest.mark.anyio
+async def test_publish_linkedin_post_with_image_ids() -> None:
+    expected = _routes.LinkedInPublishPostResponse(
+        success=True,
+        post_id="123",
+        post_urn="urn:li:activity:123",
+        provider="unipile",
+        message="Published to LinkedIn with image.",
+        debug_id="debug456",
+        has_media=True,
+    )
+
+    with (
+        patch.object(
+            _routes,
+            "parse_publish_request",
+            AsyncMock(
+                return_value=(
+                    "Hello with image",
+                    "acct-1",
+                    ["abc123def4567890"],
+                    None,
+                    None,
+                )
+            ),
+        ),
+        patch.object(
+            _routes,
+            "execute_linkedin_publish",
+            AsyncMock(return_value=expected),
+        ) as mock_execute,
+    ):
+        response = await _routes.publish_linkedin_post(
+            request=AsyncMock(),
+            current_user={"id": "user_1"},
+            db=MagicMock(),
+        )
+
+    assert response.success is True
+    assert response.has_media is True
+    mock_execute.assert_awaited_once()
+    call_kwargs = mock_execute.await_args.kwargs
+    assert call_kwargs["image_ids"] == ["abc123def4567890"]
+    assert call_kwargs["user_id"] == "user_1"
+
+
+@pytest.mark.anyio
+async def test_publish_linkedin_post_with_image_ids() -> None:
+    expected = _routes.LinkedInPublishPostResponse(
+        success=True,
+        post_id="123",
+        post_urn="urn:li:activity:123",
+        provider="unipile",
+        message="Published to LinkedIn with image.",
+        debug_id="debug456",
+        has_media=True,
+    )
+
+    with (
+        patch.object(
+            _routes,
+            "parse_publish_request",
+            AsyncMock(
+                return_value=(
+                    "Hello with image",
+                    "acct-1",
+                    ["abc123def4567890"],
+                    None,
+                    None,
+                )
+            ),
+        ),
+        patch.object(
+            _routes,
+            "execute_linkedin_publish",
+            AsyncMock(return_value=expected),
+        ) as mock_execute,
+    ):
+        response = await _routes.publish_linkedin_post(
+            request=AsyncMock(),
+            current_user={"id": "user_1"},
+            db=MagicMock(),
+        )
+
+    assert response.success is True
+    assert response.has_media is True
+    mock_execute.assert_awaited_once()
+    call_kwargs = mock_execute.await_args.kwargs
+    assert call_kwargs["image_ids"] == ["abc123def4567890"]
+    assert call_kwargs["user_id"] == "user_1"

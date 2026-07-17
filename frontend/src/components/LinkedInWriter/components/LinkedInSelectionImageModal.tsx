@@ -84,9 +84,15 @@ export const LinkedInSelectionImageModal: React.FC<LinkedInSelectionImageModalPr
 
   if (generatedPreview) {
     return (
-      <Dialog open={open} onClose={onClosePreview || onClose} maxWidth="sm" fullWidth>
-        <DialogTitle sx={{ color: '#0A66C2', fontWeight: 600 }}>
-          Image Generated Successfully
+      <Dialog
+        open={open}
+        onClose={onClosePreview || onClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ color: '#0A66C2', fontWeight: 600, pb: 1 }}>
+          Image Added to Your Post
         </DialogTitle>
         <DialogContent>
           <Box sx={{ textAlign: 'center', py: 1 }}>
@@ -96,14 +102,15 @@ export const LinkedInSelectionImageModal: React.FC<LinkedInSelectionImageModalPr
               alt="Generated LinkedIn image"
               sx={{
                 maxWidth: '100%',
-                maxHeight: 360,
+                maxHeight: 320,
                 borderRadius: 2,
                 border: '1px solid #e0e0e0',
                 mb: 2,
               }}
             />
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Your LinkedIn-optimized image is ready.
+              The image has been inserted into your draft. You can keep editing or switch to
+              preview mode to see how it will look.
             </Typography>
             <Link
               href={generatedPreview.imageUrl}
@@ -116,8 +123,15 @@ export const LinkedInSelectionImageModal: React.FC<LinkedInSelectionImageModalPr
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={onClosePreview || onClose} variant="contained" color="primary">
-            Close
+          <Button
+            onClick={onClosePreview || onClose}
+            variant="contained"
+            sx={{
+              backgroundColor: '#0A66C2',
+              '&:hover': { backgroundColor: '#004182' },
+            }}
+          >
+            Done
           </Button>
         </DialogActions>
       </Dialog>

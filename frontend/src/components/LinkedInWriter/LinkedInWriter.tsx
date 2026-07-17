@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Button, Snackbar, Alert, CircularProgress } from '@mui/material';
 import { Save as SaveIcon, RateReview as RateReviewIcon } from '@mui/icons-material';
@@ -20,6 +20,7 @@ import {
 } from './components';
 import OutlineEditor from './components/OutlineEditor';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
+import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssistiveEditor';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
@@ -125,6 +126,12 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     generateOutline,
     refineOutline,
   } = useLinkedInWriter();
+
+  const assistiveEditorRef = useRef<LinkedInAssistiveEditorHandle | null>(null);
+
+  const getDraftForPublish = useCallback(() => {
+    return assistiveEditorRef.current?.flushDraft() ?? draft;
+  }, [draft]);
 
   // Get persona context for enhanced AI assistance
   const { corePersona, platformPersona } = usePlatformPersonaContext();
@@ -575,7 +582,12 @@ Always use the most appropriate tool for the user's request.`.trim();
 
               <div style={{ flex: 1 }} />
 
-              <PublishLinkedInPanel draft={draft} compact />
+              <PublishLinkedInPanel
+                draft={draft}
+                getDraftForPublish={getDraftForPublish}
+                topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
+                compact
+              />
             </div>
           )}
 
@@ -598,6 +610,7 @@ Always use the most appropriate tool for the user's request.`.trim();
             onDraftChange={handleDraftChange}
             onPreviewToggle={handlePreviewToggle}
             topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
+            assistiveEditorRef={assistiveEditorRef}
           />
         </>) : (
           /* Outline Editor - Show when planning sections */

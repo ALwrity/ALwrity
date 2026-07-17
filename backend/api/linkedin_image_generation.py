@@ -174,6 +174,77 @@ async def generate_linkedin_image(
             error=f"Failed to generate image: {str(e)}"
         )
 
+@router.post("/upload-image", response_model=ImageGenerationResponse)
+async def upload_linkedin_image(
+    file: UploadFile = File(...),
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Upload a user-provided image for LinkedIn Studio editor and publish flows."""
+    try:
+        user_id = current_user.get("id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Filename is required")
+
+        content_type = (file.content_type or "").lower()
+        allowed_types = {"image/png", "image/jpeg", "image/jpg", "image/gif", "image/webp"}
+        if content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported image type. Use PNG, JPEG, GIF, or WebP.",
+            )
+
+        image_data = await file.read()
+        if not image_data:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        max_bytes = 8 * 1024 * 1024
+        if len(image_data) > max_bytes:
+            raise HTTPException(status_code=400, detail="Image must be under 8 MB")
+
+        logger.info(
+            "[LinkedInImageUpload] user={} filename={} bytes={}",
+            user_id,
+            file.filename,
+            len(image_data),
+        )
+
+        store_result = await image_storage.store_image(
+            image_data=image_data,
+            metadata={
+                "source": "upload",
+                "filename": file.filename,
+                "content_type": content_type,
+            },
+            content_type="post",
+            user_id=user_id,
+        )
+
+        if not store_result.get("success"):
+            error_msg = store_result.get("error", "Failed to store uploaded image")
+            logger.error("[LinkedInImageUpload] storage failed: {}", error_msg)
+            return ImageGenerationResponse(success=False, error=error_msg)
+
+        image_id = store_result["image_id"]
+        logger.info("[LinkedInImageUpload] stored image_id={}", image_id)
+
+        return ImageGenerationResponse(
+            success=True,
+            image_id=image_id,
+            style="Uploaded",
+            aspect_ratio=None,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("[LinkedInImageUpload] Error: {}", str(e))
+        return ImageGenerationResponse(
+            success=False,
+            error=f"Failed to upload image: {str(e)}",
+        )
+
 @router.post("/edit-image", response_model=ImageEditResponse)
 async def edit_linkedin_image(
     request: ImageEditRequest,

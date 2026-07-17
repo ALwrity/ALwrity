@@ -15,6 +15,11 @@ import { getContextAwareSuggestions, mapPostType, mapTone, mapIndustry, mapSearc
 import { linkedInWriterApi, GroundingLevel, LinkedInOutlineSection } from '../../../services/linkedInWriterApi';
 import { CopilotPersistenceManager } from '../utils/enhancedPersistence';
 import { stripSourceCitations } from '../utils/linkedInPublishFormatters';
+import {
+  assembleLinkedInPostContent,
+  DEFAULT_LINKEDIN_POST_MAX_LENGTH,
+  joinHashtagSuggestions,
+} from '../utils/linkedInPostAssembly';
 
 function normalizeDraftDetail(detail: unknown): string {
   if (typeof detail === 'string') return detail;
@@ -145,7 +150,7 @@ export function useLinkedInWriter() {
         include_call_to_action: params?.include_call_to_action ?? (prefs.include_call_to_action ?? true),
         research_enabled: params?.research_enabled ?? (prefs.research_enabled ?? true),
         search_engine: mapSearchEngine(params?.search_engine || prefs.search_engine),
-        max_length: params?.max_length || prefs.max_length || 2000,
+        max_length: params?.max_length || prefs.max_length || DEFAULT_LINKEDIN_POST_MAX_LENGTH,
         grounding_level: 'enhanced' as GroundingLevel,
         include_citations: true
       });
@@ -158,12 +163,13 @@ export function useLinkedInWriter() {
           }));
           stepIndex++;
         }
-        const content = res.data.content;
-        const hashtags = res.data.hashtags?.map((h: any) => h.hashtag).join(' ') || '';
-        const cta = res.data.call_to_action || '';
-        let fullContent = content;
-        if (hashtags) fullContent += `\n\n${hashtags}`;
-        if (cta) fullContent += `\n\n${cta}`;
+        const fullContent = assembleLinkedInPostContent({
+          content: res.data.content,
+          hashtags: joinHashtagSuggestions(res.data.hashtags),
+          callToAction: res.data.call_to_action || '',
+          includeHashtags: params?.include_hashtags ?? (prefs.include_hashtags ?? true),
+          includeCallToAction: params?.include_call_to_action ?? (prefs.include_call_to_action ?? true),
+        });
         window.dispatchEvent(new CustomEvent('linkedinwriter:updateGroundingData', { detail: {
           researchSources: res.research_sources || [],
           citations: res.data?.citations || [],

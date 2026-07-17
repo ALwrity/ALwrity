@@ -8,6 +8,11 @@ import {
   mapSearchEngine,
   readPrefs
 } from './utils/linkedInWriterUtils';
+import {
+  assembleLinkedInPostContent,
+  DEFAULT_LINKEDIN_POST_MAX_LENGTH,
+  joinHashtagSuggestions,
+} from './utils/linkedInPostAssembly';
 import { apiClient } from '../../api/client';
 import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
@@ -196,7 +201,7 @@ const RegisterLinkedInActions: React.FC = () => {
         include_call_to_action: args?.include_call_to_action ?? (prefs.include_call_to_action ?? true),
         research_enabled: args?.research_enabled ?? (prefs.research_enabled ?? true),
         search_engine: mapSearchEngine(args?.search_engine || prefs.search_engine),
-        max_length: args?.max_length || prefs.max_length || 2000,
+        max_length: args?.max_length || prefs.max_length || DEFAULT_LINKEDIN_POST_MAX_LENGTH,
         grounding_level: 'enhanced' as GroundingLevel,
         include_citations: true
       });
@@ -259,13 +264,13 @@ const RegisterLinkedInActions: React.FC = () => {
           } 
         }));
         
-        const content = res.data.content;
-        const hashtags = res.data.hashtags?.map(h => h.hashtag).join(' ') || '';
-        const cta = res.data.call_to_action || '';
-        
-        let fullContent = content;
-        if (hashtags) fullContent += `\n\n${hashtags}`;
-        if (cta) fullContent += `\n\n${cta}`;
+        const fullContent = assembleLinkedInPostContent({
+          content: res.data.content,
+          hashtags: joinHashtagSuggestions(res.data.hashtags),
+          callToAction: res.data.call_to_action || '',
+          includeHashtags: args?.include_hashtags ?? (prefs.include_hashtags ?? true),
+          includeCallToAction: args?.include_call_to_action ?? (prefs.include_call_to_action ?? true),
+        });
         
         // Debug: Log the full response structure
         console.log('[LinkedIn Writer] Full API response:', res);
