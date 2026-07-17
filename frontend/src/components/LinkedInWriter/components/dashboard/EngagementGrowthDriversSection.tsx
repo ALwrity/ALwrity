@@ -3,7 +3,10 @@ import React, { useMemo } from 'react';
 import type { EngagementSummary } from '../../../../services/postAnalyticsApi';
 import { colors } from '../GrowthEngine/styles';
 import { formatLocalizedComparisonPeriod } from './engagementTrendsLocaleFormat';
-import { GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsModalLayout';
+import {
+  GROWTH_CONTRIBUTION_TOOLTIP,
+  GROWTH_DRIVERS_CONTRIBUTION_HINT,
+} from './engagementTrendsCopy';
 
 export interface EngagementGrowthDriversSectionProps {
   period: { from: string; to: string };
@@ -20,7 +23,7 @@ function formatSignedDelta(value: number): string {
 
 function buildOverallGrowthLine(summary: EngagementSummary): string {
   const parts: string[] = [];
-  const { reactions, comments, impressions } = summary;
+  const { reactions, comments, impressions, followers } = summary;
 
   if (reactions.delta !== 0) {
     parts.push(`${formatSignedDelta(reactions.delta)} reactions`);
@@ -30,6 +33,9 @@ function buildOverallGrowthLine(summary: EngagementSummary): string {
   }
   if (impressions.delta !== 0) {
     parts.push(`${formatSignedDelta(impressions.delta)} impressions`);
+  }
+  if (followers && followers.delta !== 0) {
+    parts.push(`${formatSignedDelta(followers.delta)} followers from posts`);
   }
 
   if (parts.length === 0) {
@@ -62,7 +68,7 @@ export const EngagementGrowthDriversSection: React.FC<EngagementGrowthDriversSec
           marginBottom: 6,
         }}
       >
-        📈 Growth drivers
+        Growth drivers
       </div>
 
       <div
@@ -84,7 +90,7 @@ export const EngagementGrowthDriversSection: React.FC<EngagementGrowthDriversSec
         </p>
         {showContributionBadges && (
           <p style={{ margin: '0 0 4px' }} title={GROWTH_CONTRIBUTION_TOOLTIP}>
-            Contribution % = share of total positive growth (reactions + comments + impressions).
+            {GROWTH_DRIVERS_CONTRIBUTION_HINT}
           </p>
         )}
         <p style={{ margin: 0, fontSize: 10, fontWeight: 600, color: '#166534' }}>

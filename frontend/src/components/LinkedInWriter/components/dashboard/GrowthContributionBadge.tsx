@@ -1,15 +1,17 @@
 import React from 'react';
 
-import { GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsModalLayout';
+import { GROWTH_CONTRIBUTION_BADGE_SUBLABEL, GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsCopy';
 
 interface GrowthContributionBadgeProps {
   contributionPct: number;
 }
 
-export const GrowthContributionBadge: React.FC<GrowthContributionBadgeProps> = ({ contributionPct }) => (
+export const GrowthContributionBadge: React.FC<GrowthContributionBadgeProps> = ({
+  contributionPct,
+}) => (
   <div
     title={GROWTH_CONTRIBUTION_TOOLTIP}
-    aria-label={`${contributionPct}% of engagement growth. ${GROWTH_CONTRIBUTION_TOOLTIP}`}
+    aria-label={`${contributionPct}% share of growth. ${GROWTH_CONTRIBUTION_TOOLTIP}`}
     style={{
       flexShrink: 0,
       textAlign: 'right',
@@ -17,7 +19,7 @@ export const GrowthContributionBadge: React.FC<GrowthContributionBadgeProps> = (
       background: '#dcfce7',
       border: '1px solid #86efac',
       borderRadius: 8,
-      maxWidth: 108,
+      maxWidth: 120,
       cursor: 'help',
     }}
   >
@@ -25,7 +27,7 @@ export const GrowthContributionBadge: React.FC<GrowthContributionBadgeProps> = (
       {contributionPct}% of growth
     </div>
     <div style={{ fontSize: 8, fontWeight: 600, color: '#166534', marginTop: 1, lineHeight: 1.2 }}>
-      Key growth driver
+      {GROWTH_CONTRIBUTION_BADGE_SUBLABEL}
     </div>
   </div>
 );

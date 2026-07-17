@@ -3,9 +3,14 @@ import React from 'react';
 import type { PostDelta } from '../../../../services/postAnalyticsApi';
 import { colors, rowBase } from '../GrowthEngine/styles';
 import { GrowthContributionBadge } from './GrowthContributionBadge';
+import { METRIC_LABELS, METRIC_TOOLTIPS } from './engagementTrendsCopy';
 
-const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+const DeltaChip: React.FC<{ icon: string; delta: number; label?: string }> = ({
+  icon,
+  delta,
+  label,
+}) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }} title={label}>
     <span>{icon}</span>
     <span style={{ fontSize: 12, fontWeight: 700, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>
       {delta >= 0 ? '+' : ''}
@@ -33,6 +38,9 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
     gain &&
     post.growth_contribution_pct != null &&
     post.growth_contribution_pct > 0;
+  const followersDelta = post.followers_delta;
+  const clicksDelta = post.clicks_delta;
+  const repostsDelta = post.reposts_delta;
 
   return (
     <div
@@ -81,9 +89,22 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
         )}
       </div>
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <DeltaChip icon="❤️" delta={post.reactions_delta} />
-        <DeltaChip icon="💬" delta={post.comments_delta} />
-        <DeltaChip icon="👁️" delta={post.impressions_delta} />
+        <DeltaChip icon="❤️" delta={post.reactions_delta} label={METRIC_LABELS.reactions} />
+        <DeltaChip icon="💬" delta={post.comments_delta} label={METRIC_LABELS.comments} />
+        <DeltaChip icon="👁️" delta={post.impressions_delta} label={METRIC_LABELS.impressions} />
+        {typeof followersDelta === 'number' && (
+          <DeltaChip
+            icon="👥"
+            delta={followersDelta}
+            label={METRIC_LABELS.followersFromPosts}
+          />
+        )}
+        {typeof clicksDelta === 'number' && (
+          <DeltaChip icon="🔗" delta={clicksDelta} label={METRIC_LABELS.clicks} />
+        )}
+        {typeof repostsDelta === 'number' && (
+          <DeltaChip icon="🔁" delta={repostsDelta} label={METRIC_LABELS.reposts} />
+        )}
         {showViewComments && (
           <button
             type="button"
@@ -126,8 +147,10 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
           fontWeight: 700,
           marginTop: 4,
         }}
+        title={METRIC_TOOLTIPS.engagementRate}
       >
-        ER: {(post.engagement_rate_before * 100).toFixed(1)}% → {(post.engagement_rate_now * 100).toFixed(1)}%
+        Engagement rate: {(post.engagement_rate_before * 100).toFixed(1)}% →{' '}
+        {(post.engagement_rate_now * 100).toFixed(1)}%
       </div>
     </div>
   );

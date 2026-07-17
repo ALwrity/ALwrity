@@ -18,5 +18,5 @@ export const ENGAGEMENT_TRENDS_BODY_STYLE: CSSProperties = {
   lineHeight: 1.45,
 };
 
-export const GROWTH_CONTRIBUTION_TOOLTIP =
-  'Each percentage is that post\'s share of total positive growth (reactions + comments + impressions) across all posts in this comparison.';
+/** @deprecated Prefer importing from engagementTrendsCopy.ts */
+export { GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsCopy';

@@ -68,6 +68,10 @@ export interface PostDelta {
   engagement_rate_before: number;
   /** Share of total positive engagement growth (top gainers only). */
   growth_contribution_pct?: number | null;
+  /** Optional until Phase 2 history API includes these fields. */
+  followers_delta?: number | null;
+  clicks_delta?: number | null;
+  reposts_delta?: number | null;
 }
 
 export interface EngagementSummary {
@@ -77,6 +81,10 @@ export interface EngagementSummary {
   impressions: MetricDelta;
   avg_engagement_rate_before: number;
   avg_engagement_rate_now: number;
+  /** Optional until Phase 2 history API includes these fields. */
+  followers?: MetricDelta | null;
+  clicks?: MetricDelta | null;
+  reposts?: MetricDelta | null;
 }
 
 export interface PostAnalyticsHistoryResponse {
@@ -86,6 +94,10 @@ export interface PostAnalyticsHistoryResponse {
   top_decliners: PostDelta[];
   /** ISO timestamp of the last successful LinkedIn analytics sync. */
   last_synced_at?: string | null;
+  /** Optional until Phase 2 returns explicit Top / Rising / Falling lists. */
+  top_posts?: PostDelta[] | null;
+  rising_posts?: PostDelta[] | null;
+  falling_posts?: PostDelta[] | null;
 }
 
 export const postAnalyticsApi = {
