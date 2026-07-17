@@ -4,6 +4,7 @@ import {
   PLAN_PINNED_HINT_KEY,
   RECOMMENDED_WORKFLOW_CARD_ID,
   WORKFLOW_MOBILE_DESCRIPTIONS,
+  resolveDashboardWorkflowIcon,
   type DashboardWorkflowCardId,
 } from './dashboardWorkflowConfig';
 
@@ -74,7 +75,7 @@ export const DashboardMobileWorkflowGrid: React.FC<DashboardMobileWorkflowGridPr
                 <span className="linkedin-dashboard-mobile-workflow-badge">Start here</span>
               )}
               <span className="linkedin-dashboard-mobile-workflow-icon" aria-hidden>
-                {card.icon}
+                {React.createElement(resolveDashboardWorkflowIcon(card.icon))}
               </span>
               <span className="linkedin-dashboard-mobile-workflow-label">{card.title}</span>
               <span className="linkedin-dashboard-mobile-workflow-desc">

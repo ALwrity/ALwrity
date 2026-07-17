@@ -132,9 +132,16 @@ const App: React.FC = () => {
 
   // Listen for global open-gif-maker event
   useEffect(() => {
-    const handler = () => setShowGifMaker(true);
+    console.log('[GIF] Mounting event listener for open-gif-maker');
+    const handler = () => {
+      console.log('[GIF] open-gif-maker event received');
+      setShowGifMaker(true);
+    };
     window.addEventListener('open-gif-maker', handler);
-    return () => window.removeEventListener('open-gif-maker', handler);
+    return () => {
+      console.log('[GIF] Removing event listener for open-gif-maker');
+      window.removeEventListener('open-gif-maker', handler);
+    };
   }, []);
 
   // Listen for CopilotKit key updates
@@ -280,12 +287,13 @@ const App: React.FC = () => {
                     <Route path="/bing-analytics-storage" element={<ProtectedRoute><FeatureRoute feature="bing"><BingAnalyticsStorage /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/gif-maker" element={<ProtectedRoute><GifMakerPage apiBaseUrl={process.env.REACT_APP_API_URL || ''} maxFrames={30} /></ProtectedRoute>} />
               </Routes>
-
-              <GifMakerFloatingPanel
-                open={showGifMaker}
-                onClose={() => setShowGifMaker(false)}
-              />
             </Suspense>
+
+            {/* GifMakerFloatingPanel — outside Suspense so it's never replaced by fallback */}
+            <GifMakerFloatingPanel
+              open={showGifMaker}
+              onClose={() => setShowGifMaker(false)}
+            />
           </ConditionalCopilotKit>
         </AuthenticatedCopilotWrapper>
       </Router>

@@ -581,7 +581,7 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('open-gif-maker'))}
+            onClick={() => { console.log('[GIF] Header button clicked, dispatching open-gif-maker'); window.dispatchEvent(new CustomEvent('open-gif-maker')); }}
             title="GIF Maker — Record UI flows for marketing"
             aria-label="Open GIF Maker"
             style={{
