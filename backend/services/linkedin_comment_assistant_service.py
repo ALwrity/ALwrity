@@ -504,12 +504,15 @@ async def like_comment(
     )
 
     client = UnipilePostCommentsClient()
-    await client.add_post_reaction(
-        account_id,
-        social_id,
-        comment_id=parent_id,
-        reaction_type=normalized_type,
-    )
+    try:
+        await client.add_post_reaction(
+            account_id,
+            social_id,
+            comment_id=parent_id,
+            reaction_type=normalized_type,
+        )
+    except ValueError as exc:
+        raise LinkedInPostCommentsValidationError(str(exc)) from exc
     return CommentAssistantLikeResponse(
         success=True,
         comment_id=parent_id,

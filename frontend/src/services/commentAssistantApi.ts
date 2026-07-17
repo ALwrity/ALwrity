@@ -35,7 +35,7 @@ export const commentAssistantApi = {
     return data;
   },
 
-  /** Like a comment via Unipile v1 reaction (needs post social_id). */
+  /** React to a comment via Unipile v1 (like / celebrate / support / love / …). */
   async likeComment(
     commentId: string,
     postSocialId: string,
@@ -47,6 +47,35 @@ export const commentAssistantApi = {
         post_social_id: postSocialId,
         reaction_type: reactionType,
       }
+    );
+    return data;
+  },
+
+  /**
+   * Reply with optional mentions + image (multipart).
+   * Use when attaching an image; otherwise postCommentsApi.replyToComment is fine.
+   */
+  async replyToComment(
+    socialId: string,
+    payload: {
+      comment_id: string;
+      text: string;
+      mentions?: Array<{ name: string; profile_id: string }>;
+      imageFile?: File | null;
+    }
+  ): Promise<{ success: boolean; comment_id?: string | null }> {
+    const form = new FormData();
+    form.append('comment_id', payload.comment_id);
+    form.append('text', payload.text);
+    if (payload.mentions && payload.mentions.length > 0) {
+      form.append('mentions', JSON.stringify(payload.mentions));
+    }
+    if (payload.imageFile) {
+      form.append('attachment', payload.imageFile);
+    }
+    const { data } = await aiApiClient.post<{ success: boolean; comment_id?: string | null }>(
+      `${BASE}/posts/${encodeURIComponent(socialId)}/comments/reply`,
+      form
     );
     return data;
   },

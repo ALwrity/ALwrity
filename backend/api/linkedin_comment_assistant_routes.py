@@ -7,9 +7,10 @@ Reply / load-more remain on existing post-comments routes.
 
 from __future__ import annotations
 
-from typing import Literal
+import json
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from loguru import logger
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,10 @@ from models.linkedin_comment_assistant_models import (
     CommentAssistantInboxResponse,
     CommentAssistantLikeRequest,
     CommentAssistantLikeResponse,
+)
+from models.linkedin_post_comments_models import (
+    PostCommentMention,
+    PostCommentReplyResponse,
 )
 from models.linkedin_posts_models import PostsErrorResponse
 from services.database import get_db
@@ -30,6 +35,7 @@ from services.linkedin_comment_assistant_service import (
 from services.linkedin_post_comments_service import (
     LinkedInPostCommentsNotAvailableError,
     LinkedInPostCommentsValidationError,
+    reply_to_comment,
 )
 
 
@@ -197,6 +203,102 @@ async def get_inbox(
         _raise_inbox_http_error(exc, user_id=user_id, operation="inbox")
     except Exception as exc:
         _raise_inbox_http_error(exc, user_id=user_id, operation="inbox")
+
+
+@router.post(
+    "/comment-assistant/posts/{social_id}/comments/reply",
+    response_model=PostCommentReplyResponse,
+    responses={
+        401: {"model": PostsErrorResponse},
+        403: {"model": PostsErrorResponse},
+        404: {"model": PostsErrorResponse},
+        429: {"model": PostsErrorResponse},
+        502: {"model": PostsErrorResponse},
+        503: {"model": PostsErrorResponse},
+    },
+    summary="Reply to a comment (mentions + optional image)",
+    description=(
+        "Multipart reply with optional LinkedIn mentions and one image attachment. "
+        "Text may use {{0}} placeholders matching the mentions JSON array."
+    ),
+)
+async def post_inbox_comment_reply(
+    social_id: str,
+    comment_id: str = Form(...),
+    text: str = Form(...),
+    mentions: Optional[str] = Form(
+        None,
+        description='JSON array of {"name","profile_id"} objects',
+    ),
+    attachment: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user),
+) -> PostCommentReplyResponse:
+    """Reply with Unipile mentions and optional image (Comment Assistant)."""
+    user_id = _user_id(current_user)
+    mention_models: list[PostCommentMention] = []
+    if mentions and mentions.strip():
+        try:
+            raw_mentions = json.loads(mentions)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "error_code": "VALIDATION_ERROR",
+                    "message": "mentions must be a valid JSON array.",
+                },
+            ) from exc
+        if isinstance(raw_mentions, list):
+            for item in raw_mentions:
+                if isinstance(item, dict) and item.get("name") and item.get("profile_id"):
+                    mention_models.append(
+                        PostCommentMention(
+                            name=str(item["name"]),
+                            profile_id=str(item["profile_id"]),
+                        )
+                    )
+
+    attachment_tuple = None
+    if attachment is not None and attachment.filename:
+        content = await attachment.read()
+        if content:
+            if len(content) > 5 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail={
+                        "error_code": "VALIDATION_ERROR",
+                        "message": "Image must be 5MB or smaller.",
+                    },
+                )
+            content_type = attachment.content_type or "image/jpeg"
+            attachment_tuple = (attachment.filename, content, content_type)
+
+    logger.info(
+        "[CommentAssistant] POST reply user_id={} social_id={} comment_id={} "
+        "mentions={} has_attachment={}",
+        user_id,
+        social_id,
+        comment_id,
+        len(mention_models),
+        attachment_tuple is not None,
+    )
+    try:
+        return await reply_to_comment(
+            user_id,
+            social_id,
+            comment_id,
+            text,
+            mentions=mention_models or None,
+            attachment=attachment_tuple,
+        )
+    except (
+        LinkedInPostCommentsNotAvailableError,
+        LinkedInNotConnectedError,
+        LinkedInPostCommentsValidationError,
+        UnipileAPIError,
+    ) as exc:
+        _raise_inbox_http_error(exc, user_id=user_id, operation="reply_comment")
+    except Exception as exc:
+        _raise_inbox_http_error(exc, user_id=user_id, operation="reply_comment")
 
 
 @router.post(

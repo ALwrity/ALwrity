@@ -47,7 +47,7 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     syncDisabled,
     handleSync,
     retryPost,
-    handleLike,
+    handleReact,
     handleSendReply,
     handleDraftAi,
     handleLoadMore,
@@ -250,9 +250,11 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
                     setExpandedPostId((prev) => (prev === g.postId ? null : g.postId))
                   }
                   actionsEnabled={connected && !g.error}
-                  onLike={(commentId) => void handleLike(g.postId, g.socialId, commentId)}
-                  onSendReply={(commentId, text) =>
-                    void handleSendReply(g.postId, g.socialId, commentId, text)
+                  onReact={(commentId, reactionType) =>
+                    void handleReact(g.postId, g.socialId, commentId, reactionType)
+                  }
+                  onSendReply={(commentId, payload) =>
+                    void handleSendReply(g.postId, g.socialId, commentId, payload)
                   }
                   onDraftAi={(commentId) => {
                     const comment = g.comments?.find((c) => c.id === commentId);

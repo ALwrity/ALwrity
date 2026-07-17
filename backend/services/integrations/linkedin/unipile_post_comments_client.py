@@ -17,11 +17,15 @@ from services.integrations.linkedin.unipile_client import (
     UnipileAPIError,
     UnipileClient,
     _auth_headers,
+    _mime_for_attachment,
     _post_auth_headers,
     _raise_for_error,
 )
 
 SUPPORTED_COMMENT_SORT = frozenset({"MOST_RECENT", "MOST_RELEVANT"})
+SUPPORTED_REACTION_TYPES = frozenset(
+    {"like", "celebrate", "support", "love", "insightful", "funny"}
+)
 
 
 class UnipilePostCommentsClient(UnipileClient):
@@ -111,11 +115,15 @@ class UnipilePostCommentsClient(UnipileClient):
         text: str,
         *,
         comment_id: Optional[str] = None,
+        mentions: Optional[list[dict[str, Any]]] = None,
+        attachment: Optional[tuple[str, bytes, str]] = None,
     ) -> dict[str, Any]:
         """
-        Comment on a post or reply to a comment via ``POST /api/v1/posts/{post_id}/comments``.
+        Comment on a post or reply via ``POST /api/v1/posts/{post_id}/comments``.
 
-        Uses multipart/form-data per Unipile spec (same as create_post).
+        Uses multipart/form-data. Mentions use ``{{0}}`` placeholders in ``text``
+        plus ``mentions[i][name|profile_id]`` fields. Optional image attachment
+        (LinkedIn: one image, max 6012×6012).
         """
         if not self._api_key:
             raise ValueError("Unipile API key is required")
@@ -128,20 +136,45 @@ class UnipilePostCommentsClient(UnipileClient):
 
         encoded_post_id = quote(post_social_id, safe="")
         url = self._get_full_url(f"/api/v1/posts/{encoded_post_id}/comments")
-        form_fields: dict[str, tuple[None, str]] = {
-            "account_id": (None, account_id),
-            "text": (None, trimmed),
-        }
+        form_fields: list[tuple[str, Any]] = [
+            ("account_id", (None, account_id)),
+            ("text", (None, trimmed)),
+        ]
         if comment_id:
-            form_fields["comment_id"] = (None, comment_id)
+            form_fields.append(("comment_id", (None, comment_id)))
+
+        mention_count = 0
+        if mentions:
+            for idx, mention in enumerate(mentions):
+                if not isinstance(mention, dict):
+                    continue
+                name = str(mention.get("name") or "").strip()
+                profile_id = str(mention.get("profile_id") or "").strip()
+                if not name or not profile_id:
+                    continue
+                form_fields.append((f"mentions[{idx}][name]", (None, name)))
+                form_fields.append((f"mentions[{idx}][profile_id]", (None, profile_id)))
+                mention_count += 1
+
+        has_attachment = False
+        if attachment:
+            filename, content, content_type = attachment
+            if content:
+                mime = content_type or _mime_for_attachment(filename or "image.png")
+                form_fields.append(
+                    ("attachments", (filename or "image.png", content, mime))
+                )
+                has_attachment = True
 
         logger.info(
             "[UnipilePostCommentsClient] send_post_comment account_id={} post_social_id={} "
-            "text_len={} reply_to={}",
+            "text_len={} reply_to={} mentions={} attachment={}",
             account_id,
             post_social_id,
             len(trimmed),
             comment_id or "none",
+            mention_count,
+            has_attachment,
         )
 
         async with httpx.AsyncClient(timeout=self._timeout) as client:
@@ -240,6 +273,11 @@ class UnipilePostCommentsClient(UnipileClient):
             raise ValueError("Unipile API key is required")
 
         normalized_type = (reaction_type or "like").strip().lower() or "like"
+        if normalized_type not in SUPPORTED_REACTION_TYPES:
+            raise ValueError(
+                f"Unsupported reaction_type '{normalized_type}'. "
+                f"Use one of: {', '.join(sorted(SUPPORTED_REACTION_TYPES))}."
+            )
         payload: dict[str, str] = {
             "account_id": account_id,
             "post_id": post_social_id,

@@ -17,11 +17,15 @@ export interface CommentAssistantReplyView {
 export interface CommentAssistantCommentView {
   id: string;
   authorName: string;
+  authorId?: string | null;
   headline?: string | null;
   avatarUrl?: string | null;
   text: string;
   timeLabel: string;
   liked?: boolean;
+  /** Unipile reaction type when user already reacted (like, celebrate, …). */
+  userReacted?: string | null;
+  reactionCount?: number;
   replyCount?: number;
   draftText?: string;
   replyBusy?: boolean;

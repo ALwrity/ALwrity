@@ -2,13 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { colors } from '../GrowthEngine/styles';
 import { CommentAssistantAuthorRow } from './commentAssistantAuthorRow';
 import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
+import { CommentAssistantReactionPicker } from './commentAssistantReactionPicker';
+import {
+  CommentAssistantReplyComposer,
+  type CommentAssistantReplyPayload,
+} from './commentAssistantReplyComposer';
+import type { CommentAssistantReactionType } from './commentAssistantReactions';
 import type { CommentAssistantCommentView } from './commentAssistantTypes';
 
 interface CommentAssistantCommentRowProps {
   comment: CommentAssistantCommentView;
   actionsEnabled?: boolean;
-  onLike?: (commentId: string) => void;
-  onSendReply?: (commentId: string, text: string) => void;
+  onReact?: (commentId: string, reactionType: CommentAssistantReactionType) => void;
+  onSendReply?: (commentId: string, payload: CommentAssistantReplyPayload) => void;
   onDraftAi?: (commentId: string) => void;
   onShowThreadReplies?: (commentId: string) => void;
 }
@@ -27,18 +33,16 @@ const actionBtn = (primary?: boolean): React.CSSProperties => ({
 export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProps> = ({
   comment,
   actionsEnabled = false,
-  onLike,
+  onReact,
   onSendReply,
   onDraftAi,
   onShowThreadReplies,
 }) => {
   const [replyOpen, setReplyOpen] = useState(false);
-  const [replyText, setReplyText] = useState('');
   const [repliesOpen, setRepliesOpen] = useState(Boolean(comment.myReplies?.length));
 
   useEffect(() => {
     if (comment.draftText != null && comment.draftText !== '') {
-      setReplyText(comment.draftText);
       setReplyOpen(true);
     }
   }, [comment.draftText]);
@@ -53,12 +57,6 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
   const canAct = actionsEnabled && !busy;
   const myReplies = comment.myReplies || [];
   const replyCount = comment.replyCount ?? 0;
-
-  const handleSend = () => {
-    const text = replyText.trim();
-    if (!text || !onSendReply || busy) return;
-    onSendReply(comment.id, text);
-  };
 
   return (
     <div
@@ -188,24 +186,13 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          disabled={!canAct || comment.liked}
-          onClick={() => onLike?.(comment.id)}
-          style={{
-            ...actionBtn(),
-            opacity: canAct || comment.liked ? 1 : 0.55,
-            cursor: canAct && !comment.liked ? 'pointer' : 'default',
-            color: comment.liked ? '#0a66c2' : colors.textSecondary,
-          }}
-        >
-          {comment.likeBusy
-            ? '…'
-            : comment.liked
-              ? COMMENT_ASSISTANT_ACTIONS.liked
-              : COMMENT_ASSISTANT_ACTIONS.like}
-        </button>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <CommentAssistantReactionPicker
+          disabled={!canAct}
+          activeReaction={comment.userReacted}
+          reactionCount={comment.reactionCount}
+          onReact={(type) => onReact?.(comment.id, type)}
+        />
         <button
           type="button"
           disabled={!canAct}
@@ -235,51 +222,16 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
       </div>
 
       {replyOpen && (
-        <div style={{ marginTop: 8 }}>
-          <textarea
-            value={replyText}
-            onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Write a short reply…"
-            rows={2}
-            disabled={busy}
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              padding: '7px 9px',
-              borderRadius: 6,
-              border: `1px solid ${colors.border}`,
-              fontSize: 12,
-              fontFamily: 'inherit',
-              lineHeight: 1.45,
-              resize: 'vertical',
-              color: colors.textBody,
-              marginBottom: 6,
-            }}
-          />
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button
-              type="button"
-              disabled={!replyText.trim() || busy || !actionsEnabled}
-              onClick={handleSend}
-              style={{
-                ...actionBtn(true),
-                opacity: replyText.trim() && !busy && actionsEnabled ? 1 : 0.5,
-              }}
-            >
-              {comment.replyBusy
-                ? COMMENT_ASSISTANT_ACTIONS.sending
-                : COMMENT_ASSISTANT_ACTIONS.send}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => { setReplyOpen(false); setReplyText(''); }}
-              style={actionBtn()}
-            >
-              {COMMENT_ASSISTANT_ACTIONS.cancel}
-            </button>
-          </div>
-        </div>
+        <CommentAssistantReplyComposer
+          authorName={comment.authorName}
+          authorId={comment.authorId}
+          initialText={comment.draftText || undefined}
+          busy={busy}
+          onCancel={() => setReplyOpen(false)}
+          onSend={(payload) => {
+            onSendReply?.(comment.id, payload);
+          }}
+        />
       )}
     </div>
   );

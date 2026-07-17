@@ -47,11 +47,22 @@ class PostCommentsListResponse(BaseModel):
     total_count: Optional[int] = None
 
 
+class PostCommentMention(BaseModel):
+    """LinkedIn mention entry for Unipile comment text ``{{n}}`` placeholders."""
+
+    name: str = Field(..., min_length=1)
+    profile_id: str = Field(..., min_length=1)
+
+
 class PostCommentReplyRequest(BaseModel):
     """Request body for POST .../comments/reply."""
 
     comment_id: str = Field(..., min_length=1)
     text: str = Field(..., min_length=1, max_length=1250)
+    mentions: Optional[list[PostCommentMention]] = Field(
+        default=None,
+        description="Optional LinkedIn mentions matching {{0}}, {{1}}, … in text",
+    )
 
 
 class PostCommentReplyResponse(BaseModel):

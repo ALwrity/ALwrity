@@ -46,11 +46,14 @@ export function mapCommentToView(
   return {
     id: comment.id,
     authorName: comment.author?.name || 'Unknown',
+    authorId: comment.author_id || null,
     headline: comment.author?.headline || null,
     avatarUrl: comment.author?.avatar_url || null,
     text: comment.text || '',
     timeLabel: formatTimeLabel(comment.created_at),
     liked: Boolean(comment.user_reacted),
+    userReacted: comment.user_reacted || null,
+    reactionCount: comment.reaction_count ?? 0,
     replyCount: comment.reply_count ?? 0,
     myReplies: (comment.my_replies || []).map(mapReplyToView),
   };

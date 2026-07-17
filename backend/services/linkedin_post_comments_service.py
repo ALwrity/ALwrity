@@ -16,6 +16,7 @@ from loguru import logger
 from models.linkedin_post_comments_models import (
     PostCommentAuthor,
     PostCommentItem,
+    PostCommentMention,
     PostCommentReplyResponse,
     PostCommentsListResponse,
 )
@@ -256,9 +257,11 @@ async def reply_to_comment(
     comment_id: str,
     text: str,
     *,
+    mentions: Optional[list[PostCommentMention]] = None,
+    attachment: Optional[tuple[str, bytes, str]] = None,
     oauth: Optional[LinkedInOAuthService] = None,
 ) -> PostCommentReplyResponse:
-    """Reply to a comment on a post via Unipile."""
+    """Reply to a comment on a post via Unipile (optional mentions + image)."""
     _ensure_unipile_provider()
     resolved_social_id = _require_social_id(social_id)
     parent_id = (comment_id or "").strip()
@@ -273,15 +276,40 @@ async def reply_to_comment(
             "Reply text must be 1250 characters or fewer."
         )
 
+    mention_payload: list[dict[str, Any]] = []
+    if mentions:
+        for mention in mentions:
+            name = (mention.name or "").strip()
+            profile_id = (mention.profile_id or "").strip()
+            if name and profile_id:
+                mention_payload.append({"name": name, "profile_id": profile_id})
+
     oauth_service = oauth or LinkedInOAuthService()
     account_id = _resolve_account_id(user_id, oauth_service)
 
-    client = UnipilePostCommentsClient()
-    raw = await client.send_post_comment(
-        account_id,
+    logger.info(
+        "[PostComments] reply_to_comment user_id={} social_id={} parent={} "
+        "text_len={} mentions={} has_attachment={}",
+        user_id,
         resolved_social_id,
-        trimmed,
-        comment_id=parent_id,
+        parent_id,
+        len(trimmed),
+        len(mention_payload),
+        bool(attachment and attachment[1]),
     )
+
+    client = UnipilePostCommentsClient()
+    try:
+        raw = await client.send_post_comment(
+            account_id,
+            resolved_social_id,
+            trimmed,
+            comment_id=parent_id,
+            mentions=mention_payload or None,
+            attachment=attachment,
+        )
+    except ValueError as exc:
+        raise LinkedInPostCommentsValidationError(str(exc)) from exc
+
     new_id = raw.get("comment_id") if isinstance(raw, dict) else None
     return PostCommentReplyResponse(success=True, comment_id=str(new_id) if new_id else None)

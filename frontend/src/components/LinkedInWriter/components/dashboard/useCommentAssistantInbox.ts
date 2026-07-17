@@ -11,6 +11,8 @@ import {
 import { linkedInWriterApi } from '../../../../services/linkedInWriterApi';
 import { postCommentsApi } from '../../../../services/postCommentsApi';
 import { formatTimeLabel, mapGroupToView } from './commentAssistantMappers';
+import type { CommentAssistantReplyPayload } from './commentAssistantReplyComposer';
+import type { CommentAssistantReactionType } from './commentAssistantReactions';
 import type {
   CommentAssistantCommentView,
   CommentAssistantPostGroupView,
@@ -145,30 +147,67 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     []
   );
 
-  const handleLike = useCallback(
-    async (postId: string, socialId: string, commentId: string) => {
+  const handleReact = useCallback(
+    async (
+      postId: string,
+      socialId: string,
+      commentId: string,
+      reactionType: CommentAssistantReactionType
+    ) => {
       setActionError('');
-      updateComment(postId, commentId, { liked: true, likeBusy: true });
+      const prev = groups
+        .find((g) => g.postId === postId)
+        ?.comments?.find((c) => c.id === commentId);
+      updateComment(postId, commentId, {
+        liked: true,
+        userReacted: reactionType,
+        likeBusy: true,
+        reactionCount: Math.max((prev?.reactionCount ?? 0), 0) + (prev?.userReacted ? 0 : 1),
+      });
       try {
-        await commentAssistantApi.likeComment(commentId, socialId);
-        updateComment(postId, commentId, { liked: true, likeBusy: false });
+        await commentAssistantApi.likeComment(commentId, socialId, reactionType);
+        updateComment(postId, commentId, {
+          liked: true,
+          userReacted: reactionType,
+          likeBusy: false,
+        });
       } catch (err) {
-        updateComment(postId, commentId, { liked: false, likeBusy: false });
+        updateComment(postId, commentId, {
+          liked: Boolean(prev?.userReacted),
+          userReacted: prev?.userReacted ?? null,
+          reactionCount: prev?.reactionCount ?? 0,
+          likeBusy: false,
+        });
         setActionError(getCommentAssistantErrorMessage(err));
       }
     },
-    [updateComment]
+    [groups, updateComment]
   );
 
   const handleSendReply = useCallback(
-    async (postId: string, socialId: string, commentId: string, text: string) => {
+    async (
+      postId: string,
+      socialId: string,
+      commentId: string,
+      payload: CommentAssistantReplyPayload
+    ) => {
       setActionError('');
       updateComment(postId, commentId, { replyBusy: true });
       try {
-        await postCommentsApi.replyToComment(socialId, {
-          comment_id: commentId,
-          text,
-        });
+        if (payload.imageFile) {
+          await commentAssistantApi.replyToComment(socialId, {
+            comment_id: commentId,
+            text: payload.text,
+            mentions: payload.mentions,
+            imageFile: payload.imageFile,
+          });
+        } else {
+          await postCommentsApi.replyToComment(socialId, {
+            comment_id: commentId,
+            text: payload.text,
+            mentions: payload.mentions,
+          });
+        }
         updateComment(postId, commentId, { replyBusy: false, draftText: '' });
         if (isPriorityTab(tab)) {
           await loadInbox(tab, false);
@@ -285,7 +324,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       !connected || loadState === 'loading' || cooldownLeft > 0 || tab === 'manual',
     handleSync,
     retryPost,
-    handleLike,
+    handleReact,
     handleSendReply,
     handleDraftAi,
     handleLoadMore,

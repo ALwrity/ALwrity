@@ -30,9 +30,15 @@ export interface PostCommentsListResponse {
   total_count?: number | null;
 }
 
+export interface PostCommentMention {
+  name: string;
+  profile_id: string;
+}
+
 export interface PostCommentReplyRequest {
   comment_id: string;
   text: string;
+  mentions?: PostCommentMention[];
 }
 
 export interface PostCommentReplyResponse {

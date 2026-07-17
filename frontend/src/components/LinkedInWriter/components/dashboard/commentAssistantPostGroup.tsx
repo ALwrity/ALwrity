@@ -5,6 +5,8 @@ import {
   COMMENT_ASSISTANT_LOADING_COMMENTS,
 } from './commentAssistantCopy';
 import { CommentAssistantCommentRow } from './commentAssistantCommentRow';
+import type { CommentAssistantReplyPayload } from './commentAssistantReplyComposer';
+import type { CommentAssistantReactionType } from './commentAssistantReactions';
 import type { CommentAssistantPostGroupView } from './commentAssistantTypes';
 
 const VISIBLE_COMMENTS_COLLAPSED = 2;
@@ -15,8 +17,8 @@ interface CommentAssistantPostGroupProps {
   expanded: boolean;
   onToggleExpanded: () => void;
   actionsEnabled?: boolean;
-  onLike?: (commentId: string) => void;
-  onSendReply?: (commentId: string, text: string) => void;
+  onReact?: (commentId: string, reactionType: CommentAssistantReactionType) => void;
+  onSendReply?: (commentId: string, payload: CommentAssistantReplyPayload) => void;
   onDraftAi?: (commentId: string) => void;
   onRetry?: () => void;
   onLoadMore?: () => void;
@@ -55,7 +57,7 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
   expanded,
   onToggleExpanded,
   actionsEnabled,
-  onLike,
+  onReact,
   onSendReply,
   onDraftAi,
   onRetry,
@@ -75,7 +77,7 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
   }, [group.comments, showAllComments, commentCount]);
 
   const postBody = group.postText || group.postSnippet || 'Your post';
-  const canSeeMore = postBody.length > 140 || postBody.split('\n').length > 2;
+  const canSeeMore = postBody.length > 90 || postBody.split('\n').length > 2;
 
   return (
     <section
@@ -165,13 +167,14 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
             style={{
               fontSize: 12,
               color: colors.textBody,
-              lineHeight: 1.45,
+              lineHeight: 1.5,
               whiteSpace: 'pre-wrap',
+              marginBottom: 4,
               ...(postExpanded
                 ? {}
                 : {
                     display: '-webkit-box',
-                    WebkitLineClamp: 3,
+                    WebkitLineClamp: 4,
                     WebkitBoxOrient: 'vertical' as const,
                     overflow: 'hidden',
                   }),
@@ -179,26 +182,23 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
           >
             {postBody}
           </div>
-          {canSeeMore && (
-            <button
-              type="button"
-              onClick={() => setPostExpanded((v) => !v)}
-              style={{
-                marginTop: 4,
-                marginBottom: 8,
-                padding: '2px 8px',
-                borderRadius: 999,
-                border: `1px solid ${colors.border}`,
-                background: '#f8fafc',
-                color: colors.primary,
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {postExpanded ? 'See less' : 'See more'}
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setPostExpanded((v) => !v)}
+            style={{
+              marginBottom: 8,
+              padding: '3px 10px',
+              borderRadius: 999,
+              border: `1px solid ${colors.primary}`,
+              background: postExpanded ? '#eff6ff' : '#fff',
+              color: colors.primary,
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            {postExpanded ? 'See less' : canSeeMore ? 'See more' : 'Show full post'}
+          </button>
 
           {group.error && (
             <div
@@ -250,7 +250,7 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
               key={c.id}
               comment={c}
               actionsEnabled={actionsEnabled && !group.error}
-              onLike={onLike}
+              onReact={onReact}
               onSendReply={onSendReply}
               onDraftAi={onDraftAi}
               onShowThreadReplies={onShowThreadReplies}
