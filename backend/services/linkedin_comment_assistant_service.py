@@ -159,13 +159,22 @@ def _normalize_reply_preview(
         return None
     author_id = _raw_author_id(raw)
     is_mine = _is_me(author_id, me_ids)
+    user_reacted_raw = raw.get("user_reacted")
+    user_reacted = str(user_reacted_raw) if user_reacted_raw else None
+    if raw.get("has_liked_comment") is True and not user_reacted:
+        user_reacted = "LIKE"
     return CommentAssistantReplyPreview(
         id=str(reply_id),
         text=str(raw.get("text") or ""),
         author_name="You" if is_mine else _raw_author_name(raw),
+        author_id=author_id,
         created_at=_iso_timestamp(raw.get("date") or raw.get("created_at")),
         is_mine=is_mine,
         image_url=extract_comment_image_url(raw),
+        reaction_count=int(
+            raw.get("reaction_counter") or raw.get("comment_like_count") or 0
+        ),
+        user_reacted=user_reacted,
     )
 
 

@@ -84,10 +84,10 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
       open={open}
       title={COMMENT_ASSISTANT_TITLE}
       onClose={onClose}
-      width="70vw"
-      maxWidth="70vw"
-      maxHeight="70vh"
-      height="70vh"
+      width="60vw"
+      maxWidth="60vw"
+      maxHeight="80vh"
+      height="80vh"
     >
       <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
         {COMMENT_ASSISTANT_INTRO}

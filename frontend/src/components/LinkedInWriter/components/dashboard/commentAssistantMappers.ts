@@ -35,9 +35,13 @@ function mapReplyToView(reply: CommentAssistantReplyApi): CommentAssistantReplyV
     id: reply.id,
     text: reply.text || '',
     authorName: reply.is_mine ? 'You' : reply.author_name || 'Someone',
+    authorId: reply.author_id || null,
     timeLabel: formatTimeLabel(reply.created_at),
     isMine: Boolean(reply.is_mine),
     imageUrl: reply.image_url || null,
+    liked: Boolean(reply.user_reacted),
+    userReacted: reply.user_reacted || null,
+    reactionCount: reply.reaction_count ?? 0,
   };
 }
 

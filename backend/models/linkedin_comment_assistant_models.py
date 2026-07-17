@@ -20,12 +20,18 @@ class CommentAssistantReplyPreview(BaseModel):
     id: str
     text: str
     author_name: str = "You"
+    author_id: Optional[str] = Field(
+        default=None,
+        description="Author provider id for mentions when replying to this reply",
+    )
     created_at: str = ""
     is_mine: bool = False
     image_url: Optional[str] = Field(
         default=None,
         description="Attached image URL when the reply includes media",
     )
+    reaction_count: int = 0
+    user_reacted: Optional[str] = None
 
 
 class CommentAssistantCommentItem(BaseModel):

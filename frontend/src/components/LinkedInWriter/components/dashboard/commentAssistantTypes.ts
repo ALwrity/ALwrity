@@ -10,10 +10,16 @@ export interface CommentAssistantReplyView {
   id: string;
   text: string;
   authorName: string;
+  authorId?: string | null;
   timeLabel: string;
   isMine: boolean;
   /** Attached image URL when the reply includes media. */
   imageUrl?: string | null;
+  liked?: boolean;
+  userReacted?: string | null;
+  reactionCount?: number;
+  replyBusy?: boolean;
+  likeBusy?: boolean;
 }
 
 export interface CommentAssistantCommentView {
@@ -58,9 +64,12 @@ export interface CommentAssistantReplyApi {
   id: string;
   text: string;
   author_name?: string;
+  author_id?: string | null;
   created_at?: string;
   is_mine?: boolean;
   image_url?: string | null;
+  reaction_count?: number;
+  user_reacted?: string | null;
 }
 
 /** Backend inbox comment item. */

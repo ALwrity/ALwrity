@@ -30,6 +30,32 @@ function isPriorityTab(
   return tab !== 'manual';
 }
 
+type CommentActionState = {
+  userReacted?: string | null;
+  reactionCount?: number;
+};
+
+/** Find a top-level comment or nested reply by id (for react/reply optimistic UI). */
+function findCommentOrReply(
+  groups: CommentAssistantPostGroupView[],
+  postId: string,
+  commentId: string
+): CommentActionState | null {
+  const group = groups.find((g) => g.postId === postId);
+  if (!group?.comments) return null;
+  for (const c of group.comments) {
+    if (c.id === commentId) return c;
+    for (const list of [c.myReplies, c.threadReplies]) {
+      const hit = list?.find((r) => r.id === commentId);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+type CommentOrReplyPatch = Partial<CommentAssistantCommentView> &
+  Partial<CommentAssistantReplyView>;
+
 export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   const [tab, setTab] = useState<CommentAssistantTab>('needs_reply');
   const [loadState, setLoadState] = useState<InboxLoadState>('idle');
@@ -158,16 +184,32 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     void loadInbox(tab, false);
   }, [tab, loadInbox]);
 
+  /** Patch a top-level comment or a nested reply (my_replies / threadReplies). */
   const updateComment = useCallback(
-    (postId: string, commentId: string, patch: Partial<CommentAssistantCommentView>) => {
+    (postId: string, commentId: string, patch: CommentOrReplyPatch) => {
       setGroups((prev) =>
         prev.map((g) => {
           if (g.postId !== postId || !g.comments) return g;
           return {
             ...g,
-            comments: g.comments.map((c) =>
-              c.id === commentId ? { ...c, ...patch } : c
-            ),
+            comments: g.comments.map((c) => {
+              if (c.id === commentId) {
+                return { ...c, ...patch };
+              }
+              const patchReplies = (
+                replies?: CommentAssistantReplyView[]
+              ): CommentAssistantReplyView[] | undefined => {
+                if (!replies) return replies;
+                return replies.map((r) =>
+                  r.id === commentId ? { ...r, ...patch } : r
+                );
+              };
+              return {
+                ...c,
+                myReplies: patchReplies(c.myReplies),
+                threadReplies: patchReplies(c.threadReplies),
+              };
+            }),
           };
         })
       );
@@ -183,9 +225,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       reactionType: CommentAssistantReactionType
     ) => {
       setActionError('');
-      const prev = groups
-        .find((g) => g.postId === postId)
-        ?.comments?.find((c) => c.id === commentId);
+      const prev = findCommentOrReply(groups, postId, commentId);
       updateComment(postId, commentId, {
         liked: true,
         userReacted: reactionType,
@@ -193,6 +233,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         reactionCount: Math.max((prev?.reactionCount ?? 0), 0) + (prev?.userReacted ? 0 : 1),
       });
       try {
+        // Same Unipile like path as top-level comments (works for nested reply ids).
         await commentAssistantApi.likeComment(commentId, socialId, reactionType);
         updateComment(postId, commentId, {
           liked: true,
@@ -223,7 +264,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       showStatus('info', 'Sending your reply…');
       updateComment(postId, commentId, { replyBusy: true });
       try {
-        // Always multipart via comment-assistant reply (mentions + optional image).
+        // Same multipart reply path; commentId may be a nested reply id.
         await commentAssistantApi.replyToComment(socialId, {
           comment_id: commentId,
           text: payload.text,
@@ -289,11 +330,14 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
               .map((item) => ({
                 id: item.id,
                 authorName: item.author?.name || 'Unknown',
+                authorId: item.author_id || null,
                 headline: item.author?.headline || null,
                 avatarUrl: item.author?.avatar_url || null,
                 text: item.text || '',
                 timeLabel: formatTimeLabel(item.created_at),
                 liked: Boolean(item.user_reacted),
+                userReacted: item.user_reacted || null,
+                reactionCount: item.reaction_count ?? 0,
                 replyCount: item.reply_count ?? 0,
                 imageUrl: item.image_url || null,
               }));
@@ -325,9 +369,13 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           id: item.id,
           text: item.text || '',
           authorName: item.author?.name || 'Someone',
+          authorId: item.author_id || null,
           timeLabel: formatTimeLabel(item.created_at),
           isMine: false,
           imageUrl: item.image_url || null,
+          liked: Boolean(item.user_reacted),
+          userReacted: item.user_reacted || null,
+          reactionCount: item.reaction_count ?? 0,
         }));
         updateComment(postId, commentId, { threadReplies });
       } catch (err) {

@@ -3,32 +3,14 @@ import { colors } from '../GrowthEngine/styles';
 import { CommentAssistantAttachedImage } from './commentAssistantAttachedImage';
 import { CommentAssistantAuthorRow } from './commentAssistantAuthorRow';
 import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
+import { CommentAssistantNestedReplyRow } from './commentAssistantNestedReplyRow';
 import { CommentAssistantReactionPicker } from './commentAssistantReactionPicker';
 import {
   CommentAssistantReplyComposer,
   type CommentAssistantReplyPayload,
 } from './commentAssistantReplyComposer';
 import type { CommentAssistantReactionType } from './commentAssistantReactions';
-import type { CommentAssistantCommentView, CommentAssistantReplyView } from './commentAssistantTypes';
-
-function ReplyBody({ reply }: { reply: CommentAssistantReplyView }) {
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: colors.primary, marginBottom: 2 }}>
-        {reply.authorName}
-        {reply.timeLabel ? (
-          <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {reply.timeLabel}</span>
-        ) : null}
-      </div>
-      {reply.text ? (
-        <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-          {reply.text}
-        </div>
-      ) : null}
-      {reply.imageUrl ? <CommentAssistantAttachedImage src={reply.imageUrl} /> : null}
-    </div>
-  );
-}
+import type { CommentAssistantCommentView } from './commentAssistantTypes';
 
 interface CommentAssistantCommentRowProps {
   comment: CommentAssistantCommentView;
@@ -77,6 +59,10 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
   const canAct = actionsEnabled && !busy;
   const myReplies = comment.myReplies || [];
   const replyCount = comment.replyCount ?? 0;
+
+  /** When replying under own reply, keep @mention on the audience author. */
+  const parentMentionName = comment.authorName;
+  const parentMentionId = comment.authorId;
 
   return (
     <div
@@ -143,7 +129,15 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
               }}
             >
               {myReplies.map((r) => (
-                <ReplyBody key={r.id} reply={r} />
+                <CommentAssistantNestedReplyRow
+                  key={r.id}
+                  reply={r}
+                  actionsEnabled={actionsEnabled}
+                  mentionAuthorName={parentMentionName}
+                  mentionAuthorId={parentMentionId}
+                  onReact={onReact}
+                  onSendReply={onSendReply}
+                />
               ))}
             </div>
           )}
@@ -182,20 +176,15 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
             Thread replies
           </div>
           {comment.threadReplies.map((r) => (
-            <div key={r.id} style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 10, fontWeight: 700, color: colors.textDark }}>
-                {r.authorName}
-                {r.timeLabel ? (
-                  <span style={{ fontWeight: 400, color: colors.textTertiary }}> · {r.timeLabel}</span>
-                ) : null}
-              </div>
-              {r.text ? (
-                <div style={{ fontSize: 11, color: colors.textBody, lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>
-                  {r.text}
-                </div>
-              ) : null}
-              {r.imageUrl ? <CommentAssistantAttachedImage src={r.imageUrl} /> : null}
-            </div>
+            <CommentAssistantNestedReplyRow
+              key={r.id}
+              reply={r}
+              actionsEnabled={actionsEnabled}
+              mentionAuthorName={r.isMine ? parentMentionName : r.authorName}
+              mentionAuthorId={r.isMine ? parentMentionId : r.authorId}
+              onReact={onReact}
+              onSendReply={onSendReply}
+            />
           ))}
         </div>
       )}

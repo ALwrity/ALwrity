@@ -114,6 +114,27 @@ def extract_comment_image_url(raw: dict[str, Any]) -> Optional[str]:
     return None
 
 
+def extract_comment_author_id(raw: dict[str, Any]) -> Optional[str]:
+    """Extract author provider id from Unipile comment shapes."""
+    details = raw.get("author_details")
+    if isinstance(details, dict):
+        for key in ("id", "provider_id", "public_identifier"):
+            value = details.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    author = raw.get("author")
+    if isinstance(author, dict):
+        for key in ("id", "provider_id", "public_identifier"):
+            value = author.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    for key in ("author_id", "author_provider_id"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _normalize_comment_item(
     raw: dict[str, Any],
     *,
@@ -130,6 +151,7 @@ def _normalize_comment_item(
     text = raw.get("text") or ""
     created_at = _iso_timestamp(raw.get("date") or raw.get("created_at"))
     image_url = extract_comment_image_url(raw)
+    author_id = extract_comment_author_id(raw)
 
     reply_count = 0
     reaction_count = 0
@@ -194,6 +216,7 @@ def _normalize_comment_item(
             avatar_url=avatar_url,
             profile_url=profile_url,
         ),
+        author_id=author_id,
         created_at=created_at,
         reply_count=reply_count,
         reaction_count=reaction_count,

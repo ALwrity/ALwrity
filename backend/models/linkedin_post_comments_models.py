@@ -24,6 +24,10 @@ class PostCommentItem(BaseModel):
     id: str
     text: str
     author: PostCommentAuthor
+    author_id: Optional[str] = Field(
+        default=None,
+        description="Author provider id when available (for mentions / self-detection)",
+    )
     created_at: str
     reply_count: int = 0
     reaction_count: int = 0

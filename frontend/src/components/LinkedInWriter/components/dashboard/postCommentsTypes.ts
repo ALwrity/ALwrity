@@ -13,6 +13,7 @@ export interface PostComment {
   id: string;
   text: string;
   author: PostCommentAuthor;
+  author_id?: string | null;
   created_at: string;
   reply_count: number;
   reaction_count: number;
