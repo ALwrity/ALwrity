@@ -2,10 +2,13 @@ import { useCallback, useRef, useState } from 'react';
 
 import {
   completeProfileOptimizationRecommendation,
+  downloadProfilePhoto,
   getLinkedInSocialErrorMessage,
   loadNextProfileOptimizationBatch,
   logProfileAnalysisError,
+  makeProfilePhotoPresentable,
   runLinkedInProfileOptimization,
+  uploadProfilePhoto,
   type LinkedInProfileAnalysisError,
   type LinkedInProfileOptimizationBatchActionResponse,
   type LinkedInProfileOptimizationItem,
@@ -43,6 +46,13 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [markingRecommendationId, setMarkingRecommendationId] = useState<string | null>(null);
   const [isLoadingNextBatch, setIsLoadingNextBatch] = useState(false);
   const [showNextBatchCta, setShowNextBatchCta] = useState(false);
+
+  const [localProfilePhotoUrl, setLocalProfilePhotoUrl] = useState<string | null>(null);
+  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+  const [profilePhotoUploadError, setProfilePhotoUploadError] = useState<string | null>(null);
+  const [transformedProfilePhotoUrl, setTransformedProfilePhotoUrl] = useState<string | null>(null);
+  const [transformingProfilePhoto, setTransformingProfilePhoto] = useState(false);
+  const [profilePhotoTransformError, setProfilePhotoTransformError] = useState<string | null>(null);
 
   const lastScoreRef = useRef<number | null>(null);
   const [recheckDelta, setRecheckDelta] = useState<{
@@ -294,6 +304,55 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     setRecheckDelta(null);
   }, []);
 
+  const handleUploadProfilePhoto = useCallback(async (file: File) => {
+    setUploadingProfilePhoto(true);
+    setProfilePhotoUploadError(null);
+    setTransformedProfilePhotoUrl(null);
+    try {
+      const result = await uploadProfilePhoto(file);
+      setLocalProfilePhotoUrl(result.photo_url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to upload photo';
+      setProfilePhotoUploadError(message);
+    } finally {
+      setUploadingProfilePhoto(false);
+    }
+  }, []);
+
+  const handleMakeProfilePhotoPresentable = useCallback(async () => {
+    if (!localProfilePhotoUrl) return;
+    setTransformingProfilePhoto(true);
+    setProfilePhotoTransformError(null);
+    try {
+      const result = await makeProfilePhotoPresentable(localProfilePhotoUrl);
+      setTransformedProfilePhotoUrl(result.photo_url);
+      setLocalProfilePhotoUrl(result.photo_url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to transform photo';
+      setProfilePhotoTransformError(message);
+    } finally {
+      setTransformingProfilePhoto(false);
+    }
+  }, [localProfilePhotoUrl]);
+
+  const handleDownloadProfilePhoto = useCallback(async () => {
+    const photoUrl = transformedProfilePhotoUrl || localProfilePhotoUrl;
+    if (!photoUrl) return;
+    try {
+      const blob = await downloadProfilePhoto(photoUrl);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'linkedin_profile_photo.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[ProfileOptimization] Download failed:', err);
+    }
+  }, [transformedProfilePhotoUrl, localProfilePhotoUrl]);
+
   return {
     optimizationPanelState: panelState,
     isOptimizationOpen:
@@ -320,5 +379,14 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     isRechecking: panelState === 'loading',
     markOptimizationItemComplete,
     loadNextOptimizationBatch,
+    localProfilePhotoUrl,
+    uploadingProfilePhoto,
+    profilePhotoUploadError,
+    handleUploadProfilePhoto,
+    transformedProfilePhotoUrl,
+    transformingProfilePhoto,
+    profilePhotoTransformError,
+    handleMakeProfilePhotoPresentable,
+    handleDownloadProfilePhoto,
   };
 };

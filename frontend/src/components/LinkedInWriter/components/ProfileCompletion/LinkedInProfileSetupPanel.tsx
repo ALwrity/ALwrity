@@ -125,6 +125,15 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     markingRecommendationId,
     isLoadingNextBatch,
     showNextBatchCta,
+    localProfilePhotoUrl,
+    uploadingProfilePhoto,
+    profilePhotoUploadError,
+    handleUploadProfilePhoto,
+    transformedProfilePhotoUrl,
+    transformingProfilePhoto,
+    profilePhotoTransformError,
+    handleMakeProfilePhotoPresentable,
+    handleDownloadProfilePhoto,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
   const handleImproveProfile = () => {
@@ -404,6 +413,16 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 sectionScores={profileValidation?.section_scores ?? null}
                 aiProfileIntelligence={aiProfileIntelligence}
                 profileStrengthPercent={profileStrengthPercent}
+                profilePictureUrl={avatarUrl}
+                localProfilePhotoUrl={localProfilePhotoUrl}
+                transformedProfilePhotoUrl={transformedProfilePhotoUrl}
+                uploadingProfilePhoto={uploadingProfilePhoto}
+                profilePhotoUploadError={profilePhotoUploadError}
+                onUploadProfilePhoto={handleUploadProfilePhoto}
+                transformingProfilePhoto={transformingProfilePhoto}
+                profilePhotoTransformError={profilePhotoTransformError}
+                onMakeProfilePhotoPresentable={handleMakeProfilePhotoPresentable}
+                onDownloadProfilePhoto={handleDownloadProfilePhoto}
                 recheckDelta={recheckDelta}
                 isRechecking={isRechecking}
                 onRecheckProfile={() => {
@@ -447,6 +466,16 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           sectionScores={profileValidation?.section_scores ?? null}
           aiProfileIntelligence={aiProfileIntelligence}
           profileStrengthPercent={profileStrengthPercent}
+          profilePictureUrl={avatarUrl}
+          localProfilePhotoUrl={localProfilePhotoUrl}
+          transformedProfilePhotoUrl={transformedProfilePhotoUrl}
+          uploadingProfilePhoto={uploadingProfilePhoto}
+          profilePhotoUploadError={profilePhotoUploadError}
+          onUploadProfilePhoto={handleUploadProfilePhoto}
+          transformingProfilePhoto={transformingProfilePhoto}
+          profilePhotoTransformError={profilePhotoTransformError}
+          onMakeProfilePhotoPresentable={handleMakeProfilePhotoPresentable}
+          onDownloadProfilePhoto={handleDownloadProfilePhoto}
           recheckDelta={recheckDelta}
           isRechecking={isRechecking}
           onRecheckProfile={() => {
