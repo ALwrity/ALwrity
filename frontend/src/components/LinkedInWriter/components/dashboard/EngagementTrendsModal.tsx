@@ -377,7 +377,6 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 
                 {activeTab === 'rising' && risingList.length > 0 && (
                   <EngagementGrowthDriversSection
-                    period={data.period}
                     summary={data.summary}
                     showContributionBadges={showContributionBadges}
                   >

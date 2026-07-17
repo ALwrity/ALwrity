@@ -2,14 +2,9 @@ import React, { useMemo } from 'react';
 
 import type { EngagementSummary } from '../../../../services/postAnalyticsApi';
 import { colors } from '../GrowthEngine/styles';
-import { formatLocalizedComparisonPeriod } from './engagementTrendsLocaleFormat';
-import {
-  GROWTH_CONTRIBUTION_TOOLTIP,
-  GROWTH_DRIVERS_CONTRIBUTION_HINT,
-} from './engagementTrendsCopy';
+import { GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsCopy';
 
 export interface EngagementGrowthDriversSectionProps {
-  period: { from: string; to: string };
   summary: EngagementSummary;
   showContributionBadges: boolean;
   children: React.ReactNode;
@@ -21,7 +16,8 @@ function formatSignedDelta(value: number): string {
   return '0';
 }
 
-function buildOverallGrowthLine(summary: EngagementSummary): string {
+/** Highest-priority summary for Rising: what actually moved. */
+function buildOverallGrowthLine(summary: EngagementSummary): string | null {
   const parts: string[] = [];
   const { reactions, comments, impressions, followers } = summary;
 
@@ -38,65 +34,70 @@ function buildOverallGrowthLine(summary: EngagementSummary): string {
     parts.push(`${formatSignedDelta(followers.delta)} followers from posts`);
   }
 
-  if (parts.length === 0) {
-    return 'No net change across reactions, comments, or impressions in this period.';
-  }
-
-  return `Overall: ${parts.join(' · ')}.`;
+  if (parts.length === 0) return null;
+  return `Overall growth: ${parts.join(' · ')}`;
 }
 
+/**
+ * Rising-tab header. Comparison timestamps live in the footer only —
+ * this block shows growth outcome, then the post list.
+ */
 export const EngagementGrowthDriversSection: React.FC<EngagementGrowthDriversSectionProps> = ({
-  period,
   summary,
   showContributionBadges,
   children,
 }) => {
-  const comparison = useMemo(
-    () => formatLocalizedComparisonPeriod(period.from, period.to),
-    [period.from, period.to],
-  );
+  const overallLine = useMemo(() => buildOverallGrowthLine(summary), [summary]);
 
   return (
     <div style={{ marginBottom: 10 }}>
       <div
         style={{
-          fontSize: 10,
-          fontWeight: 700,
-          color: '#16a34a',
-          textTransform: 'uppercase',
-          letterSpacing: 0.5,
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 8,
           marginBottom: 6,
         }}
       >
-        Growth drivers
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: '#16a34a',
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+          }}
+        >
+          Growth drivers
+        </div>
+        {showContributionBadges && (
+          <div
+            title={GROWTH_CONTRIBUTION_TOOLTIP}
+            style={{ fontSize: 10, color: colors.textTertiary, cursor: 'help' }}
+          >
+            Badges = share of growth
+          </div>
+        )}
       </div>
 
-      <div
-        style={{
-          marginBottom: 8,
-          padding: '8px 10px',
-          background: '#f0fdf4',
-          border: '1px solid #bbf7d0',
-          borderRadius: 8,
-          fontSize: 11,
-          color: colors.textSecondary,
-          lineHeight: 1.4,
-        }}
-      >
-        <p style={{ margin: '0 0 4px', color: colors.textDark, fontWeight: 600 }}>
-          Posts driving growth between{' '}
-          <span style={{ color: '#15803d' }}>{comparison.previous.display}</span> and{' '}
-          <span style={{ color: '#15803d' }}>{comparison.latest.display}</span>.
-        </p>
-        {showContributionBadges && (
-          <p style={{ margin: '0 0 4px' }} title={GROWTH_CONTRIBUTION_TOOLTIP}>
-            {GROWTH_DRIVERS_CONTRIBUTION_HINT}
-          </p>
-        )}
-        <p style={{ margin: 0, fontSize: 10, fontWeight: 600, color: '#166534' }}>
-          {buildOverallGrowthLine(summary)}
-        </p>
-      </div>
+      {overallLine && (
+        <div
+          style={{
+            marginBottom: 8,
+            padding: '8px 10px',
+            background: '#f0fdf4',
+            border: '1px solid #bbf7d0',
+            borderRadius: 8,
+            fontSize: 12,
+            fontWeight: 700,
+            color: '#166534',
+            lineHeight: 1.4,
+          }}
+        >
+          {overallLine}
+        </div>
+      )}
 
       {children}
     </div>

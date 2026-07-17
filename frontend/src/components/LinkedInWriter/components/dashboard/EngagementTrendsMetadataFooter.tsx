@@ -60,10 +60,13 @@ export const EngagementTrendsMetadataFooter: React.FC<EngagementTrendsMetadataFo
         </div>
       )}
       {comparison && (
-        <div style={{ marginBottom: syncCooldownHint ? 6 : 0 }}>
+        <div
+          style={{ marginBottom: syncCooldownHint ? 6 : 0 }}
+          title={`${comparison.previous.display} → ${comparison.latest.display}`}
+        >
           <span style={{ fontWeight: 700, color: colors.textTertiary }}>Comparing: </span>
           <span style={{ color: colors.textDark, fontWeight: 600 }}>
-            {comparison.previous.display} → {comparison.latest.display}
+            {comparison.previous.relative} → {comparison.latest.relative}
           </span>
         </div>
       )}
