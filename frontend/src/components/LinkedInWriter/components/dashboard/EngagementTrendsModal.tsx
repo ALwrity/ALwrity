@@ -29,6 +29,7 @@ import {
   ENGAGEMENT_SINCE_SUBTITLE,
   ENGAGEMENT_SINCE_TITLE,
 } from './engagementTrendsCopy';
+import { extractEngagementTrendsErrorMessage } from './engagementTrendsErrors';
 import {
   insufficientHistoryMessage,
   isInsufficientHistory,
@@ -45,19 +46,6 @@ function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
   const rising = data.rising_posts?.length ? data.rising_posts : data.top_gainers;
   const falling = data.falling_posts?.length ? data.falling_posts : data.top_decliners;
   return data.summary.total_posts === 0 && rising.length === 0 && falling.length === 0;
-}
-
-function extractErrorMessage(err: unknown): string {
-  const axiosErr = err as {
-    response?: { data?: { detail?: string | { message?: string } } };
-  };
-  const detail = axiosErr.response?.data?.detail;
-  if (typeof detail === 'string' && detail.trim()) return detail;
-  if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
-    return detail.message;
-  }
-  if (err instanceof Error && err.message) return err.message;
-  return EMPTY_COPY.loadErrorFallback;
 }
 
 const primaryLoadBtn: React.CSSProperties = {
@@ -197,7 +185,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 
         setData(result);
       } catch (err: unknown) {
-        if (mountedRef.current) setError(extractErrorMessage(err));
+        if (mountedRef.current) setError(extractEngagementTrendsErrorMessage(err));
       } finally {
         if (mountedRef.current) {
           setLoading(false);

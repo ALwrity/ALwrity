@@ -26,6 +26,16 @@ _PERIOD_DELTAS: dict[str, timedelta] = {
 }
 
 
+def mask_user_id_for_log(user_id: Optional[str]) -> str:
+    """Privacy-safe user id for logs (last 4 chars only)."""
+    if not user_id:
+        return "unknown"
+    text = str(user_id)
+    if len(text) <= 4:
+        return "***"
+    return f"...{text[-4:]}"
+
+
 def normalize_period_key(period: Optional[str]) -> EngagementPeriodKey:
     """Return a valid period key; default to since_joining."""
     key = (period or "since_joining").strip().lower()
@@ -53,7 +63,6 @@ def select_baseline_epoch(
         return None, "no_snapshots"
 
     ordered = sorted(epochs)
-    # Only consider baselines strictly before now.
     older = [e for e in ordered if e < now]
     if not older:
         return None, "insufficient_history"
@@ -68,11 +77,9 @@ def select_baseline_epoch(
             candidate = at_or_before[-1]
             reason = f"nearest_to_window_start_{period_key}"
         else:
-            # Not enough span for the full window — use earliest available.
             candidate = older[0]
             reason = f"earliest_available_for_{period_key}"
 
-    # Enforce minimum gap by walking further back when needed.
     while older and (now - candidate) < MIN_BASELINE_GAP:
         idx = older.index(candidate)
         if idx == 0:

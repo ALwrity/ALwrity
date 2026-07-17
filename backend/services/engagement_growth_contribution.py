@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from loguru import logger
+
 from models.linkedin_posts_models import PostDelta
 
 
@@ -40,6 +42,7 @@ def compute_growth_contributions(deltas: list[PostDelta]) -> dict[str, float]:
 
     total_positive = sum(positive_scores.values())
     if total_positive <= 0:
+        logger.debug("[GrowthContribution] No positive growth to attribute")
         return {}
 
     return {
@@ -52,11 +55,19 @@ def attach_growth_contributions(gainers: list[PostDelta], deltas: list[PostDelta
     """Return rising posts with ``growth_contribution_pct`` set where applicable."""
     contributions = compute_growth_contributions(deltas)
     if not contributions:
+        logger.debug("[GrowthContribution] Empty map — leaving {} gainers unchanged", len(gainers))
         return gainers
 
-    return [
+    attached = [
         delta.model_copy(update={"growth_contribution_pct": contributions[delta.post_id]})
         if delta.post_id in contributions
         else delta
         for delta in gainers
     ]
+    logger.debug(
+        "[GrowthContribution] Attached pct to {}/{} rising posts (positive_pool={})",
+        sum(1 for d in attached if d.growth_contribution_pct is not None),
+        len(attached),
+        len(contributions),
+    )
+    return attached

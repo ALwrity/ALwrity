@@ -220,6 +220,13 @@ async def get_engagement_history(
 ) -> PostAnalyticsHistoryResponse:
     """Return period-aware engagement trends for the authenticated user."""
     user_id = _user_id(current_user)
+    from services.engagement_trends_period import mask_user_id_for_log
+
+    logger.info(
+        "[PostAnalyticsRoutes] Trends request user={} period={}",
+        mask_user_id_for_log(user_id),
+        period,
+    )
     analytics_service = LinkedInPostAnalyticsService(db)
     try:
         return analytics_service.get_engagement_trends(user_id, period=period)
@@ -229,8 +236,15 @@ async def get_engagement_history(
             detail={"error_code": "INVALID_PERIOD", "message": str(exc)},
         ) from exc
     except Exception as exc:
-        logger.exception(f"[PostAnalyticsRoutes] Error computing engagement trends: {exc}")
+        logger.exception(
+            "[PostAnalyticsRoutes] Trends compute failed user={} period={}",
+            mask_user_id_for_log(user_id),
+            period,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "TRENDS_ERROR", "message": "Failed to compute engagement trends."},
+            detail={
+                "error_code": "TRENDS_ERROR",
+                "message": "Failed to compute engagement trends.",
+            },
         ) from exc

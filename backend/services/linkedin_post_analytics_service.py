@@ -25,27 +25,18 @@ from services.engagement_growth_contribution import (
 )
 from services.engagement_trends_period import (
     RECOMMENDED_SYNC_COOLDOWN_SECONDS,
+    mask_user_id_for_log,
     metric_delta,
     normalize_period_key,
     select_baseline_epoch,
 )
+from services.linkedin_post_analytics_mappers import (
+    as_naive_utc,
+    row_to_linkedin_post,
+    utc_iso,
+)
 
 TOP_TREND_POSTS_LIMIT = 5
-
-
-def _utc_iso(dt: Optional[datetime]) -> Optional[str]:
-    """Serialize a naive UTC datetime as an ISO-8601 string with Z suffix."""
-    if dt is None:
-        return None
-    if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt.isoformat() + "Z"
-
-
-def _as_naive_utc(dt: datetime) -> datetime:
-    if dt.tzinfo is not None:
-        return dt.astimezone(timezone.utc).replace(tzinfo=None)
-    return dt
 
 
 class LinkedInPostAnalyticsService:
@@ -64,7 +55,7 @@ class LinkedInPostAnalyticsService:
             .order_by(LinkedInPostAnalytics.created_at.desc())
             .all()
         )
-        posts = [_row_to_linkedin_post(r) for r in rows]
+        posts = [row_to_linkedin_post(r) for r in rows]
         return PostListResponse(
             posts=posts,
             cursor=None,
@@ -96,7 +87,13 @@ class LinkedInPostAnalyticsService:
     def store_posts(self, user_id: str, posts: list[LinkedInPost]) -> int:
         """Upsert posts; write initial + daily-anchor snapshots for Trends windows."""
         now = datetime.utcnow()
-        upserted = 0
+        inserted = updated = change_snaps = daily_anchors = flat_skips = 0
+        safe_uid = mask_user_id_for_log(user_id)
+        logger.info(
+            "[PostAnalyticsService] Sync start user={} posts={}",
+            safe_uid,
+            len(posts),
+        )
 
         for post in posts:
             existing: Optional[LinkedInPostAnalytics] = (
@@ -109,16 +106,31 @@ class LinkedInPostAnalyticsService:
             )
 
             if existing:
-                self._update_row(existing, post, now)
+                snap_kind = self._update_row(existing, post, now)
+                updated += 1
+                if snap_kind == "change":
+                    change_snaps += 1
+                elif snap_kind == "anchor":
+                    daily_anchors += 1
+                else:
+                    flat_skips += 1
             else:
                 self._insert_row(user_id, post, now)
-            upserted += 1
+                inserted += 1
 
         self.db.commit()
         logger.info(
-            f"[PostAnalyticsService] Stored {upserted} analytics rows for user={user_id}"
+            "[PostAnalyticsService] Sync done user={} inserted={} updated={} "
+            "change_snapshots={} daily_anchors={} unchanged_no_snapshot={} total={}",
+            safe_uid,
+            inserted,
+            updated,
+            change_snaps,
+            daily_anchors,
+            flat_skips,
+            inserted + updated,
         )
-        return upserted
+        return inserted + updated
 
     # ── Engagement Trends (period windows) ─────────────────────────────────
 
@@ -129,12 +141,18 @@ class LinkedInPostAnalyticsService:
     ) -> PostAnalyticsHistoryResponse:
         """Compare current metrics vs a period baseline (not last two syncs)."""
         period_key = normalize_period_key(period)
+        safe_uid = mask_user_id_for_log(user_id)
         now = datetime.utcnow()
         last_synced = self.get_last_synced_at(user_id)
-        now_ts = _as_naive_utc(last_synced) if last_synced else now
+        now_ts = as_naive_utc(last_synced) if last_synced else now
+        logger.info(
+            "[PostAnalyticsService] Trends start user={} period={}",
+            safe_uid,
+            period_key,
+        )
 
         epochs = [
-            _as_naive_utc(row[0])
+            as_naive_utc(row[0])
             for row in (
                 self.db.query(PostAnalyticsSnapshot.snapshot_at)
                 .filter(PostAnalyticsSnapshot.user_id == user_id)
@@ -146,6 +164,14 @@ class LinkedInPostAnalyticsService:
 
         baseline_at, baseline_reason = select_baseline_epoch(epochs, now_ts, period_key)
         if baseline_at is None:
+            logger.info(
+                "[PostAnalyticsService] Trends empty user={} period={} "
+                "reason={} epochs={}",
+                safe_uid,
+                period_key,
+                baseline_reason,
+                len(epochs),
+            )
             return self._empty_trends(
                 user_id=user_id,
                 period_key=period_key,
@@ -159,6 +185,11 @@ class LinkedInPostAnalyticsService:
             .all()
         )
         if not current_rows:
+            logger.info(
+                "[PostAnalyticsService] Trends empty user={} period={} reason=no_current_posts",
+                safe_uid,
+                period_key,
+            )
             return self._empty_trends(
                 user_id=user_id,
                 period_key=period_key,
@@ -174,16 +205,17 @@ class LinkedInPostAnalyticsService:
             )
             .all()
         )
-        # If exact epoch miss (clock skew), fall back to nearest snapshot per post.
         prev_map: dict[str, PostAnalyticsSnapshot] = {r.post_id: r for r in baseline_rows}
         if not prev_map:
             prev_map = self._nearest_snapshots_at_or_before(user_id, baseline_at)
 
         now_map = {r.post_id: r for r in current_rows}
+        skipped = 0
         deltas: list[PostDelta] = []
         for pid, current in now_map.items():
             prev = prev_map.get(pid)
             if not prev:
+                skipped += 1
                 continue
             deltas.append(
                 PostDelta(
@@ -223,19 +255,32 @@ class LinkedInPostAnalyticsService:
             reverse=True,
         )[:TOP_TREND_POSTS_LIMIT]
 
+        gap_hours = round((now_ts - baseline_at).total_seconds() / 3600, 1)
+        outcome = (
+            "no_changes"
+            if summary.total_posts > 0 and not rising and not falling
+            else "ok"
+        )
         logger.info(
-            "[PostAnalyticsService] Trends period={} baseline={} reason={} "
-            "comparable={} rising={} falling={}",
+            "[PostAnalyticsService] Trends done user={} period={} baseline={} "
+            "reason={} gap_hours={} current={} comparable={} skipped={} "
+            "rising={} falling={} top={} outcome={}",
+            safe_uid,
             period_key,
             baseline_at,
             baseline_reason,
+            gap_hours,
+            len(now_map),
             len(deltas),
+            skipped,
             len(rising),
             len(falling),
+            len(top_posts),
+            outcome,
         )
 
         return PostAnalyticsHistoryResponse(
-            period={"from": _utc_iso(baseline_at), "to": _utc_iso(now_ts)},
+            period={"from": utc_iso(baseline_at), "to": utc_iso(now_ts)},
             summary=summary,
             top_gainers=rising,
             top_decliners=falling,
@@ -259,7 +304,7 @@ class LinkedInPostAnalyticsService:
     ) -> PostAnalyticsHistoryResponse:
         zero = MetricDelta(before=0, now=0, delta=0, pct_change=0.0)
         return PostAnalyticsHistoryResponse(
-            period={"from": _utc_iso(now_ts), "to": _utc_iso(now_ts)},
+            period={"from": utc_iso(now_ts), "to": utc_iso(now_ts)},
             summary=EngagementSummary(
                 total_posts=0,
                 reactions=zero,
@@ -404,11 +449,13 @@ class LinkedInPostAnalyticsService:
 
     def _update_row(
         self, row: LinkedInPostAnalytics, post: LinkedInPost, now: datetime
-    ) -> None:
+    ) -> Optional[str]:
+        """Update row. Returns snapshot kind: change | anchor | None."""
         wrote_change = self._snapshot_if_changed(row, post, now)
+        snap_kind: Optional[str] = "change" if wrote_change else None
         if not wrote_change and not self._has_snapshot_on_utc_day(row.user_id, row.post_id, now):
-            # Daily anchor even when metrics are flat — enables period windows.
             self.db.add(self._snapshot_from_row(row, now))
+            snap_kind = "anchor"
 
         row.text = post.text
         row.title = post.title
@@ -428,6 +475,7 @@ class LinkedInPostAnalyticsService:
         row.is_repost = post.is_repost
         row.is_company_post = post.is_company_post
         row.last_synced_at = now
+        return snap_kind
 
     def _insert_row(
         self, user_id: str, post: LinkedInPost, now: datetime
@@ -471,37 +519,8 @@ class LinkedInPostAnalyticsService:
         )
         self.db.commit()
         logger.info(
-            f"[PostAnalyticsService] Cleared {deleted} analytics rows for user={user_id}"
+            "[PostAnalyticsService] Cleared {} analytics rows for user={}",
+            deleted,
+            mask_user_id_for_log(user_id),
         )
         return deleted
-
-
-def _row_to_linkedin_post(row: LinkedInPostAnalytics) -> LinkedInPost:
-    """Convert a DB row to a Pydantic LinkedInPost for external consumption."""
-    from models.linkedin_posts_models import PostAuthor, PostEngagementMetrics
-
-    return LinkedInPost(
-        id=row.post_id,
-        social_id=row.social_id,
-        text=row.text or "",
-        title=row.title,
-        created_at=row.created_at or datetime.utcnow(),
-        engagement=PostEngagementMetrics(
-            reactions=row.reactions or 0,
-            comments=row.comments or 0,
-            reposts=row.reposts or 0,
-            impressions=row.impressions or 0,
-            clicks=row.clicks or 0,
-            followers_gained=row.followers_gained or 0,
-            engagement_rate=row.engagement_rate or 0.0,
-        ),
-        author=PostAuthor(
-            name=row.author_name or "Unknown",
-            avatar_url=row.author_avatar_url,
-            headline=row.author_headline,
-            public_identifier=row.author_public_identifier,
-        ),
-        share_url=row.share_url,
-        is_repost=row.is_repost or False,
-        is_company_post=row.is_company_post or False,
-    )

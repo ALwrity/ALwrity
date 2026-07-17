@@ -2,8 +2,8 @@
 
 ## Implementation Plan (Issue #118)
 
-**Status:** Phases 1–2 shipped + pushed; Phase 3 frontend↔API wiring implemented (manual QA); Phase 4 planned  
-**Last updated:** 2026-07-17  
+**Status:** Phases 1–4 implemented on branch `feat/engagement-since-joined-alwrity` (manual QA for Phase 4)  
+**Last updated:** 2026-07-18  
 **GitHub:** [#118](https://github.com/ALwrity/ALwrity-prod/issues/118)  
 **Related:** [#75](https://github.com/ALwrity/ALwrity-prod/pull/75) (growth contribution %), [#120](https://github.com/ALwrity/ALwrity-prod/issues/120) (logging gaps), [#119](https://github.com/ALwrity/ALwrity-prod/issues/119) (media isolation — out of scope here)
 
@@ -296,10 +296,20 @@ Keep `reactions + comments + impressions` **or** include `followers_gained` in t
 
 **Phase 4 exit criteria**
 
-- [ ] From logs alone: insufficient history vs no change vs compute error vs Unipile refresh error.  
-- [ ] UI never shows `[object Object]` for API errors.  
-- [ ] Today digest survives Trends failures.
+- [x] From logs alone: insufficient history vs no change vs compute error vs Unipile refresh error.  
+- [x] UI never shows `[object Object]` for API errors.  
+- [x] Today digest survives Trends failures.
 
+**Phase 4 shipped notes (2026-07-18)**
+
+- Decision logs in `get_engagement_trends` (period, baseline, gap, counts, outcome)  
+- Sync logs: inserts/updates + change vs daily-anchor snapshots  
+- `mask_user_id_for_log` (last 4 chars) on Trends path  
+- API entry + structured `TRENDS_ERROR` / `INVALID_PERIOD`  
+- Frontend `engagementTrendsErrors.ts` parses `detail.message` + safe console warn  
+- Today digest soft-fails Trends fetch  
+- Contribution empty/attached debug logs  
+- Split mappers into `linkedin_post_analytics_mappers.py` to keep service under 500 lines
 ---
 
 ## 7. Out of scope
