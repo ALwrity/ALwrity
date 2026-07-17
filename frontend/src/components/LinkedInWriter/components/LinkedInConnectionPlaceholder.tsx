@@ -43,10 +43,66 @@ const CONNECT_WELCOME_SIGN_IN_HINT = 'Sign in via LinkedIn and choose your perso
 const CONNECT_WELCOME_CTA = 'Connect LinkedIn⚡';
 const CONNECT_WELCOME_DISMISS_LABEL = 'Explore first';
 const CONNECT_WELCOME_DISMISSED_KEY = 'linkedin_connect_welcome_dismissed';
+const MAX_CONNECT_WELCOME_LOGIN_COUNT = 3;
+const CONNECT_WELCOME_LOGIN_COUNT_KEY = 'linkedin_connect_welcome_login_count';
+const CONNECT_WELCOME_SESSION_COUNTED_KEY = 'linkedin_connect_welcome_session_counted';
 
 function getConnectWelcomeDismissedKey(userId: string | null | undefined): string | null {
   if (!userId) return null;
   return `${CONNECT_WELCOME_DISMISSED_KEY}_${userId}`;
+}
+
+function getConnectWelcomeLoginCountKey(userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  return `${CONNECT_WELCOME_LOGIN_COUNT_KEY}_${userId}`;
+}
+
+function getConnectWelcomeSessionCountedKey(userId: string | null | undefined): string | null {
+  if (!userId) return null;
+  return `${CONNECT_WELCOME_SESSION_COUNTED_KEY}_${userId}`;
+}
+
+function readConnectWelcomeLoginCount(userId: string | null | undefined): number {
+  const key = getConnectWelcomeLoginCountKey(userId);
+  if (!key) return 0;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return 0;
+    const parsed = parseInt(raw, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  } catch {
+    return 0;
+  }
+}
+
+function incrementConnectWelcomeLoginCount(userId: string | null | undefined): number {
+  if (!userId) return readConnectWelcomeLoginCount(userId);
+
+  const countedKey = getConnectWelcomeSessionCountedKey(userId);
+  const countKey = getConnectWelcomeLoginCountKey(userId);
+  if (!countedKey || !countKey) return readConnectWelcomeLoginCount(userId);
+
+  try {
+    if (sessionStorage.getItem(countedKey) === '1') {
+      return readConnectWelcomeLoginCount(userId);
+    }
+  } catch {
+    // ignore sessionStorage errors
+  }
+
+  const current = readConnectWelcomeLoginCount(userId);
+  const next = current + 1;
+  try {
+    localStorage.setItem(countKey, String(next));
+    sessionStorage.setItem(countedKey, '1');
+  } catch {
+    // ignore storage errors
+  }
+  return next;
+}
+
+function isWithinConnectWelcomeLoginWindow(userId: string | null | undefined): boolean {
+  return readConnectWelcomeLoginCount(userId) < MAX_CONNECT_WELCOME_LOGIN_COUNT;
 }
 
 const ConnectWelcomeBenefitsList: React.FC = () => (
@@ -130,8 +186,17 @@ const DisconnectedState: React.FC<{
     if (!storageKey) return false;
     try { return localStorage.getItem(storageKey) !== null; } catch { return false; }
   })();
-  const [showConnectWelcomeModal, setShowConnectWelcomeModal] = useState(centered && !initialWelcomeDismissed);
+  const initialLoginCount = readConnectWelcomeLoginCount(userId);
+  const [showConnectWelcomeModal, setShowConnectWelcomeModal] = useState(
+    centered && !initialWelcomeDismissed && isWithinConnectWelcomeLoginWindow(userId)
+  );
   const [welcomeDismissed, setWelcomeDismissed] = useState(initialWelcomeDismissed);
+  const [loginCount, setLoginCount] = useState(initialLoginCount);
+
+  // Track a new login/session once per browser session per user.
+  useEffect(() => {
+    setLoginCount(incrementConnectWelcomeLoginCount(userId));
+  }, [userId]);
 
   const persistDismissal = () => {
     const storageKey = getConnectWelcomeDismissedKey(userId);
@@ -150,8 +215,10 @@ const DisconnectedState: React.FC<{
 
   useEffect(() => {
     if (!centered || welcomeDismissed) return;
-    setShowConnectWelcomeModal(true);
-  }, [centered, welcomeDismissed]);
+    if (loginCount < MAX_CONNECT_WELCOME_LOGIN_COUNT) {
+      setShowConnectWelcomeModal(true);
+    }
+  }, [centered, welcomeDismissed, loginCount]);
 
   useEffect(() => {
     onConnectWelcomeOpenChange?.(centered && showConnectWelcomeModal);

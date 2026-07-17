@@ -24,6 +24,7 @@ import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialCon
 import { useLinkedInSearch } from '../hooks/useLinkedInSearch';
 import { LinkedInSearchBar } from './search/LinkedInSearchBar';
 import { LinkedInSearchModal } from './search/LinkedInSearchModal';
+import GifIcon from '@mui/icons-material/Gif';
 
 const NAV_TITLE_CLASS = 'linkedin-writer-header-title';
 
@@ -571,7 +572,7 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="linkedin-writer-header-controls">
+        <div className="linkedin-writer-header-right">
           <LinkedInSearchBar
             value={linkedInSearch.query}
             onChange={linkedInSearch.setQuery}
@@ -581,30 +582,14 @@ export const Header: React.FC<HeaderProps> = ({
           />
           <button
             type="button"
+            className="linkedin-writer-header-gif-btn"
             onClick={() => { window.location.href = '/gif-maker'; }}
             title="GIF Maker — Record UI flows for marketing"
             aria-label="Open GIF Maker"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: 36,
-              height: 36,
-              border: 'none',
-              borderRadius: 8,
-              background: 'transparent',
-              cursor: 'pointer',
-              fontSize: 18,
-              lineHeight: 1,
-              transition: 'all 0.2s ease',
-              marginRight: 4,
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = '#e8f5e9'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            🎬
+            <GifIcon sx={{ fontSize: 22 }} />
           </button>
-          <HeaderControls colorMode="light" showAlerts={true} showUser={true} />
+          <HeaderControls colorMode="light" showAlerts={true} showUser={true} gap={1} />
         </div>
       </div>
       
