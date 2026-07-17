@@ -39,18 +39,46 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   >({});
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [statusMessage, setStatusMessage] = useState<{
+    tone: 'info' | 'success';
+    text: string;
+  } | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const requestIdRef = useRef(0);
+  const statusTimerRef = useRef<number | null>(null);
+
+  const clearStatusTimer = useCallback(() => {
+    if (statusTimerRef.current != null) {
+      window.clearTimeout(statusTimerRef.current);
+      statusTimerRef.current = null;
+    }
+  }, []);
+
+  const showStatus = useCallback(
+    (tone: 'info' | 'success', text: string, autoClearMs?: number) => {
+      clearStatusTimer();
+      setStatusMessage({ tone, text });
+      if (autoClearMs && autoClearMs > 0) {
+        statusTimerRef.current = window.setTimeout(() => {
+          setStatusMessage(null);
+          statusTimerRef.current = null;
+        }, autoClearMs);
+      }
+    },
+    [clearStatusTimer]
+  );
 
   const resetInboxShell = useCallback(() => {
+    clearStatusTimer();
     setTab('needs_reply');
     setGroups([]);
     setCounts({});
     setLoadState('idle');
     setError('');
     setActionError('');
-  }, []);
+    setStatusMessage(null);
+  }, [clearStatusTimer]);
 
   const loadInbox = useCallback(
     async (priority: Exclude<CommentAssistantTab, 'manual'>, refresh = false) => {
@@ -192,32 +220,28 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       payload: CommentAssistantReplyPayload
     ) => {
       setActionError('');
+      showStatus('info', 'Sending your reply…');
       updateComment(postId, commentId, { replyBusy: true });
       try {
-        if (payload.imageFile) {
-          await commentAssistantApi.replyToComment(socialId, {
-            comment_id: commentId,
-            text: payload.text,
-            mentions: payload.mentions,
-            imageFile: payload.imageFile,
-          });
-        } else {
-          await postCommentsApi.replyToComment(socialId, {
-            comment_id: commentId,
-            text: payload.text,
-            mentions: payload.mentions,
-          });
-        }
+        // Always multipart via comment-assistant reply (mentions + optional image).
+        await commentAssistantApi.replyToComment(socialId, {
+          comment_id: commentId,
+          text: payload.text,
+          mentions: payload.mentions,
+          imageFile: payload.imageFile,
+        });
         updateComment(postId, commentId, { replyBusy: false, draftText: '' });
+        showStatus('success', 'Reply posted successfully.', 4500);
         if (isPriorityTab(tab)) {
           await loadInbox(tab, false);
         }
       } catch (err) {
         updateComment(postId, commentId, { replyBusy: false });
+        setStatusMessage(null);
         setActionError(getCommentAssistantReplyErrorMessage(err));
       }
     },
-    [tab, loadInbox, updateComment]
+    [tab, loadInbox, updateComment, showStatus]
   );
 
   const handleDraftAi = useCallback(
@@ -319,6 +343,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     counts,
     error,
     actionError,
+    statusMessage,
     cooldownLeft,
     syncDisabled:
       !connected || loadState === 'loading' || cooldownLeft > 0 || tab === 'manual',

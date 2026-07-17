@@ -43,6 +43,7 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     counts,
     error,
     actionError,
+    statusMessage,
     cooldownLeft,
     syncDisabled,
     handleSync,
@@ -132,6 +133,41 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
           {cooldownLeft > 0 && (
             <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 8 }}>
               {COMMENT_ASSISTANT_COOLDOWN(cooldownLeft)}
+            </div>
+          )}
+
+          {statusMessage && (
+            <div
+              role="status"
+              style={{
+                padding: '10px 12px',
+                background: statusMessage.tone === 'success' ? '#ecfdf5' : '#eff6ff',
+                borderRadius: 8,
+                color: statusMessage.tone === 'success' ? '#047857' : '#1d4ed8',
+                fontSize: 12,
+                marginBottom: 10,
+                lineHeight: 1.45,
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              {statusMessage.tone === 'info' && (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: 12,
+                    height: 12,
+                    border: '2px solid #bfdbfe',
+                    borderTopColor: '#1d4ed8',
+                    borderRadius: '50%',
+                    animation: 'ca-inbox-spin 0.7s linear infinite',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+              {statusMessage.text}
             </div>
           )}
 

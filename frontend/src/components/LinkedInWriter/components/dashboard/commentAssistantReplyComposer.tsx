@@ -302,7 +302,24 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
             cursor: canSend ? 'pointer' : 'default',
           }}
         >
-          {busy ? COMMENT_ASSISTANT_ACTIONS.sending : 'Reply'}
+          {busy ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 12,
+                  height: 12,
+                  border: '2px solid rgba(255,255,255,0.4)',
+                  borderTopColor: '#fff',
+                  borderRadius: '50%',
+                  animation: 'ca-inbox-spin 0.7s linear infinite',
+                }}
+              />
+              {COMMENT_ASSISTANT_ACTIONS.sending}
+            </span>
+          ) : (
+            'Reply'
+          )}
         </button>
         <button
           type="button"

@@ -53,7 +53,8 @@ export const commentAssistantApi = {
 
   /**
    * Reply with optional mentions + image (multipart).
-   * Use when attaching an image; otherwise postCommentsApi.replyToComment is fine.
+   * Must override aiApiClient's default application/json Content-Type or FastAPI
+   * returns 422 (form fields never parse).
    */
   async replyToComment(
     socialId: string,
@@ -71,11 +72,24 @@ export const commentAssistantApi = {
       form.append('mentions', JSON.stringify(payload.mentions));
     }
     if (payload.imageFile) {
-      form.append('attachment', payload.imageFile);
+      form.append('attachment', payload.imageFile, payload.imageFile.name);
     }
     const { data } = await aiApiClient.post<{ success: boolean; comment_id?: string | null }>(
       `${BASE}/posts/${encodeURIComponent(socialId)}/comments/reply`,
-      form
+      form,
+      {
+        // aiApiClient defaults to application/json; that makes FastAPI return 422 for FormData.
+        // Drop Content-Type so the runtime sets multipart/form-data with boundary.
+        headers: { 'Content-Type': undefined as unknown as string },
+        transformRequest: [
+          (body, headers) => {
+            if (body instanceof FormData && headers) {
+              delete (headers as Record<string, unknown>)['Content-Type'];
+            }
+            return body;
+          },
+        ],
+      }
     );
     return data;
   },

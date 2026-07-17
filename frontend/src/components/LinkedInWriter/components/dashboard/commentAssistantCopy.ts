@@ -55,6 +55,9 @@ export const COMMENT_ASSISTANT_ACTIONS = {
   loadMore: 'Load more comments',
 } as const;
 
+export const COMMENT_ASSISTANT_REPLY_SENDING = 'Sending your reply…';
+export const COMMENT_ASSISTANT_REPLY_SUCCESS = 'Reply posted successfully.';
+
 export const COMMENT_ASSISTANT_MANUAL_INTRO =
   'Paste a comment and draft an AI reply in your voice — then copy it to LinkedIn.';
 
