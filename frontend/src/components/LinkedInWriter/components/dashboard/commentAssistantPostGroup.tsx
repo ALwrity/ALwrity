@@ -1,6 +1,9 @@
 import React from 'react';
 import { colors } from '../GrowthEngine/styles';
-import { COMMENT_ASSISTANT_LOADING_COMMENTS } from './commentAssistantCopy';
+import {
+  COMMENT_ASSISTANT_ACTIONS,
+  COMMENT_ASSISTANT_LOADING_COMMENTS,
+} from './commentAssistantCopy';
 import { CommentAssistantCommentRow } from './commentAssistantCommentRow';
 import type { CommentAssistantPostGroupView } from './commentAssistantTypes';
 
@@ -10,6 +13,8 @@ interface CommentAssistantPostGroupProps {
   onLike?: (commentId: string) => void;
   onSendReply?: (commentId: string, text: string) => void;
   onDraftAi?: (commentId: string) => void;
+  onRetry?: () => void;
+  onLoadMore?: () => void;
 }
 
 const SkeletonLine: React.FC<{ width: string }> = ({ width }) => (
@@ -49,6 +54,8 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
   onLike,
   onSendReply,
   onDraftAi,
+  onRetry,
+  onLoadMore,
 }) => (
   <section
     style={{
@@ -80,31 +87,86 @@ export const CommentAssistantPostGroup: React.FC<CommentAssistantPostGroupProps>
           overflow: 'hidden',
         }}
       >
-        {group.postSnippet}
+        {group.postSnippet || 'Your post'}
       </div>
     </header>
 
     <div style={{ padding: '8px 10px 4px' }}>
+      {group.error && (
+        <div
+          style={{
+            padding: '10px 12px',
+            marginBottom: 8,
+            borderRadius: 7,
+            background: '#fff7ed',
+            color: '#9a3412',
+            fontSize: 12,
+            lineHeight: 1.45,
+          }}
+        >
+          <div style={{ marginBottom: 8 }}>{group.error}</div>
+          {onRetry && (
+            <button
+              type="button"
+              onClick={onRetry}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 5,
+                border: `1px solid #fdba74`,
+                background: '#fff',
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#9a3412',
+                cursor: 'pointer',
+              }}
+            >
+              {COMMENT_ASSISTANT_ACTIONS.retryPost}
+            </button>
+          )}
+        </div>
+      )}
+
       {group.comments === null && (
         <div style={{ fontSize: 12, color: colors.textSecondary, padding: '8px 4px 12px' }}>
           {COMMENT_ASSISTANT_LOADING_COMMENTS}
         </div>
       )}
-      {group.comments && group.comments.length === 0 && (
+      {group.comments && group.comments.length === 0 && !group.error && (
         <div style={{ fontSize: 12, color: colors.textSecondary, padding: '8px 4px 12px' }}>
-          No comments on this post.
+          No comments in this view for this post.
         </div>
       )}
       {group.comments?.map((c) => (
         <CommentAssistantCommentRow
           key={c.id}
           comment={c}
-          actionsEnabled={actionsEnabled}
+          actionsEnabled={actionsEnabled && !group.error}
           onLike={onLike}
           onSendReply={onSendReply}
           onDraftAi={onDraftAi}
         />
       ))}
+
+      {group.hasMoreComments && group.commentsCursor && onLoadMore && (
+        <button
+          type="button"
+          onClick={onLoadMore}
+          style={{
+            width: '100%',
+            margin: '4px 0 10px',
+            padding: '7px 10px',
+            borderRadius: 6,
+            border: `1px solid ${colors.border}`,
+            background: '#fff',
+            fontSize: 11,
+            fontWeight: 600,
+            color: colors.textSecondary,
+            cursor: 'pointer',
+          }}
+        >
+          {COMMENT_ASSISTANT_ACTIONS.loadMore}
+        </button>
+      )}
     </div>
   </section>
 );

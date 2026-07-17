@@ -47,13 +47,16 @@ export const COMMENT_ASSISTANT_ACTIONS = {
   liked: 'Liked',
   reply: 'Reply',
   draftAi: 'Draft with AI',
+  drafting: 'Drafting…',
   send: 'Send reply',
+  sending: 'Sending…',
   cancel: 'Cancel',
-  comingSoon: 'Available after sync is connected.',
+  retryPost: 'Retry this post',
+  loadMore: 'Load more comments',
 } as const;
 
 export const COMMENT_ASSISTANT_MANUAL_INTRO =
   'Paste a comment and draft an AI reply in your voice — then copy it to LinkedIn.';
 
-export const COMMENT_ASSISTANT_PHASE1_NOTE =
-  'Inbox sync connects in a later update. Use Manual anytime to draft a reply.';
+export const COMMENT_ASSISTANT_INBOX_HINT =
+  'Comments on your recent posts. Sync to refresh from LinkedIn.';

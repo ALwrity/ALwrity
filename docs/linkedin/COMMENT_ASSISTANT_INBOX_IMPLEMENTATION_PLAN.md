@@ -2,7 +2,7 @@
 
 ## Implementation Plan
 
-**Status:** Phase 1–2 complete (UI shell + backend foundation); Phases 3–5 pending  
+**Status:** Phase 1–3 complete (UI + backend + frontend wiring); Phases 4–5 pending  
 **Last updated:** 2026-07-18  
 **GitHub:** [#73](https://github.com/ALwrity/ALwrity-prod/issues/73) — Centralized Comment & Reply Dashboard  
 **Related (separate, not in this plan):** [#122](https://github.com/ALwrity/ALwrity-prod/issues/122) — comments I left on others’ posts (networking)  
@@ -238,10 +238,22 @@ Mental model for users: **Sync once → work from the list.**
 
 **Phase 3 exit criteria**
 
-- [ ] Changing priority tab shows the right set.  
-- [ ] Reply and Like work without leaving Comment Assistant.  
-- [ ] AI draft prefills from real comment + post.  
-- [ ] Failed post shows retry; rest of inbox still usable.
+- [x] Changing priority tab shows the right set.  
+- [x] Reply and Like work without leaving Comment Assistant.  
+- [x] AI draft prefills from real comment + post.  
+- [x] Failed post shows retry; rest of inbox still usable.
+
+**Phase 3 delivered**
+
+| Piece | Location |
+|-------|----------|
+| API client | `frontend/src/services/commentAssistantApi.ts` |
+| Inbox hook | `useCommentAssistantInbox.ts` |
+| Mappers | `commentAssistantMappers.ts` |
+| Wired UI | `CommentAssistantInboxModal` + post group / comment row |
+| Reply | existing `postCommentsApi.replyToComment` |
+| Load more | existing `postCommentsApi.fetchPostComments` + cursor |
+| AI draft | existing `linkedInWriterApi.generateCommentResponse` |
 
 ---
 

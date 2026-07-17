@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { colors, rowBase } from '../GrowthEngine/styles';
 import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
 import type { CommentAssistantCommentView } from './commentAssistantTypes';
 
 interface CommentAssistantCommentRowProps {
   comment: CommentAssistantCommentView;
-  /** Phase 1: actions are UI-only until Phase 3 wires APIs. */
   actionsEnabled?: boolean;
   onLike?: (commentId: string) => void;
   onSendReply?: (commentId: string, text: string) => void;
@@ -33,12 +32,20 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState('');
 
+  useEffect(() => {
+    if (comment.draftText != null && comment.draftText !== '') {
+      setReplyText(comment.draftText);
+      setReplyOpen(true);
+    }
+  }, [comment.draftText]);
+
+  const busy = Boolean(comment.replyBusy || comment.draftBusy || comment.likeBusy);
+  const canAct = actionsEnabled && !busy;
+
   const handleSend = () => {
     const text = replyText.trim();
-    if (!text || !onSendReply) return;
+    if (!text || !onSendReply || busy) return;
     onSendReply(comment.id, text);
-    setReplyText('');
-    setReplyOpen(false);
   };
 
   return (
@@ -53,43 +60,46 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button
           type="button"
-          disabled={!actionsEnabled}
-          title={!actionsEnabled ? COMMENT_ASSISTANT_ACTIONS.comingSoon : undefined}
+          disabled={!canAct || comment.liked}
           onClick={() => onLike?.(comment.id)}
           style={{
             ...actionBtn(),
-            opacity: actionsEnabled ? 1 : 0.55,
-            cursor: actionsEnabled ? 'pointer' : 'default',
+            opacity: canAct || comment.liked ? 1 : 0.55,
+            cursor: canAct && !comment.liked ? 'pointer' : 'default',
             color: comment.liked ? '#0a66c2' : colors.textSecondary,
           }}
         >
-          {comment.liked ? COMMENT_ASSISTANT_ACTIONS.liked : COMMENT_ASSISTANT_ACTIONS.like}
+          {comment.likeBusy
+            ? '…'
+            : comment.liked
+              ? COMMENT_ASSISTANT_ACTIONS.liked
+              : COMMENT_ASSISTANT_ACTIONS.like}
         </button>
         <button
           type="button"
-          disabled={!actionsEnabled}
-          title={!actionsEnabled ? COMMENT_ASSISTANT_ACTIONS.comingSoon : undefined}
+          disabled={!canAct}
           onClick={() => setReplyOpen((v) => !v)}
           style={{
             ...actionBtn(),
-            opacity: actionsEnabled ? 1 : 0.55,
-            cursor: actionsEnabled ? 'pointer' : 'default',
+            opacity: canAct ? 1 : 0.55,
+            cursor: canAct ? 'pointer' : 'default',
           }}
         >
           {COMMENT_ASSISTANT_ACTIONS.reply}
         </button>
         <button
           type="button"
-          disabled={!actionsEnabled}
-          title={!actionsEnabled ? COMMENT_ASSISTANT_ACTIONS.comingSoon : undefined}
+          disabled={!canAct}
           onClick={() => onDraftAi?.(comment.id)}
           style={{
             ...actionBtn(true),
-            opacity: actionsEnabled ? 1 : 0.55,
-            cursor: actionsEnabled ? 'pointer' : 'default',
+            opacity: canAct ? 1 : 0.55,
+            cursor: canAct ? 'pointer' : 'default',
           }}
         >
-          {COMMENT_ASSISTANT_ACTIONS.draftAi}
+          {comment.draftBusy
+            ? COMMENT_ASSISTANT_ACTIONS.drafting
+            : COMMENT_ASSISTANT_ACTIONS.draftAi}
         </button>
       </div>
 
@@ -100,6 +110,7 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
             onChange={(e) => setReplyText(e.target.value)}
             placeholder="Write a short reply…"
             rows={3}
+            disabled={busy}
             style={{
               width: '100%',
               boxSizing: 'border-box',
@@ -117,17 +128,20 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
           <div style={{ display: 'flex', gap: 8 }}>
             <button
               type="button"
-              disabled={!replyText.trim() || !actionsEnabled}
+              disabled={!replyText.trim() || busy || !actionsEnabled}
               onClick={handleSend}
               style={{
                 ...actionBtn(true),
-                opacity: replyText.trim() && actionsEnabled ? 1 : 0.5,
+                opacity: replyText.trim() && !busy && actionsEnabled ? 1 : 0.5,
               }}
             >
-              {COMMENT_ASSISTANT_ACTIONS.send}
+              {comment.replyBusy
+                ? COMMENT_ASSISTANT_ACTIONS.sending
+                : COMMENT_ASSISTANT_ACTIONS.send}
             </button>
             <button
               type="button"
+              disabled={busy}
               onClick={() => { setReplyOpen(false); setReplyText(''); }}
               style={actionBtn()}
             >
