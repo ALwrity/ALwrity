@@ -1,5 +1,6 @@
-import React, { useState, useRef, useCallback } from 'react';
-import { Popper, Paper } from '@mui/material';
+import React, { useState, useCallback } from 'react';
+import { DashboardRailIconButton } from './DashboardRailIconButton';
+import { DashboardActionModal } from './DashboardActionModal';
 
 interface ResumeDraftRailChipProps {
   draft: string;
@@ -12,18 +13,19 @@ export const ResumeDraftRailChip: React.FC<ResumeDraftRailChipProps> = ({
   onResumeDraft,
   onClear,
 }) => {
-  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-  const open = Boolean(anchorEl);
-  const leaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [open, setOpen] = useState(false);
 
-  const handleOpen = useCallback((el: HTMLElement) => {
-    if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
-    setAnchorEl(el);
-  }, []);
+  const handleClose = useCallback(() => setOpen(false), []);
 
-  const handleClose = useCallback(() => {
-    leaveTimeoutRef.current = setTimeout(() => setAnchorEl(null), 180);
-  }, []);
+  const handleContinue = useCallback(() => {
+    setOpen(false);
+    onResumeDraft?.();
+  }, [onResumeDraft]);
+
+  const handleDiscard = useCallback(() => {
+    setOpen(false);
+    onClear?.();
+  }, [onClear]);
 
   if (!draft) return null;
 
@@ -31,110 +33,41 @@ export const ResumeDraftRailChip: React.FC<ResumeDraftRailChipProps> = ({
     draft
       .split('\n')[0]
       .replace(/^#\s*/, '')
-      .substring(0, 80) || 'Untitled draft';
+      .substring(0, 120) || 'Untitled draft';
 
   return (
-    <div
-      className="linkedin-resume-draft-chip"
-      onMouseEnter={(e) => handleOpen(e.currentTarget)}
-      onMouseLeave={handleClose}
-    >
-      <span className="linkedin-resume-draft-chip-dot" />
-      <span className="linkedin-resume-draft-chip-label">Resume</span>
-
-      <Popper
+    <>
+      <DashboardRailIconButton
+        label="Resume"
+        icon="resume"
+        alwaysShowLabel
+        iconLeading
+        onClick={() => setOpen(true)}
+        title="Resume your saved draft"
+        ariaExpanded={open}
         open={open}
-        anchorEl={anchorEl}
-        placement="left"
-        style={{ zIndex: 1300 }}
-        modifiers={[
-          { name: 'offset', options: { offset: [0, 12] } },
-          { name: 'flip', enabled: false },
-        ]}
+      />
+
+      <DashboardActionModal
+        open={open}
+        title="Resume Draft"
+        onClose={handleClose}
+        maxWidth={420}
+        maxHeight="min(90vh, 360px)"
       >
-        <Paper
-          onMouseEnter={() => {
-            if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
-            setAnchorEl(anchorEl);
-          }}
-          onMouseLeave={handleClose}
-          sx={{
-            p: 2,
-            minWidth: 220,
-            maxWidth: 260,
-            borderRadius: 2,
-            boxShadow: '0 8px 28px rgba(0,0,0,0.14)',
-            border: '1px solid #e2e8f0',
-          }}
-        >
-          <div
-            style={{
-              fontSize: 13,
-              color: '#c2410c',
-              fontWeight: 700,
-              marginBottom: 6,
-              textTransform: 'uppercase',
-              letterSpacing: '0.04em',
-            }}
-          >
-            Resume Draft
-          </div>
-
-          <div
-            style={{
-              fontSize: 12.5,
-              color: '#334155',
-              lineHeight: 1.4,
-              marginBottom: 12,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              wordBreak: 'break-word',
-            }}
-          >
-            {preview}
-          </div>
-
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              type="button"
-              onClick={onResumeDraft}
-              style={{
-                flex: 1,
-                padding: '6px 14px',
-                borderRadius: 6,
-                border: 'none',
-                background: '#0a66c2',
-                color: '#fff',
-                fontWeight: 600,
-                fontSize: 12.5,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Continue editing →
-            </button>
-            <button
-              type="button"
-              onClick={onClear}
-              style={{
-                padding: '6px 10px',
-                borderRadius: 6,
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                color: '#64748b',
-                fontWeight: 500,
-                fontSize: 12.5,
-                cursor: 'pointer',
-              }}
-            >
-              Discard
-            </button>
-          </div>
-        </Paper>
-      </Popper>
-    </div>
+        <p className="linkedin-resume-modal-lead">
+          Pick up where you left off with your saved LinkedIn draft.
+        </p>
+        <div className="linkedin-resume-modal-preview">{preview}</div>
+        <div className="linkedin-resume-modal-actions">
+          <button type="button" className="linkedin-resume-modal-btn linkedin-resume-modal-btn--primary" onClick={handleContinue}>
+            Continue editing →
+          </button>
+          <button type="button" className="linkedin-resume-modal-btn linkedin-resume-modal-btn--secondary" onClick={handleDiscard}>
+            Discard
+          </button>
+        </div>
+      </DashboardActionModal>
+    </>
   );
 };
