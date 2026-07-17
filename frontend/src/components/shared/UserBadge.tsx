@@ -437,7 +437,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
         <MenuItem onClick={() => { handleClose(); window.location.href = '/billing'; }} sx={{ mx: 1, borderRadius: 1, background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)', color: '#ffffff', fontWeight: 600, '&:hover': { background: 'linear-gradient(135deg, #0891b2 0%, #2563eb 100%)', boxShadow: '0 2px 8px rgba(6,182,212,0.4)' } }}>
           View Costing Details
         </MenuItem>
-        <MenuItem onClick={() => { handleClose(); window.location.href = '/gif-maker'; }} sx={{ mx: 1, borderRadius: 1, color: '#6b7280', '&:hover': { bgcolor: '#f0fdf4', color: '#16a34a' } }}>
+        <MenuItem onClick={() => { handleClose(); window.dispatchEvent(new CustomEvent('open-gif-maker')); }} sx={{ mx: 1, borderRadius: 1, color: '#6b7280', '&:hover': { bgcolor: '#f0fdf4', color: '#16a34a' } }}>
           📹 GIF Maker
         </MenuItem>
         <MenuItem onClick={handleSignOut} sx={{ mx: 1, borderRadius: 1, color: '#6b7280', '&:hover': { bgcolor: '#fef2f2', color: '#ef4444' } }}>

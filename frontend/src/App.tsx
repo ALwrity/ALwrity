@@ -14,6 +14,7 @@ import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
 import PricingPage from './components/Pricing/PricingPage';
 import ContactPage from './components/Landing/ContactPage';
+import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
 
 // ─── Lazy loaded route components ───────────────────────────────────────────
 // Default exports
@@ -124,6 +125,23 @@ const App: React.FC = () => {
   // Initialize app - loading state will be managed by InitialRouteHandler
   useEffect(() => {
     setLoading(false);
+  }, []);
+
+  // GIF Maker floating overlay state
+  const [showGifMaker, setShowGifMaker] = useState(false);
+
+  // Listen for global open-gif-maker event
+  useEffect(() => {
+    console.log('[GIF] Mounting event listener for open-gif-maker');
+    const handler = () => {
+      console.log('[GIF] open-gif-maker event received');
+      setShowGifMaker(true);
+    };
+    window.addEventListener('open-gif-maker', handler);
+    return () => {
+      console.log('[GIF] Removing event listener for open-gif-maker');
+      window.removeEventListener('open-gif-maker', handler);
+    };
   }, []);
 
   // Listen for CopilotKit key updates
@@ -270,6 +288,12 @@ const App: React.FC = () => {
                     <Route path="/gif-maker" element={<ProtectedRoute><GifMakerPage apiBaseUrl={process.env.REACT_APP_API_URL || ''} maxFrames={30} /></ProtectedRoute>} />
               </Routes>
             </Suspense>
+
+            {/* GifMakerFloatingPanel — outside Suspense so it's never replaced by fallback */}
+            <GifMakerFloatingPanel
+              open={showGifMaker}
+              onClose={() => setShowGifMaker(false)}
+            />
           </ConditionalCopilotKit>
         </AuthenticatedCopilotWrapper>
       </Router>
