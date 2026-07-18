@@ -1,11 +1,12 @@
 import React from 'react';
 import { Box } from '@mui/material';
-import AlertsBadge from './AlertsBadge';
 import UserBadge from './UserBadge';
 
 interface HeaderControlsProps {
   colorMode?: 'light' | 'dark';
+  /** @deprecated AlertsBadge has moved inside UserBadge dropdown — prop kept for backward compat */
   showAlerts?: boolean;
+  /** @deprecated always shown now */
   showUser?: boolean;
   showPlanChip?: boolean;
   gap?: number;
@@ -13,19 +14,12 @@ interface HeaderControlsProps {
 
 const HeaderControls: React.FC<HeaderControlsProps> = ({
   colorMode = 'light',
-  showAlerts = true,
-  showUser = true,
   showPlanChip = true,
   gap = 1.5,
 }) => {
-  if (!showAlerts && !showUser) {
-    return null;
-  }
-
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap }}>
-      {showAlerts && <AlertsBadge colorMode={colorMode} />}
-      {showUser && <UserBadge colorMode={colorMode} showPlanChip={showPlanChip} />}
+      <UserBadge colorMode={colorMode} showPlanChip={showPlanChip} />
     </Box>
   );
 };

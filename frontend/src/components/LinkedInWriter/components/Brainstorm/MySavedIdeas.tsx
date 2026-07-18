@@ -10,6 +10,8 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { LI_Z_MODAL } from '../../utils/linkedInStudioZIndex';
 import { apiClient } from '../../../../api/client';
 
 export interface SavedBrainstormIdea {
@@ -183,7 +185,7 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -192,7 +194,7 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 10020,
+        zIndex: LI_Z_MODAL,
         padding: 20,
       }}
       onClick={onClose}
@@ -375,7 +377,8 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

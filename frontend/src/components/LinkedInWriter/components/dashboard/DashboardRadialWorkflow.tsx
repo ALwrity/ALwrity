@@ -287,7 +287,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
                 width: iconFontSize,
                 height: iconFontSize,
                 marginBottom: iconHeaderGap,
-                color: isActive ? card.accent : '#334155',
+                color: isActive ? card.accent : accentFill(card.accent, 0.75),
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',

@@ -12,7 +12,6 @@ import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialCon
 import { useLinkedInSearch } from '../hooks/useLinkedInSearch';
 import { LinkedInSearchBar } from './search/LinkedInSearchBar';
 import { LinkedInSearchModal } from './search/LinkedInSearchModal';
-import GifIcon from '@mui/icons-material/Gif';
 import { useMobileHeaderNav } from '../hooks/useMobileHeaderNav';
 import { StudioTourTrigger } from './dashboard/StudioTourTrigger';
 import { ContentPersonaPreferencesBody } from './ContentPersonaPreferencesBody';
@@ -286,26 +285,13 @@ export const Header: React.FC<HeaderProps> = ({
     </div>
   );
 
-  const gifButton = (
-    <button
-      type="button"
-      className="linkedin-writer-header-gif-btn"
-      onClick={() => {
-        window.location.href = '/gif-maker';
-      }}
-      title="GIF Maker — Record UI flows for marketing"
-      aria-label="Open GIF Maker"
-    >
-      <GifIcon sx={{ fontSize: 22 }} />
-    </button>
-  );
-
   const searchBar = (
     <LinkedInSearchBar
       value={linkedInSearch.query}
       onChange={linkedInSearch.setQuery}
       onSearch={() => void linkedInSearch.runSearch()}
       disabled={!connected}
+      connected={connected}
       size={isMobileHeaderNav ? 'mobileStrip' : 'nav'}
     />
   );
@@ -319,12 +305,9 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="linkedin-writer-header-row linkedin-writer-header-row--nav">
             {brandBlock}
             <div className="linkedin-writer-header-nav-actions">
-              {gifButton}
               <StudioTourTrigger variant="headerNav" />
               <HeaderControls
                 colorMode="light"
-                showAlerts
-                showUser
                 showPlanChip={false}
                 gap={1}
               />
@@ -376,8 +359,7 @@ export const Header: React.FC<HeaderProps> = ({
           <div className="linkedin-writer-header-right">
             <div className="linkedin-writer-header-search-slot">{searchBar}</div>
             <div className="linkedin-writer-header-icon-cluster">
-              {gifButton}
-              <HeaderControls colorMode="light" showAlerts showUser gap={1} />
+              <HeaderControls colorMode="light" gap={1} />
             </div>
           </div>
         </div>
