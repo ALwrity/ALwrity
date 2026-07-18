@@ -2,6 +2,25 @@
 
 This document describes how **Radial workflow hero**, **Profile hub**, and **Connect button** are positioned on wide screens. All three share one vertical axis anchored on the profile hub.
 
+## Responsive breakpoints (Mobile Studio)
+
+**Canonical constants:** `dashboardLayoutConstants.ts` — import these instead of hard-coding pixel values.
+
+| Name | Constant | CSS / JS | Layout effect |
+|------|----------|----------|---------------|
+| **Mobile Studio** | `MOBILE_STUDIO_MAX_WIDTH_PX` = **960** | `@media (max-width: 960px)` | Mobile workflow grid, floating Co-Pilot FAB, Analytics section; radial ring hidden |
+| **Desktop Studio** | `DESKTOP_DASHBOARD_MIN_WIDTH_PX` = **961** | `@media (min-width: 961px)` + `useDesktopViewport()` | Radial ring, right rail, desktop Co-Pilot dock |
+| **Header compact** | `HEADER_COMPACT_MAX_WIDTH_PX` = **768** | `@media (max-width: 768px)` | Two-row app header |
+| **Tour phone** | `TOUR_PHONE_MAX_WIDTH_PX` = **640** | Tour variant only | Compact tour tooltips (641–960 uses tablet tour) |
+
+**960 vs 961:** Mobile CSS uses `max-width: 960px`; JS desktop detection uses `min-width: 961px`. There is no gap — at exactly 960px you get mobile; at 961px you get desktop.
+
+**QA matrix:** 960px → mobile grid, no radial. 961px → radial, no mobile grid. 768px → compact header. 640px → phone tour tooltips.
+
+See also: `docs/dashboardDesktopHeroPlacement.md` (QA breakpoint reference).
+
+---
+
 ## Golden rule
 
 > **One axis, one source of truth:** horizontal position always comes from `layout.centerX` in `computeRadialLayout()`. Never position the connect button with a separate `left: 50%` or a different offset on desktop.
