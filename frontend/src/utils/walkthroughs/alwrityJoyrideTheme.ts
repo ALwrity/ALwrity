@@ -1,7 +1,14 @@
 import type { Styles } from 'react-joyride';
+import {
+  MOBILE_STUDIO_MAX_WIDTH_PX,
+  TOUR_PHONE_MAX_WIDTH_PX,
+} from '../../components/LinkedInWriter/components/dashboard/dashboardLayoutConstants';
 
-export const TOUR_BREAKPOINT_MOBILE_PX = 640;
-export const TOUR_BREAKPOINT_TABLET_PX = 960;
+/** Phone tour tooltips (≤640px). */
+export const TOUR_BREAKPOINT_MOBILE_PX = TOUR_PHONE_MAX_WIDTH_PX;
+
+/** Tablet + mobile studio tour variant (≤960px) — matches Mobile Studio layout. */
+export const TOUR_BREAKPOINT_TABLET_PX = MOBILE_STUDIO_MAX_WIDTH_PX;
 
 export type TourViewportVariant = 'mobile' | 'tablet' | 'desktop';
 

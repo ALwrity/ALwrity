@@ -193,7 +193,7 @@ const DONE_STEP: Step = {
   target: '[data-tour="li-tour-trigger"]',
   title: "You're all set!",
   content:
-    'Replay this tour anytime from the Tour guide button. Start with Plan or Create — connect LinkedIn when you are ready to publish.',
+    "You're set. Start with Plan, draft in Create, review every word, then Publish when it sounds like you. Replay anytime from the Tour guide button.",
   placement: 'bottom',
   styles: DESKTOP_TOOLTIP_STYLE,
 };
@@ -240,9 +240,9 @@ const MOBILE_PUBLISH_STEP: Step = {
 
 const MOBILE_ANALYTICS_STEP: Step = {
   target: '[data-tour="li-mobile-analytics"]',
-  title: 'Analytics & Knowledge',
+  title: 'Analytics, Knowledge & Library',
   content:
-    'Scroll for your Analytics card and Knowledge Center — view post stats, open your library, and explore ALwrity features.',
+    'Three quick actions in one row — Analytics for post stats, Knowledge center for guides and coaching, Library for saved content.',
   placement: 'top',
   spotlightPadding: 10,
   styles: MOBILE_TOOLTIP_STYLE,
@@ -250,30 +250,42 @@ const MOBILE_ANALYTICS_STEP: Step = {
 };
 
 const MOBILE_COPILOT_STEP: Step = {
-  target: '[data-tour="li-mobile-copilot-bar"]',
+  target: '[data-tour="li-mobile-copilot-fab"]',
   title: 'Ask ALwrity Co-Pilot',
   content:
-    'Your sticky chat bar stays in the thumb zone. Tap anytime to ask for help drafting, refining, or planning LinkedIn content.',
+    'Your Co-Pilot sits at the bottom right — tap anytime to draft, refine, and plan. You stay in control of every post.',
   placement: 'top',
-  spotlightPadding: 6,
+  spotlightPadding: 8,
   styles: MOBILE_TOOLTIP_STYLE,
   floaterProps: VIEWPORT_FLOATER,
 };
 
 const TABLET_ANALYTICS_STEP: Step = {
   target: '[data-tour="li-mobile-analytics"]',
-  title: 'Analytics & Knowledge',
+  title: 'Analytics, Knowledge & Library',
   content:
-    'Scroll down to find your Analytics card and Knowledge Center tools — view post stats, open your library, and explore ALwrity features.',
+    'Analytics, Knowledge Center, and Library sit in one row — tap any icon to open stats, guides, or saved assets.',
   placement: 'top',
   styles: TABLET_TOOLTIP_STYLE,
+  floaterProps: VIEWPORT_FLOATER,
+};
+
+const MOBILE_CONNECT_STEP: Step = {
+  target: '[data-tour="li-profile-hub"]',
+  title: 'Connect when you are ready to publish',
+  content:
+    'Use Connect in your profile strip before your first post. Explore Plan and Create now — connect before you publish.',
+  placement: 'bottom',
+  spotlightPadding: 6,
+  styles: MOBILE_TOOLTIP_STYLE,
   floaterProps: VIEWPORT_FLOATER,
 };
 
 const COMPACT_DONE_STEP: Step = {
   target: '[data-tour="li-tour-trigger"]',
   title: "You're all set!",
-  content: 'Replay this tour from the Tour button. Try Plan or Create to make your first post.',
+  content:
+    "You're set. Start with Plan, draft in Create, review every word, then Publish when it sounds like you. Replay anytime from ? in the header.",
   placement: 'bottom',
   styles: MOBILE_TOOLTIP_STYLE,
   floaterProps: VIEWPORT_FLOATER,
@@ -307,12 +319,18 @@ export function buildLinkedInStudioTourSteps({
   variant = getTourViewportVariant(),
 }: BuildStudioTourStepsOptions): Step[] {
   const accountStep = connected ? CONNECTED_STEP : CONNECT_STEP;
+  const compactAccountStep = connected ? CONNECTED_STEP : MOBILE_CONNECT_STEP;
 
   if (variant === 'mobile') {
     return [
       adaptStepForCompact(WELCOME_STEP, MOBILE_TOOLTIP_STYLE),
-      { ...accountStep, styles: MOBILE_TOOLTIP_STYLE, floaterProps: VIEWPORT_FLOATER, placement: 'bottom' },
       MOBILE_WORKFLOW_STEP,
+      {
+        ...compactAccountStep,
+        styles: MOBILE_TOOLTIP_STYLE,
+        floaterProps: VIEWPORT_FLOATER,
+        placement: 'bottom',
+      },
       MOBILE_PLAN_STEP,
       MOBILE_CREATE_STEP,
       MOBILE_PUBLISH_STEP,
@@ -325,13 +343,13 @@ export function buildLinkedInStudioTourSteps({
   if (variant === 'tablet') {
     return [
       adaptStepForCompact(WELCOME_STEP, TABLET_TOOLTIP_STYLE),
+      { ...MOBILE_WORKFLOW_STEP, styles: TABLET_TOOLTIP_STYLE },
       {
-        ...accountStep,
+        ...compactAccountStep,
         styles: TABLET_TOOLTIP_STYLE,
         floaterProps: VIEWPORT_FLOATER,
         placement: 'bottom' as const,
       },
-      { ...MOBILE_WORKFLOW_STEP, styles: TABLET_TOOLTIP_STYLE },
       { ...MOBILE_PLAN_STEP, styles: TABLET_TOOLTIP_STYLE },
       { ...MOBILE_CREATE_STEP, styles: TABLET_TOOLTIP_STYLE },
       { ...MOBILE_PUBLISH_STEP, styles: TABLET_TOOLTIP_STYLE },
