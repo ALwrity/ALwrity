@@ -1,16 +1,18 @@
 """
-LinkedIn aggregate analytics routes (profile / org / landing).
+LinkedIn aggregate analytics routes (profile / org / landing / personal).
 
 Kept separate from linkedin_social_routes.py (file already >500 lines).
-Unipile aggregate analytics are not implemented yet — endpoints return 501.
+Personal Profile Growth uses Unipile post metrics; other aggregates stay 501.
 """
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from middleware.auth_middleware import get_current_user
 from models.linkedin_social_models import (
@@ -18,8 +20,22 @@ from models.linkedin_social_models import (
     LinkedInLandingAnalyticsResponse,
     LinkedInPersonalAnalyticsResponse,
 )
+from services.database import get_db
+from services.integrations.linkedin.analytics_dates import (
+    InvalidAnalyticsDateRange,
+    parse_range_request,
+)
 from services.integrations.linkedin.factory import get_linkedin_provider
+from services.integrations.linkedin.posts_service import (
+    PostsService,
+    PostsServiceError,
+    get_posts_service,
+)
 from services.integrations.linkedin.types import LinkedInNotConnectedError
+from services.integrations.linkedin.unipile_client import UnipileAPIError
+from services.integrations.linkedin.unipile_personal_analytics import (
+    build_personal_analytics_payload,
+)
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 
 router = APIRouter(prefix="/api/linkedin-social", tags=["LinkedIn Social Analytics"])
@@ -63,15 +79,54 @@ async def get_personal_analytics(
     start_date: Optional[str] = Query(None, alias="startDate"),
     end_date: Optional[str] = Query(None, alias="endDate"),
     current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    posts_service: PostsService = Depends(get_posts_service),
 ) -> LinkedInPersonalAnalyticsResponse:
-    """Personal aggregate analytics — not yet available via Unipile."""
+    """
+    Personal Profile Growth aggregates from Unipile post metrics.
+
+    Sums lifetime metrics for posts published in the selected window.
+    """
     user_id = _user_id(current_user)
-    _ensure_connected(user_id)
-    logger.info(
-        f"[LinkedInAnalytics] personal unavailable (Unipile) user_id={user_id} "
-        f"preset_days={preset_days} start={start_date} end={end_date}"
-    )
-    raise HTTPException(status_code=501, detail=_UNAVAILABLE)
+    try:
+        if preset_days is not None and preset_days not in (7, 14, 28, 90, 365):
+            raise InvalidAnalyticsDateRange(
+                "presetDays must be one of 7, 14, 28, 90, or 365."
+            )
+        date_range = parse_range_request(
+            today=date.today(),
+            preset_days=preset_days,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        payload = await build_personal_analytics_payload(
+            user_id,
+            date_range,
+            db=db,
+            posts_service=posts_service,
+            oauth_service=_oauth_service,
+        )
+        return LinkedInPersonalAnalyticsResponse(**payload)
+    except InvalidAnalyticsDateRange as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LinkedInNotConnectedError as exc:
+        raise HTTPException(status_code=401, detail=str(exc)) from exc
+    except PostsServiceError as exc:
+        cause = exc.cause
+        if isinstance(cause, UnipileAPIError):
+            status_code = cause.status_code or 502
+            raise HTTPException(status_code=status_code, detail=str(cause)) from exc
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except UnipileAPIError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception(
+            f"[LinkedInAnalytics] personal failed user_id={user_id}: {exc}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to load personal LinkedIn analytics",
+        ) from exc
 
 
 @router.get("/analytics/profile", response_model=LinkedInAnalyticsResponse)

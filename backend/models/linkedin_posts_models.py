@@ -30,6 +30,11 @@ class PostEngagementMetrics(BaseModel):
         default=0,
         description="Number of followers gained from this post"
     )
+    reach: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Users reached (Unipile analytics); null when not available from cache",
+    )
 
 
 class PostAuthor(BaseModel):

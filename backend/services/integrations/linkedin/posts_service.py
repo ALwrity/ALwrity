@@ -89,8 +89,13 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
     comments = unipile_item.get("comment_counter", 0) or analytics.get("comments", 0)
     reposts = unipile_item.get("repost_counter", 0) or analytics.get("reposts", 0)
     impressions = unipile_item.get("impressions_counter", 0) or analytics.get("impressions", 0)
-    clicks = analytics.get("clicks", 0)
-    followers_gained = analytics.get("followers_gained_from_this_post", 0)
+    clicks = analytics.get("clicks", 0) or analytics.get("clicks_counter", 0)
+    followers_gained = (
+        analytics.get("followers_gained_from_this_post", 0)
+        or analytics.get("followers_gained_from_this_post_counter", 0)
+    )
+    reach_raw = analytics.get("users_reached_counter")
+    reach = int(reach_raw) if reach_raw is not None else None
 
     # Calculate engagement rate
     total_engagements = reactions + comments + reposts + clicks
@@ -104,6 +109,7 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
         engagement_rate=engagement_rate,
         clicks=max(0, clicks),
         followers_gained=max(0, followers_gained),
+        reach=max(0, reach) if reach is not None else None,
     )
 
 
