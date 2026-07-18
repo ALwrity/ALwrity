@@ -22,6 +22,8 @@ export const commentAssistantApi = {
   async fetchInbox(params?: {
     priority?: CommentAssistantPriority;
     refresh?: boolean;
+    /** Analytics post headers only (progressive UI; no Unipile). */
+    shell?: boolean;
   }): Promise<CommentAssistantInboxResponse> {
     const { data } = await aiApiClient.get<CommentAssistantInboxResponse>(
       `${BASE}/inbox`,
@@ -29,6 +31,7 @@ export const commentAssistantApi = {
         params: {
           priority: params?.priority ?? 'needs_reply',
           refresh: params?.refresh ?? false,
+          shell: params?.shell ?? false,
         },
       }
     );

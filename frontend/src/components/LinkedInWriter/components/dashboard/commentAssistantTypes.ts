@@ -100,10 +100,14 @@ export interface CommentAssistantPostGroupApi {
   post_text?: string;
   comment_count_hint?: number;
   comments: CommentAssistantCommentApi[];
+  /** True while progressive shell is waiting for comments. */
+  comments_pending?: boolean;
   has_more_comments?: boolean;
   comments_cursor?: string | null;
   error?: string | null;
 }
+
+export type CommentAssistantEmptyReason = 'no_analytics' | 'no_candidates';
 
 export interface CommentAssistantInboxResponse {
   groups: CommentAssistantPostGroupApi[];
@@ -115,6 +119,8 @@ export interface CommentAssistantInboxResponse {
   last_synced_at?: string | null;
   /** True when served from workspace cache within TTL. */
   from_cache?: boolean;
+  /** Why inbox is empty when groups length is 0. */
+  empty_reason?: CommentAssistantEmptyReason | null;
 }
 
 export interface CommentAssistantLikeResponse {

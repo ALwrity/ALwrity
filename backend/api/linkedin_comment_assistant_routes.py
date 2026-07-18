@@ -33,7 +33,7 @@ from services.linkedin_comment_assistant_cache_service import (
     mask_user_id,
 )
 from services.linkedin_comment_assistant_inbox import get_comment_assistant_inbox
-from services.linkedin_comment_assistant_service import like_comment
+from services.linkedin_comment_assistant_reactions import like_comment
 from services.linkedin_post_comments_service import (
     LinkedInPostCommentsNotAvailableError,
     LinkedInPostCommentsValidationError,
@@ -186,16 +186,21 @@ async def get_inbox(
         False,
         description="Bypass workspace cache and refetch comments from LinkedIn (Sync)",
     ),
+    shell: bool = Query(
+        False,
+        description="Return analytics post headers only (progressive load; no Unipile)",
+    ),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> CommentAssistantInboxResponse:
     """Return post-grouped inbox comments for the connected user."""
     user_id = _user_id(current_user)
     logger.info(
-        "[CommentAssistant] GET inbox user={} priority={} refresh={}",
+        "[CommentAssistant] GET inbox user={} priority={} refresh={} shell={}",
         mask_user_id(user_id),
         priority,
         refresh,
+        shell,
     )
     try:
         result = await get_comment_assistant_inbox(
@@ -203,12 +208,16 @@ async def get_inbox(
             db,
             priority=priority,
             refresh=refresh,
+            shell=shell,
         )
         logger.info(
-            "[CommentAssistant] GET inbox ok user={} from_cache={} groups={} counts={}",
+            "[CommentAssistant] GET inbox ok user={} from_cache={} shell={} "
+            "groups={} empty_reason={} counts={}",
             mask_user_id(user_id),
             result.from_cache,
+            shell,
             len(result.groups),
+            result.empty_reason,
             result.counts,
         )
         return result

@@ -29,6 +29,18 @@ export const COMMENT_ASSISTANT_EMPTY = {
   },
 } as const;
 
+/** Shown when post analytics has never been synced (not “caught up”). */
+export const COMMENT_ASSISTANT_EMPTY_NO_ANALYTICS = {
+  title: 'Load your posts first',
+  desc: 'Comment Assistant needs your recent LinkedIn posts. Open Post Engagement Pulse or Sync analytics, then come back here.',
+} as const;
+
+/** Posts exist but none have comments yet. */
+export const COMMENT_ASSISTANT_EMPTY_NO_CANDIDATES = {
+  title: 'No comments on recent posts yet',
+  desc: 'When someone comments on your posts, they’ll show up here so you can reply in one place.',
+} as const;
+
 export const COMMENT_ASSISTANT_LOADING = 'Loading comments on your posts…';
 export const COMMENT_ASSISTANT_LOADING_COMMENTS = 'Loading comments…';
 
@@ -39,8 +51,13 @@ export const COMMENT_ASSISTANT_NOT_CONNECTED = {
 
 export const COMMENT_ASSISTANT_SYNC = 'Sync comments';
 export const COMMENT_ASSISTANT_SYNCING = 'Syncing…';
-export const COMMENT_ASSISTANT_COOLDOWN = (seconds: number) =>
-  `Please wait ${seconds}s before syncing again.`;
+export const COMMENT_ASSISTANT_COOLDOWN = (seconds: number) => {
+  if (seconds >= 60) {
+    const minutes = Math.max(1, Math.ceil(seconds / 60));
+    return `Please wait about ${minutes} min before syncing again.`;
+  }
+  return `Please wait ${seconds}s before syncing again.`;
+};
 
 export const COMMENT_ASSISTANT_LAST_UPDATED = (relative: string) =>
   `Last updated ${relative}`;

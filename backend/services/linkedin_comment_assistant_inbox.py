@@ -24,6 +24,7 @@ from services.linkedin_comment_assistant_service import (
     build_comment_assistant_inbox_live,
     filter_groups_by_priority,
 )
+from services.linkedin_comment_assistant_shell import build_comment_assistant_inbox_shell
 
 
 def _iso_utc(dt: datetime) -> str:
@@ -48,6 +49,7 @@ def _with_priority(
         counts=full.counts,
         last_synced_at=last_synced_at,
         from_cache=from_cache,
+        empty_reason=full.empty_reason,
     )
 
 
@@ -57,14 +59,24 @@ async def get_comment_assistant_inbox(
     *,
     priority: CommentAssistantPriority = "needs_reply",
     refresh: bool = False,
+    shell: bool = False,
     oauth: Optional[LinkedInOAuthService] = None,
     ttl_seconds: int = DEFAULT_TTL_SECONDS,
 ) -> CommentAssistantInboxResponse:
     """
     Serve inbox from workspace cache when fresh; otherwise live Unipile build.
 
-    ``refresh=True`` (Sync) bypasses TTL and overwrites the cache.
+    ``refresh=True`` (Sync / Retry) bypasses TTL and overwrites the cache.
+    ``shell=True`` returns analytics post headers only (progressive UI).
     """
+    if shell:
+        logger.info(
+            "[CommentAssistant] inbox shell user={} priority={}",
+            mask_user_id(user_id),
+            priority,
+        )
+        return build_comment_assistant_inbox_shell(user_id, db, priority=priority)
+
     cache = LinkedInCommentAssistantCacheService(db)
 
     if not refresh:

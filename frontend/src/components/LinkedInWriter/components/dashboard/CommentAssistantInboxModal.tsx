@@ -8,6 +8,8 @@ import { colors } from '../GrowthEngine/styles';
 import {
   COMMENT_ASSISTANT_COOLDOWN,
   COMMENT_ASSISTANT_EMPTY,
+  COMMENT_ASSISTANT_EMPTY_NO_ANALYTICS,
+  COMMENT_ASSISTANT_EMPTY_NO_CANDIDATES,
   COMMENT_ASSISTANT_INBOX_HINT,
   COMMENT_ASSISTANT_INTRO,
   COMMENT_ASSISTANT_LAST_UPDATED,
@@ -48,6 +50,7 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     statusMessage,
     cooldownLeft,
     lastSyncedAt,
+    emptyReason,
     syncDisabled,
     handleSync,
     retryPost,
@@ -71,9 +74,16 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     });
   }, [open, groups]);
 
-  const emptyCopy = tab === 'manual' ? null : COMMENT_ASSISTANT_EMPTY[tab];
-  const showGroups =
-    connected && loadState === 'ready' && groups.length > 0 && tab !== 'manual';
+  const emptyCopy =
+    tab === 'manual'
+      ? null
+      : emptyReason === 'no_analytics'
+        ? COMMENT_ASSISTANT_EMPTY_NO_ANALYTICS
+        : emptyReason === 'no_candidates'
+          ? COMMENT_ASSISTANT_EMPTY_NO_CANDIDATES
+          : COMMENT_ASSISTANT_EMPTY[tab];
+  /** Show shell headers while comments load; keep groups during refresh. */
+  const showGroups = connected && groups.length > 0 && tab !== 'manual';
   const showEmpty =
     connected &&
     loadState === 'ready' &&
@@ -81,6 +91,8 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
     !error &&
     emptyCopy &&
     tab !== 'manual';
+  const showLoadingPlaceholders =
+    connected && loadState === 'loading' && groups.length === 0 && tab !== 'manual';
 
   return (
     <DashboardActionModal
@@ -226,32 +238,35 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
             </div>
           )}
 
-          {connected && loadState === 'loading' && (
-            <div>
-              <div
+          {connected && loadState === 'loading' && tab !== 'manual' && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 12,
+                color: colors.textSecondary,
+                marginBottom: 10,
+              }}
+            >
+              <span
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  fontSize: 12,
-                  color: colors.textSecondary,
-                  marginBottom: 10,
+                  display: 'inline-block',
+                  width: 14,
+                  height: 14,
+                  border: '2px solid #d1d5db',
+                  borderTopColor: colors.primary,
+                  borderRadius: '50%',
+                  animation: 'ca-inbox-spin 0.7s linear infinite',
                 }}
-              >
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: 14,
-                    height: 14,
-                    border: '2px solid #d1d5db',
-                    borderTopColor: colors.primary,
-                    borderRadius: '50%',
-                    animation: 'ca-inbox-spin 0.7s linear infinite',
-                  }}
-                />
-                {COMMENT_ASSISTANT_LOADING}
-                <style>{`@keyframes ca-inbox-spin { to { transform: rotate(360deg); } }`}</style>
-              </div>
+              />
+              {COMMENT_ASSISTANT_LOADING}
+              <style>{`@keyframes ca-inbox-spin { to { transform: rotate(360deg); } }`}</style>
+            </div>
+          )}
+
+          {showLoadingPlaceholders && (
+            <div>
               <CommentAssistantPostGroupSkeleton />
               <CommentAssistantPostGroupSkeleton />
             </div>
@@ -295,7 +310,7 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
                   onToggleExpanded={() =>
                     setExpandedPostId((prev) => (prev === g.postId ? null : g.postId))
                   }
-                  actionsEnabled={connected && !g.error}
+                  actionsEnabled={connected && !g.error && loadState === 'ready'}
                   onReact={(commentId, reactionType) =>
                     void handleReact(g.postId, g.socialId, commentId, reactionType)
                   }

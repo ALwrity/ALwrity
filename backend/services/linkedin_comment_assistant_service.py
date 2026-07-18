@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 from models.linkedin_comment_assistant_models import (
     CommentAssistantCommentItem,
     CommentAssistantInboxResponse,
-    CommentAssistantLikeResponse,
     CommentAssistantPostGroup,
     CommentAssistantPriority,
     CommentAssistantReplyPreview,
@@ -49,7 +48,8 @@ from services.linkedin_post_comments_service import (
 # Guardrails from the implementation plan (safe Unipile fan-out).
 MAX_POSTS = 12
 COMMENTS_PER_POST = 15
-MAX_REPLY_CHECKS_PER_POST = 5
+# Check replies for every first-page comment that has a reply thread.
+MAX_REPLY_CHECKS_PER_POST = COMMENTS_PER_POST
 POST_CONCURRENCY = 3
 OLDER_DAYS = 14
 POST_SNIPPET_LEN = 160
@@ -128,7 +128,7 @@ def _is_me(author_id: Optional[str], me_ids: set[str]) -> bool:
     return author_id.strip().lower() in me_ids
 
 
-def _select_candidate_posts(posts: list[LinkedInPost]) -> list[LinkedInPost]:
+def select_candidate_posts(posts: list[LinkedInPost]) -> list[LinkedInPost]:
     """Newest posts with social_id and comments > 0, capped."""
     candidates: list[LinkedInPost] = []
     for post in posts:
@@ -143,7 +143,8 @@ def _select_candidate_posts(posts: list[LinkedInPost]) -> list[LinkedInPost]:
     return candidates
 
 
-def _post_snippet(text: str) -> str:
+def post_snippet(text: str) -> str:
+    """Short plain-text preview for post headers."""
     cleaned = " ".join((text or "").split())
     if len(cleaned) <= POST_SNIPPET_LEN:
         return cleaned
@@ -290,7 +291,7 @@ async def _load_post_group(
 ) -> CommentAssistantPostGroup:
     social_id = (post.social_id or "").strip()
     full_text = (post.text or "").strip()
-    snippet = _post_snippet(full_text)
+    snippet = post_snippet(full_text)
     base = CommentAssistantPostGroup(
         post_id=post.id,
         social_id=social_id,
@@ -407,7 +408,7 @@ async def build_comment_assistant_inbox_live(
 
     analytics = LinkedInPostAnalyticsService(db)
     stored = analytics.get_stored_analytics(user_id)
-    candidates = _select_candidate_posts(stored.posts)
+    candidates = select_candidate_posts(stored.posts)
 
     logger.info(
         "[CommentAssistant] live build start user={} stored_posts={} candidates={} cap={}",
@@ -418,9 +419,11 @@ async def build_comment_assistant_inbox_live(
     )
 
     if not candidates:
+        empty_reason = "no_analytics" if len(stored.posts) == 0 else "no_candidates"
         logger.info(
-            "[CommentAssistant] live build empty user={} (no posts with comments+social_id)",
+            "[CommentAssistant] live build empty user={} reason={}",
             mask_user_id(user_id),
+            empty_reason,
         )
         return CommentAssistantInboxResponse(
             groups=[],
@@ -429,6 +432,7 @@ async def build_comment_assistant_inbox_live(
             older_days=OLDER_DAYS,
             counts={"needs_reply": 0, "active": 0, "older": 0},
             from_cache=False,
+            empty_reason=empty_reason,
         )
 
     client = UnipilePostCommentsClient()
@@ -480,80 +484,13 @@ async def build_comment_assistant_inbox_live(
     )
 
 
-async def like_comment(
-    user_id: str,
-    comment_id: str,
-    post_social_id: str,
-    *,
-    reaction_type: str = "like",
-    oauth: Optional[LinkedInOAuthService] = None,
-) -> CommentAssistantLikeResponse:
-    """Like a comment via Unipile v1 ``POST /api/v1/posts/reaction`` + comment_id."""
-    _ensure_unipile_provider()
-    parent_id = (comment_id or "").strip()
-    if not parent_id:
-        raise LinkedInPostCommentsValidationError("comment_id is required to like.")
-
-    social_id = (post_social_id or "").strip()
-    if not social_id:
-        raise LinkedInPostCommentsValidationError(
-            "post_social_id is required to like a comment."
-        )
-
-    oauth_service = oauth or LinkedInOAuthService()
-    account_id = _resolve_account_id(user_id, oauth_service)
-    normalized_type = (reaction_type or "like").strip().lower() or "like"
-
-    logger.info(
-        "[CommentAssistant] Unipile like start user={} comment_id={} social_id={} type={}",
-        mask_user_id(user_id),
-        parent_id,
-        social_id,
-        normalized_type,
-    )
-
-    client = UnipilePostCommentsClient()
-    try:
-        await client.add_post_reaction(
-            account_id,
-            social_id,
-            comment_id=parent_id,
-            reaction_type=normalized_type,
-        )
-    except ValueError as exc:
-        logger.warning(
-            "[CommentAssistant] Unipile like validation user={} err={}",
-            mask_user_id(user_id),
-            exc,
-        )
-        raise LinkedInPostCommentsValidationError(str(exc)) from exc
-    except Exception:
-        logger.warning(
-            "[CommentAssistant] Unipile like fail user={} comment_id={} social_id={}",
-            mask_user_id(user_id),
-            parent_id,
-            social_id,
-        )
-        raise
-
-    logger.info(
-        "[CommentAssistant] Unipile like ok user={} comment_id={} type={}",
-        mask_user_id(user_id),
-        parent_id,
-        normalized_type,
-    )
-    return CommentAssistantLikeResponse(
-        success=True,
-        comment_id=parent_id,
-        reaction_type=normalized_type,
-    )
-
-
 # Re-export errors used by routes for a single import surface.
 __all__ = [
     "build_comment_assistant_inbox_live",
     "filter_groups_by_priority",
-    "like_comment",
+    "select_candidate_posts",
+    "post_snippet",
+    "OLDER_DAYS",
     "LinkedInPostCommentsNotAvailableError",
     "LinkedInPostCommentsValidationError",
     "LinkedInNotConnectedError",

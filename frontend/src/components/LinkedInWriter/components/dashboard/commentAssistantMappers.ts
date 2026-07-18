@@ -74,7 +74,9 @@ export function mapGroupToView(
     socialId: group.social_id,
     postSnippet: group.post_snippet || '',
     postText: fullText,
-    comments: (group.comments || []).map(mapCommentToView),
+    comments: group.comments_pending
+      ? null
+      : (group.comments || []).map(mapCommentToView),
     error: group.error || null,
     hasMoreComments: Boolean(group.has_more_comments),
     commentsCursor: group.comments_cursor || null,

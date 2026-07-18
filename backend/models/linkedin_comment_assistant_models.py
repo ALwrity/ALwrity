@@ -75,12 +75,19 @@ class CommentAssistantPostGroup(BaseModel):
         description="Engagement comment count from post analytics (hint only)",
     )
     comments: list[CommentAssistantCommentItem] = Field(default_factory=list)
+    comments_pending: bool = Field(
+        default=False,
+        description="True for progressive shell rows while comments are still loading",
+    )
     has_more_comments: bool = False
     comments_cursor: Optional[str] = None
     error: Optional[str] = Field(
         default=None,
         description="Soft-fail message when this post's comments could not load",
     )
+
+
+CommentAssistantEmptyReason = Literal["no_analytics", "no_candidates"]
 
 
 class CommentAssistantInboxResponse(BaseModel):
@@ -101,6 +108,10 @@ class CommentAssistantInboxResponse(BaseModel):
     from_cache: bool = Field(
         default=False,
         description="True when served from workspace cache within TTL",
+    )
+    empty_reason: Optional[CommentAssistantEmptyReason] = Field(
+        default=None,
+        description="Set when inbox has no groups: no analytics posts vs no comment candidates",
     )
 
 

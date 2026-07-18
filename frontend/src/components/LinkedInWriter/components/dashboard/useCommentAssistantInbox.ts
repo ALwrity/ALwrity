@@ -10,18 +10,20 @@ import {
 } from '../../../../services/commentAssistantApi';
 import { linkedInWriterApi } from '../../../../services/linkedInWriterApi';
 import { postCommentsApi } from '../../../../services/postCommentsApi';
-import { formatTimeLabel, mapGroupToView } from './commentAssistantMappers';
+import { loadCommentAssistantInbox } from './commentAssistantInboxLoad';
+import { formatTimeLabel } from './commentAssistantMappers';
 import type { CommentAssistantReplyPayload } from './commentAssistantReplyComposer';
 import type { CommentAssistantReactionType } from './commentAssistantReactions';
 import type {
   CommentAssistantCommentView,
+  CommentAssistantEmptyReason,
   CommentAssistantPostGroupView,
   CommentAssistantReplyView,
   CommentAssistantTab,
 } from './commentAssistantTypes';
 
-/** Client spam guard; server cache TTL is 5 minutes. */
-const SYNC_COOLDOWN_MS = 60_000;
+/** Match server cache TTL so Sync cannot hammer Unipile every minute. */
+const SYNC_COOLDOWN_MS = 300_000;
 
 type InboxLoadState = 'idle' | 'loading' | 'ready';
 
@@ -73,8 +75,16 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const [emptyReason, setEmptyReason] = useState<CommentAssistantEmptyReason | null>(
+    null
+  );
   const requestIdRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
+  const groupsRef = useRef<CommentAssistantPostGroupView[]>([]);
+
+  useEffect(() => {
+    groupsRef.current = groups;
+  }, [groups]);
 
   const clearStatusTimer = useCallback(() => {
     if (statusTimerRef.current != null) {
@@ -107,6 +117,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     setActionError('');
     setStatusMessage(null);
     setLastSyncedAt(null);
+    setEmptyReason(null);
   }, [clearStatusTimer]);
 
   const loadInbox = useCallback(
@@ -115,6 +126,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         setGroups([]);
         setLoadState('ready');
         setError('');
+        setEmptyReason(null);
         return;
       }
 
@@ -122,23 +134,31 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       setLoadState('loading');
       setError('');
       setActionError('');
+      // Keep existing groups visible while refreshing (stale-while-revalidate).
 
       try {
-        const data = await commentAssistantApi.fetchInbox({ priority, refresh });
-        if (reqId !== requestIdRef.current) return;
-        setGroups((data.groups || []).map(mapGroupToView));
-        setCounts({
-          needs_reply: data.counts?.needs_reply ?? 0,
-          active: data.counts?.active ?? 0,
-          older: data.counts?.older ?? 0,
+        const result = await loadCommentAssistantInbox({
+          priority,
+          refresh,
+          showShell: groupsRef.current.length === 0,
+          isCurrent: () => reqId === requestIdRef.current,
+          onShell: (partial) => {
+            setGroups(partial.groups);
+            setEmptyReason(partial.emptyReason);
+          },
         });
-        setLastSyncedAt(data.last_synced_at || null);
+        if (reqId !== requestIdRef.current) return;
+        setGroups(result.groups);
+        setCounts(result.counts);
+        setLastSyncedAt(result.lastSyncedAt);
+        setEmptyReason(result.emptyReason);
         setLoadState('ready');
       } catch (err) {
         if (reqId !== requestIdRef.current) return;
         setGroups([]);
         setCounts({});
         setLastSyncedAt(null);
+        setEmptyReason(null);
         setError(getCommentAssistantErrorMessage(err));
         setLoadState('ready');
       }
@@ -185,9 +205,12 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   }, [connected, loadState, tab, cooldownUntil, loadInbox]);
 
   const retryPost = useCallback(() => {
-    if (!isPriorityTab(tab)) return;
-    void loadInbox(tab, false);
-  }, [tab, loadInbox]);
+    if (!connected || loadState === 'loading' || !isPriorityTab(tab)) return;
+    // Must bypass cache — soft-failed posts are stored in the warm snapshot.
+    if (Date.now() < cooldownUntil) return;
+    setCooldownUntil(Date.now() + SYNC_COOLDOWN_MS);
+    void loadInbox(tab, true);
+  }, [connected, loadState, tab, cooldownUntil, loadInbox]);
 
   /** Patch a top-level comment or a nested reply (my_replies / threadReplies). */
   const updateComment = useCallback(
@@ -401,6 +424,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     statusMessage,
     cooldownLeft,
     lastSyncedAt,
+    emptyReason,
     syncDisabled:
       !connected || loadState === 'loading' || cooldownLeft > 0 || tab === 'manual',
     handleSync,
