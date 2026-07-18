@@ -72,8 +72,11 @@ export function getPostCommentsErrorMessage(err: unknown): string {
       return 'Post or comments not found. Re-sync analytics and try again.';
     }
 
-    if (errorCode === 'VALIDATION_ERROR' || status === 400) {
-      return detailText || 'Invalid comment request. Please check your input and try again.';
+    if (errorCode === 'VALIDATION_ERROR' || status === 400 || status === 422) {
+      return (
+        detailText ||
+        'Could not send that reply. Check your text or image and try again.'
+      );
     }
 
     if (status === 502) {
@@ -91,7 +94,9 @@ export function getPostCommentsErrorMessage(err: unknown): string {
     if (detailText) return detailText;
   }
 
-  if (err instanceof Error && err.message) return err.message;
+  if (err instanceof Error && err.message && !err.message.includes('[object Object]')) {
+    return err.message;
+  }
   return POST_COMMENTS_NOT_CONNECTED;
 }
 
@@ -100,6 +105,12 @@ export function getPostCommentsReplyErrorMessage(err: unknown): string {
   const message = getPostCommentsErrorMessage(err);
   if (message === POST_COMMENTS_NOT_CONNECTED) {
     return 'Could not post reply. Connect LinkedIn and try again.';
+  }
+  if (err && typeof err === 'object' && 'response' in err) {
+    const status = (err as { response?: { status?: number } }).response?.status;
+    if (status === 422) {
+      return 'Could not send your reply. Please try again in a moment.';
+    }
   }
   return message;
 }

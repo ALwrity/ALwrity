@@ -16,6 +16,7 @@ from loguru import logger
 from models.linkedin_post_comments_models import (
     PostCommentAuthor,
     PostCommentItem,
+    PostCommentMention,
     PostCommentReplyResponse,
     PostCommentsListResponse,
 )
@@ -91,6 +92,49 @@ def _iso_timestamp(value: Any) -> str:
     return str(value)
 
 
+def extract_comment_image_url(raw: dict[str, Any]) -> Optional[str]:
+    """Return attached image URL from a Unipile comment payload (v1/v2 shapes)."""
+    picture = raw.get("picture_url")
+    if isinstance(picture, str) and picture.strip():
+        return picture.strip()
+
+    attachments = raw.get("attachments")
+    if not isinstance(attachments, list):
+        return None
+
+    for att in attachments:
+        if not isinstance(att, dict):
+            continue
+        url = att.get("url")
+        if not isinstance(url, str) or not url.strip():
+            continue
+        att_type = str(att.get("type") or "img").lower()
+        if att_type in ("img", "image", "photo") or not att.get("type"):
+            return url.strip()
+    return None
+
+
+def extract_comment_author_id(raw: dict[str, Any]) -> Optional[str]:
+    """Extract author provider id from Unipile comment shapes."""
+    details = raw.get("author_details")
+    if isinstance(details, dict):
+        for key in ("id", "provider_id", "public_identifier"):
+            value = details.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    author = raw.get("author")
+    if isinstance(author, dict):
+        for key in ("id", "provider_id", "public_identifier"):
+            value = author.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    for key in ("author_id", "author_provider_id"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
 def _normalize_comment_item(
     raw: dict[str, Any],
     *,
@@ -106,6 +150,8 @@ def _normalize_comment_item(
 
     text = raw.get("text") or ""
     created_at = _iso_timestamp(raw.get("date") or raw.get("created_at"))
+    image_url = extract_comment_image_url(raw)
+    author_id = extract_comment_author_id(raw)
 
     reply_count = 0
     reaction_count = 0
@@ -123,7 +169,8 @@ def _normalize_comment_item(
     author_details = raw.get("author_details")
     if isinstance(author_details, dict):
         headline = author_details.get("headline")
-        avatar_url = author_details.get("profile_picture_url") or raw.get("picture_url")
+        # Do not use picture_url as avatar — that field is the comment image.
+        avatar_url = author_details.get("profile_picture_url")
         profile_url = author_details.get("profile_url")
         author_name = (
             (raw.get("author") if isinstance(raw.get("author"), str) else None)
@@ -169,12 +216,14 @@ def _normalize_comment_item(
             avatar_url=avatar_url,
             profile_url=profile_url,
         ),
+        author_id=author_id,
         created_at=created_at,
         reply_count=reply_count,
         reaction_count=reaction_count,
         impressions_count=impressions_count,
         user_reacted=user_reacted,
         parent_comment_id=resolved_parent,
+        image_url=image_url,
     )
 
 
@@ -256,9 +305,11 @@ async def reply_to_comment(
     comment_id: str,
     text: str,
     *,
+    mentions: Optional[list[PostCommentMention]] = None,
+    attachment: Optional[tuple[str, bytes, str]] = None,
     oauth: Optional[LinkedInOAuthService] = None,
 ) -> PostCommentReplyResponse:
-    """Reply to a comment on a post via Unipile."""
+    """Reply to a comment on a post via Unipile (optional mentions + image)."""
     _ensure_unipile_provider()
     resolved_social_id = _require_social_id(social_id)
     parent_id = (comment_id or "").strip()
@@ -273,15 +324,40 @@ async def reply_to_comment(
             "Reply text must be 1250 characters or fewer."
         )
 
+    mention_payload: list[dict[str, Any]] = []
+    if mentions:
+        for mention in mentions:
+            name = (mention.name or "").strip()
+            profile_id = (mention.profile_id or "").strip()
+            if name and profile_id:
+                mention_payload.append({"name": name, "profile_id": profile_id})
+
     oauth_service = oauth or LinkedInOAuthService()
     account_id = _resolve_account_id(user_id, oauth_service)
 
-    client = UnipilePostCommentsClient()
-    raw = await client.send_post_comment(
-        account_id,
+    logger.info(
+        "[PostComments] reply_to_comment user_id={} social_id={} parent={} "
+        "text_len={} mentions={} has_attachment={}",
+        user_id,
         resolved_social_id,
-        trimmed,
-        comment_id=parent_id,
+        parent_id,
+        len(trimmed),
+        len(mention_payload),
+        bool(attachment and attachment[1]),
     )
+
+    client = UnipilePostCommentsClient()
+    try:
+        raw = await client.send_post_comment(
+            account_id,
+            resolved_social_id,
+            trimmed,
+            comment_id=parent_id,
+            mentions=mention_payload or None,
+            attachment=attachment,
+        )
+    except ValueError as exc:
+        raise LinkedInPostCommentsValidationError(str(exc)) from exc
+
     new_id = raw.get("comment_id") if isinstance(raw, dict) else None
     return PostCommentReplyResponse(success=True, comment_id=str(new_id) if new_id else None)

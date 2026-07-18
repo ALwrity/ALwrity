@@ -13,6 +13,7 @@ export interface PostComment {
   id: string;
   text: string;
   author: PostCommentAuthor;
+  author_id?: string | null;
   created_at: string;
   reply_count: number;
   reaction_count: number;
@@ -21,6 +22,8 @@ export interface PostComment {
   user_reacted?: string | null;
   /** Set when this item is a nested reply under a parent comment. */
   parent_comment_id?: string | null;
+  /** Attached image URL when the comment includes media. */
+  image_url?: string | null;
 }
 
 export interface PostCommentsListResponse {
@@ -30,9 +33,15 @@ export interface PostCommentsListResponse {
   total_count?: number | null;
 }
 
+export interface PostCommentMention {
+  name: string;
+  profile_id: string;
+}
+
 export interface PostCommentReplyRequest {
   comment_id: string;
   text: string;
+  mentions?: PostCommentMention[];
 }
 
 export interface PostCommentReplyResponse {

@@ -237,7 +237,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       </DashboardActionModal>
 
       <EngagementBoosterModal open={engagementSub === 'booster'}       onClose={() => setEngagementSub(null)} connected={connected} />
-      <CommentAssistantModal  open={engagementSub === 'comment'}       onClose={() => setEngagementSub(null)} />
+      <CommentAssistantModal  open={engagementSub === 'comment'}       onClose={() => setEngagementSub(null)} connected={connected} />
       <OpportunitiesModal     open={engagementSub === 'opportunities'} onClose={() => setEngagementSub(null)} connected={connected} />
       <PostPulseModal         open={engagementSub === 'pulse'}         onClose={() => setEngagementSub(null)} connected={connected} />
       <NetworkAdvisorModal    open={engagementSub === 'network'}       onClose={() => setEngagementSub(null)} connected={connected} />

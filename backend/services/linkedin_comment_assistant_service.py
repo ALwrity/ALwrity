@@ -1,0 +1,498 @@
+"""
+Comment Assistant inbox aggregation (Issue #73).
+
+Selects capped posts with comments from post-analytics cache, lists Unipile
+comments with limited concurrency, classifies Needs reply / Active / Older.
+Soft-fails per post so one Unipile error never blanks the whole inbox.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+
+from loguru import logger
+from sqlalchemy.orm import Session
+
+from models.linkedin_comment_assistant_models import (
+    CommentAssistantCommentItem,
+    CommentAssistantInboxResponse,
+    CommentAssistantPostGroup,
+    CommentAssistantPriority,
+    CommentAssistantReplyPreview,
+)
+from models.linkedin_post_comments_models import PostCommentAuthor
+from models.linkedin_posts_models import LinkedInPost
+from services.integrations.linkedin.types import LinkedInNotConnectedError
+from services.integrations.linkedin.unipile_client import (
+    UnipileAPIError,
+    UnipileClient,
+    personal_profile_provider_id_from_owner,
+)
+from services.integrations.linkedin.unipile_post_comments_client import (
+    UnipilePostCommentsClient,
+)
+from services.integrations.linkedin_oauth import LinkedInOAuthService
+from services.linkedin_post_analytics_service import LinkedInPostAnalyticsService
+from services.linkedin_comment_assistant_cache_service import mask_user_id
+from services.linkedin_post_comments_service import (
+    LinkedInPostCommentsNotAvailableError,
+    LinkedInPostCommentsValidationError,
+    _ensure_unipile_provider,
+    _iso_timestamp,
+    _resolve_account_id,
+    extract_comment_image_url,
+)
+
+# Guardrails from the implementation plan (safe Unipile fan-out).
+MAX_POSTS = 12
+COMMENTS_PER_POST = 15
+# Check replies for every first-page comment that has a reply thread.
+MAX_REPLY_CHECKS_PER_POST = COMMENTS_PER_POST
+POST_CONCURRENCY = 3
+OLDER_DAYS = 14
+POST_SNIPPET_LEN = 160
+
+
+def _parse_created_at(value: str) -> Optional[datetime]:
+    """Best-effort parse of ISO / Unipile timestamps to aware UTC datetime."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    try:
+        if raw.endswith("Z"):
+            raw = raw[:-1] + "+00:00"
+        dt = datetime.fromisoformat(raw)
+        if dt.tzinfo is None:
+            return dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _collect_me_ids(owner: dict[str, Any]) -> set[str]:
+    """Identity keys used to detect comments/replies authored by the connected user."""
+    ids: set[str] = set()
+    provider_id = personal_profile_provider_id_from_owner(owner)
+    if provider_id:
+        ids.add(provider_id.lower())
+    for key in ("public_identifier", "provider_id", "id", "entity_urn", "member_urn"):
+        value = owner.get(key)
+        if isinstance(value, str) and value.strip():
+            ids.add(value.strip().lower())
+    return ids
+
+
+def _raw_author_id(raw: dict[str, Any]) -> Optional[str]:
+    """Extract author id from Unipile comment shapes."""
+    details = raw.get("author_details")
+    if isinstance(details, dict):
+        for key in ("id", "provider_id", "public_identifier"):
+            value = details.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    author = raw.get("author")
+    if isinstance(author, dict):
+        for key in ("id", "provider_id", "public_identifier"):
+            value = author.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    for key in ("author_id", "author_provider_id"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
+
+
+def _raw_author_name(raw: dict[str, Any]) -> str:
+    details = raw.get("author_details")
+    if isinstance(details, dict) and details.get("name"):
+        return str(details["name"])
+    author = raw.get("author")
+    if isinstance(author, str) and author.strip():
+        return author.strip()
+    if isinstance(author, dict):
+        return str(
+            author.get("name")
+            or author.get("public_identifier")
+            or author.get("provider_id")
+            or "Unknown"
+        )
+    return "Unknown"
+
+
+def _is_me(author_id: Optional[str], me_ids: set[str]) -> bool:
+    if not author_id or not me_ids:
+        return False
+    return author_id.strip().lower() in me_ids
+
+
+def select_candidate_posts(posts: list[LinkedInPost]) -> list[LinkedInPost]:
+    """Newest posts with social_id and comments > 0, capped."""
+    candidates: list[LinkedInPost] = []
+    for post in posts:
+        social_id = (post.social_id or "").strip()
+        if not social_id:
+            continue
+        if int(post.engagement.comments or 0) <= 0:
+            continue
+        candidates.append(post)
+        if len(candidates) >= MAX_POSTS:
+            break
+    return candidates
+
+
+def post_snippet(text: str) -> str:
+    """Short plain-text preview for post headers."""
+    cleaned = " ".join((text or "").split())
+    if len(cleaned) <= POST_SNIPPET_LEN:
+        return cleaned
+    return cleaned[: POST_SNIPPET_LEN - 1].rstrip() + "…"
+
+
+def _normalize_reply_preview(
+    raw: dict[str, Any],
+    *,
+    me_ids: set[str],
+) -> Optional[CommentAssistantReplyPreview]:
+    reply_id = raw.get("id") or raw.get("provider_id")
+    if not reply_id:
+        return None
+    author_id = _raw_author_id(raw)
+    is_mine = _is_me(author_id, me_ids)
+    user_reacted_raw = raw.get("user_reacted")
+    user_reacted = str(user_reacted_raw) if user_reacted_raw else None
+    if raw.get("has_liked_comment") is True and not user_reacted:
+        user_reacted = "LIKE"
+    return CommentAssistantReplyPreview(
+        id=str(reply_id),
+        text=str(raw.get("text") or ""),
+        author_name="You" if is_mine else _raw_author_name(raw),
+        author_id=author_id,
+        created_at=_iso_timestamp(raw.get("date") or raw.get("created_at")),
+        is_mine=is_mine,
+        image_url=extract_comment_image_url(raw),
+        reaction_count=int(
+            raw.get("reaction_counter") or raw.get("comment_like_count") or 0
+        ),
+        user_reacted=user_reacted,
+    )
+
+
+def _normalize_inbox_comment(
+    raw: dict[str, Any],
+    *,
+    me_ids: set[str],
+    older_cutoff: datetime,
+    i_replied: bool,
+    my_replies: Optional[list[CommentAssistantReplyPreview]] = None,
+) -> Optional[CommentAssistantCommentItem]:
+    comment_id = raw.get("id") or raw.get("provider_id")
+    if not comment_id:
+        return None
+
+    author_id = _raw_author_id(raw)
+    created_at = _iso_timestamp(raw.get("date") or raw.get("created_at"))
+    created_dt = _parse_created_at(created_at)
+    reply_count = int(raw.get("reply_counter") or raw.get("child_comment_count") or 0)
+    reaction_count = int(raw.get("reaction_counter") or raw.get("comment_like_count") or 0)
+    user_reacted_raw = raw.get("user_reacted")
+    user_reacted = str(user_reacted_raw) if user_reacted_raw else None
+    if raw.get("has_liked_comment") is True and not user_reacted:
+        user_reacted = "LIKE"
+
+    details = raw.get("author_details") if isinstance(raw.get("author_details"), dict) else {}
+    author = PostCommentAuthor(
+        name=_raw_author_name(raw),
+        headline=details.get("headline") if details else None,
+        # Do not use picture_url as avatar — that field is the comment image.
+        avatar_url=details.get("profile_picture_url") if details else None,
+        profile_url=details.get("profile_url") if details else None,
+    )
+
+    # Skip own top-level comments from triage inbox.
+    if _is_me(author_id, me_ids):
+        return None
+
+    is_older = bool(created_dt and created_dt < older_cutoff)
+    if is_older:
+        priority: str = "older"
+        needs_reply = False
+    elif i_replied:
+        priority = "active"
+        needs_reply = False
+    else:
+        priority = "needs_reply"
+        needs_reply = True
+
+    return CommentAssistantCommentItem(
+        id=str(comment_id),
+        text=str(raw.get("text") or ""),
+        author=author,
+        author_id=author_id,
+        created_at=created_at,
+        reply_count=reply_count,
+        reaction_count=reaction_count,
+        user_reacted=user_reacted,
+        image_url=extract_comment_image_url(raw),
+        needs_reply=needs_reply,
+        priority=priority,  # type: ignore[arg-type]
+        my_replies=my_replies or [],
+    )
+
+
+async def _fetch_my_replies_in_thread(
+    client: UnipilePostCommentsClient,
+    account_id: str,
+    social_id: str,
+    parent_comment_id: str,
+    me_ids: set[str],
+) -> list[CommentAssistantReplyPreview]:
+    """Best-effort: first page of replies authored by the connected user."""
+    try:
+        raw = await client.list_post_comments(
+            account_id,
+            social_id,
+            limit=10,
+            sort_by="MOST_RECENT",
+            comment_id=parent_comment_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "[CommentAssistant] reply check failed social_id={} comment_id={}: {}",
+            social_id,
+            parent_comment_id,
+            exc,
+        )
+        return []
+
+    items = raw.get("items") if isinstance(raw, dict) else None
+    if not isinstance(items, list):
+        return []
+
+    mine: list[CommentAssistantReplyPreview] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        preview = _normalize_reply_preview(item, me_ids=me_ids)
+        if preview and preview.is_mine:
+            mine.append(preview)
+    return mine
+
+
+async def _load_post_group(
+    client: UnipilePostCommentsClient,
+    account_id: str,
+    post: LinkedInPost,
+    me_ids: set[str],
+    older_cutoff: datetime,
+    semaphore: asyncio.Semaphore,
+) -> CommentAssistantPostGroup:
+    social_id = (post.social_id or "").strip()
+    full_text = (post.text or "").strip()
+    snippet = post_snippet(full_text)
+    base = CommentAssistantPostGroup(
+        post_id=post.id,
+        social_id=social_id,
+        post_snippet=snippet,
+        post_text=full_text,
+        comment_count_hint=int(post.engagement.comments or 0),
+    )
+
+    async with semaphore:
+        logger.info(
+            "[CommentAssistant] Unipile list comments social_id={} limit={}",
+            social_id,
+            COMMENTS_PER_POST,
+        )
+        try:
+            raw = await client.list_post_comments(
+                account_id,
+                social_id,
+                limit=COMMENTS_PER_POST,
+                sort_by="MOST_RECENT",
+            )
+        except Exception as exc:
+            logger.warning(
+                "[CommentAssistant] Unipile list fail soft social_id={} err={}",
+                social_id,
+                type(exc).__name__,
+            )
+            base.error = "Could not load comments for this post. Try again later."
+            return base
+
+    items_raw = raw.get("items") if isinstance(raw, dict) else None
+    if not isinstance(items_raw, list):
+        items_raw = []
+
+    reply_checks = 0
+    comments: list[CommentAssistantCommentItem] = []
+    for item in items_raw:
+        if not isinstance(item, dict):
+            continue
+        comment_id = str(item.get("id") or item.get("provider_id") or "")
+        reply_count = int(item.get("reply_counter") or item.get("child_comment_count") or 0)
+        my_replies: list[CommentAssistantReplyPreview] = []
+        if comment_id and reply_count > 0 and reply_checks < MAX_REPLY_CHECKS_PER_POST:
+            reply_checks += 1
+            my_replies = await _fetch_my_replies_in_thread(
+                client, account_id, social_id, comment_id, me_ids
+            )
+
+        normalized = _normalize_inbox_comment(
+            item,
+            me_ids=me_ids,
+            older_cutoff=older_cutoff,
+            i_replied=bool(my_replies),
+            my_replies=my_replies,
+        )
+        if normalized:
+            comments.append(normalized)
+
+    cursor = raw.get("cursor") if isinstance(raw, dict) else None
+    cursor_str = str(cursor) if cursor else None
+    base.comments = comments
+    base.has_more_comments = bool(cursor_str)
+    base.comments_cursor = cursor_str
+    logger.info(
+        "[CommentAssistant] Unipile list ok social_id={} comments={} soft_error={}",
+        social_id,
+        len(comments),
+        bool(base.error),
+    )
+    return base
+
+
+def filter_groups_by_priority(
+    groups: list[CommentAssistantPostGroup],
+    priority: CommentAssistantPriority,
+) -> list[CommentAssistantPostGroup]:
+    """Filter cached/live groups for a priority tab (soft-fail shells kept)."""
+    if priority == "all":
+        return groups
+
+    filtered: list[CommentAssistantPostGroup] = []
+    for group in groups:
+        if group.error and not group.comments:
+            filtered.append(group)
+            continue
+        matching = [c for c in group.comments if c.priority == priority]
+        if matching or group.error:
+            filtered.append(group.model_copy(update={"comments": matching}))
+    return filtered
+
+
+def _count_priorities(groups: list[CommentAssistantPostGroup]) -> dict[str, int]:
+    counts = {"needs_reply": 0, "active": 0, "older": 0}
+    for group in groups:
+        for comment in group.comments:
+            counts[comment.priority] = counts.get(comment.priority, 0) + 1
+    return counts
+
+
+async def build_comment_assistant_inbox_live(
+    user_id: str,
+    db: Session,
+    *,
+    oauth: Optional[LinkedInOAuthService] = None,
+) -> CommentAssistantInboxResponse:
+    """
+    Build full (unfiltered) inbox from post-analytics posts + Unipile comments.
+
+    Soft-fails per post. Caller applies priority filter and cache storage.
+    """
+    _ensure_unipile_provider()
+    oauth_service = oauth or LinkedInOAuthService()
+    account_id = _resolve_account_id(user_id, oauth_service)
+
+    analytics = LinkedInPostAnalyticsService(db)
+    stored = analytics.get_stored_analytics(user_id)
+    candidates = select_candidate_posts(stored.posts)
+
+    logger.info(
+        "[CommentAssistant] live build start user={} stored_posts={} candidates={} cap={}",
+        mask_user_id(user_id),
+        len(stored.posts),
+        len(candidates),
+        MAX_POSTS,
+    )
+
+    if not candidates:
+        empty_reason = "no_analytics" if len(stored.posts) == 0 else "no_candidates"
+        logger.info(
+            "[CommentAssistant] live build empty user={} reason={}",
+            mask_user_id(user_id),
+            empty_reason,
+        )
+        return CommentAssistantInboxResponse(
+            groups=[],
+            priority="all",
+            posts_considered=0,
+            older_days=OLDER_DAYS,
+            counts={"needs_reply": 0, "active": 0, "older": 0},
+            from_cache=False,
+            empty_reason=empty_reason,
+        )
+
+    client = UnipilePostCommentsClient()
+    me_ids: set[str] = set()
+    try:
+        owner = await UnipileClient().get_own_profile(account_id)
+        me_ids = _collect_me_ids(owner if isinstance(owner, dict) else {})
+        logger.info(
+            "[CommentAssistant] me_ids_count={} user={}",
+            len(me_ids),
+            mask_user_id(user_id),
+        )
+    except Exception as exc:
+        logger.warning(
+            "[CommentAssistant] get_own_profile failed user={} err={} "
+            "(classification best-effort without self ids)",
+            mask_user_id(user_id),
+            type(exc).__name__,
+        )
+
+    older_cutoff = datetime.now(timezone.utc) - timedelta(days=OLDER_DAYS)
+    semaphore = asyncio.Semaphore(POST_CONCURRENCY)
+    groups = await asyncio.gather(
+        *[
+            _load_post_group(
+                client, account_id, post, me_ids, older_cutoff, semaphore
+            )
+            for post in candidates
+        ]
+    )
+
+    all_groups = list(groups)
+    counts = _count_priorities(all_groups)
+    soft_fails = sum(1 for g in all_groups if g.error)
+    logger.info(
+        "[CommentAssistant] live build done user={} groups={} soft_fails={} counts={}",
+        mask_user_id(user_id),
+        len(all_groups),
+        soft_fails,
+        counts,
+    )
+    return CommentAssistantInboxResponse(
+        groups=all_groups,
+        priority="all",
+        posts_considered=len(candidates),
+        older_days=OLDER_DAYS,
+        counts=counts,
+        from_cache=False,
+    )
+
+
+# Re-export errors used by routes for a single import surface.
+__all__ = [
+    "build_comment_assistant_inbox_live",
+    "filter_groups_by_priority",
+    "select_candidate_posts",
+    "post_snippet",
+    "OLDER_DAYS",
+    "LinkedInPostCommentsNotAvailableError",
+    "LinkedInPostCommentsValidationError",
+    "LinkedInNotConnectedError",
+    "UnipileAPIError",
+]

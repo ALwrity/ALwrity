@@ -24,6 +24,10 @@ class PostCommentItem(BaseModel):
     id: str
     text: str
     author: PostCommentAuthor
+    author_id: Optional[str] = Field(
+        default=None,
+        description="Author provider id when available (for mentions / self-detection)",
+    )
     created_at: str
     reply_count: int = 0
     reaction_count: int = 0
@@ -36,6 +40,10 @@ class PostCommentItem(BaseModel):
         default=None,
         description="Parent comment id when this item is a nested reply",
     )
+    image_url: Optional[str] = Field(
+        default=None,
+        description="Attached image URL when the comment includes media",
+    )
 
 
 class PostCommentsListResponse(BaseModel):
@@ -47,11 +55,22 @@ class PostCommentsListResponse(BaseModel):
     total_count: Optional[int] = None
 
 
+class PostCommentMention(BaseModel):
+    """LinkedIn mention entry for Unipile comment text ``{{n}}`` placeholders."""
+
+    name: str = Field(..., min_length=1)
+    profile_id: str = Field(..., min_length=1)
+
+
 class PostCommentReplyRequest(BaseModel):
     """Request body for POST .../comments/reply."""
 
     comment_id: str = Field(..., min_length=1)
     text: str = Field(..., min_length=1, max_length=1250)
+    mentions: Optional[list[PostCommentMention]] = Field(
+        default=None,
+        description="Optional LinkedIn mentions matching {{0}}, {{1}}, … in text",
+    )
 
 
 class PostCommentReplyResponse(BaseModel):

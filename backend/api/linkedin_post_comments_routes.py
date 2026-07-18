@@ -212,6 +212,7 @@ async def post_comment_reply(
             social_id,
             body.comment_id,
             body.text,
+            mentions=body.mentions,
         )
     except (LinkedInPostCommentsNotAvailableError, LinkedInNotConnectedError, LinkedInPostCommentsValidationError, UnipileAPIError) as exc:
         _raise_comments_http_error(exc, user_id=user_id, operation="reply_to_comment")

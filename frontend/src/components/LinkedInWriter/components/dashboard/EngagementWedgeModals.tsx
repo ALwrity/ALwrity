@@ -2,7 +2,7 @@
  * Engagement Wedge — 5 AI-first feature modals (priority order)
  *
  * E5  EngagementBoosterModal      — optimize_engagement rewrite + before/after preview score
- * E2  CommentAssistantModal       — HITL comment reply drafter
+ * E2  CommentAssistantModal       — extracted to CommentAssistantInboxModal.tsx
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
  * E3  PostPulseModal              — real Unipile post metrics with repurpose CTAs
  * E4  NetworkAdvisorModal         — network_suggestions from cache with outreach drafts
@@ -15,10 +15,7 @@ import {
   type NetworkSuggestionItem,
   type ConsolidatedGrowthResponse,
 } from '../../../../services/linkedInGrowthApi';
-import {
-  linkedInWriterApi,
-  type LinkedInCommentResponseRequest,
-} from '../../../../services/linkedInWriterApi';
+import { linkedInWriterApi } from '../../../../services/linkedInWriterApi';
 import {
   postAnalyticsApi,
   type LinkedInPost,
@@ -33,6 +30,8 @@ import {
   barColor,
 } from '../GrowthEngine/styles';
 import { openGrowthEngineModal } from '../../utils/linkedInDashboardEvents';
+
+export { CommentAssistantModal } from './CommentAssistantInboxModal';
 
 // ---------------------------------------------------------------------------
 // Shared helpers (mirror of AnalysisWedgeModals pattern)
@@ -361,175 +360,6 @@ const DraftPane: React.FC<{ label: string; content: string; accent: string }> = 
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// E2 — Comment Reply Assistant
-// ─────────────────────────────────────────────────────────────────────────────
-
-const RESPONSE_TYPES = [
-  { value: 'professional', label: 'Professional' },
-  { value: 'appreciative', label: 'Appreciative' },
-  { value: 'value_add', label: 'Add Value' },
-  { value: 'clarifying', label: 'Clarifying' },
-  { value: 'disagreement', label: 'Respectful Pushback' },
-] as const;
-
-interface CommentAssistantModalProps { open: boolean; onClose: () => void; }
-
-export const CommentAssistantModal: React.FC<CommentAssistantModalProps> = ({ open, onClose }) => {
-  const [originalPost, setOriginalPost] = useState('');
-  const [comment, setComment] = useState('');
-  const [responseType, setResponseType] = useState<string>('professional');
-  const [includeQuestion, setIncludeQuestion] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState<{ reply: string; alternatives: string[] } | null>(null);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const draft = readDraft();
-    setOriginalPost(draft);
-    setComment(''); setResult(null); setError('');
-  }, [open]);
-
-  const handleGenerate = async () => {
-    if (!comment.trim()) { setError('Please paste the comment you received.'); return; }
-    setLoading(true); setError(''); setResult(null);
-    try {
-      const req: LinkedInCommentResponseRequest = {
-        original_post: originalPost,
-        comment,
-        response_type: responseType as any,
-        include_question: includeQuestion,
-      };
-      const res = await linkedInWriterApi.generateCommentResponse(req);
-      setResult({ reply: res.response ?? '', alternatives: res.alternative_responses ?? [] });
-    } catch { setError('Could not generate reply. Please try again.'); }
-    finally { setLoading(false); }
-  };
-
-  const handleCopy = async (text: string) => {
-    try { await navigator.clipboard.writeText(text); } catch { /* fallback ok */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <DashboardActionModal open={open} title="Comment Reply Assistant" onClose={onClose} maxWidth={580} maxHeight="min(92vh, 760px)">
-      <p style={{ margin: '0 0 14px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-        Got a comment on your post? Draft the perfect AI-powered reply in your voice.
-      </p>
-
-      <FieldLabel label="Comment you received *" />
-      <textarea
-        value={comment}
-        onChange={e => setComment(e.target.value)}
-        placeholder="Paste the comment here…"
-        style={textareaStyle(100)}
-      />
-
-      <FieldLabel label="Your original post (optional — improves context)" />
-      <textarea
-        value={originalPost}
-        onChange={e => setOriginalPost(e.target.value)}
-        placeholder="Paste your original post, or leave blank…"
-        style={textareaStyle(80)}
-      />
-
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div>
-          <FieldLabel label="Reply type" />
-          <select
-            value={responseType}
-            onChange={e => setResponseType(e.target.value)}
-            style={{ padding: '6px 10px', borderRadius: 7, border: `1px solid ${colors.border}`, fontSize: 13, color: colors.textBody, background: '#fff', cursor: 'pointer' }}
-          >
-            {RESPONSE_TYPES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-          </select>
-        </div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: colors.textBody, cursor: 'pointer', marginTop: 18 }}>
-          <input type="checkbox" checked={includeQuestion} onChange={e => setIncludeQuestion(e.target.checked)} />
-          End with a question
-        </label>
-      </div>
-
-      {error && <ErrorBanner msg={error} />}
-
-      {!result && (
-        <button
-          type="button"
-          onClick={() => void handleGenerate()}
-          disabled={loading || !comment.trim()}
-          style={{ width: '100%', padding: '11px', background: colors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: comment.trim() ? 'pointer' : 'default', opacity: comment.trim() ? 1 : 0.5, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-        >
-          {loading ? <><Spinner /> Drafting reply…</> : '💬 Generate Reply'}
-        </button>
-      )}
-
-      {result && (
-        <>
-          <div style={{ ...rowBase, marginBottom: 10, borderLeft: `3px solid ${colors.primary}` }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>AI Reply</div>
-            <div style={{ fontSize: 13, color: colors.textBody, lineHeight: 1.65, whiteSpace: 'pre-wrap', marginBottom: 10 }}>{result.reply}</div>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button
-                type="button"
-                onClick={() => void handleCopy(result.reply)}
-                style={{ padding: '6px 14px', background: copied ? '#dcfce7' : colors.primary, color: copied ? '#166534' : '#fff', border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-              >
-                {copied ? '✓ Copied' : '📋 Copy Reply'}
-              </button>
-              <button
-                type="button"
-                onClick={() => { pushDraftToStudio(result.reply); onClose(); }}
-                style={{ padding: '6px 14px', background: 'none', border: `1.5px solid ${colors.primary}`, borderRadius: 6, fontSize: 12, fontWeight: 600, color: colors.primary, cursor: 'pointer' }}
-              >
-                ✏️ Edit in Studio
-              </button>
-              <button
-                type="button"
-                onClick={() => setResult(null)}
-                style={{ padding: '6px 12px', background: 'none', border: `1px solid ${colors.border}`, borderRadius: 6, fontSize: 12, color: colors.textTertiary, cursor: 'pointer' }}
-              >
-                ↩ Retry
-              </button>
-            </div>
-          </div>
-
-          {result.alternatives.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                {result.alternatives.length} Alternatives
-              </div>
-              {result.alternatives.map((alt, i) => (
-                <AltReplyRow key={i} text={alt} onCopy={handleCopy} onUse={() => { pushDraftToStudio(alt); onClose(); }} />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </DashboardActionModal>
-  );
-};
-
-const AltReplyRow: React.FC<{ text: string; onCopy: (t: string) => void; onUse: () => void }> = ({ text, onCopy, onUse }) => {
-  const [copied, setCopied] = useState(false);
-  const copy = () => { void onCopy(text); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-  return (
-    <div style={{ ...rowBase, marginBottom: 8 }}>
-      <div style={{ fontSize: 12, color: colors.textBody, lineHeight: 1.6, whiteSpace: 'pre-wrap', marginBottom: 8 }}>{text}</div>
-      <div style={{ display: 'flex', gap: 8 }}>
-        <button type="button" onClick={copy} style={{ padding: '4px 10px', background: copied ? '#dcfce7' : colors.badgeBg, color: copied ? '#166534' : colors.textSecondary, border: `1px solid ${colors.border}`, borderRadius: 5, fontSize: 11, cursor: 'pointer' }}>
-          {copied ? '✓' : '📋'} Copy
-        </button>
-        <button type="button" onClick={onUse} style={{ padding: '4px 10px', background: 'none', border: `1px solid ${colors.primary}`, borderRadius: 5, fontSize: 11, color: colors.primary, cursor: 'pointer', fontWeight: 600 }}>
-          Edit in Studio
-        </button>
-      </div>
-    </div>
-  );
-};
-
 function textareaStyle(minH: number): React.CSSProperties {
   return {
     width: '100%', minHeight: minH, padding: '9px 11px', borderRadius: 8,
@@ -538,10 +368,6 @@ function textareaStyle(minH: number): React.CSSProperties {
     boxSizing: 'border-box', marginBottom: 10,
   };
 }
-
-const FieldLabel: React.FC<{ label: string }> = ({ label }) => (
-  <div style={{ fontSize: 11, fontWeight: 700, color: colors.textMedium, marginBottom: 5 }}>{label}</div>
-);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // E1 — Engagement Opportunities Quick-View
