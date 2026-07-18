@@ -519,6 +519,9 @@ Always use the most appropriate tool for the user's request.`.trim();
         onPreferencesChange={handlePreferencesChange}
         hasDraft={!!draft}
         onResetDraft={handleClear}
+        dashboardDraft={draft}
+        onResumeDraft={() => setShowEditor(true)}
+        onClearDraft={handleClear}
       />
 
 
@@ -638,6 +641,8 @@ Always use the most appropriate tool for the user's request.`.trim();
             onGenerateSimilarPost={handleGenerateSimilarPost}
             onResumeDraft={() => setShowEditor(true)}
             onClear={handleClear}
+            showPreferencesModal={showPreferencesModal}
+            onPreferencesModalChange={setShowPreferencesModal}
           />)
         )}
       </div>

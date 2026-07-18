@@ -4,6 +4,9 @@ import { useAuth } from '@clerk/clerk-react';
 import { useWorkflowStore } from '../../../../stores/workflowStore';
 import type { TodayTask } from '../../../../types/workflow';
 import { DashboardRailIconButton } from './DashboardRailIconButton';
+import { DashboardActionModal } from './DashboardActionModal';
+import { useMobileHeaderNav } from '../../hooks/useMobileHeaderNav';
+import { STUDIO_TAB_ACTION_MODAL_CLASS } from './dashboardLayoutConstants';
 
 const PILLAR_META: Record<string, { label: string; icon: string; color: string }> = {
   plan:       { label: 'Plan',       icon: '📅', color: '#6366f1' },
@@ -14,7 +17,9 @@ const PILLAR_META: Record<string, { label: string; icon: string; color: string }
   remarket:   { label: 'Remarket',   icon: '♻️', color: '#f59e0b' },
 };
 
-const PILLAR_ORDER = ['plan', 'create', 'publish', 'analysis', 'engagement', 'remarket'];
+const PILLAR_ORDER = ['plan', 'create', 'publish', 'analysis', 'engagement', 'remarket'] as const;
+
+const GROWTH_TAB_STACKED_LABEL = ["Today\u2019s\u00A0Grow", 'Tasks'] as const;
 
 const PRIORITY_COLORS: Record<string, string> = {
   high: '#e53e3e',
@@ -31,8 +36,8 @@ const ROI_COLORS: Record<string, string> = {
 type Phase = 'loading' | 'error' | 'briefing' | 'active' | 'completed';
 
 interface TodayGrowthWalkthroughProps {
-  /** main = below nav in dashboard canvas (original placement) */
-  variant?: 'main';
+  /** main = dashboard toolbar; tab = mobile header tab bar */
+  variant?: 'main' | 'tab';
 }
 
 /** Self-contained dropdown: today's growth tasks with in-panel pillar walkthrough. */
@@ -46,6 +51,9 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
   const storeLoading = useWorkflowStore(s => s.isLoading);
   const storeError = useWorkflowStore(s => s.error);
   const generationProgress = useWorkflowStore(s => s.generationProgress);
+
+  const isMobileHeaderNav = useMobileHeaderNav();
+  const isMobileTab = variant === 'tab' && isMobileHeaderNav;
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -117,7 +125,7 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
     optimisticRef.current = optimisticDone;
   }, [optimisticDone]);
 
-  const activePillars = useMemo(() => {
+  const activePillars = useMemo((): (typeof PILLAR_ORDER)[number][] => {
     if (!currentWorkflow?.tasks) return [];
     const ids = new Set(currentWorkflow.tasks.map(t => t.pillarId));
     return PILLAR_ORDER.filter(id => ids.has(id));
@@ -602,6 +610,8 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
     ? 'Growth Tasks'
     : 'Loading…';
 
+  const isTab = variant === 'tab';
+
   return (
     <div
       className={`linkedin-growth-dropdown linkedin-growth-dropdown--${variant}`}
@@ -609,17 +619,36 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
     >
       <DashboardRailIconButton
         label="Today's Growth Tasks"
+        stackedLabel={isTab ? GROWTH_TAB_STACKED_LABEL : undefined}
+        shortLabel={isTab ? undefined : 'Growth Tasks'}
         icon="growth"
         emojiIcon="🚀"
         alwaysShowLabel
-        iconLeading
+        iconLeading={!isTab}
+        layout={isTab ? 'tab' : 'pill'}
         open={open}
         ariaExpanded={open}
         onClick={() => setOpen(prev => !prev)}
         title="Walk through today's growth tasks pillar by pillar"
       />
 
-      {open && (
+      {open && isMobileTab && (
+        <DashboardActionModal
+          open={open}
+          title={panelTitle}
+          onClose={closeDropdown}
+          maxWidth="100%"
+          maxHeight="min(85dvh, 640px)"
+          modalClassName={STUDIO_TAB_ACTION_MODAL_CLASS}
+        >
+          {phase !== 'loading' && phase !== 'active' && (
+            <div style={{ marginBottom: 8 }}>{renderDateNav()}</div>
+          )}
+          {renderPanelContent()}
+        </DashboardActionModal>
+      )}
+
+      {open && !isMobileTab && (
         <div className="linkedin-growth-dropdown-panel" role="dialog" aria-label="Today's Growth Tasks">
           <div className="linkedin-growth-dropdown-header">
             <h3 className="linkedin-growth-dropdown-title">{panelTitle}</h3>

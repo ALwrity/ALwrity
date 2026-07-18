@@ -22,6 +22,8 @@ interface DashboardActionModalProps {
   closeLabel?: string;
   /** Above studio tour / error overlays when set. */
   elevated?: boolean;
+  /** Optional class on the modal panel (for mobile-specific layout tweaks). */
+  modalClassName?: string;
 }
 
 export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
@@ -40,6 +42,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   titleSize = 'default',
   closeLabel,
   elevated = false,
+  modalClassName,
 }) => {
   if (!open) return null;
 
@@ -69,7 +72,11 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       onClick={handleBackdropClose}
     >
       <div
-        className="linkedin-dashboard-action-modal"
+        className={
+          modalClassName
+            ? `linkedin-dashboard-action-modal ${modalClassName}`
+            : 'linkedin-dashboard-action-modal'
+        }
         onClick={(e) => e.stopPropagation()}
         style={{
           width: width ?? '100%',

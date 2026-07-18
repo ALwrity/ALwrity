@@ -8,6 +8,8 @@ import {
   ringSpotlightDiameter,
 } from './dashboardRadialLayout';
 import { DashboardMobileWorkflowGrid } from './DashboardMobileWorkflowGrid';
+import { DashboardMobileAnalyticsSection } from './DashboardMobileAnalyticsSection';
+import type { KnowledgeCenterAction } from './KnowledgeCenterDock';
 import { useDesktopViewport } from '../../hooks/useDesktopViewport';
 import { HUB_CENTER_LEFT_CSS_VAR } from './dashboardLayoutConstants';
 
@@ -15,12 +17,22 @@ interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
   planAnchorSlot?: React.ReactNode;
   onWorkflowCardAction: (cardId: DashboardWorkflowCardId) => void;
+  onViewAnalytics?: () => void;
+  onKnowledgeCenterAction?: (action: KnowledgeCenterAction) => void;
+  mobileProfileHubSlot?: React.ReactNode;
+  mobileContextNudgeSlot?: React.ReactNode;
+  mobileStudioActionsSlot?: React.ReactNode;
 }
 
 export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
   children,
   planAnchorSlot,
   onWorkflowCardAction,
+  onViewAnalytics,
+  onKnowledgeCenterAction,
+  mobileProfileHubSlot,
+  mobileContextNudgeSlot,
+  mobileStudioActionsSlot,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -89,6 +101,18 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     return () => ro.disconnect();
   }, [readSize, syncHubAxis]);
 
+  const mobileWorkflowGrid = (
+    <div className="linkedin-dashboard-mobile-workflow-wrap">
+      <DashboardMobileWorkflowGrid
+        onCardAction={onWorkflowCardAction}
+        profileHubSlot={mobileProfileHubSlot}
+        contextNudgeSlot={mobileContextNudgeSlot}
+        studioActionsSlot={mobileStudioActionsSlot}
+      />
+    </div>
+  );
+  const profileRelocatedToWorkflowHeader = !desktopViewport && Boolean(mobileProfileHubSlot);
+
   return (
     <>
       <div
@@ -109,9 +133,17 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
           paddingTop: 0,
         }}
       >
+        {!desktopViewport && mobileWorkflowGrid}
+
         <div
           ref={canvasRef}
-          className={`linkedin-dashboard-hero-canvas${desktopViewport ? '' : ' linkedin-dashboard-hero-canvas--mobile'}`}
+          className={`linkedin-dashboard-hero-canvas${
+            desktopViewport ? '' : ' linkedin-dashboard-hero-canvas--mobile'
+          }${
+            profileRelocatedToWorkflowHeader
+              ? ' linkedin-dashboard-hero-canvas--profile-relocated'
+              : ''
+          }`}
           style={{
             position: 'relative',
             width: '100%',
@@ -121,7 +153,6 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
             zIndex: 1,
           }}
         >
-          {/* Desktop-only radial ring — never mount on mobile (≤960px) */}
           {desktopViewport && (
             <>
               <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
@@ -197,10 +228,12 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
           )}
         </div>
 
-        {/* Mobile-only 2-column workflow grid */}
-        <div className="linkedin-dashboard-mobile-workflow-wrap">
-          <DashboardMobileWorkflowGrid onCardAction={onWorkflowCardAction} />
-        </div>
+        {!desktopViewport && onViewAnalytics && onKnowledgeCenterAction && (
+          <DashboardMobileAnalyticsSection
+            onViewAnalytics={onViewAnalytics}
+            onKnowledgeCenterAction={onKnowledgeCenterAction}
+          />
+        )}
       </div>
 
       {planAnchorSlot && desktopViewport && (

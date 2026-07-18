@@ -35,6 +35,7 @@ import {
 
 interface UserBadgeProps {
   colorMode?: 'light' | 'dark';
+  showPlanChip?: boolean;
 }
 
 /** LinkedIn Studio keyboard shortcuts surfaced in the nav menu Quick Launch section. */
@@ -44,7 +45,7 @@ const QUICK_LAUNCH_SHORTCUTS = [
   { key: 'P', label: 'Content Persona',   event: 'linkedinwriter:openPreferences'     },
 ] as const;
 
-const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
+const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip = true }) => {
   const { user, isSignedIn } = useUser();
   const { signOut } = useClerk();
   const { subscription, refreshSubscription, loading } = useSubscription();
@@ -243,7 +244,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      {/* Subscription Plan Chip */}
+      {showPlanChip && (
       <Chip
         label={getPlanLabel()}
         size="small"
@@ -262,7 +263,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
           },
         }}
       />
-      
+      )}
       <Tooltip title="User Navigation Menu"> 
         <Box sx={{ position: 'relative', display: 'inline-flex' }}>
           <Avatar
