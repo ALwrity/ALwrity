@@ -582,10 +582,27 @@ async def fetch_engagement_trends(user_id: str) -> Optional[Dict[str, Any]]:
                 "avg_engagement_rate_now": result.summary.avg_engagement_rate_now,
                 "total_posts": result.summary.total_posts,
             }
+        except Exception:
+            from services.engagement_trends_period import mask_user_id_for_log
+
+            logger.debug(
+                "Engagement trends unavailable for user {}",
+                mask_user_id_for_log(user_id),
+            )
+            return None
         finally:
             db.close()
 
-    return await run_in_threadpool(_query)
+    try:
+        return await run_in_threadpool(_query)
+    except Exception:
+        from services.engagement_trends_period import mask_user_id_for_log
+
+        logger.debug(
+            "Engagement trends unavailable for user {}",
+            mask_user_id_for_log(user_id),
+        )
+        return None
 
 
 async def fetch_persona(user_id: str) -> Dict[str, Any]:

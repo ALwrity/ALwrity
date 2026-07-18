@@ -4,8 +4,8 @@ import { colors } from '../GrowthEngine/styles';
 import {
   formatLocalizedComparisonPeriod,
   formatLocalizedRelativeTime,
-  getUserTimeZone,
 } from './engagementTrendsLocaleFormat';
+import { EMPTY_COPY } from './engagementTrendsCopy';
 
 export interface EngagementTrendsMetadataFooterProps {
   lastSyncedAt?: string | null;
@@ -13,6 +13,8 @@ export interface EngagementTrendsMetadataFooterProps {
   showComparison: boolean;
   onRefresh: () => void;
   loading: boolean;
+  syncDisabled?: boolean;
+  syncCooldownHint?: string | null;
 }
 
 /** Lower-priority sync metadata — shown below actionable trend insights. */
@@ -22,16 +24,19 @@ export const EngagementTrendsMetadataFooter: React.FC<EngagementTrendsMetadataFo
   showComparison,
   onRefresh,
   loading,
+  syncDisabled = false,
+  syncCooldownHint = null,
 }) => {
   const comparison = useMemo(
     () => (period && showComparison ? formatLocalizedComparisonPeriod(period.from, period.to) : null),
     [period, showComparison],
   );
-  const timeZone = getUserTimeZone().replace(/_/g, ' ');
 
   if (!lastSyncedAt && !comparison) {
     return null;
   }
+
+  const refreshDisabled = loading || syncDisabled;
 
   return (
     <div
@@ -41,33 +46,41 @@ export const EngagementTrendsMetadataFooter: React.FC<EngagementTrendsMetadataFo
         background: colors.rowBg,
         border: `1px solid ${colors.border}`,
         borderRadius: 8,
-        fontSize: 10,
+        fontSize: 11,
         color: colors.textSecondary,
         lineHeight: 1.45,
       }}
     >
       {lastSyncedAt && (
-        <div style={{ marginBottom: comparison ? 6 : 0 }}>
-          <span style={{ fontWeight: 700, color: colors.textTertiary }}>Last fetch: </span>
+        <div style={{ marginBottom: comparison || syncCooldownHint ? 6 : 0 }}>
+          <span style={{ fontWeight: 700, color: colors.textTertiary }}>Last updated: </span>
           <span style={{ color: colors.textDark, fontWeight: 600 }}>
             {formatLocalizedRelativeTime(lastSyncedAt)}
           </span>
         </div>
       )}
       {comparison && (
-        <div style={{ marginBottom: 6 }}>
-          <span style={{ fontWeight: 700, color: colors.textTertiary }}>Compared: </span>
-          <span>{comparison.previous.display}</span>
-          <span style={{ margin: '0 4px', color: colors.textTertiary }}>→</span>
-          <span>{comparison.latest.display}</span>
+        <div
+          style={{ marginBottom: syncCooldownHint ? 6 : 0 }}
+          title={`${comparison.previous.display} → ${comparison.latest.display}`}
+        >
+          <span style={{ fontWeight: 700, color: colors.textTertiary }}>Comparing: </span>
+          <span style={{ color: colors.textDark, fontWeight: 600 }}>
+            {comparison.previous.relative} → {comparison.latest.relative}
+          </span>
         </div>
       )}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontSize: 9, color: colors.textTertiary }}>Times in {timeZone}</span>
+      {syncCooldownHint && (
+        <div style={{ marginBottom: 6, fontSize: 10, color: '#b45309' }}>
+          {EMPTY_COPY.syncCooldownPrefix} ({syncCooldownHint}).
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
         <button
           type="button"
           onClick={onRefresh}
-          disabled={loading}
+          disabled={refreshDisabled}
+          title={syncCooldownHint ? `${EMPTY_COPY.syncCooldownPrefix} (${syncCooldownHint})` : undefined}
           style={{
             padding: '4px 10px',
             background: 'transparent',
@@ -76,12 +89,12 @@ export const EngagementTrendsMetadataFooter: React.FC<EngagementTrendsMetadataFo
             borderRadius: 6,
             fontSize: 10,
             fontWeight: 700,
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.6 : 1,
+            cursor: refreshDisabled ? 'not-allowed' : 'pointer',
+            opacity: refreshDisabled ? 0.6 : 1,
             flexShrink: 0,
           }}
         >
-          ⟳ Refresh analytics
+          Sync Latest
         </button>
       </div>
     </div>

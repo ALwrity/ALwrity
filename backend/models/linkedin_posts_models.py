@@ -172,13 +172,18 @@ class PostDelta(BaseModel):
     reactions_delta: int = 0
     comments_delta: int = 0
     impressions_delta: int = 0
+    followers_delta: int = 0
+    clicks_delta: int = 0
+    reposts_delta: int = 0
     engagement_rate_now: float = 0.0
     engagement_rate_before: float = 0.0
+    impressions_now: int = 0
+    reactions_now: int = 0
     growth_contribution_pct: Optional[float] = Field(
         default=None,
         description=(
             "Share of total positive engagement growth contributed by this post "
-            "across the comparison period (reactions + comments + impressions deltas)"
+            "across the comparison period (reactions + comments + impressions + followers)"
         ),
     )
 
@@ -189,16 +194,34 @@ class EngagementSummary(BaseModel):
     reactions: MetricDelta
     comments: MetricDelta
     impressions: MetricDelta
+    followers: Optional[MetricDelta] = None
+    clicks: Optional[MetricDelta] = None
+    reposts: Optional[MetricDelta] = None
     avg_engagement_rate_before: float
     avg_engagement_rate_now: float
 
 
 class PostAnalyticsHistoryResponse(BaseModel):
     """Response model for GET /post-analytics/history."""
-    period: dict  # {"from": datetime, "to": datetime}
+    period: dict  # {"from": iso, "to": iso}
     summary: EngagementSummary
     top_gainers: list[PostDelta]
     top_decliners: list[PostDelta]
+    top_posts: list[PostDelta] = Field(default_factory=list)
+    rising_posts: list[PostDelta] = Field(default_factory=list)
+    falling_posts: list[PostDelta] = Field(default_factory=list)
+    period_key: str = Field(
+        default="since_joining",
+        description="Requested comparison window: 1d|7d|15d|30d|since_joining",
+    )
+    baseline_reason: Optional[str] = Field(
+        default=None,
+        description="Why this baseline was chosen, or why history is insufficient",
+    )
+    recommended_sync_cooldown_seconds: int = Field(
+        default=300,
+        description="Suggested client wait between Sync clicks (seconds)",
+    )
     last_synced_at: Optional[datetime] = Field(
         default=None,
         description="When post analytics were last fetched from LinkedIn",

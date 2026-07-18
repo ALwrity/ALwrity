@@ -201,26 +201,50 @@ async def get_post_analytics(
     response_model=PostAnalyticsHistoryResponse,
     responses={
         401: {"model": PostsErrorResponse, "description": "Not authenticated"},
+        400: {"model": PostsErrorResponse, "description": "Invalid period"},
         500: {"model": PostsErrorResponse, "description": "Internal server error"},
     },
-    summary="Get engagement trends over time",
+    summary="Get engagement trends over a period window",
     description=(
-        "Compare the latest two snapshot epochs and return aggregate deltas, "
-        "top gainers, and top decliners."
+        "Compare current post metrics vs a meaningful baseline for the selected period "
+        "(1d, 7d, 15d, 30d, or since_joining). Returns Top / Rising / Falling lists."
     ),
 )
 async def get_engagement_history(
+    period: str = Query(
+        "since_joining",
+        description="Comparison window: 1d | 7d | 15d | 30d | since_joining",
+    ),
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> PostAnalyticsHistoryResponse:
-    """Return engagement trends by comparing the two most recent snapshot epochs."""
+    """Return period-aware engagement trends for the authenticated user."""
     user_id = _user_id(current_user)
+    from services.engagement_trends_period import mask_user_id_for_log
+
+    logger.info(
+        "[PostAnalyticsRoutes] Trends request user={} period={}",
+        mask_user_id_for_log(user_id),
+        period,
+    )
     analytics_service = LinkedInPostAnalyticsService(db)
     try:
-        return analytics_service.get_engagement_trends(user_id)
+        return analytics_service.get_engagement_trends(user_id, period=period)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"error_code": "INVALID_PERIOD", "message": str(exc)},
+        ) from exc
     except Exception as exc:
-        logger.exception(f"[PostAnalyticsRoutes] Error computing engagement trends: {exc}")
+        logger.exception(
+            "[PostAnalyticsRoutes] Trends compute failed user={} period={}",
+            mask_user_id_for_log(user_id),
+            period,
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"error_code": "TRENDS_ERROR", "message": "Failed to compute engagement trends."},
+            detail={
+                "error_code": "TRENDS_ERROR",
+                "message": "Failed to compute engagement trends.",
+            },
         ) from exc

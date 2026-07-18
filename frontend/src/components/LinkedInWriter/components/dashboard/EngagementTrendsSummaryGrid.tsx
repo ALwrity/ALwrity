@@ -1,10 +1,17 @@
 import React from 'react';
 
 import { colors } from '../GrowthEngine/styles';
-import type { EngagementSummary } from '../../../../services/postAnalyticsApi';
+import type { EngagementSummary, MetricDelta } from '../../../../services/postAnalyticsApi';
+import { METRIC_LABELS, METRIC_TOOLTIPS } from './engagementTrendsCopy';
 
 interface EngagementTrendsSummaryGridProps {
   summary: EngagementSummary;
+}
+
+function formatDeltaLabel(delta: number, isRate: boolean, unchangedLabel: string): string {
+  if (delta === 0) return unchangedLabel;
+  if (isRate) return `${delta > 0 ? '+' : ''}${delta} points`;
+  return `${delta > 0 ? '+' : ''}${delta.toLocaleString()}`;
 }
 
 const SummaryDeltaCard: React.FC<{
@@ -15,10 +22,15 @@ const SummaryDeltaCard: React.FC<{
   delta: number;
   pct: number;
   isRate?: boolean;
-}> = ({ icon, label, before, now, delta, pct, isRate }) => {
-  const up = delta >= 0;
+  tooltip?: string;
+}> = ({ icon, label, before, now, delta, pct, isRate, tooltip }) => {
+  const up = delta > 0;
+  const flat = delta === 0;
+  const tone = flat ? colors.textSecondary : up ? '#16a34a' : '#dc2626';
+
   return (
     <div
+      title={tooltip}
       style={{
         flex: '1 1 calc(50% - 4px)',
         minWidth: 100,
@@ -26,20 +38,20 @@ const SummaryDeltaCard: React.FC<{
         background: colors.rowBg,
         border: `1px solid ${colors.border}`,
         borderRadius: 8,
+        cursor: tooltip ? 'help' : 'default',
       }}
     >
       <div style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2, fontWeight: 600 }}>
         {icon} {label}
       </div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: up ? '#16a34a' : '#dc2626', marginBottom: 1 }}>
+      <div style={{ fontSize: 16, fontWeight: 800, color: flat ? colors.textDark : tone, marginBottom: 1 }}>
         {isRate ? `${now}%` : now.toLocaleString()}
       </div>
       <div style={{ fontSize: 10, color: colors.textSecondary, lineHeight: 1.35 }}>
-        <span style={{ color: up ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-          {up ? '+' : ''}
-          {isRate ? `${delta}pp` : delta.toLocaleString()}
+        <span style={{ color: tone, fontWeight: 700 }}>
+          {formatDeltaLabel(delta, Boolean(isRate), 'unchanged')}
         </span>
-        {!isRate && pct !== 0 && (
+        {!isRate && !flat && pct !== 0 && (
           <span>
             {' '}
             ({up ? '+' : ''}
@@ -55,42 +67,120 @@ const SummaryDeltaCard: React.FC<{
   );
 };
 
-export const EngagementTrendsSummaryGrid: React.FC<EngagementTrendsSummaryGridProps> = ({ summary }) => (
-  <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
-    <SummaryDeltaCard
-      icon="❤️"
-      label="Reactions"
-      before={summary.reactions.before}
-      now={summary.reactions.now}
-      delta={summary.reactions.delta}
-      pct={summary.reactions.pct_change}
-    />
-    <SummaryDeltaCard
-      icon="💬"
-      label="Comments"
-      before={summary.comments.before}
-      now={summary.comments.now}
-      delta={summary.comments.delta}
-      pct={summary.comments.pct_change}
-    />
-    <SummaryDeltaCard
-      icon="👁️"
-      label="Impressions"
-      before={summary.impressions.before}
-      now={summary.impressions.now}
-      delta={summary.impressions.delta}
-      pct={summary.impressions.pct_change}
-    />
-    <SummaryDeltaCard
-      icon="📊"
-      label="Avg ER"
-      before={Math.round(summary.avg_engagement_rate_before * 100)}
-      now={Math.round(summary.avg_engagement_rate_now * 100)}
-      delta={Math.round(
-        (summary.avg_engagement_rate_now - summary.avg_engagement_rate_before) * 100,
-      )}
-      pct={0}
-      isRate
-    />
+const PlaceholderMetricCard: React.FC<{
+  icon: string;
+  label: string;
+  tooltip: string;
+}> = ({ icon, label, tooltip }) => (
+  <div
+    title={tooltip}
+    style={{
+      flex: '1 1 calc(50% - 4px)',
+      minWidth: 100,
+      padding: '8px 10px',
+      background: colors.rowBg,
+      border: `1px dashed ${colors.border}`,
+      borderRadius: 8,
+      cursor: 'help',
+    }}
+  >
+    <div style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2, fontWeight: 600 }}>
+      {icon} {label}
+    </div>
+    <div style={{ fontSize: 16, fontWeight: 800, color: colors.textTertiary, marginBottom: 1 }}>—</div>
+    <div style={{ fontSize: 10, color: colors.textSecondary, lineHeight: 1.35 }}>
+      Not available for this view yet
+    </div>
   </div>
 );
+
+function OptionalMetricCard({
+  icon,
+  label,
+  metric,
+  tooltip,
+}: {
+  icon: string;
+  label: string;
+  metric?: MetricDelta | null;
+  tooltip: string;
+}) {
+  if (!metric) {
+    return <PlaceholderMetricCard icon={icon} label={label} tooltip={tooltip} />;
+  }
+  return (
+    <SummaryDeltaCard
+      icon={icon}
+      label={label}
+      before={metric.before}
+      now={metric.now}
+      delta={metric.delta}
+      pct={metric.pct_change}
+      tooltip={tooltip}
+    />
+  );
+}
+
+export const EngagementTrendsSummaryGrid: React.FC<EngagementTrendsSummaryGridProps> = ({
+  summary,
+}) => {
+  const erBefore = Math.round(summary.avg_engagement_rate_before * 100);
+  const erNow = Math.round(summary.avg_engagement_rate_now * 100);
+
+  return (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+      <SummaryDeltaCard
+        icon="❤️"
+        label={METRIC_LABELS.reactions}
+        before={summary.reactions.before}
+        now={summary.reactions.now}
+        delta={summary.reactions.delta}
+        pct={summary.reactions.pct_change}
+      />
+      <SummaryDeltaCard
+        icon="💬"
+        label={METRIC_LABELS.comments}
+        before={summary.comments.before}
+        now={summary.comments.now}
+        delta={summary.comments.delta}
+        pct={summary.comments.pct_change}
+      />
+      <SummaryDeltaCard
+        icon="👁️"
+        label={METRIC_LABELS.impressions}
+        before={summary.impressions.before}
+        now={summary.impressions.now}
+        delta={summary.impressions.delta}
+        pct={summary.impressions.pct_change}
+      />
+      <SummaryDeltaCard
+        icon="📊"
+        label={METRIC_LABELS.engagementRate}
+        before={erBefore}
+        now={erNow}
+        delta={erNow - erBefore}
+        pct={0}
+        isRate
+        tooltip={METRIC_TOOLTIPS.engagementRate}
+      />
+      <OptionalMetricCard
+        icon="👥"
+        label={METRIC_LABELS.followersFromPosts}
+        metric={summary.followers}
+        tooltip={METRIC_TOOLTIPS.followersFromPosts}
+      />
+      <OptionalMetricCard
+        icon="🔗"
+        label={METRIC_LABELS.clicks}
+        metric={summary.clicks}
+        tooltip={METRIC_TOOLTIPS.clicks}
+      />
+      <OptionalMetricCard
+        icon="🔁"
+        label={METRIC_LABELS.reposts}
+        metric={summary.reposts}
+        tooltip={METRIC_TOOLTIPS.reposts}
+      />
+    </div>
+  );
+};

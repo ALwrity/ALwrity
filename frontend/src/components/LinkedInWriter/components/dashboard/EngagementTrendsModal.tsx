@@ -1,8 +1,7 @@
 /**
- * F6 — Engagement Trends Modal
+ * F6 — Engagement Since You Joined ALwrity
  *
- * Compares post engagement between the last two DB snapshot epochs.
- * Extracted from AnalysisWedgeModals.tsx to keep files under 500 lines.
+ * Phase 3: period chips refetch `?period=`; tabs bind Top/Rising/Falling from API.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -13,29 +12,41 @@ import {
   type PostDelta,
 } from '../../../../services/postAnalyticsApi';
 import { colors } from '../GrowthEngine/styles';
-import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
 import {
   ENGAGEMENT_TRENDS_BODY_STYLE,
   ENGAGEMENT_TRENDS_MODAL_SIZE,
 } from './engagementTrendsModalLayout';
 import { shouldShowContributionBadges } from './engagementTrendsGrowthUtils';
-import { PostDeltaRow } from './PostDeltaRow';
 import { PostCommentsModal } from './PostCommentsModal';
 import { EngagementGrowthDriversSection } from './EngagementGrowthDriversSection';
 import { EngagementTrendsSummaryGrid } from './EngagementTrendsSummaryGrid';
 import { EngagementTrendsMetadataFooter } from './EngagementTrendsMetadataFooter';
+import { EngagementTrendsPeriodChips } from './engagementTrendsPeriodChips';
+import { EngagementTrendsPostTabs } from './engagementTrendsPostTabs';
+import { EngagementTrendsPostList } from './engagementTrendsPostList';
+import {
+  EMPTY_COPY,
+  ENGAGEMENT_SINCE_SUBTITLE,
+  ENGAGEMENT_SINCE_TITLE,
+} from './engagementTrendsCopy';
+import { extractEngagementTrendsErrorMessage } from './engagementTrendsErrors';
+import {
+  insufficientHistoryMessage,
+  isInsufficientHistory,
+  isSyncOnCooldown,
+  postsForTab,
+  resolveDefaultPeriod,
+  resolveSyncCooldownMs,
+  syncCooldownRemainingLabel,
+  type EngagementPeriodKey,
+  type EngagementPostTab,
+} from './engagementTrendsPeriodUtils';
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
-  return (
-    data.summary.total_posts === 0 &&
-    data.top_gainers.length === 0 &&
-    data.top_decliners.length === 0
-  );
+  const rising = data.rising_posts?.length ? data.rising_posts : data.top_gainers;
+  const falling = data.falling_posts?.length ? data.falling_posts : data.top_decliners;
+  return data.summary.total_posts === 0 && rising.length === 0 && falling.length === 0;
 }
-
-// ---------------------------------------------------------------------------
-// Shared UI primitives (local to this modal)
-// ---------------------------------------------------------------------------
 
 const primaryLoadBtn: React.CSSProperties = {
   padding: '8px 18px',
@@ -116,17 +127,13 @@ const NoChangesEmptyState: React.FC = () => (
   >
     <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
     <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
-      No changes detected
+      {EMPTY_COPY.noChangesTitle}
     </div>
     <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
-      There are no changes in post analytics to compare with.
+      {EMPTY_COPY.noChangesDescription}
     </div>
   </div>
 );
-
-// ---------------------------------------------------------------------------
-// Modal
-// ---------------------------------------------------------------------------
 
 export interface EngagementTrendsModalProps {
   open: boolean;
@@ -143,97 +150,130 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [commentsPost, setCommentsPost] = useState<PostDelta | null>(null);
+  const [period, setPeriod] = useState<EngagementPeriodKey>('since_joining');
+  const [activeTab, setActiveTab] = useState<EngagementPostTab>('rising');
+  const [nowTick, setNowTick] = useState(() => Date.now());
   const mountedRef = useRef(true);
+  const periodInitializedRef = useRef(false);
+  const periodRef = useRef(period);
+  periodRef.current = period;
 
-  const fetchData = useCallback(async (refreshFirst = false) => {
-    setLoading(true);
-    setError('');
-    try {
-      if (refreshFirst) {
-        await postAnalyticsApi.fetchStoredAnalytics(true);
+  const fetchData = useCallback(
+    async (opts: {
+      periodKey: EngagementPeriodKey;
+      refreshFirst?: boolean;
+      initDefault?: boolean;
+    }) => {
+      setLoading(true);
+      setError('');
+      try {
+        if (opts.refreshFirst) {
+          await postAnalyticsApi.fetchStoredAnalytics(true);
+        }
+        let result = await postAnalyticsApi.fetchEngagementHistory(opts.periodKey);
+        if (!mountedRef.current) return;
+
+        if (opts.initDefault && !periodInitializedRef.current) {
+          const preferred = resolveDefaultPeriod(result);
+          periodInitializedRef.current = true;
+          setPeriod(preferred);
+          if (preferred !== opts.periodKey) {
+            result = await postAnalyticsApi.fetchEngagementHistory(preferred);
+            if (!mountedRef.current) return;
+          }
+        }
+
+        setData(result);
+      } catch (err: unknown) {
+        if (mountedRef.current) setError(extractEngagementTrendsErrorMessage(err));
+      } finally {
+        if (mountedRef.current) {
+          setLoading(false);
+          setNowTick(Date.now());
+        }
       }
-      const result = await postAnalyticsApi.fetchEngagementHistory();
-      if (mountedRef.current) setData(result);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      if (mountedRef.current) {
-        setError(
-          axiosErr.response?.data?.detail ??
-            (err instanceof Error ? err.message : 'Could not load engagement trends.')
-        );
-      }
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     mountedRef.current = true;
     if (!open) return;
-    setLoading(true);
-    setError('');
-    postAnalyticsApi
-      .fetchEngagementHistory()
-      .then((result) => {
-        if (mountedRef.current) setData(result);
-      })
-      .catch((err) => {
-        const axiosErr = err as { response?: { data?: { detail?: string } } };
-        if (mountedRef.current) {
-          setError(
-            axiosErr.response?.data?.detail ??
-              (err instanceof Error ? err.message : 'Could not load engagement trends.')
-          );
-        }
-      })
-      .finally(() => {
-        if (mountedRef.current) setLoading(false);
-      });
+    periodInitializedRef.current = false;
+    void fetchData({ periodKey: 'since_joining', initDefault: true });
     return () => {
       mountedRef.current = false;
     };
-  }, [open]);
+  }, [open, fetchData]);
 
-  const handleLoad = () => void fetchData(false);
-  const handleSync = () => void fetchData(true);
+  const handlePeriodChange = (next: EngagementPeriodKey) => {
+    setPeriod(next);
+    void fetchData({ periodKey: next });
+  };
 
+  const handleLoad = () => void fetchData({ periodKey: periodRef.current });
+  const cooldownMs = resolveSyncCooldownMs(data);
+  const syncOnCooldown = isSyncOnCooldown(data?.last_synced_at, nowTick, cooldownMs);
+  const cooldownHint = syncCooldownRemainingLabel(data?.last_synced_at, nowTick, cooldownMs);
+  const handleSync = () => {
+    if (syncOnCooldown) return;
+    void fetchData({ periodKey: periodRef.current, refreshFirst: true });
+  };
+
+  const insufficient = Boolean(data && !loading && isInsufficientHistory(data));
   const showNoChanges =
-    data && !loading && hasNoComparableChanges(data) && !hasInsufficientSnapshots(data.period);
-  const showInsufficientSnapshots =
-    data && !loading && hasInsufficientSnapshots(data.period) && hasNoComparableChanges(data);
+    Boolean(data && !loading && !insufficient && hasNoComparableChanges(data));
+  const risingList = data ? postsForTab('rising', data) : [];
   const hasTrendData =
-    data &&
-    !loading &&
-    (data.summary.total_posts > 0 ||
-      data.top_gainers.length > 0 ||
-      data.top_decliners.length > 0);
+    Boolean(
+      data &&
+        !loading &&
+        !insufficient &&
+        (data.summary.total_posts > 0 ||
+          postsForTab('top', data).length > 0 ||
+          risingList.length > 0 ||
+          postsForTab('falling', data).length > 0),
+    );
 
   const showContributionBadges = useMemo(
-    () => (data ? shouldShowContributionBadges(data.top_gainers) : false),
-    [data],
+    () => shouldShowContributionBadges(risingList),
+    [risingList],
   );
+
+  const tabPosts = useMemo(() => (data ? postsForTab(activeTab, data) : []), [activeTab, data]);
+  const tabCounts = useMemo(() => {
+    if (!data) return undefined;
+    return {
+      top: postsForTab('top', data).length,
+      rising: postsForTab('rising', data).length,
+      falling: postsForTab('falling', data).length,
+    };
+  }, [data]);
 
   return (
     <DashboardActionModal
       open={open}
-      title="Engagement Trends"
+      title={ENGAGEMENT_SINCE_TITLE}
       onClose={onClose}
       {...ENGAGEMENT_TRENDS_MODAL_SIZE}
     >
       <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
-        {!data && !loading && (
-          <p style={{ margin: '0 0 12px', fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
-            See how your post engagement has changed between the last two syncs — track growth,
-            spot declines, and measure what works.
-          </p>
-        )}
+        <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+          {ENGAGEMENT_SINCE_SUBTITLE}
+        </p>
+
+        <EngagementTrendsPeriodChips
+          value={period}
+          onChange={handlePeriodChange}
+          disabled={loading}
+        />
 
         {!connected && !data && !loading && (
           <CacheEmptyPrompt
             icon="🔗"
-            title="LinkedIn not connected"
-            description="Connect your LinkedIn account first to view engagement trends."
-            buttonLabel="⟳ Sync Posts Now"
+            title={EMPTY_COPY.notConnectedTitle}
+            description={EMPTY_COPY.notConnectedDescription}
+            buttonLabel={EMPTY_COPY.syncButton}
             onLoad={handleSync}
             disabled
           />
@@ -242,11 +282,11 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
         {connected && !data && !loading && !error && (
           <CacheEmptyPrompt
             icon="📈"
-            title="No trends yet"
-            description="Sync your LinkedIn posts at least twice to see engagement trends."
-            buttonLabel="⟳ Sync Posts Now"
+            title={EMPTY_COPY.noDataTitle}
+            description={EMPTY_COPY.noDataDescription}
+            buttonLabel={EMPTY_COPY.syncButton}
             onLoad={handleSync}
-            disabled={loading}
+            disabled={loading || syncOnCooldown}
           />
         )}
 
@@ -254,7 +294,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
             <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
-              Could not load trends
+              {EMPTY_COPY.loadErrorTitle}
             </div>
             <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 14 }}>{error}</div>
             <button
@@ -267,27 +307,27 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                 cursor: loading ? 'not-allowed' : 'pointer',
               }}
             >
-              🔁 Retry
+              {EMPTY_COPY.retry}
             </button>
           </div>
         )}
 
-        {loading && <LoadingRow message="Computing engagement trends…" />}
+        {loading && <LoadingRow message={EMPTY_COPY.loading} />}
 
         {data && !loading && (
           <>
-            {showInsufficientSnapshots && !data.last_synced_at && (
+            {insufficient && !data.last_synced_at && (
               <CacheEmptyPrompt
                 icon="📈"
-                title="No trends yet"
-                description="Sync your LinkedIn posts at least twice to see engagement trends."
-                buttonLabel="⟳ Sync Posts Now"
+                title={EMPTY_COPY.noDataTitle}
+                description={insufficientHistoryMessage(data)}
+                buttonLabel={EMPTY_COPY.syncButton}
                 onLoad={handleSync}
-                disabled={loading}
+                disabled={loading || syncOnCooldown}
               />
             )}
 
-            {showInsufficientSnapshots && data.last_synced_at && (
+            {insufficient && data.last_synced_at && (
               <div
                 style={{
                   textAlign: 'center',
@@ -300,10 +340,10 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
               >
                 <div style={{ fontSize: 24, marginBottom: 8 }}>📈</div>
                 <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
-                  Not enough history to compare
+                  {EMPTY_COPY.insufficientTitle}
                 </div>
                 <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
-                  Sync again after your post metrics change to build a comparison snapshot.
+                  {insufficientHistoryMessage(data)}
                 </div>
               </div>
             )}
@@ -314,53 +354,49 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
               <EngagementTrendsSummaryGrid summary={data.summary} />
             )}
 
-            {data.top_gainers.length > 0 && (
-              <EngagementGrowthDriversSection
-                period={data.period}
-                summary={data.summary}
-                showContributionBadges={showContributionBadges}
-              >
-                {data.top_gainers.map((post) => (
-                  <PostDeltaRow
-                    key={post.post_id}
-                    post={post}
-                    gain
+            {hasTrendData && (
+              <>
+                <EngagementTrendsPostTabs
+                  value={activeTab}
+                  onChange={setActiveTab}
+                  counts={tabCounts}
+                  disabled={loading}
+                />
+
+                {activeTab === 'rising' && risingList.length > 0 && (
+                  <EngagementGrowthDriversSection
+                    summary={data.summary}
+                    showContributionBadges={showContributionBadges}
+                  >
+                    <EngagementTrendsPostList
+                      tab="rising"
+                      posts={tabPosts}
+                      showContribution={showContributionBadges}
+                      onViewComments={setCommentsPost}
+                    />
+                  </EngagementGrowthDriversSection>
+                )}
+
+                {(activeTab !== 'rising' || risingList.length === 0) && (
+                  <EngagementTrendsPostList
+                    tab={activeTab}
+                    posts={tabPosts}
                     showContribution={showContributionBadges}
                     onViewComments={setCommentsPost}
                   />
-                ))}
-              </EngagementGrowthDriversSection>
-            )}
-
-            {data.top_decliners.length > 0 && (
-              <div style={{ marginBottom: 10 }}>
-                <div
-                  style={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    color: '#dc2626',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.5,
-                    marginBottom: 6,
-                  }}
-                >
-                  📉 Top decliners
-                </div>
-                {data.top_decliners.map((post) => (
-                  <PostDeltaRow
-                    key={post.post_id}
-                    post={post}
-                    gain={false}
-                    onViewComments={setCommentsPost}
-                  />
-                ))}
-              </div>
+                )}
+              </>
             )}
 
             <button
               type="button"
               onClick={handleSync}
-              disabled={loading}
+              disabled={loading || syncOnCooldown}
+              title={
+                syncOnCooldown && cooldownHint
+                  ? `${EMPTY_COPY.syncCooldownPrefix} (${cooldownHint})`
+                  : undefined
+              }
               style={{
                 width: '100%',
                 padding: '7px',
@@ -369,21 +405,36 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                 borderRadius: 6,
                 fontSize: 11,
                 color: colors.textSecondary,
-                cursor: loading ? 'not-allowed' : 'pointer',
+                cursor: loading || syncOnCooldown ? 'not-allowed' : 'pointer',
                 fontWeight: 600,
                 marginTop: 4,
-                opacity: loading ? 0.6 : 1,
+                opacity: loading || syncOnCooldown ? 0.6 : 1,
               }}
             >
-              ⟳ Sync Latest & Recompute
+              {EMPTY_COPY.syncButton}
             </button>
+            {syncOnCooldown && cooldownHint && (
+              <div
+                style={{
+                  marginTop: 6,
+                  fontSize: 10,
+                  color: '#b45309',
+                  textAlign: 'center',
+                  lineHeight: 1.4,
+                }}
+              >
+                {EMPTY_COPY.syncCooldownPrefix} ({cooldownHint}).
+              </div>
+            )}
 
             <EngagementTrendsMetadataFooter
               lastSyncedAt={data.last_synced_at}
               period={data.period}
-              showComparison={!hasInsufficientSnapshots(data.period)}
+              showComparison={!insufficient}
               onRefresh={handleSync}
               loading={loading}
+              syncDisabled={syncOnCooldown}
+              syncCooldownHint={cooldownHint}
             />
           </>
         )}
