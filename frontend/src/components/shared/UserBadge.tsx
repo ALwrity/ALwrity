@@ -13,6 +13,7 @@ import { useUser, useClerk } from '@clerk/clerk-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import SystemStatusIndicator from '../ContentPlanningDashboard/components/SystemStatusIndicator';
 import UsageDashboard from './UsageDashboard';
+import AlertsBadge from './AlertsBadge';
 import { isFeatureOnlyMode } from '../../utils/demoMode';
 import {
   apiClient,
@@ -243,26 +244,6 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-      {/* Subscription Plan Chip */}
-      <Chip
-        label={getPlanLabel()}
-        size="small"
-        sx={{
-          bgcolor: loading ? '#e5e7eb' : `${getPlanColor()}20`,
-          border: loading ? '1px solid #d1d5db' : `1px solid ${getPlanColor()}`,
-          color: loading ? '#9ca3af' : getPlanColor(),
-          fontWeight: 700,
-          fontSize: '0.75rem',
-          height: 24,
-          minWidth: loading ? 60 : 'auto',
-          animation: loading ? 'plan-pulse 1.5s ease-in-out infinite' : 'none',
-          '@keyframes plan-pulse': {
-            '0%, 100%': { opacity: 1 },
-            '50%': { opacity: 0.4 },
-          },
-        }}
-      />
-      
       <Tooltip title="User Navigation Menu"> 
         <Box sx={{ position: 'relative', display: 'inline-flex' }}>
           <Avatar
@@ -334,9 +315,32 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1a1a2e', fontSize: '0.9rem' }}>
             {user?.fullName || user?.username || 'User'}
           </Typography>
-          <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
-            {user?.primaryEmailAddress?.emailAddress}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 0.5 }}>
+            <Typography variant="caption" sx={{ color: '#6b7280', fontSize: '0.75rem' }}>
+              {user?.primaryEmailAddress?.emailAddress}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <AlertsBadge colorMode={colorMode} />
+              <Chip
+                label={getPlanLabel()}
+                size="small"
+                sx={{
+                  bgcolor: loading ? '#e5e7eb' : `${getPlanColor()}20`,
+                  border: loading ? '1px solid #d1d5db' : `1px solid ${getPlanColor()}`,
+                  color: loading ? '#9ca3af' : getPlanColor(),
+                  fontWeight: 700,
+                  fontSize: '0.65rem',
+                  height: 22,
+                  minWidth: loading ? 50 : 'auto',
+                  animation: loading ? 'plan-pulse 1.5s ease-in-out infinite' : 'none',
+                  '@keyframes plan-pulse': {
+                    '0%, 100%': { opacity: 1 },
+                    '50%': { opacity: 0.4 },
+                  },
+                }}
+              />
+            </Box>
+          </Box>
         </Box>
 
         {/* LinkedIn Identity Mirror Card + Active Persona Chip */}
@@ -346,25 +350,8 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
           onClose={handleClose}
         />
 
-        {/* Subscription Info */}
-        <Box sx={{ px: 2.5, py: 1.5, bgcolor: '#f8f9fb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 600, color: '#6b7280', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Current Plan
-            </Typography>
-            <Chip
-              label={getPlanLabel()}
-              size="small"
-              sx={{
-                bgcolor: `${getPlanColor()}15`,
-                border: `1.5px solid ${getPlanColor()}40`,
-                color: getPlanColor(),
-                fontWeight: 700,
-                fontSize: '0.75rem',
-                height: 26,
-              }}
-            />
-          </Box>
+        {/* Subscription Refresh */}
+        <Box sx={{ px: 2.5, py: 1, bgcolor: '#f8f9fb', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <Tooltip title="Refresh subscription status">
             <IconButton 
               onClick={handleRefreshPlan} 
@@ -372,10 +359,15 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light' }) => {
               disabled={isRefreshing || loading}
               sx={{ 
                 color: '#6b7280',
+                gap: 0.5,
+                fontSize: '0.75rem',
                 '&:hover': { bgcolor: '#e5e7eb' },
               }}
             >
-              {(isRefreshing || loading) ? <CircularProgress size={16} /> : <RefreshIcon fontSize="small" />}
+              {(isRefreshing || loading) ? <CircularProgress size={14} /> : <RefreshIcon fontSize="small" />}
+              <Typography variant="caption" sx={{ fontWeight: 600, color: '#6b7280' }}>
+                Refresh Plan
+              </Typography>
             </IconButton>
           </Tooltip>
         </Box>

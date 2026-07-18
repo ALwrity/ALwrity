@@ -325,7 +325,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
             >
               {localProfilePhotoUrl || profilePictureUrl ? (
                 <img
-                  src={localProfilePhotoUrl || profilePictureUrl}
+                  src={localProfilePhotoUrl || profilePictureUrl || undefined}
                   alt="Profile"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />

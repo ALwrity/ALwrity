@@ -24,7 +24,6 @@ import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialCon
 import { useLinkedInSearch } from '../hooks/useLinkedInSearch';
 import { LinkedInSearchBar } from './search/LinkedInSearchBar';
 import { LinkedInSearchModal } from './search/LinkedInSearchModal';
-import GifIcon from '@mui/icons-material/Gif';
 
 const NAV_TITLE_CLASS = 'linkedin-writer-header-title';
 
@@ -578,18 +577,10 @@ export const Header: React.FC<HeaderProps> = ({
             onChange={linkedInSearch.setQuery}
             onSearch={() => void linkedInSearch.runSearch()}
             disabled={!connected}
+            connected={connected}
             size="nav"
           />
-          <button
-            type="button"
-            className="linkedin-writer-header-gif-btn"
-            onClick={() => { window.location.href = '/gif-maker'; }}
-            title="GIF Maker — Record UI flows for marketing"
-            aria-label="Open GIF Maker"
-          >
-            <GifIcon sx={{ fontSize: 22 }} />
-          </button>
-          <HeaderControls colorMode="light" showAlerts={true} showUser={true} gap={1} />
+          <HeaderControls colorMode="light" gap={1} />
         </div>
       </div>
       

@@ -8,7 +8,6 @@ import {
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { DashboardRailIconButton } from './DashboardRailIconButton';
 import { StudioModalCloseButton } from './StudioModalCloseButton';
-import { useDesktopViewport } from '../../hooks/useDesktopViewport';
 
 export type KnowledgeCenterAction =
   | 'featureMap'
@@ -41,10 +40,9 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     null
   );
   const anchorRef = useRef<HTMLDivElement>(null);
-  const desktopViewport = useDesktopViewport();
   const isRail = variant === 'rail';
-  /** Phase 7 — on mobile, expand inline in the analytics section (no floating portal). */
-  const useInlinePanel = !isRail || !desktopViewport;
+  /** Always render inline in the rail — structural sidebar, not floating overlay */
+  const useInlinePanel = !isRail;
 
   useEffect(() => {
     if (!expanded) return;
