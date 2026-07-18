@@ -5,7 +5,7 @@ interface LinkedInSearchBarProps {
   onChange: (value: string) => void;
   onSearch: () => void;
   disabled?: boolean;
-  size?: 'nav' | 'default';
+  size?: 'nav' | 'mobileStrip' | 'default';
   connected?: boolean;
 }
 
@@ -36,6 +36,7 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
 }) => {
   const inputId = useId();
   const isNav = size === 'nav';
+  const isMobileStrip = size === 'mobileStrip';
   const [showInfo, setShowInfo] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
@@ -62,10 +63,10 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
   useEffect(() => {
     return () => clearTimeout(timeoutRef.current);
   }, []);
-
   const rootClass = [
     'linkedin-search-bar',
     isNav && 'linkedin-search-bar--nav',
+    isMobileStrip && 'linkedin-search-bar--mobile-strip',
     disabled && 'linkedin-search-bar--disabled',
   ]
     .filter(Boolean)

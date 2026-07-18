@@ -17,7 +17,6 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
     <aside
       className="linkedin-dashboard-right-rail linkedin-dashboard-data-section"
       aria-label="Dashboard tools"
-      data-tour="li-mobile-analytics"
       style={{
         width: DASHBOARD_RIGHT_RAIL_WIDTH,
         flexShrink: 0,

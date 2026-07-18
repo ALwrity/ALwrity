@@ -8,16 +8,18 @@ interface HeaderControlsProps {
   showAlerts?: boolean;
   /** @deprecated always shown now */
   showUser?: boolean;
+  showPlanChip?: boolean;
   gap?: number;
 }
 
 const HeaderControls: React.FC<HeaderControlsProps> = ({
   colorMode = 'light',
+  showPlanChip = true,
   gap = 1.5,
 }) => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap }}>
-      <UserBadge colorMode={colorMode} />
+      <UserBadge colorMode={colorMode} showPlanChip={showPlanChip} />
     </Box>
   );
 };

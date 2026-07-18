@@ -12,8 +12,16 @@ interface DashboardRailIconButtonProps {
   alwaysShowLabel?: boolean;
   /** Icon before label (toolbar pills). Default: label expands left of right-aligned icon. */
   iconLeading?: boolean;
+  /** Pill (default) or mobile studio tab strip. */
+  layout?: 'pill' | 'tab';
   /** Emoji replaces the SVG icon (e.g. growth 🚀). */
   emojiIcon?: string;
+  /** Shorter visible label on narrow screens (full string stays in aria-label). */
+  shortLabel?: string;
+  /** Two-line tab label (mobile studio tabs). */
+  stackedLabel?: readonly [string, string];
+  /** Orange dot on icon (e.g. draft exists on Resume). */
+  showBadge?: boolean;
   title?: string;
 }
 
@@ -105,10 +113,16 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
   ariaExpanded,
   alwaysShowLabel = false,
   iconLeading = false,
+  layout = 'pill',
   emojiIcon,
+  shortLabel,
+  stackedLabel,
+  showBadge = false,
   title,
 }) => {
   const iconNode = emojiIcon ?? ICONS[icon];
+
+  const isTab = layout === 'tab';
 
   return (
     <button
@@ -119,23 +133,64 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
         open && 'linkedin-rail-icon-trigger--open',
         alwaysShowLabel && 'linkedin-rail-icon-trigger--labeled',
         iconLeading && 'linkedin-rail-icon-trigger--icon-leading',
+        shortLabel && 'linkedin-rail-icon-trigger--responsive-label',
+        isTab && 'linkedin-writer-header-studio-tab',
+        isTab && open && 'linkedin-writer-header-studio-tab--active',
       ].filter(Boolean).join(' ')}
       onClick={onClick}
       aria-label={label}
       aria-expanded={ariaExpanded}
       title={title ?? label}
+      role={isTab ? 'tab' : undefined}
     >
-      {iconLeading ? (
+      {isTab ? (
+        <>
+          <span
+            className={[
+              'linkedin-writer-header-studio-tab-label',
+              stackedLabel && 'linkedin-writer-header-studio-tab-label--stacked',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {stackedLabel ? (
+              <>
+                <span className="linkedin-writer-header-studio-tab-label-line">{stackedLabel[0]}</span>
+                <span className="linkedin-writer-header-studio-tab-label-line">{stackedLabel[1]}</span>
+              </>
+            ) : (
+              shortLabel ?? label
+            )}
+          </span>
+          <span
+            className={[
+              'linkedin-writer-header-studio-tab-icon',
+              showBadge && 'linkedin-writer-header-studio-tab-icon--badged',
+            ].filter(Boolean).join(' ')}
+            aria-hidden
+          >
+            {emojiIcon ?? iconNode}
+          </span>
+        </>
+      ) : iconLeading ? (
         <>
           <span
             className={[
               'linkedin-rail-icon-trigger-icon',
               emojiIcon && 'linkedin-rail-icon-trigger-icon--emoji',
+              showBadge && 'linkedin-rail-icon-trigger-icon--badged',
             ].filter(Boolean).join(' ')}
           >
             {iconNode}
           </span>
-          <span className="linkedin-rail-icon-trigger-label">{label}</span>
+          {shortLabel ? (
+            <>
+              <span className="linkedin-rail-icon-trigger-label linkedin-rail-icon-trigger-label--full">{label}</span>
+              <span className="linkedin-rail-icon-trigger-label linkedin-rail-icon-trigger-label--short">{shortLabel}</span>
+            </>
+          ) : (
+            <span className="linkedin-rail-icon-trigger-label">{label}</span>
+          )}
         </>
       ) : (
         <>
