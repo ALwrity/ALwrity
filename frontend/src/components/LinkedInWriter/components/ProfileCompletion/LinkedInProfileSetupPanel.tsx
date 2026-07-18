@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useLinkedInProfileCompletion } from '../../../../hooks/useLinkedInProfileCompletion';
 import { useLinkedInProfileOptimization } from '../../../../hooks/useLinkedInProfileOptimization';
 import { LinkedInConnectedProfileCard } from '../LinkedInConnectedProfileCard';
+import { LinkedInProfileHubStrip } from '../LinkedInProfileHubStrip';
 import { TopicRecommendationsPanel } from '../TopicRecommendations/TopicRecommendationsPanel';
 import { AnalysisErrorAlert } from '../TopicRecommendations/TopicSuggestionIntro';
 import { LinkedInAdvisorActionsBar } from '../ProfileOptimization/LinkedInAdvisorActionsBar';
@@ -20,6 +21,7 @@ import {
 } from '../../utils/profileStrengthUtils';
 import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
+import { STUDIO_TAB_ACTION_MODAL_CLASS } from '../dashboard/dashboardLayoutConstants';
 import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
 
 const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed_v2';
@@ -62,6 +64,8 @@ interface LinkedInProfileSetupPanelProps {
   disconnectError?: string | null;
   centered?: boolean;
   hideDisconnectButton?: boolean;
+  /** Mobile hero: compact profile strip with inline connect/disconnect. */
+  mobileProfileStrip?: boolean;
 }
 
 export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps> = ({
@@ -72,6 +76,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   disconnectError,
   centered = false,
   hideDisconnectButton = false,
+  mobileProfileStrip = false,
 }) => {
   const {
     foundationStatus,
@@ -125,15 +130,6 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     markingRecommendationId,
     isLoadingNextBatch,
     showNextBatchCta,
-    localProfilePhotoUrl,
-    uploadingProfilePhoto,
-    profilePhotoUploadError,
-    handleUploadProfilePhoto,
-    transformedProfilePhotoUrl,
-    transformingProfilePhoto,
-    profilePhotoTransformError,
-    handleMakeProfilePhotoPresentable,
-    handleDownloadProfilePhoto,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
   const handleImproveProfile = () => {
@@ -313,19 +309,31 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         />
       )}
 
-      <LinkedInConnectedProfileCard
-        displayName={displayName}
-        avatarUrl={avatarUrl}
-        onDisconnect={onDisconnect}
-        isDisconnecting={isDisconnecting}
-        disconnectError={disconnectError}
-        centered={centered}
-        onOptimiseProfile={centered ? handleImproveProfile : undefined}
-        strengthTooltip={centered ? strengthTooltip : undefined}
-        isOptimiseDisabled={isOptimizationDisabled || foundationStatus !== 'ready'}
-        isOptimiseLoading={isOptimizationLoading}
-        hideDisconnectButton={hideDisconnectButton}
-      />
+      {mobileProfileStrip ? (
+        <LinkedInProfileHubStrip
+          connected
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          isDisconnecting={isDisconnecting}
+          onDisconnect={onDisconnect}
+        />
+      ) : (
+        <LinkedInConnectedProfileCard
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          onDisconnect={onDisconnect}
+          isDisconnecting={isDisconnecting}
+          disconnectError={disconnectError}
+          centered={centered}
+          onOptimiseProfile={centered ? handleImproveProfile : undefined}
+          profileStrengthPercent={centered ? profileStrengthPercent : null}
+          strengthLabel={centered ? strengthLabel : undefined}
+          strengthTooltip={centered ? strengthTooltip : undefined}
+          isOptimiseDisabled={isOptimizationDisabled || foundationStatus !== 'ready'}
+          isOptimiseLoading={isOptimizationLoading}
+          hideDisconnectButton={hideDisconnectButton}
+        />
+      )}
 
       {showAdvisorBar && (
         <LinkedInAdvisorActionsBar
@@ -350,6 +358,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         typeof document !== 'undefined' &&
         createPortal(
           <div
+            className={`linkedin-profile-optimization-overlay ${STUDIO_TAB_ACTION_MODAL_CLASS}`}
             role="dialog"
             aria-modal="true"
             aria-label="Profile optimization suggestions"
@@ -367,6 +376,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
             }}
           >
             <div
+              className={`linkedin-profile-optimization-dialog ${STUDIO_TAB_ACTION_MODAL_CLASS}`}
               onClick={(e) => e.stopPropagation()}
               style={{
                 width: 'min(980px, 100%)',
@@ -413,16 +423,6 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 sectionScores={profileValidation?.section_scores ?? null}
                 aiProfileIntelligence={aiProfileIntelligence}
                 profileStrengthPercent={profileStrengthPercent}
-                profilePictureUrl={avatarUrl}
-                localProfilePhotoUrl={localProfilePhotoUrl}
-                transformedProfilePhotoUrl={transformedProfilePhotoUrl}
-                uploadingProfilePhoto={uploadingProfilePhoto}
-                profilePhotoUploadError={profilePhotoUploadError}
-                onUploadProfilePhoto={handleUploadProfilePhoto}
-                transformingProfilePhoto={transformingProfilePhoto}
-                profilePhotoTransformError={profilePhotoTransformError}
-                onMakeProfilePhotoPresentable={handleMakeProfilePhotoPresentable}
-                onDownloadProfilePhoto={handleDownloadProfilePhoto}
                 recheckDelta={recheckDelta}
                 isRechecking={isRechecking}
                 onRecheckProfile={() => {
@@ -466,16 +466,6 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           sectionScores={profileValidation?.section_scores ?? null}
           aiProfileIntelligence={aiProfileIntelligence}
           profileStrengthPercent={profileStrengthPercent}
-          profilePictureUrl={avatarUrl}
-          localProfilePhotoUrl={localProfilePhotoUrl}
-          transformedProfilePhotoUrl={transformedProfilePhotoUrl}
-          uploadingProfilePhoto={uploadingProfilePhoto}
-          profilePhotoUploadError={profilePhotoUploadError}
-          onUploadProfilePhoto={handleUploadProfilePhoto}
-          transformingProfilePhoto={transformingProfilePhoto}
-          profilePhotoTransformError={profilePhotoTransformError}
-          onMakeProfilePhotoPresentable={handleMakeProfilePhotoPresentable}
-          onDownloadProfilePhoto={handleDownloadProfilePhoto}
           recheckDelta={recheckDelta}
           isRechecking={isRechecking}
           onRecheckProfile={() => {

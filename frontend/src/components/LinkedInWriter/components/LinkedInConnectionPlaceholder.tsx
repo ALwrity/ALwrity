@@ -3,6 +3,8 @@ import { LinkedIn as LinkedInIcon } from '@mui/icons-material';
 import { CircularProgress } from '@mui/material';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { LinkedInProfileSetupPanel } from './ProfileCompletion/LinkedInProfileSetupPanel';
+import { LinkedInProfileHubStrip } from './LinkedInProfileHubStrip';
+import { useDesktopViewport } from '../hooks/useDesktopViewport';
 import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 import { DashboardActionModal } from './dashboard/DashboardActionModal';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
@@ -31,14 +33,15 @@ const CONNECT_BUTTON_STYLE: React.CSSProperties = {
 };
 
 const CONNECT_WELCOME_TITLE = "Let's Supercharge Your LinkedIn! 🔥";
-const CONNECT_WELCOME_LEAD = 'Connect your account to unlock full power of ALwrity';
+const CONNECT_WELCOME_LEAD =
+  'Your AI co-pilot for LinkedIn — you stay in control of every post.';
 const CONNECT_WELCOME_BENEFITS: ReadonlyArray<{ icon: string; label: string }> = [
   { icon: '🚀', label: 'Publish instantly' },
   { icon: '🔍', label: 'In-depth profile insights' },
   { icon: '🎯', label: 'Smarter Analytics' },
 ];
 const CONNECT_WELCOME_REASSURANCE =
-  'Not ready to commit just yet? No worries! You can still explore our planning and creation tools without connecting.';
+  'Explore planning and creation tools first — connect when you\'re ready to publish.';
 const CONNECT_WELCOME_SIGN_IN_HINT = 'Sign in via LinkedIn and choose your personal profile';
 const CONNECT_WELCOME_CTA = 'Connect LinkedIn⚡';
 const CONNECT_WELCOME_DISMISS_LABEL = 'Explore first';
@@ -162,6 +165,8 @@ const DisconnectedState: React.FC<{
   onConnect: () => void;
   centered?: boolean;
   splitConnectAction?: boolean;
+  mobileProfileStrip?: boolean;
+  relocateMobileProfileStrip?: boolean;
   onConnectWelcomeDismissed?: () => void;
   onConnectWelcomeOpenChange?: (open: boolean) => void;
   userId?: string | null;
@@ -172,6 +177,8 @@ const DisconnectedState: React.FC<{
   onConnect,
   centered = false,
   splitConnectAction = false,
+  mobileProfileStrip = false,
+  relocateMobileProfileStrip = false,
   onConnectWelcomeDismissed,
   onConnectWelcomeOpenChange,
   userId,
@@ -253,6 +260,7 @@ const DisconnectedState: React.FC<{
           maxWidth={500}
           titleSize="lg"
           elevated
+          modalClassName="linkedin-connect-welcome-modal"
         >
           <p style={{ margin: '0 0 10px', color: '#1e293b', fontSize: 15, lineHeight: 1.55, fontWeight: 500 }}>
             {CONNECT_WELCOME_LEAD}
@@ -283,18 +291,32 @@ const DisconnectedState: React.FC<{
 
         <div
           className="linkedin-profile-hub-cluster"
-          data-tour="li-profile-hub"
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            marginBottom: 0,
-            transform: 'translateY(0)',
-          }}
+          data-tour={mobileProfileStrip ? 'li-profile-hub' : undefined}
+          style={
+            mobileProfileStrip
+              ? { width: '100%', margin: 0 }
+              : relocateMobileProfileStrip
+                ? { width: 0, height: 0, overflow: 'hidden', margin: 0, padding: 0 }
+                : {
+                    width: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    marginBottom: 0,
+                    transform: 'translateY(0)',
+                  }
+          }
         >
+          {mobileProfileStrip ? (
+            <LinkedInProfileHubStrip
+              connected={false}
+              isConnecting={isConnecting}
+              onConnect={onConnect}
+            />
+          ) : relocateMobileProfileStrip ? null : (
+            <>
           <div style={{ position: 'relative' }}>
             <div
               style={{
@@ -337,6 +359,8 @@ const DisconnectedState: React.FC<{
                 {connectCtaLabel}
               </button>
             </div>
+          )}
+            </>
           )}
         </div>
       </>
@@ -583,6 +607,7 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
 export const LinkedInConnectionPlaceholder: React.FC<{
   centered?: boolean;
   splitConnectAction?: boolean;
+  relocateMobileProfileStrip?: boolean;
   socialConnection?: LinkedInSocialConnectionState;
   isDisconnecting?: boolean;
   onDisconnect?: () => Promise<void>;
@@ -592,6 +617,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
 }> = ({
   centered = false,
   splitConnectAction = false,
+  relocateMobileProfileStrip = false,
   socialConnection,
   isDisconnecting: isDisconnectingProp = false,
   onDisconnect: onDisconnectProp,
@@ -600,6 +626,8 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   userId,
 }) => {
   const internalSocial = useLinkedInSocialConnection();
+  const desktopViewport = useDesktopViewport();
+  const mobileProfileStrip = centered && !desktopViewport && !relocateMobileProfileStrip;
   const {
     connected,
     isLoading,
@@ -644,15 +672,19 @@ export const LinkedInConnectionPlaceholder: React.FC<{
 
   if (connected) {
     return (
-      <div data-tour="li-profile-hub" style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div
+        data-tour={relocateMobileProfileStrip ? undefined : 'li-profile-hub'}
+        style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+      >
         <LinkedInProfileSetupPanel
           centered={centered}
+          mobileProfileStrip={mobileProfileStrip}
           displayName={displayName}
           avatarUrl={avatarUrl}
           onDisconnect={showDisconnect ? handleDisconnect : undefined}
           isDisconnecting={isDisconnecting}
           disconnectError={disconnectError}
-          hideDisconnectButton={centered && splitConnectAction}
+          hideDisconnectButton={centered && splitConnectAction && !mobileProfileStrip}
         />
       </div>
     );
@@ -662,6 +694,8 @@ export const LinkedInConnectionPlaceholder: React.FC<{
     <DisconnectedState
       centered={centered}
       splitConnectAction={splitConnectAction}
+      mobileProfileStrip={mobileProfileStrip}
+      relocateMobileProfileStrip={relocateMobileProfileStrip}
       isConnecting={isConnecting}
       connectError={connectError}
       statusError={error}

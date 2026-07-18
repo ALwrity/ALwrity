@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { getInitials } from '../utils/linkedInProfileSummary';
 import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
 import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
+import { ProfileStrengthTicker } from './dashboard/ProfileStrengthTicker';
 import { buildAvatarProxyUrl } from '../../../api/linkedinSocial';
 
 interface LinkedInConnectedProfileCardProps {
@@ -12,6 +13,8 @@ interface LinkedInConnectedProfileCardProps {
   disconnectError?: string | null;
   centered?: boolean;
   onOptimiseProfile?: () => void;
+  profileStrengthPercent?: number | null;
+  strengthLabel?: string;
   strengthTooltip?: string;
   isOptimiseDisabled?: boolean;
   isOptimiseLoading?: boolean;
@@ -30,6 +33,8 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
   disconnectError,
   centered = false,
   onOptimiseProfile,
+  profileStrengthPercent = null,
+  strengthLabel = '',
   strengthTooltip = '',
   isOptimiseDisabled = false,
   isOptimiseLoading = false,
@@ -87,20 +92,39 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
           }}
         >
           {onOptimiseProfile && (
-            <button
-              type="button"
-              className="linkedin-profile-optimise-btn"
-              onClick={onOptimiseProfile}
-              disabled={isOptimiseDisabled || isOptimiseLoading}
-              title={
-                isOptimiseLoading
-                  ? 'Optimising profile...'
-                  : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
-              }
-              aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
-            >
-              {isOptimiseLoading ? '…' : '✦'}
-            </button>
+            <div className="linkedin-profile-optimise-hover-wrap">
+              <button
+                type="button"
+                className="linkedin-profile-optimise-btn"
+                onClick={onOptimiseProfile}
+                disabled={isOptimiseDisabled || isOptimiseLoading}
+                title={
+                  isOptimiseLoading
+                    ? 'Optimising profile...'
+                    : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
+                }
+                aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
+                aria-describedby={
+                  profileStrengthPercent != null ? 'linkedin-profile-strength-hover-tracker' : undefined
+                }
+              >
+                {isOptimiseLoading ? '…' : '✦'}
+              </button>
+              {profileStrengthPercent != null && (
+                <div
+                  id="linkedin-profile-strength-hover-tracker"
+                  className="linkedin-profile-optimise-hover-tracker"
+                  role="tooltip"
+                >
+                  <ProfileStrengthTicker
+                    percent={profileStrengthPercent}
+                    strengthLabel={strengthLabel}
+                    strengthTooltip={strengthTooltip}
+                    variant="popover"
+                  />
+                </div>
+              )}
+            </div>
           )}
           <div
             className="linkedin-profile-avatar-wrap linkedin-profile-connected"
@@ -172,6 +196,23 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
           )}
           </div>
         </div>
+
+        {onOptimiseProfile && (
+          <button
+            type="button"
+            className="linkedin-profile-optimise-pill-mobile"
+            onClick={onOptimiseProfile}
+            disabled={isOptimiseDisabled || isOptimiseLoading}
+            title={
+              isOptimiseLoading
+                ? 'Optimising profile...'
+                : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
+            }
+            aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
+          >
+            {isOptimiseLoading ? 'Optimising…' : 'Optimise Profile →'}
+          </button>
+        )}
 
         {showDisconnect && (
           <button
