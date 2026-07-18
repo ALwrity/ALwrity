@@ -26,7 +26,7 @@ from services.integrations.linkedin.types import (
 
 _STUB_MSG = (
     "Native LinkedIn Marketing API provider is not implemented yet. "
-    "Set LINKEDIN_PROVIDER=zernio to use Zernio."
+    "Set LINKEDIN_PROVIDER=unipile (default)."
 )
 
 

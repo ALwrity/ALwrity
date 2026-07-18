@@ -21,7 +21,7 @@ from .types import (
 
 @runtime_checkable
 class LinkedInSocialProvider(Protocol):
-    """Abstract contract for LinkedIn platform operations (Zernio or native API)."""
+    """Abstract contract for LinkedIn platform operations (Unipile or native API)."""
 
     @property
     def provider_name(self) -> str:

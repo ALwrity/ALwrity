@@ -199,7 +199,7 @@ export const useLinkedInSocialConnection = () => {
     } catch (e: any) {
 
       // 404 means the backend endpoint isn't mounted in this deployment
-      // (mid-migration: zernio/zenio → Unipile). The catch block below
+      // (Unipile connect path). The catch block below
       // already falls back to "not connected" + clears the error
       // message for the user, so we only need to avoid spamming
       // console.error here. For any other error (5xx, network), keep
@@ -217,7 +217,7 @@ export const useLinkedInSocialConnection = () => {
 
         connected: false,
 
-        provider: 'zernio',
+        provider: 'unipile',
 
         has_per_user_token: false,
 
@@ -523,7 +523,7 @@ export const useLinkedInSocialConnection = () => {
 
 
   const setDisconnected = useCallback(() => {
-    setStatus({ connected: false, provider: 'zernio', has_per_user_token: false, accounts: [] });
+    setStatus({ connected: false, provider: 'unipile', has_per_user_token: false, accounts: [] });
     setAccounts([]);
     setOrganizations([]);
     setError(null);
@@ -627,7 +627,7 @@ export const useLinkedInSocialConnection = () => {
 
   const connected = status?.connected ?? false;
 
-  const provider = status?.provider ?? 'zernio';
+  const provider = status?.provider ?? 'unipile';
 
   const hasPerUserToken = status?.has_per_user_token ?? false;
 

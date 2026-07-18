@@ -54,7 +54,7 @@ function truncateId(id: string, maxLen = 12): string {
 
 function formatProviderLabel(provider: string): string {
 
-  if (provider === 'zernio') return 'Zernio';
+  if (provider === 'unipile') return 'Unipile';
 
   if (provider === 'native') return 'LinkedIn';
 

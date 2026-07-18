@@ -22,7 +22,7 @@ from urllib.parse import quote
 import httpx
 from loguru import logger
 
-from services.integrations.linkedin.zernio_client import avatar_url_from_item
+from services.integrations.linkedin.account_item_utils import avatar_url_from_item
 
 
 DEFAULT_UNIPILE_DSN = "api30.unipile.com:16037"

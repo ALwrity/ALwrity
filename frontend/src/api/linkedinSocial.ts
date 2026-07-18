@@ -457,8 +457,15 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
 
     if (status === 402) {
       return (
-        'LinkedIn connection requires billing on your Zernio account. ' +
-        'Add a payment method in Zernio, then try connecting again.'
+        'LinkedIn connection requires an active billing plan. ' +
+        'Update billing, then try connecting again.'
+      );
+    }
+
+    if (status === 501) {
+      return (
+        (typeof detail === 'string' && detail.trim()) ||
+        'This LinkedIn analytics feature is not available yet.'
       );
     }
 
@@ -476,7 +483,7 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
     }
 
     if (typeof detail === 'string' && detail.trim()) {
-      if (detail.includes('ZERNIO_API_KEY')) {
+      if (detail.includes('UNIPILE_API_KEY') || detail.includes('LINKEDIN_PROVIDER')) {
         return 'LinkedIn is not configured on this server. Contact your administrator.';
       }
       const lowerDetail = detail.toLowerCase();

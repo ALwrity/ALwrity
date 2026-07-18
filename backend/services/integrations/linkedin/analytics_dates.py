@@ -1,8 +1,10 @@
 """
-LinkedIn analytics date-range helpers.
+LinkedIn analytics date-range helpers (provider-agnostic).
 
-LinkedIn / Zernio treat the end date as exclusive. The latest two calendar days
-are typically incomplete — use DATA_LAG_DAYS when computing ranges.
+LinkedIn treats the end date as exclusive. The latest two calendar days are
+typically incomplete — use DATA_LAG_DAYS when computing ranges.
+
+Shared date-range helpers for LinkedIn analytics endpoints.
 """
 
 from __future__ import annotations

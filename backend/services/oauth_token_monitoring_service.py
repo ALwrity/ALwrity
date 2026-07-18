@@ -146,7 +146,7 @@ def get_connected_platforms(user_id: str) -> List[str]:
     - WordPress: wordpress_oauth_tokens table
     - Wix: wix_oauth_tokens table
     - YouTube: youtube_oauth_tokens table
-    - LinkedIn: linkedin_oauth_tokens table (Zernio / native / Unipile)
+    - LinkedIn: linkedin_oauth_tokens table (Unipile / native)
 
     Args:
         user_id: User ID (Clerk string)

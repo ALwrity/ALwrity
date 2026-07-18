@@ -117,11 +117,8 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
 
       {/* Error */}
       {error && !loading && (
-        <div style={{ fontSize: 9, color: '#dc2626', padding: '4px 0' }}>
-          Could not load profile data.{' '}
-          <button type="button" onClick={() => void fetch(preset)} style={{ background: 'none', border: 'none', color: '#0a66c2', cursor: 'pointer', fontSize: 9, padding: 0, fontWeight: 700 }}>
-            Retry
-          </button>
+        <div style={{ fontSize: 9, color: '#64748b', padding: '4px 0' }}>
+          Profile growth analytics are not available yet for Unipile.
         </div>
       )}
 

@@ -1,13 +1,13 @@
 """
-LinkedIn Social API routes (Growth Engine — connect, analytics).
+LinkedIn Social API routes (Growth Engine — connect, profile, publish).
 
+Aggregate analytics live in linkedin_analytics_routes.py.
 Separate from routers/linkedin.py (content generation / LinkedIn Writer).
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import date
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
@@ -24,12 +24,9 @@ from middleware.auth_middleware import clerk_auth, get_current_user, get_current
 from models.linkedin_social_models import (
     LinkedInAccountsListResponse,
     LinkedInAccountResponse,
-    LinkedInAnalyticsResponse,
     LinkedInConnectionStatusResponse,
-    LinkedInLandingAnalyticsResponse,
     LinkedInOrganizationResponse,
     LinkedInOrganizationsListResponse,
-    LinkedInPersonalAnalyticsResponse,
     LinkedInProfileAcquireResponse,
     LinkedInProfileCompleteRequest,
     LinkedInProfileCompleteResponse,
@@ -87,13 +84,7 @@ from services.integrations.linkedin.topic_recommendation_service import (
 from services.integrations.linkedin.topic_recommendation_validator import (
     TopicRecommendationValidationError,
 )
-from services.integrations.linkedin.analytics_dates import (
-    InvalidAnalyticsDateRange,
-    parse_range_request,
-)
 from services.integrations.linkedin.factory import get_linkedin_provider
-from services.integrations.linkedin.landing_analytics import build_landing_analytics_payload
-from services.integrations.linkedin.personal_analytics import build_personal_analytics_payload
 from services.integrations.linkedin.profile_context_service import get_or_build_profile_context
 from services.integrations.linkedin.profile_context_types import ProfileContextBuildError
 from services.integrations.linkedin.profile_completion_questions import build_completion_questions
@@ -118,7 +109,6 @@ from services.integrations.linkedin.unipile_health import (
     check_unipile_health,
     get_cached_unipile_health,
 )
-from services.integrations.linkedin.zernio_client import ZernioAPIError
 from services.integrations.linkedin.linkedin_publish_service import (
     execute_linkedin_publish,
     parse_publish_request,
@@ -1624,10 +1614,6 @@ async def get_connection_status(
     """Return LinkedIn connection state for the authenticated user."""
     user_id = _user_id(current_user)
     status = _oauth_service.get_connection_status(user_id)
-    if status.get("connected"):
-        if status.get("provider") == "zernio":
-            _oauth_service.try_sync_zernio_accounts(user_id)
-            status = _oauth_service.get_connection_status(user_id)
 
     organizations: List[Dict[str, Any]] = []
     if status.get("connected") and status.get("accounts"):
@@ -1688,7 +1674,7 @@ async def get_authorization_url(
     ),
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, str]:
-    """Return OAuth authorization URL for Zernio, Unipile, or native LinkedIn connect."""
+    """Return OAuth authorization URL for Unipile or native LinkedIn connect."""
     user_id = _user_id(current_user)
     logger.info(f"[LinkedInConnect] auth URL requested user_id={user_id}")
     try:
@@ -1709,17 +1695,11 @@ async def get_authorization_url(
         }
     except ValueError as e:
         error_str = str(e).lower()
-        if "zernio_api_key is not configured" in error_str:
-            logger.error(f"[LinkedInConnect] missing ZERNIO_API_KEY user_id={user_id}")
-        elif "unipile_api_key is not configured" in error_str:
+        if "unipile_api_key is not configured" in error_str:
             logger.error(f"[LinkedInConnect] missing UNIPILE_API_KEY user_id={user_id}")
         else:
             logger.warning(f"[LinkedInConnect] configuration error user_id={user_id}: {e}")
         raise HTTPException(status_code=400, detail=str(e)) from e
-    except ZernioAPIError as e:
-        status = e.status_code or 502
-        logger.warning(f"[LinkedInConnect] auth URL Zernio error user_id={user_id}: {e}")
-        raise HTTPException(status_code=status, detail=str(e)) from e
     except UnipileAPIError as e:
         status = e.status_code or 502
         logger.warning(f"[LinkedInConnect] auth URL Unipile error user_id={user_id}: {e}")
@@ -1733,11 +1713,15 @@ async def get_authorization_url(
 async def sync_linkedin_accounts(
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Refresh personal + organization account IDs from Zernio (no new OAuth)."""
+    """Best-effort Unipile account sync when credentials exist remotely."""
     user_id = _user_id(current_user)
     try:
-        accounts = _oauth_service.sync_zernio_accounts(user_id)
-        return {"success": True, "accounts": accounts}
+        synced = await _oauth_service.try_sync_unipile_accounts(user_id)
+        status = _oauth_service.get_connection_status(user_id)
+        return {
+            "success": synced or bool(status.get("connected")),
+            "accounts": status.get("accounts") or [],
+        }
     except LinkedInNotConnectedError as e:
         raise HTTPException(status_code=401, detail=str(e)) from e
     except ValueError as e:
@@ -1757,7 +1741,7 @@ async def handle_oauth_callback_get(
     account_id: Optional[str] = None,
     username: Optional[str] = None,
     alwrity_state: Optional[str] = None,
-    provider: Optional[str] = Query(None, description="OAuth provider (unipile, zernio, native)"),
+    provider: Optional[str] = Query(None, description="OAuth provider (unipile, native)"),
     status: Optional[str] = Query(None, description="Connection status (success, error)"),
     message: Optional[str] = Query(None, description="Error message if status is error"),
     name: Optional[str] = Query(None, description="User ID passed to Unipile as 'name' param"),
@@ -1766,17 +1750,13 @@ async def handle_oauth_callback_get(
     """HTML OAuth callback that stores credentials and notifies opener via postMessage.
 
     Handles callbacks from:
-    - Zernio (legacy): connected, accountId, tempToken params
-    - Unipile (Phase 2): provider=unipile, status=success|error, account_id, name
+    - Unipile: provider=unipile, status=success|error, account_id, name
     - Native LinkedIn: code, state params
     """
     try:
         resolved_account_id = accountId or account_id
-        temp_token = request.query_params.get("tempToken") or request.query_params.get(
-            "temp_token"
-        )
 
-        # Detect Unipile callback (Phase 2)
+        # Detect Unipile callback
         is_unipile_redirect = provider == "unipile"
         if is_unipile_redirect:
             logger.info(
@@ -1836,43 +1816,6 @@ async def handle_oauth_callback_get(
                 title="LinkedIn Connected",
                 heading="Connection Successful",
                 message="Your LinkedIn account was connected via Unipile. You can close this window.",
-            )
-            return HTMLResponse(
-                content=html,
-                headers={
-                    "Cross-Origin-Opener-Policy": "unsafe-none",
-                    "Cross-Origin-Embedder-Policy": "unsafe-none",
-                },
-            )
-
-        # Detect Zernio callback (legacy)
-        is_zernio_redirect = (
-            connected == "linkedin"
-            or bool(resolved_account_id and not provider)
-            or bool(temp_token)
-        )
-
-        if is_zernio_redirect:
-            logger.info(
-                f"[LinkedInConnect] Zernio callback user_id={user_id} "
-                f"account_id_present={bool(resolved_account_id)} "
-                f"headless={bool(temp_token)}"
-            )
-            query_params = dict(request.query_params)
-            ok = _oauth_service.handle_zernio_connect_callback(user_id, query_params)
-            if not ok:
-                raise HTTPException(status_code=400, detail="Zernio connect callback failed")
-            logger.info(f"[LinkedInConnect] Zernio callback succeeded user_id={user_id}")
-            payload = {
-                "type": "LINKEDIN_OAUTH_SUCCESS",
-                "success": True,
-                "provider": "zernio",
-            }
-            html = build_oauth_callback_html(
-                payload=payload,
-                title="LinkedIn Connected",
-                heading="Connection Successful",
-                message="Your LinkedIn account was connected. You can close this window.",
             )
             return HTMLResponse(
                 content=html,
@@ -1954,7 +1897,7 @@ async def disconnect_linkedin(
         result = await _oauth_service.disconnect_user(user_id)
         logger.info(
             f"[LinkedInConnect] disconnect completed user_id={user_id} "
-            f"revoked={result.get('revoked')} zernio_account_deleted={result.get('zernio_account_deleted')}"
+            f"revoked={result.get('revoked')} unipile_account_deleted={result.get('unipile_account_deleted')}"
         )
         return {
             "success": result.get("success", False),
@@ -2021,7 +1964,7 @@ async def list_accounts(
 
 @router.get("/organizations", response_model=LinkedInOrganizationsListResponse)
 async def list_organizations(
-    account_id: str = Query(..., description="Zernio LinkedIn account id"),
+    account_id: str = Query(..., description="LinkedIn account id"),
     current_user: dict = Depends(get_current_user),
 ) -> LinkedInOrganizationsListResponse:
     """List LinkedIn company pages for an account."""
@@ -2046,201 +1989,6 @@ async def list_organizations(
             for o in orgs
         ],
     )
-
-
-@router.get("/analytics/landing", response_model=LinkedInLandingAnalyticsResponse)
-async def get_landing_analytics(
-    current_user: dict = Depends(get_current_user),
-) -> LinkedInLandingAnalyticsResponse:
-    """Rolling last-7-day personal + org analytics for the LinkedIn Writer landing page."""
-    user_id = _user_id(current_user)
-    provider = get_linkedin_provider()
-    try:
-        payload = await build_landing_analytics_payload(
-            user_id, provider, _oauth_service
-        )
-        return LinkedInLandingAnalyticsResponse(**payload)
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    except ZernioAPIError as e:
-        status = e.status_code or 502
-        if status in (402, 403, 412):
-            raise HTTPException(status_code=status, detail=str(e)) from e
-        logger.warning(f"[LinkedInAnalytics] landing Zernio error user_id={user_id}: {e}")
-        raise HTTPException(status_code=502, detail=str(e)) from e
-    except Exception as e:
-        logger.exception(f"[LinkedInAnalytics] landing failed user_id={user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to load LinkedIn analytics") from e
-
-
-@router.get("/analytics/personal", response_model=LinkedInPersonalAnalyticsResponse)
-async def get_personal_analytics(
-    preset_days: Optional[int] = Query(
-        None,
-        alias="presetDays",
-        description="Preset window: 7, 14, 28, 90, or 365 days",
-    ),
-    start_date: Optional[str] = Query(
-        None,
-        alias="startDate",
-        description="Custom range start (YYYY-MM-DD, inclusive)",
-    ),
-    end_date: Optional[str] = Query(
-        None,
-        alias="endDate",
-        description="Custom range end (YYYY-MM-DD, inclusive in UI)",
-    ),
-    current_user: dict = Depends(get_current_user),
-) -> LinkedInPersonalAnalyticsResponse:
-    """Normalized personal profile aggregate analytics for a date range."""
-    user_id = _user_id(current_user)
-    provider = get_linkedin_provider()
-    try:
-        if preset_days is not None and preset_days not in (7, 14, 28, 90, 365):
-            raise InvalidAnalyticsDateRange(
-                "presetDays must be one of 7, 14, 28, 90, or 365."
-            )
-        date_range = parse_range_request(
-            today=date.today(),
-            preset_days=preset_days,
-            start_date=start_date,
-            end_date=end_date,
-        )
-        if preset_days is not None:
-            logger.warning(
-                f"[LinkedInAnalytics] personal range user_id={user_id} preset={preset_days}"
-            )
-        elif start_date and end_date:
-            logger.warning(
-                f"[LinkedInAnalytics] personal range user_id={user_id} "
-                f"custom start={start_date} end={end_date}"
-            )
-        payload = await build_personal_analytics_payload(
-            user_id, provider, _oauth_service, date_range
-        )
-        return LinkedInPersonalAnalyticsResponse(**payload)
-    except InvalidAnalyticsDateRange as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    except ZernioAPIError as e:
-        status = e.status_code or 502
-        if status in (402, 403, 412):
-            raise HTTPException(status_code=status, detail=str(e)) from e
-        logger.warning(
-            f"[LinkedInAnalytics] personal Zernio error user_id={user_id}: {e}"
-        )
-        raise HTTPException(status_code=502, detail=str(e)) from e
-    except Exception as e:
-        logger.exception(
-            f"[LinkedInAnalytics] personal failed user_id={user_id}: {e}"
-        )
-        raise HTTPException(
-            status_code=500, detail="Failed to load personal LinkedIn analytics"
-        ) from e
-
-
-@router.get("/analytics/profile", response_model=LinkedInAnalyticsResponse)
-async def get_profile_analytics(
-    account_id: Optional[str] = Query(None, description="Defaults to connected personal account"),
-    aggregation: str = Query("TOTAL", pattern="^(TOTAL|DAILY)$"),
-    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    end_date: Optional[str] = Query(None, description="YYYY-MM-DD (exclusive)"),
-    metrics: Optional[str] = Query(None, description="Comma-separated metrics"),
-    current_user: dict = Depends(get_current_user),
-) -> LinkedInAnalyticsResponse:
-    """Fetch LinkedIn personal profile aggregate analytics."""
-    user_id = _user_id(current_user)
-    provider = get_linkedin_provider()
-    metric_list = [m.strip().upper() for m in metrics.split(",")] if metrics else None
-    try:
-        resolved_account = _resolve_user_account_id(user_id, account_id)
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    try:
-        data = await provider.get_profile_aggregate_analytics(
-            user_id,
-            resolved_account,
-            aggregation=aggregation,  # type: ignore[arg-type]
-            start_date=start_date,
-            end_date=end_date,
-            metrics=metric_list,
-        )
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"profile analytics failed for user {user_id}: {e}")
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-    return LinkedInAnalyticsResponse(data=data, provider=provider.provider_name)
-
-
-@router.get("/analytics/org", response_model=LinkedInAnalyticsResponse)
-async def get_org_analytics(
-    account_id: Optional[str] = Query(None, description="Defaults to connected org account"),
-    since: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    until: Optional[str] = Query(None, description="YYYY-MM-DD"),
-    metric_type: str = Query("total_value", pattern="^(total_value|time_series)$"),
-    metrics: Optional[str] = Query(None, description="Comma-separated org metrics"),
-    current_user: dict = Depends(get_current_user),
-) -> LinkedInAnalyticsResponse:
-    """Fetch LinkedIn organization page aggregate analytics."""
-    user_id = _user_id(current_user)
-    provider = get_linkedin_provider()
-    metric_list = [m.strip().lower() for m in metrics.split(",")] if metrics else None
-    try:
-        creds = _oauth_service.resolve_credentials(user_id)
-        resolved_account = account_id or creds.zernio_org_account_id
-        if not resolved_account:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "No LinkedIn organization account is connected. "
-                    "Connect a company page before requesting org analytics."
-                ),
-            )
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    try:
-        data = await provider.get_org_aggregate_analytics(
-            user_id,
-            resolved_account,
-            since=since,
-            until=until,
-            metric_type=metric_type,  # type: ignore[arg-type]
-            metrics=metric_list,
-        )
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"org analytics failed for user {user_id}: {e}")
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-    return LinkedInAnalyticsResponse(data=data, provider=provider.provider_name)
-
-
-@router.get("/analytics/post", response_model=LinkedInAnalyticsResponse)
-async def get_post_analytics(
-    urn: str = Query(..., description="LinkedIn post URN"),
-    account_id: Optional[str] = Query(None, description="Defaults to connected personal account"),
-    current_user: dict = Depends(get_current_user),
-) -> LinkedInAnalyticsResponse:
-    """Fetch analytics for a single LinkedIn post by URN."""
-    user_id = _user_id(current_user)
-    provider = get_linkedin_provider()
-    try:
-        resolved_account = _resolve_user_account_id(user_id, account_id)
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    try:
-        data = await provider.get_post_analytics(user_id, resolved_account, urn)
-    except LinkedInNotConnectedError as e:
-        raise HTTPException(status_code=401, detail=str(e)) from e
-    except Exception as e:
-        logger.error(f"post analytics failed for user {user_id}: {e}")
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-    return LinkedInAnalyticsResponse(data=data, provider=provider.provider_name)
 
 
 @router.get("/avatar-proxy")
