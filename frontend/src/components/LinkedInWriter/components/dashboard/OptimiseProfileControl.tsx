@@ -1,121 +1,10 @@
 import React from 'react';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import CheckIcon from '@mui/icons-material/Check';
-import StarIcon from '@mui/icons-material/Star';
 import CircularProgress from '@mui/material/CircularProgress';
-import { getProfileStrengthSegmentFillCount } from '../../utils/profileStrengthUtils';
+import { ProfileStrengthTicker } from './ProfileStrengthTicker';
 
 /** Header nav optimise button — sized to fit fixed 72px bar via CSS alignment */
 export const PROFILE_ACTION_BTN_HEIGHT = 55;
-
-const SEGMENT_COLORS = [
-  '#4338ca', // indigo-700
-  '#3b82f6', // blue-500
-  '#0ea5e9', // sky-500
-  '#14b8a6', // teal-500
-  '#22c55e', // green-500
-  '#16a34a', // green-600 (darker for WCAG contrast)
-  '#64748b', // slate-500 (darker gray for contrast)
-];
-
-interface ProfileStrengthTickerProps {
-  percent: number;
-  strengthLabel?: string;
-  strengthTooltip?: string;
-}
-
-function ProfileStrengthTicker({ percent, strengthLabel, strengthTooltip }: ProfileStrengthTickerProps) {
-  const segments = 7;
-  const clamped = Math.max(0, Math.min(100, percent));
-  const filledCount = getProfileStrengthSegmentFillCount(clamped, segments);
-
-  return (
-    <div
-      role="progressbar"
-      aria-valuenow={clamped}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-label={
-        strengthTooltip
-          ? `${clamped}% profile strength. ${strengthTooltip}`
-          : `${clamped}% profile strength${strengthLabel ? `. ${strengthLabel}` : ''}`
-      }
-      style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}
-      title={strengthTooltip}
-    >
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <span style={{ fontSize: 12, fontWeight: 800, color: '#0f172a' }}>{clamped}%</span>
-        {strengthLabel && (
-          <span style={{ fontSize: 9, fontWeight: 500, color: '#64748b', lineHeight: 1.2 }}>
-            {strengthLabel}
-          </span>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-        {SEGMENT_COLORS.slice(0, segments).map((color, i) => {
-          const isFilled = i < filledCount;
-          return (
-            <div
-              key={i}
-              style={{
-                width: 20,
-                height: 8,
-                borderRadius: 3,
-                background: isFilled ? color : '#e5e7eb',
-                border: isFilled ? '1px solid rgba(0,0,0,0.1)' : '1px solid #d1d5d6',
-                flexShrink: 0,
-                transition: 'background 200ms ease',
-              }}
-            />
-          );
-        })}
-        {filledCount > 0 && filledCount < segments && (
-          <span
-            aria-hidden
-            style={{
-              width: 22,
-              height: 22,
-              borderRadius: '50%',
-              border: '2px solid #14b8a6',
-              background: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: -4,
-              marginRight: -4,
-              boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-              flexShrink: 0,
-            }}
-          >
-            <CheckIcon sx={{ fontSize: 13, color: '#14b8a6' }} />
-          </span>
-        )}
-        <span
-          aria-hidden
-          style={{
-            width: 22,
-            height: 22,
-            borderRadius: '50%',
-            border: `2px solid ${clamped >= 95 ? '#22c55e' : '#d1d5db'}`,
-            background: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-            boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-          }}
-        >
-          <StarIcon
-            sx={{
-              fontSize: 12,
-              color: clamped >= 95 ? '#22c55e' : '#9ca3af',
-            }}
-          />
-        </span>
-      </div>
-    </div>
-  );
-}
 
 interface OptimiseProfileControlProps {
   onOptimiseProfile: () => void;
@@ -124,7 +13,7 @@ interface OptimiseProfileControlProps {
   strengthTooltip?: string;
   isDisabled?: boolean;
   isLoading?: boolean;
-  variant?: 'ticker' | 'capsule';
+  variant?: 'ticker' | 'capsule' | 'tab';
 }
 
 export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
@@ -138,6 +27,32 @@ export const OptimiseProfileControl: React.FC<OptimiseProfileControlProps> = ({
 }) => {
   const disabled = isDisabled || isLoading;
   const label = isLoading ? 'Loading…' : 'Optimise Profile';
+
+  if (variant === 'tab') {
+    return (
+      <button
+        type="button"
+        className="linkedin-writer-header-studio-tab linkedin-writer-header-studio-tab--optimise"
+        onClick={onOptimiseProfile}
+        disabled={disabled}
+        title={strengthTooltip || label}
+        aria-label={label}
+        role="tab"
+      >
+        {isLoading ? (
+          <span className="linkedin-writer-header-studio-tab-label">Loading…</span>
+        ) : (
+          <span className="linkedin-writer-header-studio-tab-label linkedin-writer-header-studio-tab-label--stacked">
+            <span>Optimise</span>
+            <span>Profile</span>
+          </span>
+        )}
+        <span className="linkedin-writer-header-studio-tab-icon" aria-hidden>
+          ✦
+        </span>
+      </button>
+    );
+  }
 
   if (variant === 'capsule') {
     return (

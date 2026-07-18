@@ -7,6 +7,7 @@ interface HeaderControlsProps {
   colorMode?: 'light' | 'dark';
   showAlerts?: boolean;
   showUser?: boolean;
+  showPlanChip?: boolean;
   gap?: number;
 }
 
@@ -14,6 +15,7 @@ const HeaderControls: React.FC<HeaderControlsProps> = ({
   colorMode = 'light',
   showAlerts = true,
   showUser = true,
+  showPlanChip = true,
   gap = 1.5,
 }) => {
   if (!showAlerts && !showUser) {
@@ -23,7 +25,7 @@ const HeaderControls: React.FC<HeaderControlsProps> = ({
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap }}>
       {showAlerts && <AlertsBadge colorMode={colorMode} />}
-      {showUser && <UserBadge colorMode={colorMode} />}
+      {showUser && <UserBadge colorMode={colorMode} showPlanChip={showPlanChip} />}
     </Box>
   );
 };

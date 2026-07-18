@@ -6,7 +6,7 @@ interface LinkedInSearchBarProps {
   onSearch: () => void;
   disabled?: boolean;
   /** Nav bar uses a smaller footprint before the alerts bell. */
-  size?: 'nav' | 'default';
+  size?: 'nav' | 'mobileStrip' | 'default';
 }
 
 const SearchIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
@@ -35,9 +35,11 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
 }) => {
   const inputId = useId();
   const isNav = size === 'nav';
+  const isMobileStrip = size === 'mobileStrip';
   const rootClass = [
     'linkedin-search-bar',
     isNav && 'linkedin-search-bar--nav',
+    isMobileStrip && 'linkedin-search-bar--mobile-strip',
     disabled && 'linkedin-search-bar--disabled',
   ]
     .filter(Boolean)
