@@ -721,6 +721,35 @@ export async function loadNextProfileOptimizationBatch(): Promise<LinkedInProfil
   }
 }
 
+/** Upload a profile photo for the Optimize Profile modal. */
+export async function uploadProfilePhoto(file: File): Promise<{ photo_url: string; filename: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post(`${BASE}/profile-photo/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+/** Transform an uploaded profile photo into a professional headshot via AI image editing. */
+export async function makeProfilePhotoPresentable(photoUrl: string): Promise<{ photo_url: string; filename: string }> {
+  const formData = new FormData();
+  formData.append('photo_url', photoUrl);
+  const response = await apiClient.post(`${BASE}/profile-photo/make-presentable`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+/** Download a profile photo as a file attachment. */
+export async function downloadProfilePhoto(photoUrl: string): Promise<Blob> {
+  const filename = photoUrl.split('/').pop() || 'profile_photo.jpg';
+  const response = await apiClient.get(`${BASE}/profile-photo/download/${filename}`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
 const _PHASE_LABELS: Record<number, string> = {
   1: 'Acquire Profile Data',
   2: 'Build Profile Context',

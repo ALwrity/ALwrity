@@ -1,4 +1,4 @@
-﻿import React from 'react';
+﻿import React, { useRef } from 'react';
 import { CircularProgress } from '@mui/material';
 
 import type {
@@ -33,6 +33,26 @@ interface ProfileOptimizationPanelProps {
   /** AI-detected brand identity (Phase 5 intelligence). */
   aiProfileIntelligence?: LinkedInAIProfileIntelligence | null;
   profileStrengthPercent?: number | null;
+  /** Current LinkedIn profile picture URL. */
+  profilePictureUrl?: string | null;
+  /** Uploaded local profile photo URL (from profile-photo/upload). */
+  localProfilePhotoUrl?: string | null;
+  /** Transformed profile photo URL (from make-presentable). */
+  transformedProfilePhotoUrl?: string | null;
+  /** Whether a photo upload is in progress. */
+  uploadingProfilePhoto?: boolean;
+  /** Error message from last photo upload attempt. */
+  profilePhotoUploadError?: string | null;
+  /** Called when user selects a file to upload. */
+  onUploadProfilePhoto?: (file: File) => void;
+  /** Whether the "Make Presentable" transform is in progress. */
+  transformingProfilePhoto?: boolean;
+  /** Error message from last transform attempt. */
+  profilePhotoTransformError?: string | null;
+  /** Called when user clicks "Make Presentable". */
+  onMakeProfilePhotoPresentable?: () => void;
+  /** Called when user clicks "Download Photo". */
+  onDownloadProfilePhoto?: () => void;
   onCollapse?: () => void;
   onExpand?: () => void;
   onRefresh?: () => void;
@@ -131,6 +151,16 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   onDismissRecheckDelta,
   aiProfileIntelligence,
   profileStrengthPercent,
+  profilePictureUrl,
+  localProfilePhotoUrl,
+  transformedProfilePhotoUrl,
+  uploadingProfilePhoto = false,
+  profilePhotoUploadError = null,
+  onUploadProfilePhoto,
+  transformingProfilePhoto = false,
+  profilePhotoTransformError = null,
+  onMakeProfilePhotoPresentable,
+  onDownloadProfilePhoto,
   onCollapse,
   onExpand,
   onRefresh,
@@ -173,6 +203,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     return sortedRecommendations.filter((item) => item.id !== quickWin.id);
   }, [sortedRecommendations, quickWin]);
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAllAngles, setShowAllAngles] = React.useState(false);
   const VISIBLE_ANGLES_COUNT = 3;
   const writingOpportunities = aiProfileIntelligence?.writing_opportunities ?? [];
@@ -264,6 +295,162 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
               intelligence={aiProfileIntelligence}
               profileStrengthPercent={profileStrengthPercent}
             />
+          )}
+
+          {/* Profile Photo Card */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 16,
+              padding: '14px 18px',
+              borderRadius: 12,
+              backgroundColor: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              marginBottom: 16,
+            }}
+          >
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                overflow: 'hidden',
+                flexShrink: 0,
+                backgroundColor: '#e2e8f0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {localProfilePhotoUrl || profilePictureUrl ? (
+                <img
+                  src={localProfilePhotoUrl || profilePictureUrl}
+                  alt="Profile"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="#94a3b8">
+                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                </svg>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
+                Profile Picture
+              </p>
+              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>
+                Upload a professional headshot to make a strong first impression.
+              </p>
+              {profilePhotoUploadError && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#dc2626' }}>
+                  {profilePhotoUploadError}
+                </p>
+              )}
+              {profilePhotoTransformError && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#dc2626' }}>
+                  {profilePhotoTransformError}
+                </p>
+              )}
+            </div>
+            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file && onUploadProfilePhoto) {
+                    onUploadProfilePhoto(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingProfilePhoto || transformingProfilePhoto}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: 8,
+                  border: '1px solid #0A66C2',
+                  backgroundColor: uploadingProfilePhoto ? '#cbd5e1' : '#fff',
+                  color: uploadingProfilePhoto ? '#64748b' : '#0A66C2',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: uploadingProfilePhoto || transformingProfilePhoto ? 'wait' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'background 150ms ease',
+                }}
+              >
+                {uploadingProfilePhoto ? 'Uploading…' : 'Upload Photo'}
+              </button>
+              {localProfilePhotoUrl && onMakeProfilePhotoPresentable && (
+                <button
+                  type="button"
+                  onClick={onMakeProfilePhotoPresentable}
+                  disabled={transformingProfilePhoto || uploadingProfilePhoto}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: transformingProfilePhoto
+                      ? '#cbd5e1'
+                      : 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
+                    color: transformingProfilePhoto ? '#64748b' : '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: transformingProfilePhoto || uploadingProfilePhoto ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 150ms ease',
+                  }}
+                >
+                  {transformingProfilePhoto ? 'Enhancing…' : '✨ Make Presentable'}
+                </button>
+              )}
+              {localProfilePhotoUrl && onDownloadProfilePhoto && (
+                <button
+                  type="button"
+                  onClick={onDownloadProfilePhoto}
+                  disabled={uploadingProfilePhoto || transformingProfilePhoto}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: '1px solid #10b981',
+                    backgroundColor: '#fff',
+                    color: '#059669',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: uploadingProfilePhoto || transformingProfilePhoto ? 'wait' : 'pointer',
+                    whiteSpace: 'nowrap',
+                    transition: 'background 150ms ease',
+                  }}
+                >
+                  ⬇ Download Photo
+                </button>
+              )}
+            </div>
+          </div>
+
+          {transformedProfilePhotoUrl && (
+            <div
+              style={{
+                padding: '12px 16px',
+                borderRadius: 10,
+                backgroundColor: '#ecfdf5',
+                border: '1px solid #6ee7b7',
+                marginBottom: 16,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#065f46' }}>
+                Your enhanced profile photo is ready!
+              </p>
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: '#047857', lineHeight: 1.5 }}>
+                To update your LinkedIn profile: Download the photo above, then go to{' '}
+                <strong>LinkedIn → Me → View Profile → Edit profile photo</strong> and upload the downloaded image.
+              </p>
+            </div>
           )}
 
           <div
