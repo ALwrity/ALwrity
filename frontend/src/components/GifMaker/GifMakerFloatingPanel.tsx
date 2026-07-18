@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Paper,
   IconButton,
@@ -9,6 +10,11 @@ import {
   Box,
   Chip,
   CircularProgress,
+  TextField,
+  Select,
+  MenuItem,
+  InputLabel,
+  FormControl,
   alpha,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
@@ -17,8 +23,9 @@ import VideocamIcon from '@mui/icons-material/Videocam';
 import DownloadIcon from '@mui/icons-material/Download';
 import DeleteIcon from '@mui/icons-material/Delete';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import type { Frame, GifResult } from './types';
-import { generateGif } from './gifMakerApi';
+import SendIcon from '@mui/icons-material/Send';
+import type { Frame, FrameMetadata, GifResult, GifHandoffSession } from './types';
+import { generateGif, saveSession } from './gifMakerApi';
 
 interface GifMakerFloatingPanelProps {
   open: boolean;
@@ -41,11 +48,33 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
   const [isHidingForCapture, setIsHidingForCapture] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GifResult | null>(null);
+  const [topic, setTopic] = useState('');
+  const [sessionMetadata, setSessionMetadata] = useState<{
+    pageTitle: string;
+    pageUrl: string;
+    createdAt: string;
+  }>({ pageTitle: '', pageUrl: '', createdAt: '' });
+  const [targetApp, setTargetApp] = useState('');
+  const [isHandingOff, setIsHandingOff] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const navigate = useNavigate();
 
   const toBlobPromise = useCallback((canvas: HTMLCanvasElement, type: string, quality?: number): Promise<Blob | null> => {
     return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
+  }, []);
+
+  const captureFrameMetadata = useCallback((sequence: number): FrameMetadata => {
+    const selection = window.getSelection()?.toString()?.trim();
+    return {
+      sequence,
+      capturedAt: new Date().toISOString(),
+      pageTitle: document.title || '',
+      pageUrl: window.location.href || '',
+      pageHeading: document.querySelector('h1')?.textContent?.trim() || '',
+      pageDescription: document.querySelector('meta[name="description"]')?.getAttribute('content') || '',
+      ...(selection ? { selectedText: selection } : {}),
+    };
   }, []);
 
   const captureFrame = useCallback(async () => {
@@ -53,8 +82,24 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
       alert('Screen capture is not supported in this browser');
       return;
     }
+
+    // Capture metadata before the panel is hidden so DOM context is accurate.
+    const nextSequence = frames.length + 1;
+    const metadata = captureFrameMetadata(nextSequence);
+
     setIsCapturing(true);
     setIsHidingForCapture(true);
+
+    if (!topic) {
+      setTopic(metadata.pageTitle || metadata.pageHeading || '');
+    }
+    if (!sessionMetadata.createdAt) {
+      setSessionMetadata({
+        pageTitle: metadata.pageTitle,
+        pageUrl: metadata.pageUrl,
+        createdAt: metadata.capturedAt,
+      });
+    }
 
     await new Promise((resolve) => requestAnimationFrame(resolve));
 
@@ -98,6 +143,7 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
             thumbnail: URL.createObjectURL(blob),
             width: cw,
             height: ch,
+            metadata,
           },
         ]);
       }
@@ -108,7 +154,7 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
       setIsHidingForCapture(false);
       setIsCapturing(false);
     }
-  }, [toBlobPromise]);
+  }, [toBlobPromise, captureFrameMetadata, frames.length, sessionMetadata.createdAt, topic]);
 
   const removeFrame = useCallback((id: string) => {
     setFrames((prev) => {
@@ -146,6 +192,92 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
     a.download = 'ui-flow.gif';
     a.click();
   }, [result]);
+
+  const handleHandoff = useCallback(async () => {
+    if (!targetApp || frames.length === 0) return;
+    setIsHandingOff(true);
+
+    // Generate GIF first if not already done
+    if (!result) {
+      if (frames.length < 2) {
+        alert('Need at least 2 frames to create a GIF');
+        setIsHandingOff(false);
+        return;
+      }
+      try {
+        const gifResult = await generateGif({
+          frames: frames.map((f) => f.file),
+          settings: { duration, endFrameDelay: 3000, maxWidth, loop: true, sharedPalette: true, optimizeLevel: 0 },
+          apiBaseUrl,
+        });
+        setResult(gifResult);
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Generation failed');
+        setIsHandingOff(false);
+        return;
+      }
+    }
+
+    // Convert GIF blob URL to a Blob for upload
+    let gifBlob: Blob | null = null;
+    try {
+      const gifRes = await fetch(result!.url);
+      gifBlob = await gifRes.blob();
+    } catch {
+      // GIF upload is optional — proceed without it
+    }
+
+    const sessionMeta = {
+      topic: topic || sessionMetadata.pageTitle || document.title,
+      pageTitle: sessionMetadata.pageTitle || document.title,
+      pageUrl: sessionMetadata.pageUrl || window.location.href,
+      createdAt: sessionMetadata.createdAt || new Date().toISOString(),
+      frames: frames.map((f) => ({ metadata: f.metadata })),
+    };
+
+    let handoffSession: GifHandoffSession;
+
+    try {
+      const saveResult = await saveSession({
+        frames: frames.map((f) => f.file),
+        gif: gifBlob,
+        metadata: sessionMeta,
+        apiBaseUrl,
+      });
+
+      handoffSession = {
+        ...sessionMeta,
+        sessionTag: saveResult.session_tag,
+        frames: saveResult.frames.map((fa, i) => ({
+          metadata: frames[i].metadata,
+          assetId: fa.asset_id,
+          fileUrl: fa.file_url,
+        })),
+        gif: saveResult.gif
+          ? { assetId: saveResult.gif.asset_id, fileUrl: saveResult.gif.file_url }
+          : undefined,
+      };
+    } catch {
+      // Save failed (backend may be offline) — navigate with metadata only
+      console.warn('[GIF Maker] Save session failed, handing off with metadata only');
+      handoffSession = {
+        ...sessionMeta,
+        sessionTag: '',
+        frames: frames.map((f) => ({
+          metadata: f.metadata,
+          assetId: null,
+          fileUrl: '',
+        })),
+      };
+    }
+
+    if (targetApp === 'blog') {
+      navigate('/blog-writer', { state: { gifHandoff: handoffSession } });
+    }
+
+    setIsHandingOff(false);
+    onClose();
+  }, [targetApp, frames, result, duration, maxWidth, apiBaseUrl, topic, sessionMetadata, navigate, onClose]);
 
   const scrollAreaSx = {
     overflowY: 'auto',
@@ -210,7 +342,7 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
           elevation={24}
           sx={{
             borderRadius: 2.5,
-            overflow: 'hidden',
+            overflow: 'visible',
             display: 'flex',
             flexDirection: 'column',
             maxHeight: '80vh',
@@ -233,14 +365,42 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
               <IconButton size="small" onClick={onClose} title="Close" sx={{ color: '#94a3b8', '&:hover': { bgcolor: alpha('#000', 0.04) } }}>
                 <CloseIcon fontSize="small" />
               </IconButton>
-            </Box>
-          </Box>
+                    </Box>
+                    {!targetApp && (
+                      <Typography sx={{ fontSize: 10.5, color: '#94a3b8', mt: 0.5, lineHeight: 1.3 }}>
+                        Select a target app, then click Save &amp; Handoff
+                      </Typography>
+                    )}
+                  </Box>
 
           {/* Info banner */}
           <Box sx={{ px: 2, py: 1, bgcolor: alpha(accent, 0.06), borderBottom: '1px solid', borderColor: alpha(accent, 0.12) }}>
             <Typography sx={{ fontSize: 11.5, color: alpha('#000', 0.6), display: 'flex', alignItems: 'center', gap: 0.75, lineHeight: 1.4 }}>
               <InfoOutlinedIcon sx={{ fontSize: 14, color: accent, flexShrink: 0 }} />
               This panel auto-hides during capture — it will never appear in your screenshots
+            </Typography>
+          </Box>
+
+          {/* Session topic — editable, seeded from page title */}
+          <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: alpha('#000', 0.06) }}>
+            <TextField
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              placeholder="Topic or page title"
+              label="Blog topic"
+              size="small"
+              fullWidth
+              variant="outlined"
+              inputProps={{ style: { fontSize: 13, color: '#1e293b' } }}
+              InputLabelProps={{ style: { fontSize: 13, color: '#475569' } }}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: '#f8fafc' },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: alpha('#000', 0.15) },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha('#000', 0.25) },
+              }}
+            />
+            <Typography sx={{ fontSize: 10, color: '#94a3b8', mt: 0.5, lineHeight: 1.3 }}>
+              Used as the blog keyword prompt. Auto-filled from the page title.
             </Typography>
           </Box>
 
@@ -322,8 +482,10 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
                           <img
                             src={frame.thumbnail}
                             alt={`Frame ${i + 1}`}
+                            title={`Frame ${i + 1}\n${frame.metadata.pageTitle}\n${frame.metadata.pageUrl}\nHeading: ${frame.metadata.pageHeading || '—'}\n${frame.metadata.selectedText ? `Selected: "${frame.metadata.selectedText}"` : ''}`}
                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                           />
+
                           <IconButton
                             size="small"
                             onClick={() => removeFrame(frame.id)}
@@ -424,7 +586,7 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
                       </Button>
                       <Button
                         variant="outlined"
-                        onClick={() => { setResult(null); setFrames([]); }}
+                        onClick={() => { setResult(null); setFrames([]); setTopic(''); setSessionMetadata({ pageTitle: '', pageUrl: '', createdAt: '' }); setTargetApp(''); }}
                         sx={{ textTransform: 'none', fontSize: 13, borderRadius: 2, color: '#64748b', borderColor: alpha('#000', 0.15), flexShrink: 0 }}
                       >
                         New
@@ -450,6 +612,74 @@ export const GifMakerFloatingPanel: React.FC<GifMakerFloatingPanelProps> = ({
                     {isGenerating ? <CircularProgress size={18} color="inherit" sx={{ mr: 1 }} /> : null}
                     {isGenerating ? 'Generating GIF...' : `Generate GIF (${frames.length} frames)`}
                   </Button>
+                )}
+
+                {/* Handoff row — visible when frames exist */}
+                {frames.length > 0 && (
+                  <Box sx={{ pt: 1, mt: 1, borderTop: '1px solid', borderColor: alpha('#000', 0.06) }}>
+                    <Typography sx={{ fontSize: 10.5, fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: 0.5, mb: 0.75 }}>
+                      Handoff to App
+                    </Typography>
+                    <Box sx={{ display: 'flex', gap: 0.75 }}>
+                      <FormControl size="small" sx={{ minWidth: 150 }}>
+                        <InputLabel sx={{ fontSize: 13, color: '#475569', fontWeight: 500 }}>Send to...</InputLabel>
+                        <Select
+                          value={targetApp}
+                          label="Send to..."
+                          onChange={(e) => { setTargetApp(e.target.value); }}
+                          sx={{
+                            fontSize: 13,
+                            borderRadius: 2,
+                            bgcolor: '#f8fafc',
+                            color: '#1e293b',
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: alpha('#000', 0.15) },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha('#000', 0.25) },
+                          }}
+                          MenuProps={{
+                            disablePortal: true,
+                            slotProps: {
+                              paper: {
+                                sx: {
+                                  zIndex: 2147483647,
+                                  mt: 0.5,
+                                  borderRadius: 2,
+                                  border: '1px solid',
+                                  borderColor: alpha('#000', 0.08),
+                                  bgcolor: '#ffffff',
+                                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                },
+                              },
+                            },
+                          }}
+                        >
+                          <MenuItem
+                            value="blog"
+                            sx={{ fontSize: 13, color: '#1e293b', bgcolor: '#ffffff', '&:hover': { bgcolor: '#f1f5f9' }, '&.Mui-selected': { bgcolor: '#f0fdf4', '&:hover': { bgcolor: '#dcfce7' } } }}
+                          >
+                            Blog Writer
+                          </MenuItem>
+                        </Select>
+                      </FormControl>
+                      <Button
+                        variant="contained"
+                        onClick={handleHandoff}
+                        disabled={!targetApp || isHandingOff}
+                        endIcon={isHandingOff ? <CircularProgress size={14} color="inherit" /> : <SendIcon />}
+                        sx={{
+                          bgcolor: accent,
+                          '&:hover': { bgcolor: '#15803d' },
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          fontSize: 13,
+                          borderRadius: 2,
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                        }}
+                      >
+                        {isHandingOff ? 'Saving...' : 'Save & Handoff'}
+                      </Button>
+                    </Box>
+                  </Box>
                 )}
               </Box>
             </>

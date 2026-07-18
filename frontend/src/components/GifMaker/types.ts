@@ -3,12 +3,43 @@
  * Zero imports from ALwrity internals — pure domain types.
  */
 
+export interface FrameMetadata {
+  /** Sequence number of the frame within the current session (1-based). */
+  sequence: number;
+  /** ISO timestamp when the frame was captured. */
+  capturedAt: string;
+  /** document.title of the captured page at the moment of capture. */
+  pageTitle: string;
+  /** window.location.href of the captured page at the moment of capture. */
+  pageUrl: string;
+  /** Text content of the first <h1> on the page, if any. */
+  pageHeading: string;
+  /** Value of the meta description tag, if any. */
+  pageDescription: string;
+  /** Any text the user had selected on the page at the moment of capture. */
+  selectedText?: string;
+}
+
 export interface Frame {
   id: string;
   file: File;
   thumbnail: string; // URL.createObjectURL
   width: number;
   height: number;
+  metadata: FrameMetadata;
+}
+
+export interface GifSessionMetadata {
+  /** User-editable topic used as the blog/LinkedIn keyword prompt. */
+  topic: string;
+  /** Page title at the time the first frame was captured. */
+  pageTitle: string;
+  /** Page URL at the time the first frame was captured. */
+  pageUrl: string;
+  /** ISO timestamp when the session started. */
+  createdAt: string;
+  /** Ordered list of per-frame metadata for handoff to content generators. */
+  frames: FrameMetadata[];
 }
 
 export interface GifSettings {
@@ -78,3 +109,25 @@ export const OPTIMIZE_DESCRIPTIONS: Record<number, string> = {
   2: 'Good for UI screenshots with limited color ranges. May show minor banding in gradients.',
   3: 'Maximum compression. Best for simple UI flows with mostly solid colors. Noticeable banding.',
 };
+
+/**
+ * Serializable session passed via React Router location.state
+ * when the user selects "Save & Handoff" to a target app.
+ * No Blob/File/URL references — only plain JSON-safe data.
+ */
+export interface GifHandoffSession {
+  topic: string;
+  pageTitle: string;
+  pageUrl: string;
+  createdAt: string;
+  sessionTag: string;
+  frames: {
+    metadata: FrameMetadata;
+    assetId: number | null;
+    fileUrl: string;
+  }[];
+  gif?: {
+    assetId: number | null;
+    fileUrl: string;
+  };
+}

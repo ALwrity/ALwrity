@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import type { GifHandoffSession } from '../GifMaker/types';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -286,7 +287,7 @@ const BlogWriter: React.FC = () => {
   } = useBlogAsset();
   // Load blog asset passed via React Router state (from Asset Library)
   const location = useLocation();
-  const locationState = location.state as { restoreBlogAssetId?: number; calendarTopic?: string; calendarDescription?: string; calendarEventId?: string; workflowTaskId?: string } | null;
+  const locationState = location.state as { restoreBlogAssetId?: number; calendarTopic?: string; calendarDescription?: string; calendarEventId?: string; workflowTaskId?: string; gifHandoff?: GifHandoffSession } | null;
 
   // Persist last active asset_id across refreshes
   const saveLastAssetId = useCallback((id: number) => {
@@ -320,6 +321,17 @@ const BlogWriter: React.FC = () => {
           });
         }
       }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // GIF Maker handoff: pre-fill topic and navigate to research phase
+  React.useEffect(() => {
+    const handoff = locationState?.gifHandoff;
+    if (handoff) {
+      setResearchKeywords(handoff.topic);
+      navigateToPhase('research');
+      window.history.replaceState({}, document.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -808,6 +820,7 @@ const BlogWriter: React.FC = () => {
         startResearchRef={startResearchRef}
         restoreAttempted={restoreAttempted}
         onBrainstormResult={handleBrainstormResult}
+        initialKeywords={researchKeywords}
       />
 
       {research && (
@@ -815,6 +828,7 @@ const BlogWriter: React.FC = () => {
       <PhaseContent
         currentPhase={currentPhase}
         research={research}
+        initialKeywords={researchKeywords}
         outline={outline}
         outlineConfirmed={outlineConfirmed}
         titleOptions={titleOptions}
