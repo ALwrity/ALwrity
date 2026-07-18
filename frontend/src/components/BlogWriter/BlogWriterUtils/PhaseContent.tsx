@@ -54,6 +54,7 @@ interface PhaseContentProps {
   onCompetitiveAdvantageSelect?: (advantage: string) => void;
   introduction?: string;
   onIntroductionUpdate?: (intro: string) => void;
+  initialKeywords?: string;
 }
 
 export const PhaseContent: React.FC<PhaseContentProps> = ({
@@ -103,6 +104,7 @@ export const PhaseContent: React.FC<PhaseContentProps> = ({
   onIntroductionUpdate,
   onOpenSEOMetadata,
   onRunFlowAnalysis,
+  initialKeywords,
 }) => {
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -125,6 +127,7 @@ export const PhaseContent: React.FC<PhaseContentProps> = ({
                     blogLengthRef={blogLengthRef}
                     researchRef={startResearchRef}
                     onBrainstormResult={onBrainstormResult}
+                    initialKeywords={initialKeywords}
                   />
                 )}
               </>

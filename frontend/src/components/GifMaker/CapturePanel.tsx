@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import { useScreenCapture } from './hooks/useScreenCapture';
 import type { Frame } from './types';
+import { captureFrameMetadata } from './utils';
 
 interface CapturePanelProps {
   frames: Frame[];
@@ -58,6 +59,7 @@ export const CapturePanel: React.FC<CapturePanelProps> = ({
             thumbnail: URL.createObjectURL(file),
             width: img.naturalWidth,
             height: img.naturalHeight,
+            metadata: captureFrameMetadata(frames.length + 1),
           });
           URL.revokeObjectURL(img.src);
         };

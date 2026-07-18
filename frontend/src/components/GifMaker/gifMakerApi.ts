@@ -5,7 +5,7 @@
  * that serves the same contract.
  */
 
-import type { GifResult, GifSettings } from './types';
+import type { GifResult, GifSettings, FrameMetadata } from './types';
 
 export interface GenerateGifOptions {
   frames: File[];
@@ -13,6 +13,64 @@ export interface GenerateGifOptions {
   apiBaseUrl: string;
   apiKey?: string;
   signal?: AbortSignal;
+}
+
+export interface SaveSessionMetadata {
+  topic: string;
+  pageTitle: string;
+  pageUrl: string;
+  createdAt: string;
+  frames: { metadata: FrameMetadata }[];
+}
+
+export interface FrameAsset {
+  asset_id: number | null;
+  file_url: string;
+  sequence: number;
+}
+
+export interface SaveSessionResult {
+  success: boolean;
+  session_tag: string;
+  frames: FrameAsset[];
+  gif: { asset_id: number; file_url: string; file_size: number } | null;
+}
+
+export interface SaveSessionOptions {
+  frames: File[];
+  gif?: Blob | null;
+  metadata: SaveSessionMetadata;
+  apiBaseUrl: string;
+}
+
+/** Upload frames + GIF + metadata to the asset library, returning asset IDs. */
+export async function saveSession({
+  frames,
+  gif,
+  metadata,
+  apiBaseUrl,
+}: SaveSessionOptions): Promise<SaveSessionResult> {
+  const formData = new FormData();
+  frames.forEach((f) => formData.append('frames', f));
+  if (gif) formData.append('gif', gif, 'animation.gif');
+  formData.append('metadata', JSON.stringify(metadata));
+
+  const url = `${apiBaseUrl.replace(/\/+$/, '')}/api/gif-maker/save-session`;
+
+  const res = await fetch(url, { method: 'POST', body: formData });
+
+  if (!res.ok) {
+    let detail = `Server returned ${res.status}`;
+    try {
+      const body = await res.json();
+      detail = body.detail || detail;
+    } catch {
+      // Ignore parse errors
+    }
+    throw new Error(detail);
+  }
+
+  return res.json();
 }
 
 /**

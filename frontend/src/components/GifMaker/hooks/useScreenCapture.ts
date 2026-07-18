@@ -8,6 +8,7 @@
 
 import { useState, useCallback } from 'react';
 import type { Frame } from '../types';
+import { captureFrameMetadata } from '../utils';
 
 interface UseScreenCaptureOptions {
   frames: Frame[];
@@ -90,6 +91,7 @@ export function useScreenCapture({
             thumbnail: URL.createObjectURL(blob),
             width: canvas.width,
             height: canvas.height,
+            metadata: captureFrameMetadata(frames.length + 1),
           });
         },
         'image/png',
