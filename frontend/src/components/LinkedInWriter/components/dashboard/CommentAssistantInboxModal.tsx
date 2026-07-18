@@ -238,7 +238,7 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
             </div>
           )}
 
-          {connected && loadState === 'loading' && tab !== 'manual' && (
+          {connected && loadState === 'loading' && (
             <div
               style={{
                 display: 'flex',
