@@ -1,6 +1,10 @@
 import { Category, Tool, ToolCategories } from './types';
+import { isFeatureEnabled } from '../../utils/demoMode';
 
 // Utility functions for dashboard components
+const filterFeatureGatedTools = (tools: Tool[]): Tool[] =>
+  tools.filter(tool => !tool.featureKey || isFeatureEnabled(tool.featureKey));
+
 export const getToolsForCategory = (category: Category | null, selectedSubCategory: string | null): Tool[] => {
   if (!category) {
     return [];
@@ -9,7 +13,7 @@ export const getToolsForCategory = (category: Category | null, selectedSubCatego
   if ('subCategories' in category) {
     if (selectedSubCategory && category.subCategories[selectedSubCategory]) {
       const subCategory = category.subCategories[selectedSubCategory];
-      return subCategory && subCategory.tools ? subCategory.tools : [];
+      return filterFeatureGatedTools(subCategory && subCategory.tools ? subCategory.tools : []);
     }
     // When no subcategory is selected, return all tools from all subcategories
     const allTools: Tool[] = [];
@@ -18,9 +22,9 @@ export const getToolsForCategory = (category: Category | null, selectedSubCatego
         allTools.push(...subCategory.tools);
       }
     });
-    return allTools;
+    return filterFeatureGatedTools(allTools);
   }
-  return category.tools && Array.isArray(category.tools) ? category.tools : [];
+  return filterFeatureGatedTools(category.tools && Array.isArray(category.tools) ? category.tools : []);
 };
 
 export const getFilteredCategories = (
@@ -69,21 +73,21 @@ export const getStatusConfig = (status: string) => {
   switch (status) {
     case 'excellent':
     case 'strong':
-      return { color: '#4CAF50', icon: '✓', label: 'Excellent' };
+      return { color: '#4CAF50', icon: '\u2713', label: 'Excellent' };
     case 'good':
-      return { color: '#FF9800', icon: '⚠', label: 'Good' };
+      return { color: '#FF9800', icon: '\u26A0', label: 'Good' };
     case 'needs_action':
-      return { color: '#F44336', icon: '✗', label: 'Needs Action' };
+      return { color: '#F44336', icon: '\u2717', label: 'Needs Action' };
     case 'premium':
-      return { color: '#9C27B0', icon: '⭐', label: 'Premium' };
+      return { color: '#9C27B0', icon: '\u2B50', label: 'Premium' };
     case 'beta':
-      return { color: '#FF9800', icon: '🧪', label: 'Beta' };
+      return { color: '#FF9800', icon: '\uD83E\uDDEA', label: 'Beta' };
     case 'pro':
-      return { color: '#2196F3', icon: '💎', label: 'Pro' };
+      return { color: '#2196F3', icon: '\uD83D\uDC8E', label: 'Pro' };
     case 'active':
-      return { color: '#4CAF50', icon: '✓', label: 'Active' };
+      return { color: '#4CAF50', icon: '\u2713', label: 'Active' };
     default:
-      return { color: '#9E9E9E', icon: 'ℹ', label: 'Unknown' };
+      return { color: '#9E9E9E', icon: '\u2139', label: 'Unknown' };
   }
 };
 
@@ -113,21 +117,21 @@ export const getStatusIcon = (status: string) => {
   switch (status) {
     case 'excellent':
     case 'strong':
-      return '✓';
+      return '\u2713';
     case 'good':
-      return '⚠';
+      return '\u26A0';
     case 'needs_action':
-      return '✗';
+      return '\u2717';
     case 'premium':
-      return '⭐';
+      return '\u2B50';
     case 'beta':
-      return '🧪';
+      return '\uD83E\uDDEA';
     case 'pro':
-      return '💎';
+      return '\uD83D\uDC8E';
     case 'active':
-      return '✓';
+      return '\u2713';
     default:
-      return 'ℹ';
+      return '\u2139';
   }
 };
 
@@ -158,11 +162,11 @@ export const getTrendColor = (trend: string): string => {
 export const getTrendIcon = (trend: string): string => {
   switch (trend) {
     case 'up':
-      return '↗';
+      return '\u2197';
     case 'down':
-      return '↘';
+      return '\u2198';
     default:
-      return '→';
+      return '\u2192';
   }
 };
 
@@ -184,4 +188,4 @@ export const debounce = <T extends (...args: any[]) => any>(
     clearTimeout(timeout);
     timeout = setTimeout(() => func(...args), wait);
   };
-}; 
+};

@@ -4,7 +4,8 @@ import { useAuth } from '@clerk/clerk-react';
 import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useOnboarding } from '../../contexts/OnboardingContext';
-import { shouldSkipOnboarding, isFeatureOnlyAllowedPath } from '../../utils/demoMode';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import { shouldSkipOnboarding, isFeatureOnlyAllowedPath, getDefaultLandingRoute } from '../../utils/demoMode';
 import { useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
@@ -22,6 +23,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     refresh,
     clearError 
   } = useOnboarding();
+  const { subscription, error: subError } = useSubscription();
   const location = useLocation();
   useEffect(() => {
     try {
@@ -40,8 +42,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const pathname = typeof location?.pathname === 'string' ? location.pathname : '';
   const isOnFeatureOnlyRoute = isFeatureOnlyAllowedPath(pathname);
 
-  // Allow access to utility pages regardless of onboarding status
-  const bypassRoutes = ['/billing', '/pricing', '/onboarding'];
+  // Allow access to utility pages regardless of onboarding/subscription status
+  const bypassRoutes = ['/billing'];
   const isBypassRoute = pathname !== '' && bypassRoutes.some(route => pathname.startsWith(route));
 
   const allowAccess = isOnboardingComplete || localComplete || (isFeatureLimited && isOnFeatureOnlyRoute) || isBypassRoute;
@@ -125,6 +127,45 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   if (isLoaded && !isSignedIn) {
     console.log('ProtectedRoute: Not signed in, redirecting to landing');
     return <Navigate to="/" replace />;
+  }
+
+  // Feature-only mode: /dashboard is not accessible, redirect to feature app
+  if (pathname.startsWith('/dashboard') && isFeatureLimited) {
+    const route = getDefaultLandingRoute();
+    console.log(`ProtectedRoute: Feature-only mode, redirecting from /dashboard to ${route}`);
+    return <Navigate to={route} replace />;
+  }
+
+  // Subscription guard for non-bypass routes (feature apps like story-writer, linkedin-writer)
+  if (!isBypassRoute) {
+    // Subscription data not yet loaded - show spinner
+    if (subscription === null) {
+      console.log('ProtectedRoute: Waiting for subscription data...');
+      return (
+        <Box
+          display="flex"
+          flexDirection="column"
+          alignItems="center"
+          justifyContent="center"
+          minHeight="100vh"
+          gap={2}
+        >
+          <CircularProgress size={60} />
+          <Typography variant="h6" color="textSecondary">
+            Verifying access...
+          </Typography>
+        </Box>
+      );
+    }
+
+    // Subscription loaded but not active - redirect to pricing
+    if (!subscription.active) {
+      console.log('ProtectedRoute: No active subscription, redirecting to pricing', {
+        active: subscription.active,
+        subError
+      });
+      return <Navigate to="/pricing" replace />;
+    }
   }
 
   // Onboarding not complete - redirect to onboarding
