@@ -77,7 +77,10 @@ export const GroundingDataDisplay: React.FC<GroundingDataDisplayProps> = ({
         </h4>
         <div style={{
           display: 'grid',
-          gap: '12px'
+          gap: '12px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+          width: '100%',
+          overflow: 'hidden'
         }}>
           {researchSources.map((source, index) => (
             <ResearchSourceCard

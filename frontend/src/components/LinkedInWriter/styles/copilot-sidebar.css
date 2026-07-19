@@ -1,0 +1,515 @@
+/* ALwrity Co-Pilot Compact Styling - 60% Smaller & More Efficient */
+
+/* ===== COMPACT SIDEBAR CONTAINER ===== */
+.alwrity-copilot-sidebar .copilot-sidebar-container,
+.alwrity-copilot-sidebar .copilotkit-sidebar,
+.alwrity-copilot-sidebar .copilotkit-chat-container {
+  /* Reduce overall width by 60% */
+  width: 40% !important; /* Reduced from 100% */
+  max-width: 320px !important; /* Reduced from typical 800px+ */
+  min-width: 280px !important;
+  
+  /* Compact height */
+  height: 85vh !important; /* Reduced from 100vh */
+  max-height: 600px !important;
+  
+  /* Reduced padding and margins */
+  padding: 8px !important; /* Reduced from 20px+ */
+  margin: 8px !important;
+  
+  /* Compact border radius */
+  border-radius: 8px !important; /* Reduced from 16px+ */
+  
+  /* Subtle shadow */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important; /* Reduced from 18px+ */
+}
+
+/* ===== COMPACT TRIGGER BUTTONS ===== */
+.alwrity-copilot-sidebar .copilot-sidebar-trigger,
+.alwrity-copilot-sidebar [data-testid="copilot-sidebar-trigger"],
+.alwrity-copilot-sidebar .copilot-sidebar-trigger-button,
+.alwrity-copilot-sidebar button[aria-label*="copilot"],
+.alwrity-copilot-sidebar button[aria-label*="assistant"],
+.alwrity-copilot-sidebar .copilot-sidebar-trigger > button,
+.alwrity-copilot-sidebar .copilot-sidebar-trigger > div,
+.alwrity-copilot-sidebar button[class*="trigger"],
+.alwrity-copilot-sidebar button[class*="floating"],
+.alwrity-copilot-sidebar button[class*="assistant"],
+.alwrity-copilot-sidebar button[class*="copilot"],
+.alwrity-copilot-sidebar [data-testid*="trigger"],
+.alwrity-copilot-sidebar [data-testid*="assistant"],
+.alwrity-copilot-sidebar [data-testid*="copilot"] {
+  /* Reduce button size by 60% */
+  width: 32px !important; /* Reduced from 48px */
+  height: 32px !important; /* Reduced from 48px */
+  border-radius: 50% !important;
+  
+  /* Compact shadow */
+  box-shadow: 0 2px 8px rgba(10, 102, 194, 0.25) !important; /* Reduced from 12px */
+  transition: all 0.2s ease !important; /* Reduced from 0.3s */
+}
+
+/* Compact hover effects */
+.alwrity-copilot-sidebar .copilot-sidebar-trigger:hover,
+.alwrity-copilot-sidebar [data-testid="copilot-sidebar-trigger"]:hover,
+.alwrity-copilot-sidebar .copilot-sidebar-trigger-button:hover,
+.alwrity-copilot-sidebar button[aria-label*="copilot"]:hover,
+.alwrity-copilot-sidebar button[aria-label*="assistant"]:hover,
+.alwrity-copilot-sidebar .copilot-sidebar-trigger > button:hover,
+.alwrity-copilot-sidebar .copilot-sidebar-trigger > div:hover,
+.alwrity-copilot-sidebar button[class*="trigger"]:hover,
+.alwrity-copilot-sidebar button[class*="floating"]:hover,
+.alwrity-copilot-sidebar button[class*="assistant"]:hover,
+.alwrity-copilot-sidebar button[class*="copilot"]:hover {
+  transform: scale(1.05) !important; /* Reduced from 1.1 */
+  box-shadow: 0 3px 12px rgba(10, 102, 194, 0.35) !important; /* Reduced from 20px */
+}
+
+/* ===== COMPACT SIDEBAR HEADER ===== */
+.alwrity-copilot-sidebar .copilot-sidebar-header {
+  background: linear-gradient(135deg, #0a66c2 0%, #0056b3 100%) !important;
+  border-bottom: 1px solid #ffffff20 !important; /* Reduced from 2px */
+  padding: 8px 12px !important; /* Reduced from 16px+ */
+  margin-bottom: 8px !important; /* Reduced from 20px+ */
+}
+
+/* Compact sidebar title */
+.alwrity-copilot-sidebar .copilot-sidebar-title {
+  color: #ffffff !important;
+  font-weight: 600 !important; /* Reduced from 700 */
+  font-size: 14px !important; /* Reduced from 18px */
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important; /* Reduced from 8px */
+}
+
+/* ===== COMPACT MESSAGE STYLING ===== */
+.alwrity-copilot-sidebar .copilot-message,
+.alwrity-copilot-sidebar [data-testid="copilot-message"],
+.alwrity-copilot-sidebar .message,
+.alwrity-copilot-sidebar .chat-message,
+.alwrity-copilot-sidebar .assistant-message,
+.alwrity-copilot-sidebar .user-message {
+  /* Reduce spacing by 60% */
+  border-radius: 8px !important; /* Reduced from 16px */
+  margin: 6px 0 !important; /* Reduced from 12px */
+  padding: 8px 12px !important; /* Reduced from 16px 20px */
+  
+  /* Maximize message width for chat */
+  max-width: 95% !important; /* Increased from 85% for better space usage */
+  width: fit-content !important;
+  
+  /* Compact shadows and effects */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important; /* Reduced from 12px */
+  transition: all 0.15s ease !important; /* Reduced from 0.2s */
+  
+  /* Compact typography */
+  line-height: 1.4 !important; /* Reduced from 1.5 */
+  font-size: 13px !important; /* Reduced from 14px */
+}
+
+/* Compact user message styling */
+.alwrity-copilot-sidebar .copilot-message.user,
+.alwrity-copilot-sidebar [data-testid="copilot-message"].user,
+.alwrity-copilot-sidebar .message.user,
+.alwrity-copilot-sidebar .chat-message.user,
+.alwrity-copilot-sidebar .user-message {
+  background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%) !important;
+  border: 1px solid #d1e7ff !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  color: #1a365d !important;
+  font-weight: 500 !important;
+}
+
+/* Compact user message arrow */
+.alwrity-copilot-sidebar .copilot-message.user::before,
+.alwrity-copilot-sidebar [data-testid="copilot-message"].user::before,
+.alwrity-copilot-sidebar .message.user::before,
+.alwrity-copilot-sidebar .chat-message.user::before,
+.alwrity-copilot-sidebar .user-message::before {
+  content: '' !important;
+  position: absolute !important;
+  right: -6px !important; /* Reduced from -8px */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-left: 6px solid #d1e7ff !important; /* Reduced from 8px */
+  border-top: 4px solid transparent !important; /* Reduced from 6px */
+  border-bottom: 4px solid transparent !important; /* Reduced from 6px */
+}
+
+/* Compact assistant message styling */
+.alwrity-copilot-sidebar .copilot-message.assistant,
+.alwrity-copilot-sidebar [data-testid="copilot-message"].assistant,
+.alwrity-copilot-sidebar .message.assistant,
+.alwrity-copilot-sidebar .chat-message.assistant,
+.alwrity-copilot-sidebar .assistant-message {
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%) !important;
+  border: 1px solid #e1e8ed !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  color: #2d3748 !important;
+  font-weight: 400 !important;
+}
+
+/* Compact assistant message arrow */
+.alwrity-copilot-sidebar .copilot-message.assistant::before,
+.alwrity-copilot-sidebar [data-testid="copilot-message"].assistant::before,
+.alwrity-copilot-sidebar .message.assistant::before,
+.alwrity-copilot-sidebar .chat-message.assistant::before,
+.alwrity-copilot-sidebar .assistant-message::before {
+  content: '' !important;
+  position: absolute !important;
+  left: -6px !important; /* Reduced from -8px */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 0 !important;
+  height: 0 !important;
+  border-right: 6px solid #e1e8ed !important; /* Reduced from 8px */
+  border-top: 4px solid transparent !important; /* Reduced from 6px */
+  border-bottom: 4px solid transparent !important; /* Reduced from 6px */
+}
+
+/* Compact message hover effects */
+.alwrity-copilot-sidebar .copilot-message:hover,
+.alwrity-copilot-sidebar [data-testid="copilot-message"]:hover,
+.alwrity-copilot-sidebar .message:hover,
+.alwrity-copilot-sidebar .chat-message:hover,
+.alwrity-copilot-sidebar .assistant-message:hover,
+.alwrity-copilot-sidebar .user-message:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12) !important; /* Reduced from 20px */
+}
+
+/* ===== COMPACT MESSAGE CONTENT ===== */
+.alwrity-copilot-sidebar .copilot-message p,
+.alwrity-copilot-sidebar [data-testid="copilot-message"] p,
+.alwrity-copilot-sidebar .message p,
+.alwrity-copilot-sidebar .chat-message p,
+.alwrity-copilot-sidebar .assistant-message p,
+.alwrity-copilot-sidebar .user-message p {
+  margin: 0 0 8px 0 !important; /* Reduced from 12px */
+  line-height: 1.4 !important; /* Reduced from 1.6 */
+  font-size: 13px !important; /* Reduced from 14px */
+}
+
+.alwrity-copilot-sidebar .copilot-message p:last-child,
+.alwrity-copilot-sidebar [data-testid="copilot-message"] p:last-child,
+.alwrity-copilot-sidebar .message p:last-child,
+.alwrity-copilot-sidebar .chat-message p:last-child,
+.alwrity-copilot-sidebar .assistant-message p:last-child,
+.alwrity-copilot-sidebar .user-message p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* ===== COMPACT CODE BLOCKS ===== */
+.alwrity-copilot-sidebar .copilot-message code,
+.alwrity-copilot-sidebar [data-testid="copilot-message"] code,
+.alwrity-copilot-sidebar .message code,
+.alwrity-copilot-sidebar .chat-message code,
+.alwrity-copilot-sidebar .assistant-message code,
+.alwrity-copilot-sidebar .user-message code {
+  background: #f7fafc !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 4px !important; /* Reduced from 6px */
+  padding: 1px 4px !important; /* Reduced from 2px 6px */
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 12px !important; /* Reduced from 13px */
+  color: #2d3748 !important;
+}
+
+/* ===== COMPACT BUTTON STYLING ===== */
+.alwrity-copilot-sidebar .copilot-button,
+.alwrity-copilot-sidebar button,
+.alwrity-copilot-sidebar .btn {
+  background: linear-gradient(135deg, #0a66c2 0%, #0056b3 100%) !important;
+  border: none !important;
+  border-radius: 6px !important; /* Reduced from 10px */
+  color: white !important;
+  font-weight: 500 !important; /* Reduced from 600 */
+  
+  /* Reduce padding by 60% */
+  padding: 6px 12px !important; /* Reduced from 10px 20px */
+  
+  /* Compact transitions */
+  transition: all 0.15s ease !important; /* Reduced from 0.2s */
+  
+  /* Compact shadows */
+  box-shadow: 0 1px 4px rgba(10, 102, 194, 0.25) !important; /* Reduced from 8px */
+  
+  /* Smaller font size */
+  font-size: 12px !important; /* Reduced from 14px */
+}
+
+.alwrity-copilot-sidebar .copilot-button:hover,
+.alwrity-copilot-sidebar button:hover,
+.alwrity-copilot-sidebar .btn:hover {
+  background: linear-gradient(135deg, #0056b3 0%, #004494 100%) !important;
+  transform: translateY(-1px) !important; /* Reduced from -2px */
+  box-shadow: 0 2px 8px rgba(10, 102, 194, 0.35) !important; /* Reduced from 16px */
+}
+
+/* ===== COMPACT INPUT STYLING ===== */
+.alwrity-copilot-sidebar .copilot-input,
+.alwrity-copilot-sidebar input,
+.alwrity-copilot-sidebar textarea {
+  border: 1px solid #e2e8f0 !important; /* Reduced from 2px */
+  border-radius: 6px !important; /* Reduced from 12px */
+  
+  /* Reduce padding by 60% */
+  padding: 8px 12px !important; /* Reduced from 14px 18px */
+  
+  /* Compact font size */
+  font-size: 13px !important; /* Reduced from 14px */
+  
+  /* Compact transitions */
+  transition: all 0.15s ease !important; /* Reduced from 0.2s */
+  
+  background: #ffffff !important;
+  color: #2d3748 !important;
+}
+
+.alwrity-copilot-sidebar .copilot-input:focus,
+.alwrity-copilot-sidebar input:focus,
+.alwrity-copilot-sidebar textarea:focus {
+  border-color: #0a66c2 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.1) !important; /* Reduced from 3px */
+  transform: translateY(-1px) !important;
+}
+
+/* ===== COMPACT SUGGESTION CHIPS ===== */
+.alwrity-copilot-sidebar .copilot-suggestion,
+.alwrity-copilot-sidebar .suggestion,
+.alwrity-copilot-sidebar .chip {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 16px !important; /* Reduced from 24px */
+  
+  /* Reduce padding by 60% */
+  padding: 6px 12px !important; /* Reduced from 10px 18px */
+  
+  /* Compact margins */
+  margin: 3px !important; /* Reduced from 6px */
+  
+  cursor: pointer !important;
+  transition: all 0.15s ease !important; /* Reduced from 0.2s */
+  
+  /* Compact font size */
+  font-size: 12px !important; /* Reduced from 13px */
+  color: #475569 !important;
+  font-weight: 500 !important;
+  
+  /* Compact shadows */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important; /* Reduced from 3px */
+}
+
+.alwrity-copilot-sidebar .copilot-suggestion:hover,
+.alwrity-copilot-sidebar .suggestion:hover,
+.alwrity-copilot-sidebar .chip:hover {
+  background: linear-gradient(135deg, #0a66c2 0%, #0056b3 100%) !important;
+  color: white !important;
+  border-color: #0a66c2 !important;
+  transform: translateY(-1px) !important; /* Reduced from -2px */
+  box-shadow: 0 2px 6px rgba(10, 102, 194, 0.25) !important; /* Reduced from 12px */
+}
+
+/* ===== COMPACT LOADING STATES ===== */
+.alwrity-copilot-sidebar .copilot-loading,
+.alwrity-copilot-sidebar .loading {
+  color: #0a66c2 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important; /* Reduced from 8px */
+  font-size: 12px !important; /* Reduced from 14px */
+}
+
+/* ===== COMPACT TYPING INDICATOR ===== */
+.alwrity-copilot-sidebar .typing-indicator,
+.alwrity-copilot-sidebar .is-typing {
+  display: flex !important;
+  align-items: center !important;
+  gap: 3px !important; /* Reduced from 4px */
+  padding: 6px 12px !important; /* Reduced from 8px 16px */
+  color: #64748b !important;
+  font-style: italic !important;
+  font-size: 12px !important; /* Reduced from 14px */
+}
+
+.alwrity-copilot-sidebar .typing-dot {
+  width: 4px !important; /* Reduced from 6px */
+  height: 4px !important; /* Reduced from 6px */
+  border-radius: 50% !important;
+  background: #0a66c2 !important;
+  animation: typing 1.2s infinite ease-in-out !important; /* Reduced from 1.4s */
+}
+
+/* ===== COMPACT TOOL CALL STYLING ===== */
+.alwrity-copilot-sidebar .tool-call,
+.alwrity-copilot-sidebar .function-call {
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 6px !important; /* Reduced from 8px */
+  padding: 8px 12px !important; /* Reduced from 12px 16px */
+  margin: 4px 0 !important; /* Reduced from 8px */
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 11px !important; /* Reduced from 12px */
+  color: #475569 !important;
+  border-left: 3px solid #0a66c2 !important; /* Reduced from 4px */
+}
+
+/* ===== COMPACT ERROR/SUCCESS MESSAGE STYLING ===== */
+.alwrity-copilot-sidebar .error-message,
+.alwrity-copilot-sidebar .error {
+  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%) !important;
+  border: 1px solid #fecaca !important;
+  color: #dc2626 !important;
+  border-left: 3px solid #dc2626 !important; /* Reduced from 4px */
+  padding: 8px 12px !important; /* Reduced from 12px 16px */
+  border-radius: 6px !important; /* Reduced from 8px */
+  font-size: 12px !important; /* Reduced from 14px */
+}
+
+.alwrity-copilot-sidebar .success-message,
+.alwrity-copilot-sidebar .success {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%) !important;
+  border: 1px solid #bbf7d0 !important;
+  color: #16a34a !important;
+  border-left: 3px solid #16a34a !important; /* Reduced from 4px */
+  padding: 8px 12px !important; /* Reduced from 12px 16px */
+  border-radius: 6px !important; /* Reduced from 8px */
+  font-size: 12px !important; /* Reduced from 14px */
+}
+
+/* ===== COMPACT SCROLLBAR STYLING ===== */
+.alwrity-copilot-sidebar ::-webkit-scrollbar {
+  width: 6px !important; /* Reduced from 10px */
+  height: 6px !important; /* Reduced from 10px */
+}
+
+.alwrity-copilot-sidebar ::-webkit-scrollbar-thumb {
+  background: rgba(10, 102, 194, 0.3) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 6px !important; /* Reduced from 10px */
+}
+
+.alwrity-copilot-sidebar ::-webkit-scrollbar-track {
+  background: rgba(10, 102, 194, 0.05) !important;
+  border-radius: 6px !important; /* Reduced from 10px */
+}
+
+/* ===== COMPACT SUGGESTIONS GRID ===== */
+.alwrity-copilot-sidebar .copilotkit-suggestions,
+.alwrity-copilot-sidebar .copilot-suggestions {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 6px !important; /* Reduced from 10px */
+  margin: 8px 0 !important; /* Reduced from 16px+ */
+}
+
+@media (min-width: 420px) {
+  .alwrity-copilot-sidebar .copilotkit-suggestions,
+  .alwrity-copilot-sidebar .copilot-suggestions {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important; /* Reduced from 12px */
+  }
+}
+
+/* ===== COMPACT CHAT INPUT AREA ===== */
+.alwrity-copilot-sidebar .copilotkit-input-container,
+.alwrity-copilot-sidebar .copilot-input-container {
+  padding: 8px !important; /* Reduced from 16px+ */
+  margin: 8px 0 !important; /* Reduced from 16px+ */
+  border-top: 1px solid rgba(10, 102, 194, 0.1) !important;
+}
+
+/* ===== COMPACT CHAT MESSAGES CONTAINER ===== */
+.alwrity-copilot-sidebar .copilotkit-messages,
+.alwrity-copilot-sidebar .copilot-messages,
+.alwrity-copilot-sidebar .chat-messages {
+  padding: 8px !important; /* Reduced from 16px+ */
+  margin: 0 !important;
+  max-height: 70vh !important; /* Ensure chat takes most space */
+  overflow-y: auto !important;
+}
+
+/* ===== COMPACT INITIAL MESSAGE ===== */
+.alwrity-copilot-sidebar .copilotkit-initial-message,
+.alwrity-copilot-sidebar .copilot-initial-message {
+  padding: 12px !important; /* Reduced from 20px+ */
+  margin: 8px 0 !important; /* Reduced from 16px+ */
+  font-size: 13px !important; /* Reduced from 16px+ */
+  line-height: 1.4 !important; /* Reduced from 1.6 */
+}
+
+/* ===== COMPACT SUBTITLE ===== */
+.alwrity-copilot-sidebar .copilotkit-subtitle,
+.alwrity-copilot-sidebar .copilot-subtitle {
+  font-size: 12px !important; /* Reduced from 14px+ */
+  color: #64748b !important;
+  margin: 4px 0 8px 0 !important; /* Reduced from 8px+ */
+  line-height: 1.3 !important; /* Reduced from 1.5 */
+}
+
+/* ===== COMPACT ICONS IN SUGGESTIONS ===== */
+.alwrity-copilot-sidebar .copilot-suggestion .icon,
+.alwrity-copilot-sidebar .copilotkit-suggestion .icon,
+.alwrity-copilot-sidebar .copilotkit-suggestions button .icon {
+  width: 14px !important; /* Reduced from 18px+ */
+  height: 14px !important; /* Reduced from 18px+ */
+  margin-right: 6px !important; /* Reduced from 8px+ */
+}
+
+/* ===== COMPACT CLOSE BUTTON ===== */
+.alwrity-copilot-sidebar .copilotkit-close,
+.alwrity-copilot-sidebar .copilot-close,
+.alwrity-copilot-sidebar button[aria-label*="close"],
+.alwrity-copilot-sidebar button[aria-label*="Close"] {
+  width: 24px !important; /* Reduced from 32px+ */
+  height: 24px !important; /* Reduced from 32px+ */
+  border-radius: 50% !important;
+  padding: 0 !important;
+  font-size: 12px !important; /* Reduced from 16px+ */
+}
+
+/* ===== COMPACT ANIMATIONS ===== */
+@keyframes typing {
+  0%, 60%, 100% { 
+    opacity: 0.4; 
+    transform: scale(0.8); /* Reduced from 1.0 */
+  }
+  30% { 
+    opacity: 1; 
+    transform: scale(1.0); 
+  }
+}
+
+/* ===== COMPACT RESPONSIVE DESIGN ===== */
+@media (max-width: 768px) {
+  .alwrity-copilot-sidebar .copilot-sidebar-container,
+  .alwrity-copilot-sidebar .copilotkit-sidebar,
+  .alwrity-copilot-sidebar .copilotkit-chat-container {
+    width: 90% !important; /* Mobile: take more width */
+    max-width: none !important;
+    min-width: 280px !important;
+    height: 80vh !important;
+  }
+  
+  .alwrity-copilot-sidebar .copilotkit-suggestions,
+  .alwrity-copilot-sidebar .copilot-suggestions {
+    grid-template-columns: 1fr !important; /* Single column on mobile */
+    gap: 4px !important; /* Even more compact on mobile */
+  }
+}
+
+/* ===== COMPACT FOCUS STATES ===== */
+.alwrity-copilot-sidebar .copilot-suggestion:focus-visible,
+.alwrity-copilot-sidebar .copilotkit-suggestion:focus-visible,
+.alwrity-copilot-sidebar .copilotkit-suggestions button:focus-visible,
+.alwrity-copilot-sidebar .copilot-suggestions button:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.3) !important; /* Reduced from 4px */
+}
+
