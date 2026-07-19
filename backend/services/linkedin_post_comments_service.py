@@ -37,7 +37,7 @@ class LinkedInPostCommentsValidationError(ValueError):
 
 def _ensure_unipile_provider() -> None:
     """Require LINKEDIN_PROVIDER=unipile for comment operations."""
-    mode = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
+    mode = os.getenv("LINKEDIN_PROVIDER", "unipile").lower()
     if mode != "unipile":
         logger.warning(
             "[PostComments] unavailable provider_mode={} (requires unipile)",

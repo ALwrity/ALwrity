@@ -1,13 +1,13 @@
 /**
  * ProfileGrowthWidget — F1 Analytics Dashboard feature
  *
- * Calls the previously unused getLinkedInPersonalAnalytics() to surface
- * profile-level aggregates (impressions, reach, engagement rate, reactions,
- * followers, shares) with a 7 / 28 / 90-day preset selector.
+ * Surfaces profile-level aggregates from GET /analytics/personal
+ * (Unipile post metrics summed for posts published in the window).
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   getLinkedInPersonalAnalytics,
+  getLinkedInSocialErrorMessage,
   type LinkedInAnalyticsPresetDays,
   type LinkedInPersonalAnalyticsResponse,
 } from '../../../../api/linkedinSocial';
@@ -59,16 +59,17 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
   const [preset, setPreset] = useState<LinkedInAnalyticsPresetDays>(28);
   const [data, setData] = useState<LinkedInPersonalAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetch = useCallback(async (days: LinkedInAnalyticsPresetDays) => {
     setLoading(true);
-    setError(false);
+    setErrorMessage(null);
     try {
       const res = await getLinkedInPersonalAnalytics({ presetDays: days });
       setData(res);
-    } catch {
-      setError(true);
+    } catch (err) {
+      setData(null);
+      setErrorMessage(getLinkedInSocialErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -77,6 +78,8 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
   useEffect(() => { void fetch(preset); }, [fetch, preset]);
 
   const analytics = data?.personal?.analytics ?? {};
+  const emptyReason = data?.personal?.error ?? null;
+  const hasMetrics = Object.keys(analytics).length > 0;
 
   return (
     <div style={{ marginBottom: 8 }}>
@@ -115,18 +118,37 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
         </div>
       )}
 
-      {/* Error */}
-      {error && !loading && (
+      {/* Request error */}
+      {errorMessage && !loading && (
         <div style={{ fontSize: 9, color: '#dc2626', padding: '4px 0' }}>
-          Could not load profile data.{' '}
-          <button type="button" onClick={() => void fetch(preset)} style={{ background: 'none', border: 'none', color: '#0a66c2', cursor: 'pointer', fontSize: 9, padding: 0, fontWeight: 700 }}>
+          {errorMessage}{' '}
+          <button
+            type="button"
+            onClick={() => void fetch(preset)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#0a66c2',
+              cursor: 'pointer',
+              fontSize: 9,
+              padding: 0,
+              fontWeight: 700,
+            }}
+          >
             Retry
           </button>
         </div>
       )}
 
+      {/* Honest empty (connected, but no posts in window) */}
+      {!loading && !errorMessage && data && !hasMetrics && (
+        <div style={{ fontSize: 9, color: '#64748b', padding: '4px 0' }}>
+          {emptyReason || 'No post metrics available for this range.'}
+        </div>
+      )}
+
       {/* Metrics grid */}
-      {!loading && !error && data && (
+      {!loading && !errorMessage && data && hasMetrics && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 4, marginBottom: 4 }}>
           {METRIC_DEFS.map(m => {
             const raw = analytics[m.key as MetricKey];
@@ -153,7 +175,7 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({ onView
       )}
 
       {/* Date range label */}
-      {data?.dateRange?.label && !loading && (
+      {data?.dateRange?.label && !loading && !errorMessage && (
         <div style={{ fontSize: 7, color: '#94a3b8', marginBottom: 3, textAlign: 'right' }}>
           {data.dateRange.label}
         </div>

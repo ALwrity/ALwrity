@@ -45,7 +45,7 @@ async def check_unipile_health(*, probe_api: bool = True) -> Dict[str, Any]:
 
     Returns a structured report safe to expose over HTTP (no API key values).
     """
-    provider = os.getenv("LINKEDIN_PROVIDER", "zernio").strip().lower()
+    provider = os.getenv("LINKEDIN_PROVIDER", "unipile").strip().lower()
     api_key = (os.getenv("UNIPILE_API_KEY") or "").strip()
     dsn = (os.getenv("UNIPILE_DSN") or "").strip()
 

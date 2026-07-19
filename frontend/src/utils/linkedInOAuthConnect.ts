@@ -1,5 +1,5 @@
 /**
- * Shared LinkedIn OAuth popup flow (Zernio / Unipile connect).
+ * Shared LinkedIn OAuth popup flow (Unipile connect).
  * Used by LinkedIn Writer and onboarding integrations.
  */
 
@@ -57,7 +57,7 @@ function isTrustedOAuthMessageOrigin(origin: string, trusted: string[]): boolean
 }
 
 /**
- * Opens Zernio/Unipile OAuth in a popup (or full-page redirect if blocked).
+ * Opens Unipile OAuth in a popup (or full-page redirect if blocked).
  * Resolves when the callback posts LINKEDIN_OAUTH_SUCCESS, or when verifyConnected
  * confirms the account is linked (Unipile notify_url / sync fallback).
  */

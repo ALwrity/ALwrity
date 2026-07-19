@@ -37,7 +37,7 @@ from services.integrations.linkedin.unipile_client import (
 from services.integrations.linkedin.unipile_post_comments_client import (
     UnipilePostCommentsClient,
 )
-from services.integrations.linkedin.zernio_client import avatar_url_from_item
+from services.integrations.linkedin.account_item_utils import avatar_url_from_item
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 
 

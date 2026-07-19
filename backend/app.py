@@ -870,7 +870,7 @@ async def startup_event():
         except Exception as poller_err:
             logger.warning(f"[STARTUP] Watchdog monitor poller not started: {poller_err}")
 
-        if _is_feature_enabled("linkedin") and os.getenv("LINKEDIN_PROVIDER", "zernio").strip().lower() == "unipile":
+        if _is_feature_enabled("linkedin") and os.getenv("LINKEDIN_PROVIDER", "unipile").strip().lower() == "unipile":
             try:
                 from services.integrations.linkedin.unipile_health import log_unipile_startup_health
 
