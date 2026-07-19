@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { 
   Box, 
   Container, 
@@ -6,8 +6,12 @@ import {
   Stack, 
   Grid, 
   useTheme,
+  useMediaQuery,
   alpha,
-  Button
+  Button,
+  Card,
+  CardContent,
+  Collapse,
 } from '@mui/material';
 import { 
   Psychology, 
@@ -21,6 +25,7 @@ import { useClerk } from '@clerk/clerk-react';
 import { ScrambleText } from '../ScrambleText';
 import { useDeferredBackground } from './useDeferredBackground';
 import { landingSectionTitleSx } from './landingStyles';
+import { landingDarkSectionSx, landingSectionBackgroundLayerSx, landingMobileBackgroundBleedSx, landingGlassCardSx, landingWelcomeIconBoxSx } from './landingSectionShellSx';
 import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
 const SECTION_BG = '/alwrity_landing_pg_bg.png';
@@ -54,8 +59,12 @@ const ScramblingText: React.FC<{ phrases: string[]; interval?: number; duration?
 
 const SolopreneurDilemma: React.FC = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [expandedPainIndex, setExpandedPainIndex] = useState<number | null>(null);
+  const [expandedSolutionIndex, setExpandedSolutionIndex] = useState<number | null>(null);
   const { openSignIn } = useClerk();
   const sectionBgUrl = useDeferredBackground(SECTION_BG);
+  const iconBoxSx = landingWelcomeIconBoxSx(theme);
 
   const painPoints = [
     {
@@ -119,31 +128,171 @@ const SolopreneurDilemma: React.FC = () => {
     }
   };
 
+  const mobileCardContentSx = {
+    p: { xs: 0.61, md: 2.5 },
+    '&:last-child': { pb: { xs: 0.61, md: 2.5 } },
+  } as const;
+
+  const mobileIconBoxSx = {
+    ...iconBoxSx,
+    width: 26,
+    height: 26,
+    minWidth: 26,
+    '& .MuiSvgIcon-root': { fontSize: 15 },
+  } as const;
+
+  const makeIconBoxSx = (accent: 'error' | 'success') => ({
+    width: { xs: 36, md: 48 },
+    height: { xs: 36, md: 48 },
+    borderRadius: 2,
+    p: { xs: 0, md: 1.5 },
+    background: `linear-gradient(135deg, ${theme.palette[accent].main} 0%, ${theme.palette[accent].dark} 100%)`,
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    minWidth: { xs: 36, md: 48 },
+    '& .MuiSvgIcon-root': { fontSize: { xs: 18, md: 24 } },
+  });
+
+  const cardBoxSx = (accent: 'error' | 'success') => ({
+    display: { xs: 'none', md: 'block' },
+    p: { xs: 2, md: 3 },
+    borderRadius: 3,
+    background: `linear-gradient(135deg, ${alpha(theme.palette[accent].main, 0.1)} 0%, ${alpha(theme.palette[accent].dark, 0.05)} 100%)`,
+    border: `1px solid ${alpha(theme.palette[accent].main, 0.2)}`,
+    backdropFilter: 'blur(10px)',
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      background: `linear-gradient(135deg, ${alpha(theme.palette[accent].main, 0.15)} 0%, ${alpha(theme.palette[accent].dark, 0.08)} 100%)`,
+      border: `1px solid ${alpha(theme.palette[accent].main, 0.3)}`,
+    },
+  });
+
+  const handleMobileCardToggle = useCallback(
+    (setter: React.Dispatch<React.SetStateAction<number | null>>, index: number) => {
+      if (!isMobile) return;
+      setter((prev) => (prev === index ? null : index));
+    },
+    [isMobile]
+  );
+
+  const handleMobileCardKeyDown = useCallback(
+    (
+      event: React.KeyboardEvent,
+      setter: React.Dispatch<React.SetStateAction<number | null>>,
+      index: number
+    ) => {
+      if (!isMobile) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleMobileCardToggle(setter, index);
+      }
+    },
+    [handleMobileCardToggle, isMobile]
+  );
+
+  const renderMobileGlassCard = (
+    title: string,
+    description: string,
+    icon: React.ReactNode,
+    index: number,
+    expandedIndex: number | null,
+    setExpandedIndex: React.Dispatch<React.SetStateAction<number | null>>,
+    variant: 'pain' | 'solution',
+    titleVariations?: string[]
+  ) => {
+    const isExpanded = expandedIndex === index;
+    const iconOnRight = variant === 'pain';
+    const alignRight = variant === 'pain';
+
+    return (
+      <Card
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        onClick={() => handleMobileCardToggle(setExpandedIndex, index)}
+        onKeyDown={(event) => handleMobileCardKeyDown(event, setExpandedIndex, index)}
+        sx={{
+          ...landingGlassCardSx,
+          display: { xs: 'block', md: 'none' },
+          width: { xs: '70%', md: 'auto' },
+          alignSelf: { xs: alignRight ? 'flex-end' : 'flex-start', md: 'stretch' },
+          cursor: 'pointer',
+          borderColor: isExpanded ? alpha(theme.palette.primary.main, 0.45) : 'rgba(255,255,255,0.15)',
+          '&:focus-visible': {
+            outline: `2px solid ${theme.palette.primary.main}`,
+            outlineOffset: 2,
+          },
+        }}
+      >
+        <CardContent sx={mobileCardContentSx}>
+          <Stack spacing={isExpanded ? 0.5 : 0} alignItems="stretch">
+            <Stack
+              direction={iconOnRight ? 'row-reverse' : 'row'}
+              spacing={0.75}
+              alignItems="center"
+              justifyContent={iconOnRight ? 'flex-end' : 'flex-start'}
+              sx={{ width: '100%' }}
+            >
+              <Box sx={mobileIconBoxSx}>{icon}</Box>
+              <Typography
+                variant="subtitle1"
+                component="h3"
+                fontWeight={700}
+                sx={{
+                  color: 'white',
+                  fontSize: '0.8rem',
+                  textAlign: iconOnRight ? 'right' : 'left',
+                  lineHeight: 1.15,
+                  flex: 1,
+                  minWidth: 0,
+                }}
+              >
+                {variant === 'pain' && titleVariations ? (
+                  <ScramblingText
+                    phrases={titleVariations}
+                    duration={500}
+                    delay={500}
+                    interval={10000}
+                  />
+                ) : (
+                  title
+                )}
+              </Typography>
+            </Stack>
+            <Collapse in={isExpanded} timeout={300}>
+              <Typography
+                variant="body2"
+                color="rgba(255,255,255,0.8)"
+                lineHeight={1.5}
+                sx={{ fontSize: '0.82rem', textAlign: 'center', pt: 0.25, px: 0.5 }}
+              >
+                {description}
+              </Typography>
+            </Collapse>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <Box
       sx={{
-        position: 'relative',
-        py: { xs: 5, md: 7 },
+        ...landingDarkSectionSx,
+        py: { xs: 2.5, md: 7 },
+        mt: { xs: 0, md: 0 },
         '&::before': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          ...landingSectionBackgroundLayerSx,
+          ...landingMobileBackgroundBleedSx,
           backgroundImage: sectionBgUrl ? `url(${sectionBgUrl})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
           zIndex: 0,
         },
         '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          ...landingSectionBackgroundLayerSx,
+          ...landingMobileBackgroundBleedSx,
           background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.7) 0%, rgba(25, 118, 210, 0.3) 50%, rgba(156, 39, 176, 0.3) 100%)',
           zIndex: 1,
         },
@@ -160,10 +309,10 @@ const SolopreneurDilemma: React.FC = () => {
           <Stack 
             direction={{ xs: 'column', md: 'row' }} 
             spacing={{ xs: 1, md: 2 }} 
-            alignItems={{ xs: 'center', md: 'flex-start' }}
-            sx={{ mb: { xs: 4, md: 5 } }}
+            alignItems={{ xs: 'flex-start', md: 'flex-start' }}
+            sx={{ mb: { xs: 2.5, md: 5 } }}
           >
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1, width: { xs: '100%', md: 'auto' } }}>
               <motion.div variants={itemVariants}>
                 <Typography
                   variant="h2"
@@ -173,67 +322,82 @@ const SolopreneurDilemma: React.FC = () => {
                     color: 'white',
                     textShadow: '0 2px 10px rgba(0, 0, 0, 0.8)',
                     lineHeight: 1.12,
+                    textAlign: { xs: 'left', md: 'left' },
                   }}
                 >
                   Content Struggle Is Real:
-                  <br />
-                  Scale Smart,
-                  <br />
-                  Burn Out Less
+                  <Box
+                    component="span"
+                    sx={{
+                      display: { xs: 'block', md: 'none' },
+                      whiteSpace: 'nowrap',
+                      fontSize: { xs: '1.35rem', sm: 'inherit' },
+                    }}
+                  >
+                    Scale Smart, Burn Out Less
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
+                    <br />
+                    Scale Smart,
+                    <br />
+                    Burn Out Less
+                  </Box>
                 </Typography>
               </motion.div>
             </Box>
             
-            <Box sx={{ flex: 1 }}>
-              <motion.div variants={itemVariants}>
+            <Box sx={{ flex: 1, width: { xs: '100%', md: 'auto' }, display: { xs: 'none', md: 'flex' }, justifyContent: { md: 'flex-start' } }}>
+              <motion.div variants={itemVariants} style={{ maxWidth: '100%' }}>
                 <Typography 
-                  variant="h5" 
+                  variant="h2"
                   component="p"
-                  sx={{ 
+                  sx={{
                     color: 'rgba(255, 255, 255, 0.9)',
                     fontWeight: 400,
                     textShadow: '0 1px 3px rgba(0, 0, 0, 0.7)',
-                    lineHeight: 1.4
+                    lineHeight: 1.4,
                   }}
                 >
-                  You're juggling multiple platforms, struggling to maintain your voice, 
-                  and spending hours on content that should take minutes.
+                  You're juggling multiple platforms, struggling to maintain your voice, and
+                  spending hours on content that should take minutes.
                 </Typography>
               </motion.div>
             </Box>
           </Stack>
 
           <Box sx={{ ml: { xs: 0, md: '35%' } }}>
-            <Grid container spacing={6} alignItems="center">
+            <Grid container spacing={{ xs: 2, md: 6 }} alignItems="center">
               {/* Left Column - Pain Points */}
               <Grid item xs={12} md={6}>
                 <motion.div variants={itemVariants}>
-                  <Stack spacing={4}>
+                  <Stack spacing={{ xs: 1.5, md: 4 }} sx={{ alignItems: { xs: 'flex-end', md: 'stretch' } }}>
                     {/* Before ALwrity Label */}
-                    <Box
-                      sx={{
-                        display: 'inline-block',
-                        px: 2,
-                        py: 1,
-                        background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
-                        borderRadius: 2,
-                        mb: 2
-                      }}
-                    >
-                      <Typography 
-                        variant="caption" 
-                        fontWeight={700}
-                        sx={{ 
-                          color: 'white',
-                          textTransform: 'uppercase',
-                          letterSpacing: '1px',
-                          fontSize: '0.8rem'
+                    <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-end', md: 'flex-start' }, width: { xs: '100%', md: 'auto' } }}>
+                      <Box
+                        sx={{
+                          display: 'inline-block',
+                          px: { xs: 1.36, md: 2 },
+                          py: { xs: 0.42, md: 1 },
+                          borderRadius: { xs: 1.5, md: 2 },
+                          mb: { xs: 0.75, md: 2 },
+                          background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
                         }}
                       >
-                        Before ALwrity
-                      </Typography>
+                        <Typography 
+                          variant="caption" 
+                          fontWeight={700}
+                          sx={{ 
+                            color: 'white',
+                            textTransform: 'uppercase',
+                            letterSpacing: { xs: '0.78px', md: '1px' },
+                            fontSize: { xs: '0.95rem', md: '0.8rem' },
+                          }}
+                        >
+                          Before ALwrity
+                        </Typography>
+                      </Box>
                     </Box>
-                    
+                  
 
                   
                   {painPoints.map((point, index) => (
@@ -242,35 +406,21 @@ const SolopreneurDilemma: React.FC = () => {
                       variants={itemVariants}
                       whileHover={{ scale: 1.02 }}
                       transition={{ duration: 0.2 }}
+                      style={{ width: '100%', display: 'flex', justifyContent: 'flex-end' }}
                     >
-                      <Box
-                        sx={{
-                          p: 3,
-                          borderRadius: 3,
-                          background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.1)} 0%, ${alpha(theme.palette.error.dark, 0.05)} 100%)`,
-                          border: `1px solid ${alpha(theme.palette.error.main, 0.2)}`,
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease',
-                          '&:hover': {
-                            background: `linear-gradient(135deg, ${alpha(theme.palette.error.main, 0.15)} 0%, ${alpha(theme.palette.error.dark, 0.08)} 100%)`,
-                            border: `1px solid ${alpha(theme.palette.error.main, 0.3)}`,
-                          }
-                        }}
-                      >
+                      {renderMobileGlassCard(
+                        point.title,
+                        point.description,
+                        point.icon,
+                        index,
+                        expandedPainIndex,
+                        setExpandedPainIndex,
+                        'pain',
+                        point.titleVariations
+                      )}
+                      <Box sx={cardBoxSx('error')}>
                         <Stack direction="row" spacing={2} alignItems="flex-start">
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 2,
-                              background: `linear-gradient(135deg, ${theme.palette.error.main} 0%, ${theme.palette.error.dark} 100%)`,
-                              color: 'white',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              minWidth: 48,
-                              height: 48,
-                            }}
-                          >
+                          <Box sx={makeIconBoxSx('error')}>
                             {point.icon}
                           </Box>
                           <Stack spacing={1} sx={{ flex: 1 }}>
@@ -280,7 +430,8 @@ const SolopreneurDilemma: React.FC = () => {
                               fontWeight={600}
                               sx={{ 
                                 color: 'white',
-                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.7)'
+                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.7)',
+                                fontSize: { xs: '0.95rem', md: 'inherit' },
                               }}
                             >
                               <ScramblingText 
@@ -295,7 +446,8 @@ const SolopreneurDilemma: React.FC = () => {
                               sx={{ 
                                 color: 'rgba(255, 255, 255, 0.8)',
                                 textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                                lineHeight: 1.5
+                                lineHeight: 1.5,
+                                fontSize: { xs: '0.88rem', md: 'inherit' },
                               }}
                             >
                               {point.description}
@@ -305,6 +457,27 @@ const SolopreneurDilemma: React.FC = () => {
                       </Box>
                     </motion.div>
                   ))}
+
+                  {isMobile && (
+                    <Typography
+                      variant="body1"
+                      component="p"
+                      sx={{
+                        color: 'rgba(255, 255, 255, 0.85)',
+                        fontWeight: 400,
+                        fontSize: '0.88rem',
+                        lineHeight: 1.55,
+                        textShadow: '0 1px 3px rgba(0, 0, 0, 0.7)',
+                        textAlign: 'right',
+                        maxWidth: 320,
+                        alignSelf: 'flex-end',
+                        mt: 0.5,
+                      }}
+                    >
+                      You're juggling multiple platforms, struggling to maintain your voice, and spending hours on
+                      content that should take minutes.
+                    </Typography>
+                  )}
                 </Stack>
               </motion.div>
             </Grid>
@@ -312,30 +485,32 @@ const SolopreneurDilemma: React.FC = () => {
               {/* Right Column - Solutions */}
               <Grid item xs={12} md={6}>
                 <motion.div variants={itemVariants}>
-                  <Stack spacing={4}>
+                  <Stack spacing={{ xs: 1.5, md: 4 }} sx={{ alignItems: { xs: 'flex-start', md: 'stretch' } }}>
                     {/* After ALwrity Label */}
-                    <Box
-                      sx={{
-                        display: 'inline-block',
-                        px: 2,
-                        py: 1,
-                        background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-                        borderRadius: 2,
-                        mb: 2
-                      }}
-                    >
-                      <Typography 
-                        variant="caption" 
-                        fontWeight={700}
-                        sx={{ 
-                          color: 'white',
-                          textTransform: 'uppercase',
-                          letterSpacing: '1px',
-                          fontSize: '0.8rem'
+                    <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-start' }, width: { xs: '100%', md: 'auto' } }}>
+                      <Box
+                        sx={{
+                          display: 'inline-block',
+                          px: { xs: 1.36, md: 2 },
+                          py: { xs: 0.42, md: 1 },
+                          borderRadius: { xs: 1.5, md: 2 },
+                          mb: { xs: 0.75, md: 2 },
+                          background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
                         }}
                       >
-                        After ALwrity
-                      </Typography>
+                        <Typography 
+                          variant="caption" 
+                          fontWeight={700}
+                          sx={{ 
+                            color: 'white',
+                            textTransform: 'uppercase',
+                            letterSpacing: { xs: '0.78px', md: '1px' },
+                            fontSize: { xs: '0.95rem', md: '0.8rem' },
+                          }}
+                        >
+                          After ALwrity
+                        </Typography>
+                      </Box>
                     </Box>
                     
                   {solutions.map((solution, index) => (
@@ -344,35 +519,20 @@ const SolopreneurDilemma: React.FC = () => {
                       variants={itemVariants}
                       whileHover={{ scale: 1.02 }}
                       transition={{ duration: 0.2 }}
+                      style={{ width: '100%' }}
                     >
-                      <Box
-                        sx={{
-                          p: 3,
-                          borderRadius: 3,
-                          background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.1)} 0%, ${alpha(theme.palette.success.dark, 0.05)} 100%)`,
-                          border: `1px solid ${alpha(theme.palette.success.main, 0.2)}`,
-                          backdropFilter: 'blur(10px)',
-                          transition: 'all 0.3s ease',
-                          '&:hover': {
-                            background: `linear-gradient(135deg, ${alpha(theme.palette.success.main, 0.15)} 0%, ${alpha(theme.palette.success.dark, 0.08)} 100%)`,
-                            border: `1px solid ${alpha(theme.palette.success.main, 0.3)}`,
-                          }
-                        }}
-                      >
+                      {renderMobileGlassCard(
+                        solution.title,
+                        solution.description,
+                        solution.icon,
+                        index,
+                        expandedSolutionIndex,
+                        setExpandedSolutionIndex,
+                        'solution'
+                      )}
+                      <Box sx={cardBoxSx('success')}>
                         <Stack direction="row" spacing={2} alignItems="flex-start">
-                          <Box
-                            sx={{
-                              p: 1.5,
-                              borderRadius: 2,
-                              background: `linear-gradient(135deg, ${theme.palette.success.main} 0%, ${theme.palette.success.dark} 100%)`,
-                              color: 'white',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              minWidth: 48,
-                              height: 48,
-                            }}
-                          >
+                          <Box sx={makeIconBoxSx('success')}>
                             {solution.icon}
                           </Box>
                           <Stack spacing={1} sx={{ flex: 1 }}>
@@ -391,7 +551,7 @@ const SolopreneurDilemma: React.FC = () => {
                               variant="body1"
                               sx={{ 
                                 color: 'rgba(255, 255, 255, 0.8)',
-                                textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
+                                textShadow: '0 1px 2px rgba(0, 0, 0.5)',
                                 lineHeight: 1.5
                               }}
                             >
@@ -403,7 +563,7 @@ const SolopreneurDilemma: React.FC = () => {
                     </motion.div>
                   ))}
 
-                  {/* CTA Button */}
+                  {/* CTA Button — desktop only */}
                   <motion.div variants={itemVariants}>
                     <Button
                       variant="contained"
@@ -411,6 +571,7 @@ const SolopreneurDilemma: React.FC = () => {
                       endIcon={<ArrowForward />}
                       onClick={() => openSignIn({ forceRedirectUrl: getPostAuthDestination() })}
                       sx={{
+                        display: { xs: 'none', md: 'inline-flex' },
                         mt: 3,
                         py: 2,
                         px: 4,
