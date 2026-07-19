@@ -24,7 +24,7 @@ import {
   Speed,
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
-import { landingSectionTitleSx, landingSectionSubtitleSx } from './landingStyles';
+import { landingSectionTitleSx, landingSectionSubtitleSx, landingDesktopPromotedCopySx } from './landingStyles';
 import { scrollToLandingSection } from '../../utils/landingNavigation';
 import { useDeferredBackground } from './useDeferredBackground';
 import { landingDarkSectionSx, landingSectionBackgroundLayerSx, landingMobileBackgroundBleedSx, landingMobileSeamBleedSx } from './landingSectionShellSx';
@@ -184,11 +184,12 @@ const IntroducingAlwrity: React.FC = () => {
                 maxWidth="720px"
                 sx={{
                   ...landingSectionSubtitleSx,
-                  fontWeight: 400,
-                  fontSize: { xs: '0.95rem', md: '1.05rem' },
+                  ...landingDesktopPromotedCopySx,
+                  fontWeight: { xs: 400, md: 600 },
+                  fontSize: { xs: '0.95rem', md: '1.15rem' },
                 }}
               >
-                Transform from a manual implementer to a strategic director. ALwrity automates the entire
+                Transform from a manual implementer to a Strategic Director. ALwrity automates the entire
                 Content Strategy process with AI-powered Intelligence
               </Typography>
             </motion.div>

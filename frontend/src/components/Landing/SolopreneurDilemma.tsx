@@ -24,7 +24,7 @@ import { motion } from 'framer-motion';
 import { useClerk } from '@clerk/clerk-react';
 import { ScrambleText } from '../ScrambleText';
 import { useDeferredBackground } from './useDeferredBackground';
-import { landingSectionTitleSx } from './landingStyles';
+import { landingSectionTitleSx, landingDesktopPromotedCopySx } from './landingStyles';
 import { landingDarkSectionSx, landingSectionBackgroundLayerSx, landingMobileBackgroundBleedSx, landingGlassCardSx, landingWelcomeIconBoxSx } from './landingSectionShellSx';
 import { getPostAuthDestination } from '../../utils/returningUserStorage';
 
@@ -351,11 +351,14 @@ const SolopreneurDilemma: React.FC = () => {
                 <Typography 
                   variant="h2"
                   component="p"
-                  sx={{
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontWeight: 400,
+                  sx={{ 
+                    color: { md: 'rgba(255, 255, 255, 0.9)' },
+                    ...landingDesktopPromotedCopySx,
+                    fontWeight: { md: 500 },
+                    fontSize: { md: '2rem' },
+                    lineHeight: { md: 1.35 },
                     textShadow: '0 1px 3px rgba(0, 0, 0, 0.7)',
-                    lineHeight: 1.4,
+                    textAlign: { md: 'left' },
                   }}
                 >
                   You're juggling multiple platforms, struggling to maintain your voice, and
