@@ -229,8 +229,8 @@ const App: React.FC = () => {
                     <Route path="/facebook-writer" element={<ProtectedRoute><FeatureRoute feature="facebook"><FacebookWriter /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/linkedin-writer" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/blog-writer" element={<ProtectedRoute><FeatureRoute feature="blog_writer"><BlogWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/youtube-creator" element={<ProtectedRoute><FeatureRoute feature="youtube"><YouTubeCreator /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/podcast-maker" element={<ProtectedRoute><FeatureRoute feature="podcast"><PodcastDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/image-studio" element={<ProtectedRoute><FeatureRoute feature="image"><ImageStudioDashboard /></FeatureRoute></ProtectedRoute>} />

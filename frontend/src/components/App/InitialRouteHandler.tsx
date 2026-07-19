@@ -300,12 +300,6 @@ const InitialRouteHandler: React.FC = () => {
       );
     }
 
-    if (shouldSkipOnboarding()) {
-      const route = getDefaultLandingRoute();
-      console.log(`InitialRouteHandler: No subscription data in feature-only mode → ${route}`);
-      return navigateAndLog(route);
-    }
-
     console.log('InitialRouteHandler: No subscription data after check → Pricing page');
     return navigateAndLog("/pricing");
   }
@@ -315,12 +309,6 @@ const InitialRouteHandler: React.FC = () => {
   if (isNewUser || !subscription.active) {
     console.log('InitialRouteHandler: No active subscription - modal will be shown by SubscriptionContext');
     if (isNewUser) {
-      if (shouldSkipOnboarding()) {
-        const route = getDefaultLandingRoute();
-        console.log(`InitialRouteHandler: New user in feature-only mode → ${route}`);
-        return navigateAndLog(route);
-      }
-
       console.log('InitialRouteHandler: New user (no subscription) → Pricing page');
       return <Navigate to="/pricing" replace />;
     }
