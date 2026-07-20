@@ -1,8 +1,6 @@
 import React from 'react';
 
-import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
-import { useLinkedInStudioProfileStrength } from '../../hooks/useLinkedInStudioProfileStrength';
-import { OptimiseProfileControl } from './OptimiseProfileControl';
+import { OptimiseProfileRailChip } from './OptimiseProfileRailChip';
 import { ResumeDraftRailChip } from './ResumeDraftRailChip';
 import { TodayGrowthWalkthrough } from './TodayGrowthWalkthrough';
 
@@ -15,7 +13,7 @@ interface MobileStudioQuickActionsDockProps {
 }
 
 /**
- * Mobile (≤960px): four studio actions in one segmented row above the workflow title.
+ * Mobile (≤960px): studio actions in one segmented row above the workflow title.
  */
 export const MobileStudioQuickActionsDock: React.FC<MobileStudioQuickActionsDockProps> = ({
   dashboardDraft,
@@ -24,19 +22,6 @@ export const MobileStudioQuickActionsDock: React.FC<MobileStudioQuickActionsDock
   showPreferencesModal,
   onTogglePreferences,
 }) => {
-  const { connected } = useLinkedInSocialConnection();
-  const {
-    profileStrengthPercent,
-    profileStrengthLoading,
-    strengthLabel,
-    strengthTooltip,
-  } = useLinkedInStudioProfileStrength();
-
-  const handleOpenOptimiseProfile = () => {
-    if (!connected) return;
-    window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
-  };
-
   return (
     <div
       className="linkedin-writer-header-studio-dock"
@@ -51,6 +36,7 @@ export const MobileStudioQuickActionsDock: React.FC<MobileStudioQuickActionsDock
         onResumeDraft={onResumeDraft}
         onClear={onClearDraft}
       />
+      <OptimiseProfileRailChip variant="tab" />
       <button
         type="button"
         className={`linkedin-writer-header-studio-tab linkedin-writer-header-studio-tab--persona${
@@ -70,17 +56,6 @@ export const MobileStudioQuickActionsDock: React.FC<MobileStudioQuickActionsDock
           ⚙️
         </span>
       </button>
-      <OptimiseProfileControl
-        variant="tab"
-        onOptimiseProfile={handleOpenOptimiseProfile}
-        profileStrengthPercent={connected ? profileStrengthPercent : null}
-        strengthLabel={strengthLabel}
-        strengthTooltip={
-          connected ? strengthTooltip : 'Connect LinkedIn to optimise your profile'
-        }
-        isLoading={profileStrengthLoading}
-        isDisabled={!connected}
-      />
     </div>
   );
 };
