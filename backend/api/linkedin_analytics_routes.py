@@ -42,9 +42,9 @@ router = APIRouter(prefix="/api/linkedin-social", tags=["LinkedIn Social Analyti
 _oauth_service = LinkedInOAuthService()
 
 _UNAVAILABLE = (
-    "LinkedIn profile and organization aggregate analytics are not available yet "
-    "for Unipile. Reconnect LinkedIn if needed; this endpoint will return data "
-    "when Unipile analytics ships."
+    "LinkedIn profile and organization aggregate analytics are not available yet. "
+    "Reconnect LinkedIn if needed; this endpoint will return data "
+    "when these analytics are available."
 )
 
 

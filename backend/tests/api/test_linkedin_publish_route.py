@@ -3,66 +3,50 @@ from __future__ import annotations
 import importlib.util
 import os
 import sys
-from contextlib import contextmanager
 from pathlib import Path
-from types import ModuleType, SimpleNamespace
+from types import ModuleType
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from cryptography.fernet import Fernet
 from fastapi import HTTPException
-from loguru import logger
+
 
 _BACKEND_ROOT = Path(__file__).resolve().parents[2]
 if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
 
-@contextmanager
-def _linkedin_env():
-    key = Fernet.generate_key().decode("utf-8")
-    with patch.dict(
-        os.environ,
-        {"LINKEDIN_TOKEN_ENCRYPTION_KEY": key},
-        clear=False,
-    ):
-        yield
-
-
-def _load_linkedin_social_routes():
-    module_name = "_linkedin_social_routes_publish_under_test"
+def _load_linkedin_publish_accounts_routes():
+    module_name = "_linkedin_publish_accounts_routes_under_test"
     if module_name in sys.modules:
         return sys.modules[module_name]
 
-    routes_path = _BACKEND_ROOT / "api" / "linkedin_social_routes.py"
+    routes_path = _BACKEND_ROOT / "api" / "linkedin_publish_accounts_routes.py"
     spec = importlib.util.spec_from_file_location(module_name, routes_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load route module from {routes_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
-    if not hasattr(logger, "warn"):
-        setattr(logger, "warn", logger.warning)
-    stub_main_text_generation = ModuleType("services.llm_providers.main_text_generation")
-    stub_main_text_generation.llm_text_gen = SimpleNamespace()
-    stub_huggingface_provider = ModuleType("services.llm_providers.huggingface_provider")
-    stub_huggingface_provider.huggingface_text_response = lambda *args, **kwargs: None
-    stub_huggingface_provider.huggingface_structured_json_response = (
-        lambda *args, **kwargs: None
-    )
-    with patch.dict(
-        sys.modules,
-        {
-            "services.llm_providers.main_text_generation": stub_main_text_generation,
-            "services.llm_providers.huggingface_provider": stub_huggingface_provider,
-        },
-        clear=False,
-    ):
-        with _linkedin_env():
+
+    stub_image_gen = ModuleType("services.llm_providers.main_image_generation")
+    stub_image_gen.generate_image = MagicMock()
+    stub_image_gen.enhance_image_prompt = MagicMock()
+    stub_image_gen._track_image_operation_usage = MagicMock()
+    stub_image_gen._validate_image_operation = MagicMock()
+
+    key = Fernet.generate_key().decode("utf-8")
+    with patch.dict(os.environ, {"LINKEDIN_TOKEN_ENCRYPTION_KEY": key}, clear=False):
+        with patch.dict(
+            sys.modules,
+            {"services.llm_providers.main_image_generation": stub_image_gen},
+            clear=False,
+        ):
             spec.loader.exec_module(module)
     return module
 
 
-_routes = _load_linkedin_social_routes()
+_routes = _load_linkedin_publish_accounts_routes()
 
 
 @pytest.mark.anyio

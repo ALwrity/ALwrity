@@ -53,15 +53,14 @@ class LinkedInOAuthService(OAuthProviderBase):
     """Manages LinkedIn Growth Engine credentials (Unipile or native OAuth).
 
     Inherits Fernet token encryption and per-user DB path resolution from
-    OAuthProviderBase. Legacy zernio_* SQLite columns are retained for
-    schema compatibility but are unused by the Unipile connect path.
+    OAuthProviderBase.
     """
 
     _TOKEN_SELECT_COLUMNS = """
-        id, user_id, provider_mode, zernio_api_key, zernio_account_id,
-        zernio_org_account_id, linkedin_access_token, linkedin_refresh_token,
+        id, user_id, provider_mode,
+        linkedin_access_token, linkedin_refresh_token,
         expires_at, account_name, profile_urn, is_active, created_at, updated_at,
-        zernio_profile_id, unipile_account_id, unipile_org_account_id
+        unipile_account_id, unipile_org_account_id
     """
 
     def __init__(self, db_path: Optional[str] = None):
@@ -86,9 +85,6 @@ class LinkedInOAuthService(OAuthProviderBase):
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
                     provider_mode TEXT NOT NULL,
-                    zernio_api_key TEXT,
-                    zernio_account_id TEXT,
-                    zernio_org_account_id TEXT,
                     linkedin_access_token TEXT,
                     linkedin_refresh_token TEXT,
                     expires_at TIMESTAMP,
@@ -97,7 +93,6 @@ class LinkedInOAuthService(OAuthProviderBase):
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    zernio_profile_id TEXT,
                     unipile_account_id TEXT,
                     unipile_org_account_id TEXT
                 )
@@ -105,10 +100,6 @@ class LinkedInOAuthService(OAuthProviderBase):
             )
             cursor.execute("PRAGMA table_info(linkedin_oauth_tokens)")
             existing_cols = {row[1] for row in cursor.fetchall()}
-            if "zernio_profile_id" not in existing_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN zernio_profile_id TEXT"
-                )
             # Add Unipile columns (Phase 2 migration)
             if "unipile_account_id" not in existing_cols:
                 cursor.execute(
@@ -118,6 +109,13 @@ class LinkedInOAuthService(OAuthProviderBase):
                 cursor.execute(
                     "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_org_account_id TEXT"
                 )
+            # Drop legacy zernio columns (post-Zernio cleanup)
+            for _col in ("zernio_api_key", "zernio_account_id", "zernio_org_account_id", "zernio_profile_id"):
+                if _col in existing_cols:
+                    try:
+                        cursor.execute(f"ALTER TABLE linkedin_oauth_tokens DROP COLUMN {_col}")
+                    except sqlite3.OperationalError:
+                        logger.warning(f"Could not drop column {_col} (SQLite version < 3.35.0); ignoring")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS linkedin_oauth_states (
@@ -200,24 +198,21 @@ class LinkedInOAuthService(OAuthProviderBase):
     ) -> None:
         """Override of OAuthProviderBase._migrate_plaintext_tokens_if_needed.
 
-        LinkedIn may store encrypted access/refresh tokens and a legacy
-        zernio_api_key column. Migrate any plaintext values once per user.
+        Migrate any plaintext access/refresh token values once per user.
         """
         if user_id in self._migration_done:
             return
         cursor = conn.cursor()
         cursor.execute(
             """
-            SELECT id, zernio_api_key, linkedin_access_token, linkedin_refresh_token
+            SELECT id, linkedin_access_token, linkedin_refresh_token
             FROM linkedin_oauth_tokens WHERE user_id = ?
             """,
             (user_id,),
         )
         migrated = 0
-        for token_id, zernio_key, access, refresh in cursor.fetchall():
+        for token_id, access, refresh in cursor.fetchall():
             updates: Dict[str, Optional[str]] = {}
-            if zernio_key and not self._is_likely_encrypted_blob(zernio_key):
-                updates["zernio_api_key"] = self._encrypt_token(zernio_key)
             if access and not self._is_likely_encrypted_blob(access):
                 updates["linkedin_access_token"] = self._encrypt_token(access)
             if refresh and not self._is_likely_encrypted_blob(refresh):
@@ -242,27 +237,9 @@ class LinkedInOAuthService(OAuthProviderBase):
         self._migration_done.add(user_id)
 
     def _row_to_credentials(self, row: tuple) -> LinkedInCredentials:
-        (
-            _id,
-            _user_id,
-            provider_mode,
-            zernio_api_key,
-            zernio_account_id,
-            zernio_org_account_id,
-            linkedin_access_token,
-            linkedin_refresh_token,
-            _expires_at,
-            account_name,
-            profile_urn,
-            _is_active,
-            _created_at,
-            _updated_at,
-            *rest,
-        ) = row
-        # Handle optional columns that may not exist in older rows
-        zernio_profile_id = rest[0] if len(rest) > 0 else None
-        unipile_account_id = rest[1] if len(rest) > 1 else None
-        unipile_org_account_id = rest[2] if len(rest) > 2 else None
+        # Map SELECT columns by name for resilience against column reordering
+        col_names = [c.strip() for c in self._TOKEN_SELECT_COLUMNS.split(",")]
+        row_dict = dict(zip(col_names, row))
 
         def _maybe_decrypt(value: Optional[str]) -> Optional[str]:
             if not value:
@@ -271,24 +248,19 @@ class LinkedInOAuthService(OAuthProviderBase):
                 return self._decrypt_token(value)
             return value
 
-        # Legacy zernio_* columns remain in the SELECT for schema compat.
-        _ = (zernio_api_key, zernio_account_id, zernio_org_account_id, zernio_profile_id)
-        mode = str(provider_mode or "").strip().lower()
-        if mode == "zernio":
-            # Force reconnect via Unipile — legacy Zernio rows are unsupported.
+        mode = str(row_dict.get("provider_mode") or "").strip().lower()
+        if mode not in ("native", "unipile"):
             mode = "unipile"
-            unipile_account_id = None
-            unipile_org_account_id = None
 
         return LinkedInCredentials.from_db_row(
             {
                 "provider_mode": mode,
-                "unipile_account_id": unipile_account_id,
-                "unipile_org_account_id": unipile_org_account_id,
-                "linkedin_access_token": _maybe_decrypt(linkedin_access_token),
-                "linkedin_refresh_token": _maybe_decrypt(linkedin_refresh_token),
-                "account_name": account_name,
-                "profile_urn": profile_urn,
+                "unipile_account_id": row_dict.get("unipile_account_id"),
+                "unipile_org_account_id": row_dict.get("unipile_org_account_id"),
+                "linkedin_access_token": _maybe_decrypt(row_dict.get("linkedin_access_token")),
+                "linkedin_refresh_token": _maybe_decrypt(row_dict.get("linkedin_refresh_token")),
+                "account_name": row_dict.get("account_name"),
+                "profile_urn": row_dict.get("profile_urn"),
             }
         )
 
@@ -430,37 +402,20 @@ class LinkedInOAuthService(OAuthProviderBase):
 
     def _token_row_metadata(self, row: tuple) -> Dict[str, Any]:
         """Build monitoring-safe token metadata (no decrypted secrets)."""
-        (
-            token_id,
-            _user_id,
-            provider_mode,
-            _legacy_zernio_api_key,
-            _legacy_zernio_account_id,
-            _legacy_zernio_org_account_id,
-            _linkedin_access_token,
-            linkedin_refresh_token,
-            expires_at,
-            account_name,
-            profile_urn,
-            is_active,
-            created_at,
-            _updated_at,
-            *_rest,
-        ) = row
-        unipile_account_id = _rest[1] if len(_rest) > 1 else None
-        unipile_org_account_id = _rest[2] if len(_rest) > 2 else None
-        not_expired, expires_dt = self._parse_expires_at(expires_at)
-        has_refresh = bool(linkedin_refresh_token)
+        col_names = [c.strip() for c in self._TOKEN_SELECT_COLUMNS.split(",")]
+        row_dict = dict(zip(col_names, row))
+        not_expired, expires_dt = self._parse_expires_at(row_dict.get("expires_at"))
+        has_refresh = bool(row_dict.get("linkedin_refresh_token"))
         return {
-            "id": token_id,
-            "provider_mode": provider_mode,
-            "unipile_account_id": unipile_account_id,
-            "unipile_org_account_id": unipile_org_account_id,
-            "expires_at": expires_at,
-            "account_name": account_name,
-            "profile_urn": profile_urn,
-            "is_active": bool(is_active),
-            "created_at": created_at,
+            "id": row_dict.get("id"),
+            "provider_mode": row_dict.get("provider_mode"),
+            "unipile_account_id": row_dict.get("unipile_account_id"),
+            "unipile_org_account_id": row_dict.get("unipile_org_account_id"),
+            "expires_at": row_dict.get("expires_at"),
+            "account_name": row_dict.get("account_name"),
+            "profile_urn": row_dict.get("profile_urn"),
+            "is_active": bool(row_dict.get("is_active")),
+            "created_at": row_dict.get("created_at"),
             "has_refresh_token": has_refresh,
             "not_expired": not_expired,
             "expires_at_dt": expires_dt.isoformat() if expires_dt else None,
@@ -1085,7 +1040,7 @@ class LinkedInOAuthService(OAuthProviderBase):
                 )
             except Exception as e:
                 logger.error(f"[LinkedInConnect] Failed to create Unipile auth link: {e}")
-                raise ValueError(f"Failed to generate Unipile auth URL: {e}")
+                raise ValueError(f"Failed to generate LinkedIn auth URL: {e}")
 
             logger.info(f"[LinkedInConnect] Unipile auth URL generated for user={user_id}")
             return {

@@ -613,7 +613,7 @@ class UnipileProvider:
 
         creds = self._oauth.resolve_credentials(user_id)
         if creds.provider_mode != "unipile" or not creds.unipile_account_id:
-            raise LinkedInNotConnectedError("Unipile LinkedIn account not connected")
+            raise LinkedInNotConnectedError("LinkedIn account not connected")
 
         account_id = creds.unipile_account_id
         if request.account_id and request.account_id != account_id:

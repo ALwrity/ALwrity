@@ -5,6 +5,7 @@ Step 2.5 / Phase 5 Step 6 — GET /api/linkedin-social/profile API tests.
 from __future__ import annotations
 
 import importlib.util
+import os
 import sys
 from pathlib import Path
 from contextlib import ExitStack
@@ -18,22 +19,25 @@ if str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
 
-def _load_linkedin_social_routes():
+def _load_linkedin_profile_routes():
     """Load route module without importing ``api`` package ``__init__``."""
-    module_name = "_linkedin_social_routes_under_test"
+    module_name = "_linkedin_profile_routes_under_test"
     if module_name in sys.modules:
         return sys.modules[module_name]
-    routes_path = _BACKEND_ROOT / "api" / "linkedin_social_routes.py"
+    routes_path = _BACKEND_ROOT / "api" / "linkedin_profile_acquire_routes.py"
     spec = importlib.util.spec_from_file_location(module_name, routes_path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Unable to load route module from {routes_path}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+    from cryptography.fernet import Fernet
+    key = Fernet.generate_key().decode("utf-8")
+    with patch.dict(os.environ, {"LINKEDIN_TOKEN_ENCRYPTION_KEY": key}, clear=False):
+        spec.loader.exec_module(module)
     return module
 
 
-_routes = _load_linkedin_social_routes()
+_routes = _load_linkedin_profile_routes()
 get_linkedin_profile = _routes.get_linkedin_profile
 
 

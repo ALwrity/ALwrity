@@ -168,9 +168,6 @@ def _init_linkedin_oauth_tokens(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
             provider_mode TEXT NOT NULL,
-            zernio_api_key TEXT,
-            zernio_account_id TEXT,
-            zernio_org_account_id TEXT,
             linkedin_access_token TEXT,
             linkedin_refresh_token TEXT,
             expires_at TIMESTAMP,
@@ -179,7 +176,6 @@ def _init_linkedin_oauth_tokens(conn: sqlite3.Connection) -> None:
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            zernio_profile_id TEXT,
             unipile_account_id TEXT,
             unipile_org_account_id TEXT
         )
