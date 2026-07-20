@@ -29,6 +29,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   landingSectionTitleSx,
   landingSectionSubtitleSx,
+  landingDesktopPromotedCopySx,
   landingCardHoverSx,
 } from './landingStyles';
 import { useDeferredBackground } from './useDeferredBackground';
@@ -346,16 +347,24 @@ const FeatureShowcase: React.FC = () => {
               textAlign="center"
               sx={{
                 ...landingSectionSubtitleSx,
+                ...landingDesktopPromotedCopySx,
                 color: alpha('#fff', 0.9),
-                fontWeight: 500,
-                fontSize: { xs: '0.95rem', md: '1.05rem' },
+                fontWeight: { xs: 500, md: 600 },
+                fontSize: { xs: '0.95rem', md: '1.15rem' },
                 mt: { xs: 2.5, md: 3 },
                 mb: { xs: 3.5, md: 4.5 },
                 mx: 'auto',
               }}
             >
-              See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking — Transform
-              Your Content workflow on one Dashboard
+              <Box component="span" sx={{ display: { xs: 'inline', md: 'none' } }}>
+                See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking — Transform
+                Your Content workflow on one Dashboard
+              </Box>
+              <Box component="span" sx={{ display: { xs: 'none', md: 'block' } }}>
+                See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking —
+                <br />
+                Transform Your Content workflow on one Dashboard
+              </Box>
             </Typography>
           </Box>
 

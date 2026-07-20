@@ -278,13 +278,13 @@ const HeroSection: React.FC = () => {
             <motion.div variants={fadeInUp} style={{ width: '100%' }}>
               <Stack
                 direction="row"
-                spacing={{ xs: 1, md: 1.5 }}
+                spacing={{ xs: 1, md: 7.5 }}
                 alignItems="center"
                 flexWrap="wrap"
                 justifyContent="center"
                 sx={{
-                  mb: { xs: 3, md: 3 },
-                  mt: { xs: 0, md: 1 },
+                  mb: { xs: 3, md: 2 },
+                  mt: { xs: 0, md: 0 },
                   display: { xs: 'none', md: 'flex' },
                 }}
               >
@@ -375,8 +375,8 @@ const HeroSection: React.FC = () => {
                   </Box>
                 </Box>
                 <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
-                  ALwrity learns your brand voice, outsmarts your competitors, and publishes on every
-                  channel — AI enterprise firepower, without the complexity
+                  ALwrity learns Your brand voice, outsmarts your competitors, and publishes on every channel — AI
+                  Enterprise Firepower, without the Complexity
                 </Box>
               </Typography>
             </motion.div>

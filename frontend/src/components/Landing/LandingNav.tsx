@@ -217,6 +217,7 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
             <Box
               component={RouterLink}
               to={LANDING_MARKETING_PATH}
+              className="landing-nav-brand"
               sx={{
                 position: 'absolute',
                 left: { xs: 12, md: 20 },
@@ -226,6 +227,30 @@ const LandingNav: React.FC<LandingNavProps> = ({ surface = 'dark' }) => {
                 zIndex: 2,
                 display: 'flex',
                 alignItems: 'flex-start',
+                // Desktop: remove global focus ring / link underline lines around logo block
+                outline: { md: 'none' },
+                '&:hover': {
+                  textDecoration: 'none',
+                },
+                '&:focus': {
+                  outline: { xs: undefined, md: 'none' },
+                },
+                '&:focus-visible': {
+                  outline: { xs: undefined, md: 'none' },
+                  boxShadow: { md: 'none' },
+                },
+                '& *:focus': {
+                  outline: { md: 'none' },
+                },
+                '& *:focus-visible': {
+                  outline: { md: 'none' },
+                },
+                '& *': {
+                  textDecoration: { md: 'none' },
+                },
+                '&:hover *': {
+                  textDecoration: { md: 'none' },
+                },
               }}
             >
               <BrandMark
