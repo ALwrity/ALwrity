@@ -10,9 +10,12 @@ import { getApiBaseUrl } from './apiUrl';
 const POPUP_NAME = 'linkedin_oauth';
 const POPUP_FEATURES = 'width=600,height=700,scrollbars=yes';
 const POPUP_POLL_MS = 500;
-const STATUS_POLL_MS = 2000;
-/** Allow webhook / sync to finish after popup closes before treating connect as failed. */
-const POPUP_CLOSE_GRACE_MS = 2000;
+const STATUS_POLL_MS = 1500;
+/**
+ * Unipile often finishes via notify_url webhook after the popup closes.
+ * Keep verifying connection status for this long before treating connect as failed.
+ */
+const POPUP_CLOSE_GRACE_MS = 20000;
 
 export interface LinkedInOAuthConnectOptions {
   /** When postMessage is missed, confirm connection via GET /connection/status. */
@@ -166,24 +169,29 @@ export function connectWithLinkedInOAuth(
 
     console.info('[LinkedInConnect] OAuth popup opened');
 
+    // Keep polling after popup close — webhook/sync often lands after Unipile closes the window.
     if (options.verifyConnected) {
       statusPollTimer = setInterval(() => {
-        if (settled || popup.closed) return;
-        void tryVerifyConnected('poll');
+        if (settled) return;
+        void tryVerifyConnected(popup.closed ? 'poll-after-close' : 'poll');
       }, STATUS_POLL_MS);
     }
+
+    let finalizingClose = false;
 
     pollTimer = setInterval(() => {
       if (settled) return;
 
       if (!popup.closed) {
         popupClosedAt = null;
+        finalizingClose = false;
         return;
       }
 
       if (popupClosedAt === null) {
         popupClosedAt = Date.now();
         console.info('[LinkedInConnect] OAuth popup closed; verifying connection');
+        void tryVerifyConnected('popup-just-closed');
         return;
       }
 
@@ -191,9 +199,12 @@ export function connectWithLinkedInOAuth(
         return;
       }
 
+      if (finalizingClose) return;
+      finalizingClose = true;
+
       void (async () => {
         if (settled) return;
-        if (await tryVerifyConnected('popup-closed')) {
+        if (await tryVerifyConnected('popup-closed-final')) {
           return;
         }
         console.warn('[LinkedInConnect] OAuth popup closed before completion');
