@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction } from './LinkedInConnectionPlaceholder';
+import { LinkedInProfileHubStrip } from './LinkedInProfileHubStrip';
 import { DashboardMobileStudioContextNudge } from './dashboard/DashboardMobileStudioContextNudge';
 import { MobileStudioQuickActionsDock } from './dashboard/MobileStudioQuickActionsDock';
 import { useDesktopViewport } from '../hooks/useDesktopViewport';
@@ -425,7 +426,20 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
               />
             ) : null
           }
-          mobileProfileHubSlot={null}
+          mobileProfileHubSlot={
+            relocateMobileProfileStrip && !isSocialLoading ? (
+              <LinkedInProfileHubStrip
+                variant="inline"
+                connected={connected}
+                displayName={displayName}
+                avatarUrl={avatarUrl}
+                isConnecting={isConnecting}
+                isDisconnecting={isDisconnecting}
+                onConnect={connectWithOAuth}
+                onDisconnect={handleDisconnect}
+              />
+            ) : null
+          }
           mobileContextNudgeSlot={
             relocateMobileProfileStrip && !isSocialLoading ? (
               <DashboardMobileStudioContextNudge
@@ -441,6 +455,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             key={userId ?? 'signed-out'}
             centered
             splitConnectAction
+            relocateMobileProfileStrip={relocateMobileProfileStrip}
             socialConnection={social}
             isDisconnecting={isDisconnecting}
             onDisconnect={handleDisconnect}

@@ -15,6 +15,10 @@ import {
   LINKEDIN_STUDIO_TOUR_SEEN_KEY,
   buildLinkedInStudioTourSteps,
 } from '../../../../utils/walkthroughs/linkedInStudioTourSteps';
+import {
+  MOBILE_STUDIO_MAX_WIDTH_PX,
+  TOUR_PHONE_MAX_WIDTH_PX,
+} from './dashboardLayoutConstants';
 
 interface LinkedInStudioTourProps {
   run: boolean;
@@ -61,8 +65,8 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
   }, [run]);
 
   useEffect(() => {
-    const mobileMq = window.matchMedia('(max-width: 640px)');
-    const tabletMq = window.matchMedia('(max-width: 960px)');
+    const mobileMq = window.matchMedia(`(max-width: ${TOUR_PHONE_MAX_WIDTH_PX}px)`);
+    const tabletMq = window.matchMedia(`(max-width: ${MOBILE_STUDIO_MAX_WIDTH_PX}px)`);
     const sync = () => {
       setTourVariant(getTourViewportVariant());
       setCompactViewport(tabletMq.matches);

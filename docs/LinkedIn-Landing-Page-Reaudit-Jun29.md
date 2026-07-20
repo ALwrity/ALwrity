@@ -287,3 +287,18 @@
 1. **Connect modal timing:** Auto-open connect modal on first visit helps conversion; consider showing again after 7 days if still disconnected (reset `linkedin_connect_welcome_dismissed` with TTL).  
 2. **Watchdog visibility:** Industry Watchdog is a differentiator — a header badge with unread count would increase engagement.  
 3. **Overlap regression test:** Add to QA script: expand Knowledge Center + open Connect modal + open Plan modal — verify z-index stacking (modals at 11000+ should always sit on top).
+
+---
+
+## Changes
+
+| Date | Change |
+|------|--------|
+| 2026-06-29 | **Original audit published** (R-1 through R-14, implementation summary, remaining action items). Content above this section is unchanged from the original re-audit. |
+| 2026-07-18 | **Mobile landing audit added.** Full mobile-specific findings (M-1 through M-28) published separately in [`LinkedIn-Studio-Mobile-Landing-Audit-Jul2026.md`](LinkedIn-Studio-Mobile-Landing-Audit-Jul2026.md). Desktop re-audit items R-1–R-14 remain open where not yet fixed; mobile audit adds critical gaps not covered here. |
+| 2026-07-18 | **Cross-reference — mobile-only issues:** Analytics right rail hidden at ≤960px while mobile tour still references `[data-tour="li-mobile-analytics"]` (see mobile **M-17**). `.linkedin-mobile-analytics-teaser` CSS exists but no component shipped (**M-18**). Toolbar pills overlap profile hub on small phones (**M-5**). Dead `.linkedin-mobile-resume-bar` CSS after Resume moved to toolbar modal (**M-26**). |
+| 2026-07-18 | **Cross-reference — shared desktop/mobile issues:** R-1 (Today's Tasks dead click) = mobile **M-2**; R-4 (Plan copy) = mobile **M-14**; R-5 (disconnected actions) = mobile **M-16**; R-7 (Optimise Profile) = mobile **M-9**. |
+| 2026-07-18 | **Code implemented (July 18, 2026):** **M-2 / R-1** — Today's Tasks removed from persona menu (all devices). **M-1, M-3, M-4** — mobile header two-row layout, persona voice hint, hide search when disconnected. **M-5–M-8** — toolbar document flow, Growth Tasks short label (≤640px), tour floating hint, Resume badge. See [`LinkedIn-Studio-Mobile-Landing-Audit-Jul2026.md`](LinkedIn-Studio-Mobile-Landing-Audit-Jul2026.md) Changes section. |
+| — | *(Add rows when R-items or linked M-items are implemented and verified.)* |
+
+**Note:** Do not delete original R-1–R-14 findings above when logging fixes — append status here only.
