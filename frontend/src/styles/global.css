@@ -9,6 +9,26 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Landing nav brand — desktop: no focus ring / underline chrome on logo block */
+@media (min-width: 900px) {
+  .landing-nav-brand:focus,
+  .landing-nav-brand:focus-visible,
+  .landing-nav-brand *:focus,
+  .landing-nav-brand *:focus-visible {
+    outline: none !important;
+    outline-offset: 0 !important;
+    box-shadow: none !important;
+  }
+
+  .landing-nav-brand,
+  .landing-nav-brand:hover,
+  .landing-nav-brand:focus,
+  .landing-nav-brand:visited,
+  .landing-nav-brand * {
+    text-decoration: none !important;
+  }
+}
+
 /* Better focus styles */
 *:focus {
   outline: 2px solid #667eea;
