@@ -6,6 +6,7 @@ interface LinkedInSearchBarProps {
   onSearch: () => void;
   disabled?: boolean;
   size?: 'nav' | 'mobileStrip' | 'default';
+  connected?: boolean;
 }
 
 const SearchIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
@@ -25,18 +26,13 @@ const SearchIcon: React.FC<{ size?: number }> = ({ size = 16 }) => (
   </svg>
 );
 
-const SEARCH_DESCRIPTION_LINES = [
-  'Search across LinkedIn to find',
-  'People, Companies, Posts, & Jobs',
-  'relevant to Your content creation',
-] as const;
-
 export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
   value,
   onChange,
   onSearch,
   disabled = false,
   size = 'default',
+  connected = false,
 }) => {
   const inputId = useId();
   const isNav = size === 'nav';
@@ -64,8 +60,9 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
     if (dismissed) setDismissed(false);
   };
 
-  useEffect(() => () => clearTimeout(timeoutRef.current), []);
-
+  useEffect(() => {
+    return () => clearTimeout(timeoutRef.current);
+  }, []);
   const rootClass = [
     'linkedin-search-bar',
     isNav && 'linkedin-search-bar--nav',
@@ -84,14 +81,14 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
 
   return (
     <div
-      className="linkedin-search-bar-wrap"
+      style={{ position: 'relative' }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleInfoClick}
     >
       <div className={rootClass}>
         <span className="linkedin-search-bar__icon" aria-hidden>
-          <SearchIcon size={16} />
+          <SearchIcon size={isNav ? 14 : 16} />
         </span>
         <input
           id={inputId}
@@ -107,46 +104,25 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
       </div>
 
       {showInfo && !dismissed && (
-        <div className="linkedin-search-bar__info-popover" role="tooltip">
+        <div className="linkedin-search-bar__info-popover">
           <button
-            type="button"
             className="linkedin-search-bar__info-dismiss"
             onClick={handleDismiss}
             aria-label="Dismiss"
           >
             &times;
           </button>
-
-          <div className="linkedin-search-bar__info-header">
-            <div className="linkedin-search-bar__info-brand">
-              <span className="linkedin-search-bar__info-icon" aria-hidden>
-                {disabled ? '\u{1F512}' : '\u{1F50D}'}
-              </span>
-              <h4 className="linkedin-search-bar__info-title linkedin-search-bar__info-title--stacked">
-                {disabled ? (
-                  'Connect LinkedIn to Search'
-                ) : (
-                  <>
-                    <span className="linkedin-search-bar__info-title-line">LinkedIn</span>
-                    <span className="linkedin-search-bar__info-title-line">Search</span>
-                  </>
-                )}
-              </h4>
-            </div>
-
-            <p className="linkedin-search-bar__info-text">
-              {disabled ? (
-                'Unlock the power of LinkedIn search to find people, companies, and posts relevant to your content strategy. Connect your account to get started.'
-              ) : (
-                SEARCH_DESCRIPTION_LINES.map((line) => (
-                  <span key={line} className="linkedin-search-bar__info-text-line">
-                    {line}
-                  </span>
-                ))
-              )}
-            </p>
+          <div className="linkedin-search-bar__info-icon">
+            {disabled ? '\u{1F512}' : '\u{1F50D}'}
           </div>
-
+          <h4 className="linkedin-search-bar__info-title">
+            {disabled ? 'Connect LinkedIn to Search' : 'LinkedIn Search'}
+          </h4>
+          <p className="linkedin-search-bar__info-text">
+            {disabled
+              ? 'Unlock the power of LinkedIn search to find people, companies, and posts relevant to your content strategy. Connect your account to get started.'
+              : 'Search across LinkedIn to find people, companies, posts, and jobs relevant to your content creation.'}
+          </p>
           <div className="linkedin-search-bar__info-examples">
             <strong>{disabled ? 'What you can do:' : 'Try searching for:'}</strong>
             <ul>

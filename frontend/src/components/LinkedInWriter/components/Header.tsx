@@ -291,6 +291,7 @@ export const Header: React.FC<HeaderProps> = ({
       onChange={linkedInSearch.setQuery}
       onSearch={() => void linkedInSearch.runSearch()}
       disabled={!connected}
+      connected={connected}
       size={isMobileHeaderNav ? 'mobileStrip' : 'nav'}
     />
   );
