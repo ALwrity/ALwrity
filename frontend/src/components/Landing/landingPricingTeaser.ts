@@ -11,6 +11,8 @@ export type LandingPricingTeaserPlan = {
   highlight: boolean;
   features: readonly string[];
   ctaLabel: string;
+  /** Shorter label for mobile compact row (falls back to ctaLabel) */
+  mobileCtaLabel?: string;
   /** free → sign-in; others → /pricing */
   ctaAction: 'signin' | 'pricing';
 };
@@ -37,6 +39,7 @@ export const LANDING_PRICING_TEASER_PLANS: readonly LandingPricingTeaserPlan[] =
     period: '/mo',
     highlight: true,
     ctaLabel: 'See Basic plan →',
+    mobileCtaLabel: 'Basic →',
     ctaAction: 'pricing',
     features: [
       '500 AI text generations / month',
@@ -52,6 +55,7 @@ export const LANDING_PRICING_TEASER_PLANS: readonly LandingPricingTeaserPlan[] =
     period: '/mo',
     highlight: false,
     ctaLabel: 'See Pro plan →',
+    mobileCtaLabel: 'Pro →',
     ctaAction: 'pricing',
     features: [
       '3,000 AI text generations / month',
@@ -67,6 +71,7 @@ export const LANDING_PRICING_TEASER_PLANS: readonly LandingPricingTeaserPlan[] =
     period: '/mo',
     highlight: false,
     ctaLabel: 'See Enterprise plan →',
+    mobileCtaLabel: 'Enterprise →',
     ctaAction: 'pricing',
     features: [
       'Unlimited AI usage (fair use)',

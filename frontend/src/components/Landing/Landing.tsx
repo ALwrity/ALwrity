@@ -1,4 +1,4 @@
-import React, { Suspense, lazy, useEffect } from 'react';
+import React, { Suspense, lazy, useEffect, useCallback, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useClerk } from '@clerk/clerk-react';
 import usePerformanceMonitor from '../../hooks/usePerformanceMonitor';
@@ -14,6 +14,7 @@ import {
   Chip,
   Avatar,
   useTheme,
+  useMediaQuery,
   alpha,
   Skeleton,
 } from '@mui/material';
@@ -46,6 +47,8 @@ import { LANDING_LIFECYCLE_FEATURES } from './landingLifecycleFeatures';
 import { useDeferredBackground } from './useDeferredBackground';
 import { useLandingCanonical } from './useLandingCanonical';
 import { getPostAuthDestination } from '../../utils/returningUserStorage';
+import LandingMobileDetailDialog from './LandingMobileDetailDialog';
+import { landingDarkSectionSx, landingSectionBackgroundLayerBaseSx, landingMobileBackgroundBleedSx, landingMobileSeamBleedSx } from './landingSectionShellSx';
 
 const LIFECYCLE_BG = '/content_lifecycle.png';
 
@@ -101,6 +104,8 @@ const SKELETON_HEIGHT = {
 
 const Landing: React.FC = () => {
   const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [lifecycleDialogIndex, setLifecycleDialogIndex] = useState<number | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const { openSignIn } = useClerk();
@@ -117,17 +122,28 @@ const Landing: React.FC = () => {
     return scrollToLandingSectionWithRetry(section);
   }, [location.pathname, location.hash]);
 
+  const handleLifecycleCardOpen = useCallback(
+    (index: number) => {
+      if (!isMobile) return;
+      setLifecycleDialogIndex(index);
+    },
+    [isMobile]
+  );
+
+  const handleLifecycleCardKeyDown = useCallback(
+    (event: React.KeyboardEvent, index: number) => {
+      if (!isMobile) return;
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleLifecycleCardOpen(index);
+      }
+    },
+    [handleLifecycleCardOpen, isMobile]
+  );
+
   // Optimized Framer Motion variants for better performance
 
   // Cinematic lifecycle section animations
-  const backgroundFade = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1,
-      transition: { duration: 1, ease: "easeInOut" as const }
-    }
-  };
-
   const titleFlyIn = {
     hidden: { opacity: 0, y: -40, scale: 0.95 },
     visible: { 
@@ -266,7 +282,7 @@ const Landing: React.FC = () => {
   );
 
   return (
-    <Box sx={{ minHeight: '100vh', overflowX: 'hidden', position: 'relative', bgcolor: '#000' }}>
+    <Box sx={{ minHeight: '100vh', overflowX: 'hidden', position: 'relative', bgcolor: '#0a0a0a' }}>
       <Box
         component="a"
         href="#main-content"
@@ -294,7 +310,7 @@ const Landing: React.FC = () => {
 
       <LandingNav />
 
-      <Box component="main" id="main-content">
+      <Box component="main" id="main-content" sx={{ bgcolor: '#0a0a0a', display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Hero Section */}
       <HeroSection />
 
@@ -307,58 +323,45 @@ const Landing: React.FC = () => {
       <Box
         id="lifecycle"
         sx={{
-          position: 'relative',
+          ...landingDarkSectionSx,
           minHeight: { xs: 'auto', md: 'calc(100vh - 48px)' },
-          py: { xs: 3.5, md: 4 },
-          overflow: 'hidden',
+          pt: { xs: 3, md: 4 },
+          pb: { xs: 2.5, md: 4 },
+          position: 'relative',
+          zIndex: 0,
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
         }}
       >
-        {/* Background Image Layer */}
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.1 }}
-          variants={backgroundFade}
-        >
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundImage: lifecycleBgUrl ? `url(${lifecycleBgUrl})` : 'none',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              zIndex: 0,
-              bgcolor: lifecycleBgUrl ? 'transparent' : '#0a0a0a',
-            }}
-          />
-          {/* Dark overlay for readability */}
-          <Box
-            sx={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: `linear-gradient(
-                135deg, 
-                rgba(0,0,0,0.85) 0%, 
-                rgba(0,0,0,0.75) 50%,
-                rgba(0,0,0,0.85) 100%
-              )`,
-              backdropFilter: 'blur(2px)',
-              zIndex: 1
-            }}
-          />
-        </motion.div>
+        <Box
+          sx={{
+            ...landingSectionBackgroundLayerBaseSx,
+            ...landingMobileBackgroundBleedSx,
+            ...landingMobileSeamBleedSx,
+            zIndex: 0,
+            bgcolor: '#0a0a0a',
+            backgroundImage: lifecycleBgUrl ? `url(${lifecycleBgUrl})` : 'none',
+          }}
+        />
+        <Box
+          sx={{
+            ...landingSectionBackgroundLayerBaseSx,
+            ...landingMobileBackgroundBleedSx,
+            ...landingMobileSeamBleedSx,
+            zIndex: 1,
+            background: `linear-gradient(
+              135deg,
+              rgba(0,0,0,1) 0%,
+              rgba(0,0,0,0.92) 30%,
+              rgba(0,0,0,0.88) 35%,
+              rgba(0,0,0,0.78) 50%,
+              rgba(0,0,0,0.88) 100%
+            )`,
+            backdropFilter: 'blur(2px)',
+          }}
+        />
 
-        {/* Content Layer */}
         <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
           <motion.div
             initial="hidden"
@@ -387,6 +390,8 @@ const Landing: React.FC = () => {
                       ...landingSectionSubtitleSx,
                       color: alpha('#fff', 0.9),
                       fontWeight: 600,
+                      fontSize: { xs: '1rem', md: '1.5rem' },
+                      lineHeight: { xs: 1.55, md: 1.45 },
                       textShadow: '0 2px 10px rgba(0,0,0,0.6)',
                     }}
                   >
@@ -524,9 +529,9 @@ const Landing: React.FC = () => {
                 viewport={{ once: true, amount: 0.1 }}
                 style={{ width: '100%' }}
               >
-                <Grid container spacing={{ xs: 1.5, md: 2 }} sx={{ px: { xs: 0.5, md: 1 } }}>
+                <Grid container spacing={{ xs: 1.25, md: 2 }} sx={{ px: { xs: 0.5, md: 1 } }}>
                   {features.map((feature, index) => (
-                    <Grid item xs={12} sm={6} md={4} key={feature.title}>
+                    <Grid item xs={6} sm={6} md={4} key={feature.title}>
                     <motion.div
                       variants={cardVariants[index]}
                       transition={{
@@ -535,9 +540,17 @@ const Landing: React.FC = () => {
                       }}
                     >
                       <Card 
+                        role={isMobile ? 'button' : undefined}
+                        tabIndex={isMobile ? 0 : undefined}
+                        aria-haspopup={isMobile ? 'dialog' : undefined}
+                        onClick={() => handleLifecycleCardOpen(index)}
+                        onKeyDown={(event) => handleLifecycleCardKeyDown(event, index)}
                         sx={{ 
                           ...glassCardSx, 
-                          height: '100%',
+                          height: { xs: 'auto', md: '100%' },
+                          aspectRatio: { xs: '15 / 6.3', md: 'auto' },
+                          borderRadius: { xs: 0, md: 3 },
+                          cursor: { xs: 'pointer', md: 'default' },
                           position: 'relative',
                           background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, 0.08)} 0%, ${alpha(theme.palette.common.white, 0.03)} 100%)`,
                           backdropFilter: 'blur(20px)',
@@ -564,19 +577,37 @@ const Landing: React.FC = () => {
                               overflow: 'visible',
                             },
                           },
+                          '&:focus-visible': {
+                            outline: `2px solid ${theme.palette.primary.main}`,
+                            outlineOffset: 2,
+                          },
                         }}
                       >
-                        <CardContent sx={{ p: 2 }}>
-                          <Stack spacing={1.25}>
-                            <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <CardContent
+                          sx={{
+                            p: { xs: 1, md: 2 },
+                            height: '100%',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: { xs: 'center', md: 'flex-start' },
+                            '&:last-child': { pb: { xs: 1, md: 2 } },
+                          }}
+                        >
+                          <Stack spacing={{ xs: 0.75, md: 1.25 }} alignItems={{ xs: 'center', md: 'stretch' }}>
+                            <Stack
+                              direction="row"
+                              justifyContent="space-between"
+                              alignItems="center"
+                              sx={{ width: '100%' }}
+                            >
                               <Avatar
                                 sx={{
-                                  width: 36,
-                                  height: 36,
+                                  width: { xs: 32, md: 36 },
+                                  height: { xs: 32, md: 36 },
                                   borderRadius: 2,
                                   background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.25)}, ${alpha(theme.palette.secondary.main, 0.25)})`,
                                   color: theme.palette.primary.main,
-                                  '& .MuiSvgIcon-root': { fontSize: 20 },
+                                  '& .MuiSvgIcon-root': { fontSize: { xs: 18, md: 20 } },
                                 }}
                               >
                                 {feature.icon}
@@ -588,48 +619,59 @@ const Landing: React.FC = () => {
                                   background: alpha(theme.palette.primary.main, 0.2),
                                   color: theme.palette.primary.main,
                                   fontWeight: 600,
-                                  fontSize: '0.7rem',
-                                  height: 24,
+                                  fontSize: { xs: '0.62rem', md: '0.7rem' },
+                                  height: { xs: 22, md: 24 },
                                 }} 
                               />
                             </Stack>
-                            <Stack spacing={0.75}>
-                              <Typography variant="subtitle1" component="h3" fontWeight={700} sx={{ fontSize: '0.95rem', color: 'white' }}>
-                                {feature.title}
-                              </Typography>
-                              <Typography
-                                className="lifecycle-card-desc"
-                                variant="body2"
-                                color={alpha('#fff', 0.85)}
-                                lineHeight={1.45}
-                                sx={{ fontSize: '0.8rem' }}
-                              >
-                                {feature.description}
-                              </Typography>
-                            </Stack>
-                            <Box>
-                              <Button
-                                onClick={() =>
-                                  openSignIn({ forceRedirectUrl: feature.href })
-                                }
-                                size="small"
-                                endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
-                                aria-label={`Sign in to explore ${feature.title}`}
-                                data-landing-redirect={feature.href}
-                                sx={{
-                                  textTransform: 'none',
-                                  fontWeight: 600,
-                                  px: 0,
-                                  minWidth: 0,
-                                  fontSize: '0.8rem',
-                                  color: theme.palette.primary.main,
-                                  '&:hover': {
-                                    color: theme.palette.primary.light,
-                                  },
-                                }}
-                              >
-                                Sign in to explore →
-                              </Button>
+                            <Typography
+                              variant="subtitle1"
+                              component="h3"
+                              fontWeight={700}
+                              sx={{
+                                fontSize: { xs: '0.92rem', md: '0.95rem' },
+                                color: 'white',
+                                lineHeight: 1.2,
+                                textAlign: { xs: 'center', md: 'left' },
+                                width: '100%',
+                              }}
+                            >
+                              {feature.title}
+                            </Typography>
+                            <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+                              <Stack spacing={0.75}>
+                                <Typography
+                                  className="lifecycle-card-desc"
+                                  variant="body2"
+                                  color={alpha('#fff', 0.85)}
+                                  lineHeight={1.45}
+                                  sx={{ fontSize: '0.8rem', textAlign: 'left' }}
+                                >
+                                  {feature.description}
+                                </Typography>
+                                <Box>
+                                  <Button
+                                    onClick={() => openSignIn({ forceRedirectUrl: feature.href })}
+                                    size="small"
+                                    endIcon={<OpenInNew sx={{ fontSize: 14 }} />}
+                                    aria-label={`Sign in to explore ${feature.title}`}
+                                    data-landing-redirect={feature.href}
+                                    sx={{
+                                      textTransform: 'none',
+                                      fontWeight: 600,
+                                      px: 0,
+                                      minWidth: 0,
+                                      fontSize: '0.8rem',
+                                      color: theme.palette.primary.main,
+                                      '&:hover': {
+                                        color: theme.palette.primary.light,
+                                      },
+                                    }}
+                                  >
+                                    Sign in to explore →
+                                  </Button>
+                                </Box>
+                              </Stack>
                             </Box>
                           </Stack>
                         </CardContent>
@@ -642,6 +684,19 @@ const Landing: React.FC = () => {
             </Stack>
           </motion.div>
         </Container>
+
+        {isMobile && lifecycleDialogIndex !== null && (
+          <LandingMobileDetailDialog
+            open
+            onClose={() => setLifecycleDialogIndex(null)}
+            title={features[lifecycleDialogIndex].title}
+            description={features[lifecycleDialogIndex].description}
+            badge={features[lifecycleDialogIndex].badge}
+            icon={features[lifecycleDialogIndex].icon}
+            actionLabel={`Explore ${features[lifecycleDialogIndex].title} →`}
+            onAction={() => openSignIn({ forceRedirectUrl: features[lifecycleDialogIndex].href })}
+          />
+        )}
       </Box>
 
       {/* Feature Showcase with Carousel - Lazy Loaded */}
@@ -658,7 +713,7 @@ const Landing: React.FC = () => {
       <Box 
         id="pricing" 
         sx={{ 
-          py: { xs: 4, md: 5 },
+          py: { xs: 2.5, md: 5 },
           minHeight: { xs: 'auto', md: 'calc(100vh - 64px)' },
           display: 'flex',
           flexDirection: 'column',
@@ -707,21 +762,104 @@ const Landing: React.FC = () => {
                       },
                     }}
                   >
-                    <CardContent sx={{ p: 2.25 }}>
-                      <Typography variant="h6" component="h3" fontWeight={700} gutterBottom>
-                        {plan.name}
-                      </Typography>
-                      <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ mb: 2 }}>
-                        <Typography variant="h4" component="p" fontWeight={800} color="primary.main">
-                          {plan.price}
+                    <CardContent sx={{ p: { xs: 1.75, md: 2.25 } }}>
+                      {/* Mobile: plan name (left) → price (center) → CTA (right) */}
+                      <Box
+                        sx={{
+                          display: { xs: 'grid', md: 'none' },
+                          gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+                          alignItems: 'center',
+                          columnGap: 1.25,
+                          px: { xs: 0.75, md: 0 },
+                          mb: 1.5,
+                          width: '100%',
+                        }}
+                      >
+                        <Typography
+                          variant="subtitle1"
+                          component="h3"
+                          fontWeight={700}
+                          noWrap
+                          sx={{
+                            fontSize: '1.25rem',
+                            justifySelf: 'start',
+                            minWidth: 0,
+                            pl: { xs: 0.25, md: 0 },
+                          }}
+                        >
+                          {plan.name}
                         </Typography>
-                        {plan.period && (
-                          <Typography variant="body2" color="text.secondary">
-                            {plan.period}
+                        <Stack
+                          direction="row"
+                          alignItems="baseline"
+                          spacing={0.35}
+                          sx={{ justifySelf: 'center' }}
+                        >
+                          <Typography
+                            variant="h6"
+                            component="span"
+                            fontWeight={800}
+                            color="primary.main"
+                            sx={{ fontSize: '1.48rem', lineHeight: 1 }}
+                          >
+                            {plan.price}
                           </Typography>
-                        )}
-                      </Stack>
-                      <Stack spacing={0.75} sx={{ mb: 1.5 }}>
+                          {plan.period && (
+                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                              {plan.period}
+                            </Typography>
+                          )}
+                        </Stack>
+                        <Button
+                          variant={plan.highlight ? 'contained' : 'outlined'}
+                          size="small"
+                          onClick={() => {
+                            if (plan.ctaAction === 'signin') {
+                              openSignIn({ forceRedirectUrl: getPostAuthDestination() });
+                              return;
+                            }
+                            navigate('/pricing');
+                          }}
+                          sx={{
+                            justifySelf: 'end',
+                            mr: { xs: 0.25, md: 0 },
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            fontSize: '0.82rem',
+                            py: 0.65,
+                            px: 1.25,
+                            minWidth: 'auto',
+                            minHeight: 40,
+                            whiteSpace: 'nowrap',
+                            ...(plan.highlight
+                              ? {
+                                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                                }
+                              : {}),
+                          }}
+                        >
+                          {plan.mobileCtaLabel ?? plan.ctaLabel}
+                        </Button>
+                      </Box>
+
+                      {/* Desktop: stacked header */}
+                      <Box sx={{ display: { xs: 'none', md: 'block' } }}>
+                        <Typography variant="h6" component="h3" fontWeight={700} gutterBottom>
+                          {plan.name}
+                        </Typography>
+                        <Stack direction="row" alignItems="baseline" spacing={0.5} sx={{ mb: 2 }}>
+                          <Typography variant="h4" component="p" fontWeight={800} color="primary.main">
+                            {plan.price}
+                          </Typography>
+                          {plan.period && (
+                            <Typography variant="body2" color="text.secondary">
+                              {plan.period}
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Box>
+
+                      <Stack spacing={0.75} sx={{ mb: { xs: 0, md: 1.5 } }}>
                         {plan.features.map((feature) => (
                           <Stack key={feature} direction="row" spacing={0.75} alignItems="flex-start">
                             <Check sx={{ fontSize: 16, color: 'primary.main', mt: 0.25 }} />
@@ -743,6 +881,7 @@ const Landing: React.FC = () => {
                           navigate('/pricing');
                         }}
                         sx={{
+                          display: { xs: 'none', md: 'inline-flex' },
                           textTransform: 'none',
                           fontWeight: 600,
                           fontSize: '0.82rem',

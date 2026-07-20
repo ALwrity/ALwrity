@@ -1,7 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useClerk } from '@clerk/clerk-react';
-import { Box, Container, Typography, Stack, IconButton, useTheme, useMediaQuery, alpha, Theme } from '@mui/material';
+import {
+  Box,
+  Container,
+  Typography,
+  Stack,
+  Grid,
+  Card,
+  CardContent,
+  Chip,
+  Avatar,
+  IconButton,
+  useTheme,
+  useMediaQuery,
+  alpha,
+  Theme,
+} from '@mui/material';
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import ArrowForward from '@mui/icons-material/ArrowForward';
 import Psychology from '@mui/icons-material/Psychology';
@@ -18,6 +33,8 @@ import {
 } from './landingStyles';
 import { useDeferredBackground } from './useDeferredBackground';
 import { getPostAuthDestination } from '../../utils/returningUserStorage';
+import LandingMobileDetailDialog from './LandingMobileDetailDialog';
+import { landingDarkSectionSx, landingSectionBackgroundLayerSx, landingMobileBackgroundBleedSx } from './landingSectionShellSx';
 
 interface Feature {
   image: string;
@@ -187,17 +204,26 @@ const FeatureShowcase: React.FC = () => {
   const navigate = useNavigate();
   const { isSignedIn } = useAuth();
   const { openSignIn } = useClerk();
-  const isMobileCarousel = useMediaQuery(theme.breakpoints.down('md'));
-  const itemsPerPage = isMobileCarousel ? 1 : 3;
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const itemsPerPage = isMobile ? 1 : 3;
   const [currentPage, setCurrentPage] = useState(0);
+  const [featureDialogIndex, setFeatureDialogIndex] = useState<number | null>(null);
   const sectionBg = useDeferredBackground(PRIMARY_SECTION_BG);
   const totalPages = Math.ceil(features.length / itemsPerPage);
+
+  const glassCardSx = {
+    background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, 0.08)} 0%, ${alpha(theme.palette.common.white, 0.03)} 100%)`,
+    backdropFilter: 'blur(16px)',
+    border: '1px solid rgba(255,255,255,0.15)',
+    borderRadius: 3,
+    boxShadow: '0 12px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08)',
+  } as const;
 
   useEffect(() => {
     setCurrentPage((prev) => Math.min(prev, Math.max(0, totalPages - 1)));
   }, [totalPages]);
 
-  const handleFeatureClick = useCallback(() => {
+  const handleFeatureAuth = useCallback(() => {
     const destination = getPostAuthDestination();
     if (isSignedIn) {
       navigate(destination);
@@ -205,6 +231,27 @@ const FeatureShowcase: React.FC = () => {
     }
     openSignIn({ forceRedirectUrl: destination });
   }, [isSignedIn, navigate, openSignIn]);
+
+  const handleFeatureCardOpen = useCallback(
+    (index: number) => {
+      if (!isMobile) {
+        handleFeatureAuth();
+        return;
+      }
+      setFeatureDialogIndex(index);
+    },
+    [handleFeatureAuth, isMobile]
+  );
+
+  const handleFeatureCardKeyDown = useCallback(
+    (event: React.KeyboardEvent, index: number) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleFeatureCardOpen(index);
+      }
+    },
+    [handleFeatureCardOpen]
+  );
 
   const handleNext = () => setCurrentPage((prev) => (prev + 1) % totalPages);
   const handlePrev = () => setCurrentPage((prev) => (prev - 1 + totalPages) % totalPages);
@@ -248,66 +295,140 @@ const FeatureShowcase: React.FC = () => {
     <Box
       id="features"
       sx={{
-        position: 'relative',
-        backgroundImage: sectionBg ? `url(${sectionBg})` : undefined,
-        backgroundColor: '#0a0a0a',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
+        ...landingDarkSectionSx,
         minHeight: { xs: 'auto', md: '100vh' },
+        mt: { xs: 0, md: 0 },
+        py: { xs: 2.5, md: 0 },
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
+        '&::before': {
+          ...landingSectionBackgroundLayerSx,
+          ...landingMobileBackgroundBleedSx,
+          zIndex: 0,
+          bgcolor: '#0a0a0a',
+          backgroundImage: sectionBg ? `url(${sectionBg})` : 'none',
+        },
         '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(25, 118, 210, 0.2) 50%, rgba(156, 39, 176, 0.2) 100%)',
+          ...landingSectionBackgroundLayerSx,
+          ...landingMobileBackgroundBleedSx,
           zIndex: 1,
+          background: 'linear-gradient(135deg, rgba(0, 0, 0, 0.35) 0%, rgba(25, 118, 210, 0.2) 50%, rgba(156, 39, 176, 0.2) 100%)',
         },
       }}
     >
       <Container
         maxWidth="xl"
         sx={{
-          pb: { xs: 3, md: 3.5 },
-          pt: { xs: 2, md: 2.5 },
+          pb: { xs: 1, md: 3.5 },
+          pt: { xs: 1, md: 2.5 },
           position: 'relative',
           zIndex: 2,
         }}
       >
-        <Stack spacing={0} alignItems="center">
-          <Typography
-            variant="h3"
-            component="h2"
-            sx={{
-              ...landingSectionTitleSx,
-              color: '#fff',
-              mb: { xs: 1, md: 1.25 },
-            }}
-          >
-            Experience the Platform
-          </Typography>
-          <Typography
-            variant="body1"
-            maxWidth="780px"
-            textAlign="center"
-            sx={{
-              ...landingSectionSubtitleSx,
-              color: alpha('#fff', 0.9),
-              fontSize: { xs: '0.95rem', md: '1.05rem' },
-              mt: { xs: 2.5, md: 3 },
-              mb: { xs: 3.5, md: 4.5 },
-            }}
-          >
-            See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking
-            — Transform your content workflow on one Dashboard
-          </Typography>
+        <Stack spacing={0} alignItems="center" sx={{ width: '100%' }}>
+          <Box sx={{ width: '100%', textAlign: 'center' }}>
+            <Typography
+              variant="h3"
+              component="h2"
+              sx={{
+                ...landingSectionTitleSx,
+                color: '#fff',
+                mb: { xs: 1, md: 1.25 },
+              }}
+            >
+              Experience the Platform
+            </Typography>
+            <Typography
+              variant="h5"
+              component="p"
+              maxWidth="780px"
+              textAlign="center"
+              sx={{
+                ...landingSectionSubtitleSx,
+                color: alpha('#fff', 0.9),
+                fontWeight: 500,
+                fontSize: { xs: '0.95rem', md: '1.05rem' },
+                mt: { xs: 2.5, md: 3 },
+                mb: { xs: 3.5, md: 4.5 },
+                mx: 'auto',
+              }}
+            >
+              See ALwrity in action: AI copilot writing, live web research, and built-in fact-checking — Transform
+              Your Content workflow on one Dashboard
+            </Typography>
+          </Box>
 
           <Box sx={{ position: 'relative', width: '100%', overflow: 'visible', px: { xs: 0.5, md: 9 }, mt: { xs: 1, md: 1.5 } }}>
+            {isMobile ? (
+              <Grid container spacing={1.25} sx={{ px: 0.5 }}>
+                {features.map((feature, index) => (
+                  <Grid item xs={6} key={feature.title}>
+                    <Card
+                      role="button"
+                      tabIndex={0}
+                      aria-haspopup="dialog"
+                      onClick={() => handleFeatureCardOpen(index)}
+                      onKeyDown={(event) => handleFeatureCardKeyDown(event, index)}
+                      sx={{
+                        ...glassCardSx,
+                        height: '100%',
+                        cursor: 'pointer',
+                        '&:focus-visible': {
+                          outline: `2px solid ${theme.palette.primary.main}`,
+                          outlineOffset: 2,
+                        },
+                      }}
+                    >
+                      <CardContent sx={{ p: 1.25, '&:last-child': { pb: 1.25 } }}>
+                        <Stack spacing={0.75} alignItems="center">
+                          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ width: '100%' }}>
+                            <Avatar
+                              sx={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 2,
+                                background: `linear-gradient(45deg, ${alpha(theme.palette.primary.main, 0.25)}, ${alpha(theme.palette.secondary.main, 0.25)})`,
+                                color: theme.palette.primary.main,
+                                '& .MuiSvgIcon-root': { fontSize: 18 },
+                              }}
+                            >
+                              {feature.icon}
+                            </Avatar>
+                            <Chip
+                              label={feature.badge}
+                              size="small"
+                              sx={{
+                                background: alpha(theme.palette.primary.main, 0.2),
+                                color: theme.palette.primary.main,
+                                fontWeight: 600,
+                                fontSize: '0.62rem',
+                                height: 22,
+                              }}
+                            />
+                          </Stack>
+                          <Typography
+                            variant="subtitle2"
+                            component="h3"
+                            fontWeight={700}
+                            sx={{
+                              color: 'white',
+                              fontSize: '0.92rem',
+                              lineHeight: 1.2,
+                              textAlign: 'center',
+                              width: '100%',
+                            }}
+                          >
+                            {feature.title}
+                          </Typography>
+                        </Stack>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                ))}
+              </Grid>
+            ) : (
+              <>
             <AnimatePresence mode="wait" custom={currentPage}>
               <motion.div
                 key={currentPage}
@@ -338,11 +459,11 @@ const FeatureShowcase: React.FC = () => {
                         role="button"
                         tabIndex={0}
                         aria-label={`Explore ${feature.title}`}
-                        onClick={handleFeatureClick}
+                        onClick={handleFeatureAuth}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            handleFeatureClick();
+                            handleFeatureAuth();
                           }
                         }}
                         sx={{
@@ -432,7 +553,6 @@ const FeatureShowcase: React.FC = () => {
                   onClick={handlePrev}
                   sx={{
                     ...arrowButtonSx,
-                    display: { xs: 'none', md: 'inline-flex' },
                     position: 'absolute',
                     left: 8,
                     top: '50%',
@@ -447,7 +567,6 @@ const FeatureShowcase: React.FC = () => {
                   onClick={handleNext}
                   sx={{
                     ...arrowButtonSx,
-                    display: { xs: 'none', md: 'inline-flex' },
                     position: 'absolute',
                     right: 8,
                     top: '50%',
@@ -459,53 +578,25 @@ const FeatureShowcase: React.FC = () => {
                 </IconButton>
               </>
             )}
+              </>
+            )}
           </Box>
-
-          {totalPages > 1 && (
-            <Stack
-              direction="row"
-              spacing={2}
-              justifyContent="center"
-              alignItems="center"
-              sx={{ display: { xs: 'flex', md: 'none' }, mt: 2, width: '100%' }}
-            >
-              <IconButton aria-label="Previous features" onClick={handlePrev} sx={arrowButtonSx}>
-                <ArrowBack />
-              </IconButton>
-              <IconButton aria-label="Next features" onClick={handleNext} sx={arrowButtonSx}>
-                <ArrowForward />
-              </IconButton>
-            </Stack>
-          )}
-
-          {totalPages > 1 && (
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 2 }}>
-              {Array.from({ length: totalPages }).map((_, index) => (
-                <Box
-                  key={index}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Go to feature page ${index + 1}`}
-                  onClick={() => setCurrentPage(index)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') setCurrentPage(index);
-                  }}
-                  sx={{
-                    width: index === currentPage ? 28 : 8,
-                    height: 8,
-                    borderRadius: 4,
-                    cursor: 'pointer',
-                    background: index === currentPage
-                      ? `linear-gradient(90deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`
-                      : alpha('#fff', 0.25),
-                    transition: 'all 0.3s ease',
-                  }}
-                />
-              ))}
-            </Stack>
-          )}
         </Stack>
       </Container>
+
+      {isMobile && featureDialogIndex !== null && (
+        <LandingMobileDetailDialog
+          open
+          onClose={() => setFeatureDialogIndex(null)}
+          title={features[featureDialogIndex].title}
+          description={features[featureDialogIndex].description}
+          badge={features[featureDialogIndex].badge}
+          icon={features[featureDialogIndex].icon}
+          media={<FeatureCardImage feature={features[featureDialogIndex]} theme={theme} />}
+          actionLabel="Start creating now"
+          onAction={handleFeatureAuth}
+        />
+      )}
     </Box>
   );
 };

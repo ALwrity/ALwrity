@@ -6,7 +6,6 @@ import {
   Container,
   Typography,
   Stack,
-  Grid,
   Chip,
   useTheme,
   alpha,
@@ -109,14 +108,15 @@ const HeroSection: React.FC = () => {
   };
 
   const primaryCtaSx = {
-    py: 1.55,
-    px: 4,
-    fontSize: { xs: '1.05rem', md: '1.12rem' },
+    py: { xs: 1.89, md: 1.55 },
+    px: { xs: 4, md: 4 },
+    fontSize: { xs: '1.22rem', md: '1.12rem' },
     fontWeight: 700,
     borderRadius: 2.5,
-    width: 'auto',
-    minWidth: { xs: 240, sm: 270 },
-    maxWidth: 320,
+    width: { xs: '100%', md: 'auto' },
+    minWidth: { xs: '100%', sm: 270 },
+    maxWidth: { xs: '100%', md: 320 },
+    minHeight: { xs: 52, md: 48 },
     background: 'linear-gradient(45deg, #667eea 30%, #764ba2 90%)',
     backgroundImage: `
       linear-gradient(120deg, transparent 0%, rgba(255,255,255,0.3) 50%, transparent 100%),
@@ -156,11 +156,11 @@ const HeroSection: React.FC = () => {
   ];
 
   const trustSignals = [
-    { icon: <Security />, label: 'Hyper Personalization' },
-    { icon: <Shield />, label: 'Fact-Checked Output' },
-    { icon: <CloudDone />, label: 'SME AI Platform' },
-    { icon: <Verified />, label: 'Connected Platforms' },
-  ];
+    { icon: <Security />, label: 'Hyper Personalization', mobileLabel: 'Hyper\nPersonalization' },
+    { icon: <Shield />, label: 'Fact-Checked Output', mobileLabel: 'Fact-Checked\nOutput' },
+    { icon: <CloudDone />, label: 'SME AI Platform', mobileLabel: 'SME AI\nPlatform' },
+    { icon: <Verified />, label: 'Connected Platforms', mobileLabel: 'Connected\nPlatforms' },
+  ] as const;
 
   const glassPanelSx = {
     background: `linear-gradient(135deg, ${alpha(theme.palette.common.white, 0.08)} 0%, ${alpha(theme.palette.common.white, 0.03)} 100%)`,
@@ -173,8 +173,12 @@ const HeroSection: React.FC = () => {
   const chipSx = {
     cursor: 'pointer',
     fontWeight: 600,
-    fontSize: '0.85rem',
+    fontSize: { xs: '0.78rem', md: '0.85rem' },
+    height: { xs: 32, md: 'auto' },
     transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    '& .MuiChip-label': {
+      px: { xs: 0.75, md: 1.25 },
+    },
     '&:hover': {
       transform: 'translateY(-2px)',
       boxShadow: `0 4px 16px ${alpha(theme.palette.primary.main, 0.35)}`,
@@ -186,10 +190,11 @@ const HeroSection: React.FC = () => {
       id="hero"
       sx={{
         position: 'relative',
-        bgcolor: '#000',
+        bgcolor: '#0a0a0a',
         color: theme.palette.getContrastText('#000'),
         overflow: 'hidden',
         minHeight: { xs: 'auto', md: '100vh' },
+        pb: { xs: 3.5, md: 0 },
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'flex-start',
@@ -198,14 +203,16 @@ const HeroSection: React.FC = () => {
       <Box
         sx={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          top: { xs: -32, md: 0 },
+          left: { xs: -16, md: 0 },
+          right: { xs: -16, md: 0 },
+          bottom: { xs: -48, md: 0 },
           backgroundImage: 'url(/alwrity_landing_hero_bg.png)',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
+          transform: { xs: 'scale(1.12)', md: 'none' },
+          transformOrigin: 'center center',
           zIndex: 0,
         }}
       />
@@ -213,10 +220,10 @@ const HeroSection: React.FC = () => {
       <Box
         sx={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          top: { xs: -32, md: 0 },
+          left: { xs: -16, md: 0 },
+          right: { xs: -16, md: 0 },
+          bottom: { xs: -48, md: 0 },
           background: `
             linear-gradient(135deg,
               rgba(0, 0, 0, 0.55) 0%,
@@ -231,10 +238,10 @@ const HeroSection: React.FC = () => {
       <Box
         sx={{
           position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
+          top: { xs: -32, md: 0 },
+          left: { xs: -16, md: 0 },
+          right: { xs: -16, md: 0 },
+          bottom: { xs: -48, md: 0 },
           background: `
             radial-gradient(circle at 50% 50%, ${alpha(theme.palette.primary.main, 0.10)} 0%, transparent 60%),
             radial-gradient(circle at 20% 80%, ${alpha(theme.palette.secondary.main, 0.08)} 0%, transparent 50%)
@@ -246,26 +253,40 @@ const HeroSection: React.FC = () => {
       <Container
         maxWidth="lg"
         sx={{
-          pt: { xs: 9.5, md: 10.5 },
-          pb: { xs: 2.5, md: 3 },
+          pt: { xs: 9, md: 10.5 },
+          pb: { xs: 0, md: 3 },
           position: 'relative',
           zIndex: 3,
-          flex: 1,
+          flex: { xs: '0 0 auto', md: 1 },
           display: 'flex',
           flexDirection: 'column',
         }}
       >
-        <motion.div variants={stagger} initial="hidden" animate="visible" style={{ flex: 1, display: 'flex', flexDirection: 'column', width: '100%' }}>
-          <Stack spacing={0} alignItems="center" textAlign="center" sx={{ flex: 1, width: '100%' }}>
-            {/* Top chips — close below fixed nav */}
+        <motion.div
+          variants={stagger}
+          initial="hidden"
+          animate="visible"
+          style={{ width: '100%' }}
+        >
+          <Stack
+            spacing={0}
+            alignItems="center"
+            textAlign="center"
+            sx={{ flex: { xs: '0 0 auto', md: 1 }, width: '100%' }}
+          >
+            {/* Top chips — flush below fixed nav on mobile */}
             <motion.div variants={fadeInUp} style={{ width: '100%' }}>
               <Stack
                 direction="row"
-                spacing={1.5}
+                spacing={{ xs: 1, md: 1.5 }}
                 alignItems="center"
                 flexWrap="wrap"
                 justifyContent="center"
-                sx={{ mb: { xs: 2, md: 3 }, mt: { xs: 0.5, md: 1 } }}
+                sx={{
+                  mb: { xs: 3, md: 3 },
+                  mt: { xs: 0, md: 1 },
+                  display: { xs: 'none', md: 'flex' },
+                }}
               >
                 <Chip
                   icon={<RocketLaunch sx={{ fontSize: '1rem !important' }} />}
@@ -300,11 +321,12 @@ const HeroSection: React.FC = () => {
                 variant="h1"
                 component="h1"
                 sx={{
-                  fontSize: { xs: '1.75rem', sm: '2.35rem', md: '3.1rem', lg: '3.5rem' },
+                  fontSize: { xs: '2.05rem', sm: '2.35rem', md: '3.1rem', lg: '3.5rem' },
                   fontWeight: 900,
                   letterSpacing: '-0.03em',
                   lineHeight: 1.08,
-                  mb: { xs: 2.75, md: 4 },
+                  mt: { xs: 0, md: 0 },
+                  mb: { xs: 2, md: 4 },
                   color: '#fff',
                   textAlign: 'center',
                   whiteSpace: { xs: 'normal', sm: 'nowrap' },
@@ -338,7 +360,7 @@ const HeroSection: React.FC = () => {
                   maxWidth: '780px',
                   mx: 'auto',
                   lineHeight: 1.45,
-                  mb: { xs: 3.25, md: 4.5 },
+                  mb: { xs: 2, md: 4.5 },
                   color: 'rgba(255, 255, 255, 0.92)',
                   textShadow: `
                     0 2px 8px rgba(0, 0, 0, 0.8),
@@ -346,8 +368,16 @@ const HeroSection: React.FC = () => {
                   `,
                 }}
               >
-                ALwrity learns your brand voice, outsmarts your competitors, and publishes on every
-                channel — AI enterprise firepower, without the complexity
+                <Box component="span" sx={{ display: { xs: 'block', md: 'none' } }}>
+                  ALwrity learns Your brand voice, outsmarts your competitors, and publishes on every channel —
+                  <Box component="span" sx={{ display: 'block' }}>
+                    AI Enterprise Firepower, without the Complexity
+                  </Box>
+                </Box>
+                <Box component="span" sx={{ display: { xs: 'none', md: 'inline' } }}>
+                  ALwrity learns your brand voice, outsmarts your competitors, and publishes on every
+                  channel — AI enterprise firepower, without the complexity
+                </Box>
               </Typography>
             </motion.div>
 
@@ -357,7 +387,9 @@ const HeroSection: React.FC = () => {
                 sx={{
                   display: { xs: 'flex', md: 'none' },
                   justifyContent: 'center',
-                  mb: 2,
+                  mb: { xs: 2, md: 2 },
+                  mt: { xs: 0, md: 0 },
+                  px: { xs: 2, sm: 2.5 },
                   width: '100%',
                 }}
               >
@@ -365,7 +397,7 @@ const HeroSection: React.FC = () => {
                   onClick={handleAuthNavigation}
                   variant="contained"
                   size="large"
-                  startIcon={<Lightbulb sx={{ fontSize: '1.35rem !important' }} />}
+                  startIcon={<Lightbulb sx={{ fontSize: { xs: '1.5rem !important', md: '1.35rem !important' } }} />}
                   sx={primaryCtaSx}
                 >
                   <ScramblingText
@@ -379,9 +411,7 @@ const HeroSection: React.FC = () => {
               </Box>
             </motion.div>
 
-            <Box sx={{ flex: 0, minHeight: 0, width: '100%' }} />
-
-            {/* Glass CTA panel — centered */}
+            {/* Glass CTA panel — stats anchored to bottom on mobile */}
             <motion.div
               variants={fadeInUp}
               style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
@@ -389,20 +419,31 @@ const HeroSection: React.FC = () => {
               <Box
                 sx={{
                   ...glassPanelSx,
-                  px: { xs: 2.25, md: 3 },
-                  py: { xs: 2.75, md: 3.25 },
-                  minHeight: { xs: 220, md: 260 },
+                  px: { xs: 1.5, md: 3 },
+                  py: { xs: 1.08, md: 3.25 },
+                  minHeight: { xs: 124, md: 260 },
                   maxWidth: 560,
                   width: '100%',
                   mx: 'auto',
-                  mb: { xs: 1.25, md: 1.5 },
+                  mt: { xs: 2, md: 0 },
+                  mb: { xs: 1, md: 1.5 },
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
+                  justifyContent: { xs: 'flex-end', md: 'space-between' },
                 }}
               >
-                <Stack spacing={0} alignItems="center" sx={{ width: '100%', flex: 1, justifyContent: 'space-evenly' }}>
+                <Box sx={{ flex: { xs: 1, md: 0 }, minHeight: 0, width: '100%', display: { xs: 'block', md: 'none' } }} />
+
+                <Stack
+                  spacing={0}
+                  alignItems="center"
+                  sx={{
+                    width: '100%',
+                    flex: { xs: '0 0 auto', md: 1 },
+                    justifyContent: { xs: 'flex-end', md: 'space-evenly' },
+                  }}
+                >
                   <Button
                     onClick={handleAuthNavigation}
                     variant="contained"
@@ -427,10 +468,10 @@ const HeroSection: React.FC = () => {
                     sx={{
                       color: 'rgba(255, 255, 255, 0.9)',
                       fontWeight: 500,
-                      fontSize: { xs: '0.82rem', md: '0.92rem' },
-                      mt: 2.75,
-                      mb: 0,
-                      lineHeight: 1.5,
+                      fontSize: { xs: '0.78rem', md: '0.92rem' },
+                      mt: { xs: 0, md: 2.75 },
+                      mb: { xs: 0, md: 0 },
+                      lineHeight: 1.45,
                       textAlign: 'center',
                       width: '100%',
                       textShadow: '0 2px 6px rgba(0, 0, 0, 0.7)',
@@ -439,74 +480,97 @@ const HeroSection: React.FC = () => {
                     AI Marketing OS • No vendor lock-in • Enterprise security
                   </Typography>
 
-                  <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: { xs: 2, md: 2.25 } }}>
-                    <Grid
-                      container
-                      spacing={{ xs: 1.5, md: 2 }}
-                      justifyContent="center"
-                      alignItems="center"
-                      sx={{ maxWidth: { xs: 340, md: 460 }, mx: 'auto' }}
+                  <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: { xs: 1.75, md: 2.25 } }}>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: 'repeat(4, minmax(0, 1fr))',
+                          md: 'repeat(4, minmax(0, 1fr))',
+                        },
+                        gap: { xs: 0.5, md: 2 },
+                        width: '100%',
+                        maxWidth: { xs: '100%', md: 460 },
+                        mx: 'auto',
+                      }}
                     >
                       {stats.map((stat, index) => (
-                        <Grid item xs={6} md={3} key={index} sx={{ display: 'flex', justifyContent: 'center' }}>
-                          <Stack
-                            spacing={0.2}
-                            alignItems="center"
-                            sx={{ width: '100%', maxWidth: { xs: 118, md: 104 } }}
+                        <Stack
+                          key={index}
+                          spacing={{ xs: 0.6, md: 1.15 }}
+                          alignItems="center"
+                          sx={{ width: '100%', minWidth: 0 }}
+                        >
+                          <Typography
+                            variant="h5"
+                            component="p"
+                            sx={{
+                              order: { xs: 1, md: 3 },
+                              fontWeight: 800,
+                              fontSize: { xs: '0.82rem', md: '0.95rem' },
+                              color: '#fff',
+                              lineHeight: 1.1,
+                              textAlign: 'center',
+                              width: '100%',
+                              m: 0,
+                              mb: { xs: 0.35, md: 0 },
+                              mt: { xs: 0, md: 2 },
+                            }}
                           >
-                            <Box sx={{ width: '100%', maxWidth: 44 }}>
+                            {stat.value}*
+                          </Typography>
+                          <Box
+                            sx={{
+                              order: { xs: 2, md: 1 },
+                              width: '100%',
+                              maxWidth: { xs: 36, md: 44 },
+                              my: { xs: 0.2, md: 0 },
+                              mb: { xs: 0.25, md: 0.5 },
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                height: 3,
+                                borderRadius: 2,
+                                background: 'rgba(255, 255, 255, 0.1)',
+                                overflow: 'hidden',
+                              }}
+                            >
                               <Box
                                 sx={{
-                                  height: 3,
+                                  height: '100%',
+                                  width: stat.value,
+                                  background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
                                   borderRadius: 2,
-                                  background: 'rgba(255, 255, 255, 0.1)',
-                                  overflow: 'hidden',
+                                  boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)',
                                 }}
-                              >
-                                <Box
-                                  sx={{
-                                    height: '100%',
-                                    width: stat.value,
-                                    background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
-                                    borderRadius: 2,
-                                    boxShadow: '0 0 8px rgba(102, 126, 234, 0.5)',
-                                  }}
-                                />
-                              </Box>
+                              />
                             </Box>
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                color: 'rgba(255, 255, 255, 0.85)',
-                                fontWeight: 600,
-                                fontSize: '0.6rem',
-                                lineHeight: 1.15,
-                                textAlign: 'center',
-                                width: '100%',
-                                px: 0.25,
-                              }}
-                            >
-                              {stat.label}
-                            </Typography>
-                            <Typography
-                              variant="h5"
-                              component="p"
-                              sx={{
-                                fontWeight: 800,
-                                fontSize: { xs: '0.85rem', md: '0.95rem' },
-                                color: '#fff',
-                                lineHeight: 1.1,
-                                textAlign: 'center',
-                                width: '100%',
-                                m: 0,
-                              }}
-                            >
-                              {stat.value}*
-                            </Typography>
-                          </Stack>
-                        </Grid>
+                          </Box>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              order: { xs: 3, md: 2 },
+                              color: 'rgba(255, 255, 255, 0.85)',
+                              fontWeight: 600,
+                              fontSize: { xs: '0.58rem', md: '0.6rem' },
+                              lineHeight: 1.15,
+                              textAlign: 'center',
+                              width: '100%',
+                              px: 0.15,
+                              mt: { xs: 0.25, md: 0.65 },
+                              mb: { xs: 0, md: 1 },
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {stat.label}
+                          </Typography>
+                        </Stack>
                       ))}
-                    </Grid>
+                    </Box>
                   </Box>
 
                   <Typography
@@ -515,7 +579,7 @@ const HeroSection: React.FC = () => {
                       color: 'rgba(255, 255, 255, 0.55)',
                       fontSize: '0.6rem',
                       fontStyle: 'italic',
-                      mt: 0.75,
+                      mt: { xs: 0.5, md: 0.75 },
                       width: '100%',
                       textAlign: 'center',
                     }}
@@ -526,47 +590,72 @@ const HeroSection: React.FC = () => {
               </Box>
             </motion.div>
 
-            {/* Trust badges */}
+            {/* Trust badges — mobile: icon + 2-line label, no pill box */}
             <motion.div variants={fadeInUp} style={{ width: '100%' }}>
-              <Stack
-                direction="row"
-                spacing={{ xs: 0.75, md: 1.5 }}
-                alignItems="center"
-                flexWrap="wrap"
-                justifyContent="center"
-                sx={{ mt: { xs: 1.25, md: 1.5 } }}
+              <Box
+                sx={{
+                  display: { xs: 'grid', md: 'flex' },
+                  gridTemplateColumns: { xs: 'repeat(4, minmax(0, 1fr))', md: 'none' },
+                  flexWrap: { md: 'wrap' },
+                  gap: { xs: 0.5, md: 1.5 },
+                  alignItems: { xs: 'flex-start', md: 'center' },
+                  justifyContent: 'center',
+                  width: '100%',
+                  mt: { xs: 2, md: 1.5 },
+                  mb: { xs: 0.5, md: 0 },
+                }}
               >
                 {trustSignals.map((signal, index) => (
                   <Stack
                     key={index}
-                    direction="row"
-                    spacing={0.75}
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={{ xs: 0.35, md: 0.75 }}
                     alignItems="center"
                     sx={{
-                      background: 'rgba(0, 0, 0, 0.3)',
-                      backdropFilter: 'blur(8px)',
-                      px: { xs: 1, md: 1.25 },
-                      py: 0.5,
-                      borderRadius: 2,
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      minWidth: 0,
+                      background: { xs: 'transparent', md: 'rgba(0, 0, 0, 0.3)' },
+                      backdropFilter: { xs: 'none', md: 'blur(8px)' },
+                      px: { xs: 0, md: 1.25 },
+                      py: { xs: 0, md: 0.5 },
+                      borderRadius: { xs: 0, md: 2 },
+                      border: { xs: 'none', md: '1px solid rgba(255, 255, 255, 0.1)' },
                     }}
                   >
                     <Box sx={{ color: theme.palette.success.light, display: 'flex' }}>
-                      {React.cloneElement(signal.icon as React.ReactElement, { sx: { fontSize: 18 } })}
+                      {React.cloneElement(signal.icon as React.ReactElement, {
+                        sx: { fontSize: { xs: 20, md: 18 } },
+                      })}
                     </Box>
                     <Typography
                       variant="caption"
                       sx={{
+                        display: { xs: 'block', md: 'none' },
                         color: 'rgba(255, 255, 255, 0.95)',
                         fontWeight: 600,
-                        fontSize: { xs: '0.65rem', md: '0.68rem' },
+                        fontSize: '0.58rem',
+                        lineHeight: 1.15,
+                        textAlign: 'center',
+                        whiteSpace: 'pre-line',
+                      }}
+                    >
+                      {signal.mobileLabel}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: { xs: 'none', md: 'block' },
+                        color: 'rgba(255, 255, 255, 0.95)',
+                        fontWeight: 600,
+                        fontSize: '0.68rem',
+                        lineHeight: 1.15,
+                        textAlign: { md: 'left' },
                       }}
                     >
                       {signal.label}
                     </Typography>
                   </Stack>
                 ))}
-              </Stack>
+              </Box>
             </motion.div>
           </Stack>
         </motion.div>
