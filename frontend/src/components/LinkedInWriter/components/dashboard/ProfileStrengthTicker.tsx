@@ -18,7 +18,7 @@ export interface ProfileStrengthTickerProps {
   strengthLabel?: string;
   strengthTooltip?: string;
   /** Compact layout for avatar hover popover. */
-  variant?: 'default' | 'popover';
+  variant?: 'default' | 'popover' | 'inline';
 }
 
 export const ProfileStrengthTicker: React.FC<ProfileStrengthTickerProps> = ({
@@ -31,6 +31,40 @@ export const ProfileStrengthTicker: React.FC<ProfileStrengthTickerProps> = ({
   const clamped = Math.max(0, Math.min(100, percent));
   const filledCount = getProfileStrengthSegmentFillCount(clamped, segments);
   const isPopover = variant === 'popover';
+  const isInline = variant === 'inline';
+
+  if (isInline) {
+    return (
+      <span
+        className="linkedin-profile-strength-ticker--inline"
+        role="progressbar"
+        aria-valuenow={clamped}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={
+          strengthTooltip
+            ? `${clamped}% profile strength. ${strengthTooltip}`
+            : `${clamped}% profile strength${strengthLabel ? `. ${strengthLabel}` : ''}`
+        }
+      >
+        <span className="linkedin-profile-strength-ticker--inline-row">
+          <span className="linkedin-profile-strength-ticker--inline-percent">{clamped}%</span>
+          <span className="linkedin-profile-strength-ticker--inline-segments" aria-hidden>
+            {SEGMENT_COLORS.slice(0, segments).map((color, i) => (
+              <span
+                key={i}
+                className="linkedin-profile-strength-ticker--inline-segment"
+                style={{ background: i < filledCount ? color : '#e5e7eb' }}
+              />
+            ))}
+          </span>
+        </span>
+        {strengthLabel ? (
+          <span className="linkedin-profile-strength-ticker--inline-label">{strengthLabel}</span>
+        ) : null}
+      </span>
+    );
+  }
 
   return (
     <div

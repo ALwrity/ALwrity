@@ -5,7 +5,6 @@ import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformP
 import HeaderControls from '../../shared/HeaderControls';
 import BrainstormFlow from './BrainstormFlow';
 
-import { OptimiseProfileControl } from './dashboard/OptimiseProfileControl';
 import { useLinkedInStudioProfileStrength } from '../hooks/useLinkedInStudioProfileStrength';
 import { dispatchLinkedInPersonaUpdated } from '../utils/profileStrengthEvents';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
@@ -154,7 +153,6 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleOpenOptimiseProfile = () => {
-    if (!connected) return;
     window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
   };
 
@@ -324,19 +322,6 @@ export const Header: React.FC<HeaderProps> = ({
           {brandBlock}
 
           <div className="linkedin-writer-header-center">
-            <div className="linkedin-writer-header-strength-ticker">
-              <OptimiseProfileControl
-                onOptimiseProfile={handleOpenOptimiseProfile}
-                profileStrengthPercent={connected ? profileStrengthPercent : null}
-                strengthLabel={strengthLabel}
-                strengthTooltip={
-                  connected ? strengthTooltip : 'Connect LinkedIn to optimise your profile'
-                }
-                isLoading={profileStrengthLoading}
-                isDisabled={!connected}
-                variant="ticker"
-              />
-            </div>
             <div ref={personaDropdownRef} className="linkedin-writer-header-persona">
               <button
                 ref={personaButtonRef}

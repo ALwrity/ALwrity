@@ -6,6 +6,8 @@ interface BrandIdentityCardProps {
   intelligence?: LinkedInAIProfileIntelligence | null;
   profileStrengthPercent?: number | null;
   isLoading?: boolean;
+  /** full = default card; compact = one-row strip with expand (Phase 2). */
+  variant?: 'full' | 'compact';
 }
 
 /**
@@ -27,7 +29,10 @@ export const BrandIdentityCard: React.FC<BrandIdentityCardProps> = ({
   intelligence,
   profileStrengthPercent,
   isLoading = false,
+  variant = 'full',
 }) => {
+  const [expanded, setExpanded] = React.useState(false);
+  const isCompact = variant === 'compact';
   // Loading state - show skeleton shimmer
   if (isLoading) {
     return (
@@ -103,6 +108,66 @@ export const BrandIdentityCard: React.FC<BrandIdentityCardProps> = ({
     profileStrengthPercent != null
       ? `Your profile currently communicates ${profileStrengthPercent}% of this positioning — here's how to strengthen it.`
       : "Here's how your profile can better reflect your professional identity.";
+
+  if (isCompact && intelligence) {
+    const summaryParts = [
+      displayIdentity !== 'Professional profile' ? displayIdentity : null,
+      topExpertise,
+      industry && industry !== 'Unknown' ? industry : null,
+    ].filter(Boolean);
+
+    return (
+      <div className="profile-opt-brand-strip">
+        <button
+          type="button"
+          className="profile-opt-brand-strip__trigger"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+        >
+          <span className="profile-opt-brand-strip__icon" aria-hidden>
+            ✦
+          </span>
+          <span className="profile-opt-brand-strip__copy">
+            <span className="profile-opt-brand-strip__title">Your professional identity</span>
+            <span className="profile-opt-brand-strip__summary">
+              {summaryParts.length > 0
+                ? summaryParts.slice(0, 2).join(' · ')
+                : 'AI-detected positioning from your profile'}
+            </span>
+          </span>
+          <span className="profile-opt-brand-strip__chevron" aria-hidden>
+            {expanded ? '▲' : '▼'}
+          </span>
+        </button>
+        {expanded && (
+          <div className="profile-opt-brand-strip__details">
+            {hasIdentityData && (
+              <p className="profile-opt-brand-strip__identity">{displayIdentity}</p>
+            )}
+            {brand_positioning && brand_positioning !== 'Unknown' && (
+              <p className="profile-opt-brand-strip__line">
+                <strong>Positioning:</strong> {brand_positioning}
+              </p>
+            )}
+            {(topExpertise || (industry && industry !== 'Unknown')) && (
+              <div className="profile-opt-brand-strip__tags">
+                {topExpertise && <span className="profile-opt-brand-strip__tag">{topExpertise}</span>}
+                {industry && industry !== 'Unknown' && (
+                  <span className="profile-opt-brand-strip__tag">{industry}</span>
+                )}
+              </div>
+            )}
+            {primaryAudience && primaryAudience !== 'Unknown' && (
+              <p className="profile-opt-brand-strip__line">
+                <strong>Speaks to:</strong> {primaryAudience}
+              </p>
+            )}
+            <p className="profile-opt-brand-strip__strength">{strengthMessage}</p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
