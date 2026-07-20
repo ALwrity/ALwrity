@@ -49,6 +49,7 @@ pandas>=2.0.0
 
 # Image processing - needed for LinkedIn image generation/editing
 Pillow>=10.0.0
+huggingface_hub>=1.1.4
 
 # PDF carousel rendering for LinkedIn
 reportlab==4.5.1

@@ -376,23 +376,14 @@ def start_backend(enable_reload=False, production_mode=False):
         verbose_mode = setup_clean_logging()
         uvicorn_log_level = get_uvicorn_log_level()
 
-        # Log diagnostics and assert versions (fail fast if misconfigured)
-        try:
-            if log_video_stack_diagnostics:
-                log_video_stack_diagnostics()
-            if assert_supported_moviepy:
-                assert_supported_moviepy()
-        except Exception as _video_stack_err:
-            print(f"[ERROR] Video stack preflight failed: {_video_stack_err}")
-            return False
-        
         print(f"[DEBUG] Starting uvicorn with host={host} port={port}", flush=True)
         print("[DEBUG] >>> ABOUT TO CALL UVICORN.RUN() <<<", flush=True)
-        
-        # Skip video preflight in feature-limited mode to save memory/time
+
+        # Skip video/moviepy preflight in feature-limited mode (e.g. linkedin-only).
+        # Lean installs (requirements-linkedin.txt) intentionally omit moviepy.
         is_feature_limited = os.getenv("ALWRITY_ENABLED_FEATURES", "").strip().lower() not in ("", "all")
         print(f"[DEBUG] Feature-limited mode check: {is_feature_limited}", flush=True)
-        
+
         if is_feature_limited:
             print("[DEBUG] Feature-limited mode - skipping video preflight", flush=True)
         else:
@@ -405,7 +396,7 @@ def start_backend(enable_reload=False, production_mode=False):
             except Exception as _video_stack_err:
                 print(f"[ERROR] Video stack preflight failed: {_video_stack_err}")
                 return False
-        
+
         uvicorn.run(
             "app:app",
             host=host,
