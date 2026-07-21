@@ -75,6 +75,18 @@ const SKELETON_CARD_STYLE: React.CSSProperties = {
 
 const SKELETON_COUNT = 3;
 
+const hideSuggestionsButtonStyle: React.CSSProperties = {
+  padding: '8px 14px',
+  borderRadius: 8,
+  border: '1px solid #cbd5e1',
+  backgroundColor: '#fff',
+  color: '#475569',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
+};
+
 const panelBackgroundGlowStyle: React.CSSProperties = {
   position: 'absolute',
   top: '-50%',
@@ -191,11 +203,9 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     return sortedRecommendations.filter((item) => item.id !== quickWin.id);
   }, [sortedRecommendations, quickWin]);
 
-  const [showAllAngles, setShowAllAngles] = React.useState(false);
-  const [showAllRecommendations, setShowAllRecommendations] = React.useState(false);
-  const VISIBLE_ANGLES_COUNT = 3;
-  const VISIBLE_REC_COUNT = 3;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showAllAngles, setShowAllAngles] = React.useState(false);
+  const VISIBLE_ANGLES_COUNT = 3;
   const writingOpportunities = aiProfileIntelligence?.writing_opportunities ?? [];
   const visibleOpportunities = showAllAngles
     ? writingOpportunities
@@ -206,15 +216,6 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
       ? aiProfileIntelligence.industry
       : 'your industry';
   const contentBridgeExpertise = aiProfileIntelligence?.primary_expertise?.[0];
-
-  React.useEffect(() => {
-    setShowAllRecommendations(false);
-  }, [recommendations]);
-
-  const visibleRemainingItems = showAllRecommendations
-    ? remainingItems
-    : remainingItems.slice(0, VISIBLE_REC_COUNT);
-  const hiddenRecCount = Math.max(0, remainingItems.length - VISIBLE_REC_COUNT);
 
   if (!isOpen) {
     return null;
@@ -278,50 +279,23 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
       `}</style>
     <div className="profile-opt-panel" style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
       <div
-        className="profile-opt-panel__inner"
         style={{
           ...linkedInPlaceholderCardStyles.inner,
+          minHeight: 'unset',
+          padding: '20px 24px',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
         <div style={panelBackgroundGlowStyle} />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <div className="profile-opt-panel__header">
-            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-              <h3 className="profile-opt-panel__title">Improve your LinkedIn profile</h3>
-              <p className="profile-opt-panel__subtitle">
-                {quickWin
-                  ? 'Prioritized by impact — start with your quick win below.'
-                  : 'Get more views, connections, and leads with prioritized suggestions.'}
-              </p>
-              {updatedLabel && (
-                <p className="profile-opt-panel__meta">
-                  {updatedLabel}
-                  {optimizationMeta?.source ? ` · Source: ${optimizationMeta.source}` : ''}
-                </p>
-              )}
-              {!updatedLabel && optimizationMeta?.source && (
-                <p className="profile-opt-panel__meta">
-                  Source: {optimizationMeta.source}
-                  {typeof optimizationMeta.remaining_in_backlog === 'number' &&
-                    optimizationMeta.remaining_in_backlog > 0 &&
-                    ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
-                </p>
-              )}
-            </div>
-
-            {showCards && onCollapse && (
-              <button
-                type="button"
-                className="profile-opt-panel__hide-link"
-                onClick={onCollapse}
-                aria-expanded
-                aria-controls="profile-optimization-list"
-              >
-                Hide suggestions
-              </button>
-            )}
-          </div>
+          {aiProfileIntelligence && (
+            <BrandIdentityCard
+              intelligence={aiProfileIntelligence}
+              profileStrengthPercent={profileStrengthPercent}
+            />
+          )}
 
           {/* Profile Photo Card */}
           <div
@@ -349,9 +323,9 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                 justifyContent: 'center',
               }}
             >
-              {(localProfilePhotoUrl || profilePictureUrl) ? (
+              {localProfilePhotoUrl || profilePictureUrl ? (
                 <img
-                  src={(localProfilePhotoUrl || profilePictureUrl) ?? undefined}
+                  src={localProfilePhotoUrl || profilePictureUrl || undefined}
                   alt="Profile"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
@@ -479,127 +453,61 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
             </div>
           )}
 
-          <div className="profile-opt-panel__grid">
-            <aside className="profile-opt-panel__rail">
-              {aiProfileIntelligence && (
-                <BrandIdentityCard
-                  intelligence={aiProfileIntelligence}
-                  profileStrengthPercent={profileStrengthPercent}
-                />
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'flex-start',
+              justifyContent: 'space-between',
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 700,
+                  color: '#1e293b',
+                }}
+              >
+                Improve your LinkedIn profile
+              </h3>
+              <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b', lineHeight: 1.55 }}>
+                {quickWin
+                  ? "ALwrity detected opportunities to get more views, connections, and leads — prioritized by impact and time required. Start with 'Quick win'."
+                  : 'ALwrity detected opportunities to get more views, connections, and leads — prioritized by impact and time required.'}
+              </p>
+              {updatedLabel && (
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                  {updatedLabel}
+                  {optimizationMeta?.source ? ` ┬╖ Source: ${optimizationMeta.source}` : ''}
+                </p>
               )}
-
-              {showSectionScores && sectionScores && (
-                <SectionScoresPanel
-                  scores={sectionScores}
-                  activeSectionKeys={activeSectionKeys}
-                  activeSectionCount={activeSectionCount}
-                />
+              {!updatedLabel && optimizationMeta?.source && (
+                <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                  Source: {optimizationMeta.source}
+                  {typeof optimizationMeta.remaining_in_backlog === 'number' &&
+                    optimizationMeta.remaining_in_backlog > 0 &&
+                    ` ┬╖ ${optimizationMeta.remaining_in_backlog} more in backlog`}
+                </p>
               )}
+            </div>
 
-              {showCards && onRecheckProfile && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: '#475569',
-                      lineHeight: 1.4,
-                      flex: '1 1 200px',
-                    }}
-                  >
-                    Applied changes on LinkedIn? Re-check your live profile to verify your real score.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={onRecheckProfile}
-                    disabled={isRechecking}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 8,
-                      border: '1px solid #0A66C2',
-                      backgroundColor: isRechecking ? '#cbd5e1' : '#fff',
-                      color: isRechecking ? '#64748b' : '#0A66C2',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: isRechecking ? 'wait' : 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {isRechecking ? 'Re-checking…' : '🔄 Re-check my profile'}
-                  </button>
-                </div>
-              )}
+            {showCards && onCollapse && (
+              <button
+                type="button"
+                onClick={onCollapse}
+                aria-expanded
+                aria-controls="profile-optimization-list"
+                style={hideSuggestionsButtonStyle}
+              >
+                Hide suggestions
+              </button>
+            )}
+          </div>
 
-              {recheckDelta && onDismissRecheckDelta && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  style={{
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    backgroundColor: recheckDelta.current > recheckDelta.previous ? '#ecfdf5' : '#fef3c7',
-                    border: recheckDelta.current > recheckDelta.previous
-                      ? '1px solid #6ee7b7'
-                      : '1px solid #fcd34d',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: recheckDelta.current > recheckDelta.previous ? '#065f46' : '#92400e',
-                      lineHeight: 1.45,
-                      flex: 1,
-                    }}
-                  >
-                    {recheckDelta.current > recheckDelta.previous
-                      ? `✅ Real score improved: ${recheckDelta.previous} → ${recheckDelta.current} (+${
-                          recheckDelta.current - recheckDelta.previous
-                        } from your live LinkedIn changes).`
-                      : recheckDelta.current < recheckDelta.previous
-                        ? `Real score changed: ${recheckDelta.previous} → ${recheckDelta.current} (${recheckDelta.current - recheckDelta.previous}). The rubric re-evaluated against your current LinkedIn profile.`
-                        : `Score unchanged at ${recheckDelta.current}. The rubric didn't detect new gaps based on your live LinkedIn profile.`}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={onDismissRecheckDelta}
-                    aria-label="Dismiss re-check result"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#64748b',
-                      cursor: 'pointer',
-                      fontSize: 18,
-                      lineHeight: 1,
-                      padding: 0,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-            </aside>
-
-            <div className="profile-opt-panel__main">
           {showSkeleton && (
             <>
               <style>{`
@@ -700,6 +608,116 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
             </div>
           )}
 
+          {showSectionScores && sectionScores && (
+            <SectionScoresPanel
+              scores={sectionScores}
+              activeSectionKeys={activeSectionKeys}
+              activeSectionCount={activeSectionCount}
+            />
+          )}
+
+          {showCards && onRecheckProfile && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                padding: '10px 14px',
+                borderRadius: 10,
+                backgroundColor: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                flexWrap: 'wrap',
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: '#475569',
+                  lineHeight: 1.4,
+                  flex: '1 1 200px',
+                }}
+              >
+                Applied changes on LinkedIn? Re-check your live profile to verify your real score.
+              </p>
+              <button
+                type="button"
+                onClick={onRecheckProfile}
+                disabled={isRechecking}
+                style={{
+                  padding: '7px 14px',
+                  borderRadius: 8,
+                  border: '1px solid #0A66C2',
+                  backgroundColor: isRechecking ? '#cbd5e1' : '#fff',
+                  color: isRechecking ? '#64748b' : '#0A66C2',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: isRechecking ? 'wait' : 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {isRechecking ? 'Re-checkingΓÇª' : '≡ƒöä Re-check my profile'}
+              </button>
+            </div>
+          )}
+
+          {recheckDelta && onDismissRecheckDelta && (
+            <div
+              role="status"
+              aria-live="polite"
+              style={{
+                padding: '12px 14px',
+                borderRadius: 10,
+                backgroundColor: recheckDelta.current > recheckDelta.previous ? '#ecfdf5' : '#fef3c7',
+                border: recheckDelta.current > recheckDelta.previous
+                  ? '1px solid #6ee7b7'
+                  : '1px solid #fcd34d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13,
+                  color: recheckDelta.current > recheckDelta.previous ? '#065f46' : '#92400e',
+                  lineHeight: 1.45,
+                  flex: 1,
+                }}
+              >
+                {recheckDelta.current > recheckDelta.previous
+                  ? `Γ£à Real score improved: ${recheckDelta.previous} ΓåÆ ${recheckDelta.current} (+${
+                      recheckDelta.current - recheckDelta.previous
+                    } from your live LinkedIn changes).`
+                  : recheckDelta.current < recheckDelta.previous
+                    ? `Real score changed: ${recheckDelta.previous} ΓåÆ ${recheckDelta.current} (${recheckDelta.current - recheckDelta.previous}). The rubric re-evaluated against your current LinkedIn profile.`
+                    : `Score unchanged at ${recheckDelta.current}. The rubric didn't detect new gaps based on your live LinkedIn profile.`}
+              </p>
+              <button
+                type="button"
+                onClick={onDismissRecheckDelta}
+                aria-label="Dismiss re-check result"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  fontSize: 18,
+                  lineHeight: 1,
+                  padding: 0,
+                }}
+              >
+                ├ù
+              </button>
+            </div>
+          )}
+
           {showCards && (
             <div
               id="profile-optimization-list"
@@ -756,7 +774,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                 </div>
               )}
 
-              {visibleRemainingItems.map((item, index) => (
+              {remainingItems.map((item, index) => (
                 <ProfileOptimizationCard
                   key={item.id}
                   recommendation={item}
@@ -768,16 +786,6 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
                 />
               ))}
-
-              {!showAllRecommendations && hiddenRecCount > 0 && (
-                <button
-                  type="button"
-                  className="profile-opt-panel__show-all"
-                  onClick={() => setShowAllRecommendations(true)}
-                >
-                  Show all ({remainingItems.length + (quickWin ? 1 : 0)} suggestions)
-                </button>
-              )}
             </div>
           )}
 
@@ -982,8 +990,6 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                 </button>
               </div>
             )}
-            </div>
-          </div>
         </div>
       </div>
     </div>
