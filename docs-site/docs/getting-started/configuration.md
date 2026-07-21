@@ -306,9 +306,6 @@ DATABASE_URL=postgresql://username:password@localhost:5432/alwrity
 
 ```bash
 # Initialize database with default data
-python scripts/init_alpha_subscription_tiers.py
-
-# Or manually initialize
 python -c "from services.database import initialize_database; initialize_database()"
 ```
 

@@ -44,9 +44,6 @@ if not exist ".env" (
 echo Creating subscription tables...
 python scripts\create_subscription_tables.py 2>nul || echo ⚠️  Subscription tables may already exist
 
-echo Updating subscription plans...
-python scripts\cleanup_alpha_plans.py 2>nul || echo ⚠️  Plans may already be updated
-
 cd ..
 
 echo ✅ Backend setup complete!
