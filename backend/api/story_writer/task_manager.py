@@ -9,6 +9,7 @@ import asyncio
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
+from fastapi import HTTPException
 from loguru import logger
 
 
@@ -77,11 +78,13 @@ class TaskManager:
             )
             return None
 
+        progress_messages = task.get("progress_messages", [])
         response = {
             "task_id": task_id,
             "status": task["status"],
             "progress": task.get("progress", 0.0),
-            "message": task.get("progress_messages", [])[-1] if task.get("progress_messages") else None,
+            "message": progress_messages[-1]["message"] if progress_messages else None,
+            "progress_messages": progress_messages,
             "created_at": task["created_at"].isoformat() if task.get("created_at") else None,
             "updated_at": task.get("updated_at", task.get("created_at")).isoformat() if task.get("updated_at") or task.get("created_at") else None,
         }
@@ -124,7 +127,10 @@ class TaskManager:
         if message:
             if "progress_messages" not in task:
                 task["progress_messages"] = []
-            task["progress_messages"].append(message)
+            task["progress_messages"].append({
+                "timestamp": datetime.now().isoformat(),
+                "message": message,
+            })
             logger.info(f"[StoryWriter] Task {task_id}: {message} (progress: {progress}%)")
         
         if result is not None:
@@ -138,6 +144,112 @@ class TaskManager:
         if error_data is not None:
             task["error_data"] = error_data
     
+    def start_outline_generation_task(self, request_data: Dict[str, Any], user_id: str) -> str:
+        """Start an outline generation operation and return a task ID for polling."""
+        task_id = self.create_task("outline_generation", metadata={"owner_user_id": user_id})
+        asyncio.create_task(self._run_outline_generation_task(task_id, request_data, user_id))
+        return task_id
+
+    async def _run_outline_generation_task(
+        self,
+        task_id: str,
+        request_data: Dict[str, Any],
+        user_id: str
+    ):
+        """Background task to run outline generation and update status."""
+        from services.story_writer.story_service import StoryWriterService
+
+        service = StoryWriterService()
+
+        try:
+            self.update_task_status(
+                task_id, "processing", progress=0.0,
+                message="Starting outline generation..."
+            )
+
+            self.update_task_status(
+                task_id, "processing", progress=10.0,
+                message="Reading your premise and story setup..."
+            )
+
+            self.update_task_status(
+                task_id, "processing", progress=20.0,
+                message="Building story context (persona, setting, characters, plot)..."
+            )
+
+            self.update_task_status(
+                task_id, "processing", progress=35.0,
+                message="Mapping scene arc — opening, development, resolution beats..."
+            )
+
+            outline = service.generate_outline(
+                premise=request_data["premise"],
+                persona=request_data.get("persona", ""),
+                story_setting=request_data.get("story_setting", ""),
+                character_input=request_data.get("character_input", ""),
+                plot_elements=request_data.get("plot_elements", ""),
+                writing_style=request_data.get("writing_style", ""),
+                story_tone=request_data.get("story_tone", ""),
+                narrative_pov=request_data.get("narrative_pov", ""),
+                audience_age_group=request_data.get("audience_age_group", ""),
+                content_rating=request_data.get("content_rating", ""),
+                ending_preference=request_data.get("ending_preference", ""),
+                user_id=user_id,
+                use_structured_output=True,
+                include_anime_bible=True,
+            )
+
+            self.update_task_status(
+                task_id, "processing", progress=75.0,
+                message="Crafting scene titles, descriptions, image prompts, and narration..."
+            )
+
+            anime_bible = None
+            outline_payload = outline
+
+            if isinstance(outline, dict):
+                if "anime_bible" in outline:
+                    anime_bible = outline.get("anime_bible")
+                if "scenes" in outline:
+                    outline_payload = outline.get("scenes")
+                elif "outline" in outline:
+                    outline_payload = outline.get("outline")
+
+            result = {
+                "outline": outline_payload,
+                "is_structured": isinstance(outline_payload, list),
+                "anime_bible": anime_bible,
+            }
+
+            self.update_task_status(
+                task_id, "completed", progress=100.0,
+                message="Outline generation completed!",
+                result=result
+            )
+
+            logger.info(f"[StoryWriter] Outline task {task_id} completed successfully")
+
+        except HTTPException as http_error:
+            error_detail = http_error.detail
+            error_message = error_detail.get("message", str(error_detail)) if isinstance(error_detail, dict) else str(error_detail)
+            logger.error(f"[StoryWriter] Outline task {task_id} failed with HTTP {http_error.status_code}: {error_message}")
+            self.update_task_status(
+                task_id, "failed",
+                error=error_message,
+                error_status=http_error.status_code,
+                error_data=error_detail if isinstance(error_detail, dict) else {"error": str(error_detail)},
+                message=f"Outline generation failed: {error_message}"
+            )
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"[StoryWriter] Outline task {task_id} failed: {error_msg}")
+            self.update_task_status(
+                task_id, "failed",
+                error=error_msg,
+                message=f"Outline generation failed: {error_msg}"
+            )
+
     async def execute_story_generation_task(
         self,
         task_id: str,

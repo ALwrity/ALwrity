@@ -6,7 +6,9 @@ import {
   Alert,
   Snackbar,
   Dialog,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import { motion } from 'framer-motion';
 import { useStoryWriterState, SceneAnimationResume } from '../../../hooks/useStoryWriterState';
@@ -20,6 +22,8 @@ import AudioScriptModal from './StoryOutlineParts/AudioScriptModal';
 import CharactersModal from './StoryOutlineParts/CharactersModal';
 import KeyEventsModal from './StoryOutlineParts/KeyEventsModal';
 import TitleEditModal from './StoryOutlineParts/TitleEditModal';
+import { SceneImagesProgressModal } from './StorySetup/SceneImagesProgressModal';
+import { SceneImageGenerationProgressModal } from './StorySetup/SceneImageGenerationProgressModal';
 import {
   StoryImageGenerationModal,
   StoryImageGenerationSettings,
@@ -68,6 +72,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const [animatingSceneNumber, setAnimatingSceneNumber] = useState<number | null>(null);
   const [isRefiningAnimeScene, setIsRefiningAnimeScene] = useState(false);
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
+  const [isGeneratingCurrentSceneImage, setIsGeneratingCurrentSceneImage] = useState(false);
   
   // Use state from hook instead of local state
   const sceneImages = state.sceneImages || new Map<number, string>();
@@ -636,6 +641,62 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
     }
   };
 
+  const handleGenerateCurrentSceneImage = async () => {
+    if (!hasScenes || !currentScene) return;
+    setIsGeneratingCurrentSceneImage(true);
+    try {
+      const prompt = currentScene?.image_prompt || '';
+      if (!prompt.trim()) return;
+      const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
+
+      const resp = await storyWriterApi.regenerateSceneImage({
+        scene_number: sceneNum,
+        scene_title: sceneTitle,
+        prompt: prompt.trim(),
+        provider: state.imageProvider || undefined,
+        width: state.imageWidth,
+        height: state.imageHeight,
+        model: state.imageModel || undefined,
+      });
+
+      if (resp.success && resp.image_url) {
+        const nextMap = new Map(state.sceneImages || []);
+        nextMap.set(sceneNum, resp.image_url);
+        state.setSceneImages(nextMap);
+
+        try {
+          const cleanUrl = resp.image_url.split('?')[0];
+          const imageUrl = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+          const blobResp = await aiApiClient.get(imageUrl, { responseType: 'blob' });
+          const blobUrl = URL.createObjectURL(blobResp.data);
+          setImageBlobUrls((prev) => {
+            const next = new Map(prev);
+            const oldBlob = next.get(sceneNum);
+            if (oldBlob) URL.revokeObjectURL(oldBlob);
+            next.set(sceneNum, blobUrl);
+            return next;
+          });
+          setImageLoadError((prev) => {
+            const next = new Set(prev);
+            next.delete(sceneNum);
+            return next;
+          });
+        } catch (fetchErr) {
+          console.error('Failed to load generated image:', fetchErr);
+          setImageLoadError((prev) => new Set(prev).add(sceneNum));
+        }
+      } else {
+        throw new Error(resp.error || 'Failed to generate image');
+      }
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to generate image';
+      setError(errorMessage);
+    } finally {
+      setIsGeneratingCurrentSceneImage(false);
+    }
+  };
+
   const handleOutlineToastClose = (_?: unknown, reason?: string) => {
     if (reason === 'clickaway') {
       return;
@@ -662,21 +723,25 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
       
       if (response.success && response.outline) {
         // Handle structured outline (scenes) or plain text outline
-        if (response.is_structured && Array.isArray(response.outline)) {
+        if (response.is_structured && Array.isArray(response.outline) && response.outline.length > 0) {
           // Structured outline with scenes
           const scenes = response.outline as any[]; // Assuming StoryScene is any[]
+          // setOutlineScenes auto-derives isOutlineStructured; do not override
+          // it here so an empty array is never falsely marked "structured".
           state.setOutlineScenes(scenes);
-          state.setIsOutlineStructured(true);
           // Also store as formatted text for backward compatibility
-          const formattedOutline = scenes.map((scene, idx) => 
+          const formattedOutline = scenes.map((scene, idx) =>
             `Scene ${scene.scene_number || idx + 1}: ${scene.title}\n${scene.description}`
           ).join('\n\n');
           state.setOutline(formattedOutline);
+        } else if (Array.isArray(response.outline) && response.outline.length === 0) {
+          // Backend returned an empty scene array — surface an error instead
+          // of silently leaving a stale outline in the UI.
+          throw new Error('AI returned no scenes for this outline. Please try again or refine your premise.');
         } else {
           // Plain text outline
           state.setOutline(typeof response.outline === 'string' ? response.outline : String(response.outline));
           state.setOutlineScenes(null);
-          state.setIsOutlineStructured(false);
         }
         state.setError(null);
       } else {
@@ -958,6 +1023,27 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
           '.tw-page-accent': {
             background: 'linear-gradient(120deg, #f9e6c8, #f2d8b4)',
           },
+          '.rendered-content p': { marginBottom: '0.75rem', lineHeight: 1.9 },
+          '.rendered-content h1, .rendered-content h2, .rendered-content h3': {
+            color: '#2C2416', marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 600,
+          },
+          '.rendered-content h1': { fontSize: '1.5rem' },
+          '.rendered-content h2': { fontSize: '1.3rem', borderBottom: '1px solid rgba(120,90,60,0.2)', paddingBottom: '0.25rem' },
+          '.rendered-content h3': { fontSize: '1.15rem' },
+          '.rendered-content strong': { fontWeight: 700 },
+          '.rendered-content em': { fontStyle: 'italic' },
+          '.rendered-content ul, .rendered-content ol': { paddingLeft: '1.5rem', marginBottom: '0.75rem' },
+          '.rendered-content li': { marginBottom: '0.25rem' },
+          '.rendered-content blockquote': {
+            borderLeft: '3px solid #8D6E63', paddingLeft: '1rem', color: '#5D4037',
+            fontStyle: 'italic', margin: '0.75rem 0',
+          },
+          '.rendered-content code': {
+            background: 'rgba(141,110,99,0.12)', padding: '2px 6px', borderRadius: 4,
+            fontFamily: 'monospace', fontSize: '0.9em',
+          },
+          '.rendered-content hr': { border: 'none', borderTop: '1px solid rgba(120,90,60,0.2)', margin: '1rem 0' },
+          '.rendered-content a': { color: '#5D4037', textDecoration: 'underline' },
         }}
       />
       <Snackbar
@@ -994,7 +1080,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
         </Alert>
       )}
 
-      {(state.outline || state.outlineScenes) ? (
+      {hasScenes ? (
         <Box component="div">
           <BookPages
             currentScene={currentScene}
@@ -1007,6 +1093,8 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
             onNext={handleNextScene}
             imageUrl={currentSceneImageFullUrl}
             onImageError={() => setImageLoadError((prev) => new Set(prev).add(currentSceneNumber))}
+            onGenerateImage={handleGenerateCurrentSceneImage}
+            isGeneratingImage={isGeneratingCurrentSceneImage}
             narrationEnabled={!!state.enableNarration}
             audioUrl={resolvedSceneAudioUrl || null}
             hasAudio={hasAudioForScene}
@@ -1054,6 +1142,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
               value={state.outline || ''}
               onChange={(e) => state.setOutline(e.target.value)}
               label="Story Outline"
+              helperText="Paste or edit your story outline here. Click Generate Outline above to have Alwrity AI build a structured scene-by-scene outline from your premise."
               sx={{ mb: 3 }}
             />
           )}
@@ -1062,14 +1151,25 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
         onClose={() => setIsImageFullscreenOpen(false)}
         maxWidth="lg"
         fullWidth
+        PaperProps={{ sx: { bgcolor: 'black', borderRadius: 2 } }}
       >
+        <IconButton
+          onClick={() => setIsImageFullscreenOpen(false)}
+          sx={{
+            position: 'absolute', top: 8, right: 8, zIndex: 10,
+            color: 'white', bgcolor: 'rgba(0,0,0,0.5)',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
         <Box
           sx={{
-            bgcolor: 'black',
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
-            p: 2,
+            p: 3,
+            minHeight: '60vh',
           }}
         >
           {currentSceneImageFullUrl ? (
@@ -1079,8 +1179,8 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
               alt={currentScene?.title || `Scene ${currentSceneNumber} illustration`}
               sx={{
                 width: '100%',
-                height: 'auto',
-                maxHeight: '85vh',
+                maxWidth: '100%',
+                maxHeight: '90vh',
                 objectFit: 'contain',
                 display: 'block',
               }}
@@ -1313,7 +1413,12 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
           setIsTitleModalOpen(false);
         }}
       />
-        </Box>
+      <SceneImagesProgressModal open={isGeneratingImages} />
+      <SceneImageGenerationProgressModal
+        open={isGeneratingCurrentSceneImage}
+        sceneTitle={currentScene?.title}
+      />
+      </Box>
   );
 };
 

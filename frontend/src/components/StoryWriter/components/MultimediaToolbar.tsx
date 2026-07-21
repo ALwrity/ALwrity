@@ -25,6 +25,7 @@ interface MultimediaToolbarProps {
   isGeneratingAudio?: boolean;
   isGeneratingVideo?: boolean;
   onOpenPanel?: (section: 'audio' | 'video') => void;
+  colorMode?: 'light' | 'dark';
 }
 
 export const MultimediaToolbar: React.FC<MultimediaToolbarProps> = ({
@@ -34,19 +35,19 @@ export const MultimediaToolbar: React.FC<MultimediaToolbarProps> = ({
   isGeneratingAudio = false,
   isGeneratingVideo = false,
   onOpenPanel,
+  colorMode = 'dark',
 }) => {
+  const isLight = colorMode === 'light';
   const hasScenes = state.isOutlineStructured && state.outlineScenes && state.outlineScenes.length > 0;
   const hasAudio = state.enableNarration && state.sceneAudio && state.sceneAudio.size > 0;
   const hasVideo = state.enableVideoNarration && !!state.storyVideo;
   const hasImages = state.sceneImages && state.sceneImages.size > 0;
-  
-  // Determine if audio generation is available
+
   const audioFeatureEnabled = state.enableNarration;
   const videoFeatureEnabled = state.enableVideoNarration;
   const canGenerateAudio = hasScenes && audioFeatureEnabled && !isGeneratingAudio;
   const canGenerateVideo = hasScenes && videoFeatureEnabled && hasImages && hasAudio && !isGeneratingVideo;
 
-  // Determine status for each
   const audioStatus = hasAudio ? 'success' : isGeneratingAudio ? 'loading' : 'idle';
   const videoStatus = hasVideo ? 'success' : isGeneratingVideo ? 'loading' : canGenerateVideo ? 'ready' : 'disabled';
 
@@ -75,8 +76,32 @@ export const MultimediaToolbar: React.FC<MultimediaToolbarProps> = ({
     onOpenPanel?.(section);
   };
 
+  const iconBtnSx = isLight ? {
+    color: '#5D4037',
+    backgroundColor: 'rgba(93, 64, 55, 0.08)',
+    '&:hover': {
+      backgroundColor: 'rgba(93, 64, 55, 0.15)',
+      color: '#3E2723',
+    },
+    '&:disabled': {
+      color: '#C4B8A8',
+      backgroundColor: 'rgba(93, 64, 55, 0.04)',
+    },
+  } : {
+    color: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    '&:hover': {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      color: 'white',
+    },
+    '&:disabled': {
+      color: 'rgba(255, 255, 255, 0.4)',
+      backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    },
+  };
+
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       {/* Audio Generation Button */}
       <Tooltip
         title={
@@ -95,34 +120,23 @@ export const MultimediaToolbar: React.FC<MultimediaToolbarProps> = ({
           <IconButton
             onClick={handleAudioMenuOpen}
             disabled={!hasScenes || !audioFeatureEnabled}
-            sx={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-              },
-              '&:disabled': {
-                color: 'rgba(255, 255, 255, 0.4)',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              },
-            }}
+            sx={iconBtnSx}
             size="small"
           >
             {isGeneratingAudio ? (
-              <CircularProgress size={20} sx={{ color: 'rgba(255, 255, 255, 0.9)' }} />
+              <CircularProgress size={18} sx={{ color: isLight ? '#5D4037' : 'rgba(255, 255, 255, 0.9)' }} />
             ) : hasAudio ? (
               <Badge
                 overlap="circular"
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 badgeContent={
-                  <CheckCircleIcon sx={{ fontSize: 12, color: '#4caf50' }} />
+                  <CheckCircleIcon sx={{ fontSize: 11, color: '#4caf50' }} />
                 }
               >
-                <VolumeUpIcon fontSize="small" />
+                <VolumeUpIcon sx={{ fontSize: 18 }} />
               </Badge>
             ) : (
-              <VolumeUpIcon fontSize="small" />
+              <VolumeUpIcon sx={{ fontSize: 18 }} />
             )}
           </IconButton>
         </span>
@@ -179,34 +193,23 @@ export const MultimediaToolbar: React.FC<MultimediaToolbarProps> = ({
           <IconButton
             onClick={handleVideoMenuOpen}
             disabled={!hasScenes || !videoFeatureEnabled}
-            sx={{
-              color: 'rgba(255, 255, 255, 0.9)',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-              },
-              '&:disabled': {
-                color: 'rgba(255, 255, 255, 0.4)',
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-              },
-            }}
+            sx={iconBtnSx}
             size="small"
           >
             {isGeneratingVideo ? (
-              <CircularProgress size={20} sx={{ color: 'rgba(255, 255, 255, 0.9)' }} />
+              <CircularProgress size={18} sx={{ color: isLight ? '#5D4037' : 'rgba(255, 255, 255, 0.9)' }} />
             ) : hasVideo ? (
               <Badge
                 overlap="circular"
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 badgeContent={
-                  <CheckCircleIcon sx={{ fontSize: 12, color: '#4caf50' }} />
+                  <CheckCircleIcon sx={{ fontSize: 11, color: '#4caf50' }} />
                 }
               >
-                <VideoLibraryIcon fontSize="small" />
+                <VideoLibraryIcon sx={{ fontSize: 18 }} />
               </Badge>
             ) : (
-              <VideoLibraryIcon fontSize="small" />
+              <VideoLibraryIcon sx={{ fontSize: 18 }} />
             )}
           </IconButton>
         </span>
@@ -244,3 +247,4 @@ export const MultimediaToolbar: React.FC<MultimediaToolbarProps> = ({
   );
 };
 
+export default MultimediaToolbar;

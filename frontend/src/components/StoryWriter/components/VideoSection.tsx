@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   Button,
-  LinearProgress,
   CircularProgress,
   Chip,
   Alert,
@@ -16,6 +15,7 @@ import { storyWriterApi } from '../../../services/storyWriterApi';
 import { triggerSubscriptionError } from '../../../api/client';
 import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
 import { HdVideoSection } from './HdVideoSection';
+import { StoryVideoProgressModal } from '../Phases/StorySetup/StoryVideoProgressModal';
 
 interface VideoSectionProps {
   state: ReturnType<typeof useStoryWriterState>;
@@ -256,17 +256,11 @@ export const VideoSection: React.FC<VideoSectionProps> = ({ state, error, onErro
         </Box>
       </Box>
 
-      {isGeneratingVideo && (
-        <Box sx={{ mt: 1 }}>
-          <LinearProgress
-            variant={videoProgress > 0 ? 'determinate' : 'indeterminate'}
-            value={videoProgress}
-          />
-          <Typography variant="caption" sx={{ mt: 0.5, color: '#5D4037', display: 'block' }}>
-            {videoMessage || 'Generating video... This may take a few minutes.'}
-          </Typography>
-        </Box>
-      )}
+      <StoryVideoProgressModal
+        open={isGeneratingVideo}
+        progress={videoProgress}
+        message={videoMessage || 'Generating video... This may take a few minutes.'}
+      />
 
       {hasVideo && state.storyVideo && (
         <Box sx={{ mt: 2 }}>

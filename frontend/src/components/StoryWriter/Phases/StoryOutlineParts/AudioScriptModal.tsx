@@ -9,6 +9,7 @@ import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import SmartToyIcon from '@mui/icons-material/SmartToy';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { OperationButton } from '../../../shared/OperationButton';
+import { modalPaperSx, modalSelectMenuProps } from './modalStyles';
 
 interface AudioScriptModalProps {
   open: boolean;
@@ -142,16 +143,11 @@ const AudioScriptModal: React.FC<AudioScriptModalProps> = ({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: {
-          backgroundColor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-          border: '1px solid rgba(0,0,0,0.06)',
-        },
+        sx: modalPaperSx,
       }}
     >
       <DialogTitle>Edit Audio Narration Script (Scene {sceneNumber})</DialogTitle>
-      <DialogContent dividers sx={{ color: '#2C2416', bgcolor: '#fff' }}>
+      <DialogContent dividers>
         <Box
           sx={{
             display: 'flex',
@@ -335,6 +331,7 @@ const AudioScriptModal: React.FC<AudioScriptModalProps> = ({
                     }
                   }}
                   label="Voice"
+                  {...modalSelectMenuProps}
                   renderValue={(value) => {
                     if (value === 'custom') {
                       return customVoiceId || 'Custom Voice ID';

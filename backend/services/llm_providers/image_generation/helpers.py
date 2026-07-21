@@ -85,7 +85,7 @@ def _track_image_operation_usage(
                 "wavespeed": ("wavespeed_calls", "wavespeed_cost"),
                 "gemini": ("gemini_calls", "gemini_cost"),
                 "openai": ("openai_calls", "openai_cost"),
-                "huggingface": ("total_calls", "total_cost"),  # no dedicated columns
+                "huggingface": ("stability_calls", "stability_cost"),  # route through stability (image-gen counter)
             }
             calls_col, cost_col = provider_column_map.get(provider, ("total_calls", "total_cost"))
 

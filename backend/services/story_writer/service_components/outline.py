@@ -16,9 +16,9 @@ from .base import StoryServiceBase
 class StoryOutlineMixin(StoryServiceBase):
     """Provides outline generation behaviour."""
 
-    def _get_outline_schema(self) -> Dict[str, Any]:
+    def _get_outline_schema(self, include_anime_bible: bool = False) -> Dict[str, Any]:
         """Return JSON schema for structured story outlines."""
-        return {
+        schema: Dict[str, Any] = {
             "type": "object",
             "properties": {
                 "scenes": {
@@ -40,6 +40,55 @@ class StoryOutlineMixin(StoryServiceBase):
             },
             "required": ["scenes"],
         }
+
+        if include_anime_bible:
+            schema["properties"]["anime_bible"] = {
+                "type": "object",
+                "properties": {
+                    "main_cast": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "string"},
+                                "name": {"type": "string"},
+                                "age_range": {"type": "string"},
+                                "role": {"type": "string"},
+                                "look": {"type": "string"},
+                                "outfit_palette": {"type": "string"},
+                                "personality_tags": {"type": "array", "items": {"type": "string"}},
+                            },
+                            "required": ["id", "name", "age_range", "role", "look", "outfit_palette", "personality_tags"],
+                        },
+                    },
+                    "world": {
+                        "type": "object",
+                        "properties": {
+                            "setting": {"type": "string"},
+                            "era": {"type": "string"},
+                            "tech_or_magic_level": {"type": "string"},
+                            "core_rules": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["setting", "era", "tech_or_magic_level", "core_rules"],
+                    },
+                    "visual_style": {
+                        "type": "object",
+                        "properties": {
+                            "style_preset": {"type": "string"},
+                            "camera_style": {"type": "string"},
+                            "color_mood": {"type": "string"},
+                            "lighting": {"type": "string"},
+                            "line_style": {"type": "string"},
+                            "extra_tags": {"type": "array", "items": {"type": "string"}},
+                        },
+                        "required": ["style_preset", "camera_style", "color_mood", "lighting", "line_style", "extra_tags"],
+                    },
+                },
+                "required": ["main_cast", "world", "visual_style"],
+            }
+            schema["required"].append("anime_bible")
+
+        return schema
 
     def generate_outline(
         self,
@@ -139,9 +188,21 @@ For each scene, provide:
 Before finalizing, verify that every scene adheres to the writing style, tone, age appropriateness, content rating, and narrative POV. Create 5-10 scenes that tell a complete, engaging story with clear progression and satisfying resolution.
 """
 
+        if include_anime_bible:
+            outline_prompt += """
+
+**ANIME STORY BIBLE:**
+In addition to the scenes, generate a complete anime-style story bible with:
+1. **main_cast** — each character in the story with: id (short unique key), name, age_range, role (e.g. protagonist/antagonist/support), look (physical appearance), outfit_palette (dominant colors), personality_tags (array of descriptive tags)
+2. **world** — object with: setting, era, tech_or_magic_level, core_rules (array of rules governing this world)
+3. **visual_style** — object with: style_preset, camera_style, color_mood, lighting, line_style, extra_tags (array of visual keywords)
+
+The anime bible must be consistent with the characters, setting, and tone defined above.
+"""
+
         try:
             if use_structured_output:
-                outline_schema = self._get_outline_schema()
+                outline_schema = self._get_outline_schema(include_anime_bible=include_anime_bible)
                 try:
                     response = self.load_json_response(
                         llm_text_gen(prompt=outline_prompt, json_struct=outline_schema, user_id=user_id)
@@ -153,7 +214,7 @@ Before finalizing, verify that every scene adheres to the writing style, tone, a
                             "[StoryWriter] Outline generated with parameters: "
                             f"audience={audience_age_group}, style={writing_style}, tone={story_tone}"
                         )
-                        return scenes
+                        return response
                     logger.warning("[StoryWriter] No scenes found in structured output, falling back to text parsing")
                     raise ValueError("No scenes found in structured output")
                 except (json.JSONDecodeError, ValueError, KeyError) as exc:

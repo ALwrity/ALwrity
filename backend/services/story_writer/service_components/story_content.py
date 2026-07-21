@@ -15,6 +15,126 @@ from .base import StoryServiceBase
 from .outline import StoryOutlineMixin
 
 
+# ------------------------------------------------------------------ #
+# Bible formatting helpers
+# ------------------------------------------------------------------ #
+
+def _format_bible_for_prompt(anime_bible: Optional[Dict[str, Any]]) -> str:
+    """Format the anime bible into readable sections for prompt injection,
+    replacing the raw JSON dump. Presents cast profiles, world info, and
+    visual style as natural language sections."""
+    if not anime_bible:
+        return ""
+
+    sections = []
+
+    main_cast = anime_bible.get("main_cast", [])
+    if main_cast:
+        cast_lines = ["MAIN CAST:"]
+        for member in main_cast:
+            name = member.get("name", "?")
+            role = member.get("role", "")
+            look = member.get("look", "")
+            outfit = member.get("outfit_palette", "")
+            tags = member.get("personality_tags", [])
+            age = member.get("age_range", "")
+
+            header = f"  {name}"
+            if role:
+                header += f" [{role.capitalize()}]"
+            if age:
+                header += f" ({age})"
+            cast_lines.append(header)
+            if look:
+                cast_lines.append(f"    Look: {look}")
+            if outfit:
+                cast_lines.append(f"    Outfit palette: {outfit}")
+            if tags:
+                cast_lines.append(f"    Personality: {', '.join(tags)}")
+        sections.append("\n".join(cast_lines))
+
+    world = anime_bible.get("world")
+    if world:
+        world_lines = ["WORLD:"]
+        if world.get("setting"):
+            world_lines.append(f"  Setting: {world['setting']}")
+        if world.get("era"):
+            world_lines.append(f"  Era: {world['era']}")
+        if world.get("tech_or_magic_level"):
+            world_lines.append(f"  Tech/Magic Level: {world['tech_or_magic_level']}")
+        rules = world.get("core_rules", [])
+        if rules:
+            world_lines.append("  WORLD RULES — Your writing MUST NOT violate these:")
+            for i, rule in enumerate(rules, 1):
+                world_lines.append(f"    {i}. {rule}")
+        sections.append("\n".join(world_lines))
+
+    visual = anime_bible.get("visual_style")
+    if visual:
+        visual_lines = ["VISUAL STYLE:"]
+        if visual.get("style_preset"):
+            visual_lines.append(f"  Style Preset: {visual['style_preset']}")
+        if visual.get("camera_style"):
+            visual_lines.append(f"  Camera Style: {visual['camera_style']}")
+        if visual.get("color_mood"):
+            visual_lines.append(f"  Color Mood: {visual['color_mood']}")
+        if visual.get("lighting"):
+            visual_lines.append(f"  Lighting: {visual['lighting']}")
+        if visual.get("line_style"):
+            visual_lines.append(f"  Line Style: {visual['line_style']}")
+        tags = visual.get("extra_tags", [])
+        if tags:
+            visual_lines.append(f"  Tags: {', '.join(tags)}")
+        sections.append("\n".join(visual_lines))
+
+    return "\n\n".join(sections)
+
+
+def _build_bible_context_for_scene(
+    character_descriptions: List[str],
+    anime_bible: Optional[Dict[str, Any]],
+) -> str:
+    """Cross-reference a scene's character descriptions with the bible's
+    main_cast. For each scene character that matches a bible entry, shows
+    the scene description alongside the bible's structured data. Unmatched
+    descriptions are included as-is."""
+    if not anime_bible or not character_descriptions:
+        return ""
+
+    main_cast = anime_bible.get("main_cast", [])
+    if not main_cast:
+        return ""
+
+    fragments = []
+    for desc in character_descriptions:
+        desc_lower = desc.lower()
+        matched = None
+        for member in main_cast:
+            name = member.get("name", "")
+            if name and name.lower() in desc_lower:
+                matched = member
+                break
+
+        if matched:
+            parts = [f"• Scene description: {desc}"]
+            parts.append(f"  Bible entry for {matched.get('name', '?')}:")
+            if matched.get("role"):
+                parts.append(f"  - Role: {matched['role']}")
+            if matched.get("look"):
+                parts.append(f"  - Look: {matched['look']}")
+            if matched.get("outfit_palette"):
+                parts.append(f"  - Outfit palette: {matched['outfit_palette']}")
+            if matched.get("personality_tags"):
+                parts.append(f"  - Personality: {', '.join(matched['personality_tags'])}")
+            if matched.get("age_range"):
+                parts.append(f"  - Age: {matched['age_range']}")
+            fragments.append("\n".join(parts))
+        else:
+            fragments.append(f"• {desc}")
+
+    return "\n\n".join(fragments)
+
+
 class StoryContentMixin(StoryOutlineMixin):
     """Provides story drafting and continuation behaviour."""
 
@@ -57,15 +177,12 @@ class StoryContentMixin(StoryOutlineMixin):
 
         anime_bible_context = ""
         if anime_bible:
-            try:
-                serialized_bible = json.dumps(anime_bible, ensure_ascii=False, indent=2)
-            except Exception:
-                serialized_bible = str(anime_bible)
+            formatted_bible = _format_bible_for_prompt(anime_bible)
             anime_bible_context = f"""
 
-You also have a structured ANIME STORY BIBLE that defines the main cast, world rules, and visual style. Use it as a hard constraint for character consistency, worldbuilding, and visual storytelling:
+You have a detailed ANIME STORY BIBLE that defines the main cast, world rules, and visual style. Use it as a hard constraint for character consistency, worldbuilding, and visual storytelling throughout the story. Pay special attention to the WORLD RULES — your writing must not contradict any of them:
 
-{serialized_bible}
+{formatted_bible}
 """
 
         outline_text = self._format_outline_for_prompt(outline)
@@ -77,8 +194,6 @@ You also have a structured ANIME STORY BIBLE that defines the main cast, world r
             short_story_prompt = f"""\
 {persona_prompt}
 
-{anime_bible_context}
-
 You have a gripping premise in mind:
 
 {premise}
@@ -87,8 +202,10 @@ Your imagination has crafted a rich narrative outline:
 
 {outline_text}
 
+{anime_bible_context}
+
 **YOUR TASK:**
-Write the COMPLETE story from beginning to end. This is a SHORT story, so you need to write the entire narrative in a single response.
+Write the COMPLETE story from beginning to end. This is a SHORT story, so you need to write the entire narrative in a single response. Before you finish, verify your story does not violate any rule in the WORLD RULES section above.
 
 **STORY LENGTH TARGET:**
 - Target: Approximately 1000 words (900-1100 words acceptable)
@@ -148,7 +265,11 @@ Your imagination has crafted a rich narrative outline:
 
 {outline_text}
 
+{anime_bible_context}
+
 First, silently review the outline and the premise. Consider how to start the story.
+
+Check that your planned opening does not violate any WORLD RULES from the anime bible above.
 
 Start to write the very beginning of the story. You are not expected to finish
 the whole story now. Your writing should be detailed enough that you are only
@@ -205,25 +326,32 @@ on establishing the setting, characters, and beginning of the plot in {initial_w
             "Neutral",
         )
 
-        anime_bible_context = ""
-        if anime_bible:
-            try:
-                serialized_bible = json.dumps(anime_bible, ensure_ascii=False, indent=2)
-            except Exception:
-                serialized_bible = str(anime_bible)
-            anime_bible_context = f"""
-
-You also have a structured ANIME STORY BIBLE that defines the main cast, world rules, and visual style. Use it as a hard constraint for character consistency, worldbuilding, and visual storytelling:
-
-{serialized_bible}
-"""
-
         current_title = scene.get("title", "")
         current_description = scene.get("description", "")
         current_image_prompt = scene.get("image_prompt", "")
         current_audio_narration = scene.get("audio_narration", "")
         current_character_descriptions = scene.get("character_descriptions") or []
         current_key_events = scene.get("key_events") or []
+
+        anime_bible_context = ""
+        if anime_bible:
+            world_visual = _format_bible_for_prompt(anime_bible)
+            character_context = _build_bible_context_for_scene(
+                current_character_descriptions, anime_bible
+            )
+            bible_parts = [world_visual]
+            if character_context:
+                bible_parts.append(
+                    "CHARACTERS IN THIS SCENE (scene description matched against bible entry):\n"
+                    + character_context
+                )
+            formatted = "\n\n".join(bible_parts)
+            anime_bible_context = f"""
+
+You have a detailed ANIME STORY BIBLE. Use it as a hard constraint — especially the WORLD RULES which your scene must not violate:
+
+{formatted}
+"""
 
         scene_schema: Dict[str, Any] = {
             "type": "object",
@@ -247,9 +375,7 @@ You also have a structured ANIME STORY BIBLE that defines the main cast, world r
         prompt = f"""
 {persona_prompt}
 
-{anime_bible_context}
-
-You are refining a single anime story scene so that it fully respects the anime story bible for characters, world rules, and visual style.
+You are refining a single anime story scene.
 
 Current scene:
 - Title: {current_title}
@@ -259,6 +385,8 @@ Current scene:
 - Character descriptions: {current_character_descriptions}
 - Key events: {current_key_events}
 
+{anime_bible_context}
+
 Refine the scene so that:
 - Title is concise and evocative
 - Description clearly describes what happens in the scene
@@ -266,6 +394,7 @@ Refine the scene so that:
 - Audio narration is natural, spoken-friendly text matching the scene
 - Character descriptions highlight key visual and personality traits relevant to this moment
 - Key events list the main beats of the scene
+- The scene does not violate any WORLD RULES from the anime bible above — verify before finalizing
 
 Respond with JSON matching this schema:
 {scene_schema}
@@ -338,16 +467,12 @@ Respond with JSON matching this schema:
             "Neutral",
         )
 
-        try:
-            serialized_bible = json.dumps(anime_bible, ensure_ascii=False, indent=2)
-        except Exception:
-            serialized_bible = str(anime_bible)
-
+        formatted_bible = _format_bible_for_prompt(anime_bible)
         anime_bible_context = f"""
 
-You have a structured ANIME STORY BIBLE that defines the main cast, world rules, and visual style. You MUST treat it as a hard constraint for character consistency, worldbuilding, and visual storytelling:
+You have a detailed ANIME STORY BIBLE. You MUST treat it as a hard constraint for character consistency, worldbuilding, and visual storytelling. The WORLD RULES listed below must not be violated by any scene you create:
 
-{serialized_bible}
+{formatted_bible}
 """
 
         previous_summary_lines: List[str] = []
@@ -392,13 +517,13 @@ You have a structured ANIME STORY BIBLE that defines the main cast, world rules,
         prompt = f"""
 {persona_prompt}
 
-{anime_bible_context}
-
-You are generating a brand new anime story scene that must fully respect the anime story bible for characters, world rules, and visual style.
+You are generating a brand new anime story scene.
 
 Overall premise:
 {premise}
 {previous_block}
+
+{anime_bible_context}
 
 Your task:
 - Create the NEXT SCENE in this story.
@@ -412,6 +537,7 @@ Design the scene so that:
 - Audio narration is natural, spoken-friendly text matching the scene.
 - Character descriptions highlight key visual and personality traits relevant to this moment.
 - Key events list the main beats of the scene.
+- Verify the scene does not violate any WORLD RULES from the anime bible before finalizing.
 
 Respond with JSON matching this schema:
 {scene_schema}
@@ -491,15 +617,12 @@ Respond with JSON matching this schema:
 
         anime_bible_context = ""
         if anime_bible:
-            try:
-                serialized_bible = json.dumps(anime_bible, ensure_ascii=False, indent=2)
-            except Exception:
-                serialized_bible = str(anime_bible)
+            formatted_bible = _format_bible_for_prompt(anime_bible)
             anime_bible_context = f"""
 
-You also have a structured ANIME STORY BIBLE that defines the main cast, world rules, and visual style. Use it as a hard constraint for character consistency, worldbuilding, and visual storytelling:
+You have a detailed ANIME STORY BIBLE that defines the main cast, world rules, and visual style. Use it as a hard constraint for character consistency, worldbuilding, and visual storytelling throughout the story. The WORLD RULES section must not be violated by any writing you produce:
 
-{serialized_bible}
+{formatted_bible}
 """
 
         outline_text = self._format_outline_for_prompt(outline)
@@ -538,8 +661,6 @@ You also have a structured ANIME STORY BIBLE that defines the main cast, world r
         continuation_prompt = f"""\
 {persona_prompt}
 
-{anime_bible_context}
-
 You have a gripping premise in mind:
 
 {premise}
@@ -553,12 +674,14 @@ Here's what you've written so far:
 
 {story_text}
 
+{anime_bible_context}
+
 =====
 
 First, silently review the outline and story so far. Identify what the single
-next part of your outline you should write.
+next part of your outline you should write. Also verify that everything written so far is consistent with the WORLD RULES above.
 
-Your task is to continue where you left off and write the next part of the story.
+Your task is to continue where you left off and write the next part of the story. Ensure this continuation does not violate any WORLD RULES.
 You are not expected to finish the whole story now. Your writing should be
 detailed enough that you are only scratching the surface of the next part of
 your outline. Try to write AT MINIMUM {continuation_word_count} WORDS.

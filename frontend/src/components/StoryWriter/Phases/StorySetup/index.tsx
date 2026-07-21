@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Paper, Typography, Box, Button, Alert, Grid, CircularProgress } from '@mui/material';
 import { storyWriterApi, StoryScene } from '../../../../services/storyWriterApi';
+import { useStoryOutlinePolling } from '../../../../hooks/usePolling';
 import { triggerSubscriptionError } from '../../../../api/client';
 import { StoryParametersSection } from './StoryParametersSection';
 import { StoryConfigurationSection } from './StoryConfigurationSection';
+import { GenerateOutlineProgressModal } from './GenerateOutlineProgressModal';
 
 // TODO: Reintroduce FeatureCheckboxesSection and GenerationSettingsSection in a later
 // publishing/campaign configuration phase (after Outline/Writing), so they feel like
@@ -34,6 +36,51 @@ const StorySetup: React.FC<StorySetupProps> = ({ state, onNext }) => {
     customEndingPreferences,
   };
 
+  const onOutlineComplete = useCallback((result: any) => {
+    setIsGeneratingOutline(false);
+    const outline = result?.outline;
+    const animeBible = result?.anime_bible;
+    const isStructured = result?.is_structured;
+
+    if (animeBible) {
+      state.setAnimeBible(animeBible);
+    }
+
+    if (outline && isStructured && Array.isArray(outline) && outline.length > 0) {
+      const scenes = outline as StoryScene[];
+      state.setOutlineScenes(scenes);
+      const formattedOutline = scenes
+        .map((scene, idx) => `Scene ${scene.scene_number || idx + 1}: ${scene.title}\n${scene.description}`)
+        .join('\n\n');
+      state.setOutline(formattedOutline);
+    } else if (Array.isArray(outline) && outline.length === 0) {
+      setError('AI returned no scenes for this outline. Please try again or refine your premise.');
+      return;
+    } else {
+      state.setOutline(typeof outline === 'string' ? outline : String(outline));
+      state.setOutlineScenes(null);
+    }
+    state.setError(null);
+    onNext();
+  }, [state, onNext]);
+
+  const onOutlineError = useCallback((errorMsg: string) => {
+    setIsGeneratingOutline(false);
+    setError(errorMsg);
+    state.setError(errorMsg);
+  }, [state]);
+
+  const {
+    startPolling: startOutlinePolling,
+    stopPolling: stopOutlinePolling,
+    isPolling: isOutlinePolling,
+    progressMessages: outlineProgressMessages,
+  } = useStoryOutlinePolling({
+    onComplete: onOutlineComplete,
+    onError: onOutlineError,
+    interval: 3000,
+  });
+
   const handleGenerateOutlineAndProceed = async () => {
     if (!state.premise) {
       setError('Please generate a premise before generating the outline');
@@ -45,31 +92,8 @@ const StorySetup: React.FC<StorySetupProps> = ({ state, onNext }) => {
 
     try {
       const request = state.getRequest();
-      const response = await storyWriterApi.generateOutline(state.premise, request);
-
-      if (response.anime_bible) {
-        state.setAnimeBible(response.anime_bible);
-      }
-
-      if (response.success && response.outline) {
-        if (response.is_structured && Array.isArray(response.outline)) {
-          const scenes = response.outline as StoryScene[];
-          state.setOutlineScenes(scenes);
-          state.setIsOutlineStructured(true);
-          const formattedOutline = scenes
-            .map((scene, idx) => `Scene ${scene.scene_number || idx + 1}: ${scene.title}\n${scene.description}`)
-            .join('\n\n');
-          state.setOutline(formattedOutline);
-        } else {
-          state.setOutline(typeof response.outline === 'string' ? response.outline : String(response.outline));
-          state.setOutlineScenes(null);
-          state.setIsOutlineStructured(false);
-        }
-        state.setError(null);
-        onNext();
-      } else {
-        throw new Error(typeof response.outline === 'string' ? response.outline : 'Failed to generate outline');
-      }
+      const { task_id } = await storyWriterApi.startOutlineGeneration(state.premise, request);
+      startOutlinePolling(task_id);
     } catch (err: any) {
       const status = err?.response?.status;
       if (status === 429 || status === 402) {
@@ -80,10 +104,9 @@ const StorySetup: React.FC<StorySetupProps> = ({ state, onNext }) => {
         }
       }
 
-      const errorMessage = err.response?.data?.detail || err.message || 'Failed to generate outline';
+      const errorMessage = err.response?.data?.detail || err.message || 'Failed to start outline generation';
       setError(errorMessage);
       state.setError(errorMessage);
-    } finally {
       setIsGeneratingOutline(false);
     }
   };
@@ -280,6 +303,8 @@ const StorySetup: React.FC<StorySetupProps> = ({ state, onNext }) => {
         </Button>
       </Box>
       </Paper>
+
+      <GenerateOutlineProgressModal open={isGeneratingOutline} progressMessages={outlineProgressMessages} />
     </>
   );
 };
