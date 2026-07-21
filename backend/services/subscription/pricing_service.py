@@ -18,6 +18,7 @@ from models.subscription_models import (
     APIProviderPricing, SubscriptionPlan, UserSubscription, 
     UsageSummary, APIUsageLog, APIProvider, SubscriptionTier
 )
+from services.subscription.pricing_config import PricingConfigLoader
 
 class PricingService:
     """Service for managing API pricing and cost calculations."""
@@ -129,567 +130,90 @@ class PricingService:
         return len(keys_to_remove)
         
     def initialize_default_pricing(self):
-        """Initialize default pricing for all API providers."""
-        
-        # Gemini API Pricing (Updated as of September 2025 - Official Google AI Pricing)
-        # Source: https://ai.google.dev/gemini-api/docs/pricing
-        gemini_pricing = [
-            # Gemini 2.5 Pro - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-2.5-pro",
-                "cost_per_input_token": 0.00000125,   # $1.25 per 1M input tokens (prompts <= 200k tokens)
-                "cost_per_output_token": 0.00001,     # $10.00 per 1M output tokens (prompts <= 200k tokens)
-                "description": "Gemini 2.5 Pro - State-of-the-art multipurpose model for coding and complex reasoning"
-            },
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-2.5-pro-large",
-                "cost_per_input_token": 0.0000025,    # $2.50 per 1M input tokens (prompts > 200k tokens)
-                "cost_per_output_token": 0.000015,    # $15.00 per 1M output tokens (prompts > 200k tokens)
-                "description": "Gemini 2.5 Pro - Large context model for prompts > 200k tokens"
-            },
-            # Gemini 2.5 Flash - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-2.5-flash",
-                "cost_per_input_token": 0.0000003,    # $0.30 per 1M input tokens (text/image/video)
-                "cost_per_output_token": 0.0000025,   # $2.50 per 1M output tokens
-                "description": "Gemini 2.5 Flash - Hybrid reasoning model with 1M token context window"
-            },
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-2.5-flash-audio",
-                "cost_per_input_token": 0.000001,     # $1.00 per 1M input tokens (audio)
-                "cost_per_output_token": 0.0000025,   # $2.50 per 1M output tokens
-                "description": "Gemini 2.5 Flash - Audio input model"
-            },
-            # Gemini 2.5 Flash-Lite - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-2.5-flash-lite",
-                "cost_per_input_token": 0.0000001,    # $0.10 per 1M input tokens (text/image/video)
-                "cost_per_output_token": 0.0000004,   # $0.40 per 1M output tokens
-                "description": "Gemini 2.5 Flash-Lite - Smallest and most cost-effective model for at-scale usage"
-            },
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-2.5-flash-lite-audio",
-                "cost_per_input_token": 0.0000003,    # $0.30 per 1M input tokens (audio)
-                "cost_per_output_token": 0.0000004,   # $0.40 per 1M output tokens
-                "description": "Gemini 2.5 Flash-Lite - Audio input model"
-            },
-            # Gemini 1.5 Flash - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-1.5-flash",
-                "cost_per_input_token": 0.000000075,  # $0.075 per 1M input tokens (prompts <= 128k tokens)
-                "cost_per_output_token": 0.0000003,   # $0.30 per 1M output tokens (prompts <= 128k tokens)
-                "description": "Gemini 1.5 Flash - Fast multimodal model with 1M token context window"
-            },
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-1.5-flash-large",
-                "cost_per_input_token": 0.00000015,   # $0.15 per 1M input tokens (prompts > 128k tokens)
-                "cost_per_output_token": 0.0000006,   # $0.60 per 1M output tokens (prompts > 128k tokens)
-                "description": "Gemini 1.5 Flash - Large context model for prompts > 128k tokens"
-            },
-            # Gemini 1.5 Flash-8B - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-1.5-flash-8b",
-                "cost_per_input_token": 0.0000000375, # $0.0375 per 1M input tokens (prompts <= 128k tokens)
-                "cost_per_output_token": 0.00000015,  # $0.15 per 1M output tokens (prompts <= 128k tokens)
-                "description": "Gemini 1.5 Flash-8B - Smallest model for lower intelligence use cases"
-            },
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-1.5-flash-8b-large",
-                "cost_per_input_token": 0.000000075,  # $0.075 per 1M input tokens (prompts > 128k tokens)
-                "cost_per_output_token": 0.0000003,   # $0.30 per 1M output tokens (prompts > 128k tokens)
-                "description": "Gemini 1.5 Flash-8B - Large context model for prompts > 128k tokens"
-            },
-            # Gemini 1.5 Pro - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-1.5-pro",
-                "cost_per_input_token": 0.00000125,   # $1.25 per 1M input tokens (prompts <= 128k tokens)
-                "cost_per_output_token": 0.000005,    # $5.00 per 1M output tokens (prompts <= 128k tokens)
-                "description": "Gemini 1.5 Pro - Highest intelligence model with 2M token context window"
-            },
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-1.5-pro-large",
-                "cost_per_input_token": 0.0000025,    # $2.50 per 1M input tokens (prompts > 128k tokens)
-                "cost_per_output_token": 0.00001,     # $10.00 per 1M output tokens (prompts > 128k tokens)
-                "description": "Gemini 1.5 Pro - Large context model for prompts > 128k tokens"
-            },
-            # Gemini Embedding - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-embedding",
-                "cost_per_input_token": 0.00000015,   # $0.15 per 1M input tokens
-                "cost_per_output_token": 0.0,         # No output tokens for embeddings
-                "description": "Gemini Embedding - Newest embeddings model with higher rate limits"
-            },
-            # Grounding with Google Search - Standard Tier
-            {
-                "provider": APIProvider.GEMINI,
-                "model_name": "gemini-grounding-search",
-                "cost_per_request": 0.035,            # $35 per 1,000 requests (after free tier)
-                "cost_per_input_token": 0.0,          # No additional token cost for grounding
-                "cost_per_output_token": 0.0,         # No additional token cost for grounding
-                "description": "Grounding with Google Search - 1,500 RPD free, then $35/1K requests"
-            },
-            # Alwrity Voice Cloning - Qwen3
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "alwrity-ai/qwen3-tts/voice-clone",
-                "cost_per_request": 0.10,
-                "cost_per_input_token": 0.00001,
-                "cost_per_output_token": 0.0,
-                "description": "Alwrity Qwen3 Voice Clone (Efficient)"
-            },
-            # Alwrity Voice Cloning - CosyVoice
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "alwrity-ai/cosyvoice/voice-clone",
-                "cost_per_request": 0.15,
-                "cost_per_input_token": 0.00001,
-                "cost_per_output_token": 0.0,
-                "description": "Alwrity CosyVoice Clone (High Fidelity)"
-            }
-        ]
-        
-        # OpenAI Pricing (estimated, will be updated)
-        openai_pricing = [
-            {
-                "provider": APIProvider.OPENAI,
-                "model_name": "gpt-4o",
-                "cost_per_input_token": 0.0000025,    # $2.50 per 1M input tokens
-                "cost_per_output_token": 0.00001,     # $10.00 per 1M output tokens
-                "description": "GPT-4o - Latest OpenAI model"
-            },
-            {
-                "provider": APIProvider.OPENAI,
-                "model_name": "gpt-4o-mini",
-                "cost_per_input_token": 0.00000015,   # $0.15 per 1M input tokens
-                "cost_per_output_token": 0.0000006,   # $0.60 per 1M output tokens
-                "description": "GPT-4o Mini - Cost-effective model"
-            }
-        ]
-        
-        # Anthropic Pricing (estimated, will be updated)
-        anthropic_pricing = [
-            {
-                "provider": APIProvider.ANTHROPIC,
-                "model_name": "claude-3.5-sonnet",
-                "cost_per_input_token": 0.000003,     # $3.00 per 1M input tokens
-                "cost_per_output_token": 0.000015,    # $15.00 per 1M output tokens
-                "description": "Claude 3.5 Sonnet - Anthropic's flagship model"
-            }
-        ]
-        
-        # HuggingFace/Mistral Pricing (for GPT-OSS-120B via Groq)
-        # Default pricing from environment variables or fallback to estimated values
-        # Based on Groq pricing: ~$1 per 1M input tokens, ~$3 per 1M output tokens
-        hf_input_cost = float(os.getenv('HUGGINGFACE_INPUT_TOKEN_COST', '0.000001'))  # $1 per 1M tokens default
-        hf_output_cost = float(os.getenv('HUGGINGFACE_OUTPUT_TOKEN_COST', '0.000003'))  # $3 per 1M tokens default
-        
-        mistral_pricing = [
-            {
-                "provider": APIProvider.MISTRAL,
-                "model_name": "openai/gpt-oss-120b:groq",
-                "cost_per_input_token": hf_input_cost,
-                "cost_per_output_token": hf_output_cost,
-                "description": f"GPT-OSS-120B via HuggingFace/Groq (configurable via HUGGINGFACE_INPUT_TOKEN_COST and HUGGINGFACE_OUTPUT_TOKEN_COST env vars)"
-            },
-            {
-                "provider": APIProvider.MISTRAL,
-                "model_name": "gpt-oss-120b",
-                "cost_per_input_token": hf_input_cost,
-                "cost_per_output_token": hf_output_cost,
-                "description": f"GPT-OSS-120B via HuggingFace/Groq (configurable via HUGGINGFACE_INPUT_TOKEN_COST and HUGGINGFACE_OUTPUT_TOKEN_COST env vars)"
-            },
-            {
-                "provider": APIProvider.MISTRAL,
-                "model_name": "default",
-                "cost_per_input_token": hf_input_cost,
-                "cost_per_output_token": hf_output_cost,
-                "description": f"HuggingFace default model pricing (configurable via HUGGINGFACE_INPUT_TOKEN_COST and HUGGINGFACE_OUTPUT_TOKEN_COST env vars)"
-            }
-        ]
-        
-        # Search API Pricing (estimated)
-        search_pricing = [
-            {
-                "provider": APIProvider.TAVILY,
-                "model_name": "tavily-search",
-                "cost_per_request": 0.001,  # $0.001 per search
-                "description": "Tavily AI Search API"
-            },
-            {
-                "provider": APIProvider.SERPER,
-                "model_name": "serper-search",
-                "cost_per_request": 0.001,  # $0.001 per search
-                "description": "Serper Google Search API"
-            },
-            {
-                "provider": APIProvider.METAPHOR,
-                "model_name": "metaphor-search",
-                "cost_per_request": 0.003,  # $0.003 per search
-                "description": "Metaphor/Exa AI Search API"
-            },
-            {
-                "provider": APIProvider.FIRECRAWL,
-                "model_name": "firecrawl-extract",
-                "cost_per_page": 0.002,  # $0.002 per page crawled
-                "description": "Firecrawl Web Extraction API"
-            },
-            {
-                "provider": APIProvider.STABILITY,
-                "model_name": "stable-diffusion",
-                "cost_per_image": 0.04,  # $0.04 per image
-                "description": "Stability AI Image Generation"
-            },
-            # WaveSpeed OSS Image Generation Models
-            {
-                "provider": APIProvider.STABILITY,  # Using STABILITY provider for image generation
-                "model_name": "qwen-image",
-                "cost_per_image": 0.03,  # $0.03 per image (OSS model via WaveSpeed)
-                "cost_per_request": 0.03,  # Also support cost_per_request
-                "description": "WaveSpeed Qwen Image (OSS) - Fast generation, cost-effective"
-            },
-            {
-                "provider": APIProvider.STABILITY,
-                "model_name": "ideogram-v3-turbo",
-                "cost_per_image": 0.05,  # $0.05 per image (OSS model via WaveSpeed)
-                "cost_per_request": 0.05,  # Also support cost_per_request
-                "description": "WaveSpeed Ideogram V3 Turbo (OSS) - Photorealistic, text rendering"
-            },
-            # WaveSpeed OSS Image Editing Models
-            {
-                "provider": APIProvider.IMAGE_EDIT,
-                "model_name": "qwen-edit",
-                "cost_per_request": 0.02,  # $0.02 per edit (OSS model via WaveSpeed)
-                "description": "WaveSpeed Qwen Image Edit (OSS) - Budget editing, bilingual"
-            },
-            {
-                "provider": APIProvider.IMAGE_EDIT,
-                "model_name": "qwen-edit-plus",
-                "cost_per_request": 0.02,  # $0.02 per edit (OSS model via WaveSpeed)
-                "description": "WaveSpeed Qwen Image Edit Plus (OSS) - Multi-image editing"
-            },
-            {
-                "provider": APIProvider.IMAGE_EDIT,
-                "model_name": "flux-kontext-pro",
-                "cost_per_request": 0.04,  # $0.04 per edit (OSS model via WaveSpeed)
-                "description": "WaveSpeed FLUX Kontext Pro (OSS) - Professional editing, typography"
-            },
-            {
-                "provider": APIProvider.EXA,
-                "model_name": "exa-search",
-                "cost_per_request": 0.005,  # $0.005 per search (1-25 results)
-                "description": "Exa Neural Search API"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "tencent/HunyuanVideo",
-                "cost_per_request": 0.10,  # $0.10 per video generation (estimated)
-                "description": "HuggingFace AI Video Generation (HunyuanVideo)"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "default",
-                "cost_per_request": 0.25,  # UPDATED: Default to WAN 2.5 OSS model ($0.25)
-                "description": "AI Video Generation default pricing (OSS: WAN 2.5)"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "kling-v2.5-turbo-std-5s",
-                "cost_per_request": 0.21,
-                "description": "WaveSpeed Kling v2.5 Turbo Std Image-to-Video (5 seconds)"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "kling-v2.5-turbo-std-10s",
-                "cost_per_request": 0.42,
-                "description": "WaveSpeed Kling v2.5 Turbo Std Image-to-Video (10 seconds)"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "wavespeed-ai/infinitetalk",
-                "cost_per_request": 0.30,
-                "description": "WaveSpeed InfiniteTalk (image + audio to talking avatar video)"
-            },
-            # WaveSpeed OSS Video Generation Models
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "wan-2.5",
-                "cost_per_request": 0.25,  # $0.25 per video (~5 seconds, OSS model via WaveSpeed)
-                "description": "WaveSpeed WAN 2.5 (OSS) - Text-to-Video, Image-to-Video, cost-effective"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "alibaba/wan-2.5",
-                "cost_per_request": 0.25,  # $0.25 per video (~5 seconds, OSS model via WaveSpeed)
-                "description": "WaveSpeed WAN 2.5 (OSS) - Alternative path, same model"
-            },
-            {
-                "provider": APIProvider.VIDEO,
-                "model_name": "seedance-1.5-pro",
-                "cost_per_request": 0.40,  # $0.40 per video (~5 seconds, OSS model via WaveSpeed)
-                "description": "WaveSpeed Seedance 1.5 Pro (OSS) - Longer duration videos (10-30 sec)"
-            },
-            # Audio Generation Pricing (Minimax Speech 02 HD via WaveSpeed)
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "minimax/speech-02-hd",
-                "cost_per_input_token": 0.00005,  # $0.05 per 1,000 characters (every character is 1 token)
-                "cost_per_output_token": 0.0,  # No output tokens for audio
-                "cost_per_request": 0.0,  # Pricing is per character, not per request
-                "description": "AI Audio Generation (Text-to-Speech) - Minimax Speech 02 HD via WaveSpeed"
-            },
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "minimax/voice-clone",
-                "cost_per_request": 0.50,
-                "cost_per_input_token": 0.0,
-                "cost_per_output_token": 0.0,
-                "description": "MiniMax Voice Clone via WaveSpeed (per run pricing)"
-            },
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "wavespeed-ai/qwen3-tts/voice-clone",
-                "cost_per_request": 0.005,
-                "cost_per_input_token": 0.00005,
-                "cost_per_output_token": 0.0,
-                "description": "Qwen3-TTS Voice Clone via WaveSpeed (cost depends on text length)"
-            },
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "wavespeed-ai/cosyvoice-tts/voice-clone",
-                "cost_per_request": 0.005,
-                "cost_per_input_token": 0.00005,
-                "cost_per_output_token": 0.0,
-                "description": "CosyVoice-TTS Voice Clone via WaveSpeed (cost depends on text length)"
-            },
-            {
-                "provider": APIProvider.AUDIO,
-                "model_name": "default",
-                "cost_per_input_token": 0.00005,  # $0.05 per 1,000 characters default
-                "cost_per_output_token": 0.0,
-                "cost_per_request": 0.0,
-                "description": "AI Audio Generation default pricing"
-            }
-        ]
+        """Initialize default pricing for all API providers from pricing.yaml SSOT."""
+        loader = PricingConfigLoader()
+        config = loader.load()
 
-        # WaveSpeed LLM Text Generation Pricing (via Cerebras)
-        wavespeed_llm_pricing = [
-            {
-                "provider": APIProvider.WAVESPEED,
-                "model_name": "openai/gpt-oss-120b",
-                "cost_per_input_token": 0.0000006,   # $0.60 per 1M input tokens
-                "cost_per_output_token": 0.0000006,  # $0.60 per 1M output tokens
-                "description": "WaveSpeed GPT-OSS 120B (Cerebras) - Fast text generation"
-            },
-            {
-                "provider": APIProvider.WAVESPEED,
-                "model_name": "openai/gpt-oss-120b:cerebras",
-                "cost_per_input_token": 0.0000006,
-                "cost_per_output_token": 0.0000006,
-                "description": "WaveSpeed GPT-OSS 120B (Cerebras) - Fast text generation"
-            },
-            {
-                "provider": APIProvider.WAVESPEED,
-                "model_name": "openai/gpt-oss-20b",
-                "cost_per_input_token": 0.0000002,   # $0.20 per 1M input tokens
-                "cost_per_output_token": 0.0000002,  # $0.20 per 1M output tokens
-                "description": "WaveSpeed GPT-OSS 20B (Cerebras) - Cost-effective text generation"
-            },
-        ]
-        
-        # Combine all pricing data (include video pricing in search_pricing list)
-        all_pricing = gemini_pricing + openai_pricing + anthropic_pricing + mistral_pricing + search_pricing + wavespeed_llm_pricing
-        
-        # Insert or update pricing data
-        for pricing_data in all_pricing:
+        all_pricing = config.model_pricing
+
+        for mp_entry in all_pricing:
+            pricing_dict = {
+                "provider": mp_entry.provider,
+                "model_name": mp_entry.model_name,
+                "cost_per_input_token": mp_entry.cost_per_input_token,
+                "cost_per_output_token": mp_entry.cost_per_output_token,
+                "cost_per_request": mp_entry.cost_per_request,
+                "cost_per_image": mp_entry.cost_per_image,
+                "cost_per_page": mp_entry.cost_per_page,
+                "cost_per_search": mp_entry.cost_per_search,
+                "description": mp_entry.description,
+            }
+
             existing = self.db.query(APIProviderPricing).filter(
-                APIProviderPricing.provider == pricing_data["provider"],
-                APIProviderPricing.model_name == pricing_data["model_name"]
+                APIProviderPricing.provider == pricing_dict["provider"],
+                APIProviderPricing.model_name == pricing_dict["model_name"]
             ).first()
-            
+
             if existing:
-                # Update existing pricing (especially for HuggingFace if env vars changed)
-                if pricing_data["provider"] in [APIProvider.MISTRAL, APIProvider.AUDIO]:
-                    # Update pricing
-                    existing.cost_per_request = pricing_data.get("cost_per_request", 0.0)
-                    existing.cost_per_input_token = pricing_data["cost_per_input_token"]
-                    existing.cost_per_output_token = pricing_data["cost_per_output_token"]
-                    existing.description = pricing_data["description"]
-                    existing.updated_at = datetime.utcnow()
-                    logger.debug(f"Updated pricing for {pricing_data['provider'].value}:{pricing_data['model_name']}")
+                existing.cost_per_input_token = pricing_dict["cost_per_input_token"]
+                existing.cost_per_output_token = pricing_dict["cost_per_output_token"]
+                existing.description = pricing_dict["description"]
+                existing.updated_at = datetime.utcnow()
+                if pricing_dict["provider"] in [APIProvider.MISTRAL, APIProvider.HUGGINGFACE, APIProvider.AUDIO]:
+                    existing.cost_per_request = pricing_dict.get("cost_per_request", 0.0)
+                logger.debug(f"Updated pricing for {pricing_dict['provider'].value}:{pricing_dict['model_name']}")
             else:
-                pricing = APIProviderPricing(**pricing_data)
+                pricing = APIProviderPricing(**pricing_dict)
                 self.db.add(pricing)
-                logger.debug(f"Added new pricing for {pricing_data['provider'].value}:{pricing_data['model_name']}")
-        
+                logger.debug(f"Added new pricing for {pricing_dict['provider'].value}:{pricing_dict['model_name']}")
+
         self.db.commit()
-        
-        # Debug: count pricing rows seeded
+
         total_rows = self.db.query(APIProviderPricing).count()
         providers = self.db.query(APIProviderPricing.provider).distinct().all()
         provider_list = sorted([p[0].value for p in providers]) if providers else []
         logger.info(f"[PRICING_INIT] Default API pricing initialized: {len(all_pricing)} rows configured, {total_rows} rows in DB, providers: {provider_list}")
-        
-        # Warning-level log that will be visible
         logger.warning(f"[PRICING_INIT] Pricing ready: {total_rows} rows for {len(provider_list)} providers")
-        logger.warning("Default API pricing initialized/updated. HuggingFace pricing loaded from env vars if available.")
-    
+
     def initialize_default_plans(self):
-        """Initialize default subscription plans."""
-        
-        plans = [
-            {
-                "name": "Free",
-                "tier": SubscriptionTier.FREE,
-                "price_monthly": 0.0,
-                "price_yearly": 0.0,
-                "ai_text_generation_calls_limit": 50,  # Explicit: Free gets 50 AI text calls (via Gemini fallback)
-                "gemini_calls_limit": 50,
-                "openai_calls_limit": 0,  # DISABLED: OpenAI access not included in Free tier
-                "anthropic_calls_limit": 0,  # DISABLED: Anthropic access not included in Free tier
-                "mistral_calls_limit": 0,  # DISABLED: HuggingFace not in Free tier
-                "tavily_calls_limit": 10,
-                "serper_calls_limit": 10,
-                "metaphor_calls_limit": 0,  # DISABLED: Metaphor not in Free tier
-                "firecrawl_calls_limit": 0,  # DISABLED: Firecrawl not in Free tier
-                "stability_calls_limit": 10,  # 10 images - enough for 2 podcasts (5 images each)
-                "exa_calls_limit": 10,  # 10 research queries - enough to try the product
-                "video_calls_limit": 2,  # 2 video renders - try podcast video on Free
-                "image_edit_calls_limit": 5,  # 5 image edits - enough to try the product
-                "audio_calls_limit": 10,  # 10 audio clips - enough for 2 podcasts (5 clips each)
-                "wavespeed_calls_limit": 0,  # 0 = unlimited for Free; video controlled via video_calls_limit
-                "gemini_tokens_limit": 50000,
-                "openai_tokens_limit": 0,  # DISABLED
-                "anthropic_tokens_limit": 0,  # DISABLED
-                "mistral_tokens_limit": 0,  # DISABLED
-                "monthly_cost_limit": 2.0,  # $2 cap - prevents runaway costs on free tier
-                "features": ["basic_content_generation", "limited_research"],
-                "description": "Perfect for trying out ALwrity"
-            },
-            {
-                "name": "Basic",
-                "tier": SubscriptionTier.BASIC,
-                "price_monthly": 29.0,
-                "price_yearly": 290.0,
-                "ai_text_generation_calls_limit": 500,  # Unified limit for all LLM providers
-                "gemini_calls_limit": 1000,  # Legacy, kept for backwards compatibility (not used for enforcement)
-                "openai_calls_limit": 500,
-                "anthropic_calls_limit": 200,
-                "mistral_calls_limit": 500,
-                "tavily_calls_limit": 200,
-                "serper_calls_limit": 200,
-                "metaphor_calls_limit": 100,
-                "firecrawl_calls_limit": 100,
-                "stability_calls_limit": 25,  # 25 images - good for podcast episode covers
-                "exa_calls_limit": 100,  # 100 research queries
-                "video_calls_limit": 10,  # 10 videos - enough for a few podcast episodes
-                "image_edit_calls_limit": 25,  # 25 AI image edits
-                "audio_calls_limit": 100,  # INCREASED: 100 AI audio generation calls/month (Minimax Speech OSS)
-                "wavespeed_calls_limit": 200,  # WaveSpeed combined limit: TTS + video + image + LLM (Minimax Speech $0.002/min, Qwen $0.03/img, Kling $0.25/5s)
-                "gemini_tokens_limit": 100000,  # INCREASED: 100K tokens per provider (OSS-focused strategy)
-                "openai_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
-                "anthropic_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
-                "mistral_tokens_limit": 100000,  # INCREASED: 100K tokens per provider
-                "monthly_cost_limit": 25.0,  # $25 cap - podcast-focused pricing
-                "features": ["full_content_generation", "advanced_research", "basic_analytics", "all_tools_access", "oss_models_priority"],
-                "description": "Perfect for individuals and small teams. Access all ALwrity features with generous limits powered by OSS AI models."
-            },
-            {
-                "name": "Pro",
-                "tier": SubscriptionTier.PRO,
-                "price_monthly": 79.0,
-                "price_yearly": 790.0,
-                "ai_text_generation_calls_limit": 3000,  # Explicit: Pro gets 3000 AI text calls
-                "gemini_calls_limit": 5000,
-                "openai_calls_limit": 2500,
-                "anthropic_calls_limit": 1000,
-                "mistral_calls_limit": 2500,
-                "tavily_calls_limit": 1000,
-                "serper_calls_limit": 1000,
-                "metaphor_calls_limit": 500,
-                "firecrawl_calls_limit": 500,
-                "stability_calls_limit": 100,  # 100 images - good for regular podcasts
-                "exa_calls_limit": 500,  # 500 research queries
-                "video_calls_limit": 30,  # 30 videos - enough for daily episodes
-                "image_edit_calls_limit": 100,  # 100 AI image edits
-                "audio_calls_limit": 100,  # 100 audio clips - podcast-focused
-                "wavespeed_calls_limit": 500,  # WaveSpeed combined limit: TTS + video + image + LLM
-                "gemini_tokens_limit": 5000000,
-                "openai_tokens_limit": 2500000,
-                "anthropic_tokens_limit": 1000000,
-                "mistral_tokens_limit": 2500000,
-                "monthly_cost_limit": 100.0,  # $100 cap - podcast-focused
-                "features": ["unlimited_content_generation", "premium_research", "advanced_analytics", "priority_support"],
-                "description": "Perfect for growing businesses"
-            },
-            {
-                "name": "Enterprise",
-                "tier": SubscriptionTier.ENTERPRISE,
-                "price_monthly": 199.0,
-                "price_yearly": 1990.0,
-                "ai_text_generation_calls_limit": 0,  # Unlimited
-                "gemini_calls_limit": 0,  # Unlimited
-                "openai_calls_limit": 0,
-                "anthropic_calls_limit": 0,
-                "mistral_calls_limit": 0,
-                "tavily_calls_limit": 0,
-                "serper_calls_limit": 0,
-                "metaphor_calls_limit": 0,
-                "firecrawl_calls_limit": 0,
-                "stability_calls_limit": 0,
-                "exa_calls_limit": 0,  # Unlimited
-                "video_calls_limit": 0,  # Unlimited for enterprise
-                "image_edit_calls_limit": 0,  # Unlimited image editing for enterprise
-                "audio_calls_limit": 0,  # Unlimited audio generation for enterprise
-                "wavespeed_calls_limit": 0,  # Unlimited for enterprise
-                "gemini_tokens_limit": 0,
-                "openai_tokens_limit": 0,
-                "anthropic_tokens_limit": 0,
-                "mistral_tokens_limit": 0,
-                "monthly_cost_limit": 500.0,
-                "features": ["unlimited_everything", "white_label", "dedicated_support", "custom_integrations"],
-                "description": "For large organizations with high-volume needs"
+        """Initialize default subscription plans from pricing.yaml SSOT."""
+        loader = PricingConfigLoader()
+        config = loader.load()
+
+        for plan_entry in config.plans:
+            plan_data = {
+                "name": plan_entry.name,
+                "tier": plan_entry.tier,
+                "price_monthly": plan_entry.price_monthly,
+                "price_yearly": plan_entry.price_yearly,
+                "monthly_cost_limit": plan_entry.monthly_cost_limit,
+                "features": plan_entry.features,
+                "description": plan_entry.description,
             }
-        ]
-        
-        for plan_data in plans:
+
+            for limit_key, limit_val in plan_entry.limits.items():
+                plan_data[limit_key] = limit_val
+
             existing = self.db.query(SubscriptionPlan).filter(
                 SubscriptionPlan.name == plan_data["name"]
             ).first()
-            
+
             if not existing:
                 plan = SubscriptionPlan(**plan_data)
                 self.db.add(plan)
             else:
-                # Update existing plan with new limits (e.g., image_edit_calls_limit)
-                # This ensures existing plans get new columns like image_edit_calls_limit
                 for key, value in plan_data.items():
-                    if key not in ["name", "tier"]:  # Don't overwrite name/tier
+                    if key not in ["name", "tier"]:
                         try:
-                            # Try to set the attribute (works even if column was just added)
                             setattr(existing, key, value)
                         except (AttributeError, Exception) as e:
-                            # If attribute doesn't exist yet (column not migrated), skip it
-                            # Schema migration will add it, then this will update it on next run
                             logger.debug(f"Could not set {key} on plan {existing.name}: {e}")
                 existing.updated_at = datetime.utcnow()
                 logger.debug(f"Updated existing plan: {existing.name}")
-        
+
         self.db.commit()
-        logger.debug("Default subscription plans initialized")
-    
+        logger.info("[PLANS_INIT] Default subscription plans initialized from pricing.yaml")
+
     def calculate_api_cost(self, provider: APIProvider, model_name: str, 
                           tokens_input: int = 0, tokens_output: int = 0, 
                           request_count: int = 1, **kwargs) -> Dict[str, float]:
