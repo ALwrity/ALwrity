@@ -39,14 +39,6 @@ openai>=1.3.0
 google-genai>=1.0.0
 exa-py==1.9.1
 
-# Text processing
-markdown>=3.5.0
-beautifulsoup4>=4.12.0
-
-# Data processing
-numpy>=1.24.0
-pandas>=2.0.0
-
 # Image processing - needed for LinkedIn image generation/editing
 Pillow>=10.0.0
 huggingface_hub>=1.1.4
@@ -54,25 +46,8 @@ huggingface_hub>=1.1.4
 # PDF carousel rendering for LinkedIn
 reportlab==4.5.1
 
-# Testing
-pytest>=7.4.0
-pytest-asyncio>=0.21.0
-
-# Task scheduling - needed for content calendar
-apscheduler>=3.10.0
-
 # Utilities
-redis>=5.0.0
-schedule>=1.2.0
 aiofiles>=23.2.0
 psutil>=5.9.0
-
-# Google APIs
-google-api-python-client>=2.100.0
-google-auth>=2.23.0
-google-auth-oauthlib>=1.0.0
-
-# Other utilities
 python-dateutil>=2.8.0
-jinja2>=3.1.0
 pydantic-settings>=2.0.0

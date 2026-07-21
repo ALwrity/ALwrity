@@ -30,9 +30,6 @@ class BootstrapResult:
     details: Optional[str] = None
 
 
-LINGUISTIC_REQUIRED_FEATURES = {"content_planning", "strategy_copilot", "facebook", "linkedin", "blog_writer", "persona"}
-
-
 def get_enabled_features() -> set:
     """Get enabled features from ALWRITY_ENABLED_FEATURES env var.
     
@@ -51,27 +48,9 @@ def get_enabled_features() -> set:
 
 def should_bootstrap_linguistic_models() -> bool:
     """Decide whether to bootstrap linguistic models based on enabled features."""
-    enabled_features = get_enabled_features()
-    verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
-    
-    if "all" in enabled_features:
-        return True
-    
-    # Podcast-only mode doesn't need linguistic models
-    if enabled_features == {"podcast"}:
-        return False
-    
-    # Map old profile names to features for backwards compatibility
-    feature_mapping = {
-        "podcast": "podcast",
-        "youtube": "youtube",
-        "planning": "content-planning",
-        "default": "all"
-    }
-    
-    # Check if any linguistic-required feature is enabled
-    linguistic_features = {"content_planning", "facebook", "linkedin", "blog_writer", "persona"}
-    return bool(enabled_features & linguistic_features)
+    from alwrity_utils.linkedin_lean_mode import should_bootstrap_linguistic_models as _should_bootstrap
+
+    return _should_bootstrap(get_enabled_features())
 
 
 def should_bootstrap_local_llm_models() -> bool:
@@ -483,7 +462,10 @@ def main():
         return False
     
     # Initialize modular components
-    dependency_manager = DependencyManager()
+    from alwrity_utils.linkedin_lean_mode import get_requirements_file_for_features
+
+    requirements_file = get_requirements_file_for_features(get_enabled_features())
+    dependency_manager = DependencyManager(requirements_file)
     environment_setup = EnvironmentSetup(production_mode=production_mode)
     database_setup = DatabaseSetup(production_mode=production_mode)
     production_optimizer = ProductionOptimizer()

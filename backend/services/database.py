@@ -764,14 +764,17 @@ def init_user_database(user_id: str):
         LinkedInCommentAssistantCacheBase.metadata.create_all(bind=engine)
         _ensure_daily_workflow_schema(engine, user_id)
         _ensure_task_history_unique_index(engine, user_id)
-        # Phase 3.4: ensure the SIF indexing watermark table exists.
-        _ensure_sif_indexing_watermark_table(engine, user_id)
-        # Phase 5: ensure the semantic health checks table exists.
-        # Replaces the JSON-file cadence tracker in check_cycle_handler.
-        _ensure_semantic_health_checks_table(engine, user_id)
-        # Phase 5: ensure the per-cycle monitoring snapshot table exists.
-        # Provides durable history for the dashboard across restarts.
-        _ensure_semantic_monitoring_snapshots_table(engine, user_id)
+        from alwrity_utils.linkedin_lean_mode import should_run_sif_schema_ensures
+
+        if should_run_sif_schema_ensures():
+            # Phase 3.4: ensure the SIF indexing watermark table exists.
+            _ensure_sif_indexing_watermark_table(engine, user_id)
+            # Phase 5: ensure the semantic health checks table exists.
+            # Replaces the JSON-file cadence tracker in check_cycle_handler.
+            _ensure_semantic_health_checks_table(engine, user_id)
+            # Phase 5: ensure the per-cycle monitoring snapshot table exists.
+            # Provides durable history for the dashboard across restarts.
+            _ensure_semantic_monitoring_snapshots_table(engine, user_id)
         
         # Initialize default data for new databases
         try:
