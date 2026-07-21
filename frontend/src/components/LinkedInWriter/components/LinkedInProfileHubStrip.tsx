@@ -99,7 +99,10 @@ export const LinkedInProfileHubStrip: React.FC<LinkedInProfileHubStripProps> = (
           )
         ) : (
           <LinkedInIcon
-            sx={{ color: '#0A66C2', fontSize: inlineInsideButton ? 32 : isInline ? 40 : 28 }}
+            sx={{
+              color: '#0A66C2',
+              fontSize: inlineInsideButton ? 18 : isInline ? 40 : 28,
+            }}
           />
         )}
       </div>
@@ -159,6 +162,22 @@ export const LinkedInProfileHubStrip: React.FC<LinkedInProfileHubStripProps> = (
       : isConnecting
         ? 'Connecting…'
         : 'Connect';
+
+    if (inlineCombo && !connected) {
+      return (
+        <button
+          type="button"
+          className="linkedin-profile-hub-strip-btn linkedin-profile-hub-strip-btn--connect linkedin-profile-hub-strip-btn--inline-header"
+          onClick={onConnect}
+          disabled={isConnecting || !onConnect}
+          data-tour="li-connect-action"
+          aria-label={isConnecting ? 'Connecting account' : 'Connect account'}
+          {...swipeHandlers}
+        >
+          {label}
+        </button>
+      );
+    }
 
     if (inlineCombo) {
       return (

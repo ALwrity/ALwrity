@@ -9,12 +9,14 @@ import {
 } from './knowledgeCenterFeatures';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import type { KnowledgeCenterAction } from './KnowledgeCenterDock';
+import { ConnectLockBadge } from './ConnectLockIcon';
 import { DashboardActionModal } from './DashboardActionModal';
 import { STUDIO_TAB_ACTION_MODAL_CLASS } from './dashboardLayoutConstants';
 
 interface DashboardMobileAnalyticsSectionProps {
   onViewAnalytics: () => void;
   onKnowledgeCenterAction: (action: KnowledgeCenterAction) => void;
+  connected?: boolean;
 }
 
 interface MobileBottomIconActionProps {
@@ -23,6 +25,7 @@ interface MobileBottomIconActionProps {
   ariaExpanded?: boolean;
   onClick: () => void;
   tourTarget?: string;
+  connectLocked?: boolean;
   children: React.ReactNode;
 }
 
@@ -32,21 +35,29 @@ const MobileBottomIconAction: React.FC<MobileBottomIconActionProps> = ({
   ariaExpanded,
   onClick,
   tourTarget,
+  connectLocked = false,
   children,
 }) => (
   <button
     type="button"
-    className="linkedin-mobile-analytics-icon-btn"
+    className={[
+      'linkedin-mobile-analytics-icon-btn',
+      connectLocked && 'linkedin-studio-connect-locked',
+      connectLocked && 'linkedin-studio-connect-locked--lock-right',
+    ]
+      .filter(Boolean)
+      .join(' ')}
     data-tour={tourTarget}
     onClick={onClick}
     aria-label={ariaLabel}
     aria-expanded={ariaExpanded}
-    title={label}
+    title={connectLocked ? undefined : label}
   >
     <span className="linkedin-mobile-analytics-icon-btn-circle" aria-hidden>
       {children}
     </span>
     <span className="linkedin-mobile-analytics-icon-btn-label">{label}</span>
+    {connectLocked && <ConnectLockBadge size={10} className="linkedin-mobile-analytics-icon-btn__lock" />}
   </button>
 );
 
@@ -57,6 +68,7 @@ const MobileBottomIconAction: React.FC<MobileBottomIconActionProps> = ({
 export const DashboardMobileAnalyticsSection: React.FC<DashboardMobileAnalyticsSectionProps> = ({
   onViewAnalytics,
   onKnowledgeCenterAction,
+  connected = true,
 }) => {
   const navigate = useNavigate();
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
@@ -82,6 +94,7 @@ export const DashboardMobileAnalyticsSection: React.FC<DashboardMobileAnalyticsS
             label="Analytics"
             ariaLabel="View post analytics"
             onClick={onViewAnalytics}
+            connectLocked={!connected}
             tourTarget="li-mobile-analytics-icon"
           >
             <AnalyticsIcon fontSize="medium" />
