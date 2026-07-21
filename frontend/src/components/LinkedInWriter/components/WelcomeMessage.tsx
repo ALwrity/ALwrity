@@ -27,6 +27,7 @@ import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal
 import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
 import { TodayGrowthWalkthrough } from './dashboard/TodayGrowthWalkthrough';
 import { ResumeDraftRailChip } from './dashboard/ResumeDraftRailChip';
+import { OptimiseProfileRailChip } from './dashboard/OptimiseProfileRailChip';
 import { useMobileHeaderNav } from '../hooks/useMobileHeaderNav';
 import { useMobileVisualViewportInset } from '../hooks/useMobileVisualViewportInset';
 import { MOBILE_STUDIO_MAX_WIDTH_PX } from './dashboard/dashboardLayoutConstants';
@@ -396,6 +397,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
               onResumeDraft={onResumeDraft}
               onClear={onClear}
             />
+            <OptimiseProfileRailChip variant="main" />
             {desktopViewport && !isSocialLoading && (
               <DashboardMobileStudioContextNudge
                 variant="desktop"

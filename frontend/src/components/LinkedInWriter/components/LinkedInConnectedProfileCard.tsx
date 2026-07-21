@@ -5,6 +5,38 @@ import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal
 import { ProfileStrengthTicker } from './dashboard/ProfileStrengthTicker';
 import { buildAvatarProxyUrl } from '../../../api/linkedinSocial';
 
+interface ProfileOptimiseHoverHintProps {
+  children: React.ReactNode;
+  profileStrengthPercent?: number | null;
+  strengthLabel?: string;
+  strengthTooltip?: string;
+  showPopover?: boolean;
+}
+
+/** Local hover wrapper — kept in-file to avoid circular init with ProfileSetupPanel. */
+const ProfileOptimiseHoverHint: React.FC<ProfileOptimiseHoverHintProps> = ({
+  children,
+  profileStrengthPercent = null,
+  strengthLabel = '',
+  strengthTooltip = '',
+  showPopover = true,
+}) => (
+  <div className="linkedin-profile-optimise-hover-wrap">
+    {children}
+    {showPopover && profileStrengthPercent != null && (
+      <div className="linkedin-profile-optimise-hover-tracker" role="tooltip">
+        <p className="linkedin-profile-optimise-hover-title">LinkedIn Profile</p>
+        <ProfileStrengthTicker
+          percent={profileStrengthPercent}
+          strengthLabel={strengthLabel}
+          strengthTooltip={strengthTooltip}
+          variant="popover"
+        />
+      </div>
+    )}
+  </div>
+);
+
 interface LinkedInConnectedProfileCardProps {
   displayName: string;
   avatarUrl?: string | null;
@@ -92,7 +124,12 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
           }}
         >
           {onOptimiseProfile && (
-            <div className="linkedin-profile-optimise-hover-wrap">
+            <ProfileOptimiseHoverHint
+              profileStrengthPercent={profileStrengthPercent}
+              strengthLabel={strengthLabel}
+              strengthTooltip={strengthTooltip}
+              showPopover={!isOptimiseLoading && profileStrengthPercent != null}
+            >
               <button
                 type="button"
                 className="linkedin-profile-optimise-btn"
@@ -101,30 +138,15 @@ export const LinkedInConnectedProfileCard: React.FC<LinkedInConnectedProfileCard
                 title={
                   isOptimiseLoading
                     ? 'Optimising profile...'
-                    : strengthTooltip || 'Optimise profile based on LinkedIn best practices'
+                    : 'LinkedIn Profile — Optimise your profile'
                 }
-                aria-label={isOptimiseLoading ? 'Optimising profile' : 'Optimise profile'}
-                aria-describedby={
-                  profileStrengthPercent != null ? 'linkedin-profile-strength-hover-tracker' : undefined
+                aria-label={
+                  isOptimiseLoading ? 'Optimising profile' : 'LinkedIn Profile — Optimise profile'
                 }
               >
                 {isOptimiseLoading ? '…' : '✦'}
               </button>
-              {profileStrengthPercent != null && (
-                <div
-                  id="linkedin-profile-strength-hover-tracker"
-                  className="linkedin-profile-optimise-hover-tracker"
-                  role="tooltip"
-                >
-                  <ProfileStrengthTicker
-                    percent={profileStrengthPercent}
-                    strengthLabel={strengthLabel}
-                    strengthTooltip={strengthTooltip}
-                    variant="popover"
-                  />
-                </div>
-              )}
-            </div>
+            </ProfileOptimiseHoverHint>
           )}
           <div
             className="linkedin-profile-avatar-wrap linkedin-profile-connected"

@@ -159,8 +159,8 @@ class TestLinkedInOAuthServiceMigration:
     access/refresh tokens in a single pass.
     """
 
-    def test_migration_handles_three_columns(self, patch_user_db_path, monkeypatch):
-        """Plaintext rows for all 3 columns get re-encrypted in one pass."""
+    def test_migration_handles_two_columns(self, patch_user_db_path, monkeypatch):
+        """Plaintext rows for access and refresh tokens get re-encrypted in one pass."""
         from cryptography.fernet import Fernet
         valid = Fernet.generate_key().decode("utf-8")
         monkeypatch.setenv("LINKEDIN_TOKEN_ENCRYPTION_KEY", valid)
@@ -174,10 +174,10 @@ class TestLinkedInOAuthServiceMigration:
                     """
                     INSERT INTO linkedin_oauth_tokens (
                         user_id, provider_mode,
-                        zernio_api_key, linkedin_access_token, linkedin_refresh_token
-                    ) VALUES (?, 'zernio', ?, ?, ?)
+                        linkedin_access_token, linkedin_refresh_token
+                    ) VALUES (?, 'unipile', ?, ?)
                     """,
-                    (ctx.user_id, "zernio-plaintext", "access-plaintext", "refresh-plaintext"),
+                    (ctx.user_id, "access-plaintext", "refresh-plaintext"),
                 )
                 conn.commit()
 
@@ -189,15 +189,14 @@ class TestLinkedInOAuthServiceMigration:
                 conn.commit()
                 row = conn.execute(
                     """
-                    SELECT zernio_api_key, linkedin_access_token, linkedin_refresh_token
+                    SELECT linkedin_access_token, linkedin_refresh_token
                     FROM linkedin_oauth_tokens WHERE user_id = ?
                     """,
                     (ctx.user_id,),
                 ).fetchone()
 
-        zernio, access, refresh = row
-        # All three should now be Fernet-encrypted blobs (start with gAAAAA).
-        assert zernio.startswith("gAAAAA"), f"zernio not encrypted: {zernio[:20]}"
+        access, refresh = row
+        # Both should now be Fernet-encrypted blobs (start with gAAAAA).
         assert access.startswith("gAAAAA"), f"access not encrypted: {access[:20]}"
         assert refresh.startswith("gAAAAA"), f"refresh not encrypted: {refresh[:20]}"
 
@@ -212,7 +211,6 @@ class TestLinkedInOAuthServiceMigration:
 
         # Pre-encrypt the tokens with the same key the service will use.
         fernet = Fernet(valid.encode("utf-8"))
-        encrypted_zernio = fernet.encrypt(b"already-encrypted").decode("utf-8")
         encrypted_access = fernet.encrypt(b"already-encrypted").decode("utf-8")
         encrypted_refresh = fernet.encrypt(b"already-encrypted").decode("utf-8")
 
@@ -222,10 +220,10 @@ class TestLinkedInOAuthServiceMigration:
                     """
                     INSERT INTO linkedin_oauth_tokens (
                         user_id, provider_mode,
-                        zernio_api_key, linkedin_access_token, linkedin_refresh_token
-                    ) VALUES (?, 'zernio', ?, ?, ?)
+                        linkedin_access_token, linkedin_refresh_token
+                    ) VALUES (?, 'unipile', ?, ?)
                     """,
-                    (ctx.user_id, encrypted_zernio, encrypted_access, encrypted_refresh),
+                    (ctx.user_id, encrypted_access, encrypted_refresh),
                 )
                 conn.commit()
 
@@ -235,15 +233,14 @@ class TestLinkedInOAuthServiceMigration:
                 svc._migrate_plaintext_tokens_if_needed(conn, ctx.user_id)
                 row = conn.execute(
                     """
-                    SELECT zernio_api_key, linkedin_access_token, linkedin_refresh_token
+                    SELECT linkedin_access_token, linkedin_refresh_token
                     FROM linkedin_oauth_tokens WHERE user_id = ?
                     """,
                     (ctx.user_id,),
                 ).fetchone()
 
         # Values must be unchanged (still decryptable to the same plaintext).
-        zernio, access, refresh = row
-        assert fernet.decrypt(zernio.encode("utf-8")) == b"already-encrypted"
+        access, refresh = row
         assert fernet.decrypt(access.encode("utf-8")) == b"already-encrypted"
         assert fernet.decrypt(refresh.encode("utf-8")) == b"already-encrypted"
 

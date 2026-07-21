@@ -13,6 +13,8 @@ interface SectionScoresPanelProps {
   scores: Record<string, number>;
   activeSectionKeys?: Set<string> | null;
   activeSectionCount?: Map<string, number> | null;
+  /** panel = table rows; chips = horizontal compact chips (Phase 2). */
+  variant?: 'panel' | 'chips';
 }
 
 const SECTION_ORDER: readonly string[] = [
@@ -88,10 +90,54 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
   scores,
   activeSectionKeys = null,
   activeSectionCount = null,
+  variant = 'panel',
 }) => {
   if (!scores) {
     return null;
   }
+
+  if (variant === 'chips') {
+    return (
+      <div className="profile-opt-section-chips" aria-label="Per-section profile scores">
+        <p className="profile-opt-section-chips__heading">Section scores</p>
+        <div className="profile-opt-section-chips__row">
+          {SECTION_ORDER.map((sectionKey) => {
+            const rawScore = scores[sectionKey];
+            if (typeof rawScore !== 'number') return null;
+            const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+            const actionCount = activeSectionCount?.get(sectionKey) ?? 0;
+            const hasActiveAction =
+              activeSectionKeys?.has(sectionKey) || actionCount > 0;
+            return (
+              <span
+                key={sectionKey}
+                className={[
+                  'profile-opt-section-chip',
+                  hasActiveAction && 'profile-opt-section-chip--active',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                title={`${formatProfileSection(sectionKey)}: ${score}/100${
+                  hasActiveAction ? ` · ${actionCount} action${actionCount === 1 ? '' : 's'}` : ''
+                }`}
+              >
+                <span className="profile-opt-section-chip__label">
+                  {formatProfileSection(sectionKey)}
+                </span>
+                <span
+                  className="profile-opt-section-chip__score"
+                  style={{ color: scoreColor(score) }}
+                >
+                  {score}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={PANEL_STYLE} aria-label="Per-section profile scores">
       <p style={HEADER_STYLE}>Section-by-section</p>

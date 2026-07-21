@@ -21,7 +21,6 @@ import {
 } from '../../utils/profileStrengthUtils';
 import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
-import { STUDIO_TAB_ACTION_MODAL_CLASS } from '../dashboard/dashboardLayoutConstants';
 import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
 
 const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed_v2';
@@ -358,54 +357,27 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         typeof document !== 'undefined' &&
         createPortal(
           <div
-            className={`linkedin-profile-optimization-overlay ${STUDIO_TAB_ACTION_MODAL_CLASS}`}
+            className="linkedin-profile-optimization-overlay"
             role="dialog"
             aria-modal="true"
             aria-label="Profile optimization suggestions"
             onClick={() => closeOptimizationPanel()}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              zIndex: 12100,
-              background: 'rgba(15, 23, 42, 0.45)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: 20,
-              overflowY: 'auto',
-            }}
           >
             <div
-              className={`linkedin-profile-optimization-dialog ${STUDIO_TAB_ACTION_MODAL_CLASS}`}
+              className="linkedin-profile-optimization-dialog"
               onClick={(e) => e.stopPropagation()}
-              style={{
-                width: 'min(980px, 100%)',
-                maxHeight: 'calc(100vh - 40px)',
-                overflowY: 'auto',
-                borderRadius: 14,
-              }}
             >
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+              <div className="linkedin-profile-optimization-dialog__close-row">
                 <button
                   type="button"
+                  className="linkedin-profile-optimization-dialog__close"
                   onClick={() => closeOptimizationPanel()}
                   aria-label="Close profile optimization"
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: '50%',
-                    border: '1px solid rgba(255,255,255,0.7)',
-                    background: 'rgba(255,255,255,0.92)',
-                    color: '#334155',
-                    cursor: 'pointer',
-                    fontSize: 18,
-                    lineHeight: 1,
-                    fontWeight: 700,
-                  }}
                 >
                   ✕
                 </button>
               </div>
+              <div className="linkedin-profile-optimization-dialog__body">
               <ProfileOptimizationPanel
                 isOpen={isOptimizationOpen}
                 isLoading={isOptimizationLoading}
@@ -444,6 +416,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                   void loadNextOptimizationBatch();
                 }}
               />
+              </div>
             </div>
           </div>,
           document.body
