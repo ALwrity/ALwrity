@@ -27,8 +27,7 @@ def detect_actual_provider(provider_enum: APIProvider, model_name: Optional[str]
         return "openai"
     elif provider_enum == APIProvider.ANTHROPIC:
         return "anthropic"
-    elif provider_enum == APIProvider.MISTRAL:
-        # MISTRAL enum is used for HuggingFace models
+    elif provider_enum in (APIProvider.MISTRAL, APIProvider.HUGGINGFACE):
         return "huggingface"
     
     # For search APIs, use the enum value

@@ -723,9 +723,9 @@ class PricingService:
                 APIProviderPricing.is_active == True
             ).first()
         
-        # If still not found, check for HuggingFace models (provider is MISTRAL)
+        # If still not found, check for HuggingFace models (provider is MISTRAL or HUGGINGFACE)
         # Try alternative model name variations
-        if not pricing and provider == APIProvider.MISTRAL:
+        if not pricing and provider in (APIProvider.MISTRAL, APIProvider.HUGGINGFACE):
             # Try with "gpt-oss-120b" (without full path) if model contains it
             if "gpt-oss-120b" in model_name.lower():
                 pricing = self.db.query(APIProviderPricing).filter(
@@ -744,7 +744,7 @@ class PricingService:
         
         if not pricing:
             # Check if we should use env vars for HuggingFace/Mistral
-            if provider == APIProvider.MISTRAL:
+            if provider in (APIProvider.MISTRAL, APIProvider.HUGGINGFACE):
                 # Use environment variables for HuggingFace pricing if available
                 hf_input_cost = float(os.getenv('HUGGINGFACE_INPUT_TOKEN_COST', '0.000001'))
                 hf_output_cost = float(os.getenv('HUGGINGFACE_OUTPUT_TOKEN_COST', '0.000003'))
