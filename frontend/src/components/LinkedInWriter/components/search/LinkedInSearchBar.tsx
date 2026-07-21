@@ -1,4 +1,5 @@
 import React, { useId, useState, useRef, useEffect } from 'react';
+import { ConnectLockBadge } from '../dashboard/ConnectLockIcon';
 
 interface LinkedInSearchBarProps {
   value: string;
@@ -71,6 +72,7 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
     isNav && 'linkedin-search-bar--nav',
     isMobileStrip && 'linkedin-search-bar--mobile-strip',
     disabled && 'linkedin-search-bar--disabled',
+    disabled && 'linkedin-studio-connect-locked',
   ]
     .filter(Boolean)
     .join(' ');
@@ -84,7 +86,12 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
 
   return (
     <div
-      className="linkedin-search-bar-wrap"
+      className={[
+        'linkedin-search-bar-wrap',
+        disabled && 'linkedin-search-bar-wrap--connect-locked',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleInfoClick}
@@ -104,10 +111,19 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
           placeholder="LinkedIn Search"
           aria-label="LinkedIn Search"
         />
+        {disabled && <ConnectLockBadge size={11} className="linkedin-search-bar__lock" />}
       </div>
 
       {showInfo && !dismissed && (
-        <div className="linkedin-search-bar__info-popover" role="tooltip">
+        <div
+          className={[
+            'linkedin-search-bar__info-popover',
+            disabled && 'linkedin-search-bar__info-popover--connect',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+          role="tooltip"
+        >
           <button
             type="button"
             className="linkedin-search-bar__info-dismiss"
@@ -117,12 +133,26 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
             &times;
           </button>
 
-          <div className="linkedin-search-bar__info-header">
+          <div
+            className={[
+              'linkedin-search-bar__info-header',
+              disabled && 'linkedin-search-bar__info-header--connect',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
             <div className="linkedin-search-bar__info-brand">
               <span className="linkedin-search-bar__info-icon" aria-hidden>
                 {disabled ? '\u{1F512}' : '\u{1F50D}'}
               </span>
-              <h4 className="linkedin-search-bar__info-title linkedin-search-bar__info-title--stacked">
+              <h4
+                className={[
+                  'linkedin-search-bar__info-title',
+                  !disabled && 'linkedin-search-bar__info-title--stacked',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
                 {disabled ? (
                   'Connect LinkedIn to Search'
                 ) : (
@@ -134,18 +164,23 @@ export const LinkedInSearchBar: React.FC<LinkedInSearchBarProps> = ({
               </h4>
             </div>
 
-            <p className="linkedin-search-bar__info-text">
-              {disabled ? (
-                'Unlock the power of LinkedIn search to find people, companies, and posts relevant to your content strategy. Connect your account to get started.'
-              ) : (
-                SEARCH_DESCRIPTION_LINES.map((line) => (
+            {!disabled && (
+              <p className="linkedin-search-bar__info-text">
+                {SEARCH_DESCRIPTION_LINES.map((line) => (
                   <span key={line} className="linkedin-search-bar__info-text-line">
                     {line}
                   </span>
-                ))
-              )}
-            </p>
+                ))}
+              </p>
+            )}
           </div>
+
+          {disabled && (
+            <p className="linkedin-search-bar__info-lead">
+              Unlock the power of LinkedIn search to find people, companies, and posts relevant to
+              your content strategy. Connect your account to get started.
+            </p>
+          )}
 
           <div className="linkedin-search-bar__info-examples">
             <strong>{disabled ? 'What you can do:' : 'Try searching for:'}</strong>

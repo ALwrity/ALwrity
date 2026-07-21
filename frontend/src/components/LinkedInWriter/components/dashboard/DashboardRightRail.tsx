@@ -2,6 +2,7 @@ import React from 'react';
 import { DashboardAnalyticsSidebar, DASHBOARD_RIGHT_RAIL_WIDTH } from './DashboardAnalyticsSidebar';
 import { KnowledgeCenterDock, type KnowledgeCenterAction } from './KnowledgeCenterDock';
 import { LibraryRailButton } from './LibraryRailButton';
+import { StudioTourTrigger } from './StudioTourTrigger';
 
 interface DashboardRightRailProps {
   onViewAllAnalytics?: () => void;
@@ -32,7 +33,14 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
     >
       <h2 className="linkedin-dashboard-data-section-title">Analytics &amp; Knowledge</h2>
 
-      <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
+      <div className="linkedin-dashboard-analytics-row">
+        <div className="linkedin-dashboard-rail-tour-slot">
+          <StudioTourTrigger variant="analyticsPanel" />
+        </div>
+        <div className="linkedin-dashboard-analytics-slot">
+          <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
+        </div>
+      </div>
 
       <div className="linkedin-dashboard-rail-actions">
         <LibraryRailButton />

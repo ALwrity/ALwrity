@@ -28,6 +28,7 @@ export const OptimiseProfileRailChip: React.FC<OptimiseProfileRailChipProps> = (
       variant={variant}
       onClick={handleOpenOptimiseProfile}
       isLoading={profileStrengthLoading}
+      connectLocked={!connected}
       profileStrengthPercent={connected ? profileStrengthPercent : null}
       strengthLabel={strengthLabel}
       strengthTooltip={
