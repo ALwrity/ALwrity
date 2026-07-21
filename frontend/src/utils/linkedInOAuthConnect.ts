@@ -61,8 +61,10 @@ function isTrustedOAuthMessageOrigin(origin: string, trusted: string[]): boolean
 
 /**
  * Opens Unipile OAuth in a popup (or full-page redirect if blocked).
- * Resolves when the callback posts LINKEDIN_OAUTH_SUCCESS, or when verifyConnected
- * confirms the account is linked (Unipile notify_url / sync fallback).
+ * Resolves when verifyConnected confirms the account is linked, or when the
+ * callback posts LINKEDIN_OAUTH_SUCCESS and no verifyConnected is provided.
+ * Unipile may post SUCCESS before notify_url credentials are visible — in that
+ * case we keep polling status until connected or the post-close grace expires.
  */
 export function connectWithLinkedInOAuth(
   options: LinkedInOAuthConnectOptions = {}
@@ -75,7 +77,9 @@ export function connectWithLinkedInOAuth(
         provider: authResponse.provider,
       });
     } catch (err) {
-      console.error('[LinkedInConnect] auth URL fetch failed:', err);
+      console.error('[LinkedInConnect] auth URL fetch failed', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       reject(err);
       return;
     }
@@ -85,6 +89,9 @@ export function connectWithLinkedInOAuth(
     let statusPollTimer: ReturnType<typeof setInterval> | undefined;
     let settled = false;
     let popupClosedAt: number | null = null;
+    /** True when callback posted SUCCESS (credentials may still be landing via webhook). */
+    let oauthSuccessSignalReceived = false;
+    let lastVerifyErrorMessage: string | null = null;
 
     const cleanup = () => {
       window.removeEventListener('message', onMessage);
@@ -92,21 +99,46 @@ export function connectWithLinkedInOAuth(
       if (statusPollTimer) clearInterval(statusPollTimer);
     };
 
-    const finishSuccess = (source: string) => {
-      if (settled) return;
-      settled = true;
-      cleanup();
+    const closePopupIfOpen = () => {
       try {
         if (popup && !popup.closed) {
           popup.close();
           console.info('[LinkedInConnect] OAuth popup closed by opener');
         }
       } catch (err) {
-        console.warn('[LinkedInConnect] could not close OAuth popup:', err);
+        console.warn('[LinkedInConnect] could not close OAuth popup:', {
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
-      console.info('[LinkedInConnect] OAuth connect resolved', { source });
+    };
+
+    const finishSuccess = (source: string) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      closePopupIfOpen();
+      console.info('[LinkedInConnect] OAuth connect resolved', {
+        source,
+        oauthSuccessSignalReceived,
+      });
       window.dispatchEvent(new CustomEvent('linkedin-oauth-success'));
       resolve();
+    };
+
+    const buildPopupCloseFailureMessage = (): string => {
+      if (oauthSuccessSignalReceived) {
+        return (
+          'LinkedIn login finished, but the connection was not confirmed in time. ' +
+          'Wait a moment and refresh, or try connecting again.'
+        );
+      }
+      if (lastVerifyErrorMessage) {
+        return (
+          'Could not verify LinkedIn connection after the login window closed. ' +
+          'Check your network and try again.'
+        );
+      }
+      return 'LinkedIn connection was closed before completing. Please try again.';
     };
 
     const tryVerifyConnected = async (context: string): Promise<boolean> => {
@@ -116,11 +148,18 @@ export function connectWithLinkedInOAuth(
       try {
         const connected = await options.verifyConnected();
         if (connected) {
+          lastVerifyErrorMessage = null;
           finishSuccess(`connection-status:${context}`);
           return true;
         }
+        console.debug('[LinkedInConnect] connection not ready yet', { context });
       } catch (err) {
-        console.warn('[LinkedInConnect] connection status verify failed:', context, err);
+        lastVerifyErrorMessage =
+          err instanceof Error ? err.message : String(err);
+        console.warn('[LinkedInConnect] connection status verify failed', {
+          context,
+          error: lastVerifyErrorMessage,
+        });
       }
       return false;
     };
@@ -136,7 +175,35 @@ export function connectWithLinkedInOAuth(
       if (!event.data || typeof event.data !== 'object') return;
 
       if (event.data.type === 'LINKEDIN_OAUTH_SUCCESS') {
-        finishSuccess('postMessage');
+        if (settled) return;
+
+        oauthSuccessSignalReceived = true;
+
+        // Without verifyConnected (e.g. onboarding), trust the callback signal.
+        if (!options.verifyConnected) {
+          finishSuccess('postMessage');
+          return;
+        }
+
+        // Backend may post SUCCESS before notify_url credentials are stored.
+        // Close the popup for UX, then keep status polling until connected.
+        closePopupIfOpen();
+        console.info(
+          '[LinkedInConnect] OAuth success postMessage received; verifying connection',
+          { hasVerifyConnected: true }
+        );
+        void (async () => {
+          if (await tryVerifyConnected('postMessage')) {
+            return;
+          }
+          console.info(
+            '[LinkedInConnect] postMessage success but not connected yet; continuing status poll',
+            {
+              graceMs: POPUP_CLOSE_GRACE_MS,
+              statusPollMs: STATUS_POLL_MS,
+            }
+          );
+        })();
         return;
       }
       if (event.data.type === 'LINKEDIN_OAUTH_ERROR') {
@@ -147,7 +214,10 @@ export function connectWithLinkedInOAuth(
           typeof event.data.error === 'string' && event.data.error.trim()
             ? event.data.error
             : 'LinkedIn connection failed. Please try again.';
-        console.error('[LinkedInConnect] OAuth popup error message received:', message);
+        console.error('[LinkedInConnect] OAuth popup error message received', {
+          error: message,
+          origin: event.origin,
+        });
         reject(new Error(message));
       }
     };
@@ -167,7 +237,11 @@ export function connectWithLinkedInOAuth(
       return;
     }
 
-    console.info('[LinkedInConnect] OAuth popup opened');
+    console.info('[LinkedInConnect] OAuth popup opened', {
+      hasVerifyConnected: Boolean(options.verifyConnected),
+      statusPollMs: options.verifyConnected ? STATUS_POLL_MS : null,
+      popupCloseGraceMs: options.verifyConnected ? POPUP_CLOSE_GRACE_MS : null,
+    });
 
     // Keep polling after popup close — webhook/sync often lands after Unipile closes the window.
     if (options.verifyConnected) {
@@ -190,7 +264,10 @@ export function connectWithLinkedInOAuth(
 
       if (popupClosedAt === null) {
         popupClosedAt = Date.now();
-        console.info('[LinkedInConnect] OAuth popup closed; verifying connection');
+        console.info('[LinkedInConnect] OAuth popup closed; verifying connection', {
+          oauthSuccessSignalReceived,
+          graceMs: POPUP_CLOSE_GRACE_MS,
+        });
         void tryVerifyConnected('popup-just-closed');
         return;
       }
@@ -207,14 +284,18 @@ export function connectWithLinkedInOAuth(
         if (await tryVerifyConnected('popup-closed-final')) {
           return;
         }
-        console.warn('[LinkedInConnect] OAuth popup closed before completion');
+        const elapsedMs = Date.now() - (popupClosedAt ?? Date.now());
+        const failMessage = buildPopupCloseFailureMessage();
+        console.warn('[LinkedInConnect] OAuth connect timed out after popup close', {
+          elapsedMs,
+          graceMs: POPUP_CLOSE_GRACE_MS,
+          oauthSuccessSignalReceived,
+          lastVerifyErrorMessage,
+          userMessage: failMessage,
+        });
         settled = true;
         cleanup();
-        reject(
-          new Error(
-            'LinkedIn connection was closed before completing. Please try again.'
-          )
-        );
+        reject(new Error(failMessage));
       })();
     }, POPUP_POLL_MS);
   });
