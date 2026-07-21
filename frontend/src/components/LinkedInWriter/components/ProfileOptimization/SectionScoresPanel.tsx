@@ -13,8 +13,10 @@ interface SectionScoresPanelProps {
   scores: Record<string, number>;
   activeSectionKeys?: Set<string> | null;
   activeSectionCount?: Map<string, number> | null;
-  /** panel = table rows; chips = horizontal compact chips (Phase 2). */
-  variant?: 'panel' | 'chips';
+  /** panel = table rows; chips = horizontal compact chips; embedded = compact rows inside a parent card. */
+  variant?: 'panel' | 'chips' | 'embedded';
+  /** Tighter two-column grid for side-by-side batch impact layout. */
+  compactGrid?: boolean;
 }
 
 const SECTION_ORDER: readonly string[] = [
@@ -91,9 +93,59 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
   activeSectionKeys = null,
   activeSectionCount = null,
   variant = 'panel',
+  compactGrid = false,
 }) => {
   if (!scores) {
     return null;
+  }
+
+  if (variant === 'embedded') {
+    return (
+      <div
+        className={[
+          'profile-opt-section-embedded',
+          compactGrid && 'profile-opt-section-embedded--compact-grid',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        aria-label="Per-section profile scores"
+      >
+        {SECTION_ORDER.map((sectionKey) => {
+          const rawScore = scores[sectionKey];
+          if (typeof rawScore !== 'number') return null;
+          const score = Math.max(0, Math.min(100, Math.round(rawScore)));
+          const actionCount = activeSectionCount?.get(sectionKey) ?? 0;
+          const hasActiveAction =
+            activeSectionKeys?.has(sectionKey) || actionCount > 0;
+          return (
+            <div
+              key={sectionKey}
+              className={[
+                'profile-opt-section-embedded__row',
+                hasActiveAction && 'profile-opt-section-embedded__row--active',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <span className="profile-opt-section-embedded__label">
+                {formatProfileSection(sectionKey)}
+              </span>
+              {hasActiveAction && (
+                <span className="profile-opt-section-embedded__badge">
+                  {actionCount}
+                </span>
+              )}
+              <span
+                className="profile-opt-section-embedded__score"
+                style={{ color: scoreColor(score) }}
+              >
+                {score}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
   }
 
   if (variant === 'chips') {

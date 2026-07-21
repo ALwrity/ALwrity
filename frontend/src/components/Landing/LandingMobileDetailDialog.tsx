@@ -6,13 +6,12 @@ import {
   Chip,
   Dialog,
   DialogContent,
-  IconButton,
   Stack,
   Typography,
   alpha,
   useTheme,
 } from '@mui/material';
-import Close from '@mui/icons-material/Close';
+import { AlwrityModalCloseIconButton } from '../shared/AlwrityModalCloseIconButton';
 
 export type LandingMobileDetailDialogProps = {
   open: boolean;
@@ -73,24 +72,7 @@ const LandingMobileDetailDialog: React.FC<LandingMobileDetailDialogProps> = ({
           zIndex: theme.zIndex.modal + 1,
         }}
       >
-        <IconButton
-          aria-label="Close"
-          onClick={onClose}
-          size="small"
-          sx={{
-            width: 36,
-            height: 36,
-            bgcolor: alpha('#fff', 0.14),
-            border: `1px solid ${alpha('#fff', 0.35)}`,
-            color: '#fff',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.45)',
-            '&:hover': {
-              bgcolor: alpha('#fff', 0.22),
-            },
-          }}
-        >
-          <Close sx={{ fontSize: 20 }} />
-        </IconButton>
+        <AlwrityModalCloseIconButton onClick={onClose} ariaLabel="Close" variant="dark" />
       </Box>
 
       <DialogContent sx={{ p: 2.25, pt: 3.5, position: 'relative', zIndex: 1 }}>

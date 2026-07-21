@@ -60,19 +60,21 @@
 }
 
 .linkedin-writer-header-brand-line {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 800;
   letter-spacing: -0.03em;
   color: #0a66c2;
+  line-height: 1;
 }
 
 .linkedin-writer-header-brand-subline {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #1e3a5f;
   opacity: 0.9;
+  line-height: 1;
 }
 
 .linkedin-writer-header-center {
@@ -456,6 +458,21 @@
 
   .linkedin-writer-header-row {
     grid-template-columns: auto minmax(0, 1fr) auto;
+    position: relative;
+  }
+
+  /* Persona pill: fixed viewport X tracks profile picture (set by syncHubHeaderPersona). */
+  body.linkedin-dashboard-view .linkedin-writer-header-center {
+    position: fixed;
+    left: var(--hub-header-persona-left, 50vw);
+    top: 0;
+    height: 80px;
+    margin: 0;
+    transform: translateX(-50%);
+    grid-column: auto;
+    justify-self: auto;
+    z-index: 110;
+    pointer-events: auto;
   }
 
   .linkedin-writer-header-right {

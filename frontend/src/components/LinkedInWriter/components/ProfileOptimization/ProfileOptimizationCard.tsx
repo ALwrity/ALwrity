@@ -24,6 +24,9 @@ interface ProfileOptimizationCardProps {
   publicIdentifier?: string | null;
   /** Human-readable effort time label (e.g., "Takes ~5 minutes"). */
   showEffortTimeLabel?: string;
+  /** Phase 4 — pin Copy + Open LinkedIn at top; show inline Mark done after copy. */
+  promotePrimaryActions?: boolean;
+  className?: string;
 }
 
 const LOG_PREFIX = '[ProfileOptimizationCard]';
@@ -111,6 +114,15 @@ function parseCompletionCriteria(criteria: string): string[] {
 
 type ProfileSection = LinkedInProfileOptimizationItem['profile_section'];
 
+function getLinkedInProfileUrl(publicIdentifier: string | null | undefined): string | null {
+  if (!publicIdentifier) return null;
+  return `https://www.linkedin.com/in/${publicIdentifier}`;
+}
+
+function formatIssueTitle(issue: string): string {
+  return issue.replace(/\.\s*$/, '').trim();
+}
+
 function getLinkedInEditorUrl(
   profileSection: ProfileSection,
   publicIdentifier: string | null | undefined
@@ -151,9 +163,12 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
   isMarking = false,
   publicIdentifier = null,
   showEffortTimeLabel,
+  promotePrimaryActions = false,
+  className,
 }) => {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const [showMarkDonePrompt, setShowMarkDonePrompt] = useState(false);
   
   // Feature 4 ΓÇö Completion criteria checklist state
   const criteriaItems = useMemo(
@@ -193,8 +208,11 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
     }
     const success = await copySuggestedCopy(recommendation.suggested_copy, recommendation.id);
     setCopyState(success ? 'copied' : 'failed');
+    if (success && promotePrimaryActions) {
+      setShowMarkDonePrompt(true);
+    }
     window.setTimeout(() => setCopyState('idle'), 2000);
-  }, [recommendation.id, recommendation.suggested_copy]);
+  }, [promotePrimaryActions, recommendation.id, recommendation.suggested_copy]);
 
   const copyTooltip =
     copyState === 'copied'
@@ -204,63 +222,96 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
         : 'Copy suggested text';
 
   const editorUrl = getLinkedInEditorUrl(recommendation.profile_section, publicIdentifier);
+  const profileUrl = getLinkedInProfileUrl(publicIdentifier);
+  const issueTitle = formatIssueTitle(recommendation.issue);
+
+  const primaryActionBar = promotePrimaryActions && recommendation.suggested_copy && (
+    <div className="profile-opt-card__primary-actions">
+      <button
+        type="button"
+        className={[
+          'profile-opt-card__primary-btn',
+          copyState === 'copied' && 'profile-opt-card__primary-btn--success',
+          copyState === 'failed' && 'profile-opt-card__primary-btn--error',
+        ].filter(Boolean).join(' ')}
+        onClick={() => {
+          void handleCopy();
+        }}
+      >
+        <ContentCopyIcon sx={{ fontSize: 16 }} />
+        {copyState === 'copied' ? 'Copied!' : copyState === 'failed' ? 'Copy failed' : 'Copy'}
+      </button>
+    </div>
+  );
+
+  const markDonePrompt = promotePrimaryActions && showMarkDonePrompt && onMarkDone && (
+    <div className="profile-opt-card__mark-done-prompt" role="status">
+      <span>Copied! Mark this as done once you&apos;ve updated LinkedIn?</span>
+      <button
+        type="button"
+        className="profile-opt-card__mark-done-prompt-btn"
+        disabled={isMarking}
+        onClick={() => {
+          onMarkDone(recommendation.id);
+          setShowMarkDonePrompt(false);
+        }}
+      >
+        {isMarking ? 'Saving…' : 'Mark done'}
+      </button>
+      <button
+        type="button"
+        className="profile-opt-card__mark-done-prompt-dismiss"
+        aria-label="Dismiss mark done prompt"
+        onClick={() => setShowMarkDonePrompt(false)}
+      >
+        ×
+      </button>
+    </div>
+  );
 
   return (
-    <article style={CARD_STYLE} aria-labelledby={`profile-opt-title-${recommendation.id}`}>
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <span
-          aria-hidden
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: '50%',
-            backgroundColor: '#0A66C2',
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 700,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
+    <article
+      className={[
+        'profile-opt-card',
+        promotePrimaryActions && 'profile-opt-card--quick-win',
+        className,
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      style={CARD_STYLE}
+      aria-labelledby={`profile-opt-title-${recommendation.id}`}
+    >
+      <div className="profile-opt-card__title-row">
+        <span className="profile-opt-card__index" aria-hidden>
           {index + 1}
         </span>
+        <h4
+          id={`profile-opt-title-${recommendation.id}`}
+          className="profile-opt-card__title"
+        >
+          {issueTitle}
+        </h4>
+      </div>
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-              <span style={sectionBadgeStyle()}>
-                {formatProfileSection(recommendation.profile_section)}
-              </span>
-              <span style={impactBadgeStyle(recommendation.impact)}>
-                {formatOptimizationImpact(recommendation.impact)}
-              </span>
-              <span style={effortBadgeStyle(recommendation.effort)}>
-                {formatOptimizationEffort(recommendation.effort)}
-              </span>
-              {/* Feature 2 ΓÇö Effort time label for SME-grade prioritization */}
-              {showEffortTimeLabel && (
-                <span
-                  style={{
-                    fontSize: 12,
-                    color: '#64748b',
-                    fontWeight: 500,
-                    marginLeft: 'auto',
-                  }}
-                >
-                  {showEffortTimeLabel}
-                </span>
-              )}
-            </div>
+      <div className="profile-opt-card__badges">
+        <span style={sectionBadgeStyle()}>
+          {formatProfileSection(recommendation.profile_section)}
+        </span>
+        <span style={impactBadgeStyle(recommendation.impact)}>
+          {formatOptimizationImpact(recommendation.impact)}
+        </span>
+        <span style={effortBadgeStyle(recommendation.effort)}>
+          {formatOptimizationEffort(recommendation.effort)}
+        </span>
+        {showEffortTimeLabel && (
+          <span className="profile-opt-card__effort-time">{showEffortTimeLabel}</span>
+        )}
+      </div>
 
-          <h4
-            id={`profile-opt-title-${recommendation.id}`}
-            style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.4 }}
-          >
-            {recommendation.issue}
-          </h4>
+      {primaryActionBar}
+      {markDonePrompt}
 
-          {!isDetailsExpanded && (
+      {!isDetailsExpanded && (
             <>
               {/* TC-009: 3-line clamp with fade gradient mask for better context */}
               <div
@@ -287,8 +338,8 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
                 </p>
               </div>
 
-              {/* Feature 1 ΓÇö One-Click AI Copy (collapsed preview) */}
-              {recommendation.suggested_copy && (
+              {/* Feature 1 — One-Click AI Copy (collapsed preview) */}
+              {recommendation.suggested_copy && !promotePrimaryActions && (
                 <div
                   style={{
                     margin: '10px 0',
@@ -582,37 +633,15 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
             </div>
           </Collapse>
 
-          {(onMarkDone || onSkip || editorUrl) && (
-            <div
-              style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: 8,
-                marginTop: 14,
-                paddingTop: 14,
-                borderTop: '1px solid #e2e8f0',
-              }}
-            >
+          {(onMarkDone || onSkip || editorUrl || profileUrl) && (
+            <div className="profile-opt-card__actions">
               {editorUrl && (
                 <a
                   href={editorUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  className="profile-opt-card__action profile-opt-card__action--outline"
                   aria-label={`Open ${formatProfileSection(recommendation.profile_section)} editor on LinkedIn`}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #0A66C2',
-                    backgroundColor: '#fff',
-                    color: '#0A66C2',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    textDecoration: 'none',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    cursor: 'pointer',
-                  }}
                 >
                   <OpenInNewIcon sx={{ fontSize: 16 }} />
                   Edit on LinkedIn
@@ -621,47 +650,37 @@ export const ProfileOptimizationCard: React.FC<ProfileOptimizationCardProps> = (
               {onMarkDone && (
                 <button
                   type="button"
+                  className="profile-opt-card__action profile-opt-card__action--primary"
                   onClick={() => onMarkDone(recommendation.id)}
                   disabled={isMarking}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: isMarking ? '#94a3b8' : 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
-                    color: '#fff',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: isMarking ? 'wait' : 'pointer',
-                    opacity: isMarking ? 0.8 : 1,
-                  }}
                 >
-                  {isMarking ? 'SavingΓÇª' : 'Mark as done'}
+                  {isMarking ? 'Saving…' : 'Mark as done'}
                 </button>
               )}
               {onSkip && (
                 <button
                   type="button"
+                  className="profile-opt-card__action profile-opt-card__action--secondary"
                   onClick={() => onSkip(recommendation.id)}
                   disabled={isMarking}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #cbd5e1',
-                    backgroundColor: '#fff',
-                    color: '#64748b',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: isMarking ? 'wait' : 'pointer',
-                    opacity: isMarking ? 0.7 : 1,
-                  }}
                 >
                   Skip
                 </button>
               )}
+              {profileUrl && (
+                <a
+                  href={profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="profile-opt-card__action profile-opt-card__action--outline"
+                  aria-label="Open LinkedIn profile"
+                >
+                  <OpenInNewIcon sx={{ fontSize: 16 }} />
+                  Open LinkedIn profile
+                </a>
+              )}
             </div>
           )}
-        </div>
-      </div>
     </article>
   );
 };

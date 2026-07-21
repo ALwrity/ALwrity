@@ -8,6 +8,7 @@ interface BrandIdentityCardProps {
   isLoading?: boolean;
   /** full = default card; compact = one-row strip with expand (Phase 2). */
   variant?: 'full' | 'compact';
+  className?: string;
 }
 
 /**
@@ -30,6 +31,7 @@ export const BrandIdentityCard: React.FC<BrandIdentityCardProps> = ({
   profileStrengthPercent,
   isLoading = false,
   variant = 'full',
+  className,
 }) => {
   const [expanded, setExpanded] = React.useState(false);
   const isCompact = variant === 'compact';
@@ -171,6 +173,7 @@ export const BrandIdentityCard: React.FC<BrandIdentityCardProps> = ({
 
   return (
     <div
+      className={['profile-opt-brand-identity-card', className].filter(Boolean).join(' ')}
       style={{
         padding: '18px 20px',
         borderRadius: 12,
@@ -239,7 +242,7 @@ export const BrandIdentityCard: React.FC<BrandIdentityCardProps> = ({
               color: '#0c4a6e',
             }}
           >
-            Your AI-detected professional identity
+            Your LinkedIn Professional Identity
           </h4>
           <p
             style={{

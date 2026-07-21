@@ -444,7 +444,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
               <StudioModalCloseButton
                 onClick={handleClose}
                 ariaLabel="Close brainstorm"
-                className="linkedin-studio-modal-close linkedin-studio-modal-close--on-dark"
+                variant="dark"
               />
             </div>
           </div>

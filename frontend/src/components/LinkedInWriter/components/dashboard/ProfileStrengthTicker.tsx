@@ -47,16 +47,18 @@ export const ProfileStrengthTicker: React.FC<ProfileStrengthTickerProps> = ({
             : `${clamped}% profile strength${strengthLabel ? `. ${strengthLabel}` : ''}`
         }
       >
-        <span className="linkedin-profile-strength-ticker--inline-row">
-          <span className="linkedin-profile-strength-ticker--inline-percent">{clamped}%</span>
-          <span className="linkedin-profile-strength-ticker--inline-segments" aria-hidden>
-            {SEGMENT_COLORS.slice(0, segments).map((color, i) => (
-              <span
-                key={i}
-                className="linkedin-profile-strength-ticker--inline-segment"
-                style={{ background: i < filledCount ? color : '#e5e7eb' }}
-              />
-            ))}
+        <span className="linkedin-profile-strength-ticker--inline-track" aria-hidden>
+          <span className="linkedin-profile-strength-ticker--inline-row">
+            <span className="linkedin-profile-strength-ticker--inline-percent">{clamped}%</span>
+            <span className="linkedin-profile-strength-ticker--inline-segments">
+              {SEGMENT_COLORS.slice(0, segments).map((color, i) => (
+                <span
+                  key={i}
+                  className="linkedin-profile-strength-ticker--inline-segment"
+                  style={{ background: i < filledCount ? color : '#e5e7eb' }}
+                />
+              ))}
+            </span>
           </span>
         </span>
         {strengthLabel ? (

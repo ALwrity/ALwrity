@@ -14,6 +14,7 @@ import { LinkedInSearchModal } from './search/LinkedInSearchModal';
 import { useMobileHeaderNav } from '../hooks/useMobileHeaderNav';
 import { StudioTourTrigger } from './dashboard/StudioTourTrigger';
 import { ContentPersonaPreferencesBody } from './ContentPersonaPreferencesBody';
+import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
 import { DashboardActionModal } from './dashboard/DashboardActionModal';
 import { STUDIO_TAB_ACTION_MODAL_CLASS } from './dashboard/dashboardLayoutConstants';
 
@@ -223,23 +224,10 @@ export const Header: React.FC<HeaderProps> = ({
           <h4 style={{ margin: 0, color: '#333', fontSize: '16px', fontWeight: 600 }}>
             Content Preferences & Persona
           </h4>
-          <button
-            type="button"
+          <StudioModalCloseButton
             onClick={() => onPreferencesModalChange(false)}
-            aria-label="Close content persona settings"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              lineHeight: 1,
-              cursor: 'pointer',
-              color: '#64748b',
-              padding: 2,
-              flexShrink: 0,
-            }}
-          >
-            ✕
-          </button>
+            ariaLabel="Close content persona settings"
+          />
         </div>
         <ContentPersonaPreferencesBody {...personaPreferencesBodyProps} />
         <style>{`

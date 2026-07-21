@@ -4,6 +4,7 @@ import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
 import { OptimiseProfileControl } from './OptimiseProfileControl';
 import { getProfileStrengthLabel as getProfileStrengthLabelImpl } from '../../utils/profileStrengthUtils';
+import { StudioModalCloseButton } from './StudioModalCloseButton';
 
 interface ProfileAnalysisReadyModalProps {
   open: boolean;
@@ -29,12 +30,12 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
   isProfileComplete = true,
 }) => {
   // Global 2: Accessibility - Focus management
-  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+  const primaryButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open && primaryButtonRef.current) {
-      // Move focus to primary action button when modal opens
-      primaryButtonRef.current.focus();
+      const btn = primaryButtonRef.current.querySelector('button');
+      btn?.focus();
     }
   }, [open]);
 
@@ -88,23 +89,7 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
           >
             Profile analysis ready
           </h2>
-          <button
-            ref={primaryButtonRef}
-            type="button"
-            onClick={onDismiss}
-            aria-label="Close"
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: '#475569',
-              fontSize: 20,
-              lineHeight: 1,
-              cursor: 'pointer',
-              padding: 2,
-            }}
-          >
-            ✕
-          </button>
+          <StudioModalCloseButton onClick={onDismiss} ariaLabel="Close" />
         </div>
 
         <div style={{ padding: '22px 24px' }}>
@@ -161,6 +146,7 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
           )}
 
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <div ref={primaryButtonRef}>
             <OptimiseProfileControl
               onOptimiseProfile={onOptimiseProfile}
               profileStrengthPercent={profileStrengthPercent}
@@ -169,6 +155,7 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
               isDisabled={isOptimiseDisabled}
               variant="capsule"
             />
+            </div>
             <button
               type="button"
               onClick={onDismiss}

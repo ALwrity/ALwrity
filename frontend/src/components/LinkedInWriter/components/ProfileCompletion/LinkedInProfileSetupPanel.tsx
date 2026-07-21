@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { useLinkedInProfileCompletion } from '../../../../hooks/useLinkedInProfileCompletion';
@@ -9,6 +9,11 @@ import { TopicRecommendationsPanel } from '../TopicRecommendations/TopicRecommen
 import { AnalysisErrorAlert } from '../TopicRecommendations/TopicSuggestionIntro';
 import { LinkedInAdvisorActionsBar } from '../ProfileOptimization/LinkedInAdvisorActionsBar';
 import { ProfileOptimizationPanel } from '../ProfileOptimization/ProfileOptimizationPanel';
+import {
+  ProfileOptimizationModalFooter,
+  ProfileOptimizationModalHeader,
+} from '../ProfileOptimization/ProfileOptimizationModalChrome';
+import { findProfileOptimizationQuickWin } from '../ProfileOptimization/profileOptimizationQuickWin';
 import { ProfileCompletionForm } from './ProfileCompletionForm';
 import {
   ProfileAnalysisReadyModal,
@@ -22,6 +27,7 @@ import {
 import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
+import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
 
 const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed_v2';
 const DISMISSAL_EXPIRY_HOURS = 24;
@@ -129,9 +135,20 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     markingRecommendationId,
     isLoadingNextBatch,
     showNextBatchCta,
+    localProfilePhotoUrl,
+    uploadingProfilePhoto,
+    profilePhotoUploadError,
+    handleUploadProfilePhoto,
+    transformedProfilePhotoUrl,
+    transformingProfilePhoto,
+    profilePhotoTransformError,
+    handleMakeProfilePhotoPresentable,
+    handleDownloadProfilePhoto,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
   const handleImproveProfile = () => {
+    storeDismissal();
+    setShowAnalysisModal(false);
     void openOptimizationPanel();
   };
 
@@ -178,6 +195,61 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
+  const optimizationDialogRef = useRef<HTMLDivElement>(null);
+
+  useModalFocusTrap(
+    optimizationDialogRef,
+    centered && isOptimizationOpen,
+    () => closeOptimizationPanel()
+  );
+
+  const modalFocusedRecommendation = useMemo(
+    () => findProfileOptimizationQuickWin(optimizationRecommendations),
+    [optimizationRecommendations]
+  );
+
+  /** Phase 4 — skip the ready modal when analysis/optimisation data already exists or was dismissed. */
+  const skipAnalysisReadyModal = useMemo(() => {
+    if (isDismissalValid()) return true;
+    if (optimizationRecommendations && optimizationRecommendations.length > 0) return true;
+    const source = optimizationMeta?.source;
+    if (source === 'cache' || source === 'generated' || source === 'no_gaps' || source === 'batch_advanced') {
+      return true;
+    }
+    if (optimizationMeta?.profile_optimization_updated_at) return true;
+    return false;
+  }, [optimizationRecommendations, optimizationMeta]);
+
+  useEffect(() => {
+    if (!centered || !isOptimizationOpen) return;
+    document.body.classList.add('linkedin-profile-optimization-open');
+    return () => {
+      document.body.classList.remove('linkedin-profile-optimization-open');
+    };
+  }, [centered, isOptimizationOpen]);
+
+  /** Keep header + left-rail boxes visible — reset scroll when the modal opens or content loads. */
+  useEffect(() => {
+    if (!centered || !isOptimizationOpen) return;
+
+    const resetModalScroll = () => {
+      const dialog = optimizationDialogRef.current;
+      const overlay = dialog?.parentElement;
+      overlay?.scrollTo({ top: 0, left: 0 });
+      dialog
+        ?.querySelector<HTMLElement>('.linkedin-profile-optimization-dialog__body')
+        ?.scrollTo({ top: 0, left: 0 });
+    };
+
+    resetModalScroll();
+    const rafId = requestAnimationFrame(resetModalScroll);
+    const timeoutId = window.setTimeout(resetModalScroll, 120);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [centered, isOptimizationOpen, optimizationRecommendations?.length]);
   const [dismissedErrorKey, setDismissedErrorKey] = useState<string | null>(null);
 
   // TC-007: Auto-show analysis modal when profile data is ready and not recently dismissed
@@ -186,11 +258,17 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       centered &&
       foundationStatus === 'ready' &&
       profileValidation &&
-      !isDismissalValid()
+      !skipAnalysisReadyModal
     ) {
       setShowAnalysisModal(true);
     }
-  }, [centered, foundationStatus, profileValidation]);
+  }, [centered, foundationStatus, profileValidation, skipAnalysisReadyModal]);
+
+  useEffect(() => {
+    if (skipAnalysisReadyModal && showAnalysisModal) {
+      setShowAnalysisModal(false);
+    }
+  }, [skipAnalysisReadyModal, showAnalysisModal]);
 
   const closeTopicPanel = () => {
     setIsTopicPanelOpen(false);
@@ -263,6 +341,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       void runTopicAnalysis(false);
     };
     const onOpenOptimise = () => {
+      storeDismissal();
+      setShowAnalysisModal(false);
       void openOptimizationPanel();
     };
     window.addEventListener('linkedinwriter:getTopicIdeas', onGetTopicIdeas);
@@ -364,22 +444,34 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
             onClick={() => closeOptimizationPanel()}
           >
             <div
+              ref={optimizationDialogRef}
               className="linkedin-profile-optimization-dialog"
               onClick={(e) => e.stopPropagation()}
+              aria-labelledby="profile-optimization-dialog-title"
             >
-              <div className="linkedin-profile-optimization-dialog__close-row">
-                <button
-                  type="button"
-                  className="linkedin-profile-optimization-dialog__close"
-                  onClick={() => closeOptimizationPanel()}
-                  aria-label="Close profile optimization"
-                >
-                  ✕
-                </button>
-              </div>
-              <div className="linkedin-profile-optimization-dialog__body">
-              <ProfileOptimizationPanel
-                isOpen={isOptimizationOpen}
+              <ProfileOptimizationModalHeader
+                profileStrengthPercent={profileStrengthPercent}
+                strengthLabel={strengthLabel}
+                strengthTooltip={strengthTooltip}
+                isRechecking={isRechecking}
+                recheckDelta={recheckDelta}
+                onRecheckProfile={() => {
+                  void recheckProfile();
+                }}
+                onDismissRecheckDelta={dismissRecheckDelta}
+                onClose={() => closeOptimizationPanel()}
+                displayName={displayName}
+                profilePictureUrl={avatarUrl}
+                localProfilePhotoUrl={localProfilePhotoUrl}
+                uploadingProfilePhoto={uploadingProfilePhoto}
+                transformingProfilePhoto={transformingProfilePhoto}
+                profilePhotoUploadError={profilePhotoUploadError}
+                onUploadProfilePhoto={handleUploadProfilePhoto}
+              />
+              <div className="linkedin-profile-optimization-dialog__body linkedin-profile-optimization-dialog__body--modal-layout">
+                <ProfileOptimizationPanel
+                  variant="modal"
+                  isOpen={isOptimizationOpen}
                 isLoading={isOptimizationLoading}
                 recommendations={optimizationRecommendations}
                 optimizationMeta={optimizationMeta}
@@ -415,8 +507,33 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 onLoadNextBatch={() => {
                   void loadNextOptimizationBatch();
                 }}
+                profilePictureUrl={avatarUrl}
+                localProfilePhotoUrl={localProfilePhotoUrl}
+                transformedProfilePhotoUrl={transformedProfilePhotoUrl}
+                uploadingProfilePhoto={uploadingProfilePhoto}
+                profilePhotoUploadError={profilePhotoUploadError}
+                onUploadProfilePhoto={handleUploadProfilePhoto}
+                transformingProfilePhoto={transformingProfilePhoto}
+                profilePhotoTransformError={profilePhotoTransformError}
+                onMakeProfilePhotoPresentable={handleMakeProfilePhotoPresentable}
+                onDownloadProfilePhoto={handleDownloadProfilePhoto}
               />
               </div>
+              <ProfileOptimizationModalFooter
+                focusedItem={modalFocusedRecommendation}
+                markingRecommendationId={markingRecommendationId}
+                showNextBatchCta={showNextBatchCta}
+                isLoadingNextBatch={isLoadingNextBatch}
+                onSkip={(recommendationId) => {
+                  void markOptimizationItemComplete(recommendationId, 'skipped');
+                }}
+                onMarkDone={(recommendationId) => {
+                  void markOptimizationItemComplete(recommendationId, 'done');
+                }}
+                onLoadNextBatch={() => {
+                  void loadNextOptimizationBatch();
+                }}
+              />
             </div>
           </div>,
           document.body

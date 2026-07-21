@@ -11,7 +11,12 @@ import { DashboardMobileWorkflowGrid } from './DashboardMobileWorkflowGrid';
 import { DashboardMobileAnalyticsSection } from './DashboardMobileAnalyticsSection';
 import type { KnowledgeCenterAction } from './KnowledgeCenterDock';
 import { useDesktopViewport } from '../../hooks/useDesktopViewport';
-import { HUB_CENTER_LEFT_CSS_VAR } from './dashboardLayoutConstants';
+import { useHubHeaderPersonaSync } from '../../hooks/useHubHeaderPersonaSync';
+import {
+  HUB_CENTER_LEFT_CSS_VAR,
+  HUB_CENTER_LEFT_RATIO_CSS_VAR,
+} from './dashboardLayoutConstants';
+import { layoutHubCenterPercent } from './dashboardRadialLayout';
 
 interface LinkedInDashboardHeroProps {
   children: React.ReactNode;
@@ -76,10 +81,22 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     if (!stage) return;
     if (desktopViewport) {
       stage.style.setProperty(HUB_CENTER_LEFT_CSS_VAR, hubCenterLeft);
+      document.body.style.setProperty(
+        HUB_CENTER_LEFT_RATIO_CSS_VAR,
+        String(layoutHubCenterPercent(layout) / 100)
+      );
     } else {
       stage.style.removeProperty(HUB_CENTER_LEFT_CSS_VAR);
+      document.body.style.removeProperty(HUB_CENTER_LEFT_RATIO_CSS_VAR);
     }
-  }, [desktopViewport, hubCenterLeft]);
+  }, [desktopViewport, hubCenterLeft, layout]);
+
+  useHubHeaderPersonaSync({
+    canvasRef,
+    layout,
+    desktopViewport,
+    deps: [containerWidth, containerHeight],
+  });
 
   useLayoutEffect(() => {
     readSize();
@@ -98,8 +115,24 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
     if (canvasRef.current) ro.observe(canvasRef.current);
     ro.observe(el);
     if (stage) ro.observe(stage);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      document.body.style.removeProperty(HUB_CENTER_LEFT_RATIO_CSS_VAR);
+    };
   }, [readSize, syncHubAxis]);
+
+  useEffect(() => {
+    if (!desktopViewport) return;
+    const onViewportChange = () => {
+      window.requestAnimationFrame(() => syncHubAxis());
+    };
+    window.addEventListener('resize', onViewportChange);
+    window.addEventListener('scroll', onViewportChange, { passive: true });
+    return () => {
+      window.removeEventListener('resize', onViewportChange);
+      window.removeEventListener('scroll', onViewportChange);
+    };
+  }, [desktopViewport, syncHubAxis]);
 
   const mobileWorkflowGrid = (
     <div className="linkedin-dashboard-mobile-workflow-wrap">
