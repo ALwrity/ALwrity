@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  CONNECT_GATED_WORKFLOW_IDS,
   DASHBOARD_WORKFLOW_CARDS,
   FRAME_COLOR,
   WEDGE_PANEL_GAP_DEG,
@@ -8,10 +9,12 @@ import {
 } from './dashboardWorkflowConfig';
 import type { RadialLayout } from './dashboardRadialLayout';
 import { PlanWedgeStatusBadge } from './PlanWedgeStatusBadge';
+import { ConnectLockBadge } from './ConnectLockIcon';
 
 interface DashboardRadialWorkflowProps {
   layout: RadialLayout;
   onCardAction: (cardId: DashboardWorkflowCardId) => void;
+  connected?: boolean;
 }
 
 interface LabelPolish {
@@ -142,6 +145,7 @@ function wedgeLabelBox(
 export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = ({
   layout,
   onCardAction,
+  connected = true,
 }) => {
   const [hoveredId, setHoveredId] = useState<DashboardWorkflowCardId | null>(null);
   const [focusedId, setFocusedId] = useState<DashboardWorkflowCardId | null>(null);
@@ -184,6 +188,7 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
     const isFocused = focusedId === card.id;
     const isActive = isHovered || isFocused;
     const isRecommended = showRecommendedHint && card.id === RECOMMENDED_CARD_ID;
+    const isConnectLocked = !connected && CONNECT_GATED_WORKFLOW_IDS.includes(card.id);
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
     const panelEndDeg = card.endAngle + PANEL_GAP_DEGREES;
     const polish = LABEL_POLISH[card.id] ?? { descWidthScale: 0.9 };
@@ -210,7 +215,12 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
     return (
       <g
         key={card.id}
-        className="workflow-wedge"
+        className={[
+          'workflow-wedge',
+          isConnectLocked && 'workflow-wedge--connect-locked',
+        ]
+          .filter(Boolean)
+          .join(' ')}
         data-tour={`li-wedge-${card.id}`}
         transform={wedgeTransform(
           centerX,
@@ -243,20 +253,42 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
           }
         }}
       >
+        {isConnectLocked && (
+          <title>Connect LinkedIn to unlock {card.title}</title>
+        )}
         <path
           className="workflow-wedge-base"
           d={wedgePath}
-          fill={isActive ? accentFill(card.accent, 0.2) : isRecommended ? accentFill(card.accent, 0.08) : 'url(#wedgeFill)'}
-          stroke={isActive || isRecommended ? card.accent : FRAME_COLOR}
+          fill={
+            isConnectLocked
+              ? 'rgba(226, 232, 240, 0.88)'
+              : isActive
+                ? accentFill(card.accent, 0.2)
+                : isRecommended
+                  ? accentFill(card.accent, 0.08)
+                  : 'url(#wedgeFill)'
+          }
+          stroke={isConnectLocked ? 'rgba(148, 163, 184, 0.5)' : isActive || isRecommended ? card.accent : FRAME_COLOR}
           strokeWidth={isActive ? 3 : isRecommended ? 2.4 : 1.2}
           strokeLinejoin="round"
           style={{
             transition: 'fill 180ms ease, stroke 180ms ease, filter 180ms ease',
-            filter: isActive
-              ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)}) drop-shadow(0 8px 12px rgba(0,0,0,0.1))`
-              : 'drop-shadow(0 2px 8px rgba(66,133,244,0.25)) drop-shadow(0 4px 6px rgba(0,0,0,0.05))',
+            filter: isConnectLocked
+              ? 'saturate(0.68) brightness(1.02)'
+              : isActive
+                ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)}) drop-shadow(0 8px 12px rgba(0,0,0,0.1))`
+                : 'drop-shadow(0 2px 8px rgba(66,133,244,0.25)) drop-shadow(0 4px 6px rgba(0,0,0,0.05))',
           }}
         />
+        {isConnectLocked && (
+          <path
+            d={wedgePath}
+            fill="rgba(255, 255, 255, 0.22)"
+            stroke="none"
+            pointerEvents="none"
+            aria-hidden
+          />
+        )}
         <foreignObject
           x={box.x}
           y={box.y}
@@ -306,6 +338,10 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
             </div>
             <div
               style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: Math.max(3, Math.round(labelFontSize * 0.28)),
                 fontSize: labelFontSize,
                 fontWeight: 800,
                 color: isActive ? card.accent : '#0f172a',
@@ -314,7 +350,8 @@ export const DashboardRadialWorkflow: React.FC<DashboardRadialWorkflowProps> = (
                 transition: 'color 180ms ease',
               }}
             >
-              {card.title}
+              <span>{card.title}</span>
+              {isConnectLocked && <ConnectLockBadge size={8} />}
             </div>
             <div
               style={{

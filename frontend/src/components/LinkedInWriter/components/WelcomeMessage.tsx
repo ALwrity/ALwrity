@@ -31,7 +31,6 @@ import { OptimiseProfileRailChip } from './dashboard/OptimiseProfileRailChip';
 import { useMobileHeaderNav } from '../hooks/useMobileHeaderNav';
 import { useMobileVisualViewportInset } from '../hooks/useMobileVisualViewportInset';
 import { MOBILE_STUDIO_MAX_WIDTH_PX } from './dashboard/dashboardLayoutConstants';
-import { StudioTourTrigger } from './dashboard/StudioTourTrigger';
 import {
   LINKEDIN_STUDIO_TOUR_SEEN_KEY,
   getLinkedInStudioTourSeenKey,
@@ -199,8 +198,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   useEffect(() => {
     if (connected) {
       setConnectWelcomeHandled(true);
+      setConnectWelcomeOpen(false);
     }
   }, [connected]);
+
+  useEffect(() => {
+    if (isSocialLoading || connected || connectWelcomeHandled) return;
+    setConnectWelcomeOpen(true);
+  }, [isSocialLoading, connected, connectWelcomeHandled]);
 
   // Auto-start tour only for signed-in first-time studio visitors (after connect welcome closes).
   useEffect(() => {
@@ -390,7 +395,6 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       <div className="linkedin-dashboard-main">
         {!isMobileHeaderNav && (
           <div className="linkedin-dashboard-main-toolbar">
-            <StudioTourTrigger />
             <TodayGrowthWalkthrough variant="main" />
             <ResumeDraftRailChip
               draft={draft}
@@ -411,6 +415,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
         <div className="linkedin-dashboard-hero-stage">
         <LinkedInDashboardHero
+          connected={connected}
           onWorkflowCardAction={handleWorkflowCardAction}
           onViewAnalytics={openPostAnalytics}
           onKnowledgeCenterAction={handleKnowledgeCenterAction}
@@ -464,6 +469,9 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             onConnectWelcomeDismissed={() => setConnectWelcomeHandled(true)}
             onConnectWelcomeOpenChange={setConnectWelcomeOpen}
             userId={userId}
+            blockDashboardErrorModal={
+              connectWelcomeOpen || runStudioTour || (!connected && !connectWelcomeHandled)
+            }
           />
         </LinkedInDashboardHero>
         </div>
@@ -537,10 +545,12 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
           )}
       </div>
 
-      <DashboardRightRail
-        onViewAllAnalytics={openPostAnalytics}
-        onKnowledgeCenterAction={handleKnowledgeCenterAction}
-      />
+      {desktopViewport && (
+        <DashboardRightRail
+          onViewAllAnalytics={openPostAnalytics}
+          onKnowledgeCenterAction={handleKnowledgeCenterAction}
+        />
+      )}
 
       <PostAnalyticsModal
         open={postAnalyticsOpen}
