@@ -84,48 +84,66 @@ def subscription_db_session(subscription_db_engine) -> Iterator[Session]:
 
 def _seed_pricing_and_plans(db: Session):
     """Insert all model pricing entries and subscription plans from pricing.yaml."""
-    from services.subscription.pricing_config import PricingConfigLoader
-    from services.subscription.pricing_service import PricingService
+    import re
+    import yaml
+    from models.subscription_models import (
+        APIProviderPricing, SubscriptionPlan, APIProvider, SubscriptionTier,
+    )
 
-    loader = PricingConfigLoader()
-    config = loader.load()
+    pricing_path = _BACKEND_ROOT / "config" / "pricing.yaml"
+    with open(pricing_path, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f)
 
-    for mp_entry in config.model_pricing:
-        from models.subscription_models import APIProviderPricing
+    _ENV_PATTERN = re.compile(r"\$\{(\w+):-([^}]*)\}")
+
+    def _resolve(value):
+        if not isinstance(value, str):
+            return value
+        def _repl(m):
+            return os.environ.get(m.group(1), m.group(2))
+        return _ENV_PATTERN.sub(_repl, value)
+
+    for entry in raw.get("model_pricing", []):
+        provider_str = entry["provider"]
+        provider = APIProvider(provider_str)
+        model_name = entry["model"]
+        cost_per_input = float(_resolve(entry.get("input_per_1m_tokens", 0)) or 0) / 1_000_000
+        cost_per_output = float(_resolve(entry.get("output_per_1m_tokens", 0)) or 0) / 1_000_000
+
         existing = db.query(APIProviderPricing).filter(
-            APIProviderPricing.provider == mp_entry.provider,
-            APIProviderPricing.model_name == mp_entry.model_name,
+            APIProviderPricing.provider == provider,
+            APIProviderPricing.model_name == model_name,
         ).first()
         if not existing:
             db.add(APIProviderPricing(
-                provider=mp_entry.provider,
-                model_name=mp_entry.model_name,
-                cost_per_input_token=mp_entry.cost_per_input_token,
-                cost_per_output_token=mp_entry.cost_per_output_token,
-                cost_per_request=mp_entry.cost_per_request,
-                cost_per_image=mp_entry.cost_per_image,
-                cost_per_page=mp_entry.cost_per_page,
-                cost_per_search=mp_entry.cost_per_search,
-                description=mp_entry.description,
+                provider=provider,
+                model_name=model_name,
+                cost_per_input_token=cost_per_input,
+                cost_per_output_token=cost_per_output,
+                cost_per_request=float(_resolve(entry.get("per_request", 0)) or 0),
+                cost_per_image=float(_resolve(entry.get("per_image", 0)) or 0),
+                cost_per_page=float(_resolve(entry.get("per_page", 0)) or 0),
+                cost_per_search=float(_resolve(entry.get("per_search", 0)) or 0),
+                description=str(_resolve(entry.get("notes", ""))),
             ))
 
-    for plan_entry in config.plans:
-        from models.subscription_models import SubscriptionPlan
+    for plan in raw.get("plans", []):
+        tier = SubscriptionTier(plan["tier"])
         existing = db.query(SubscriptionPlan).filter(
-            SubscriptionPlan.name == plan_entry.name,
+            SubscriptionPlan.name == plan["name"],
         ).first()
         if not existing:
             plan_data = {
-                "name": plan_entry.name,
-                "tier": plan_entry.tier,
-                "price_monthly": plan_entry.price_monthly,
-                "price_yearly": plan_entry.price_yearly,
-                "monthly_cost_limit": plan_entry.monthly_cost_limit,
-                "features": plan_entry.features,
-                "description": plan_entry.description,
+                "name": plan["name"],
+                "tier": tier,
+                "price_monthly": float(plan.get("price_monthly", 0)),
+                "price_yearly": float(plan.get("price_yearly", 0)),
+                "monthly_cost_limit": float(plan.get("monthly_cost_cap", 0)),
+                "features": plan.get("features", []),
+                "description": str(plan.get("description", "")),
             }
-            for limit_key, limit_val in plan_entry.limits.items():
-                plan_data[limit_key] = limit_val
+            for limit_key, limit_val in (plan.get("limits", {}) or {}).items():
+                plan_data[limit_key] = int(limit_val) if limit_val is not None else 0
             db.add(SubscriptionPlan(**plan_data))
 
     db.commit()
