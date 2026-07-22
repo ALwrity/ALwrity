@@ -20,6 +20,11 @@ import requests
 from loguru import logger
 
 from services.integrations.oauth_provider_base import OAuthProviderBase, resolve_encryption_key
+from services.integrations.linkedin.oauth_schema_migrations import (
+    ensure_linkedin_oauth_token_columns,
+    existing_token_encryption_columns,
+    normalize_unipile_provider_mode,
+)
 from services.integrations.linkedin.types import (
     LinkedInCredentials,
     LinkedInNotConnectedError,
@@ -98,24 +103,15 @@ class LinkedInOAuthService(OAuthProviderBase):
                 )
                 """
             )
-            cursor.execute("PRAGMA table_info(linkedin_oauth_tokens)")
-            existing_cols = {row[1] for row in cursor.fetchall()}
-            # Add Unipile columns (Phase 2 migration)
-            if "unipile_account_id" not in existing_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_account_id TEXT"
+            # Legacy tenant DBs may predate Unipile columns; backfill idempotently.
+            # Leave any leftover zernio_* columns in place (unused; DROP is unsafe/unneeded).
+            ensure_linkedin_oauth_token_columns(cursor, user_id=user_id)
+            normalized = normalize_unipile_provider_mode(cursor)
+            if normalized:
+                logger.info(
+                    f"[LinkedInOAuthSchema] Normalized provider_mode to unipile "
+                    f"user_id={user_id} rows={normalized}"
                 )
-            if "unipile_org_account_id" not in existing_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_org_account_id TEXT"
-                )
-            # Drop legacy zernio columns (post-Zernio cleanup)
-            for _col in ("zernio_api_key", "zernio_account_id", "zernio_org_account_id", "zernio_profile_id"):
-                if _col in existing_cols:
-                    try:
-                        cursor.execute(f"ALTER TABLE linkedin_oauth_tokens DROP COLUMN {_col}")
-                    except sqlite3.OperationalError:
-                        logger.warning(f"Could not drop column {_col} (SQLite version < 3.35.0); ignoring")
             cursor.execute(
                 """
                 CREATE TABLE IF NOT EXISTS linkedin_oauth_states (
@@ -199,24 +195,32 @@ class LinkedInOAuthService(OAuthProviderBase):
         """Override of OAuthProviderBase._migrate_plaintext_tokens_if_needed.
 
         Migrate any plaintext access/refresh token values once per user.
+        Only touches columns that exist after schema ensure (Unipile-era).
         """
         if user_id in self._migration_done:
             return
         cursor = conn.cursor()
+        token_cols = existing_token_encryption_columns(cursor)
+        if not token_cols:
+            self._migration_done.add(user_id)
+            return
+
+        select_cols = ", ".join(["id", *token_cols])
         cursor.execute(
-            """
-            SELECT id, linkedin_access_token, linkedin_refresh_token
+            f"""
+            SELECT {select_cols}
             FROM linkedin_oauth_tokens WHERE user_id = ?
             """,
             (user_id,),
         )
         migrated = 0
-        for token_id, access, refresh in cursor.fetchall():
+        for row in cursor.fetchall():
+            token_id = row[0]
+            values = dict(zip(token_cols, row[1:]))
             updates: Dict[str, Optional[str]] = {}
-            if access and not self._is_likely_encrypted_blob(access):
-                updates["linkedin_access_token"] = self._encrypt_token(access)
-            if refresh and not self._is_likely_encrypted_blob(refresh):
-                updates["linkedin_refresh_token"] = self._encrypt_token(refresh)
+            for col, value in values.items():
+                if value and not self._is_likely_encrypted_blob(value):
+                    updates[col] = self._encrypt_token(value)
             if not updates:
                 continue
             set_clause = ", ".join(f"{k} = ?" for k in updates)
