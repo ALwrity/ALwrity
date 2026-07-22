@@ -2,32 +2,47 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
 import {
-
   getLinkedInConnectionStatus,
-
   listLinkedInAccounts,
-
   listLinkedInOrganizations,
-
   disconnectLinkedIn,
-
   getLinkedInSocialErrorMessage,
-
   type LinkedInAccount,
-
   type LinkedInConnectionStatus,
-
   type LinkedInOrganization,
-
 } from '../api/linkedinSocial';
 
 import {
-
   buildLinkedInProfileSummary,
-
   type LinkedInProfileSummary,
-
 } from '../components/LinkedInWriter/utils/linkedInProfileSummary';
+
+// Module-level shared status cache — prevents 14 independent hook
+// mounts from firing 14 separate GET /connection/status calls.
+// All hook instances read from this single cache.
+let _sharedStatusCache: LinkedInConnectionStatus | null = null;
+let _sharedStatusTimestamp = 0;
+const _SHARED_CACHE_TTL = 30_000; // 30 seconds
+let _sharedStatusPromise: Promise<LinkedInConnectionStatus> | null = null;
+
+function _cacheStatus(status: LinkedInConnectionStatus) {
+  _sharedStatusCache = status;
+  _sharedStatusTimestamp = Date.now();
+}
+
+function _invalidateSharedCache() {
+  _sharedStatusCache = null;
+  _sharedStatusTimestamp = 0;
+  _sharedStatusPromise = null;
+}
+
+function _getCachedStatus(): LinkedInConnectionStatus | null {
+  if (_sharedStatusCache && (Date.now() - _sharedStatusTimestamp) < _SHARED_CACHE_TTL) {
+    return _sharedStatusCache;
+  }
+  _invalidateSharedCache();
+  return null;
+}
 
 import { connectWithLinkedInOAuth } from '../utils/linkedInOAuthConnect';
 
@@ -171,32 +186,35 @@ export const useLinkedInSocialConnection = () => {
 
 
   const checkStatus = useCallback(async () => {
-
     setIsLoading(true);
-
     setError(null);
-
     setProfileLoadWarning(null);
-
-
 
     let connectionStatus: LinkedInConnectionStatus;
 
-    try {
-
-      connectionStatus = await getLinkedInConnectionStatus();
-
+    // 1. Check shared module-level cache (30s TTL)
+    const cached = _getCachedStatus();
+    if (cached) {
+      connectionStatus = cached;
       setStatus(connectionStatus);
+      console.debug('[LinkedInConnect] status from shared cache', { connected: connectionStatus.connected });
+    } else {
+      // 2. Deduplicate concurrent calls — if another mount already
+      //    has an in-flight request, share its promise.
+      if (!_sharedStatusPromise) {
+        _sharedStatusPromise = getLinkedInConnectionStatus()
+          .finally(() => { _sharedStatusPromise = null; });
+      }
 
-      console.info('[LinkedInConnect] status loaded', {
-
-        connected: connectionStatus.connected,
-
-        provider: connectionStatus.provider,
-
-      });
-
-    } catch (e: any) {
+      try {
+        connectionStatus = await _sharedStatusPromise;
+        _cacheStatus(connectionStatus);
+        setStatus(connectionStatus);
+        console.info('[LinkedInConnect] status loaded (fresh)', {
+          connected: connectionStatus.connected,
+          provider: connectionStatus.provider,
+        });
+      } catch (e: any) {
 
       // 404 means the backend endpoint isn't mounted in this deployment
       // (Unipile connect path). The catch block below
@@ -523,6 +541,7 @@ export const useLinkedInSocialConnection = () => {
 
 
   const setDisconnected = useCallback(() => {
+    _invalidateSharedCache();
     setStatus({ connected: false, provider: 'unipile', has_per_user_token: false, accounts: [] });
     setAccounts([]);
     setOrganizations([]);
@@ -601,6 +620,7 @@ export const useLinkedInSocialConnection = () => {
 
       console.info('[LinkedInConnect] OAuth connect succeeded');
 
+      _invalidateSharedCache();
       await checkStatus();
 
       return true;
