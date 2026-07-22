@@ -200,6 +200,7 @@ venv/
 env/
 ENV/
 .venv/
+myenv312/
 
 # Jupyter Notebook
 .ipynb_checkpoints
