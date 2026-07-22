@@ -359,7 +359,7 @@ function writeProfileCache(data: LinkedInProfileAcquireResponse) {
 /** In-flight promise cache so 4+ hook mounts share one request */
 let statusPromiseCache: Promise<LinkedInConnectionStatus> | null = null;
 let statusCacheExpiry = 0;
-const STATUS_CACHE_TTL = 3000;
+const STATUS_CACHE_TTL = 30_000; // 30 seconds — shared across all hook mounts
 
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
   if (statusPromiseCache && Date.now() < statusCacheExpiry) {

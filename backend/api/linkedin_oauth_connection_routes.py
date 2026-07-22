@@ -5,6 +5,8 @@ disconnect, and connection status. Split out of the original linkedin_social_rou
 
 from __future__ import annotations
 
+import asyncio
+import time
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +20,10 @@ from middleware.auth_middleware import clerk_auth, get_current_user, security
 from models.linkedin_social_models import LinkedInConnectionStatusResponse
 from services.integrations.linkedin.factory import get_linkedin_provider
 from services.integrations.linkedin.types import LinkedInNotConnectedError
+
+# Organization cache — avoids Unipile API call on every /connection/status hit
+_ORG_CACHE: Dict[str, tuple[List[Dict[str, Any]], float]] = {}
+_ORG_CACHE_TTL = 300  # 5 minutes
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 from services.integrations.linkedin.unipile_health import (
     check_unipile_health,
@@ -91,10 +97,20 @@ async def get_connection_status(
     organizations: List[Dict[str, Any]] = []
     if status.get("connected") and status.get("accounts"):
         primary_account = status["accounts"][0].get("account_id")
-        if primary_account:
+        cache_key = f"{user_id}:{primary_account}"
+        now = time.time()
+
+        # Check cache first — Unipile API calls are slow
+        cached = _ORG_CACHE.get(cache_key)
+        if cached and (now - cached[1]) < _ORG_CACHE_TTL:
+            organizations = cached[0]
+        elif primary_account:
             try:
                 provider = get_linkedin_provider()
-                orgs = await provider.list_organizations(user_id, primary_account)
+                orgs = await asyncio.wait_for(
+                    provider.list_organizations(user_id, primary_account),
+                    timeout=5.0,
+                )
                 organizations = [
                     {
                         "organization_id": o.organization_id,
@@ -103,6 +119,9 @@ async def get_connection_status(
                     }
                     for o in orgs
                 ]
+                _ORG_CACHE[cache_key] = (organizations, now)
+            except asyncio.TimeoutError:
+                logger.warning(f"[LinkedInStatus] org fetch timed out for {user_id}")
             except Exception as e:
                 logger.warning(f"Could not load organizations for status: {e}")
 

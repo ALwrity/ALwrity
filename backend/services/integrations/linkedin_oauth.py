@@ -12,6 +12,7 @@ import hashlib
 import os
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote, urlencode, urlparse
@@ -613,6 +614,56 @@ class LinkedInOAuthService(OAuthProviderBase):
 
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
         provider = os.getenv("LINKEDIN_PROVIDER", "unipile")
+
+        # Retry ONLY transient errors (DB lock, decrypt glitch).
+        # Genuine credential errors (LinkedInNotConnectedError) return immediately.
+        for attempt in (1, 2):
+            try:
+                return self._get_connection_status_impl(user_id, provider)
+            except LinkedInNotConnectedError:
+                return self._disconnected_status(
+                    provider,
+                    has_db_token=self._has_active_token(user_id),
+                )
+            except Exception as e:
+                if not self._is_transient_error(e):
+                    raise  # Non-transient — let it propagate
+                if attempt == 2:
+                    logger.warning(
+                        f"[LinkedInOAuth] get_connection_status failed after retry for "
+                        f"user {user_id}: {e}"
+                    )
+                    return self._disconnected_status(
+                        provider,
+                        has_db_token=self._has_active_token(user_id),
+                    )
+                time.sleep(0.15)
+
+    @staticmethod
+    def _is_transient_error(exc: Exception) -> bool:
+        """Return True for errors that may resolve on retry (DB lock, timeout)."""
+        if isinstance(exc, sqlite3.OperationalError):
+            return "locked" in str(exc).lower()
+        return False
+
+    def _has_active_token(self, user_id: str) -> bool:
+        """Check if a token row exists without decrypting (lightweight)."""
+        try:
+            return self._get_active_token_row(user_id) is not None
+        except Exception:
+            return False
+
+    def _disconnected_status(self, provider: str, has_db_token: bool = False) -> Dict[str, Any]:
+        return {
+            "connected": False,
+            "provider": provider,
+            "has_per_user_token": has_db_token,
+            "has_env_fallback": False,
+            "accounts": [],
+            "account_name": None,
+        }
+
+    def _get_connection_status_impl(self, user_id: str, provider: str) -> Dict[str, Any]:
         row = self._get_active_token_row(user_id)
         has_db_token = row is not None
 
