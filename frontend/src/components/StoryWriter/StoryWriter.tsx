@@ -1,23 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Container, Typography, useTheme, Dialog, DialogTitle, DialogContent, IconButton, Chip } from '@mui/material';
+import { Box, Container, Typography, useTheme, Dialog, DialogTitle, DialogContent, IconButton } from '@mui/material';
 import { useStoryWriterState } from '../../hooks/useStoryWriterState';
 import { useStoryWriterPhaseNavigation } from '../../hooks/useStoryWriterPhaseNavigation';
 import StorySetup from './Phases/StorySetup';
 import StoryOutline from './Phases/StoryOutline';
 import StoryWriting from './Phases/StoryWriting';
 import StoryExport from './Phases/StoryExport';
-import PhaseNavigation from './PhaseNavigation';
-import { MultimediaToolbar } from './components/MultimediaToolbar';
+import { StoryWriterHeader } from './StoryWriterHeader';
 import { storyWriterApi } from '../../services/storyWriterApi';
 import { triggerSubscriptionError } from '../../api/client';
 import CloseIcon from '@mui/icons-material/Close';
-import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import { MultimediaSection } from './components/MultimediaSection';
-import SaveIcon from '@mui/icons-material/Save';
+import { AnimeBibleDialog } from './components/AnimeBibleDialog';
 import StoryWriterLanding from './StoryWriterLanding';
 import { AIStorySetupModal } from './Phases/StorySetup/AIStorySetupModal';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { SecondaryButton } from '../PodcastMaker/ui/SecondaryButton';
 
 const createStoryProjectId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -260,8 +257,10 @@ export const StoryWriter: React.FC = () => {
             ? state.premise.trim().slice(0, 80)
             : 'Untitled Story');
         await state.initializeProject(projectId, title);
+        await state.saveProjectToDb(projectId);
+      } else {
+        await state.saveProjectToDb();
       }
-      await state.saveProjectToDb();
     } finally {
       setIsSavingProject(false);
     }
@@ -403,81 +402,25 @@ export const StoryWriter: React.FC = () => {
           zIndex: 1,
         }}
       >
-        {/* Header with Phase Navigation and Multimedia Toolbar */}
+        {/* Header with cream theme card + Phase Navigation + UserBadge */}
         <Box sx={{ mb: 2, pt: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ minWidth: 0 }}>
-              <Typography variant="h5" component="h1" sx={{ color: 'white', fontWeight: 600, lineHeight: 1.2 }}>
-                Story Studio
-              </Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                Create fiction and non-fiction story campaigns with AI assistance
-              </Typography>
-            </Box>
-            {/* Compact Phase Navigation */}
-            <Box
-              sx={{
-                flex: '1 1 auto',
-                minWidth: { xs: '100%', md: '600px' },
-                display: 'flex',
-                alignItems: 'center',
-                gap: 2,
-                justifyContent: 'flex-end',
-              }}
-            >
-              <Box sx={{ flex: 1 }}>
-        <PhaseNavigation
-          phases={phases}
-          currentPhase={currentPhase}
-          onPhaseClick={navigateToPhase}
-          onReset={handleReset}
-        />
-              </Box>
-              <Chip
-                icon={
-                  <LightbulbIcon
-                    sx={{
-                      color: hasAnimeBible ? '#22c55e' : '#f97373',
-                    }}
-                  />
-                }
-                label="Director"
-                variant={hasAnimeBible ? 'filled' : 'outlined'}
-                onClick={() => setIsDirectorOpen(true)}
-                sx={{
-                  borderColor: hasAnimeBible ? '#22c55e' : '#f97373',
-                  color: hasAnimeBible ? '#065f46' : '#7f1d1d',
-                  bgcolor: hasAnimeBible ? 'rgba(16,185,129,0.12)' : 'transparent',
-                  fontWeight: 500,
-                  height: 32,
-                }}
-              />
-              <SecondaryButton
-                onClick={handleSaveProject}
-                loading={isSavingProject}
-                startIcon={<SaveIcon />}
-                disabled={!canSaveProject}
-                ariaLabel="Save story project"
-                tooltip={
-                  state.projectId
-                    ? 'Save latest story changes to My Projects'
-                    : 'Save this story to My Projects'
-                }
-                sx={{ minWidth: 140 }}
-              >
-                {state.projectId ? 'Save Project' : 'Save to My Projects'}
-              </SecondaryButton>
-              {/* Multimedia Toolbar */}
-              <MultimediaToolbar
-                state={state}
-                onGenerateAudio={handleGenerateAudio}
-                onGenerateVideo={handleGenerateVideo}
-                isGeneratingAudio={isGeneratingAudio}
-                isGeneratingVideo={isGeneratingVideo}
-                onOpenPanel={(_section) => handleOpenMultimediaDialog()}
-              />
-            </Box>
-          </Box>
+          <StoryWriterHeader
+            onReset={handleReset}
+            phases={phases}
+            currentPhase={currentPhase}
+            onPhaseClick={navigateToPhase}
+            hasAnimeBible={hasAnimeBible}
+            onDirectorOpen={() => setIsDirectorOpen(true)}
+            isSavingProject={isSavingProject}
+            canSaveProject={canSaveProject}
+            onSaveProject={handleSaveProject}
+            state={state}
+            onGenerateAudio={handleGenerateAudio}
+            onGenerateVideo={handleGenerateVideo}
+            isGeneratingAudio={isGeneratingAudio}
+            isGeneratingVideo={isGeneratingVideo}
+            onOpenPanel={(_section) => handleOpenMultimediaDialog()}
+          />
         </Box>
 
         {/* Phase Content */}
@@ -502,34 +445,12 @@ export const StoryWriter: React.FC = () => {
           <MultimediaSection state={state} />
         </DialogContent>
       </Dialog>
-      <Dialog
+      <AnimeBibleDialog
         open={isDirectorOpen}
         onClose={() => setIsDirectorOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>Anime Story Bible</DialogTitle>
-        <DialogContent dividers>
-          {state.animeBible ? (
-            <Box
-              component="pre"
-              sx={{
-                fontFamily: 'monospace',
-                fontSize: 12,
-                whiteSpace: 'pre-wrap',
-                wordBreak: 'break-word',
-                m: 0,
-              }}
-            >
-              {JSON.stringify(state.animeBible, null, 2)}
-            </Box>
-          ) : (
-            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-              No anime story bible is available yet. Generate an outline for an anime story to create one.
-            </Typography>
-          )}
-        </DialogContent>
-      </Dialog>
+        animeBible={state.animeBible}
+        onSave={(bible) => state.setAnimeBible(bible)}
+      />
     </Box>
   );
 };

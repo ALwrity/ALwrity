@@ -27,6 +27,7 @@ interface LinkedInDashboardHeroProps {
   mobileProfileHubSlot?: React.ReactNode;
   mobileContextNudgeSlot?: React.ReactNode;
   mobileStudioActionsSlot?: React.ReactNode;
+  connected?: boolean;
 }
 
 export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
@@ -38,6 +39,7 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
   mobileProfileHubSlot,
   mobileContextNudgeSlot,
   mobileStudioActionsSlot,
+  connected = true,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -141,6 +143,7 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         profileHubSlot={mobileProfileHubSlot}
         contextNudgeSlot={mobileContextNudgeSlot}
         studioActionsSlot={mobileStudioActionsSlot}
+        connected={connected}
       />
     </div>
   );
@@ -188,7 +191,11 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
         >
           {desktopViewport && (
             <>
-              <DashboardRadialWorkflow layout={layout} onCardAction={onWorkflowCardAction} />
+              <DashboardRadialWorkflow
+                layout={layout}
+                onCardAction={onWorkflowCardAction}
+                connected={connected}
+              />
               <div
                 data-tour="li-content-lifecycle"
                 className="linkedin-tour-lifecycle-spotlight"
@@ -265,6 +272,7 @@ export const LinkedInDashboardHero: React.FC<LinkedInDashboardHeroProps> = ({
           <DashboardMobileAnalyticsSection
             onViewAnalytics={onViewAnalytics}
             onKnowledgeCenterAction={onKnowledgeCenterAction}
+            connected={connected}
           />
         )}
       </div>

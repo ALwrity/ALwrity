@@ -62,7 +62,7 @@ def generate_hd_video_scene_payload(request: Any, user_id: str) -> Dict[str, Any
     Handles per-scene HD video generation including prompt enhancement
     and subscription validation.
     """
-    from services.database import get_db as get_db_validation
+    from services.database import get_session_for_user
     from services.onboarding.api_key_manager import APIKeyManager
     from services.subscription import PricingService
     from services.subscription.preflight_validator import validate_video_generation_operations
@@ -84,7 +84,10 @@ def generate_hd_video_scene_payload(request: Any, user_id: str) -> Dict[str, Any
             },
         )
 
-    db_validation = next(get_db_validation())
+    db_validation = get_session_for_user(user_id)
+    if db_validation is None:
+        logger.error(f"[StoryWriter] Pre-flight: Could not open database session for user {user_id}")
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
     try:
         pricing_service = PricingService(db_validation)
         logger.info(f"[StoryWriter] Pre-flight: Checking video generation limits for user {user_id}...")

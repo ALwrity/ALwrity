@@ -6,8 +6,13 @@ import {
   Button,
   Alert,
   CircularProgress,
+  Tooltip,
+  Dialog,
+  IconButton,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 import GlobalStyles from '@mui/material/GlobalStyles';
+import { marked } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStoryWriterState } from '../../../hooks/useStoryWriterState';
 import { storyWriterApi } from '../../../services/storyWriterApi';
@@ -15,8 +20,29 @@ import { triggerSubscriptionError } from '../../../api/client';
 import { aiApiClient } from '../../../api/client';
 import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
 import { MultimediaSection } from '../components/MultimediaSection';
+import { StoryWritingProgressModal } from './StorySetup/StoryWritingProgressModal';
+import { SceneImageGenerationProgressModal } from './StorySetup/SceneImageGenerationProgressModal';
+import EditSectionModal from './StoryOutlineParts/EditSectionModal';
+import ImageEditModal from './StoryOutlineParts/ImageEditModal';
+import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import EditNoteIcon from '@mui/icons-material/EditNote';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import {
+  StoryImageGenerationModal,
+  StoryImageGenerationSettings,
+} from '../components/StoryImageGenerationModal';
 
 const MotionBox = motion.create(Box);
+
+const renderMarkdown = (md: string): string => {
+  if (!md) return '';
+  try {
+    const html = marked.parse(md);
+    return typeof html === 'string' ? html : '';
+  } catch {
+    return md;
+  }
+};
 
 // Define cubic bezier easing arrays as const to preserve tuple types
 const easeInOut = [0.22, 0.61, 0.36, 1] as const;
@@ -126,6 +152,19 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
   const [imageBlobUrls, setImageBlobUrls] = useState<Map<number, string>>(new Map());
   const [videoBlobUrls, setVideoBlobUrls] = useState<Map<number, string>>(new Map());
   const [videoLoadError, setVideoLoadError] = useState<Set<number>>(new Set());
+
+  // Editing state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editText, setEditText] = useState('');
+  const [aiFeedback, setAiFeedback] = useState('');
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
+  const [imagePromptDraft, setImagePromptDraft] = useState('');
+  const [isImageSettingsModalOpen, setIsImageSettingsModalOpen] = useState(false);
+  const [isImageSettingsGenerating, setIsImageSettingsGenerating] = useState(false);
+  const [isGeneratingSceneImage, setIsGeneratingSceneImage] = useState(false);
+  const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
 
   // Get scenes and images from state
   const scenes = state.outlineScenes || [];
@@ -472,6 +511,158 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
     }
   };
 
+  const openEditModal = () => {
+    setEditText(currentPage);
+    setAiFeedback('');
+    setAiSuggestions([]);
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveUpdatedSection = () => {
+    if (!state.storyContent) {
+      setIsEditModalOpen(false);
+      return;
+    }
+    // Replace the current section in the full story content
+    const sections = storySections;
+    const before = sections.slice(0, currentPageIndex).join('\n\n');
+    const after = sections.slice(currentPageIndex + 1).join('\n\n');
+    const updated = [before, editText, after].filter(Boolean).join('\n\n');
+    state.setStoryContent(updated);
+    setIsEditModalOpen(false);
+  };
+
+  const handleGenerateAISuggestions = async () => {
+    setAiLoading(true);
+    try {
+      const base = (editText || currentPage || '').trim();
+      const suggestion1 = `${base}\n\n[Variant A] Improved pacing and clarity with stronger narrative flow.`;
+      const suggestion2 = `${base}\n\n[Variant B] Richer sensory details and deeper emotional resonance.`;
+      setAiSuggestions([suggestion1, suggestion2]);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const applySuggestion = (index: number) => {
+    const chosen = aiSuggestions[index];
+    if (chosen) {
+      setEditText(chosen);
+    }
+  };
+
+  const openImageModal = () => {
+    setImagePromptDraft(currentScene?.image_prompt || '');
+    setIsImageModalOpen(true);
+  };
+
+  const handleSaveImagePrompt = () => {
+    if (!hasScenes || !currentScene) { setIsImageModalOpen(false); return; }
+    const updated = [...scenes];
+    updated[currentSceneIndex] = { ...updated[currentSceneIndex], image_prompt: imagePromptDraft };
+    (state.setOutlineScenes as any)(updated);
+    setIsImageModalOpen(false);
+  };
+
+  const handleGenerateSceneImage = async (promptOverride?: string) => {
+    if (!hasScenes || !currentScene) return;
+    setIsGeneratingSceneImage(true);
+    try {
+      const prompt = promptOverride || imagePromptDraft || currentScene?.image_prompt || '';
+      if (!prompt.trim()) {
+        return;
+      }
+      const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
+
+      const resp = await storyWriterApi.regenerateSceneImage({
+        scene_number: sceneNum,
+        scene_title: sceneTitle,
+        prompt: prompt.trim(),
+        provider: state.imageProvider || undefined,
+        width: state.imageWidth,
+        height: state.imageHeight,
+        model: state.imageModel || undefined,
+      });
+
+      if (resp.success && resp.image_url) {
+        // Store the new image URL
+        const nextMap = new Map(state.sceneImages || []);
+        nextMap.set(sceneNum, resp.image_url);
+        state.setSceneImages(nextMap);
+
+        // Fetch the blob URL directly so the image appears immediately
+        try {
+          const cleanUrl = resp.image_url.split('?')[0];
+          const imageUrl = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
+          const blobResp = await aiApiClient.get(imageUrl, { responseType: 'blob' });
+          const blobUrl = URL.createObjectURL(blobResp.data);
+          setImageBlobUrls((prev) => {
+            const next = new Map(prev);
+            const oldBlob = next.get(sceneNum);
+            if (oldBlob) URL.revokeObjectURL(oldBlob);
+            next.set(sceneNum, blobUrl);
+            return next;
+          });
+          setImageLoadError((prev) => {
+            const next = new Set(prev);
+            next.delete(sceneNum);
+            return next;
+          });
+        } catch (fetchErr) {
+          console.error('Failed to load generated image:', fetchErr);
+          setImageLoadError((prev) => new Set(prev).add(sceneNum));
+        }
+      } else {
+        throw new Error(resp.error || 'Failed to generate image');
+      }
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to generate image';
+      state.setError(errorMessage);
+    } finally {
+      setIsGeneratingSceneImage(false);
+    }
+  };
+
+  const handleOpenAdvancedImageSettings = (prompt: string) => {
+    setImagePromptDraft(prompt);
+    setIsImageSettingsModalOpen(true);
+  };
+
+  const handleGenerateImageWithSettings = async (settings: StoryImageGenerationSettings) => {
+    if (!hasScenes || !currentScene) return;
+    setIsImageSettingsGenerating(true);
+    try {
+      const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
+
+      const resp = await storyWriterApi.regenerateSceneImage({
+        scene_number: sceneNum,
+        scene_title: sceneTitle,
+        prompt: settings.prompt.trim(),
+        provider: state.imageProvider || undefined,
+        width: state.imageWidth,
+        height: state.imageHeight,
+        model: settings.model || state.imageModel || undefined,
+      });
+
+      if (resp.success && resp.image_url) {
+        const nextMap = new Map(state.sceneImages || []);
+        nextMap.set(sceneNum, resp.image_url);
+        state.setSceneImages(nextMap);
+        setImagePromptDraft(settings.prompt.trim());
+        setIsImageSettingsModalOpen(false);
+        setIsImageModalOpen(false);
+      } else {
+        throw new Error(resp.error || 'Failed to generate image');
+      }
+    } catch (err: any) {
+      console.error('Failed to generate scene image with settings:', err);
+    } finally {
+      setIsImageSettingsGenerating(false);
+    }
+  };
+
   const handleContinueToExport = () => {
     if (state.storyContent && state.isComplete) {
       onNext();
@@ -479,6 +670,7 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
   };
 
   return (
+    <>
     <Paper 
       sx={{ 
         p: 4, 
@@ -499,6 +691,27 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
           '.tw-page-accent': {
             background: 'linear-gradient(120deg, #f9e6c8, #f2d8b4)',
           },
+          '.rendered-content p': { marginBottom: '0.75rem', lineHeight: 1.8 },
+          '.rendered-content h1, .rendered-content h2, .rendered-content h3': {
+            color: '#2C2416', marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 600,
+          },
+          '.rendered-content h1': { fontSize: '1.5rem' },
+          '.rendered-content h2': { fontSize: '1.3rem', borderBottom: '1px solid rgba(120,90,60,0.2)', paddingBottom: '0.25rem' },
+          '.rendered-content h3': { fontSize: '1.15rem' },
+          '.rendered-content strong': { fontWeight: 700 },
+          '.rendered-content em': { fontStyle: 'italic' },
+          '.rendered-content ul, .rendered-content ol': { paddingLeft: '1.5rem', marginBottom: '0.75rem' },
+          '.rendered-content li': { marginBottom: '0.25rem' },
+          '.rendered-content blockquote': {
+            borderLeft: '3px solid #8D6E63', paddingLeft: '1rem', color: '#5D4037',
+            fontStyle: 'italic', margin: '0.75rem 0',
+          },
+          '.rendered-content code': {
+            background: 'rgba(141,110,99,0.12)', padding: '2px 6px', borderRadius: 4,
+            fontFamily: 'monospace', fontSize: '0.9em',
+          },
+          '.rendered-content hr': { border: 'none', borderTop: '1px solid rgba(120,90,60,0.2)', margin: '1rem 0' },
+          '.rendered-content a': { color: '#5D4037', textDecoration: 'underline' },
         }}
       />
       {state.storyContent && (
@@ -635,51 +848,121 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
                           />
                         </Box>
                       ) : currentSceneImageFullUrl ? (
-                        <Box
-                          sx={{
-                            width: '100%',
-                            borderRadius: '12px',
-                            overflow: 'hidden',
-                            boxShadow: '0 8px 20px rgba(0, 0, 0, 0.18), 0 4px 8px rgba(0, 0, 0, 0.12)',
-                            border: '3px solid rgba(120, 90, 60, 0.25)',
-                            backgroundColor: '#fff',
-                            transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                            '&:hover': {
-                              transform: 'translateY(-4px) scale(1.01)',
-                              boxShadow: '0 12px 28px rgba(0, 0, 0, 0.25), 0 6px 12px rgba(0, 0, 0, 0.18)',
-                            },
-                          }}
-                        >
+                        <Box sx={{ position: 'relative' }}>
                           <Box
-                            component="img"
-                            src={currentSceneImageFullUrl}
-                            alt={currentScene?.title || `Scene ${currentSceneNumber} illustration`}
                             sx={{
                               width: '100%',
-                              height: 'auto',
-                              display: 'block',
-                              objectFit: 'contain',
-                              minHeight: '300px',
-                              maxHeight: '500px',
+                              borderRadius: '12px',
+                              overflow: 'hidden',
+                              boxShadow: '0 8px 20px rgba(0, 0, 0, 0.18), 0 4px 8px rgba(0, 0, 0, 0.12)',
+                              border: '3px solid rgba(120, 90, 60, 0.25)',
+                              backgroundColor: '#fff',
+                              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+                              '&:hover': {
+                                transform: 'translateY(-4px) scale(1.01)',
+                                boxShadow: '0 12px 28px rgba(0, 0, 0, 0.25), 0 6px 12px rgba(0, 0, 0, 0.18)',
+                              },
                             }}
-                            onError={() => {
-                              setImageLoadError((prev) => new Set(prev).add(currentSceneNumber));
+                          >
+                            <Box
+                              component="img"
+                              src={currentSceneImageFullUrl}
+                              alt={currentScene?.title || `Scene ${currentSceneNumber} illustration`}
+                              sx={{
+                                width: '100%',
+                                height: 'auto',
+                                display: 'block',
+                                objectFit: 'contain',
+                                minHeight: '300px',
+                                maxHeight: '500px',
+                              }}
+                              onError={() => {
+                                setImageLoadError((prev) => new Set(prev).add(currentSceneNumber));
+                              }}
+                            />
+                          </Box>
+                          <Box
+                            sx={{
+                              position: 'absolute',
+                              top: 12,
+                              right: 12,
+                              display: 'flex',
+                              gap: 4,
+                              zIndex: 4,
                             }}
-                          />
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <Tooltip title="View image full size">
+                              <Box
+                                role="button"
+                                onClick={() => setIsImageFullscreenOpen(true)}
+                                sx={{
+                                  width: 32, height: 32, borderRadius: '50%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: 'linear-gradient(135deg, #111827 0%, #4b5563 100%)',
+                                  boxShadow: '0 4px 10px rgba(15,23,42,0.35)',
+                                  color: 'white', cursor: 'pointer',
+                                }}
+                              >
+                                <OpenInFullIcon fontSize="small" />
+                              </Box>
+                            </Tooltip>
+                            <Tooltip title="Edit image prompt">
+                              <Box
+                                role="button"
+                                onClick={openImageModal}
+                                sx={{
+                                  width: 32, height: 32, borderRadius: '50%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)',
+                                  boxShadow: '0 4px 10px rgba(127,90,240,0.3)',
+                                  color: 'white', cursor: 'pointer',
+                                }}
+                              >
+                                <EditNoteIcon fontSize="small" />
+                              </Box>
+                            </Tooltip>
+                          </Box>
                         </Box>
                       ) : (
-                        <Box
-                          sx={{
-                            width: '100%',
-                            minHeight: '300px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#7a5335',
-                          }}
-                        >
-                          <Typography variant="body2" sx={{ textAlign: 'center' }}>
-                            {currentScene?.image_prompt || 'No image available for this scene'}
+                        <Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                            <Typography variant="subtitle2" sx={{ color: '#7a5335', textTransform: 'uppercase', letterSpacing: 1 }}>
+                              Image Prompt
+                            </Typography>
+                            <Tooltip title="Edit image prompt">
+                              <Box
+                                role="button"
+                                onClick={openImageModal}
+                                sx={{
+                                  width: 28, height: 28, borderRadius: '50%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)',
+                                  color: 'white', cursor: 'pointer',
+                                }}
+                              >
+                                <EditNoteIcon fontSize="small" />
+                              </Box>
+                            </Tooltip>
+                            <Tooltip title="Generate scene image">
+                              <Box
+                                role="button"
+                                onClick={() => handleGenerateSceneImage()}
+                                sx={{
+                                  width: 28, height: 28, borderRadius: '50%',
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  background: 'linear-gradient(135deg, #1f8a70 0%, #32d9c8 100%)',
+                                  boxShadow: '0 4px 10px rgba(31,138,112,0.3)',
+                                  color: 'white', cursor: 'pointer',
+                                  opacity: isGeneratingSceneImage || !currentScene?.image_prompt ? 0.5 : 1,
+                                }}
+                              >
+                                {isGeneratingSceneImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <AutoFixHighIcon fontSize="small" />}
+                              </Box>
+                            </Tooltip>
+                          </Box>
+                          <Typography variant="body2" sx={{ color: '#3f3224', lineHeight: 1.7, mb: 2, whiteSpace: 'pre-wrap' }}>
+                            {currentScene?.image_prompt || 'No image prompt available for this scene.'}
                           </Typography>
                         </Box>
                       )}
@@ -736,20 +1019,41 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
                         },
                       }}
                     >
-                      <Box sx={{ flex: 1, overflowY: 'auto' }}>
-                        <Typography
-                          variant="body1"
-                          sx={{
-                            color: '#2C2416',
-                            lineHeight: 1.8,
-                            fontFamily: `'Georgia', 'Times New Roman', serif`,
-                            fontSize: '1.1rem',
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                          }}
-                        >
-                          {currentPage || 'Loading...'}
-                        </Typography>
+                      <Box sx={{ flex: 1, overflowY: 'auto', position: 'relative' }}>
+                        <Tooltip title="Edit this section">
+                          <Box
+                            role="button"
+                            onClick={(e) => { e.stopPropagation(); openEditModal(); }}
+                            sx={{
+                              position: 'absolute', top: 0, right: 0, zIndex: 4,
+                              width: 32, height: 32, borderRadius: '50%',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)',
+                              boxShadow: '0 4px 10px rgba(127,90,240,0.3)',
+                              color: 'white', cursor: 'pointer',
+                              opacity: 0.7, '&:hover': { opacity: 1 },
+                            }}
+                          >
+                            <EditNoteIcon fontSize="small" />
+                          </Box>
+                        </Tooltip>
+                        {currentPage ? (
+                          <Box
+                            className="rendered-content"
+                            sx={{
+                              color: '#2C2416',
+                              lineHeight: 1.8,
+                              fontFamily: `'Georgia', 'Times New Roman', serif`,
+                              fontSize: '1.1rem',
+                              wordBreak: 'break-word',
+                            }}
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(currentPage) }}
+                          />
+                        ) : (
+                          <Typography variant="body1" sx={{ color: '#2C2416', fontFamily: `'Georgia', 'Times New Roman', serif` }}>
+                            Loading...
+                          </Typography>
+                        )}
                       </Box>
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
                         <Typography variant="caption" sx={{ color: '#a37b55' }}>
@@ -774,19 +1078,17 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
                   minHeight: '400px',
                 }}
               >
-                <Typography
-                  variant="body1"
+                <Box
+                  className="rendered-content"
                   sx={{
                     color: '#2C2416',
                     lineHeight: 1.8,
                     fontFamily: `'Georgia', 'Times New Roman', serif`,
                     fontSize: '1.1rem',
-                    whiteSpace: 'pre-wrap',
                     wordBreak: 'break-word',
                   }}
-                >
-                  {state.storyContent}
-                </Typography>
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(state.storyContent || '') }}
+                />
               </Paper>
             </Box>
           )}
@@ -863,6 +1165,93 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
         </Box>
       )}
     </Paper>
+
+      {/* Fullscreen image viewer */}
+      <Dialog
+        open={isImageFullscreenOpen}
+        onClose={() => setIsImageFullscreenOpen(false)}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: { bgcolor: 'black', borderRadius: 2 } }}
+      >
+        <IconButton
+          onClick={() => setIsImageFullscreenOpen(false)}
+          sx={{
+            position: 'absolute', top: 8, right: 8, zIndex: 10,
+            color: 'white', bgcolor: 'rgba(0,0,0,0.5)',
+            '&:hover': { bgcolor: 'rgba(0,0,0,0.7)' },
+          }}
+        >
+          <CloseIcon />
+        </IconButton>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 3, minHeight: '60vh' }}>
+          {currentSceneImageFullUrl ? (
+            <Box
+              component="img"
+              src={currentSceneImageFullUrl}
+              alt={currentScene?.title || `Scene ${currentSceneNumber} illustration`}
+              sx={{ width: '100%', maxWidth: '100%', maxHeight: '90vh', objectFit: 'contain', display: 'block' }}
+            />
+          ) : (
+            <Typography variant="body2" sx={{ color: 'white' }}>
+              No image is available for this scene yet.
+            </Typography>
+          )}
+        </Box>
+      </Dialog>
+
+      {/* Scene text editor */}
+      <EditSectionModal
+        open={isEditModalOpen}
+        sceneNumber={currentSceneNumber}
+        editText={editText}
+        onChangeEditText={setEditText}
+        aiFeedback={aiFeedback}
+        onChangeAiFeedback={setAiFeedback}
+        aiLoading={aiLoading}
+        onGenerateSuggestions={handleGenerateAISuggestions}
+        suggestions={aiSuggestions}
+        onPickSuggestion={applySuggestion}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveUpdatedSection}
+      />
+
+      {/* Image prompt editor */}
+      <ImageEditModal
+        open={isImageModalOpen}
+        sceneNumber={currentSceneNumber}
+        value={imagePromptDraft}
+        onChange={setImagePromptDraft}
+        onClose={() => setIsImageModalOpen(false)}
+        onSave={handleSaveImagePrompt}
+        onRegenerate={handleGenerateSceneImage}
+        imageProvider={state.imageProvider}
+        imageWidth={state.imageWidth}
+        imageHeight={state.imageHeight}
+        imageModel={state.imageModel}
+        onOpenAdvancedSettings={handleOpenAdvancedImageSettings}
+      />
+
+      {/* Advanced image settings */}
+      <StoryImageGenerationModal
+        open={isImageSettingsModalOpen}
+        onClose={() => setIsImageSettingsModalOpen(false)}
+        onGenerate={handleGenerateImageWithSettings}
+        initialPrompt={imagePromptDraft}
+        sceneTitle={currentScene?.title || undefined}
+        storyMode={state.storyMode}
+        isGenerating={isImageSettingsGenerating}
+      />
+
+      <StoryWritingProgressModal
+        open={isGenerating}
+        isShortStory={isShortStory(state.storyLength)}
+      />
+      <SceneImageGenerationProgressModal
+        open={isGeneratingSceneImage}
+        sceneTitle={currentScene?.title}
+      />
+    </>
   );
 };
 

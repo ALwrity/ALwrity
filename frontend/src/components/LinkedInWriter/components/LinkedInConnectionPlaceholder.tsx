@@ -615,6 +615,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   onConnectWelcomeDismissed?: () => void;
   onConnectWelcomeOpenChange?: (open: boolean) => void;
   userId?: string | null;
+  blockDashboardErrorModal?: boolean;
 }> = ({
   centered = false,
   splitConnectAction = false,
@@ -625,6 +626,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   onConnectWelcomeDismissed,
   onConnectWelcomeOpenChange,
   userId,
+  blockDashboardErrorModal = false,
 }) => {
   const internalSocial = useLinkedInSocialConnection();
   const desktopViewport = useDesktopViewport();
@@ -686,6 +688,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
           isDisconnecting={isDisconnecting}
           disconnectError={disconnectError}
           hideDisconnectButton={centered && splitConnectAction && !mobileProfileStrip}
+          blockDashboardErrorModal={blockDashboardErrorModal}
         />
       </div>
     );

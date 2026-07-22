@@ -4,12 +4,13 @@ const TOUR_FLOATING_HINT_KEY = 'linkedin_studio_tour_floating_hint_seen';
 
 interface StudioTourTriggerProps {
   /** Compact circle for mobile header nav (after GIF). */
-  variant?: 'toolbar' | 'headerNav';
+  variant?: 'toolbar' | 'headerNav' | 'analyticsPanel';
 }
 
 export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 'toolbar' }) => {
   const [showFloatingHint, setShowFloatingHint] = useState(false);
   const isHeaderNav = variant === 'headerNav';
+  const isAnalyticsPanel = variant === 'analyticsPanel';
 
   useEffect(() => {
     try {
@@ -45,9 +46,13 @@ export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 
 
   return (
     <div
-      className={`linkedin-studio-tour-trigger-wrap${
-        isHeaderNav ? ' linkedin-studio-tour-trigger-wrap--header-nav' : ''
-      }`}
+      className={[
+        'linkedin-studio-tour-trigger-wrap',
+        isHeaderNav && 'linkedin-studio-tour-trigger-wrap--header-nav',
+        isAnalyticsPanel && 'linkedin-studio-tour-trigger-wrap--analytics-panel',
+      ]
+        .filter(Boolean)
+        .join(' ')}
     >
       {showFloatingHint && (
         <span className="linkedin-studio-tour-floating-hint" role="status">
@@ -61,6 +66,7 @@ export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 
           'linkedin-studio-tour-trigger--icon-only',
           'linkedin-studio-tour-trigger--tooltip',
           isHeaderNav && 'linkedin-studio-tour-trigger--header-nav',
+          isAnalyticsPanel && 'linkedin-studio-tour-trigger--rail-adjacent',
         ]
           .filter(Boolean)
           .join(' ')}

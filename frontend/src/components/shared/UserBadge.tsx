@@ -39,6 +39,36 @@ interface UserBadgeProps {
   showPlanChip?: boolean;
 }
 
+/**
+ * Avatar image URLs that point at our own backend `/api/assets/...` endpoints
+ * require an auth token. Browser <img> tags cannot attach Authorization headers,
+ * so we fall back to the `?token=...` query-param path accepted by the auth
+ * middleware (see `get_current_user_with_query_token`). Clerk-hosted and other
+ * external avatar URLs are returned untouched.
+ */
+const getAuthenticatedAvatarUrl = (url?: string | null): string | undefined => {
+  if (!url) return undefined;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    // Only rewrite URLs that target our backend asset endpoints.
+    const isBackendAsset =
+      parsed.pathname.startsWith('/api/assets/') ||
+      parsed.pathname.includes('/api/assets/');
+    if (!isBackendAsset) return url;
+    const token =
+      (typeof localStorage !== 'undefined' && localStorage.getItem('clerk_dashboard_token')) || '';
+    if (!token) return url; // No token to append; let the request fail naturally.
+    parsed.searchParams.set('token', token);
+    // Preserve relative-ness: if the original was a relative URL, return relative.
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return `${parsed.pathname}${parsed.search}`;
+    }
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+};
+
 /** LinkedIn Studio keyboard shortcuts surfaced in the nav menu Quick Launch section. */
 const QUICK_LAUNCH_SHORTCUTS = [
   { key: 'B', label: 'Brainstorm Ideas',  event: 'linkedinwriter:openBrainstorm'      },
@@ -62,6 +92,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
   // Seed from sessionStorage so the card is visible immediately if this session already loaded optimization data.
   const [priorityAction, setPriorityAction] = useState<PriorityActionSnapshot | null>(readCachedPriorityAction);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [menuOpenCounter, setMenuOpenCounter] = useState(0);
   const open = Boolean(anchorEl);
 
   const initials = React.useMemo(() => {
@@ -195,7 +226,10 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
     return subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1);
   };
 
-  const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
+  const handleOpen = (e: React.MouseEvent<HTMLElement>) => {
+    setAnchorEl(e.currentTarget);
+    setMenuOpenCounter((c) => c + 1);
+  };
   const handleClose = () => { setAnchorEl(null); setShowAdvanced(false); };
 
   const handleRefreshPlan = async () => {
@@ -257,7 +291,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
               color: colorMode === 'dark' ? 'white' : 'white',
               fontWeight: 700,
             }}
-            src={user?.imageUrl || undefined}
+            src={getAuthenticatedAvatarUrl(user?.imageUrl)}
           >
             {initials}
           </Avatar>
@@ -421,7 +455,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
           <Typography variant="caption" sx={{ display: 'block', mb: 1, fontWeight: 600, color: '#6b7280', fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             Usage Statistics
           </Typography>
-          <UsageDashboard compact={true} />
+          <UsageDashboard compact={true} key={menuOpenCounter} />
         </Box>
         
         <Divider sx={{ mx: 2 }} />

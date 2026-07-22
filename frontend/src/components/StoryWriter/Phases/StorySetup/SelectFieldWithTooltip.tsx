@@ -1,6 +1,7 @@
 import React from 'react';
 import { TextField, MenuItem, Tooltip, IconButton, InputAdornment, Box, Typography } from '@mui/material';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import { selectMenuProps } from './styles';
 
 interface TooltipContent {
   title: string;
@@ -41,6 +42,7 @@ export const SelectFieldWithTooltip: React.FC<SelectFieldWithTooltipProps> = ({
       onChange={onChange}
       helperText={helperText}
       sx={sx}
+      SelectProps={selectMenuProps}
       InputProps={{
         endAdornment: (
           <InputAdornment position="end">
@@ -82,7 +84,11 @@ export const SelectFieldWithTooltip: React.FC<SelectFieldWithTooltipProps> = ({
         <MenuItem key={option} value={option}>
           {option}
           {isCustom(option) && (
-            <Typography component="span" variant="caption" sx={{ ml: 1, color: 'primary.main', fontStyle: 'italic' }}>
+            <Typography
+              component="span"
+              variant="caption"
+              sx={{ ml: 1, color: '#5D4037', fontStyle: 'italic', fontWeight: 600 }}
+            >
               (AI Generated)
             </Typography>
           )}

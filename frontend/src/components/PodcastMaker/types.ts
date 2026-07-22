@@ -234,7 +234,7 @@ export interface VideoGenerationSettings {
 
 export type TaskStatus = {
   task_id: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: "pending" | "processing" | "running" | "completed" | "failed";
   progress?: number;
   message?: string;
   result?: any;

@@ -87,6 +87,14 @@ class StoryIdeaEnhanceRequest(BaseModel):
         default=None,
         description="Optional narrative energy or pacing hint (e.g. grounded, balanced, cinematic)",
     )
+    fiction_variant_description: Optional[str] = Field(
+        default=None,
+        description="Optional description of the fiction variant for richer LLM context",
+    )
+    narrative_energy_description: Optional[str] = Field(
+        default=None,
+        description="Optional description of the narrative energy for richer LLM context",
+    )
 
 
 class StorySetupOption(BaseModel):
@@ -330,8 +338,11 @@ class TaskStatus(BaseModel):
     status: str = Field(..., description="Task status (pending, processing, completed, failed)")
     progress: Optional[float] = Field(None, description="Progress percentage (0-100)")
     message: Optional[str] = Field(None, description="Progress message")
+    progress_messages: Optional[List[Dict[str, Any]]] = Field(None, description="List of progress messages with timestamps")
     result: Optional[Dict[str, Any]] = Field(None, description="Task result when completed")
     error: Optional[str] = Field(None, description="Error message if failed")
+    error_status: Optional[int] = Field(None, description="HTTP error status code")
+    error_data: Optional[Dict[str, Any]] = Field(None, description="Error details for frontend")
     created_at: Optional[str] = Field(None, description="Task creation timestamp")
     updated_at: Optional[str] = Field(None, description="Task last update timestamp")
 

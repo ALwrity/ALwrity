@@ -1,6 +1,7 @@
 import React from 'react';
 import CircularProgress from '@mui/material/CircularProgress';
 import { ProfileStrengthTicker } from './ProfileStrengthTicker';
+import { ConnectLockBadge } from './ConnectLockIcon';
 
 interface OptimiseProfileRailButtonProps {
   variant?: 'main' | 'tab';
@@ -9,11 +10,9 @@ interface OptimiseProfileRailButtonProps {
   profileStrengthPercent?: number | null;
   strengthLabel?: string;
   strengthTooltip?: string;
+  connectLocked?: boolean;
 }
 
-/**
- * Optimise Profile entry — inline strength ticker (emerald green / rainbow toolbar slot).
- */
 export const OptimiseProfileRailButton: React.FC<OptimiseProfileRailButtonProps> = ({
   variant = 'main',
   onClick,
@@ -21,19 +20,24 @@ export const OptimiseProfileRailButton: React.FC<OptimiseProfileRailButtonProps>
   profileStrengthPercent = null,
   strengthLabel = '',
   strengthTooltip = '',
+  connectLocked = false,
 }) => {
   const isTab = variant === 'tab';
   const rootClass = [
     'linkedin-optimise-profile-rail-btn',
     !isTab && 'linkedin-dashboard-toolbar-pill',
     isTab && 'linkedin-optimise-profile-rail-btn--tab',
+    connectLocked && 'linkedin-studio-connect-locked',
+    connectLocked && 'linkedin-studio-connect-locked--lock-right',
   ]
     .filter(Boolean)
     .join(' ');
 
   const ariaLabel = isLoading
     ? 'Loading profile strength'
-    : `LinkedIn Profile — Optimise Profile${profileStrengthPercent != null ? `, ${profileStrengthPercent}% strength` : ''}`;
+    : connectLocked
+      ? 'Connect LinkedIn to optimise your profile'
+      : `LinkedIn Profile — Optimise Profile${profileStrengthPercent != null ? `, ${profileStrengthPercent}% strength` : ''}`;
 
   return (
     <button
@@ -42,7 +46,11 @@ export const OptimiseProfileRailButton: React.FC<OptimiseProfileRailButtonProps>
       onClick={onClick}
       disabled={isLoading}
       aria-label={ariaLabel}
-      title={strengthTooltip || 'LinkedIn Profile — Optimise your profile'}
+      title={
+        connectLocked
+          ? undefined
+          : strengthTooltip || 'LinkedIn Profile — Optimise your profile'
+      }
       role={isTab ? 'tab' : undefined}
     >
       {isLoading ? (
@@ -73,7 +81,7 @@ export const OptimiseProfileRailButton: React.FC<OptimiseProfileRailButtonProps>
                 'Optimise Profile'
               )}
             </span>
-            {profileStrengthPercent != null && (
+            {profileStrengthPercent != null && !connectLocked && !isTab && (
               <ProfileStrengthTicker
                 percent={profileStrengthPercent}
                 strengthLabel={strengthLabel}
@@ -82,6 +90,7 @@ export const OptimiseProfileRailButton: React.FC<OptimiseProfileRailButtonProps>
               />
             )}
           </span>
+          {connectLocked && <ConnectLockBadge size={11} />}
         </>
       )}
     </button>

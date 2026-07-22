@@ -448,8 +448,20 @@ export const useStoryWriterState = () => {
   }, []);
 
   const mapProjectToState = useCallback((project: StoryProjectSummary): StoryWriterState => {
-    const outlineScenes = project.outline && Array.isArray((project.outline as any).scenes)
+    const outlineScenes = (project.outline && Array.isArray((project.outline as any).scenes)
       ? (project.outline as any).scenes
+      : null)
+      || project.scenes
+      || null;
+
+    const mediaState = (project.media_state as Record<string, any>) || {};
+
+    const loadedSceneImages = mediaState.scene_images
+      ? new Map<number, string>(Object.entries(mediaState.scene_images).map(([k, v]) => [Number(k), v as string]))
+      : null;
+
+    const loadedSceneAudio = mediaState.scene_audio
+      ? new Map<number, string>(Object.entries(mediaState.scene_audio).map(([k, v]) => [Number(k), v as string]))
       : null;
 
     return {
@@ -491,23 +503,23 @@ export const useStoryWriterState = () => {
       storyContent: (project.story_content as any)?.story || null,
       isComplete: project.is_complete,
       animeBible: project.anime_bible || null,
-      sceneImages: null,
-      sceneAudio: null,
-      storyVideo: (project.media_state as any)?.story_video || null,
+      sceneImages: loadedSceneImages,
+      sceneAudio: loadedSceneAudio,
+      storyVideo: mediaState.story_video || null,
       sceneHdVideos: null,
       sceneAnimatedVideos: null,
       sceneAnimationResumables: null,
-      hdVideoGenerationStatus: (project.media_state as any)?.hd_video_status ||
+      hdVideoGenerationStatus: mediaState.hd_video_status ||
         (DEFAULT_STATE.hdVideoGenerationStatus as any),
       currentHdSceneIndex:
-        (project.media_state as any)?.current_hd_scene_index ||
+        mediaState.current_hd_scene_index ||
         (DEFAULT_STATE.currentHdSceneIndex as number),
-      currentTaskId: (project.media_state as any)?.current_task_id || null,
+      currentTaskId: mediaState.current_task_id || null,
       generationProgress:
-        (project.media_state as any)?.generation_progress ||
+        mediaState.generation_progress ||
         (DEFAULT_STATE.generationProgress as number),
       generationMessage:
-        (project.media_state as any)?.generation_message ||
+        mediaState.generation_message ||
         (DEFAULT_STATE.generationMessage as string | null),
       isLoading: false,
       error: null,
@@ -539,8 +551,9 @@ export const useStoryWriterState = () => {
     }
   }, [mapProjectToState, setIsLoading, setError]);
 
-  const saveProjectToDb = useCallback(async () => {
-    if (!state.projectId) {
+  const saveProjectToDb = useCallback(async (overrideProjectId?: string) => {
+    const projectId = overrideProjectId || state.projectId;
+    if (!projectId) {
       return;
     }
     try {
@@ -575,20 +588,43 @@ export const useStoryWriterState = () => {
         scenes: state.outlineScenes || undefined,
         story_content: state.storyContent ? { story: state.storyContent } : undefined,
         anime_bible: state.animeBible || undefined,
-        media_state: state.storyVideo
+        media_state: (state.storyVideo || (state.sceneImages && state.sceneImages.size > 0) || (state.sceneAudio && state.sceneAudio.size > 0))
           ? {
-              story_video: state.storyVideo,
+              story_video: state.storyVideo || undefined,
               hd_video_status: state.hdVideoGenerationStatus,
               current_hd_scene_index: state.currentHdSceneIndex,
-              current_task_id: state.currentTaskId,
+              current_task_id: state.currentTaskId || undefined,
               generation_progress: state.generationProgress,
-              generation_message: state.generationMessage,
+              generation_message: state.generationMessage || undefined,
+              scene_images: state.sceneImages && state.sceneImages.size > 0
+                ? Object.fromEntries(state.sceneImages)
+                : undefined,
+              scene_audio: state.sceneAudio && state.sceneAudio.size > 0
+                ? Object.fromEntries(state.sceneAudio)
+                : undefined,
             }
           : undefined,
         is_complete: state.isComplete,
       };
 
-      await storyWriterApi.updateStoryProject(state.projectId, payload);
+      try {
+        await storyWriterApi.updateStoryProject(projectId, payload);
+      } catch (err: any) {
+        if (err?.response?.status === 404) {
+          // Project doesn't exist yet — create it first, then retry update
+          const title = state.projectTitle || (state.premise ? state.premise.trim().slice(0, 80) : 'Untitled Story');
+          await storyWriterApi.createStoryProject({
+            project_id: projectId,
+            title,
+            story_mode: state.storyMode,
+            story_template: state.storyTemplate,
+            setup: payload.setup,
+          });
+          await storyWriterApi.updateStoryProject(projectId, payload);
+        } else {
+          throw err;
+        }
+      }
     } catch (error) {
       console.error('Error saving story project to database:', error);
     }

@@ -4,6 +4,7 @@ import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocial
 import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
 import { ProfileGrowthWidget } from './ProfileGrowthWidget';
 import { DailyDigestWidget } from './DailyDigestWidget';
+import { ConnectLockBadge } from './ConnectLockIcon';
 
 const SIDEBAR_WIDTH = 340;
 
@@ -85,9 +86,24 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
   const isLoading = panelState === 'loading' && posts.length === 0;
 
   return (
-    <div className="linkedin-analytics-panel">
+    <div
+      className={[
+        'linkedin-analytics-panel',
+        !connected && 'linkedin-analytics-panel--disconnected',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className="linkedin-analytics-panel-header">
-        <h3 className="linkedin-analytics-panel-title" style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}>Analytics</h3>
+        <div className="linkedin-analytics-panel-title-row">
+          <h3
+            className="linkedin-analytics-panel-title"
+            style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}
+          >
+            Analytics
+          </h3>
+          {!connected && <ConnectLockBadge size={10} />}
+        </div>
         {onViewAll && (
           <button type="button" className="linkedin-analytics-panel-link" onClick={onViewAll}>
             View all posts

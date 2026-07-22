@@ -71,6 +71,8 @@ interface LinkedInProfileSetupPanelProps {
   hideDisconnectButton?: boolean;
   /** Mobile hero: compact profile strip with inline connect/disconnect. */
   mobileProfileStrip?: boolean;
+  /** When true, defer blocking profile error modal (connect welcome / studio tour). */
+  blockDashboardErrorModal?: boolean;
 }
 
 export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps> = ({
@@ -82,6 +84,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   centered = false,
   hideDisconnectButton = false,
   mobileProfileStrip = false,
+  blockDashboardErrorModal = false,
 }) => {
   const {
     foundationStatus,
@@ -326,7 +329,8 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   const showDashboardErrorModal = Boolean(
     centered &&
       dashboardErrorConfig &&
-      dismissedErrorKey !== dashboardErrorConfig.key
+      dismissedErrorKey !== dashboardErrorConfig.key &&
+      !blockDashboardErrorModal
   );
 
   useEffect(() => {

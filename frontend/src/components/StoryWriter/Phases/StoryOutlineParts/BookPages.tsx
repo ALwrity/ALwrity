@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Tooltip, Chip, CircularProgress } from '@mui/material';
+import { marked } from 'marked';
 import { motion, AnimatePresence } from 'framer-motion';
 import OutlineHoverActions from './OutlineHoverActions';
 import EditNoteIcon from '@mui/icons-material/EditNote';
@@ -8,12 +9,23 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import ReplayIcon from '@mui/icons-material/Replay';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { OperationButton } from '../../../shared/OperationButton';
 import { leftPageVariants, rightPageVariants } from './pageVariants';
 import { StoryScene } from '../../../../services/storyWriterApi';
 import type { SceneAnimationResume } from '../../../../hooks/useStoryWriterState';
 
 const MotionBox = motion.create(Box);
+
+const renderMarkdown = (md: string): string => {
+  if (!md) return '';
+  try {
+    const html = marked.parse(md);
+    return typeof html === 'string' ? html : '';
+  } catch {
+    return md;
+  }
+};
 
 interface BookPagesProps {
   currentScene: StoryScene | null;
@@ -27,6 +39,8 @@ interface BookPagesProps {
 
   imageUrl: string | null;
   onImageError: () => void;
+  onGenerateImage?: () => void;
+  isGeneratingImage?: boolean;
 
   narrationEnabled: boolean;
   audioUrl: string | null;
@@ -60,6 +74,8 @@ const BookPages: React.FC<BookPagesProps> = ({
   onNext,
   imageUrl,
   onImageError,
+  onGenerateImage,
+  isGeneratingImage,
   narrationEnabled,
   onOpenImageModal,
   onOpenImageFullscreen,
@@ -195,7 +211,7 @@ const BookPages: React.FC<BookPagesProps> = ({
                     right: 20,
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 1,
+                    gap: 4,
                     zIndex: 4,
                   }}
                   onClick={(e) => {
@@ -531,38 +547,66 @@ const BookPages: React.FC<BookPagesProps> = ({
                     </>
                   ) : (
                     <>
-                      <Typography
-                        variant="subtitle2"
-                        sx={{ color: '#7a5335', textTransform: 'uppercase', letterSpacing: 1, mb: 1 }}
-                      >
-                        Image Prompt
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: '#3f3224', lineHeight: 1.7 }}>
-                        {currentScene?.image_prompt}
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ color: '#7a5335', textTransform: 'uppercase', letterSpacing: 1 }}
+                        >
+                          Image Prompt
+                        </Typography>
                         <Tooltip title="Edit scene image prompt">
                           <Box
                             role="button"
                             aria-label="Edit scene image"
                             onClick={(e) => { e.stopPropagation(); onOpenImageModal(); }}
                             sx={{
-                              width: 40,
-                              height: 40,
+                              width: 28,
+                              height: 28,
                               borderRadius: '50%',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
                               background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)',
-                              boxShadow: '0 8px 16px rgba(127,90,240,0.3)',
                               color: 'white',
                               cursor: 'pointer',
                             }}
                           >
-                            <EditNoteIcon />
+                            <EditNoteIcon fontSize="small" />
                           </Box>
                         </Tooltip>
+                        {onGenerateImage && (
+                          <Tooltip title="Generate scene image">
+                            <Box
+                              role="button"
+                              aria-label="Generate scene image"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!isGeneratingImage) onGenerateImage();
+                              }}
+                              sx={{
+                                width: 28,
+                                height: 28,
+                                borderRadius: '50%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                background: 'linear-gradient(135deg, #1f8a70 0%, #32d9c8 100%)',
+                                boxShadow: '0 4px 10px rgba(31,138,112,0.3)',
+                                color: 'white',
+                                cursor: isGeneratingImage ? 'default' : 'pointer',
+                                opacity: isGeneratingImage || !currentScene?.image_prompt ? 0.5 : 1,
+                              }}
+                            >
+                              {isGeneratingImage
+                                ? <CircularProgress size={16} sx={{ color: 'white' }} />
+                                : <AutoFixHighIcon fontSize="small" />}
+                            </Box>
+                          </Tooltip>
+                        )}
                       </Box>
+                      <Typography variant="body2" sx={{ color: '#3f3224', lineHeight: 1.7 }}>
+                        {currentScene?.image_prompt}
+                      </Typography>
                     </>
                   )}
                   {isAnimatingScene && (
@@ -699,23 +743,17 @@ const BookPages: React.FC<BookPagesProps> = ({
                     />
                   )}
                 </Box>
-                <Typography
-                  variant="body1"
+                <Box
+                  className="rendered-content"
                   sx={{
                     color: '#2C2416',
                     fontSize: '1.08rem',
                     lineHeight: 1.9,
                     fontFamily: `'Merriweather', serif`,
-                    whiteSpace: 'pre-line',
-                    textAlign: 'justify',
-                    textJustify: 'inter-word',
-                    textIndent: '2em',
-                    hyphens: 'auto',
                     pr: { xs: 0, md: 1.5 },
                   }}
-                >
-                  {currentScene?.description}
-                </Typography>
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(currentScene?.description || '') }}
+                />
               </Box>
 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>

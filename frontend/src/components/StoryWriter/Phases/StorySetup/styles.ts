@@ -80,3 +80,59 @@ export const cardStyles = {
   boxShadow: '0 2px 4px rgba(0, 0, 0, 0.08)',
 };
 
+/**
+ * `MenuProps.sx` for MUI `Select` dropdown paper. MUI renders the open menu
+ * inside a portal at <body>, so the `& .MuiMenuItem-root` overrides in
+ * `textFieldStyles` (which are scoped inside the Select's own root) never
+ * reach the dropdown. Apply this via `<TextField SelectProps={{ MenuProps: { sx: selectMenuPaperSx } }} />`
+ * to give the dropdown the same warm cream / dark brown theme as the rest of
+ * the Story Writer setup screen.
+ */
+export const selectMenuPaperSx = {
+  // The Paper that wraps the menu list.
+  backgroundColor: '#FAF9F6',
+  border: '1px solid rgba(141, 110, 99, 0.3)',
+  boxShadow: '0 12px 28px rgba(44, 36, 22, 0.18)',
+  borderRadius: 2,
+  mt: 0.5,
+  // The scrollable list inside.
+  '& .MuiList-root': {
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  '& .MuiMenuItem-root': {
+    color: '#2C2416',
+    fontSize: '0.875rem',
+    paddingTop: 6,
+    paddingBottom: 6,
+    '&:hover': {
+      backgroundColor: '#F1ECDD',
+    },
+    '&.Mui-selected': {
+      backgroundColor: 'rgba(93, 64, 55, 0.12)',
+      color: '#3E2723',
+      fontWeight: 600,
+    },
+    '&.Mui-selected:hover': {
+      backgroundColor: 'rgba(93, 64, 55, 0.18)',
+    },
+  },
+};
+
+/**
+ * Pre-built `SelectProps` containing the cream-themed `MenuProps`. Spread
+ * this onto a `<TextField ... SelectProps={selectMenuProps} />` to get a
+ * dropdown that matches the Story Writer palette.
+ */
+export const selectMenuProps = {
+  MenuProps: {
+    sx: selectMenuPaperSx,
+    // Keep the dropdown anchored to the field, avoiding off-screen popovers.
+    anchorOrigin: { vertical: 'bottom', horizontal: 'left' } as const,
+    transformOrigin: { vertical: 'top', horizontal: 'left' } as const,
+    PaperProps: {
+      sx: selectMenuPaperSx,
+    },
+  },
+};
+

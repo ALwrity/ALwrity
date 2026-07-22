@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, TextField, Typography } from '@mui/material';
+import { modalPaperSx } from './modalStyles';
 
 interface EditSectionModalProps {
   open: boolean;
@@ -37,12 +38,7 @@ const EditSectionModal: React.FC<EditSectionModalProps> = ({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: {
-          backgroundColor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-          border: '1px solid rgba(0,0,0,0.06)',
-        },
+        sx: modalPaperSx,
       }}
     >
       <DialogTitle>Edit Section (Scene {sceneNumber})</DialogTitle>

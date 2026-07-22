@@ -1,4 +1,5 @@
 import React from 'react';
+import { ConnectLockBadge } from './ConnectLockIcon';
 
 export type DashboardRailIconId = 'knowledge' | 'library' | 'growth' | 'resume';
 
@@ -8,21 +9,16 @@ interface DashboardRailIconButtonProps {
   onClick: () => void;
   open?: boolean;
   ariaExpanded?: boolean;
-  /** Keep label visible (no hover-expand). Used for Growth & Resume. */
   alwaysShowLabel?: boolean;
-  /** Icon before label (toolbar pills). Default: label expands left of right-aligned icon. */
   iconLeading?: boolean;
-  /** Pill (default) or mobile studio tab strip. */
   layout?: 'pill' | 'tab';
-  /** Emoji replaces the SVG icon (e.g. growth 🚀). */
   emojiIcon?: string;
-  /** Shorter visible label on narrow screens (full string stays in aria-label). */
   shortLabel?: string;
-  /** Two-line tab label (mobile studio tabs). */
   stackedLabel?: readonly [string, string];
-  /** Orange dot on icon (e.g. draft exists on Resume). */
   showBadge?: boolean;
   title?: string;
+  connectLocked?: boolean;
+  connectLockedBadge?: boolean;
 }
 
 const ICONS: Record<DashboardRailIconId, React.ReactNode> = {
@@ -119,10 +115,12 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
   stackedLabel,
   showBadge = false,
   title,
+  connectLocked = false,
+  connectLockedBadge = false,
 }) => {
   const iconNode = emojiIcon ?? ICONS[icon];
-
   const isTab = layout === 'tab';
+  const showLockBadge = connectLocked && connectLockedBadge;
 
   return (
     <button
@@ -136,11 +134,13 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
         shortLabel && 'linkedin-rail-icon-trigger--responsive-label',
         isTab && 'linkedin-writer-header-studio-tab',
         isTab && open && 'linkedin-writer-header-studio-tab--active',
+        connectLocked && 'linkedin-studio-connect-locked',
+        showLockBadge && 'linkedin-studio-connect-locked--lock-right',
       ].filter(Boolean).join(' ')}
       onClick={onClick}
       aria-label={label}
       aria-expanded={ariaExpanded}
-      title={title ?? label}
+      title={connectLocked && connectLockedBadge ? undefined : (title ?? label)}
       role={isTab ? 'tab' : undefined}
     >
       {isTab ? (
@@ -181,7 +181,7 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
               showBadge && 'linkedin-rail-icon-trigger-icon--badged',
             ].filter(Boolean).join(' ')}
           >
-            {iconNode}
+            {emojiIcon ?? iconNode}
           </span>
           {shortLabel ? (
             <>
@@ -198,6 +198,7 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
           <span className="linkedin-rail-icon-trigger-icon">{ICONS[icon]}</span>
         </>
       )}
+      {showLockBadge && <ConnectLockBadge size={11} />}
     </button>
   );
 };

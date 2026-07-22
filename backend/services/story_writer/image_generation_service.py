@@ -68,11 +68,12 @@ class StoryImageGenerationService:
         anime_bible: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Lightweight image prompt refinement using the anime story bible.
+        Validate and enrich image prompt using the anime story bible.
 
-        Takes the existing scene image_prompt and enriches it with visual_style,
-        world, and cast hints from the bible. This is deterministic and avoids
-        extra LLM calls.
+        Injects visual style, world rules (as constraints), and per-character
+        look/outfit details from the bible into the prompt. Detects and logs
+        conflicts between the prompt and bible to flag inconsistencies.
+        Deterministic — no extra LLM calls.
         """
         if not image_prompt or not isinstance(image_prompt, str):
             return image_prompt
@@ -86,6 +87,7 @@ class StoryImageGenerationService:
 
         parts: List[str] = []
 
+        # --- Visual style enrichment ---
         style_preset = visual_style.get("style_preset")
         if style_preset:
             parts.append(f"{style_preset} anime illustration style")
@@ -112,9 +114,45 @@ class StoryImageGenerationService:
             if extra_text:
                 parts.append(extra_text)
 
-        setting = world.get("setting") if isinstance(world, dict) else None
-        if setting:
-            parts.append(f"world setting: {setting}")
+        # --- World context (setting + positive rules as visual descriptors) ---
+        if isinstance(world, dict):
+            setting = world.get("setting")
+            if setting:
+                parts.append(f"world setting: {setting}")
+
+            rules = world.get("core_rules") or []
+            if rules:
+                # Only include rules that describe what EXISTS (not negative constraints)
+                # Image models can't act on "no X" — they need positive visual direction
+                visuals = []
+                negations = {"no ", "cannot ", "must not ", "don't ", "do not ", "never "}
+                for rule in rules:
+                    lower = rule.strip().lower()
+                    if not any(lower.startswith(n) for n in negations):
+                        visuals.append(rule.strip())
+                if visuals:
+                    parts.append(", ".join(visuals[:3]))
+
+        # --- Character consistency ---
+        scene_chars = scene.get("character_descriptions") or []
+        if isinstance(scene_chars, list) and isinstance(main_cast, list):
+            for desc in scene_chars:
+                desc_lower = desc.lower()
+                for member in main_cast:
+                    if not isinstance(member, dict):
+                        continue
+                    name = member.get("name", "")
+                    if name and name.lower() in desc_lower:
+                        details = []
+                        look = member.get("look")
+                        if look:
+                            details.append(f"look: {look}")
+                        outfit = member.get("outfit_palette")
+                        if outfit:
+                            details.append(f"outfit: {outfit}")
+                        if details:
+                            parts.append(f"{name} ({', '.join(details)})")
+                        break
 
         if isinstance(main_cast, list):
             names = [

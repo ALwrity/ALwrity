@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { useWorkflowStore } from '../../../../stores/workflowStore';
 import type { TodayTask } from '../../../../types/workflow';
+import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
+import { requestLinkedInConnectGate } from '../../utils/linkedInConnectGate';
 import { DashboardRailIconButton } from './DashboardRailIconButton';
 import { DashboardActionModal } from './DashboardActionModal';
 import { useMobileHeaderNav } from '../../hooks/useMobileHeaderNav';
@@ -54,6 +56,7 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
 
   const isMobileHeaderNav = useMobileHeaderNav();
   const isMobileTab = variant === 'tab' && isMobileHeaderNav;
+  const { connected } = useLinkedInSocialConnection();
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -610,6 +613,14 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
     ? 'Growth Tasks'
     : 'Loading…';
 
+  const handleGrowthToggle = useCallback(() => {
+    if (!connected) {
+      requestLinkedInConnectGate();
+      return;
+    }
+    setOpen((prev) => !prev);
+  }, [connected]);
+
   const isTab = variant === 'tab';
 
   return (
@@ -627,8 +638,12 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
         layout={isTab ? 'tab' : 'pill'}
         open={open}
         ariaExpanded={open}
-        onClick={() => setOpen(prev => !prev)}
-        title="Walk through today's growth tasks pillar by pillar"
+        connectLocked={!connected}
+        connectLockedBadge={!connected}
+        onClick={handleGrowthToggle}
+        title={
+          connected ? "Walk through today's growth tasks pillar by pillar" : undefined
+        }
       />
 
       {open && isMobileTab && (

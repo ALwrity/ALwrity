@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { blogWriterApi, TaskStatusResponse } from '../services/blogWriterApi';
 import { researchEngineApi } from '../services/researchEngineApi';
+import { storyWriterApi } from '../services/storyWriterApi';
 import { pollVideoTaskStatus } from '../api/videoStudioApi';
 import { triggerSubscriptionError } from '../api/client';
 
@@ -309,4 +310,8 @@ export function useRewritePolling(options: UsePollingOptions = {}) {
 
 export function useVideoGenerationPolling(options: UsePollingOptions = {}) {
   return usePolling(pollVideoTaskStatus, options);
+}
+
+export function useStoryOutlinePolling(options: UsePollingOptions = {}) {
+  return usePolling(storyWriterApi.pollOutlineTaskStatus, options);
 }

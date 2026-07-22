@@ -10,17 +10,16 @@ import {
   Alert,
   Box,
   CircularProgress,
-  RadioGroup,
-  Radio,
-  Card,
-  CardContent,
   Tooltip,
   IconButton,
   InputAdornment,
-  Switch,
-  FormControlLabel,
 } from '@mui/material';
 import InfoOutlined from '@mui/icons-material/InfoOutlined';
+import { FictionFocusSelector } from './FictionFocusSelector';
+import { NarrativeEnergySelector } from './NarrativeEnergySelector';
+import { EnhanceProgressModal } from './EnhanceProgressModal';
+import { StorySetupProgressModal } from './StorySetupProgressModal';
+import { EnhancedIdeaTabs } from './EnhancedIdeaTabs';
 import {
   storyWriterApi,
   StorySetupOption,
@@ -29,7 +28,7 @@ import {
 import { triggerSubscriptionError } from '../../../../api/client';
 import { useStoryWriterState } from '../../../../hooks/useStoryWriterState';
 import { STORY_IDEA_PLACEHOLDERS, STORY_IDEA_PLACEHOLDERS_BY_COMBINATION } from './constants';
-import { textFieldStyles, cardStyles } from './styles';
+import { textFieldStyles } from './styles';
 import {
   WRITING_STYLES,
   STORY_TONES,
@@ -37,8 +36,35 @@ import {
   AUDIENCE_AGE_GROUPS,
   CONTENT_RATINGS,
   ENDING_PREFERENCES,
+  STORY_LENGTHS,
 } from './constants';
 import { CustomValuesSetters } from './types';
+
+/**
+ * Map an LLM-returned value to its exact match in a dropdown options list so
+ * the rendered `<Select>` actually shows the chosen value. Match strategy:
+ *   1. Exact match (case-sensitive)
+ *   2. Case-insensitive exact match
+ *   3. Prefix match — handles LLM cutting parentheticals, e.g. "Medium" →
+ *      "Medium (>5000 words)".
+ * Returns the trimmed raw text if nothing matches so the value still flows
+ * through the custom-values pipeline (which surfaces it as a dropdown item
+ * with an "(AI Generated)" badge).
+ */
+const canonicalizeChoice = (
+  raw: string | undefined | null,
+  options: string[]
+): string | undefined => {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (options.includes(trimmed)) return trimmed;
+  const ciIdx = options.findIndex((o) => o.toLowerCase() === trimmed.toLowerCase());
+  if (ciIdx >= 0) return options[ciIdx];
+  const prefixIdx = options.findIndex((o) => o.toLowerCase().startsWith(trimmed.toLowerCase()));
+  if (prefixIdx >= 0) return options[prefixIdx];
+  return trimmed;
+};
 
 interface AIStorySetupModalProps {
   open: boolean;
@@ -55,30 +81,123 @@ const FICTION_VARIANT_OPTIONS: Record<
   {
     value: string;
     label: string;
+    description: string;
+    example: string;
   }[]
 > = {
   short_fiction: [
-    { value: 'High-concept twist short story', label: 'High-concept twist' },
-    { value: 'Character-driven emotional short story', label: 'Character-driven emotional' },
-    { value: 'Atmospheric literary vignette', label: 'Atmospheric vignette' },
+    {
+      value: 'High-concept twist short story',
+      label: 'High-concept twist',
+      description: 'A story built around a single, compelling "what if" premise that subverts expectations. The plot hinges on a clever reveal or an elegant inversion of a familiar trope.',
+      example: 'A time traveler discovers their mission wasn\'t to save the future, but to ensure the past unfolds exactly as recorded.',
+    },
+    {
+      value: 'Character-driven emotional short story',
+      label: 'Character-driven emotional',
+      description: 'Prioritizes interiority and emotional truth over plot mechanics. The drama unfolds through the character\'s desires, fears, and quiet transformations.',
+      example: 'A retired musician hears a familiar melody from a street performer — the same song they wrote decades ago for someone they never thanked.',
+    },
+    {
+      value: 'Atmospheric literary vignette',
+      label: 'Atmospheric vignette',
+      description: 'Foregrounds mood, sensory detail, and place over narrative propulsion. More a snapshot than a traditional story — the pleasure comes from language and texture.',
+      example: 'A fog-bound coastal town at dusk, seen through the eyes of a child waiting on a pier, watching boats that never seem to arrive.',
+    },
   ],
   long_fiction: [
-    { value: 'Epic multi-arc saga', label: 'Epic saga' },
-    { value: 'Slow-burn character drama', label: 'Slow-burn character drama' },
-    { value: 'Idea-driven speculative fiction', label: 'Idea-driven speculative' },
+    {
+      value: 'Epic multi-arc saga',
+      label: 'Epic saga',
+      description: 'Sprawling narratives that span significant time and multiple character arcs. Multiple interweaving plotlines build toward a grand convergence.',
+      example: 'Three generations of a family, each harboring a secret tied to a single abandoned lighthouse that calls them back one stormy winter.',
+    },
+    {
+      value: 'Slow-burn character drama',
+      label: 'Slow-burn character drama',
+      description: 'Deep psychological immersion with gradual character transformation. The plot moves at a deliberate pace, earning every emotional beat.',
+      example: 'A reclusive botanist discovers a flower that blooms only in silence, forcing them to confront the noise they have been hiding from for forty years.',
+    },
+    {
+      value: 'Idea-driven speculative fiction',
+      label: 'Idea-driven speculative',
+      description: 'Centers on a provocative intellectual or philosophical concept. Worldbuilding and thematic exploration drive the narrative forward.',
+      example: 'In a society where memories are currency, the poorest citizens must choose which of their experiences to auction off just to survive another week.',
+    },
   ],
   anime_fiction: [
-    { value: 'Shonen-style high-energy anime action', label: 'Shonen action' },
-    { value: 'Slice-of-life anime character drama', label: 'Slice of life' },
-    { value: 'Dark fantasy anime story', label: 'Dark fantasy' },
-    { value: 'Sci-fi mecha anime story', label: 'Sci-fi mecha' },
+    {
+      value: 'Shonen-style high-energy anime action',
+      label: 'Shonen action',
+      description: 'Fast-paced action with escalating stakes, training arcs, and triumphant moments. Friendship, determination, and超越 limits are core themes.',
+      example: 'A prodigy chef must master seven legendary cooking techniques in thirty days to save their family restaurant from a corporate food empire.',
+    },
+    {
+      value: 'Slice-of-life anime character drama',
+      label: 'Slice of life',
+      description: 'Gentle, episodic storytelling focused on everyday moments and interpersonal relationships. Warmth, nostalgia, and quiet growth.',
+      example: 'Two estranged childhood friends reunite at a rural train station and spend one rainy afternoon rediscovering why they stopped talking.',
+    },
+    {
+      value: 'Dark fantasy anime story',
+      label: 'Dark fantasy',
+      description: 'Gothic atmosphere with moral ambiguity, psychological depth, and haunting visuals. Beauty intertwined with horror.',
+      example: 'A cursed painter creates portraits that steal years from their subjects\' lives — and their latest commission is from Death itself.',
+    },
+    {
+      value: 'Sci-fi mecha anime story',
+      label: 'Sci-fi mecha',
+      description: 'Pilots and their mechanical titans facing existential threats. Technology, humanity, and sacrifice collide in spectacular fashion.',
+      example: 'The last standing mecha pilot discovers their sentient machine has been secretly recording their deceased partner\'s consciousness all along.',
+    },
   ],
   experimental_fiction: [
-    { value: 'Nonlinear experimental narrative', label: 'Nonlinear' },
-    { value: 'Second-person immersive experimental story', label: 'Second-person' },
-    { value: 'Multi-POV fragmented narrative', label: 'Multi-POV fragmented' },
+    {
+      value: 'Nonlinear experimental narrative',
+      label: 'Nonlinear',
+      description: 'Time and sequence are deliberately fractured. The reader assembles meaning from fragments, creating a uniquely personal experience.',
+      example: 'A love story told in reverse chronological order — each chapter erasing what the reader thought they understood about the ending.',
+    },
+    {
+      value: 'Second-person immersive experimental story',
+      label: 'Second-person',
+      description: 'The reader IS the protagonist. Immersive "you" narration creates an unsettling, immediate intimacy that traditional POV cannot achieve.',
+      example: 'You wake up in a hotel room with a letter that reads: "Do not open the curtains. They are watching." You open the curtains.',
+    },
+    {
+      value: 'Multi-POV fragmented narrative',
+      label: 'Multi-POV fragmented',
+      description: 'Multiple unreliable narrators each hold a piece of the truth. The reader becomes the detective, sifting through competing accounts.',
+      example: 'Seven witnesses describe the same car accident. Each account is completely different — and every single one is telling the truth as they see it.',
+    },
   ],
 };
+
+const NARRATIVE_ENERGY_OPTIONS: {
+  value: string;
+  label: string;
+  description: string;
+  example: string;
+}[] = [
+  {
+    value: 'grounded',
+    label: 'Grounded',
+    description: 'Intimate, restrained storytelling rooted in realism. Dialogue-heavy, slow-burn pacing with emphasis on internal conflict and subtle gestures. Best for character studies, literary fiction, and slice-of-life narratives.',
+    example: 'A quiet conversation in a parked car reveals more about a failing marriage than any dramatic confrontation ever could.',
+  },
+  {
+    value: 'balanced',
+    label: 'Balanced',
+    description: 'A measured blend of action and reflection. The story breathes naturally between tense sequences and quiet moments, offering versatility across most genres and story types.',
+    example: 'A chase through a crowded market is intercut with flashbacks that give each near-capture emotional weight.',
+  },
+  {
+    value: 'cinematic',
+    label: 'Cinematic',
+    description: 'Bold, immersive, and visually-driven storytelling. Sweeping descriptions, high stakes, and dramatic pacing. Ideal for genre fiction, thrillers, fantasy epics, and stories meant to feel like a feature film.',
+    example: 'The dragon\'s shadow swallowed the city before its roar did — a wave of sound that shattered every window in the lower districts.',
+  },
+];
 
 export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
   open,
@@ -111,7 +230,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
   const [isEnhancingIdea, setIsEnhancingIdea] = useState(false);
   const [ideaSuggestions, setIdeaSuggestions] = useState<StoryIdeaEnhanceSuggestion[]>([]);
   const [fictionVariant, setFictionVariant] = useState<string | null>(null);
-  const [narrativeEnergy, setNarrativeEnergy] = useState<string>('balanced');
+  const [narrativeEnergy, setNarrativeEnergy] = useState<string>(NARRATIVE_ENERGY_OPTIONS[0].value);
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null);
 
   const effectiveMode = (originMode ?? state.storyMode ?? 'pure') as 'marketing' | 'pure';
@@ -122,6 +241,27 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
       effectiveTemplate === 'long_fiction' ||
       effectiveTemplate === 'anime_fiction' ||
       effectiveTemplate === 'experimental_fiction');
+
+  const modeLabel =
+    effectiveMode === 'marketing' ? 'Non-fiction' : effectiveMode === 'pure' ? 'Fiction' : null;
+  const templateLabel =
+    effectiveTemplate === 'product_story'
+      ? 'Product Story'
+      : effectiveTemplate === 'brand_manifesto'
+        ? 'Brand Manifesto'
+        : effectiveTemplate === 'founder_story'
+          ? 'Founder Story'
+          : effectiveTemplate === 'customer_story'
+            ? 'Customer Story'
+            : effectiveTemplate === 'short_fiction'
+              ? 'Short Fiction'
+              : effectiveTemplate === 'long_fiction'
+                ? 'Long Fiction'
+                : effectiveTemplate === 'anime_fiction'
+                  ? 'Anime Fiction'
+                  : effectiveTemplate === 'experimental_fiction'
+                    ? 'Experimental'
+                    : null;
 
   // Rotating placeholder effect for story idea textarea
   useEffect(() => {
@@ -258,6 +398,15 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
     }
   }, [effectiveMode, personaEnabled]);
 
+  useEffect(() => {
+    if (open && isFictionTemplate && !fictionVariant) {
+      const templateOptions = FICTION_VARIANT_OPTIONS[effectiveTemplate || ''] || [];
+      if (templateOptions.length > 0) {
+        setFictionVariant(templateOptions[0].value);
+      }
+    }
+  }, [open, isFictionTemplate, effectiveTemplate, fictionVariant]);
+
   const handleGenerateSetup = async () => {
     if (!storyIdea.trim()) {
       setSetupError('Please enter a story idea');
@@ -284,7 +433,22 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
       if (response.success && response.options && response.options.length >= 1) {
         const option = response.options[0];
 
-        // Extract custom values from the option and add them to custom values lists
+        // === Canonicalize the LLM's choices for the seven dropdown-only fields ===
+        // The backend prompt asks the LLM to return exact dropdown values, but
+        // we still parse forgivingly here so the generated value actually
+        // matches a MenuItem. Anything that still doesn't match gets pushed
+        // into the customValues pipeline so it can render as a MenuItem with an
+        // "(AI Generated)" badge rather than silently disappearing.
+        const writingStyleValue = canonicalizeChoice(option.writing_style, WRITING_STYLES) || WRITING_STYLES[0];
+        const storyToneValue = canonicalizeChoice(option.story_tone, STORY_TONES) || STORY_TONES[0];
+        const narrativePovValue = canonicalizeChoice(option.narrative_pov, NARRATIVE_POVS) || NARRATIVE_POVS[0];
+        const audienceAgeValue = canonicalizeChoice(option.audience_age_group, AUDIENCE_AGE_GROUPS) || AUDIENCE_AGE_GROUPS[0];
+        const contentRatingValue = canonicalizeChoice(option.content_rating, CONTENT_RATINGS) || CONTENT_RATINGS[0];
+        const endingPreferenceValue = canonicalizeChoice(option.ending_preference, ENDING_PREFERENCES) || ENDING_PREFERENCES[0];
+        // Default to Medium length — `STORY_LENGTHS[1] === "Medium (>5000 words)"`.
+        const storyLengthValue = canonicalizeChoice(option.story_length, STORY_LENGTHS) || STORY_LENGTHS[1];
+
+        // Collect any non-canonical values so the dropdown still renders them.
         const newCustomWritingStyles = new Set<string>();
         const newCustomStoryTones = new Set<string>();
         const newCustomNarrativePOVs = new Set<string>();
@@ -292,23 +456,23 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         const newCustomContentRatings = new Set<string>();
         const newCustomEndingPreferences = new Set<string>();
 
-        if (option.writing_style && !WRITING_STYLES.includes(option.writing_style)) {
-          newCustomWritingStyles.add(option.writing_style);
+        if (!WRITING_STYLES.includes(writingStyleValue)) {
+          newCustomWritingStyles.add(writingStyleValue);
         }
-        if (option.story_tone && !STORY_TONES.includes(option.story_tone)) {
-          newCustomStoryTones.add(option.story_tone);
+        if (!STORY_TONES.includes(storyToneValue)) {
+          newCustomStoryTones.add(storyToneValue);
         }
-        if (option.narrative_pov && !NARRATIVE_POVS.includes(option.narrative_pov)) {
-          newCustomNarrativePOVs.add(option.narrative_pov);
+        if (!NARRATIVE_POVS.includes(narrativePovValue)) {
+          newCustomNarrativePOVs.add(narrativePovValue);
         }
-        if (option.audience_age_group && !AUDIENCE_AGE_GROUPS.includes(option.audience_age_group)) {
-          newCustomAudienceAgeGroups.add(option.audience_age_group);
+        if (!AUDIENCE_AGE_GROUPS.includes(audienceAgeValue)) {
+          newCustomAudienceAgeGroups.add(audienceAgeValue);
         }
-        if (option.content_rating && !CONTENT_RATINGS.includes(option.content_rating)) {
-          newCustomContentRatings.add(option.content_rating);
+        if (!CONTENT_RATINGS.includes(contentRatingValue)) {
+          newCustomContentRatings.add(contentRatingValue);
         }
-        if (option.ending_preference && !ENDING_PREFERENCES.includes(option.ending_preference)) {
-          newCustomEndingPreferences.add(option.ending_preference);
+        if (!ENDING_PREFERENCES.includes(endingPreferenceValue)) {
+          newCustomEndingPreferences.add(endingPreferenceValue);
         }
 
         // Update custom values state (merge with existing)
@@ -337,35 +501,15 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         state.setCharacters(option.character_input);
         state.setPlotElements(option.plot_elements);
 
-        const writingStyleValue = option.writing_style || WRITING_STYLES[0];
-        const storyToneValue = option.story_tone || STORY_TONES[0];
-        const narrativePovValue = option.narrative_pov || NARRATIVE_POVS[0];
-        const audienceAgeValue =
-          option.audience_age_group ||
-          AUDIENCE_AGE_GROUPS[0];
-        const contentRatingValue = option.content_rating || CONTENT_RATINGS[0];
-        const endingPreferenceValue =
-          option.ending_preference || ENDING_PREFERENCES[0];
-
         state.setWritingStyle(writingStyleValue);
         state.setStoryTone(storyToneValue);
         state.setNarrativePOV(narrativePovValue);
-
-        const normalizedAgeGroup =
-          audienceAgeValue === 'Adults'
-            ? 'Adults (18+)'
-            : audienceAgeValue === 'Children'
-              ? 'Children (5-12)'
-              : audienceAgeValue === 'Young Adults'
-                ? 'Young Adults (13-17)'
-                : audienceAgeValue;
-        state.setAudienceAgeGroup(normalizedAgeGroup);
+        state.setAudienceAgeGroup(audienceAgeValue);
         state.setContentRating(contentRatingValue);
         state.setEndingPreference(endingPreferenceValue);
-
-        if (option.story_length) {
-          state.setStoryLength(option.story_length);
-        }
+        // Story length is now ALWAYS set, with a Medium default when the LLM
+        // omitted it or returned something unparseable.
+        state.setStoryLength(storyLengthValue);
         if (option.premise) {
           state.setPremise(option.premise);
         }
@@ -461,7 +605,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
     setSetupError(null);
     setIdeaSuggestions([]);
     setFictionVariant(null);
-    setNarrativeEnergy('balanced');
+    setNarrativeEnergy(NARRATIVE_ENERGY_OPTIONS[0].value);
     setPlaceholderIndex(0);
     setCurrentPlaceholder('');
     setBrandContext(null);
@@ -482,7 +626,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
 
   const wordCount = storyIdea.trim() ? storyIdea.trim().split(/\s+/).length : 0;
   const showEnhanceButton =
-    wordCount >= 10 && !isGeneratingSetup && !isEnhancingIdea;
+    !isGeneratingSetup && !isEnhancingIdea;
 
   const handleEnhanceStoryIdea = async () => {
     if (!storyIdea.trim() || isGeneratingSetup || isEnhancingIdea) {
@@ -507,6 +651,12 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
           templateForRequest === 'anime_fiction' ||
           templateForRequest === 'experimental_fiction');
 
+      const currentFictionOptions = isFictionForRequest
+        ? FICTION_VARIANT_OPTIONS[templateForRequest || ''] || []
+        : [];
+      const selectedFictionOption = currentFictionOptions.find((o) => o.value === fictionVariant);
+      const currentEnergyOption = NARRATIVE_ENERGY_OPTIONS.find((o) => o.value === narrativeEnergy);
+
       const response = await storyWriterApi.enhanceStoryIdea({
         story_idea: storyIdea,
         story_mode: modeForRequest,
@@ -514,6 +664,8 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         brand_context: shouldSendBrandContext ? brandContext || undefined : undefined,
         fiction_variant: isFictionForRequest ? fictionVariant || undefined : undefined,
         narrative_energy: isFictionForRequest ? narrativeEnergy || undefined : undefined,
+        fiction_variant_description: isFictionForRequest ? selectedFictionOption?.description || undefined : undefined,
+        narrative_energy_description: isFictionForRequest ? currentEnergyOption?.description || undefined : undefined,
       });
 
       if (response.success && response.suggestions && response.suggestions.length) {
@@ -552,30 +704,53 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         },
       }}
     >
-      <DialogTitle>
-        Generate Story Setup With Alwrity AI
+      <DialogTitle sx={{ pb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#0f172a', lineHeight: 1.3 }}>
+              Generate Story Setup With Alwrity AI
+              {modeLabel && (
+                <Box component="span" sx={{ fontWeight: 400, color: '#6b7280', fontSize: '0.85rem', ml: 0.5 }}>
+                  · {modeLabel}{templateLabel ? ` · ${templateLabel}` : ''}
+                </Box>
+              )}
+            </Typography>
+          </Box>
+          {personaEnabled && (
+            <Box
+              onClick={effectiveMode === 'marketing' ? () => setUsePersonaContext(!usePersonaContext) : undefined}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1,
+                py: 0.3,
+                borderRadius: 1,
+                fontSize: '0.7rem',
+                fontWeight: 500,
+                cursor: effectiveMode === 'marketing' ? 'pointer' : 'not-allowed',
+                bgcolor: effectiveMode === 'marketing' && usePersonaContext ? 'rgba(99,102,241,0.1)' : 'rgba(148,163,184,0.08)',
+                border: '1px solid',
+                borderColor: effectiveMode === 'marketing' && usePersonaContext ? '#6366f1' : 'rgba(148,163,184,0.3)',
+                color: effectiveMode === 'marketing' && usePersonaContext ? '#4338ca' : '#9ca3af',
+                userSelect: 'none',
+                transition: 'all 0.15s ease',
+                '&:hover': effectiveMode === 'marketing' ? {
+                  bgcolor: 'rgba(99,102,241,0.15)',
+                  borderColor: '#4f46e5',
+                } : {},
+              }}
+            >
+              {effectiveMode === 'marketing' ? (
+                usePersonaContext ? 'Brand Persona: ON' : 'Brand Persona: OFF'
+              ) : (
+                'Non-fiction only'
+              )}
+            </Box>
+          )}
+        </Box>
       </DialogTitle>
       <DialogContent>
-        {personaEnabled && (
-          <Box sx={{ mb: 1, display: 'flex', justifyContent: 'flex-end' }}>
-            <FormControlLabel
-              control={
-                <Switch
-                  size="small"
-                  checked={usePersonaContext && personaEnabled && effectiveMode === 'marketing'}
-                  onChange={(_, checked) => setUsePersonaContext(checked)}
-                  disabled={!personaEnabled || effectiveMode !== 'marketing'}
-                />
-              }
-              label={
-                <Typography variant="body2" sx={{ color: '#4b5563' }}>
-                  Use onboarding brand persona
-                  {effectiveMode === 'pure' ? ' (only available for Non-fiction)' : ''}
-                </Typography>
-              }
-            />
-          </Box>
-        )}
         {usePersonaContext && (brandContext || brandAvatarUrl || brandVoicePreviewUrl) && (
           <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -625,41 +800,6 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         <Typography variant="body2" sx={{ mb: 2, color: '#4b5563' }}>
           Enter your story idea or basic information. The more details you provide, the better story setups will be generated.
         </Typography>
-        {(() => {
-          const effectiveMode = originMode ?? state.storyMode;
-          const effectiveTemplate = originTemplate ?? state.storyTemplate;
-          const modeLabel =
-            effectiveMode === 'marketing' ? 'Non-fiction' : effectiveMode === 'pure' ? 'Fiction' : null;
-          const templateLabel =
-            effectiveTemplate === 'product_story'
-              ? 'Product Story'
-              : effectiveTemplate === 'brand_manifesto'
-                ? 'Brand Manifesto'
-                : effectiveTemplate === 'founder_story'
-                  ? 'Founder Story'
-                  : effectiveTemplate === 'customer_story'
-                    ? 'Customer Story'
-                    : effectiveTemplate === 'short_fiction'
-                      ? 'Short Fiction'
-                      : effectiveTemplate === 'long_fiction'
-                        ? 'Long Fiction'
-                        : effectiveTemplate === 'anime_fiction'
-                          ? 'Anime Fiction'
-                          : effectiveTemplate === 'experimental_fiction'
-                            ? 'Experimental'
-                            : null;
-
-          if (!modeLabel && !templateLabel) {
-            return null;
-          }
-
-          return (
-            <Typography variant="body2" sx={{ mb: 2, color: '#374151' }}>
-              {modeLabel || 'Story'}
-              {templateLabel ? ` · ${templateLabel}` : ''}
-            </Typography>
-          );
-        })()}
 
         {setupError && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setSetupError(null)}>
@@ -668,67 +808,20 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         )}
 
         {isFictionTemplate && (
-          <Box sx={{ mb: 2, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
-            <Box sx={{ flex: 2 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, color: '#111827' }}>
-                Fiction Focus
-              </Typography>
-              <RadioGroup
-                row
-                value={fictionVariant || ''}
-                onChange={(e) => setFictionVariant(e.target.value)}
-              >
-                {(FICTION_VARIANT_OPTIONS[effectiveTemplate || ''] || []).map((opt) => (
-                  <FormControlLabel
-                    key={opt.value}
-                    value={opt.value}
-                    control={<Radio size="small" />}
-                    label={
-                      <Typography variant="body2" sx={{ color: '#374151' }}>
-                        {opt.label}
-                      </Typography>
-                    }
-                  />
-                ))}
-              </RadioGroup>
+          <Box sx={{ mb: 3, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 2 }}>
+            <Box sx={{ flex: 1 }}>
+              <FictionFocusSelector
+                options={FICTION_VARIANT_OPTIONS[effectiveTemplate || ''] || []}
+                value={fictionVariant}
+                onChange={setFictionVariant}
+              />
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1, color: '#111827' }}>
-                Narrative Energy
-              </Typography>
-              <RadioGroup
-                row
+              <NarrativeEnergySelector
+                options={NARRATIVE_ENERGY_OPTIONS}
                 value={narrativeEnergy}
-                onChange={(e) => setNarrativeEnergy(e.target.value)}
-              >
-                <FormControlLabel
-                  value="grounded"
-                  control={<Radio size="small" />}
-                  label={
-                    <Typography variant="body2" sx={{ color: '#374151' }}>
-                      Grounded
-                    </Typography>
-                  }
-                />
-                <FormControlLabel
-                  value="balanced"
-                  control={<Radio size="small" />}
-                  label={
-                    <Typography variant="body2" sx={{ color: '#374151' }}>
-                      Balanced
-                    </Typography>
-                  }
-                />
-                <FormControlLabel
-                  value="cinematic"
-                  control={<Radio size="small" />}
-                  label={
-                    <Typography variant="body2" sx={{ color: '#374151' }}>
-                      Cinematic
-                    </Typography>
-                  }
-                />
-              </RadioGroup>
+                onChange={setNarrativeEnergy}
+              />
             </Box>
           </Box>
         )}
@@ -737,9 +830,9 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
           sx={{
             position: 'relative',
             mb: 3,
-            borderRadius: 3,
-            p: 1,
-            background: 'radial-gradient(circle at 0% 0%, rgba(59,130,246,0.08), transparent 55%), radial-gradient(circle at 100% 100%, rgba(236,72,153,0.08), transparent 55%)',
+            borderRadius: 2,
+            bgcolor: '#ffffff',
+            boxShadow: '0 18px 45px rgba(15,23,42,0.18)',
             '&::before': {
               content: '""',
               position: 'absolute',
@@ -761,15 +854,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
             },
           }}
         >
-          <Box
-            sx={{
-              position: 'relative',
-              borderRadius: 2,
-              bgcolor: '#ffffff',
-              boxShadow: '0 18px 45px rgba(15,23,42,0.18)',
-            }}
-          >
-            <TextField
+          <TextField
               fullWidth
               multiline
               rows={6}
@@ -843,16 +928,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
                 ),
               }}
             />
-          </Box>
-          {isEnhancingIdea && (
-            <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CircularProgress size={16} />
-              <Typography variant="body2" sx={{ color: '#4b5563' }}>
-                Alwrity AI is reading your idea and drafting 3 enhanced options with gaps and
-                recommendations.
-              </Typography>
-            </Box>
-          )}
+          <EnhanceProgressModal open={isEnhancingIdea} />
           {showEnhanceButton && (
             <Box
               sx={{
@@ -863,7 +939,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
               }}
             >
               <Tooltip
-                title="Use AI to expand and refine your story idea with richer details, characters, and stakes. This only improves the idea; setup fields are generated when you continue to story setup."
+                title={wordCount < 10 ? 'Type at least 10 words to enable AI enhancement' : 'Use AI to expand and refine your story idea with richer details, characters, and stakes. This only improves the idea; setup fields are generated when you continue to story setup.'}
                 arrow
               >
                 <span>
@@ -871,7 +947,7 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
                     size="small"
                     variant="contained"
                     onClick={handleEnhanceStoryIdea}
-                    disabled={isGeneratingSetup || isEnhancingIdea}
+                    disabled={wordCount < 10 || isGeneratingSetup || isEnhancingIdea}
                     sx={{
                       pointerEvents: 'auto',
                       borderRadius: 999,
@@ -896,101 +972,20 @@ export const AIStorySetupModal: React.FC<AIStorySetupModalProps> = ({
         </Box>
 
         {ideaSuggestions.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 600, color: '#111827' }}>
-              AI-enhanced idea options
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 1.5, color: '#4b5563' }}>
-              Choose one of these refined ideas, or use them as inspiration to further edit your own.
-            </Typography>
-            <RadioGroup
-              value={selectedSuggestionIndex !== null ? selectedSuggestionIndex.toString() : ''}
-              onChange={(e) => {
-                const idx = Number(e.target.value);
-                setSelectedSuggestionIndex(idx);
-                if (ideaSuggestions[idx]) {
-                  setStoryIdea(ideaSuggestions[idx].idea);
-                  focusStoryIdeaInput();
-                }
-              }}
-            >
-              {ideaSuggestions.map((sugg, index) => (
-                <Card
-                  key={index}
-                  sx={{
-                    mb: 2,
-                    ...cardStyles,
-                    borderColor:
-                      selectedSuggestionIndex === index ? 'primary.main' : 'rgba(148,163,184,0.7)',
-                    cursor: 'pointer',
-                    '&:hover': {
-                      borderColor: 'primary.main',
-                    },
-                  }}
-                  onClick={() => {
-                    setSelectedSuggestionIndex(index);
-                    setStoryIdea(sugg.idea);
-                    focusStoryIdeaInput();
-                  }}
-                >
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-                      <Radio
-                        value={index}
-                        checked={selectedSuggestionIndex === index}
-                        sx={{ mt: 0.5 }}
-                      />
-                      <Box sx={{ flex: 1 }}>
-                        <Typography
-                          variant="subtitle2"
-                          sx={{ fontWeight: 600, mb: 1, color: '#111827' }}
-                        >
-                          Option {index + 1}
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 1, color: '#374151' }}>
-                          {sugg.idea}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ mt: 1, mb: 0.5, fontWeight: 600, color: '#111827' }}
-                        >
-                          What&apos;s Missing from Plot
-                        </Typography>
-                        <Typography variant="body2" sx={{ mb: 1, color: '#4b5563' }}>
-                          {sugg.whats_missing}
-                        </Typography>
-                        <Typography
-                          variant="body2"
-                          sx={{ mt: 0.5, mb: 0.5, fontWeight: 600, color: '#111827' }}
-                        >
-                          Why choose this Plot
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#4b5563' }}>
-                          {sugg.why_choose}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  </CardContent>
-                </Card>
-              ))}
-            </RadioGroup>
-          </Box>
+          <EnhancedIdeaTabs
+            suggestions={ideaSuggestions}
+            selectedIndex={selectedSuggestionIndex}
+            onSelect={(index) => {
+              setSelectedSuggestionIndex(index);
+              if (ideaSuggestions[index]) {
+                setStoryIdea(ideaSuggestions[index].idea);
+                focusStoryIdeaInput();
+              }
+            }}
+          />
         )}
 
-        {isGeneratingSetup && (
-          <Box sx={{ display: 'flex', alignItems: 'center', py: 3, gap: 2 }}>
-            <CircularProgress size={24} />
-            <Box>
-              <Typography sx={{ color: '#111827', fontWeight: 500 }}>
-                Generating your Story Setup…
-              </Typography>
-              <Typography variant="body2" sx={{ color: '#4b5563' }}>
-                Alwrity AI is creating persona, setting, characters and plot knobs. You&apos;ll be
-                taken to the Story Setup phase with everything pre-filled in a moment.
-              </Typography>
-            </Box>
-          </Box>
-        )}
+        {isGeneratingSetup && <StorySetupProgressModal open={isGeneratingSetup} />}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose}>Cancel</Button>

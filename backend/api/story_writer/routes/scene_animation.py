@@ -20,7 +20,7 @@ from models.story_models import (
     AnimateSceneVoiceoverRequest,
     ResumeSceneAnimationRequest,
 )
-from services.database import get_db
+from services.database import get_db, get_session_for_user
 from services.llm_providers.main_video_generation import track_video_usage
 from services.story_writer.video_generation_service import StoryVideoGenerationService
 from services.subscription import PricingService
@@ -99,7 +99,9 @@ async def animate_scene_preview(
         scene_logger.warning("[AnimateScene] Missing image bytes for user=%s scene=%s", user_id, request.scene_number)
         raise HTTPException(status_code=404, detail="Scene image not found. Generate images first.")
 
-    db = next(get_db())
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
     try:
         pricing_service = PricingService(db)
         validate_scene_animation_operation(pricing_service=pricing_service, user_id=user_id)
@@ -118,10 +120,12 @@ async def animate_scene_preview(
     (ai_video_dir / AI_VIDEO_SUBDIR).mkdir(parents=True, exist_ok=True)
 
     # Save video asset to library
-    db = next(get_db())
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
     try:
         video_service = StoryVideoGenerationService(output_dir=str(ai_video_dir / AI_VIDEO_SUBDIR))
-    
+
         save_result = video_service.save_scene_video(
             video_bytes=animation_result["video_bytes"],
             scene_number=request.scene_number,
@@ -167,31 +171,34 @@ async def animate_scene_preview(
     )
 
     # Save video asset to library
-    db = next(get_db())
-    try:
-        save_asset_to_library(
-            db=db,
-            user_id=user_id,
-            asset_type="video",
-            source_module="story_writer",
-            filename=video_filename,
-            file_url=video_url,
-            file_path=str(ai_video_dir / AI_VIDEO_SUBDIR / video_filename),
-            file_size=len(animation_result["video_bytes"]),
-            mime_type="video/mp4",
-            title=f"Scene {request.scene_number} Animation",
-            description=f"Animated scene {request.scene_number} from story",
-            prompt=animation_result["prompt"],
-            tags=["story_writer", "video", "animation", f"scene_{request.scene_number}"],
-            provider=animation_result["provider"],
-            model=animation_result.get("model_name"),
-            cost=animation_result["cost"],
-            asset_metadata={"scene_number": request.scene_number, "duration": animation_result["duration"], "status": "completed"}
-        )
-    except Exception as e:
-        logger.warning(f"[StoryWriter] Failed to save video asset to library: {e}")
-    finally:
-        db.close()
+    db = get_session_for_user(user_id)
+    if db is None:
+        logger.warning(f"[StoryWriter] Could not open database session to save video asset for {user_id}")
+    else:
+        try:
+            save_asset_to_library(
+                db=db,
+                user_id=user_id,
+                asset_type="video",
+                source_module="story_writer",
+                filename=video_filename,
+                file_url=video_url,
+                file_path=str(ai_video_dir / AI_VIDEO_SUBDIR / video_filename),
+                file_size=len(animation_result["video_bytes"]),
+                mime_type="video/mp4",
+                title=f"Scene {request.scene_number} Animation",
+                description=f"Animated scene {request.scene_number} from story",
+                prompt=animation_result["prompt"],
+                tags=["story_writer", "video", "animation", f"scene_{request.scene_number}"],
+                provider=animation_result["provider"],
+                model=animation_result.get("model_name"),
+                cost=animation_result["cost"],
+                asset_metadata={"scene_number": request.scene_number, "duration": animation_result["duration"], "status": "completed"}
+            )
+        except Exception as e:
+            logger.warning(f"[StoryWriter] Failed to save video asset to library: {e}")
+        finally:
+            db.close()
 
     return AnimateSceneResponse(
         success=True,
@@ -320,7 +327,9 @@ async def animate_scene_voiceover_endpoint(
     if not audio_bytes:
         raise HTTPException(status_code=404, detail="Scene audio not found. Generate audio first.")
 
-    db = next(get_db())
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise HTTPException(status_code=503, detail="Database temporarily unavailable")
     try:
         pricing_service = PricingService(db)
         validate_scene_animation_operation(pricing_service=pricing_service, user_id=user_id)
@@ -425,31 +434,34 @@ def _execute_voiceover_animation_task(
         )
 
         # Save video asset to library
-        db = next(get_db())
-        try:
-            save_asset_to_library(
-                db=db,
-                user_id=user_id,
-                asset_type="video",
-                source_module="story_writer",
-                filename=video_filename,
-                file_url=video_url,
-                file_path=str(ai_video_dir / AI_VIDEO_SUBDIR / video_filename),
-                file_size=len(animation_result["video_bytes"]),
-                mime_type="video/mp4",
-                title=f"Scene {request.scene_number} Animation (Voiceover)",
-                description=f"Animated scene {request.scene_number} with voiceover from story",
-                prompt=animation_result["prompt"],
-                tags=["story_writer", "video", "animation", "voiceover", f"scene_{request.scene_number}"],
-                provider=animation_result["provider"],
-                model=animation_result.get("model_name"),
-                cost=animation_result["cost"],
-                asset_metadata={"scene_number": request.scene_number, "duration": animation_result["duration"], "status": "completed"}
-            )
-        except Exception as e:
-            logger.warning(f"[StoryWriter] Failed to save video asset to library: {e}")
-        finally:
-            db.close()
+        db = get_session_for_user(user_id)
+        if db is None:
+            logger.warning(f"[StoryWriter] Could not open database session to save voiceover asset for {user_id}")
+        else:
+            try:
+                save_asset_to_library(
+                    db=db,
+                    user_id=user_id,
+                    asset_type="video",
+                    source_module="story_writer",
+                    filename=video_filename,
+                    file_url=video_url,
+                    file_path=str(ai_video_dir / AI_VIDEO_SUBDIR / video_filename),
+                    file_size=len(animation_result["video_bytes"]),
+                    mime_type="video/mp4",
+                    title=f"Scene {request.scene_number} Animation (Voiceover)",
+                    description=f"Animated scene {request.scene_number} with voiceover from story",
+                    prompt=animation_result["prompt"],
+                    tags=["story_writer", "video", "animation", "voiceover", f"scene_{request.scene_number}"],
+                    provider=animation_result["provider"],
+                    model=animation_result.get("model_name"),
+                    cost=animation_result["cost"],
+                    asset_metadata={"scene_number": request.scene_number, "duration": animation_result["duration"], "status": "completed"}
+                )
+            except Exception as e:
+                logger.warning(f"[StoryWriter] Failed to save video asset to library: {e}")
+            finally:
+                db.close()
 
         result = AnimateSceneResponse(
             success=True,

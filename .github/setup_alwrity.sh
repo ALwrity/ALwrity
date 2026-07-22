@@ -47,9 +47,6 @@ fi
 echo "Creating subscription tables..."
 python scripts/create_subscription_tables.py || echo -e "${YELLOW}⚠️  Subscription tables may already exist${NC}"
 
-echo "Updating subscription plans..."
-python scripts/cleanup_alpha_plans.py || echo -e "${YELLOW}⚠️  Plans may already be updated${NC}"
-
 cd ..
 
 echo -e "${GREEN}✅ Backend setup complete!${NC}"
