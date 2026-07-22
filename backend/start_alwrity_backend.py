@@ -30,9 +30,6 @@ class BootstrapResult:
     details: Optional[str] = None
 
 
-LINGUISTIC_REQUIRED_FEATURES = {"content_planning", "strategy_copilot", "facebook", "linkedin", "blog_writer", "persona"}
-
-
 def get_enabled_features() -> set:
     """Get enabled features from ALWRITY_ENABLED_FEATURES env var.
     
@@ -51,27 +48,9 @@ def get_enabled_features() -> set:
 
 def should_bootstrap_linguistic_models() -> bool:
     """Decide whether to bootstrap linguistic models based on enabled features."""
-    enabled_features = get_enabled_features()
-    verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
-    
-    if "all" in enabled_features:
-        return True
-    
-    # Podcast-only mode doesn't need linguistic models
-    if enabled_features == {"podcast"}:
-        return False
-    
-    # Map old profile names to features for backwards compatibility
-    feature_mapping = {
-        "podcast": "podcast",
-        "youtube": "youtube",
-        "planning": "content-planning",
-        "default": "all"
-    }
-    
-    # Check if any linguistic-required feature is enabled
-    linguistic_features = {"content_planning", "facebook", "linkedin", "blog_writer", "persona"}
-    return bool(enabled_features & linguistic_features)
+    from alwrity_utils.linkedin_lean_mode import should_bootstrap_linguistic_models as _should_bootstrap
+
+    return _should_bootstrap(get_enabled_features())
 
 
 def should_bootstrap_local_llm_models() -> bool:
@@ -376,23 +355,14 @@ def start_backend(enable_reload=False, production_mode=False):
         verbose_mode = setup_clean_logging()
         uvicorn_log_level = get_uvicorn_log_level()
 
-        # Log diagnostics and assert versions (fail fast if misconfigured)
-        try:
-            if log_video_stack_diagnostics:
-                log_video_stack_diagnostics()
-            if assert_supported_moviepy:
-                assert_supported_moviepy()
-        except Exception as _video_stack_err:
-            print(f"[ERROR] Video stack preflight failed: {_video_stack_err}")
-            return False
-        
         print(f"[DEBUG] Starting uvicorn with host={host} port={port}", flush=True)
         print("[DEBUG] >>> ABOUT TO CALL UVICORN.RUN() <<<", flush=True)
-        
-        # Skip video preflight in feature-limited mode to save memory/time
+
+        # Skip video/moviepy preflight in feature-limited mode (e.g. linkedin-only).
+        # Lean installs (requirements-linkedin.txt) intentionally omit moviepy.
         is_feature_limited = os.getenv("ALWRITY_ENABLED_FEATURES", "").strip().lower() not in ("", "all")
         print(f"[DEBUG] Feature-limited mode check: {is_feature_limited}", flush=True)
-        
+
         if is_feature_limited:
             print("[DEBUG] Feature-limited mode - skipping video preflight", flush=True)
         else:
@@ -405,7 +375,7 @@ def start_backend(enable_reload=False, production_mode=False):
             except Exception as _video_stack_err:
                 print(f"[ERROR] Video stack preflight failed: {_video_stack_err}")
                 return False
-        
+
         uvicorn.run(
             "app:app",
             host=host,
@@ -492,7 +462,10 @@ def main():
         return False
     
     # Initialize modular components
-    dependency_manager = DependencyManager()
+    from alwrity_utils.linkedin_lean_mode import get_requirements_file_for_features
+
+    requirements_file = get_requirements_file_for_features(get_enabled_features())
+    dependency_manager = DependencyManager(requirements_file)
     environment_setup = EnvironmentSetup(production_mode=production_mode)
     database_setup = DatabaseSetup(production_mode=production_mode)
     production_optimizer = ProductionOptimizer()

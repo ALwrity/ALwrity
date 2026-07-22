@@ -921,10 +921,11 @@ def _assert_router_mounted(router_name: str) -> None:
 async def shutdown_event():
     """Cleanup on shutdown."""
     try:
-        # Stop task scheduler
-        from services.scheduler import get_scheduler
-        await get_scheduler().stop()
-        
+        # Stop task scheduler (full mode only — skipped at startup in feature-limited mode)
+        if _is_full_mode():
+            from services.scheduler import get_scheduler
+            await get_scheduler().stop()
+
         # Close database connections
         close_database()
 
