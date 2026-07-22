@@ -474,13 +474,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
                        null;
       
       // Usage limit error: 429 status with usage info OR provider OR message indicating token/call limits
-      const hasUsageIndicators = usageInfo || 
-                                 errorData.provider || 
-                                 errorData.message?.includes('limit') ||
-                                 errorData.error?.includes('limit') ||
-                                 errorData.requested_tokens !== undefined ||
-                                 errorData.current_tokens !== undefined ||
-                                 errorData.current_calls !== undefined;
+      const hasUsageIndicators = (
+        (usageInfo && (usageInfo.current_tokens !== undefined || usageInfo.current_calls !== undefined || usageInfo.limit !== undefined || usageInfo.requested_tokens !== undefined))
+      ) || 
+        errorData.provider || 
+        errorData.message?.includes('limit') ||
+        errorData.error?.includes('limit') ||
+        errorData.requested_tokens !== undefined ||
+        errorData.current_tokens !== undefined ||
+        errorData.current_calls !== undefined;
       
       const isUsageLimitError = status === 429 && hasUsageIndicators;
       const isSubscriptionExpired = status === 402 || (status === 429 && !isUsageLimitError);
@@ -523,11 +525,22 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
                                   ...errorData
                                 } : null) ||
                                 errorData;
-          
+
+          const rawMessage = errorData.message || errorData.error || 'You have reached your usage limit.';
+
+          // If usage_info has no numeric fields, it's likely a provider failure,
+          // not a genuine usage limit. Don't show empty stats (0/0 NaN%).
+          const hasNumericUsageInfo = finalUsageInfo && (
+            finalUsageInfo.current_tokens !== undefined ||
+            finalUsageInfo.current_calls !== undefined ||
+            finalUsageInfo.limit !== undefined ||
+            finalUsageInfo.requested_tokens !== undefined
+          );
+
           const modalData = {
-            provider: errorData.provider || usageInfo?.provider || 'unknown',
-            usage_info: finalUsageInfo || errorData,
-            message: errorData.message || errorData.error || 'You have reached your usage limit.'
+            provider: errorData.provider || usageInfo?.provider || (hasNumericUsageInfo ? 'unknown' : undefined),
+            usage_info: hasNumericUsageInfo ? finalUsageInfo : null,
+            message: rawMessage,
           };
           
           // Set flag to mark this as a usage limit modal (should never be auto-closed)
