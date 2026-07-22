@@ -9,6 +9,7 @@ import HeaderControls from '../shared/HeaderControls';
 import PhaseNavigation from './PhaseNavigation';
 import { MultimediaToolbar } from './components/MultimediaToolbar';
 import { SecondaryButton } from '../PodcastMaker/ui/SecondaryButton';
+import AutoSaveIndicator, { SaveStatus } from './components/AutoSaveIndicator';
 import { StoryPhase } from '../../hooks/useStoryWriterPhaseNavigation';
 import { useStoryWriterState } from '../../hooks/useStoryWriterState';
 
@@ -28,6 +29,8 @@ interface StoryWriterHeaderProps {
   isGeneratingAudio: boolean;
   isGeneratingVideo: boolean;
   onOpenPanel: (section: 'audio' | 'video') => void;
+  saveStatus?: SaveStatus;
+  lastSavedAt?: Date | null;
 }
 
 export const StoryWriterHeader: React.FC<StoryWriterHeaderProps> = ({
@@ -46,6 +49,8 @@ export const StoryWriterHeader: React.FC<StoryWriterHeaderProps> = ({
   isGeneratingAudio,
   isGeneratingVideo,
   onOpenPanel,
+  saveStatus,
+  lastSavedAt,
 }) => {
   const navigate = useNavigate();
   return (
@@ -150,6 +155,12 @@ export const StoryWriterHeader: React.FC<StoryWriterHeaderProps> = ({
           >
             Save
           </SecondaryButton>
+          {saveStatus && (
+            <AutoSaveIndicator
+              status={saveStatus}
+              lastSavedAt={lastSavedAt}
+            />
+          )}
           <SecondaryButton
             onClick={() => navigate('/story-projects')}
             startIcon={<FolderOpenIcon />}

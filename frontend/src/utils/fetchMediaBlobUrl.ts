@@ -22,6 +22,20 @@ export const clearMediaCache = (url?: string) => {
   }
 };
 
+export async function downloadMediaBlob(mediaUrl: string, filename?: string): Promise<void> {
+  const blobUrl = await fetchMediaBlobUrl(mediaUrl);
+  if (!blobUrl) {
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename || `media-${Date.now()}.mp4`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(blobUrl);
+}
+
 export async function fetchMediaBlobUrl(pathOrUrl: string): Promise<string | null> {
   try {
     // Check cache first

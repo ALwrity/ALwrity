@@ -12,7 +12,8 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import GlobalStyles from '@mui/material/GlobalStyles';
-import { marked } from 'marked';
+import { renderMarkdown } from '../../../utils/markdown';
+import { useMediaBlobLoader } from '../../../hooks/useMediaBlobLoader';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStoryWriterState } from '../../../hooks/useStoryWriterState';
 import { storyWriterApi } from '../../../services/storyWriterApi';
@@ -20,29 +21,31 @@ import { triggerSubscriptionError } from '../../../api/client';
 import { aiApiClient } from '../../../api/client';
 import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
 import { MultimediaSection } from '../components/MultimediaSection';
+import { AnimeBibleDialog } from '../components/AnimeBibleDialog';
+import ErrorRetryAlert from '../components/ErrorRetryAlert';
+import AutoSaveIndicator, { SaveStatus } from '../components/AutoSaveIndicator';
+import FailedMediaList, { FailedSceneMedia } from '../components/FailedMediaList';
+import { useUndoRedo } from '../../../hooks/useUndoRedo';
+import { useSceneImageGenerator } from '../../../hooks/useSceneImageGenerator';
 import { StoryWritingProgressModal } from './StorySetup/StoryWritingProgressModal';
 import { SceneImageGenerationProgressModal } from './StorySetup/SceneImageGenerationProgressModal';
+import { AudioGenerationProgressModal } from './StorySetup/AudioGenerationProgressModal';
 import EditSectionModal from './StoryOutlineParts/EditSectionModal';
 import ImageEditModal from './StoryOutlineParts/ImageEditModal';
+import CharactersModal from './StoryOutlineParts/CharactersModal';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import AudiotrackIcon from '@mui/icons-material/Audiotrack';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import {
   StoryImageGenerationModal,
   StoryImageGenerationSettings,
 } from '../components/StoryImageGenerationModal';
 
 const MotionBox = motion.create(Box);
-
-const renderMarkdown = (md: string): string => {
-  if (!md) return '';
-  try {
-    const html = marked.parse(md);
-    return typeof html === 'string' ? html : '';
-  } catch {
-    return md;
-  }
-};
 
 // Define cubic bezier easing arrays as const to preserve tuple types
 const easeInOut = [0.22, 0.61, 0.36, 1] as const;
@@ -97,6 +100,7 @@ const rightPageVariants = {
 interface StoryWritingProps {
   state: ReturnType<typeof useStoryWriterState>;
   onNext: () => void;
+  onPrev: () => void;
 }
 
 // Helper function to check if story is short
@@ -142,29 +146,39 @@ const splitStoryContent = (content: string, numSections: number): string[] => {
   return sections;
 };
 
-const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
+const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext, onPrev }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [pageDirection, setPageDirection] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Set<number>>(new Set());
-  const [imageBlobUrls, setImageBlobUrls] = useState<Map<number, string>>(new Map());
   const [videoBlobUrls, setVideoBlobUrls] = useState<Map<number, string>>(new Map());
   const [videoLoadError, setVideoLoadError] = useState<Set<number>>(new Set());
 
   // Editing state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editText, setEditText] = useState('');
+  const editUndoRedo = useUndoRedo('', { limit: 30 });
+  const { generateSceneImage, isGenerating: isGeneratingSceneImage } = useSceneImageGenerator(state);
+  const handleEditTextChange = (text: string) => {
+    setEditText(text);
+    editUndoRedo.setValue(text);
+  };
   const [aiFeedback, setAiFeedback] = useState('');
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [imagePromptDraft, setImagePromptDraft] = useState('');
   const [isImageSettingsModalOpen, setIsImageSettingsModalOpen] = useState(false);
-  const [isImageSettingsGenerating, setIsImageSettingsGenerating] = useState(false);
-  const [isGeneratingSceneImage, setIsGeneratingSceneImage] = useState(false);
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
+  const [isBibleOpen, setIsBibleOpen] = useState(false);
+  const [isGeneratingSceneAudio, setIsGeneratingSceneAudio] = useState(false);
+  const [isCharactersOpen, setIsCharactersOpen] = useState(false);
+  const [failedImageScenes, setFailedImageScenes] = useState<Set<number>>(new Set());
+  const [failedAudioScenes, setFailedAudioScenes] = useState<Set<number>>(new Set());
 
   // Get scenes and images from state
   const scenes = state.outlineScenes || [];
@@ -199,58 +213,8 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
   const currentSceneImageUrl = sceneImages.get(currentSceneNumber);
   const hasImageLoadError = imageLoadError.has(currentSceneNumber);
 
-  // Fetch image as blob with authentication
-  useEffect(() => {
-    if (!currentSceneImageUrl || hasImageLoadError || imageBlobUrls.has(currentSceneNumber)) {
-      return;
-    }
-    
-    const loadImage = async () => {
-      try {
-        // Remove query parameters (token) from URL if present, we'll use authenticated request instead
-        const cleanUrl = currentSceneImageUrl.split('?')[0];
-        // Use relative URL path directly (aiApiClient will add base URL and auth)
-        const imageUrl = cleanUrl.startsWith('/') 
-          ? cleanUrl 
-          : `/${cleanUrl}`;
-        // Use aiApiClient to get authenticated response with blob
-        const response = await aiApiClient.get(imageUrl, {
-          responseType: 'blob',
-        });
-        
-        const blob = response.data;
-        const blobUrl = URL.createObjectURL(blob);
-        
-        setImageBlobUrls((prev) => {
-          const next = new Map(prev);
-          next.set(currentSceneNumber, blobUrl);
-          return next;
-        });
-      } catch (err) {
-        console.error('Failed to load image:', err);
-        setImageLoadError((prev) => new Set(prev).add(currentSceneNumber));
-      }
-    };
-    
-    loadImage();
-  }, [currentSceneNumber, currentSceneImageUrl, hasImageLoadError, imageBlobUrls]);
-
-  // Cleanup blob URLs when component unmounts
-  const imageBlobUrlsRef = React.useRef(imageBlobUrls);
-  useEffect(() => {
-    imageBlobUrlsRef.current = imageBlobUrls;
-  }, [imageBlobUrls]);
-
-  useEffect(() => {
-    return () => {
-      // Revoke all blob URLs on unmount using the ref
-      imageBlobUrlsRef.current.forEach((blobUrl) => {
-        URL.revokeObjectURL(blobUrl);
-      });
-    };
-  }, []);
-
-  const currentSceneImageFullUrl = imageBlobUrls.get(currentSceneNumber) || null;
+  // Image blob loaded via useMediaBlobLoader hook below
+  const { blobUrl: currentSceneImageFullUrl } = useMediaBlobLoader(currentSceneImageUrl);
   const currentSceneAnimatedVideoUrl = sceneAnimatedVideos.get(currentSceneNumber) || null;
   const currentSceneAnimatedVideoBlobUrl = videoBlobUrls.get(currentSceneNumber) || null;
   const hasVideoLoadError = videoLoadError.has(currentSceneNumber);
@@ -346,7 +310,13 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
       return;
     }
     lastSavedWordCountRef.current = wordCount;
-    state.saveProjectToDb();
+    setSaveStatus('saving');
+    state.saveProjectToDb().then(() => {
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
+    }).catch(() => {
+      setSaveStatus('error');
+    });
   }, [state.projectId, state.storyContent, state.saveProjectToDb, state]);
 
   const handlePrevPage = () => {
@@ -513,6 +483,7 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
 
   const openEditModal = () => {
     setEditText(currentPage);
+    editUndoRedo.reset(currentPage);
     setAiFeedback('');
     setAiSuggestions([]);
     setIsEditModalOpen(true);
@@ -566,62 +537,16 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
 
   const handleGenerateSceneImage = async (promptOverride?: string) => {
     if (!hasScenes || !currentScene) return;
-    setIsGeneratingSceneImage(true);
-    try {
-      const prompt = promptOverride || imagePromptDraft || currentScene?.image_prompt || '';
-      if (!prompt.trim()) {
-        return;
-      }
-      const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
-      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
-
-      const resp = await storyWriterApi.regenerateSceneImage({
-        scene_number: sceneNum,
-        scene_title: sceneTitle,
-        prompt: prompt.trim(),
-        provider: state.imageProvider || undefined,
-        width: state.imageWidth,
-        height: state.imageHeight,
-        model: state.imageModel || undefined,
-      });
-
-      if (resp.success && resp.image_url) {
-        // Store the new image URL
-        const nextMap = new Map(state.sceneImages || []);
-        nextMap.set(sceneNum, resp.image_url);
-        state.setSceneImages(nextMap);
-
-        // Fetch the blob URL directly so the image appears immediately
-        try {
-          const cleanUrl = resp.image_url.split('?')[0];
-          const imageUrl = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
-          const blobResp = await aiApiClient.get(imageUrl, { responseType: 'blob' });
-          const blobUrl = URL.createObjectURL(blobResp.data);
-          setImageBlobUrls((prev) => {
-            const next = new Map(prev);
-            const oldBlob = next.get(sceneNum);
-            if (oldBlob) URL.revokeObjectURL(oldBlob);
-            next.set(sceneNum, blobUrl);
-            return next;
-          });
-          setImageLoadError((prev) => {
-            const next = new Set(prev);
-            next.delete(sceneNum);
-            return next;
-          });
-        } catch (fetchErr) {
-          console.error('Failed to load generated image:', fetchErr);
-          setImageLoadError((prev) => new Set(prev).add(sceneNum));
-        }
-      } else {
-        throw new Error(resp.error || 'Failed to generate image');
-      }
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to generate image';
-      state.setError(errorMessage);
-    } finally {
-      setIsGeneratingSceneImage(false);
-    }
+    const prompt = promptOverride || imagePromptDraft || currentScene?.image_prompt || '';
+    if (!prompt.trim()) return;
+    const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+    await generateSceneImage(
+      sceneNum,
+      currentScene.title || `Scene ${sceneNum}`,
+      prompt.trim(),
+      () => setImageLoadError((prev) => { const s = new Set(prev); s.delete(sceneNum); return s; }),
+      (msg) => state.setError(msg),
+    );
   };
 
   const handleOpenAdvancedImageSettings = (prompt: string) => {
@@ -629,37 +554,51 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
     setIsImageSettingsModalOpen(true);
   };
 
-  const handleGenerateImageWithSettings = async (settings: StoryImageGenerationSettings) => {
+  const handleGenerateSceneAudio = async () => {
     if (!hasScenes || !currentScene) return;
-    setIsImageSettingsGenerating(true);
+    const narration = currentScene?.audio_narration || '';
+    if (!narration.trim()) return;
+    setIsGeneratingSceneAudio(true);
     try {
       const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
-      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
-
-      const resp = await storyWriterApi.regenerateSceneImage({
+      const resp = await storyWriterApi.generateFreeAudio({
         scene_number: sceneNum,
-        scene_title: sceneTitle,
-        prompt: settings.prompt.trim(),
-        provider: state.imageProvider || undefined,
-        width: state.imageWidth,
-        height: state.imageHeight,
-        model: settings.model || state.imageModel || undefined,
+        scene_title: currentScene.title || `Scene ${sceneNum}`,
+        text: narration.trim(),
+        provider: state.audioProvider || undefined,
+        lang: state.audioLang || undefined,
+        slow: state.audioSlow || false,
+        rate: state.audioRate || undefined,
       });
+      if (resp.success && resp.audio_url) {
+        const nextMap = new Map(state.sceneAudio || []);
+        nextMap.set(sceneNum, resp.audio_url);
+        state.setSceneAudio(nextMap);
+      }
+    } catch (err: any) {
+      console.error('Failed to generate audio:', err);
+    } finally {
+      setIsGeneratingSceneAudio(false);
+    }
+  };
 
-      if (resp.success && resp.image_url) {
-        const nextMap = new Map(state.sceneImages || []);
-        nextMap.set(sceneNum, resp.image_url);
-        state.setSceneImages(nextMap);
+  const handleGenerateImageWithSettings = async (settings: StoryImageGenerationSettings) => {
+    if (!hasScenes || !currentScene) return;
+    const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+    const ok = await generateSceneImage(
+      sceneNum,
+      currentScene.title || `Scene ${sceneNum}`,
+      settings.prompt.trim(),
+      () => {
         setImagePromptDraft(settings.prompt.trim());
         setIsImageSettingsModalOpen(false);
         setIsImageModalOpen(false);
-      } else {
-        throw new Error(resp.error || 'Failed to generate image');
-      }
-    } catch (err: any) {
-      console.error('Failed to generate scene image with settings:', err);
-    } finally {
-      setIsImageSettingsGenerating(false);
+      },
+      undefined,
+      settings.model || null,
+    );
+    if (!ok) {
+      console.error('Failed to generate scene image with settings');
     }
   };
 
@@ -712,21 +651,50 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
           },
           '.rendered-content hr': { border: 'none', borderTop: '1px solid rgba(120,90,60,0.2)', margin: '1rem 0' },
           '.rendered-content a': { color: '#5D4037', textDecoration: 'underline' },
+          '.rendered-content img': { maxWidth: '100%', height: 'auto', borderRadius: '4px', margin: '0.5rem 0' },
         }}
       />
       {state.storyContent && (
-        <Typography variant="body2" sx={{ mb: 3, color: '#5D4037', fontStyle: 'italic' }}>
-          Current word count: {state.storyContent.split(/\s+/).filter(word => word.length > 0).length} words
-          {state.storyLength && (
-            <> (Target: {state.storyLength.includes('1000') ? '>1000' : state.storyLength.includes('5000') ? '>5000' : '>10000'} words)</>
-          )}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography variant="body2" sx={{ color: '#5D4037', fontStyle: 'italic' }}>
+              Current word count: {state.storyContent.split(/\s+/).filter(word => word.length > 0).length} words
+              {state.storyLength && (
+                <> (Target: {state.storyLength.includes('1000') ? '>1000' : state.storyLength.includes('5000') ? '>5000' : '>10000'} words)</>
+              )}
+            </Typography>
+            {state.projectId && (
+              <AutoSaveIndicator
+                status={saveStatus}
+                lastSavedAt={lastSavedAt}
+              />
+            )}
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            {state.animeBible && (
+              <Button variant="outlined" size="small" startIcon={<MenuBookIcon />} onClick={() => setIsBibleOpen(true)}
+                sx={{ borderColor: '#8D6E63', color: '#5D4037', '&:hover': { borderColor: '#5D4037', bgcolor: 'rgba(141,110,99,0.08)' } }}>
+                View Bible
+              </Button>
+            )}
+            <Button variant="outlined" size="small" startIcon={<ArrowBackIcon />} onClick={onPrev}
+              sx={{ borderColor: '#8D6E63', color: '#5D4037', '&:hover': { borderColor: '#5D4037', bgcolor: 'rgba(141,110,99,0.08)' } }}>
+              Edit Scenes
+            </Button>
+          </Box>
+        </Box>
       )}
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+        <ErrorRetryAlert
+          error={error}
+          onDismiss={() => setError(null)}
+          defaultRetry={error.includes('generate story')
+            ? () => handleGenerateStart()
+            : error.includes('continue')
+            ? () => handleContinue()
+            : undefined}
+        />
       )}
 
       {(!state.premise || (!state.outline && !state.outlineScenes)) && (
@@ -908,20 +876,33 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
                               </Box>
                             </Tooltip>
                             <Tooltip title="Edit image prompt">
-                              <Box
-                                role="button"
-                                onClick={openImageModal}
-                                sx={{
-                                  width: 32, height: 32, borderRadius: '50%',
-                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                  background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)',
-                                  boxShadow: '0 4px 10px rgba(127,90,240,0.3)',
-                                  color: 'white', cursor: 'pointer',
-                                }}
-                              >
+                              <Box role="button" onClick={openImageModal} sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)', boxShadow: '0 4px 10px rgba(127,90,240,0.3)', color: 'white', cursor: 'pointer' }}>
                                 <EditNoteIcon fontSize="small" />
                               </Box>
                             </Tooltip>
+                            <Tooltip title="Regenerate image">
+                              <Box role="button" onClick={() => handleGenerateSceneImage()} sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1f8a70 0%, #32d9c8 100%)', boxShadow: '0 4px 10px rgba(31,138,112,0.3)', color: 'white', cursor: isGeneratingSceneImage ? 'default' : 'pointer', opacity: isGeneratingSceneImage ? 0.5 : 1 }}>
+                                {isGeneratingSceneImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <RefreshIcon fontSize="small" />}
+                              </Box>
+                            </Tooltip>
+                            {currentScene?.audio_narration && (
+                              <Tooltip title="Generate scene audio">
+                                <Box
+                                  role="button"
+                                  onClick={handleGenerateSceneAudio}
+                                  sx={{
+                                    width: 32, height: 32, borderRadius: '50%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                                    boxShadow: '0 4px 10px rgba(217,119,6,0.3)',
+                                    color: 'white', cursor: isGeneratingSceneAudio ? 'default' : 'pointer',
+                                    opacity: isGeneratingSceneAudio ? 0.5 : 1,
+                                  }}
+                                >
+                                  {isGeneratingSceneAudio ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <AudiotrackIcon fontSize="small" />}
+                                </Box>
+                              </Tooltip>
+                            )}
                           </Box>
                         </Box>
                       ) : (
@@ -960,6 +941,24 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
                                 {isGeneratingSceneImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <AutoFixHighIcon fontSize="small" />}
                               </Box>
                             </Tooltip>
+                            {currentScene?.audio_narration && (
+                              <Tooltip title="Generate scene audio">
+                                <Box
+                                  role="button"
+                                  onClick={handleGenerateSceneAudio}
+                                  sx={{
+                                    width: 28, height: 28, borderRadius: '50%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    background: 'linear-gradient(135deg, #d97706 0%, #f59e0b 100%)',
+                                    boxShadow: '0 4px 10px rgba(217,119,6,0.3)',
+                                    color: 'white', cursor: isGeneratingSceneAudio ? 'default' : 'pointer',
+                                    opacity: isGeneratingSceneAudio ? 0.5 : 1,
+                                  }}
+                                >
+                                  {isGeneratingSceneAudio ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <AudiotrackIcon fontSize="small" />}
+                                </Box>
+                              </Tooltip>
+                            )}
                           </Box>
                           <Typography variant="body2" sx={{ color: '#3f3224', lineHeight: 1.7, mb: 2, whiteSpace: 'pre-wrap' }}>
                             {currentScene?.image_prompt || 'No image prompt available for this scene.'}
@@ -1037,6 +1036,26 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
                             <EditNoteIcon fontSize="small" />
                           </Box>
                         </Tooltip>
+                        {currentScene?.character_descriptions && currentScene.character_descriptions.length > 0 && (
+                          <Tooltip title="View characters in this scene">
+                            <Box
+                              role="button"
+                              onClick={(e) => { e.stopPropagation(); setIsCharactersOpen(true); }}
+                              sx={{
+                                position: 'absolute', top: 38, right: 0, zIndex: 4,
+                                display: 'flex', alignItems: 'center', gap: 0.5,
+                                px: 1.2, py: 0.3, borderRadius: 1.5,
+                                fontSize: '0.75rem', fontWeight: 600,
+                                background: 'linear-gradient(135deg, #f5ecd8 0%, #ede0c8 100%)',
+                                border: '1px solid rgba(141,110,99,0.25)',
+                                color: '#5D4037', cursor: 'pointer',
+                                opacity: 0.8, '&:hover': { opacity: 1 },
+                              }}
+                            >
+                              {currentScene.character_descriptions.length} character{currentScene.character_descriptions.length !== 1 ? 's' : ''}
+                            </Box>
+                          </Tooltip>
+                        )}
                         {currentPage ? (
                           <Box
                             className="rendered-content"
@@ -1205,7 +1224,7 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
         open={isEditModalOpen}
         sceneNumber={currentSceneNumber}
         editText={editText}
-        onChangeEditText={setEditText}
+        onChangeEditText={handleEditTextChange}
         aiFeedback={aiFeedback}
         onChangeAiFeedback={setAiFeedback}
         aiLoading={aiLoading}
@@ -1214,6 +1233,10 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
         onPickSuggestion={applySuggestion}
         onClose={() => setIsEditModalOpen(false)}
         onSave={handleSaveUpdatedSection}
+        canUndo={editUndoRedo.canUndo}
+        canRedo={editUndoRedo.canRedo}
+        onUndo={editUndoRedo.undo}
+        onRedo={editUndoRedo.redo}
       />
 
       {/* Image prompt editor */}
@@ -1240,7 +1263,7 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
         initialPrompt={imagePromptDraft}
         sceneTitle={currentScene?.title || undefined}
         storyMode={state.storyMode}
-        isGenerating={isImageSettingsGenerating}
+        isGenerating={isGeneratingSceneImage}
       />
 
       <StoryWritingProgressModal
@@ -1250,6 +1273,21 @@ const StoryWriting: React.FC<StoryWritingProps> = ({ state, onNext }) => {
       <SceneImageGenerationProgressModal
         open={isGeneratingSceneImage}
         sceneTitle={currentScene?.title}
+      />
+      <AudioGenerationProgressModal
+        open={isGeneratingSceneAudio}
+      />
+      <AnimeBibleDialog
+        open={isBibleOpen}
+        animeBible={state.animeBible}
+        onClose={() => setIsBibleOpen(false)}
+        onSave={(updated) => { state.setAnimeBible(updated); setIsBibleOpen(false); }}
+      />
+      <CharactersModal
+        open={isCharactersOpen}
+        sceneNumber={currentSceneNumber}
+        characters={currentScene?.character_descriptions || []}
+        onClose={() => setIsCharactersOpen(false)}
       />
     </>
   );

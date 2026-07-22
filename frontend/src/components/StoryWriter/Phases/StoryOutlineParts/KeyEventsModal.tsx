@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Dialog, DialogActions, DialogContent, DialogTitle, Button, Typography } from '@mui/material';
+import { renderMarkdown } from '../../../../utils/markdown';
 import { modalPaperSx } from './modalStyles';
 
 interface KeyEventsModalProps {
@@ -26,7 +27,10 @@ const KeyEventsModal: React.FC<KeyEventsModalProps> = ({ open, sceneNumber, even
           <Box component="ul" sx={{ pl: 2, mb: 0 }}>
             {events.map((e, idx) => (
               <li key={idx}>
-                <Typography variant="body2">{e}</Typography>
+                <Box
+                  className="rendered-content"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(e) }}
+                />
               </li>
             ))}
           </Box>

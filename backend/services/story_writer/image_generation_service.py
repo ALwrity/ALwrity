@@ -68,12 +68,11 @@ class StoryImageGenerationService:
         anime_bible: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Validate and enrich image prompt using the anime story bible.
+        Enrich image prompt with 3-4 essential visual anchors from the anime bible.
 
-        Injects visual style, world rules (as constraints), and per-character
-        look/outfit details from the bible into the prompt. Detects and logs
-        conflicts between the prompt and bible to flag inconsistencies.
-        Deterministic — no extra LLM calls.
+        Keeps only high-signal items that image models interpret cleanly:
+        style preset, world setting, and character consistency. Deterministic — no
+        extra LLM calls.
         """
         if not image_prompt or not isinstance(image_prompt, str):
             return image_prompt
@@ -87,53 +86,18 @@ class StoryImageGenerationService:
 
         parts: List[str] = []
 
-        # --- Visual style enrichment ---
+        # 1. Style preset — the single most impactful visual anchor
         style_preset = visual_style.get("style_preset")
         if style_preset:
             parts.append(f"{style_preset} anime illustration style")
 
-        camera_style = visual_style.get("camera_style")
-        if camera_style:
-            parts.append(f"framing and camera style: {camera_style}")
-
-        color_mood = visual_style.get("color_mood")
-        if color_mood:
-            parts.append(f"color mood: {color_mood}")
-
-        lighting = visual_style.get("lighting")
-        if lighting:
-            parts.append(f"lighting: {lighting}")
-
-        line_style = visual_style.get("line_style")
-        if line_style:
-            parts.append(f"line style: {line_style}")
-
-        extra_tags = visual_style.get("extra_tags") or []
-        if isinstance(extra_tags, (list, tuple)):
-            extra_text = ", ".join(str(tag) for tag in extra_tags[:6] if tag)
-            if extra_text:
-                parts.append(extra_text)
-
-        # --- World context (setting + positive rules as visual descriptors) ---
+        # 2. World setting — contextual backdrop for the scene
         if isinstance(world, dict):
             setting = world.get("setting")
             if setting:
                 parts.append(f"world setting: {setting}")
 
-            rules = world.get("core_rules") or []
-            if rules:
-                # Only include rules that describe what EXISTS (not negative constraints)
-                # Image models can't act on "no X" — they need positive visual direction
-                visuals = []
-                negations = {"no ", "cannot ", "must not ", "don't ", "do not ", "never "}
-                for rule in rules:
-                    lower = rule.strip().lower()
-                    if not any(lower.startswith(n) for n in negations):
-                        visuals.append(rule.strip())
-                if visuals:
-                    parts.append(", ".join(visuals[:3]))
-
-        # --- Character consistency ---
+        # 3. Character visibility — which cast members appear, with look details for in-scene characters
         scene_chars = scene.get("character_descriptions") or []
         if isinstance(scene_chars, list) and isinstance(main_cast, list):
             for desc in scene_chars:
@@ -154,6 +118,7 @@ class StoryImageGenerationService:
                             parts.append(f"{name} ({', '.join(details)})")
                         break
 
+        # 4. Character design consistency anchor
         if isinstance(main_cast, list):
             names = [
                 c.get("name")

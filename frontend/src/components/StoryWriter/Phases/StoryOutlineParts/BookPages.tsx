@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Tooltip, Chip, CircularProgress } from '@mui/material';
-import { marked } from 'marked';
+import { renderMarkdown } from '../../../../utils/markdown';
 import { motion, AnimatePresence } from 'framer-motion';
 import OutlineHoverActions from './OutlineHoverActions';
 import EditNoteIcon from '@mui/icons-material/EditNote';
@@ -9,6 +9,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import GraphicEqIcon from '@mui/icons-material/GraphicEq';
 import ReplayIcon from '@mui/icons-material/Replay';
 import OpenInFullIcon from '@mui/icons-material/OpenInFull';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import { OperationButton } from '../../../shared/OperationButton';
 import { leftPageVariants, rightPageVariants } from './pageVariants';
@@ -16,16 +17,6 @@ import { StoryScene } from '../../../../services/storyWriterApi';
 import type { SceneAnimationResume } from '../../../../hooks/useStoryWriterState';
 
 const MotionBox = motion.create(Box);
-
-const renderMarkdown = (md: string): string => {
-  if (!md) return '';
-  try {
-    const html = marked.parse(md);
-    return typeof html === 'string' ? html : '';
-  } catch {
-    return md;
-  }
-};
 
 interface BookPagesProps {
   currentScene: StoryScene | null;
@@ -245,29 +236,19 @@ const BookPages: React.FC<BookPagesProps> = ({
                     </Box>
                   </Tooltip>
                   <Tooltip title="Edit scene image prompt">
-                    <Box
-                      role="button"
-                      aria-label="Edit scene image"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onOpenImageModal();
-                      }}
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)',
-                        boxShadow: '0 4px 10px rgba(127,90,240,0.3)',
-                        color: 'white',
-                        cursor: 'pointer',
-                      }}
-                    >
+                    <Box role="button" aria-label="Edit scene image" onClick={(e) => { e.stopPropagation(); onOpenImageModal(); }}
+                      sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #7F5AF0 0%, #2CB67D 100%)', boxShadow: '0 4px 10px rgba(127,90,240,0.3)', color: 'white', cursor: 'pointer' }}>
                       <EditNoteIcon fontSize="small" />
                     </Box>
                   </Tooltip>
+                  {onGenerateImage && (
+                    <Tooltip title="Regenerate image">
+                      <Box role="button" aria-label="Regenerate image" onClick={(e) => { e.stopPropagation(); onGenerateImage(); }}
+                        sx={{ width: 32, height: 32, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #1f8a70 0%, #32d9c8 100%)', boxShadow: '0 4px 10px rgba(31,138,112,0.3)', color: 'white', cursor: isGeneratingImage ? 'default' : 'pointer', opacity: isGeneratingImage ? 0.5 : 1 }}>
+                        {isGeneratingImage ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <RefreshIcon fontSize="small" />}
+                      </Box>
+                    </Tooltip>
+                  )}
                   {hasImage && onAnimateScene && (
                     <Box
                       onClick={(e) => {

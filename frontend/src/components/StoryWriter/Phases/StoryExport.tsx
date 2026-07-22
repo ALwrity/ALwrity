@@ -20,7 +20,9 @@ import ImageIcon from '@mui/icons-material/Image';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { useStoryWriterState } from '../../../hooks/useStoryWriterState';
 import { storyWriterApi } from '../../../services/storyWriterApi';
-import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { fetchMediaBlobUrl, downloadMediaBlob } from '../../../utils/fetchMediaBlobUrl';
+import { renderMarkdown } from '../../../utils/markdown';
+import GlobalStyles from '@mui/material/GlobalStyles';
 import { triggerSubscriptionError } from '../../../api/client';
 import SmartDisplayIcon from '@mui/icons-material/SmartDisplay';
 import SceneVideoApproval from '../components/SceneVideoApproval';
@@ -348,17 +350,7 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
 
   const handleDownloadVideo = async () => {
     if (state.storyVideo) {
-      const blobUrl = await fetchMediaBlobUrl(state.storyVideo);
-      if (!blobUrl) {
-        return;
-      }
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `story-video-${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      await downloadMediaBlob(state.storyVideo, `story-video-${Date.now()}.mp4`);
     }
   };
 
@@ -607,11 +599,37 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
       sx={{ 
         p: 4, 
         mt: 2,
-        backgroundColor: '#F7F3E9', // Warm cream/parchment color
-        color: '#2C2416', // Dark brown text for readability
+        backgroundColor: '#F7F3E9',
+        color: '#2C2416',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
       }}
     >
+      <GlobalStyles
+        styles={{
+          '.rendered-content p': { marginBottom: '0.75rem', lineHeight: 1.8 },
+          '.rendered-content h1, .rendered-content h2, .rendered-content h3': {
+            color: '#2C2416', marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 600,
+          },
+          '.rendered-content h1': { fontSize: '1.5rem' },
+          '.rendered-content h2': { fontSize: '1.3rem', borderBottom: '1px solid rgba(120,90,60,0.2)', paddingBottom: '0.25rem' },
+          '.rendered-content h3': { fontSize: '1.15rem' },
+          '.rendered-content strong': { fontWeight: 700 },
+          '.rendered-content em': { fontStyle: 'italic' },
+          '.rendered-content ul, .rendered-content ol': { paddingLeft: '1.5rem', marginBottom: '0.75rem' },
+          '.rendered-content li': { marginBottom: '0.25rem' },
+          '.rendered-content blockquote': {
+            borderLeft: '3px solid #8D6E63', paddingLeft: '1rem', color: '#5D4037',
+            fontStyle: 'italic', margin: '0.75rem 0',
+          },
+          '.rendered-content code': {
+            background: 'rgba(141,110,99,0.12)', padding: '2px 6px', borderRadius: 4,
+            fontFamily: 'monospace', fontSize: '0.9em',
+          },
+          '.rendered-content hr': { border: 'none', borderTop: '1px solid rgba(120,90,60,0.2)', margin: '1rem 0' },
+          '.rendered-content a': { color: '#5D4037', textDecoration: 'underline' },
+          '.rendered-content img': { maxWidth: '100%', height: 'auto', borderRadius: '4px', margin: '0.5rem 0' },
+        }}
+      />
       <Box
         sx={{
           display: 'flex',
@@ -726,25 +744,17 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
               <Typography variant="h6" gutterBottom sx={{ color: '#1A1611' }}>
                 Premise
               </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                value={state.premise}
-                InputProps={{ readOnly: true }}
+              <Box
+                className="rendered-content"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#FFFFFF',
-                    color: '#1A1611',
-                    '& fieldset': {
-                      borderColor: '#8D6E63',
-                      borderWidth: '1.5px',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#1A1611',
-                  },
+                  p: 2,
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 1,
+                  border: '1.5px solid #8D6E63',
+                  color: '#1A1611',
+                  lineHeight: 1.7,
                 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(state.premise || '') }}
               />
             </Box>
           )}
@@ -755,25 +765,17 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
               <Typography variant="h6" gutterBottom sx={{ color: '#1A1611' }}>
                 Outline
               </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={6}
-                value={state.outline}
-                InputProps={{ readOnly: true }}
+              <Box
+                className="rendered-content"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#FFFFFF',
-                    color: '#1A1611',
-                    '& fieldset': {
-                      borderColor: '#8D6E63',
-                      borderWidth: '1.5px',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#1A1611',
-                  },
+                  p: 2,
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 1,
+                  border: '1.5px solid #8D6E63',
+                  color: '#1A1611',
+                  lineHeight: 1.7,
                 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(state.outline || '') }}
               />
             </Box>
           )}
@@ -835,41 +837,33 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
                           />
                         </Box>
                       )}
-                      <Typography
-                        variant="body2"
+                      <Box
+                        className="rendered-content"
                         sx={{
                           color: '#3E2723',
-                          whiteSpace: 'pre-wrap',
                           lineHeight: 1.7,
                           fontSize: '0.95rem',
                         }}
-                      >
-                        {sectionText}
-                      </Typography>
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(sectionText) }}
+                      />
                     </Box>
                   );
                 })}
               </Box>
             ) : state.storyContent ? (
-              <TextField
-                fullWidth
-                multiline
-                rows={20}
-                value={state.storyContent}
-                InputProps={{ readOnly: true }}
+              <Box
+                className="rendered-content"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#FFFFFF',
-                    color: '#1A1611',
-                    '& fieldset': {
-                      borderColor: '#8D6E63',
-                      borderWidth: '1.5px',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#1A1611',
-                  },
+                  p: 2.5,
+                  backgroundColor: '#FAFAF5',
+                  borderRadius: 2,
+                  border: '1.5px solid #E8DDD0',
+                  color: '#3E2723',
+                  lineHeight: 1.7,
+                  fontSize: '0.95rem',
+                  minHeight: '400px',
                 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(state.storyContent || '') }}
               />
             ) : null}
           </Box>

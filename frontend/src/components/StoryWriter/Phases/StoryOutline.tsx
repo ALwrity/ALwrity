@@ -4,6 +4,7 @@ import {
   Typography,
   TextField,
   Alert,
+  Button,
   Snackbar,
   Dialog,
   IconButton,
@@ -13,7 +14,9 @@ import GlobalStyles from '@mui/material/GlobalStyles';
 import { motion } from 'framer-motion';
 import { useStoryWriterState, SceneAnimationResume } from '../../../hooks/useStoryWriterState';
 import { storyWriterApi } from '../../../services/storyWriterApi';
-import { aiApiClient, triggerSubscriptionError } from '../../../api/client';
+import { triggerSubscriptionError } from '../../../api/client';
+import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { useMediaBlobLoader } from '../../../hooks/useMediaBlobLoader';
 import EditSectionModal from './StoryOutlineParts/EditSectionModal';
 import BookPages from './StoryOutlineParts/BookPages';
 import OutlineActionsBar from './StoryOutlineParts/OutlineActionsBar';
@@ -24,10 +27,16 @@ import KeyEventsModal from './StoryOutlineParts/KeyEventsModal';
 import TitleEditModal from './StoryOutlineParts/TitleEditModal';
 import { SceneImagesProgressModal } from './StorySetup/SceneImagesProgressModal';
 import { SceneImageGenerationProgressModal } from './StorySetup/SceneImageGenerationProgressModal';
+import { AudioGenerationProgressModal } from './StorySetup/AudioGenerationProgressModal';
 import {
   StoryImageGenerationModal,
   StoryImageGenerationSettings,
 } from '../components/StoryImageGenerationModal';
+import ErrorRetryAlert from '../components/ErrorRetryAlert';
+import FailedMediaList, { FailedSceneMedia } from '../components/FailedMediaList';
+import GenerationStatusBar from '../components/GenerationStatusBar';
+import { useSceneImageGenerator } from '../../../hooks/useSceneImageGenerator';
+import { useUndoRedo } from '../../../hooks/useUndoRedo';
 
 // styles imported
 
@@ -44,7 +53,6 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [pageDirection, setPageDirection] = useState(0);
   const [imageLoadError, setImageLoadError] = useState<Set<number>>(new Set());
-  const [imageBlobUrls, setImageBlobUrls] = useState<Map<number, string>>(new Map());
   const [audioBlobUrls, setAudioBlobUrls] = useState<Map<number, string>>(new Map());
   const [videoBlobUrls, setVideoBlobUrls] = useState<Map<number, string>>(new Map());
   const [audioLoadError, setAudioLoadError] = useState<Set<number>>(new Set());
@@ -54,6 +62,11 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const lastSavedSceneCount = useRef<number | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editText, setEditText] = useState<string>('');
+  const outlineUndoRedo = useUndoRedo('', { limit: 30 });
+  const handleOutlineEditTextChange = (text: string) => {
+    setEditText(text);
+    outlineUndoRedo.setValue(text);
+  };
   const [aiFeedback, setAiFeedback] = useState<string>('');
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiLoading, setAiLoading] = useState<boolean>(false);
@@ -62,7 +75,6 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const [isImageModalOpen, setIsImageModalOpen] = useState(false);
   const [imagePromptDraft, setImagePromptDraft] = useState('');
   const [isImageSettingsModalOpen, setIsImageSettingsModalOpen] = useState(false);
-  const [isImageSettingsGenerating, setIsImageSettingsGenerating] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
   const [audioScriptDraft, setAudioScriptDraft] = useState('');
   const [isCharactersModalOpen, setIsCharactersModalOpen] = useState(false);
@@ -72,7 +84,11 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const [animatingSceneNumber, setAnimatingSceneNumber] = useState<number | null>(null);
   const [isRefiningAnimeScene, setIsRefiningAnimeScene] = useState(false);
   const [isImageFullscreenOpen, setIsImageFullscreenOpen] = useState(false);
-  const [isGeneratingCurrentSceneImage, setIsGeneratingCurrentSceneImage] = useState(false);
+  const [failedImageScenes, setFailedImageScenes] = useState<Set<number>>(new Set());
+  const [failedAudioScenes, setFailedAudioScenes] = useState<Set<number>>(new Set());
+  const [bulkImageProgress, setBulkImageProgress] = useState<{ total: number; completed: number; failed: number; currentTitle: string | null }>({
+    total: 0, completed: 0, failed: 0, currentTitle: null,
+  });
   
   // Use state from hook instead of local state
   const sceneImages = state.sceneImages || new Map<number, string>();
@@ -289,52 +305,13 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const currentSceneResumeInfo = sceneAnimationResumables.get(currentSceneNumber) || null;
   const canAnimateCurrentScene = !animatingSceneNumber && !currentSceneResumeInfo;
   const isCurrentSceneAnimating = animatingSceneNumber === currentSceneNumber;
+  const { generateSceneImage, isGenerating: isGeneratingSceneImageReal } = useSceneImageGenerator(state);
   const currentSceneImageUrl = sceneImages.get(currentSceneNumber);
   const hasImageLoadError = imageLoadError.has(currentSceneNumber);
   const currentSceneAudioUrl = sceneAudio.get(currentSceneNumber);
   const hasAudioLoadError = audioLoadError.has(currentSceneNumber);
   const hasAudioForScene = Boolean(currentSceneAudioUrl);
-  
-  // Fetch image as blob with authentication
-  useEffect(() => {
-    if (!currentSceneImageUrl || hasImageLoadError || imageBlobUrls.has(currentSceneNumber)) {
-      return;
-    }
-    
-    const loadImage = async () => {
-      try {
-        // Remove query parameters (token) from URL if present, we'll use authenticated request instead
-        const cleanUrl = currentSceneImageUrl.split('?')[0];
-        // Use relative URL path directly (aiApiClient will add base URL and auth)
-        const imageUrl = cleanUrl.startsWith('/') 
-          ? cleanUrl 
-          : `/${cleanUrl}`;
-        // Use aiApiClient to get authenticated response with blob
-        const response = await aiApiClient.get(imageUrl, {
-          responseType: 'blob',
-        });
-        
-        const blob = response.data;
-        const blobUrl = URL.createObjectURL(blob);
-        
-        setImageBlobUrls((prev) => {
-          const next = new Map(prev);
-          next.set(currentSceneNumber, blobUrl);
-          return next;
-        });
-      } catch (err: any) {
-        // Only log non-404 errors (404 means file doesn't exist, which is acceptable)
-        if (err?.response?.status !== 404) {
-          console.error('Failed to load image:', err);
-        }
-        // Mark as error to prevent retries
-        setImageLoadError((prev) => new Set(prev).add(currentSceneNumber));
-      }
-    };
-    
-    loadImage();
-  }, [currentSceneNumber, currentSceneImageUrl, hasImageLoadError, imageBlobUrls]);
-  
+   
   // Fetch video as blob with authentication
   useEffect(() => {
     const animatedVideoRelativeUrl = sceneAnimatedVideos.get(currentSceneNumber);
@@ -342,47 +319,130 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
       return;
     }
     
+    let cancelled = false;
+    
     const loadVideo = async () => {
       try {
-        // Remove query parameters (token) from URL if present, we'll use authenticated request instead
-        const cleanUrl = animatedVideoRelativeUrl.split('?')[0];
-        // Use relative URL path directly (aiApiClient will add base URL and auth)
-        const videoUrl = cleanUrl.startsWith('/') 
-          ? cleanUrl 
-          : `/${cleanUrl}`;
-        // Use aiApiClient to get authenticated response with blob
-        const response = await aiApiClient.get(videoUrl, {
-          responseType: 'blob',
-        });
-        
-        const blob = response.data;
-        const blobUrl = URL.createObjectURL(blob);
-        
+        const blobUrl = await fetchMediaBlobUrl(animatedVideoRelativeUrl);
+        if (cancelled || !blobUrl) {
+          if (!blobUrl) {
+            setVideoLoadError((prev) => new Set(prev).add(currentSceneNumber));
+          }
+          return;
+        }
         setVideoBlobUrls((prev) => {
           const next = new Map(prev);
+          const existing = next.get(currentSceneNumber);
+          if (existing) {
+            URL.revokeObjectURL(existing);
+          }
           next.set(currentSceneNumber, blobUrl);
           return next;
         });
       } catch (err: any) {
-        // Only log non-404 errors (404 means file doesn't exist, which is acceptable)
-        if (err?.response?.status !== 404) {
-          console.error('Failed to load video:', err);
-        }
-        // Mark as error to prevent retries
+        console.error('Failed to load video:', err);
         setVideoLoadError((prev) => new Set(prev).add(currentSceneNumber));
       }
     };
     
     loadVideo();
-  }, [currentSceneNumber, sceneAnimatedVideos, hasVideoLoadError, videoBlobUrls, audioBlobUrls, imageBlobUrls]);
+    return () => { cancelled = true; };
+  }, [currentSceneNumber, sceneAnimatedVideos, hasVideoLoadError, videoBlobUrls]);
+
+  const handleRetryFailedImages = async (specificScenes?: Set<number>) => {
+    const targets = specificScenes || failedImageScenes;
+    if (targets.size === 0) return;
+    setIsGeneratingImages(true);
+    setError(null);
+    const stillFailed = new Set<number>();
+    try {
+      for (const sceneNum of targets) {
+        const scene = scenes.find((s: any) => (s.scene_number || 0) === sceneNum);
+        if (!scene) continue;
+        try {
+          const resp = await storyWriterApi.regenerateSceneImage({
+            scene_number: sceneNum,
+            scene_title: scene.title || `Scene ${sceneNum}`,
+            prompt: scene.image_prompt || '',
+            provider: state.imageProvider || undefined,
+            width: state.imageWidth,
+            height: state.imageHeight,
+            model: state.imageModel || undefined,
+          });
+          if (resp.success && resp.image_url) {
+            const nextMap = new Map(state.sceneImages || []);
+            nextMap.set(sceneNum, resp.image_url);
+            state.setSceneImages(nextMap);
+          } else {
+            stillFailed.add(sceneNum);
+          }
+        } catch {
+          stillFailed.add(sceneNum);
+        }
+      }
+      setFailedImageScenes(stillFailed);
+      if (stillFailed.size > 0) {
+        setError(`${failedImageScenes.size - stillFailed.size} retried successfully, ${stillFailed.size} still failed.`);
+      } else {
+        setError(null);
+        state.setError(null);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Retry failed');
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  };
+
+  const handleRetryFailedAudio = async (specificScenes?: Set<number>) => {
+    const targets = specificScenes || failedAudioScenes;
+    if (targets.size === 0) return;
+    setIsGeneratingAudio(true);
+    setError(null);
+    const stillFailed = new Set<number>();
+    try {
+      for (const sceneNum of targets) {
+        const scene = scenes.find((s: any) => (s.scene_number || 0) === sceneNum);
+        if (!scene) continue;
+        try {
+          const resp = await storyWriterApi.generateFreeAudio({
+            scene_number: sceneNum,
+            scene_title: scene.title || `Scene ${sceneNum}`,
+            text: scene.audio_narration || '',
+            provider: state.audioProvider || undefined,
+            lang: state.audioLang || undefined,
+            slow: state.audioSlow || false,
+            rate: state.audioRate || undefined,
+          });
+          if (resp.success && resp.audio_url) {
+            const nextMap = new Map(state.sceneAudio || []);
+            nextMap.set(sceneNum, resp.audio_url);
+            state.setSceneAudio(nextMap);
+          } else {
+            stillFailed.add(sceneNum);
+          }
+        } catch {
+          stillFailed.add(sceneNum);
+        }
+      }
+      setFailedAudioScenes(stillFailed);
+      if (stillFailed.size > 0) {
+        setError(`${failedAudioScenes.size - stillFailed.size} retried successfully, ${stillFailed.size} still failed.`);
+      } else {
+        setError(null);
+        state.setError(null);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Retry failed');
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  };
 
   // Cleanup blob URLs when component unmounts or scenes change
   useEffect(() => {
     return () => {
       // Revoke all blob URLs on unmount
-      imageBlobUrls.forEach((blobUrl) => {
-        URL.revokeObjectURL(blobUrl);
-      });
       audioBlobUrls.forEach((blobUrl) => {
         URL.revokeObjectURL(blobUrl);
       });
@@ -392,7 +452,8 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
     };
   }, []);
   
-  const currentSceneImageFullUrl = imageBlobUrls.get(currentSceneNumber) || null;
+  // Image blob loaded via useMediaBlobLoader hook below
+  const { blobUrl: currentSceneImageFullUrl } = useMediaBlobLoader(currentSceneImageUrl);
   const currentSceneAudioFullUrl = audioBlobUrls.get(currentSceneNumber) || null;
   const resolvedSceneAudioUrl =
     currentSceneAudioFullUrl ||
@@ -458,27 +519,24 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
       return;
     }
 
+    let cancelled = false;
+
     const loadAudio = async () => {
       try {
-        // Remove query parameters (token) from URL if present, we'll use authenticated request instead
-        const cleanUrl = currentSceneAudioUrl.split('?')[0];
-        // Normalize path - ensure it starts with /api/story/audio/
-        let audioPath = cleanUrl.startsWith('/')
-          ? cleanUrl
-          : `/${cleanUrl}`;
-        
-        // If path doesn't include /api/story/audio/, add it
+        let audioPath = currentSceneAudioUrl;
         if (!audioPath.includes('/api/story/audio/')) {
-          // Extract filename from path
+          const cleanUrl = audioPath.split('?')[0];
           const filename = cleanUrl.split('/').pop() || cleanUrl;
           audioPath = `/api/story/audio/${filename}`;
         }
         
-        const response = await aiApiClient.get(audioPath, {
-          responseType: 'blob',
-        });
-        const blob = response.data;
-        const blobUrl = URL.createObjectURL(blob);
+        const blobUrl = await fetchMediaBlobUrl(audioPath);
+        if (cancelled || !blobUrl) {
+          if (!blobUrl) {
+            setAudioLoadError((prev) => new Set(prev).add(currentSceneNumber));
+          }
+          return;
+        }
 
         setAudioBlobUrls((prev) => {
           const next = new Map(prev);
@@ -490,23 +548,15 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
           return next;
         });
       } catch (err: any) {
-        // Only log non-404 errors (404 means file doesn't exist, which is acceptable)
         if (err?.response?.status !== 404) {
           console.error(`Failed to load audio for scene ${currentSceneNumber}:`, err);
-          console.error(`Audio URL was: ${currentSceneAudioUrl}`);
-          
-          // If auth error, log more details
-          if (err?.response?.status === 401) {
-            console.error(`Authentication failed for audio file. Make sure auth token is set.`);
-          }
         }
-        
-        // Mark as error to prevent retries
         setAudioLoadError((prev) => new Set(prev).add(currentSceneNumber));
       }
     };
 
     loadAudio();
+    return () => { cancelled = true; };
   }, [currentSceneAudioUrl, currentSceneNumber, currentSceneAudioFullUrl, hasAudioLoadError, sceneAudio, state.enableNarration]);
 
   const handlePrevScene = () => {
@@ -524,7 +574,9 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   };
 
   const openEditModal = () => {
-    setEditText(currentScene?.description || '');
+    const desc = currentScene?.description || '';
+    setEditText(desc);
+    outlineUndoRedo.reset(desc);
     setAiFeedback('');
     setAiSuggestions([]);
     setIsEditModalOpen(true);
@@ -590,47 +642,25 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
   const handleGenerateImageWithSettings = async (
     settings: StoryImageGenerationSettings,
   ) => {
-    if (!hasScenes || !currentScene) {
-      return;
-    }
-
-    setIsImageSettingsGenerating(true);
-    try {
-      const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
-      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
-
-      const resp = await storyWriterApi.regenerateSceneImage({
-        scene_number: sceneNum,
-        scene_title: sceneTitle,
-        prompt: settings.prompt.trim(),
-        provider: state.imageProvider || undefined,
-        width: state.imageWidth,
-        height: state.imageHeight,
-        model: settings.model || state.imageModel || undefined,
-      });
-
-      if (resp.success && resp.image_url) {
-        const nextMap = new Map(state.sceneImages || []);
-        nextMap.set(sceneNum, resp.image_url);
-        state.setSceneImages(nextMap);
-
+    if (!hasScenes || !currentScene) return;
+    const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+    const ok = await generateSceneImage(
+      sceneNum,
+      currentScene.title || `Scene ${sceneNum}`,
+      settings.prompt.trim(),
+      () => {
         const updated = [...scenes];
-        updated[currentSceneIndex] = {
-          ...updated[currentSceneIndex],
-          image_prompt: settings.prompt.trim(),
-        };
+        updated[currentSceneIndex] = { ...updated[currentSceneIndex], image_prompt: settings.prompt.trim() };
         (state.setOutlineScenes as any)(updated);
         setImagePromptDraft(settings.prompt.trim());
         setIsImageSettingsModalOpen(false);
         setIsImageModalOpen(false);
-      } else {
-        throw new Error(resp.error || 'Failed to regenerate image');
-      }
-    } catch (err: any) {
-      console.error('Failed to regenerate scene image with settings:', err);
-      setError(err?.message || 'Failed to regenerate scene image');
-    } finally {
-      setIsImageSettingsGenerating(false);
+      },
+      (msg) => setError(msg),
+      settings.model || null,
+    );
+    if (!ok) {
+      console.error('Failed to regenerate scene image with settings');
     }
   };
 
@@ -643,58 +673,16 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
 
   const handleGenerateCurrentSceneImage = async () => {
     if (!hasScenes || !currentScene) return;
-    setIsGeneratingCurrentSceneImage(true);
-    try {
-      const prompt = currentScene?.image_prompt || '';
-      if (!prompt.trim()) return;
-      const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
-      const sceneTitle = currentScene.title || `Scene ${sceneNum}`;
-
-      const resp = await storyWriterApi.regenerateSceneImage({
-        scene_number: sceneNum,
-        scene_title: sceneTitle,
-        prompt: prompt.trim(),
-        provider: state.imageProvider || undefined,
-        width: state.imageWidth,
-        height: state.imageHeight,
-        model: state.imageModel || undefined,
-      });
-
-      if (resp.success && resp.image_url) {
-        const nextMap = new Map(state.sceneImages || []);
-        nextMap.set(sceneNum, resp.image_url);
-        state.setSceneImages(nextMap);
-
-        try {
-          const cleanUrl = resp.image_url.split('?')[0];
-          const imageUrl = cleanUrl.startsWith('/') ? cleanUrl : `/${cleanUrl}`;
-          const blobResp = await aiApiClient.get(imageUrl, { responseType: 'blob' });
-          const blobUrl = URL.createObjectURL(blobResp.data);
-          setImageBlobUrls((prev) => {
-            const next = new Map(prev);
-            const oldBlob = next.get(sceneNum);
-            if (oldBlob) URL.revokeObjectURL(oldBlob);
-            next.set(sceneNum, blobUrl);
-            return next;
-          });
-          setImageLoadError((prev) => {
-            const next = new Set(prev);
-            next.delete(sceneNum);
-            return next;
-          });
-        } catch (fetchErr) {
-          console.error('Failed to load generated image:', fetchErr);
-          setImageLoadError((prev) => new Set(prev).add(sceneNum));
-        }
-      } else {
-        throw new Error(resp.error || 'Failed to generate image');
-      }
-    } catch (err: any) {
-      const errorMessage = err?.response?.data?.detail || err?.message || 'Failed to generate image';
-      setError(errorMessage);
-    } finally {
-      setIsGeneratingCurrentSceneImage(false);
-    }
+    const prompt = currentScene?.image_prompt || '';
+    if (!prompt.trim()) return;
+    const sceneNum = currentScene.scene_number || currentSceneIndex + 1;
+    await generateSceneImage(
+      sceneNum,
+      currentScene.title || `Scene ${sceneNum}`,
+      prompt.trim(),
+      () => setImageLoadError((prev) => { const s = new Set(prev); s.delete(sceneNum); return s; }),
+      (msg) => setError(msg),
+    );
   };
 
   const handleOutlineToastClose = (_?: unknown, reason?: string) => {
@@ -780,28 +768,53 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
 
     setIsGeneratingImages(true);
     setError(null);
+    const scenes = state.outlineScenes;
+    const total = scenes.length;
+    setBulkImageProgress({ total, completed: 0, failed: 0, currentTitle: scenes[0]?.title || null });
+
+    let completed = 0;
+    let failed = 0;
+    const imagesMap = new Map<number, string>(state.sceneImages || []);
+    const failedSet = new Set<number>();
 
     try {
-      const response = await storyWriterApi.generateSceneImages({
-        scenes: state.outlineScenes,
-        provider: state.imageProvider || undefined,
-        width: state.imageWidth,
-        height: state.imageHeight,
-        model: state.imageModel || undefined,
-      });
-      
-      if (response.success && response.images) {
-        // Store image URLs by scene number
-        const imagesMap = new Map<number, string>();
-        response.images.forEach((image) => {
-          if (image.image_url && !image.error) {
-            imagesMap.set(image.scene_number, image.image_url);
+      for (const scene of scenes) {
+        const sceneNum = scene.scene_number || scenes.indexOf(scene) + 1;
+        const sceneTitle = scene.title || `Scene ${sceneNum}`;
+        setBulkImageProgress({ total, completed, failed, currentTitle: sceneTitle });
+
+        try {
+          const resp = await storyWriterApi.regenerateSceneImage({
+            scene_number: sceneNum,
+            scene_title: sceneTitle,
+            prompt: scene.image_prompt || '',
+            provider: state.imageProvider || undefined,
+            width: state.imageWidth,
+            height: state.imageHeight,
+            model: state.imageModel || undefined,
+          });
+
+          if (resp.success && resp.image_url) {
+            imagesMap.set(sceneNum, resp.image_url);
+            state.setSceneImages(new Map(imagesMap));
+            completed++;
+          } else {
+            failed++;
+            failedSet.add(sceneNum);
           }
-        });
-        state.setSceneImages(imagesMap);
-        state.setError(null);
+        } catch {
+          failed++;
+          failedSet.add(sceneNum);
+        }
+        setBulkImageProgress({ total, completed, failed, currentTitle: sceneTitle });
+      }
+
+      setFailedImageScenes(failedSet);
+      if (failed > 0) {
+        setError(`${completed} scene${completed !== 1 ? 's' : ''} generated, ${failed} failed. You can retry failed scenes individually.`);
       } else {
-        throw new Error('Failed to generate images');
+        setError(null);
+        state.setError(null);
       }
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.message || 'Failed to generate images';
@@ -809,6 +822,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
       state.setError(errorMessage);
     } finally {
       setIsGeneratingImages(false);
+      setBulkImageProgress((prev) => ({ ...prev, currentTitle: null }));
     }
   };
 
@@ -835,14 +849,22 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
       });
       
       if (response.success && response.audio_files) {
-        // Store audio URLs by scene number
         const audioMap = new Map<number, string>();
+        const failed = new Set<number>();
         response.audio_files.forEach((audio) => {
           if (audio.audio_url && !audio.error) {
             audioMap.set(audio.scene_number, audio.audio_url);
+          } else if (audio.error) {
+            failed.add(audio.scene_number);
           }
         });
         state.setSceneAudio(audioMap);
+        setFailedAudioScenes(failed);
+        if (failed.size > 0) {
+          setError(`${audioMap.size} scene${audioMap.size !== 1 ? 's' : ''} generated, ${failed.size} failed. You can retry failed scenes individually.`);
+        } else {
+          setError(null);
+        }
         state.setError(null);
       } else {
         throw new Error('Failed to generate audio');
@@ -1044,6 +1066,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
           },
           '.rendered-content hr': { border: 'none', borderTop: '1px solid rgba(120,90,60,0.2)', margin: '1rem 0' },
           '.rendered-content a': { color: '#5D4037', textDecoration: 'underline' },
+          '.rendered-content img': { maxWidth: '100%', height: 'auto', borderRadius: '4px', margin: '0.5rem 0' },
         }}
       />
       <Snackbar
@@ -1062,11 +1085,50 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
         </Alert>
       </Snackbar>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
-          {error}
-        </Alert>
+      {(failedImageScenes.size > 0 || failedAudioScenes.size > 0) && (
+        <FailedMediaList
+          failedScenes={Array.from(new Set([...failedImageScenes, ...failedAudioScenes])).map((sceneNum) => ({
+            sceneNumber: sceneNum,
+            sceneTitle: scenes.find((s: any) => (s.scene_number || 0) === sceneNum)?.title,
+            hasImage: failedImageScenes.has(sceneNum),
+            hasAudio: failedAudioScenes.has(sceneNum),
+          }))}
+          onRetryAllImages={failedImageScenes.size > 0 ? () => handleRetryFailedImages() : undefined}
+          onRetryAllAudio={failedAudioScenes.size > 0 ? () => handleRetryFailedAudio() : undefined}
+          onRetryScene={(sceneNum, type) => {
+            if (type === 'image') {
+              handleRetryFailedImages(new Set([sceneNum]));
+            }
+          }}
+          isRetryingImages={isGeneratingImages}
+          isRetryingAudio={isGeneratingAudio}
+          onClear={() => { setFailedImageScenes(new Set()); setFailedAudioScenes(new Set()); }}
+        />
       )}
+      {error && !(failedImageScenes.size > 0 || failedAudioScenes.size > 0) && (
+        <ErrorRetryAlert
+          error={error}
+          onDismiss={() => setError(null)}
+          defaultRetry={error.includes('Failed to generate') ? handleGenerateOutline : undefined}
+        />
+      )}
+
+      <GenerationStatusBar
+        type="images"
+        isActive={isGeneratingImages}
+        total={bulkImageProgress.total}
+        completed={bulkImageProgress.completed}
+        failed={bulkImageProgress.failed}
+        currentLabel={bulkImageProgress.currentTitle}
+      />
+      <GenerationStatusBar
+        type="audio"
+        isActive={isGeneratingAudio}
+        total={scenes.length}
+        completed={0}
+        failed={0}
+        currentLabel="Generating audio for all scenes..."
+      />
 
       {resumableSummaryMessage && (
         <Alert severity="info" sx={{ mb: 3 }}>
@@ -1094,7 +1156,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
             imageUrl={currentSceneImageFullUrl}
             onImageError={() => setImageLoadError((prev) => new Set(prev).add(currentSceneNumber))}
             onGenerateImage={handleGenerateCurrentSceneImage}
-            isGeneratingImage={isGeneratingCurrentSceneImage}
+            isGeneratingImage={isGeneratingSceneImageReal}
             narrationEnabled={!!state.enableNarration}
             audioUrl={resolvedSceneAudioUrl || null}
             hasAudio={hasAudioForScene}
@@ -1197,7 +1259,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
         open={isEditModalOpen}
         sceneNumber={currentSceneNumber}
         editText={editText}
-        onChangeEditText={setEditText}
+        onChangeEditText={handleOutlineEditTextChange}
         aiFeedback={aiFeedback}
         onChangeAiFeedback={setAiFeedback}
         aiLoading={aiLoading}
@@ -1206,6 +1268,10 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
         onPickSuggestion={applySuggestion}
         onClose={() => setIsEditModalOpen(false)}
         onSave={handleSaveUpdatedSection}
+        canUndo={outlineUndoRedo.canUndo}
+        canRedo={outlineUndoRedo.canRedo}
+        onUndo={outlineUndoRedo.undo}
+        onRedo={outlineUndoRedo.redo}
       />
       <ImageEditModal
         open={isImageModalOpen}
@@ -1270,7 +1336,7 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
         initialPrompt={imagePromptDraft}
         sceneTitle={currentScene?.title || undefined}
         storyMode={state.storyMode}
-        isGenerating={isImageSettingsGenerating}
+        isGenerating={isGeneratingSceneImageReal}
       />
       <AudioScriptModal
         open={isAudioModalOpen}
@@ -1413,10 +1479,20 @@ const StoryOutline: React.FC<StoryOutlineProps> = ({ state, onNext }) => {
           setIsTitleModalOpen(false);
         }}
       />
-      <SceneImagesProgressModal open={isGeneratingImages} />
+      <SceneImagesProgressModal
+        open={isGeneratingImages}
+        totalScenes={bulkImageProgress.total || undefined}
+        completedScenes={bulkImageProgress.completed}
+        failedScenes={bulkImageProgress.failed}
+        currentSceneTitle={bulkImageProgress.currentTitle}
+      />
       <SceneImageGenerationProgressModal
-        open={isGeneratingCurrentSceneImage}
+        open={isGeneratingSceneImageReal}
         sceneTitle={currentScene?.title}
+      />
+      <AudioGenerationProgressModal
+        open={isGeneratingAudio}
+        isBulk
       />
       </Box>
   );

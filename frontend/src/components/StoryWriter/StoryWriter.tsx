@@ -12,8 +12,10 @@ import { triggerSubscriptionError } from '../../api/client';
 import CloseIcon from '@mui/icons-material/Close';
 import { MultimediaSection } from './components/MultimediaSection';
 import { AnimeBibleDialog } from './components/AnimeBibleDialog';
+import AutoSaveIndicator, { SaveStatus } from './components/AutoSaveIndicator';
 import StoryWriterLanding from './StoryWriterLanding';
 import { AIStorySetupModal } from './Phases/StorySetup/AIStorySetupModal';
+import ComponentErrorBoundary from '../shared/ComponentErrorBoundary';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const createStoryProjectId = () => {
@@ -52,6 +54,8 @@ export const StoryWriter: React.FC = () => {
   const [landingCustomEndingPreferences, setLandingCustomEndingPreferences] = useState<string[]>([]);
   const [isDirectorOpen, setIsDirectorOpen] = useState(false);
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     const navState = location.state as { projectId?: string } | null;
@@ -248,6 +252,7 @@ export const StoryWriter: React.FC = () => {
       return;
     }
     setIsSavingProject(true);
+    setSaveStatus('saving');
     try {
       if (!state.projectId) {
         const projectId = createStoryProjectId();
@@ -261,6 +266,11 @@ export const StoryWriter: React.FC = () => {
       } else {
         await state.saveProjectToDb();
       }
+      setSaveStatus('saved');
+      setLastSavedAt(new Date());
+    } catch (err) {
+      setSaveStatus('error');
+      console.error('Failed to save project:', err);
     } finally {
       setIsSavingProject(false);
     }
@@ -308,21 +318,39 @@ export const StoryWriter: React.FC = () => {
   const renderPhaseContent = () => {
     switch (currentPhase) {
       case 'setup':
-        return <StorySetup state={state} onNext={() => navigateToPhase('outline')} />;
+        return (
+          <ComponentErrorBoundary componentName="Story Setup">
+            <StorySetup state={state} onNext={() => navigateToPhase('outline')} />
+          </ComponentErrorBoundary>
+        );
       case 'outline':
-        return <StoryOutline state={state} onNext={() => navigateToPhase('writing')} />;
+        return (
+          <ComponentErrorBoundary componentName="Story Outline">
+            <StoryOutline state={state} onNext={() => navigateToPhase('writing')} />
+          </ComponentErrorBoundary>
+        );
       case 'writing':
-        return <StoryWriting state={state} onNext={() => navigateToPhase('export')} />;
+        return (
+          <ComponentErrorBoundary componentName="Story Writing">
+            <StoryWriting state={state} onNext={() => navigateToPhase('export')} onPrev={() => navigateToPhase('outline')} />
+          </ComponentErrorBoundary>
+        );
       case 'export':
         return (
-          <StoryExport
-            state={state}
-            onSaveProject={handleSaveProject}
-            isSavingProject={isSavingProject}
-          />
+          <ComponentErrorBoundary componentName="Story Export">
+            <StoryExport
+              state={state}
+              onSaveProject={handleSaveProject}
+              isSavingProject={isSavingProject}
+            />
+          </ComponentErrorBoundary>
         );
       default:
-        return <StorySetup state={state} onNext={() => navigateToPhase('outline')} />;
+        return (
+          <ComponentErrorBoundary componentName="Story Setup">
+            <StorySetup state={state} onNext={() => navigateToPhase('outline')} />
+          </ComponentErrorBoundary>
+        );
     }
   };
 
@@ -420,6 +448,8 @@ export const StoryWriter: React.FC = () => {
             isGeneratingAudio={isGeneratingAudio}
             isGeneratingVideo={isGeneratingVideo}
             onOpenPanel={(_section) => handleOpenMultimediaDialog()}
+            saveStatus={saveStatus}
+            lastSavedAt={lastSavedAt}
           />
         </Box>
 
@@ -442,7 +472,9 @@ export const StoryWriter: React.FC = () => {
           </IconButton>
         </DialogTitle>
         <DialogContent dividers>
-          <MultimediaSection state={state} />
+          <ComponentErrorBoundary componentName="Multimedia Controls">
+            <MultimediaSection state={state} />
+          </ComponentErrorBoundary>
         </DialogContent>
       </Dialog>
       <AnimeBibleDialog
