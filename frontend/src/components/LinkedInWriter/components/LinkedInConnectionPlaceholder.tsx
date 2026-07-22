@@ -319,6 +319,7 @@ const DisconnectedState: React.FC<{
             <>
           <div style={{ position: 'relative' }}>
             <div
+              className="linkedin-profile-hub-placeholder-avatar"
               style={{
                 width: 120,
                 height: 120,

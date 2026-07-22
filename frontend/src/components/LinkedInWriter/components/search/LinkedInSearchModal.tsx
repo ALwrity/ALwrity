@@ -11,6 +11,7 @@ import type {
   LinkedInSearchPaging,
   LinkedInSearchResultItem,
 } from './linkedinSearchTypes';
+import { StudioModalCloseButton } from '../dashboard/StudioModalCloseButton';
 
 interface LinkedInSearchModalProps {
   open: boolean;
@@ -149,23 +150,7 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
               {query || 'Search LinkedIn'}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close search"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              lineHeight: 1,
-              cursor: 'pointer',
-              color: '#475569',
-              padding: 4,
-              flexShrink: 0,
-            }}
-          >
-            ✕
-          </button>
+          <StudioModalCloseButton onClick={onClose} ariaLabel="Close search" />
         </div>
 
         <LinkedInSearchFilterBar

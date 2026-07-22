@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction } from './LinkedInConnectionPlaceholder';
 import { LinkedInProfileHubStrip } from './LinkedInProfileHubStrip';
@@ -157,7 +157,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     />
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.body.classList.add('linkedin-dashboard-view');
     return () => document.body.classList.remove('linkedin-dashboard-view');
   }, []);

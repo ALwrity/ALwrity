@@ -29,5 +29,17 @@ export const TOUR_PHONE_MAX_WIDTH_PX = 640;
  */
 export const HUB_CENTER_LEFT_CSS_VAR = '--hub-center-left';
 
+/** Unitless ratio (0–1) for header persona alignment with profile hub on desktop dashboard. */
+export const HUB_CENTER_LEFT_RATIO_CSS_VAR = '--hub-center-left-ratio';
+
+/** Viewport X (px) for Content Persona pill center — profile picture axis on dashboard. */
+export const HUB_HEADER_PERSONA_LEFT_CSS_VAR = '--hub-header-persona-left';
+
+/** Dispatched when hub horizontal axis is re-measured (header persona sync). */
+export const LINKEDIN_HUB_AXIS_UPDATED_EVENT = 'linkedinwriter:hubAxisUpdated';
+
+/** Fixed width of the desktop analytics rail (matches dashboard-layout.css). */
+export const DASHBOARD_ANALYTICS_RAIL_WIDTH_PX = 340;
+
 /** Centered modal panel for mobile header studio tab actions (Growth, Persona, Resume, Optimise). */
 export const STUDIO_TAB_ACTION_MODAL_CLASS = 'linkedin-studio-tab-action-modal';

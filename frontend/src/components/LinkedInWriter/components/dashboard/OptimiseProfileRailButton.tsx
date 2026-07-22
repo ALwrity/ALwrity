@@ -25,6 +25,7 @@ export const OptimiseProfileRailButton: React.FC<OptimiseProfileRailButtonProps>
   const isTab = variant === 'tab';
   const rootClass = [
     'linkedin-optimise-profile-rail-btn',
+    !isTab && 'linkedin-dashboard-toolbar-pill',
     isTab && 'linkedin-optimise-profile-rail-btn--tab',
     connectLocked && 'linkedin-studio-connect-locked',
     connectLocked && 'linkedin-studio-connect-locked--lock-right',

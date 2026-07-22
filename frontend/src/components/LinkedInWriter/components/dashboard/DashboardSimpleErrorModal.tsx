@@ -2,6 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
 import { FRAME_COLOR } from './dashboardWorkflowConfig';
+import { StudioModalCloseButton } from './StudioModalCloseButton';
 
 interface DashboardSimpleErrorModalProps {
   open: boolean;
@@ -72,22 +73,7 @@ export const DashboardSimpleErrorModal: React.FC<DashboardSimpleErrorModalProps>
           >
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              lineHeight: 1,
-              cursor: 'pointer',
-              color: '#64748b',
-              padding: 4,
-            }}
-          >
-            ✕
-          </button>
+          <StudioModalCloseButton onClick={onClose} ariaLabel="Close" />
         </div>
 
         <div style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}>

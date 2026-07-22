@@ -1,6 +1,7 @@
 import React from 'react';
 import { LI_Z_MODAL } from '../utils/linkedInStudioZIndex';
 import { createPortal } from 'react-dom';
+import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
 
 interface InfoModalsProps {
   showCopilotModal: boolean;
@@ -54,28 +55,9 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             position: 'relative'
           }}>
-            <button
-              onClick={onCloseCopilotModal}
-              aria-label="Close"
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'rgba(0,0,0,0.1)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '18px',
-                color: '#666'
-              }}
-            >
-              ×
-            </button>
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}>
+              <StudioModalCloseButton onClick={onCloseCopilotModal} ariaLabel="Close" />
+            </div>
             
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <h2 style={{ margin: '0 0 16px 0', color: '#1a202c', fontSize: '24px', fontWeight: '700' }}>
@@ -218,28 +200,9 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             position: 'relative'
           }}>
-            <button
-              onClick={onCloseAssistiveModal}
-              aria-label="Close"
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'rgba(0,0,0,0.1)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '18px',
-                color: '#666'
-              }}
-            >
-              ×
-            </button>
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}>
+              <StudioModalCloseButton onClick={onCloseAssistiveModal} ariaLabel="Close" />
+            </div>
             
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔬</div>
@@ -335,28 +298,9 @@ export const InfoModals: React.FC<InfoModalsProps> = ({
             boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
             position: 'relative'
           }}>
-            <button
-              onClick={onCloseFactCheckModal}
-              aria-label="Close"
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'rgba(0,0,0,0.1)',
-                border: 'none',
-                borderRadius: '50%',
-                width: '32px',
-                height: '32px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '18px',
-                color: '#666'
-              }}
-            >
-              ×
-            </button>
+            <div style={{ position: 'absolute', top: 12, right: 12, zIndex: 2 }}>
+              <StudioModalCloseButton onClick={onCloseFactCheckModal} ariaLabel="Close" />
+            </div>
             
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <div style={{ fontSize: '48px', marginBottom: '16px' }}>🔍</div>

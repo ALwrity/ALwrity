@@ -1,5 +1,5 @@
 ﻿import React, { useRef } from 'react';
-import { CircularProgress } from '@mui/material';
+import { CircularProgress, Tooltip } from '@mui/material';
 
 import type {
   LinkedInAIProfileIntelligence,
@@ -12,9 +12,20 @@ import { BrandIdentityCard } from './BrandIdentityCard';
 import { ProfileOptimizationCard } from './ProfileOptimizationCard';
 import { ProfileOptimizationSummaryBar } from './ProfileOptimizationSummaryBar';
 import { SectionScoresPanel } from './SectionScoresPanel';
+import {
+  ProfileOptimizationBatchBanner,
+  ProfileOptimizationNoGapsState,
+  ProfileOptimizationRecheckBadge,
+} from './ProfileOptimizationTerminalStates';
+import { ProfileOptimizationContentAnglesCard } from './ProfileOptimizationContentAnglesCard';
+import { ProfileOptimizationBatchImpactBar } from './ProfileOptimizationBatchImpactBar';
+import { computeBatchImpactProjection } from './profileOptimizationImpact';
+import { resolveContentAnglesForDisplay } from './profileOptimizationContentAngles';
 
 interface ProfileOptimizationPanelProps {
   isOpen: boolean;
+  /** When modal, chrome (header/footer) is supplied by the dialog wrapper. */
+  variant?: 'standalone' | 'modal';
   isLoading?: boolean;
   recommendations?: LinkedInProfileOptimizationItem[] | null;
   optimizationMeta?: LinkedInProfileOptimizationMeta | null;
@@ -67,25 +78,9 @@ const SKELETON_CARD_STYLE: React.CSSProperties = {
   backgroundColor: '#fff',
   border: '1px solid #e2e8f0',
   minHeight: 120,
-  background:
-    'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)',
-  backgroundSize: '200% 100%',
-  animation: 'linkedinTopicRecShimmer 1.2s ease-in-out infinite',
 };
 
 const SKELETON_COUNT = 3;
-
-const hideSuggestionsButtonStyle: React.CSSProperties = {
-  padding: '8px 14px',
-  borderRadius: 8,
-  border: '1px solid #cbd5e1',
-  backgroundColor: '#fff',
-  color: '#475569',
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
-};
 
 const panelBackgroundGlowStyle: React.CSSProperties = {
   position: 'absolute',
@@ -134,6 +129,7 @@ function formatEffortTimeLabel(effort: string): string {
 /** Phase 7 ΓÇö profile optimization recommendations panel. */
 export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> = ({
   isOpen,
+  variant = 'standalone',
   isLoading = false,
   recommendations,
   optimizationMeta,
@@ -203,19 +199,61 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     return sortedRecommendations.filter((item) => item.id !== quickWin.id);
   }, [sortedRecommendations, quickWin]);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const batchIndex = (optimizationMeta?.active_batch_index ?? 0) + 1;
+  const quickWinsLabel =
+    sortedRecommendations.length > 0
+      ? `${sortedRecommendations.length} Quick Win${sortedRecommendations.length === 1 ? '' : 's'}`
+      : 'Review your profile';
+  const batchNumberLabel = `Batch ${batchIndex}`;
+  const batchProjection = computeBatchImpactProjection(
+    profileStrengthPercent,
+    sortedRecommendations
+  );
+
   const [showAllAngles, setShowAllAngles] = React.useState(false);
+  const [showAllRecommendations, setShowAllRecommendations] = React.useState(false);
   const VISIBLE_ANGLES_COUNT = 3;
+  const VISIBLE_REC_COUNT = 3;
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const writingOpportunities = aiProfileIntelligence?.writing_opportunities ?? [];
-  const visibleOpportunities = showAllAngles
-    ? writingOpportunities
-    : writingOpportunities.slice(0, VISIBLE_ANGLES_COUNT);
-  const hiddenCount = Math.max(0, writingOpportunities.length - VISIBLE_ANGLES_COUNT);
+  const displayContentAngles = React.useMemo(
+    () =>
+      resolveContentAnglesForDisplay(
+        writingOpportunities,
+        aiProfileIntelligence?.knowledge_domains,
+        aiProfileIntelligence?.primary_expertise,
+        aiProfileIntelligence?.target_audience
+      ),
+    [
+      writingOpportunities,
+      aiProfileIntelligence?.knowledge_domains,
+      aiProfileIntelligence?.primary_expertise,
+      aiProfileIntelligence?.target_audience,
+    ]
+  );
   const contentBridgeIndustry =
     aiProfileIntelligence?.industry && aiProfileIntelligence.industry !== 'Unknown'
       ? aiProfileIntelligence.industry
       : 'your industry';
   const contentBridgeExpertise = aiProfileIntelligence?.primary_expertise?.[0];
+  const isModal = variant === 'modal';
+
+  const { showSkeleton, showCards } = React.useMemo(() => {
+    const skeleton = Boolean(isLoading && !recommendations?.length);
+    return {
+      showSkeleton: skeleton,
+      showCards: !skeleton && Boolean(recommendations?.length),
+    };
+  }, [isLoading, recommendations?.length]);
+
+  const strengthHoverMessage =
+    profileStrengthPercent != null
+      ? `Your profile currently communicates ${profileStrengthPercent}% of this positioning — here's how to strengthen it.`
+      : null;
+
+  React.useEffect(() => {
+    setShowAllRecommendations(false);
+  }, [recommendations]);
 
   if (!isOpen) {
     return null;
@@ -225,8 +263,15 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     optimizationMeta?.profile_optimization_updated_at
   );
   const recommendationCount = recommendations?.length ?? 0;
-  const showSkeleton = isLoading && !recommendations?.length;
-  const showCards = !showSkeleton && recommendations && recommendations.length > 0;
+  const collapsedVisibleCount =
+    (quickWin ? 1 : 0) + Math.min(remainingItems.length, VISIBLE_REC_COUNT);
+
+  const visibleRemainingItems = isModal
+    ? remainingItems
+    : showAllRecommendations
+      ? remainingItems
+      : remainingItems.slice(0, VISIBLE_REC_COUNT);
+  const canToggleAllSuggestions = !isModal && recommendationCount > collapsedVisibleCount;
   const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
   const showNextBatchBanner =
     !showSkeleton && !showCards && !showNoGaps && showNextBatchCta && Boolean(onLoadNextBatch);
@@ -277,26 +322,63 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
           }
         }
       `}</style>
-    <div className="profile-opt-panel" style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
+    <div
+      className={['profile-opt-panel', isModal && 'profile-opt-panel--modal'].filter(Boolean).join(' ')}
+      style={isModal ? undefined : { ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}
+    >
       <div
-        style={{
-          ...linkedInPlaceholderCardStyles.inner,
-          minHeight: 'unset',
-          padding: '20px 24px',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
+        className={['profile-opt-panel__inner', isModal && 'profile-opt-panel__inner--modal']
+          .filter(Boolean)
+          .join(' ')}
+        style={isModal ? undefined : { ...linkedInPlaceholderCardStyles.inner }}
       >
-        <div style={panelBackgroundGlowStyle} />
+        {!isModal && <div style={panelBackgroundGlowStyle} />}
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          {aiProfileIntelligence && (
-            <BrandIdentityCard
-              intelligence={aiProfileIntelligence}
-              profileStrengthPercent={profileStrengthPercent}
-            />
+        <div
+          className={isModal ? 'profile-opt-panel__modal-shell' : undefined}
+          style={isModal ? undefined : { position: 'relative', zIndex: 1 }}
+        >
+          {!isModal && (
+          <div className="profile-opt-panel__header">
+            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <h3 className="profile-opt-panel__title">Improve your LinkedIn profile</h3>
+              <p className="profile-opt-panel__subtitle">
+                {quickWin
+                  ? 'Prioritized by impact — start with your quick win below.'
+                  : 'Get more views, connections, and leads with prioritized suggestions.'}
+              </p>
+              {updatedLabel && (
+                <p className="profile-opt-panel__meta">
+                  {updatedLabel}
+                  {optimizationMeta?.source ? ` · Source: ${optimizationMeta.source}` : ''}
+                </p>
+              )}
+              {!updatedLabel && optimizationMeta?.source && (
+                <p className="profile-opt-panel__meta">
+                  Source: {optimizationMeta.source}
+                  {typeof optimizationMeta.remaining_in_backlog === 'number' &&
+                    optimizationMeta.remaining_in_backlog > 0 &&
+                    ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
+                </p>
+              )}
+            </div>
+
+            {showCards && onCollapse && (
+              <button
+                type="button"
+                className="profile-opt-panel__hide-link"
+                onClick={onCollapse}
+                aria-expanded
+                aria-controls="profile-optimization-list"
+              >
+                Hide suggestions
+              </button>
+            )}
+          </div>
           )}
 
+          {!isModal && (
+          <>
           {/* Profile Photo Card */}
           <div
             style={{
@@ -323,9 +405,9 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                 justifyContent: 'center',
               }}
             >
-              {localProfilePhotoUrl || profilePictureUrl ? (
+              {(localProfilePhotoUrl || profilePictureUrl) ? (
                 <img
-                  src={localProfilePhotoUrl || profilePictureUrl || undefined}
+                  src={(localProfilePhotoUrl || profilePictureUrl) ?? undefined}
                   alt="Profile"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                 />
@@ -453,69 +535,103 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
             </div>
           )}
 
+          </>
+          )}
+
           <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              alignItems: 'flex-start',
-              justifyContent: 'space-between',
-              gap: 12,
-              marginBottom: 16,
-            }}
-          >
-            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: 18,
-                  fontWeight: 700,
-                  color: '#1e293b',
-                }}
-              >
-                Improve your LinkedIn profile
-              </h3>
-              <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b', lineHeight: 1.55 }}>
-                {quickWin
-                  ? "ALwrity detected opportunities to get more views, connections, and leads — prioritized by impact and time required. Start with 'Quick win'."
-                  : 'ALwrity detected opportunities to get more views, connections, and leads — prioritized by impact and time required.'}
-              </p>
-              {updatedLabel && (
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
-                  {updatedLabel}
-                  {optimizationMeta?.source ? ` ┬╖ Source: ${optimizationMeta.source}` : ''}
-                </p>
+            className={['profile-opt-panel__grid', isModal && 'profile-opt-panel__grid--modal']
+            .filter(Boolean)
+            .join(' ')}>
+            <aside className="profile-opt-panel__rail">
+              {aiProfileIntelligence && (
+                <BrandIdentityCard
+                  intelligence={aiProfileIntelligence}
+                  profileStrengthPercent={profileStrengthPercent}
+                  className={isModal ? 'profile-opt-brand-identity-card--modal' : undefined}
+                />
               )}
-              {!updatedLabel && optimizationMeta?.source && (
-                <p style={{ margin: '8px 0 0', fontSize: 12, color: '#94a3b8' }}>
-                  Source: {optimizationMeta.source}
-                  {typeof optimizationMeta.remaining_in_backlog === 'number' &&
-                    optimizationMeta.remaining_in_backlog > 0 &&
-                    ` ┬╖ ${optimizationMeta.remaining_in_backlog} more in backlog`}
-                </p>
+
+              {showSectionScores && sectionScores && !isModal && (
+                <SectionScoresPanel
+                  scores={sectionScores}
+                  activeSectionKeys={activeSectionKeys}
+                  activeSectionCount={activeSectionCount}
+                />
               )}
-            </div>
 
-            {showCards && onCollapse && (
-              <button
-                type="button"
-                onClick={onCollapse}
-                aria-expanded
-                aria-controls="profile-optimization-list"
-                style={hideSuggestionsButtonStyle}
-              >
-                Hide suggestions
-              </button>
-            )}
-          </div>
+              {((showCards && displayContentAngles.length > 0) ||
+                (isModal && displayContentAngles.length > 0)) && (
+                <ProfileOptimizationContentAnglesCard
+                  industry={contentBridgeIndustry}
+                  expertise={contentBridgeExpertise}
+                  opportunities={displayContentAngles}
+                  showAllAngles={isModal || showAllAngles}
+                  onToggleShowAllAngles={() => setShowAllAngles((value) => !value)}
+                  visibleCount={isModal ? displayContentAngles.length : VISIBLE_ANGLES_COUNT}
+                  alwaysExpanded={isModal}
+                />
+              )}
 
+              {showCards && onRecheckProfile && !isModal && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    backgroundColor: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: '#475569',
+                      lineHeight: 1.4,
+                      flex: '1 1 200px',
+                    }}
+                  >
+                    Applied changes on LinkedIn? Re-check your live profile to verify your real score.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onRecheckProfile}
+                    disabled={isRechecking}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      border: '1px solid #0A66C2',
+                      backgroundColor: isRechecking ? '#cbd5e1' : '#fff',
+                      color: isRechecking ? '#64748b' : '#0A66C2',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: isRechecking ? 'wait' : 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {isRechecking ? 'Re-checking…' : '🔄 Re-check my profile'}
+                  </button>
+                </div>
+              )}
+
+              {recheckDelta && onDismissRecheckDelta && !isModal && (
+                <ProfileOptimizationRecheckBadge
+                  recheckDelta={recheckDelta}
+                  onDismiss={onDismissRecheckDelta}
+                />
+              )}
+            </aside>
+
+            <div className="profile-opt-panel__main">
           {showSkeleton && (
             <>
-              <style>{`
-                @keyframes linkedinTopicRecShimmer {
-                  0% { background-position: 200% 0; }
-                  100% { background-position: -200% 0; }
-                }
-              `}</style>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div
                   style={{
@@ -528,197 +644,98 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   }}
                 >
                   <CircularProgress size={20} sx={{ color: '#0A66C2' }} />
-                  Generating profile suggestionsΓÇª
+                  Generating profile suggestions…
                 </div>
                 {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
-                  <div key={index} style={SKELETON_CARD_STYLE} aria-hidden />
+                  <div
+                    key={index}
+                    className="profile-opt-panel__shimmer"
+                    style={SKELETON_CARD_STYLE}
+                    aria-hidden
+                  />
                 ))}
               </div>
             </>
           )}
 
           {showNoGaps && (
-            <p
-              style={{
-                margin: 0,
-                padding: '12px 14px',
-                borderRadius: 8,
-                backgroundColor: '#ecfdf5',
-                border: '1px solid #6ee7b7',
-                color: '#047857',
-                fontSize: 14,
-                lineHeight: 1.55,
-              }}
-            >
-              {noGapsMessage}
-            </p>
-          )}
-
-          {showNextBatchBanner && (
-            <div
-              style={{
-                padding: '16px 18px',
-                borderRadius: 12,
-                backgroundColor: '#eff6ff',
-                border: '1px solid #bfdbfe',
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-              }}
-            >
-              <div style={{ flex: '1 1 240px' }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 15,
-                    fontWeight: 700,
-                    color: '#1e3a8a',
-                  }}
-                >
-                  Batch complete
-                </p>
-                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#1d4ed8', lineHeight: 1.5 }}>
-                  {optimizationMeta?.remaining_in_backlog ?? 0} more recommendation
-                  {(optimizationMeta?.remaining_in_backlog ?? 0) === 1 ? '' : 's'} waiting in
-                  your backlog.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onLoadNextBatch}
-                disabled={isLoadingNextBatch}
-                style={{
-                  padding: '10px 18px',
-                  borderRadius: 10,
-                  border: 'none',
-                  background: isLoadingNextBatch
-                    ? '#94a3b8'
-                    : 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
-                  color: '#fff',
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: isLoadingNextBatch ? 'wait' : 'pointer',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {isLoadingNextBatch ? 'LoadingΓÇª' : 'Get your next 5 recommendations'}
-              </button>
-            </div>
-          )}
-
-          {showSectionScores && sectionScores && (
-            <SectionScoresPanel
-              scores={sectionScores}
-              activeSectionKeys={activeSectionKeys}
-              activeSectionCount={activeSectionCount}
+            <ProfileOptimizationNoGapsState
+              message={noGapsMessage}
+              onClose={onCollapse}
             />
           )}
 
-          {showCards && onRecheckProfile && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
-                padding: '10px 14px',
-                borderRadius: 10,
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                flexWrap: 'wrap',
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  color: '#475569',
-                  lineHeight: 1.4,
-                  flex: '1 1 200px',
-                }}
-              >
-                Applied changes on LinkedIn? Re-check your live profile to verify your real score.
-              </p>
-              <button
-                type="button"
-                onClick={onRecheckProfile}
-                disabled={isRechecking}
-                style={{
-                  padding: '7px 14px',
-                  borderRadius: 8,
-                  border: '1px solid #0A66C2',
-                  backgroundColor: isRechecking ? '#cbd5e1' : '#fff',
-                  color: isRechecking ? '#64748b' : '#0A66C2',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: isRechecking ? 'wait' : 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {isRechecking ? 'Re-checkingΓÇª' : '≡ƒöä Re-check my profile'}
-              </button>
-            </div>
+          {showNextBatchBanner && (
+            <ProfileOptimizationBatchBanner
+              remainingInBacklog={optimizationMeta?.remaining_in_backlog ?? 0}
+              isLoadingNextBatch={isLoadingNextBatch}
+              onLoadNextBatch={onLoadNextBatch}
+              hideInlineAction={isModal}
+            />
           )}
 
-          {recheckDelta && onDismissRecheckDelta && (
-            <div
-              role="status"
-              aria-live="polite"
-              style={{
-                padding: '12px 14px',
-                borderRadius: 10,
-                backgroundColor: recheckDelta.current > recheckDelta.previous ? '#ecfdf5' : '#fef3c7',
-                border: recheckDelta.current > recheckDelta.previous
-                  ? '1px solid #6ee7b7'
-                  : '1px solid #fcd34d',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 12,
+          {showCards && isModal && (
+            <Tooltip
+              title={strengthHoverMessage ?? ''}
+              arrow
+              placement="left"
+              enterDelay={280}
+              disableHoverListener={!strengthHoverMessage}
+              slotProps={{
+                tooltip: {
+                  sx: { maxWidth: 300, fontSize: 13, lineHeight: 1.5, fontWeight: 500 },
+                },
               }}
             >
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  color: recheckDelta.current > recheckDelta.previous ? '#065f46' : '#92400e',
-                  lineHeight: 1.45,
-                  flex: 1,
-                }}
+              <div
+                id="profile-optimization-list"
+                className="profile-opt-panel__suggestions-stack profile-opt-panel__suggestions-stack--modal profile-opt-panel__suggestions-stack--hover-tip"
               >
-                {recheckDelta.current > recheckDelta.previous
-                  ? `Γ£à Real score improved: ${recheckDelta.previous} ΓåÆ ${recheckDelta.current} (+${
-                      recheckDelta.current - recheckDelta.previous
-                    } from your live LinkedIn changes).`
-                  : recheckDelta.current < recheckDelta.previous
-                    ? `Real score changed: ${recheckDelta.previous} ΓåÆ ${recheckDelta.current} (${recheckDelta.current - recheckDelta.previous}). The rubric re-evaluated against your current LinkedIn profile.`
-                    : `Score unchanged at ${recheckDelta.current}. The rubric didn't detect new gaps based on your live LinkedIn profile.`}
-              </p>
-              <button
-                type="button"
-                onClick={onDismissRecheckDelta}
-                aria-label="Dismiss re-check result"
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#64748b',
-                  cursor: 'pointer',
-                  fontSize: 18,
-                  lineHeight: 1,
-                  padding: 0,
-                }}
-              >
-                ├ù
-              </button>
-            </div>
+                <div className="profile-opt-panel__suggestions-stack-header">
+                  <h3
+                    id="profile-opt-batch-stack-title"
+                    className="profile-opt-panel__suggestions-stack-title"
+                  >
+                    {quickWinsLabel}
+                  </h3>
+                </div>
+                <div className="profile-opt-panel__suggestions-stack-inner">
+                  <ProfileOptimizationBatchImpactBar
+                    stackCard
+                    hideSessionLabel
+                    batchLabel={batchNumberLabel}
+                    batchGainHint={
+                      batchProjection.gainPoints > 0
+                        ? `+${batchProjection.gainPoints}% profile strength if you apply this batch`
+                        : undefined
+                    }
+                    recommendations={sortedRecommendations}
+                    optimizationMeta={optimizationMeta}
+                    profileStrengthPercent={profileStrengthPercent}
+                    sectionScores={sectionScores ?? null}
+                    activeSectionKeys={activeSectionKeys}
+                    activeSectionCount={activeSectionCount}
+                  />
+                  {sortedRecommendations.map((item, index) => (
+                    <ProfileOptimizationCard
+                      key={item.id}
+                      recommendation={item}
+                      index={index}
+                      onMarkDone={onMarkDone}
+                      onSkip={onSkip}
+                      isMarking={markingRecommendationId === item.id}
+                      publicIdentifier={publicIdentifier}
+                      showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
+                      promotePrimaryActions={quickWin?.id === item.id}
+                      className="profile-opt-card--stack"
+                    />
+                  ))}
+                </div>
+              </div>
+            </Tooltip>
           )}
 
-          {showCards && (
+          {showCards && !isModal && (
             <div
               id="profile-optimization-list"
               style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
@@ -770,11 +787,12 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                     isMarking={markingRecommendationId === quickWin.id}
                     publicIdentifier={publicIdentifier}
                     showEffortTimeLabel={formatEffortTimeLabel(quickWin.effort)}
+                    promotePrimaryActions
                   />
                 </div>
               )}
 
-              {remainingItems.map((item, index) => (
+              {visibleRemainingItems.map((item, index) => (
                 <ProfileOptimizationCard
                   key={item.id}
                   recommendation={item}
@@ -786,210 +804,29 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
                   showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
                 />
               ))}
+
+              {canToggleAllSuggestions && (
+                <button
+                  type="button"
+                  className={[
+                    'profile-opt-panel__show-all',
+                    isModal && 'profile-opt-panel__show-all--modal',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onClick={() => setShowAllRecommendations((value) => !value)}
+                  aria-expanded={showAllRecommendations}
+                >
+                  {showAllRecommendations
+                    ? 'Show fewer suggestions'
+                    : `Show all (${recommendationCount} suggestion${recommendationCount === 1 ? '' : 's'})`}
+                </button>
+              )}
             </div>
           )}
 
-          {showCards && writingOpportunities.length > 0 && (
-              <div
-                style={{
-                  marginTop: 24,
-                  padding: '18px 20px',
-                  borderRadius: 12,
-                  background: 'linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)',
-                  border: '1px solid #c4b5fd',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 12,
-                    marginBottom: 14,
-                  }}
-                >
-                  <div
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                    aria-hidden
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
-                        stroke="white"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <h4
-                      style={{
-                        margin: '0 0 4px',
-                        fontSize: 15,
-                        fontWeight: 700,
-                        color: '#5b21b6',
-                      }}
-                    >
-                      Content angles from your profile
-                    </h4>
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 13,
-                        color: '#7c3aed',
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      Your experience in {contentBridgeIndustry}
-                      {contentBridgeExpertise && (
-                        <> and expertise in <strong>{contentBridgeExpertise}</strong></>
-                      )}{' '}
-                      makes these content angles native to you — not generic topics.
-                    </p>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 8,
-                    marginBottom: 16,
-                  }}
-                >
-                  {visibleOpportunities.map((opportunity, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 10,
-                        padding: '10px 14px',
-                        borderRadius: 8,
-                        backgroundColor: '#fff',
-                        border: '1px solid #ddd6fe',
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: 24,
-                          height: 24,
-                          borderRadius: '50%',
-                          backgroundColor: '#f3e8ff',
-                          color: '#7c3aed',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {idx + 1}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: 14,
-                          color: '#4c1d95',
-                          fontWeight: 500,
-                          lineHeight: 1.5,
-                        }}
-                      >
-                        {opportunity}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                {hiddenCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setShowAllAngles((v) => !v)}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '8px 14px',
-                      borderRadius: 8,
-                      border: '1px solid #c4b5fd',
-                      backgroundColor: '#fff',
-                      color: '#6b21a8',
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      marginBottom: 12,
-                      transition: 'background 150ms ease',
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#f3e8ff';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#fff';
-                    }}
-                  >
-                    {showAllAngles ? (
-                      <>Show fewer angles ▲</>
-                    ) : (
-                      <>Show {hiddenCount} more angle{hiddenCount !== 1 ? 's' : ''} ▼</>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('linkedinwriter:getTopicIdeas'));
-                  }}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    padding: '10px 18px',
-                    borderRadius: 10,
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)',
-                    color: '#fff',
-                    fontSize: 14,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    width: '100%',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      d="M12 5v14M5 12h14"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Get topic ideas from these angles
-                </button>
-              </div>
-            )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

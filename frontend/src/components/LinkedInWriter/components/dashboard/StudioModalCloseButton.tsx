@@ -1,10 +1,12 @@
 import React from 'react';
+import { AlwrityModalCloseIconButton } from '../../../shared/AlwrityModalCloseIconButton';
 
 interface StudioModalCloseButtonProps {
   onClick: () => void;
   ariaLabel?: string;
   disabled?: boolean;
   className?: string;
+  variant?: 'light' | 'dark';
 }
 
 /** Consistent ✕ close control for LinkedIn Studio popups. */
@@ -12,15 +14,14 @@ export const StudioModalCloseButton: React.FC<StudioModalCloseButtonProps> = ({
   onClick,
   ariaLabel = 'Close',
   disabled = false,
-  className = 'linkedin-studio-modal-close',
+  className,
+  variant = 'light',
 }) => (
-  <button
-    type="button"
+  <AlwrityModalCloseIconButton
     onClick={onClick}
+    ariaLabel={ariaLabel}
     disabled={disabled}
-    aria-label={ariaLabel}
     className={className}
-  >
-    ✕
-  </button>
+    variant={variant}
+  />
 );

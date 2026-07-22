@@ -20,8 +20,9 @@ Rules:
 - If evidence for a scalar field is missing, set that field to "Unknown".
 - List fields may be empty arrays when the profile lacks supporting data.
 - Be objective, concise, and professional. Avoid marketing hype or exaggeration.
-- writing_opportunities must be professional themes implied by the profile
+- writing_opportunities must be exactly 5 professional themes implied by the profile
   (e.g. "Backend Best Practices") — NOT post titles, hashtags, or topic suggestions.
+  Each theme must be distinct and grounded in profile evidence.
 - Return valid JSON only. No markdown fences, commentary, or extra keys.
 - Do NOT include a "meta" field — metadata is added server-side.
 
@@ -31,7 +32,7 @@ Return a JSON object with exactly these keys:
 - industry (string)
 - experience_level (string; e.g. Junior, Mid, Senior, Executive, or Unknown)
 - knowledge_domains (array of strings)
-- writing_opportunities (array of strings)
+- writing_opportunities (array of exactly 5 strings)
 - target_audience (array of strings)
 - communication_style (string)
 - brand_positioning (string)

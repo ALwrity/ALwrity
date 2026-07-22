@@ -629,9 +629,8 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({ 
       ref={containerRef}
     >
       <DashboardRailIconButton
-        label="Today's Growth Tasks"
+        label="Today's Growth"
         stackedLabel={isTab ? GROWTH_TAB_STACKED_LABEL : undefined}
-        shortLabel={isTab ? undefined : 'Growth Tasks'}
         icon="growth"
         emojiIcon="🚀"
         alwaysShowLabel
