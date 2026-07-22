@@ -551,14 +551,37 @@ export const useLinkedInSocialConnection = () => {
     setIsProfileLoading(false);
   }, []);
 
+  // Mirror linkedin-oauth-success: broadcast disconnect so every hook instance
+  // (Analytics sidebar, Header, etc.) clears connected state without a refresh.
+  useEffect(() => {
+    const onDisconnected = () => {
+      console.info('[LinkedInConnect] received linkedin-disconnected');
+      clearSelectionStorage();
+      setDisconnected();
+    };
+
+    window.addEventListener('linkedin-disconnected', onDisconnected);
+    return () => window.removeEventListener('linkedin-disconnected', onDisconnected);
+  }, [clearSelectionStorage, setDisconnected]);
+
   const disconnect = useCallback(async (): Promise<boolean> => {
     setDisconnectError(null);
     console.info('[LinkedInConnect] starting disconnect');
+
+    const broadcastDisconnected = () => {
+      try {
+        window.dispatchEvent(new CustomEvent('linkedin-disconnected'));
+        console.info('[LinkedInConnect] dispatched linkedin-disconnected');
+      } catch (dispatchErr) {
+        console.error('[LinkedInConnect] failed to dispatch linkedin-disconnected:', dispatchErr);
+      }
+    };
 
     try {
       const result = await disconnectLinkedIn();
       clearSelectionStorage();
       setDisconnected();
+      broadcastDisconnected();
       console.info('[LinkedInConnect] disconnect succeeded', {
         success: result.success,
       });
@@ -574,6 +597,7 @@ export const useLinkedInSocialConnection = () => {
         console.debug('[LinkedInConnect] disconnect endpoint not mounted (404); skipping');
         // Reset the connection state to "not connected" anyway.
         setDisconnected();
+        broadcastDisconnected();
         return true;
       } else {
         console.error('[LinkedInConnect] disconnect failed:', msg, err);
