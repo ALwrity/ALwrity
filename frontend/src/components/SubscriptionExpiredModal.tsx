@@ -7,12 +7,13 @@ import {
   Button,
   Typography,
   Box,
-  Alert,
-  Paper
+  Chip,
+  LinearProgress,
+  Divider,
 } from '@mui/material';
-import CreditCard from '@mui/icons-material/CreditCard';
-import Warning from '@mui/icons-material/Warning';
-import ArrowForward from '@mui/icons-material/ArrowForward';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
+import CloseIcon from '@mui/icons-material/Close';
+import UpgradeIcon from '@mui/icons-material/Upgrade';
 
 interface SubscriptionExpiredModalProps {
   open: boolean;
@@ -37,30 +38,17 @@ const SubscriptionExpiredModal: React.FC<SubscriptionExpiredModalProps> = ({
   subscriptionData,
   errorData
 }) => {
-  // Debug logging to verify modal state
   React.useEffect(() => {
-    console.log('SubscriptionExpiredModal: State update', {
-      open,
-      errorData,
-      hasUsageInfo: !!errorData?.usage_info,
-      errorDataKeys: errorData ? Object.keys(errorData) : null
-    });
     if (open) {
-      console.log('SubscriptionExpiredModal: Modal should be visible now', {
-        open,
-        errorData,
-        hasUsageInfo: !!errorData?.usage_info
+      console.log('SubscriptionExpiredModal: opened', {
+        hasUsageInfo: !!(errorData?.usage_info),
+        provider: errorData?.provider,
       });
-    } else {
-      console.log('SubscriptionExpiredModal: Modal is closed');
     }
   }, [open, errorData]);
-  
+
   const handleDialogClose = (_event: object, reason?: string) => {
-    if (reason === 'backdropClick') {
-      console.log('SubscriptionExpiredModal: Ignoring backdrop click close');
-      return;
-    }
+    if (reason === 'backdropClick') return;
     onClose();
   };
 
@@ -69,284 +57,188 @@ const SubscriptionExpiredModal: React.FC<SubscriptionExpiredModalProps> = ({
     onClose();
   };
 
+  const usageInfo = errorData?.usage_info || {};
+  const provider = errorData?.provider;
+
+  const hasUsageData = usageInfo.current_tokens !== undefined || usageInfo.current_calls !== undefined;
+
+  const isUsageLimit = !!errorData?.usage_info;
+  const planName = subscriptionData?.plan || 'Free';
+
+  const title = isUsageLimit
+    ? `${planName} Plan Limit Reached`
+    : 'Subscription Expired';
+
+  const subtitle = errorData?.message || (isUsageLimit
+    ? `You've used all your ${planName} plan resources for this month. Upgrade to keep creating with ALwrity.`
+    : 'Your ALwrity subscription has expired. Renew to continue creating.');
+
   return (
     <Dialog
       open={open}
       onClose={handleDialogClose}
-      maxWidth="sm"
+      maxWidth="xs"
       fullWidth
       disableEscapeKeyDown
       PaperProps={{
         sx: {
           borderRadius: 3,
-          background: 'linear-gradient(135deg, #fff 0%, #f8fafc 100%)',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          zIndex: 9999, // Ensure modal appears above everything
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px -10px rgba(0,0,0,0.12)',
         }
       }}
-      sx={{
-        zIndex: 9999, // Ensure modal backdrop appears above everything
-      }}
     >
-      <DialogTitle sx={{ textAlign: 'center', pb: 1 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
-          <CreditCard sx={{ fontSize: 32, color: 'warning.main' }} />
-          <Typography variant="h4" sx={{ fontWeight: 600, color: 'text.primary' }}>
-            {errorData?.usage_info ? 'Usage Limit Reached' : 'Subscription Expired'}
-          </Typography>
-        </Box>
-      </DialogTitle>
-      
-      <DialogContent sx={{ textAlign: 'center', px: 4, py: 2 }}>
-        <Alert 
-          severity="warning" 
-          sx={{ 
-            mb: 3, 
-            borderRadius: 2,
-            background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-            border: '1px solid #f59e0b'
-          }}
-          icon={<Warning sx={{ color: '#d97706' }} />}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#92400e' }}>
-            {errorData?.usage_info ? 'You\'ve reached your API usage limit' : 'Your subscription has expired'}
-          </Typography>
-        </Alert>
+      {/* Brand header */}
+      <Box
+        sx={{
+          background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+          pt: 3.5,
+          pb: 2.5,
+          px: 3,
+          textAlign: 'center',
+        }}
+      >
+        <RocketLaunchIcon sx={{ fontSize: 44, color: '#fff', mb: 1, opacity: 0.9 }} />
+        <Typography variant="h6" sx={{ fontWeight: 700, color: '#fff', mb: 0.5 }}>
+          ALwrity
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)' }}>
+          {title}
+        </Typography>
+      </Box>
 
-        <Paper 
-          elevation={0} 
-          sx={{ 
-            p: 3, 
-            mb: 3, 
-            background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
-            border: '1px solid #cbd5e1',
-            borderRadius: 2
-          }}
-        >
-          {/* Main error message */}
-          <Typography variant="body1" sx={{ mb: 2, color: 'text.secondary', lineHeight: 1.6 }}>
-            {errorData?.message || (errorData?.usage_info 
-              ? 'You\'ve reached your monthly usage limit for this plan. Upgrade your plan to get higher limits.'
-              : 'To continue using Alwrity and access all features, you need to renew your subscription.'
-            )}
-          </Typography>
-          
-          {/* Detailed usage information */}
-          {errorData?.usage_info && (
-            <Box sx={{ mb: 2, p: 2.5, background: 'rgba(255,255,255,0.9)', borderRadius: 2, border: '1px solid #e2e8f0' }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2, color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Warning sx={{ fontSize: 18, color: 'warning.main' }} />
-                Usage Information:
-              </Typography>
-              
-              {/* Provider and operation type */}
-              <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                {errorData.provider && (
-                  <Box sx={{ 
-                    flex: '1 1 auto',
-                    px: 2, 
-                    py: 1.5, 
-                    background: 'linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%)', 
-                    borderRadius: 1.5,
-                    border: '1px solid #a5b4fc'
-                  }}>
-                    <Typography variant="caption" sx={{ color: '#4338ca', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                      Provider:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#312e81', fontWeight: 700 }}>
-                      {errorData.provider}
-                    </Typography>
-                  </Box>
-                )}
-                
-                {errorData.usage_info.operation_type && (
-                  <Box sx={{ 
-                    flex: '1 1 auto',
-                    px: 2, 
-                    py: 1.5, 
-                    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)', 
-                    borderRadius: 1.5,
-                    border: '1px solid #fbbf24'
-                  }}>
-                    <Typography variant="caption" sx={{ color: '#92400e', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                      Operation:
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#78350f', fontWeight: 700, textTransform: 'capitalize' }}>
-                      {errorData.usage_info.operation_type.replace(/_/g, ' ')}
-                    </Typography>
-                  </Box>
+      <DialogContent sx={{ px: 4, pt: 3, pb: 1, textAlign: 'center' }}>
+        {/* Message */}
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, lineHeight: 1.7 }}>
+          {subtitle}
+        </Typography>
+
+        {/* Plan + Provider chips */}
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, mb: hasUsageData ? 2.5 : 2, flexWrap: 'wrap' }}>
+          <Chip
+            label={planName}
+            size="small"
+            sx={{
+              fontWeight: 700,
+              bgcolor: '#eef2ff',
+              color: '#4338ca',
+              border: '1px solid #c7d2fe',
+              textTransform: 'capitalize',
+            }}
+          />
+          {provider && (
+            <Chip
+              label={provider}
+              size="small"
+              variant="outlined"
+              sx={{ fontWeight: 600, color: 'text.secondary', textTransform: 'capitalize' }}
+            />
+          )}
+        </Box>
+
+        {/* Usage data section */}
+        {hasUsageData && (
+          <Box sx={{ textAlign: 'left', mb: 2 }}>
+            <Divider sx={{ mb: 2.5 }} />
+
+            {usageInfo.current_tokens !== undefined && (
+              <Box sx={{ mb: usageInfo.current_calls !== undefined ? 2.5 : 0 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                    Token Usage
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {usageInfo.current_tokens?.toLocaleString() || 0}
+                    {' / '}
+                    {usageInfo.limit?.toLocaleString() || '∞'}
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={(() => {
+                    if (!usageInfo.limit || usageInfo.limit === 0) return 100;
+                    return Math.min(((usageInfo.current_tokens || 0) / usageInfo.limit) * 100, 100);
+                  })()}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: '#e2e8f0',
+                    '& .MuiLinearProgress-bar': { bgcolor: '#6366f1', borderRadius: 3 },
+                  }}
+                />
+                {usageInfo.requested_tokens && usageInfo.limit > 0 && (
+                  <Typography variant="caption" color="error" sx={{ mt: 0.5, display: 'block' }}>
+                    {(usageInfo.current_tokens || 0) + usageInfo.requested_tokens > usageInfo.limit
+                      ? `Requesting ${usageInfo.requested_tokens.toLocaleString()} more would exceed your limit.`
+                      : `Requesting ${usageInfo.requested_tokens.toLocaleString()} additional tokens.`}
+                  </Typography>
                 )}
               </Box>
-              
-              {/* Token usage details (if available) */}
-              {(errorData.usage_info.current_tokens !== undefined || errorData.usage_info.current_calls !== undefined) && (
-                <Box sx={{ 
-                  p: 2, 
-                  background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)', 
-                  borderRadius: 1.5,
-                  border: '1px solid #f87171',
-                  mb: 2
-                }}>
-                  {errorData.usage_info.current_tokens !== undefined && (
-                    <>
-                      <Typography variant="body2" sx={{ color: '#7f1d1d', fontWeight: 600, mb: 1 }}>
-                        Token Usage:
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 0.5 }}>
-                        <Typography variant="h6" sx={{ color: '#991b1b', fontWeight: 700 }}>
-                          {errorData.usage_info.current_tokens?.toLocaleString() || 0}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#7f1d1d' }}>
-                          / {errorData.usage_info.limit?.toLocaleString() || 0}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#7f1d1d', ml: 'auto' }}>
-                          ({((errorData.usage_info.current_tokens / errorData.usage_info.limit) * 100).toFixed(1)}% used)
-                        </Typography>
-                      </Box>
-                      
-                      {errorData.usage_info.requested_tokens && (
-                        <Typography variant="caption" sx={{ color: '#7f1d1d', display: 'block', mt: 1 }}>
-                          Requested: {errorData.usage_info.requested_tokens.toLocaleString()} tokens
-                          {errorData.usage_info.current_tokens + errorData.usage_info.requested_tokens > errorData.usage_info.limit && (
-                            <span style={{ fontWeight: 700, marginLeft: 4 }}>
-                              (Would exceed by: {((errorData.usage_info.current_tokens + errorData.usage_info.requested_tokens) - errorData.usage_info.limit).toLocaleString()} tokens)
-                            </span>
-                          )}
-                        </Typography>
-                      )}
-                    </>
-                  )}
-                  
-                  {errorData.usage_info.current_calls !== undefined && (
-                    <>
-                      <Typography variant="body2" sx={{ color: '#7f1d1d', fontWeight: 600, mb: 1, mt: errorData.usage_info.current_tokens !== undefined ? 2 : 0 }}>
-                        API Call Usage:
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
-                        <Typography variant="h6" sx={{ color: '#991b1b', fontWeight: 700 }}>
-                          {errorData.usage_info.current_calls?.toLocaleString() || 0}
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#7f1d1d' }}>
-                          / {(errorData.usage_info.limit || errorData.usage_info.call_limit || 0)?.toLocaleString()}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: '#7f1d1d', ml: 'auto' }}>
-                          {(() => {
-                            const limit = errorData.usage_info.limit || errorData.usage_info.call_limit || 0;
-                            const current = errorData.usage_info.current_calls || 0;
-                            const percentage = limit > 0 ? ((current / limit) * 100).toFixed(1) : '0.0';
-                            return `(${percentage}% used)`;
-                          })()}
-                        </Typography>
-                      </Box>
-                    </>
-                  )}
-                </Box>
-              )}
-              
-              {/* Error type badge */}
-              {errorData.usage_info.error_type && (
-                <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                  <Box sx={{ 
-                    px: 2, 
-                    py: 0.5, 
-                    background: '#dc2626', 
-                    borderRadius: 1,
-                    display: 'inline-block'
-                  }}>
-                    <Typography variant="caption" sx={{ color: 'white', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      {errorData.usage_info.error_type.replace(/_/g, ' ')}
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          )}
-          
-          {/* Current plan information */}
-          {subscriptionData && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
-              {subscriptionData.plan && (
-                <Box sx={{ 
-                  px: 3, 
-                  py: 1.5, 
-                  background: 'rgba(255,255,255,0.9)', 
-                  borderRadius: 1.5,
-                  border: '2px solid #e2e8f0'
-                }}>
-                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, display: 'block', mb: 0.5 }}>
-                    Current Plan:
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 700, textTransform: 'capitalize' }}>
-                    {subscriptionData.plan}
-                  </Typography>
-                </Box>
-              )}
-            </Box>
-          )}
-        </Paper>
+            )}
 
-        <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
-          Renewing your subscription will restore access to:
-        </Typography>
-        
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, textAlign: 'left', maxWidth: 300, mx: 'auto' }}>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            ✓ AI Content Generation
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            ✓ Website Analysis
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            ✓ Research Tools
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-            ✓ All Premium Features
-          </Typography>
-        </Box>
+            {usageInfo.current_calls !== undefined && (
+              <Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', mb: 0.5 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                    API Calls
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {usageInfo.current_calls?.toLocaleString() || 0}
+                    {' / '}
+                    {(usageInfo.limit || usageInfo.call_limit || 0)?.toLocaleString() || '∞'}
+                  </Typography>
+                </Box>
+                <LinearProgress
+                  variant="determinate"
+                  value={(() => {
+                    const limit = usageInfo.limit || usageInfo.call_limit || 0;
+                    if (!limit) return 100;
+                    return Math.min(((usageInfo.current_calls || 0) / limit) * 100, 100);
+                  })()}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: '#e2e8f0',
+                    '& .MuiLinearProgress-bar': { bgcolor: '#6366f1', borderRadius: 3 },
+                  }}
+                />
+              </Box>
+            )}
+          </Box>
+        )}
       </DialogContent>
 
-      <DialogActions sx={{ px: 4, pb: 4, gap: 2 }}>
+      {/* Actions */}
+      <DialogActions sx={{ px: 4, pb: 3.5, pt: 1, gap: 1.5, justifyContent: 'center' }}>
         <Button
           variant="outlined"
           onClick={onClose}
+          startIcon={<CloseIcon />}
           sx={{
             borderRadius: 2,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
-            py: 1.5,
-            borderColor: 'rgba(0,0,0,0.2)',
-            color: 'text.primary',
-            '&:hover': {
-              borderColor: 'rgba(0,0,0,0.4)',
-              background: 'rgba(0,0,0,0.04)',
-            }
+            color: 'text.secondary',
+            borderColor: 'divider',
           }}
         >
-          Maybe Later
+          Close
         </Button>
-        
         <Button
           variant="contained"
           onClick={handleRenewClick}
-          startIcon={<CreditCard />}
-          endIcon={<ArrowForward />}
+          endIcon={<UpgradeIcon />}
           sx={{
             borderRadius: 2,
             textTransform: 'none',
-            fontWeight: 600,
+            fontWeight: 700,
             px: 4,
-            py: 1.5,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)',
-              transform: 'translateY(-1px)',
-              boxShadow: '0 6px 16px rgba(102, 126, 234, 0.4)',
-            }
+            bgcolor: '#6366f1',
+            '&:hover': { bgcolor: '#4f46e5' },
           }}
         >
-          Renew Subscription
+          {isUsageLimit ? 'Upgrade Plan' : 'Renew'}
         </Button>
       </DialogActions>
     </Dialog>

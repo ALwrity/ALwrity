@@ -305,6 +305,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [selectedType, setSelectedType] = useState<ContentType | null>(null);
   const [formData, setFormData] = useState(defaultForm);
   const [generating, setGenerating] = useState(false);
+  const [brainstorming, setBrainstorming] = useState(false);
   const [topicError, setTopicError] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [outlinePlanMode, setOutlinePlanMode] = useState(false);
@@ -319,6 +320,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const variationAbortRef = useRef<AbortController | null>(null);
   const brainstormTimeoutRef = useRef<number | null>(null);
   const brainstromActiveRef = useRef(false);
+  const brainstormingRef = useRef(false);
 
   const [myIdeasOpen, setMyIdeasOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
@@ -441,6 +443,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   // Cancel brainstorm safety timeout when BrainstormFlow starts (it's actively processing)
   useEffect(() => {
     const onBrainstormStarted = () => {
+      brainstormingRef.current = false;
+      setBrainstorming(false);
       if (brainstormTimeoutRef.current) {
         window.clearTimeout(brainstormTimeoutRef.current);
         brainstormTimeoutRef.current = null;
@@ -448,6 +452,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     };
     // Cancel brainstorm safety timeout when BrainstormFlow is manually closed
     const onCancelBrainstorm = () => {
+      brainstormingRef.current = false;
+      setBrainstorming(false);
       if (brainstormTimeoutRef.current) {
         window.clearTimeout(brainstormTimeoutRef.current);
         brainstormTimeoutRef.current = null;
@@ -634,7 +640,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             {topicFocused && (selectedType === 'post' || selectedType === 'article') && (
               <button
                 type="button"
+                disabled={brainstorming}
                 onClick={() => {
+                  if (brainstormingRef.current) return;
                   const topic = formData.topic.trim();
                   const brainstormType = selectedType;
                   if (!topic) {
@@ -642,6 +650,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                     return;
                   }
 
+                  brainstormingRef.current = true;
+                  setBrainstorming(true);
                   brainstromActiveRef.current = true;
                   setTopicError(null);
 
@@ -653,6 +663,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                   brainstormTimeoutRef.current = window.setTimeout(() => {
                     if (brainstromActiveRef.current) {
                       brainstromActiveRef.current = false;
+                      brainstormingRef.current = false;
+                      setBrainstorming(false);
                       openModal(brainstormType);
                     }
                   }, 15000);
@@ -673,13 +685,16 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                 style={{
                   position: 'absolute', right: 6, top: 5,
                   padding: '4px 10px', borderRadius: 6,
-                  border: '1px solid #0a66c2', background: '#fff',
-                  color: '#0a66c2', fontWeight: 700, fontSize: 12,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
+                  border: `1px solid ${brainstorming ? '#9ca3af' : '#0a66c2'}`,
+                  background: brainstorming ? '#f3f4f6' : '#fff',
+                  color: brainstorming ? '#9ca3af' : '#0a66c2',
+                  fontWeight: 700, fontSize: 12,
+                  cursor: brainstorming ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
                   display: 'flex', alignItems: 'center', gap: 4,
                 }}
               >
-                🧠 Brainstorm
+                {brainstorming ? '⏳ Generating...' : '🧠 Brainstorm'}
               </button>
             )}
           </div>

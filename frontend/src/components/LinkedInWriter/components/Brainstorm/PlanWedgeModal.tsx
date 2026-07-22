@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import DataSourceSelector from './DataSourceSelector';
 import type { BrainstormOptions } from './DataSourceSelector';
@@ -33,6 +33,8 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
 
   const [myIdeasOpen, setMyIdeasOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  const [brainstorming, setBrainstorming] = useState(false);
+  const brainstormingRef = useRef(false);
 
   const { corePersona } = usePlatformPersonaContext();
   const { connected } = useLinkedInSocialConnection();
@@ -80,8 +82,27 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    const onStarted = () => {
+      brainstormingRef.current = false;
+      setBrainstorming(false);
+    };
+    const onCancel = () => {
+      brainstormingRef.current = false;
+      setBrainstorming(false);
+    };
+    window.addEventListener('linkedinwriter:brainstormStarted', onStarted);
+    window.addEventListener('linkedinwriter:cancelBrainstorm', onCancel);
+    return () => {
+      window.removeEventListener('linkedinwriter:brainstormStarted', onStarted);
+      window.removeEventListener('linkedinwriter:cancelBrainstorm', onCancel);
+    };
+  }, []);
+
   const runBrainstorm = () => {
-    if (!canGenerate) return;
+    if (!canGenerate || brainstormingRef.current) return;
+    brainstormingRef.current = true;
+    setBrainstorming(true);
     window.dispatchEvent(
       new CustomEvent('linkedinwriter:runBrainstormIdeas', {
         detail: {
@@ -174,9 +195,9 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
                 type="button"
                 className={generateBtnClass}
                 onClick={runBrainstorm}
-                disabled={!canGenerate}
+                disabled={!canGenerate || brainstorming}
               >
-                Generate Ideas
+                {brainstorming ? '⏳ Generating...' : 'Generate Ideas'}
               </button>
             </div>
           </div>
