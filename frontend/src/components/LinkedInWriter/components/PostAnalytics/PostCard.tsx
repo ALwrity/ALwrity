@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
+import { PostCardMedia } from './PostCardMedia';
 import { cardBase, colors } from './styles';
 
 const PREVIEW_CHAR_LIMIT = 280;
@@ -159,6 +160,8 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateS
           {expanded ? 'Show less' : 'Read more'}
         </button>
       )}
+
+      <PostCardMedia attachments={post.attachments} postId={post.id} />
 
       <div
         style={{

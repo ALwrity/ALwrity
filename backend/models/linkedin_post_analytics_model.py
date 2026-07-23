@@ -1,6 +1,6 @@
 """LinkedIn Post Analytics Model — DB persistence for fetched post metrics."""
 
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, Index, UniqueConstraint, JSON
 from datetime import datetime
 
 from models.subscription_models import Base
@@ -34,6 +34,7 @@ class LinkedInPostAnalytics(Base):
     author_avatar_url = Column(String(1000), nullable=True)
 
     share_url = Column(String(1000), nullable=True)
+    attachments_json = Column(JSON, nullable=True, comment="Post media attachments from Unipile")
     is_repost = Column(Boolean, default=False)
     is_company_post = Column(Boolean, default=False)
 

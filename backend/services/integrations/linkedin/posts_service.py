@@ -21,6 +21,7 @@ from models.linkedin_posts_models import (
     PostEngagementMetrics,
     PostListResponse,
 )
+from services.integrations.linkedin.post_attachments import normalize_post_attachments
 from services.integrations.linkedin.unipile_client import UnipileClient, UnipileAPIError
 
 
@@ -143,6 +144,7 @@ def _normalize_post(unipile_item: dict[str, Any]) -> LinkedInPost:
         is_repost=is_repost,
         is_company_post=is_company,
         user_reacted=unipile_item.get("user_reacted"),
+        attachments=normalize_post_attachments(unipile_item),
     )
 
 
