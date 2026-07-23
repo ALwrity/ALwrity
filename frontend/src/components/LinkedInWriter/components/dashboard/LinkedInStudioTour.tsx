@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import Joyride, { ACTIONS, CallBackProps, EVENTS, STATUS } from 'react-joyride';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import Joyride, { ACTIONS, CallBackProps, EVENTS, STATUS } from "react-joyride";
 import {
   ALWRITY_JOYRIDE_LOCALE,
   cleanupJoyrideOverlay,
@@ -9,16 +9,16 @@ import {
   isTourCompactViewport,
   markTourFinished,
   markTourSkipped,
-} from '../../../../utils/walkthroughs/alwrityJoyrideTheme';
-import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
+} from "../../../../utils/walkthroughs/alwrityJoyrideTheme";
+import { LI_Z_TOUR } from "../../utils/linkedInStudioZIndex";
 import {
   LINKEDIN_STUDIO_TOUR_SEEN_KEY,
   buildLinkedInStudioTourSteps,
-} from '../../../../utils/walkthroughs/linkedInStudioTourSteps';
+} from "../../../../utils/walkthroughs/linkedInStudioTourSteps";
 import {
   MOBILE_STUDIO_MAX_WIDTH_PX,
   TOUR_PHONE_MAX_WIDTH_PX,
-} from './dashboardLayoutConstants';
+} from "./dashboardLayoutConstants";
 
 interface LinkedInStudioTourProps {
   run: boolean;
@@ -28,9 +28,13 @@ interface LinkedInStudioTourProps {
 }
 
 function scrollTourTargetIntoView(target: string | HTMLElement | undefined) {
-  if (!target || typeof target !== 'string') return;
+  if (!target || typeof target !== "string") return;
   const el = document.querySelector(target);
-  el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+  el?.scrollIntoView({
+    block: "center",
+    inline: "nearest",
+    behavior: "smooth",
+  });
 }
 
 export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
@@ -45,10 +49,10 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
   const [tourInstance, setTourInstance] = useState(0);
 
   const stopTour = useCallback(
-    (markSeen: 'finished' | 'skipped' | null) => {
-      if (markSeen === 'finished') {
+    (markSeen: "finished" | "skipped" | null) => {
+      if (markSeen === "finished") {
         markTourFinished(key);
-      } else if (markSeen === 'skipped') {
+      } else if (markSeen === "skipped") {
         markTourSkipped(key);
       }
       onRunChange(false);
@@ -65,18 +69,22 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
   }, [run]);
 
   useEffect(() => {
-    const mobileMq = window.matchMedia(`(max-width: ${TOUR_PHONE_MAX_WIDTH_PX}px)`);
-    const tabletMq = window.matchMedia(`(max-width: ${MOBILE_STUDIO_MAX_WIDTH_PX}px)`);
+    const mobileMq = window.matchMedia(
+      `(max-width: ${TOUR_PHONE_MAX_WIDTH_PX}px)`,
+    );
+    const tabletMq = window.matchMedia(
+      `(max-width: ${MOBILE_STUDIO_MAX_WIDTH_PX}px)`,
+    );
     const sync = () => {
       setTourVariant(getTourViewportVariant());
       setCompactViewport(tabletMq.matches);
     };
     sync();
-    mobileMq.addEventListener('change', sync);
-    tabletMq.addEventListener('change', sync);
+    mobileMq.addEventListener("change", sync);
+    tabletMq.addEventListener("change", sync);
     return () => {
-      mobileMq.removeEventListener('change', sync);
-      tabletMq.removeEventListener('change', sync);
+      mobileMq.removeEventListener("change", sync);
+      tabletMq.removeEventListener("change", sync);
     };
   }, []);
 
@@ -86,7 +94,11 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
   );
 
   const joyrideStyles = useMemo(
-    () => getAlwrityJoyrideStyles(tourVariant, { primaryColor: '#0a66c2', zIndex: LI_Z_TOUR }),
+    () =>
+      getAlwrityJoyrideStyles(tourVariant, {
+        primaryColor: "#0a66c2",
+        zIndex: LI_Z_TOUR,
+      }),
     [tourVariant],
   );
 
@@ -95,11 +107,15 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
       const { status, type, action, step } = data;
 
       if (action === ACTIONS.CLOSE) {
-        stopTour('skipped');
+        stopTour("skipped");
         return;
       }
 
-      if (compactViewport && type === EVENTS.STEP_BEFORE && action !== ACTIONS.SKIP) {
+      if (
+        compactViewport &&
+        type === EVENTS.STEP_BEFORE &&
+        action !== ACTIONS.SKIP
+      ) {
         scrollTourTargetIntoView(step.target);
       }
 
@@ -108,9 +124,9 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
       }
 
       if (status === STATUS.FINISHED) {
-        stopTour('finished');
+        stopTour("finished");
       } else if (status === STATUS.SKIPPED) {
-        stopTour('skipped');
+        stopTour("skipped");
       }
     },
     [compactViewport, stopTour],
@@ -118,7 +134,7 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
 
   return (
     <Joyride
-      key={`${tourInstance}-${tourVariant}-${connected ? 'linked' : 'guest'}`}
+      key={`${tourInstance}-${tourVariant}-${connected ? "linked" : "guest"}`}
       steps={steps}
       run={run}
       continuous
@@ -133,7 +149,7 @@ export const LinkedInStudioTour: React.FC<LinkedInStudioTourProps> = ({
       floaterProps={{
         options: {
           preventOverflow: {
-            boundariesElement: 'viewport',
+            boundariesElement: "viewport",
             padding: compactViewport ? 16 : 12,
           },
         },

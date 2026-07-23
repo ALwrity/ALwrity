@@ -14,19 +14,21 @@
  * Returns null when there's no unread — a clean empty state.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
-const WATCHDOG_UPDATES_KEY = 'alwrity-watchdog-updates';
-const WATCHDOG_UNREAD_CHANGED_EVENT = 'linkedinwriter:watchdogUnreadChanged';
+const WATCHDOG_UPDATES_KEY = "alwrity-watchdog-updates";
+const WATCHDOG_UNREAD_CHANGED_EVENT = "linkedinwriter:watchdogUnreadChanged";
 
 function readUnreadFromStorage(): number {
   try {
-    if (typeof window === 'undefined') return 0;
+    if (typeof window === "undefined") return 0;
     const raw = window.localStorage.getItem(WATCHDOG_UPDATES_KEY);
     if (!raw) return 0;
     const updates = JSON.parse(raw);
     if (!Array.isArray(updates)) return 0;
-    return updates.filter((u: { is_read?: boolean } | null | undefined) => u && !u.is_read).length;
+    return updates.filter(
+      (u: { is_read?: boolean } | null | undefined) => u && !u.is_read,
+    ).length;
   } catch {
     return 0;
   }
@@ -42,10 +44,10 @@ export const PlanWedgeStatusBadge: React.FC = () => {
       if (e.key === WATCHDOG_UPDATES_KEY) refresh();
     };
     window.addEventListener(WATCHDOG_UNREAD_CHANGED_EVENT, onCustom);
-    window.addEventListener('storage', onStorage);
+    window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener(WATCHDOG_UNREAD_CHANGED_EVENT, onCustom);
-      window.removeEventListener('storage', onStorage);
+      window.removeEventListener("storage", onStorage);
     };
   }, []);
 
@@ -53,33 +55,33 @@ export const PlanWedgeStatusBadge: React.FC = () => {
     return null;
   }
 
-  const label = unread > 99 ? '99+' : String(unread);
-  const title = `${unread} unread Watchdog update${unread === 1 ? '' : 's'}`;
+  const label = unread > 99 ? "99+" : String(unread);
+  const title = `${unread} unread Watchdog update${unread === 1 ? "" : "s"}`;
 
   return (
     <span
       aria-label={title}
       title={title}
       style={{
-        position: 'absolute',
+        position: "absolute",
         top: -6,
         right: -6,
         minWidth: 18,
         height: 18,
-        padding: '0 5px',
+        padding: "0 5px",
         borderRadius: 9,
-        background: '#ef4444',
-        color: '#ffffff',
+        background: "#ef4444",
+        color: "#ffffff",
         fontSize: 10,
         fontWeight: 700,
-        lineHeight: '18px',
-        textAlign: 'center',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        boxShadow: '0 2px 4px rgba(239, 68, 68, 0.35)',
-        pointerEvents: 'none',
-        userSelect: 'none',
+        lineHeight: "18px",
+        textAlign: "center",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: "0 2px 4px rgba(239, 68, 68, 0.35)",
+        pointerEvents: "none",
+        userSelect: "none",
         zIndex: 1,
       }}
     >

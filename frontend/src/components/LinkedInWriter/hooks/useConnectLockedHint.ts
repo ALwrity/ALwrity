@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useConnectLockedHint(locked: boolean) {
   const [hintVisible, setHintVisible] = useState(false);

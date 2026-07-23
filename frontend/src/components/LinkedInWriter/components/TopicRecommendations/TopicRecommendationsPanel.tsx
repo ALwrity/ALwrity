@@ -1,15 +1,15 @@
-import React from 'react';
+import React from "react";
 
 import type {
   LinkedInTopicRecommendation,
   LinkedInTopicRecommendationsMeta,
   LinkedInProfileAnalysisError,
-} from '../../../../api/linkedinSocial';
-import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
-import { TopicRecommendationCard } from './TopicRecommendationCard';
-import { formatRelativeUpdatedAt } from './topicRecommendationLabels';
-import { TopicRecommendationsSummaryBar } from './TopicRecommendationsSummaryBar';
-import { AnalysisErrorAlert } from './TopicSuggestionIntro';
+} from "../../../../api/linkedinSocial";
+import { linkedInPlaceholderCardStyles } from "../linkedInPlaceholderStyles";
+import { TopicRecommendationCard } from "./TopicRecommendationCard";
+import { formatRelativeUpdatedAt } from "./topicRecommendationLabels";
+import { TopicRecommendationsSummaryBar } from "./TopicRecommendationsSummaryBar";
+import { AnalysisErrorAlert } from "./TopicSuggestionIntro";
 
 interface TopicRecommendationsPanelProps {
   recommendations: LinkedInTopicRecommendation[] | null;
@@ -23,47 +23,48 @@ interface TopicRecommendationsPanelProps {
   onRefresh?: () => void;
   onRetry?: () => void;
   /** When embedded in a dashboard modal, strip outer card chrome and collapsed summary. */
-  variant?: 'standalone' | 'modal';
+  variant?: "standalone" | "modal";
 }
 
 const SKELETON_CARD_STYLE: React.CSSProperties = {
-  padding: '16px 18px',
+  padding: "16px 18px",
   borderRadius: 12,
-  backgroundColor: '#fff',
-  border: '1px solid #e2e8f0',
+  backgroundColor: "#fff",
+  border: "1px solid #e2e8f0",
   minHeight: 120,
-  background:
-    'linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)',
-  backgroundSize: '200% 100%',
-  animation: 'linkedinTopicRecShimmer 1.2s ease-in-out infinite',
+  background: "linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%)",
+  backgroundSize: "200% 100%",
+  animation: "linkedinTopicRecShimmer 1.2s ease-in-out infinite",
 };
 
 const SKELETON_COUNT = 3;
 
 const hideTopicsButtonStyle: React.CSSProperties = {
-  padding: '8px 14px',
+  padding: "8px 14px",
   borderRadius: 8,
-  border: '1px solid #cbd5e1',
-  backgroundColor: '#fff',
-  color: '#475569',
+  border: "1px solid #cbd5e1",
+  backgroundColor: "#fff",
+  color: "#475569",
   fontSize: 13,
   fontWeight: 600,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const panelBackgroundGlowStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: '-50%',
-  left: '-50%',
-  width: '200%',
-  height: '200%',
+  position: "absolute",
+  top: "-50%",
+  left: "-50%",
+  width: "200%",
+  height: "200%",
   background:
-    'radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)',
+    "radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)",
   zIndex: 0,
 };
 
-export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps> = ({
+export const TopicRecommendationsPanel: React.FC<
+  TopicRecommendationsPanelProps
+> = ({
   recommendations,
   recommendationsMeta,
   recommendationsError,
@@ -74,20 +75,25 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
   onExpand,
   onRefresh,
   onRetry,
-  variant = 'standalone',
+  variant = "standalone",
 }) => {
-  const isModal = variant === 'modal';
+  const isModal = variant === "modal";
   const updatedLabel = formatRelativeUpdatedAt(
-    recommendationsMeta?.recommendations_updated_at
+    recommendationsMeta?.recommendations_updated_at,
   );
   const recommendationCount = recommendations?.length ?? 0;
   const showSkeleton = isRefreshing && !recommendations?.length;
   const displayError = analysisError?.user_message ?? recommendationsError;
   const showError = Boolean(displayError) && !showSkeleton;
   const showEmpty =
-    !showSkeleton && !showError && (!recommendations || recommendations.length === 0);
+    !showSkeleton &&
+    !showError &&
+    (!recommendations || recommendations.length === 0);
   const showRecommendationCards =
-    !showSkeleton && !showError && recommendations && recommendations.length > 0;
+    !showSkeleton &&
+    !showError &&
+    recommendations &&
+    recommendations.length > 0;
 
   if (!isModal && !isExpanded && showRecommendationCards && onExpand) {
     return (
@@ -95,12 +101,12 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
         <div
           style={{
             ...linkedInPlaceholderCardStyles.inner,
-            minHeight: 'unset',
-            padding: '16px 20px',
+            minHeight: "unset",
+            padding: "16px 20px",
           }}
         >
           <div style={panelBackgroundGlowStyle} />
-          <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ position: "relative", zIndex: 1 }}>
             <TopicRecommendationsSummaryBar
               recommendationCount={recommendationCount}
               updatedLabel={updatedLabel}
@@ -115,15 +121,21 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
   }
 
   const wrapperStyle: React.CSSProperties = isModal
-    ? { width: '100%' }
+    ? { width: "100%" }
     : { ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 };
 
   const innerStyle: React.CSSProperties = isModal
-    ? { minHeight: 'unset', padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }
+    ? {
+        minHeight: "unset",
+        padding: 0,
+        background: "transparent",
+        border: "none",
+        boxShadow: "none",
+      }
     : {
         ...linkedInPlaceholderCardStyles.inner,
-        minHeight: 'unset',
-        padding: '20px 24px',
+        minHeight: "unset",
+        padding: "20px 24px",
       };
 
   return (
@@ -131,34 +143,42 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
       <div style={innerStyle}>
         {!isModal && <div style={panelBackgroundGlowStyle} />}
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ position: "relative", zIndex: 1 }}>
           {!isModal && (
             <div
               style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'flex-start',
-                justifyContent: 'space-between',
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
                 gap: 12,
                 marginBottom: 16,
               }}
             >
-              <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+              <div style={{ flex: "1 1 220px", minWidth: 0 }}>
                 <h3
                   style={{
                     margin: 0,
                     fontSize: 18,
                     fontWeight: 700,
-                    color: '#1e293b',
+                    color: "#1e293b",
                   }}
                 >
                   What to write next
                 </h3>
-                <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
+                <p
+                  style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}
+                >
                   Five ideas tailored to your profile
                 </p>
                 {updatedLabel && (
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
+                  <p
+                    style={{
+                      margin: "4px 0 0",
+                      fontSize: 12,
+                      color: "#94a3b8",
+                    }}
+                  >
                     {updatedLabel}
                   </p>
                 )}
@@ -179,7 +199,9 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
           )}
 
           {isModal && updatedLabel && (
-            <p style={{ margin: '0 0 12px', fontSize: 12, color: '#94a3b8' }}>{updatedLabel}</p>
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: "#94a3b8" }}>
+              {updatedLabel}
+            </p>
           )}
 
           {showSkeleton && (
@@ -190,7 +212,9 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
                   100% { background-position: -200% 0; }
                 }
               `}</style>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+              >
                 {Array.from({ length: SKELETON_COUNT }, (_, index) => (
                   <div key={index} style={SKELETON_CARD_STYLE} aria-hidden />
                 ))}
@@ -210,45 +234,52 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
             <div
               role="alert"
               style={{
-                padding: '12px 14px',
+                padding: "12px 14px",
                 borderRadius: 8,
-                backgroundColor: '#fffbeb',
-                border: '1px solid #fde68a',
-                color: '#92400e',
+                backgroundColor: "#fffbeb",
+                border: "1px solid #fde68a",
+                color: "#92400e",
                 fontSize: 13,
                 lineHeight: 1.5,
-                display: 'flex',
-                flexWrap: 'wrap',
-                alignItems: 'center',
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
                 gap: 12,
               }}
             >
-              <span style={{ flex: '1 1 240px' }}>{displayError}</span>
+              <span style={{ flex: "1 1 240px" }}>{displayError}</span>
               {onRetry && (
                 <button
                   type="button"
                   onClick={onRetry}
                   disabled={isRefreshing}
                   style={{
-                    padding: '8px 16px',
+                    padding: "8px 16px",
                     borderRadius: 8,
-                    border: '1px solid #f59e0b',
-                    backgroundColor: '#fff',
-                    color: '#92400e',
+                    border: "1px solid #f59e0b",
+                    backgroundColor: "#fff",
+                    color: "#92400e",
                     fontSize: 13,
                     fontWeight: 600,
-                    cursor: isRefreshing ? 'default' : 'pointer',
+                    cursor: isRefreshing ? "default" : "pointer",
                     opacity: isRefreshing ? 0.7 : 1,
                   }}
                 >
-                  {isRefreshing ? 'Retrying...' : 'Retry'}
+                  {isRefreshing ? "Retrying..." : "Retry"}
                 </button>
               )}
             </div>
           )}
 
           {showEmpty && (
-            <p style={{ margin: 0, fontSize: 14, color: '#64748b', lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 14,
+                color: "#64748b",
+                lineHeight: 1.5,
+              }}
+            >
               No content suggestions are available yet. Try again in a moment.
             </p>
           )}
@@ -256,7 +287,7 @@ export const TopicRecommendationsPanel: React.FC<TopicRecommendationsPanelProps>
           {showRecommendationCards && (
             <div
               id="topic-recommendations-list"
-              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+              style={{ display: "flex", flexDirection: "column", gap: 12 }}
             >
               {recommendations.map((item, index) => (
                 <TopicRecommendationCard

@@ -1,13 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   postAnalyticsApi,
   type FetchPostsParams,
   type PostListResponse,
-} from '../../../services/postAnalyticsApi';
+} from "../../../services/postAnalyticsApi";
 
-export type PostAnalyticsPanelState = 'idle' | 'loading' | 'loaded' | 'error';
+export type PostAnalyticsPanelState = "idle" | "loading" | "loaded" | "error";
 
-const CACHE_KEY = 'alwrity_post_analytics';
+const CACHE_KEY = "alwrity_post_analytics";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 interface CacheEntry {
@@ -48,20 +48,23 @@ function clearCache() {
 }
 
 /** Normalize API cursor (may be null) to string | undefined for cache/state. */
-function normalizeCursor(cursor: string | null | undefined): string | undefined {
+function normalizeCursor(
+  cursor: string | null | undefined,
+): string | undefined {
   return cursor ?? undefined;
 }
 
 function extractErrorMessage(err: unknown): string {
-  const detail = (err as { response?: { data?: { detail?: unknown } } })?.response?.data?.detail;
+  const detail = (err as { response?: { data?: { detail?: unknown } } })
+    ?.response?.data?.detail;
 
-  if (typeof detail === 'string' && detail.trim()) {
+  if (typeof detail === "string" && detail.trim()) {
     return detail;
   }
 
-  if (detail && typeof detail === 'object' && 'message' in detail) {
+  if (detail && typeof detail === "object" && "message" in detail) {
     const message = (detail as { message?: unknown }).message;
-    if (typeof message === 'string' && message.trim()) {
+    if (typeof message === "string" && message.trim()) {
       return message;
     }
   }
@@ -70,13 +73,13 @@ function extractErrorMessage(err: unknown): string {
     return err.message;
   }
 
-  return 'Failed to load LinkedIn posts';
+  return "Failed to load LinkedIn posts";
 }
 
 export function usePostAnalytics() {
   const [data, setData] = useState<PostListResponse | null>(null);
-  const [panelState, setPanelState] = useState<PostAnalyticsPanelState>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [panelState, setPanelState] = useState<PostAnalyticsPanelState>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
   const inFlightRef = useRef(false);
 
   // Load from cache on mount
@@ -84,7 +87,7 @@ export function usePostAnalytics() {
     const cached = getCache();
     if (cached) {
       setData(cached.data);
-      setPanelState('loaded');
+      setPanelState("loaded");
     }
   }, []);
 
@@ -94,18 +97,18 @@ export function usePostAnalytics() {
     }
 
     inFlightRef.current = true;
-    setPanelState('loading');
-    setErrorMessage('');
+    setPanelState("loading");
+    setErrorMessage("");
 
     try {
       const result = await postAnalyticsApi.fetchPosts(params);
       setData(result);
       setCache({ data: result, cursor: undefined, fetchedAt: Date.now() });
-      setPanelState('loaded');
+      setPanelState("loaded");
     } catch (err: unknown) {
-      console.error('[PostAnalytics] Failed to fetch posts:', err);
+      console.error("[PostAnalytics] Failed to fetch posts:", err);
       setErrorMessage(extractErrorMessage(err));
-      setPanelState('error');
+      setPanelState("error");
     } finally {
       inFlightRef.current = false;
     }
@@ -117,7 +120,7 @@ export function usePostAnalytics() {
     }
 
     inFlightRef.current = true;
-    setPanelState('loading');
+    setPanelState("loading");
 
     try {
       const result = await postAnalyticsApi.fetchPosts({ cursor: data.cursor });
@@ -130,11 +133,11 @@ export function usePostAnalytics() {
       };
       setData(merged);
       setCache({ data: merged, cursor: nextCursor, fetchedAt: Date.now() });
-      setPanelState('loaded');
+      setPanelState("loaded");
     } catch (err: unknown) {
-      console.error('[PostAnalytics] Failed to load more posts:', err);
+      console.error("[PostAnalytics] Failed to load more posts:", err);
       setErrorMessage(extractErrorMessage(err));
-      setPanelState('error');
+      setPanelState("error");
     } finally {
       inFlightRef.current = false;
     }
@@ -143,7 +146,7 @@ export function usePostAnalytics() {
   const refreshPosts = useCallback(async () => {
     clearCache();
     setData(null);
-    setPanelState('idle');
+    setPanelState("idle");
     await fetchPosts();
   }, [fetchPosts]);
 

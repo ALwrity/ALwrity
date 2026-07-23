@@ -1,7 +1,10 @@
-import React from 'react';
-import { createPortal } from 'react-dom';
-import { LI_Z_ELEVATED_MODAL, LI_Z_MODAL } from '../../utils/linkedInStudioZIndex';
-import { StudioModalCloseButton } from './StudioModalCloseButton';
+import React from "react";
+import { createPortal } from "react-dom";
+import {
+  LI_Z_ELEVATED_MODAL,
+  LI_Z_MODAL,
+} from "../../utils/linkedInStudioZIndex";
+import { StudioModalCloseButton } from "./StudioModalCloseButton";
 
 interface DashboardActionModalProps {
   open: boolean;
@@ -17,7 +20,7 @@ interface DashboardActionModalProps {
   zIndex?: number;
   disableClose?: boolean;
   /** Slightly larger title for primary wedge modals (e.g. Plan). */
-  titleSize?: 'default' | 'lg';
+  titleSize?: "default" | "lg";
   /** Text close control instead of ✕ (e.g. "Explore first"). */
   closeLabel?: string;
   /** Above studio tour / error overlays when set. */
@@ -34,12 +37,12 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   width,
   maxWidth = 720,
   height,
-  maxHeight = 'min(90vh, 640px)',
+  maxHeight = "min(90vh, 640px)",
   minWidth,
   minHeight,
   zIndex = LI_Z_MODAL,
   disableClose = false,
-  titleSize = 'default',
+  titleSize = "default",
   closeLabel,
   elevated = false,
   modalClassName,
@@ -59,14 +62,14 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
       aria-labelledby="dashboard-action-modal-title"
       className="linkedin-dashboard-action-modal-backdrop"
       style={{
-        position: 'fixed',
+        position: "fixed",
         inset: 0,
         zIndex: modalZIndex,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(0, 0, 0, 0.45)',
-        backdropFilter: 'blur(2px)',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(0, 0, 0, 0.45)",
+        backdropFilter: "blur(2px)",
         padding: 24,
       }}
       onClick={handleBackdropClose}
@@ -75,88 +78,93 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         className={
           modalClassName
             ? `linkedin-dashboard-action-modal ${modalClassName}`
-            : 'linkedin-dashboard-action-modal'
+            : "linkedin-dashboard-action-modal"
         }
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: width ?? '100%',
+          width: width ?? "100%",
           maxWidth,
           height,
           maxHeight,
           minWidth,
           minHeight,
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#ffffff',
+          display: "flex",
+          flexDirection: "column",
+          background: "#ffffff",
           borderRadius: 16,
-          border: '1px solid #e5e7eb',
-          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          overflow: 'hidden',
+          border: "1px solid #e5e7eb",
+          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+          overflow: "hidden",
         }}
       >
         <div
           className="linkedin-dashboard-action-modal-header"
           style={{
-            padding: '14px 20px',
-            borderBottom: '1px solid #e5e7eb',
-            background: '#ffffff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            padding: "14px 20px",
+            borderBottom: "1px solid #e5e7eb",
+            background: "#ffffff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             gap: 12,
             flexShrink: 0,
           }}
         >
           <h2
             id="dashboard-action-modal-title"
-            style={{ margin: 0, fontSize: titleSize === 'lg' ? 18 : 15, fontWeight: 700, color: '#0a66c2', letterSpacing: '-0.01em' }}
+            style={{
+              margin: 0,
+              fontSize: titleSize === "lg" ? 18 : 15,
+              fontWeight: 700,
+              color: "#0a66c2",
+              letterSpacing: "-0.01em",
+            }}
           >
             {title}
           </h2>
-          {!disableClose && (
-            closeLabel ? (
+          {!disableClose &&
+            (closeLabel ? (
               <button
                 type="button"
                 onClick={onClose}
-                aria-label={closeLabel ?? 'Close'}
+                aria-label={closeLabel ?? "Close"}
                 style={{
-                  background: 'transparent',
-                  border: 'none',
+                  background: "transparent",
+                  border: "none",
                   fontSize: 13,
                   lineHeight: 1.2,
-                  cursor: 'pointer',
-                  color: '#64748b',
-                  padding: '6px 10px',
+                  cursor: "pointer",
+                  color: "#64748b",
+                  padding: "6px 10px",
                   borderRadius: 6,
                   fontWeight: 600,
-                  transition: 'background 0.15s, color 0.15s',
-                  whiteSpace: 'nowrap',
+                  transition: "background 0.15s, color 0.15s",
+                  whiteSpace: "nowrap",
                   flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = '#f3f4f6';
-                  e.currentTarget.style.color = '#0a66c2';
+                  e.currentTarget.style.background = "#f3f4f6";
+                  e.currentTarget.style.color = "#0a66c2";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#64748b';
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "#64748b";
                 }}
               >
                 {closeLabel}
               </button>
             ) : (
               <StudioModalCloseButton onClick={onClose} ariaLabel="Close" />
-            )
-          )}
+            ))}
         </div>
         <div
           className="linkedin-dashboard-action-modal-body"
-          style={{ padding: 20, overflowY: 'auto', flex: 1, minHeight: 0 }}
+          style={{ padding: 20, overflowY: "auto", flex: 1, minHeight: 0 }}
         >
           {children}
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };

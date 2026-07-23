@@ -1,8 +1,8 @@
 /**
  * Compact author row — mirrors PostCommentCard avatar + name · headline.
  */
-import React from 'react';
-import { colors } from '../GrowthEngine/styles';
+import React from "react";
+import { colors } from "../GrowthEngine/styles";
 
 interface CommentAssistantAuthorRowProps {
   name: string;
@@ -12,14 +12,10 @@ interface CommentAssistantAuthorRowProps {
   size?: number;
 }
 
-export const CommentAssistantAuthorRow: React.FC<CommentAssistantAuthorRowProps> = ({
-  name,
-  headline,
-  avatarUrl,
-  timeLabel,
-  size = 28,
-}) => (
-  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+export const CommentAssistantAuthorRow: React.FC<
+  CommentAssistantAuthorRowProps
+> = ({ name, headline, avatarUrl, timeLabel, size = 28 }) => (
+  <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
     {avatarUrl ? (
       <img
         src={avatarUrl}
@@ -27,8 +23,8 @@ export const CommentAssistantAuthorRow: React.FC<CommentAssistantAuthorRowProps>
         style={{
           width: size,
           height: size,
-          borderRadius: '50%',
-          objectFit: 'cover',
+          borderRadius: "50%",
+          objectFit: "cover",
           flexShrink: 0,
         }}
       />
@@ -37,27 +33,27 @@ export const CommentAssistantAuthorRow: React.FC<CommentAssistantAuthorRowProps>
         style={{
           width: size,
           height: size,
-          borderRadius: '50%',
-          background: '#e5e7eb',
+          borderRadius: "50%",
+          background: "#e5e7eb",
           flexShrink: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           fontSize: size > 26 ? 12 : 11,
           fontWeight: 700,
           color: colors.textTertiary,
         }}
       >
-        {(name || '?')[0]}
+        {(name || "?")[0]}
       </div>
     )}
     <div style={{ flex: 1, minWidth: 0 }}>
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
+          display: "flex",
+          justifyContent: "space-between",
           gap: 6,
-          alignItems: 'baseline',
+          alignItems: "baseline",
         }}
       >
         <div
@@ -65,15 +61,17 @@ export const CommentAssistantAuthorRow: React.FC<CommentAssistantAuthorRowProps>
             fontSize: 12,
             fontWeight: 700,
             color: colors.textDark,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
           }}
         >
-          {name || 'Unknown'}
+          {name || "Unknown"}
         </div>
         {timeLabel ? (
-          <div style={{ fontSize: 10, color: colors.textTertiary, flexShrink: 0 }}>
+          <div
+            style={{ fontSize: 10, color: colors.textTertiary, flexShrink: 0 }}
+          >
             {timeLabel}
           </div>
         ) : null}
@@ -85,10 +83,10 @@ export const CommentAssistantAuthorRow: React.FC<CommentAssistantAuthorRowProps>
             color: colors.textTertiary,
             lineHeight: 1.3,
             marginTop: 1,
-            display: '-webkit-box',
+            display: "-webkit-box",
             WebkitLineClamp: 1,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
           {headline}

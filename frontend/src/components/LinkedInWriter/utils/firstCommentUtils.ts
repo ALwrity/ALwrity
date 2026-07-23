@@ -1,6 +1,6 @@
 const URL_REGEX = /https?:\/\/[^\s<>"{}|\\^`[\]]+/i;
 
-export const LINK_IN_FIRST_COMMENT_SUFFIX = 'Link in first comment 👇';
+export const LINK_IN_FIRST_COMMENT_SUFFIX = "Link in first comment 👇";
 
 export function extractFirstUrl(text: string): string | null {
   const match = text.match(URL_REGEX);
@@ -8,7 +8,10 @@ export function extractFirstUrl(text: string): string | null {
 }
 
 export function removeFirstUrl(text: string, url: string): string {
-  return text.replace(url, '').replace(/\s{2,}/g, ' ').trim();
+  return text
+    .replace(url, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 export interface ApplyLinkInFirstCommentResult {
@@ -24,7 +27,7 @@ export interface ApplyLinkInFirstCommentResult {
 export function applyLinkInFirstComment(
   draft: string,
   firstComment: string,
-  enabled = true
+  enabled = true,
 ): ApplyLinkInFirstCommentResult {
   if (!enabled || firstComment.trim()) {
     return { content: draft, firstComment, changed: false };
@@ -37,7 +40,9 @@ export function applyLinkInFirstComment(
 
   let content = removeFirstUrl(draft, url);
   if (!content.includes(LINK_IN_FIRST_COMMENT_SUFFIX)) {
-    content = content ? `${content}\n\n${LINK_IN_FIRST_COMMENT_SUFFIX}` : LINK_IN_FIRST_COMMENT_SUFFIX;
+    content = content
+      ? `${content}\n\n${LINK_IN_FIRST_COMMENT_SUFFIX}`
+      : LINK_IN_FIRST_COMMENT_SUFFIX;
   }
 
   return {
@@ -50,9 +55,13 @@ export function applyLinkInFirstComment(
 export function buildPublishPayload(
   draft: string,
   firstComment: string,
-  moveLinksEnabled: boolean
+  moveLinksEnabled: boolean,
 ): { content: string; first_comment: string } {
-  const applied = applyLinkInFirstComment(draft, firstComment, moveLinksEnabled);
+  const applied = applyLinkInFirstComment(
+    draft,
+    firstComment,
+    moveLinksEnabled,
+  );
   return {
     content: applied.content,
     first_comment: applied.firstComment,

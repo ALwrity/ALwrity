@@ -1,9 +1,10 @@
-import React from 'react';
+import React from "react";
+import { Tooltip } from "@mui/material";
 
-import type { LinkedInProfileOptimizationMeta } from '../../../../api/linkedinSocial';
-import type { LinkedInProfileOptimizationItem } from '../../../../api/linkedinSocial';
-import { computeBatchImpactProjection } from './profileOptimizationImpact';
-import { SectionScoresPanel } from './SectionScoresPanel';
+import type { LinkedInProfileOptimizationMeta } from "../../../../api/linkedinSocial";
+import type { LinkedInProfileOptimizationItem } from "../../../../api/linkedinSocial";
+import { computeBatchImpactProjection } from "./profileOptimizationImpact";
+import { SectionScoresPanel } from "./SectionScoresPanel";
 
 interface ProfileOptimizationBatchImpactBarProps {
   recommendations: LinkedInProfileOptimizationItem[];
@@ -40,26 +41,46 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
   const count = recommendations.length;
   const sessionLabel =
     count > 0
-      ? `${count} suggestion${count === 1 ? '' : 's'} · Batch ${batchIndex}`
-      : 'Review your profile';
+      ? `${count} suggestion${count === 1 ? "" : "s"} · Batch ${batchIndex}`
+      : "Review your profile";
 
-  const projection = computeBatchImpactProjection(profileStrengthPercent, recommendations);
-  const showSections = Boolean(sectionScores && Object.keys(sectionScores).length > 0);
+  const projection = computeBatchImpactProjection(
+    profileStrengthPercent,
+    recommendations,
+  );
+  const showSections = Boolean(
+    sectionScores && Object.keys(sectionScores).length > 0,
+  );
 
   if (count === 0) return null;
 
   const stackMeta =
-    stackCard && (batchLabel || batchGainHint) ? (
+    stackCard && (batchLabel || projection.gainPoints > 0) ? (
       <div className="profile-opt-batch-impact__stack-meta">
         {batchLabel && (
-          <span className="profile-opt-batch-impact__stack-batch" aria-label="Current batch">
+          <span
+            className="profile-opt-batch-impact__stack-batch"
+            aria-label="Current batch"
+          >
             {batchLabel}
           </span>
         )}
-        {batchGainHint && (
-          <span className="profile-opt-batch-impact__stack-gain" role="status">
-            {batchGainHint}
-          </span>
+        {projection.gainPoints > 0 && (
+          <Tooltip
+            title={
+              batchGainHint ||
+              `+${projection.gainPoints}% profile strength if you apply this batch`
+            }
+            arrow
+            placement="top"
+          >
+            <span
+              className="profile-opt-batch-impact__stack-gain"
+              role="status"
+            >
+              +{projection.gainPoints}%
+            </span>
+          </Tooltip>
         )}
       </div>
     ) : null;
@@ -68,18 +89,28 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
     <>
       {!hideSessionLabel && (
         <div className="profile-opt-batch-impact__head">
-          <p id="profile-opt-batch-impact-title" className="profile-opt-batch-impact__session">
+          <p
+            id="profile-opt-batch-impact-title"
+            className="profile-opt-batch-impact__session"
+          >
             {sessionLabel}
           </p>
           {projection.gainPoints > 0 && (
-            <span className="profile-opt-batch-impact__gain-badge" role="status">
+            <span
+              className="profile-opt-batch-impact__gain-badge"
+              role="status"
+            >
               +{projection.gainPoints}%
             </span>
           )}
         </div>
       )}
 
-      <div className="profile-opt-batch-impact__chart" role="img" aria-label="Profile strength projection">
+      <div
+        className="profile-opt-batch-impact__chart"
+        role="img"
+        aria-label="Profile strength projection"
+      >
         <div className="profile-opt-batch-impact__meter-row">
           <span className="profile-opt-batch-impact__meter-label">Now</span>
           <div className="profile-opt-batch-impact__track">
@@ -88,7 +119,9 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
               style={{ width: `${projection.currentPercent}%` }}
             />
           </div>
-          <span className="profile-opt-batch-impact__value">{projection.currentPercent}%</span>
+          <span className="profile-opt-batch-impact__value">
+            {projection.currentPercent}%
+          </span>
         </div>
         <div className="profile-opt-batch-impact__meter-row">
           <span className="profile-opt-batch-impact__meter-label">After</span>
@@ -106,7 +139,8 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
 
       {projection.gainPoints > 0 && (
         <p className="profile-opt-batch-impact__caption">
-          Apply this batch for <strong>+{projection.gainPoints}%</strong> strength
+          Apply this batch for <strong>+{projection.gainPoints}%</strong>{" "}
+          strength
         </p>
       )}
     </>
@@ -115,36 +149,32 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
   return (
     <section
       className={[
-        'profile-opt-batch-impact',
-        stackCard && 'profile-opt-batch-impact--stack-card',
+        "profile-opt-batch-impact",
+        stackCard && "profile-opt-batch-impact--stack-card",
+        stackCard && showSections && "profile-opt-batch-impact--vertical",
       ]
         .filter(Boolean)
-        .join(' ')}
-      aria-labelledby={hideSessionLabel ? undefined : 'profile-opt-batch-impact-title'}
+        .join(" ")}
+      aria-labelledby={
+        hideSessionLabel ? undefined : "profile-opt-batch-impact-title"
+      }
     >
-      {stackCard && showSections ? (
-        <div className="profile-opt-batch-impact__split">
-          <div className="profile-opt-batch-impact__split-pane profile-opt-batch-impact__split-primary">
-            {stackMeta}
-            {impactMeters}
-          </div>
-          <div className="profile-opt-batch-impact__split-pane profile-opt-batch-impact__split-sections">
-            <p className="profile-opt-batch-impact__sections-heading">Section-by-section</p>
-            <div className="profile-opt-batch-impact__sections-body profile-opt-batch-impact__sections-body--inline">
-              <SectionScoresPanel
-                scores={sectionScores!}
-                activeSectionKeys={activeSectionKeys}
-                activeSectionCount={activeSectionCount}
-                variant="embedded"
-              />
-            </div>
+      {stackMeta}
+      {impactMeters}
+      {stackCard && showSections && (
+        <div className="profile-opt-batch-impact__sections">
+          <p className="profile-opt-batch-impact__sections-heading">
+            Section-by-section
+          </p>
+          <div className="profile-opt-batch-impact__sections-body profile-opt-batch-impact__sections-body--inline">
+            <SectionScoresPanel
+              scores={sectionScores!}
+              activeSectionKeys={activeSectionKeys}
+              activeSectionCount={activeSectionCount}
+              variant="embedded"
+            />
           </div>
         </div>
-      ) : (
-        <>
-          {stackMeta}
-          {impactMeters}
-        </>
       )}
     </section>
   );

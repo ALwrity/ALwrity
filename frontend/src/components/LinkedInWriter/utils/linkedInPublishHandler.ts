@@ -2,17 +2,17 @@
  * Shared LinkedIn publish orchestration (Phase 3 — text + optional image).
  */
 
-import { publishLinkedInPost } from '../../../api/linkedinSocial';
-import { publishLinkedInPostWithFile } from '../../../api/linkedinPublishApi';
-import type { LinkedInPublishPostResponse } from '../../../api/linkedinSocial';
+import { publishLinkedInPost } from "../../../api/linkedinSocial";
+import { publishLinkedInPostWithFile } from "../../../api/linkedinPublishApi";
+import type { LinkedInPublishPostResponse } from "../../../api/linkedinSocial";
 import type {
   LinkedInPublishMediaAttachment,
   LinkedInPublishMediaSource,
-} from './linkedInPublishMediaUtils';
-import { resolvePublishMediaAttachment } from './linkedInPublishMediaUtils';
+} from "./linkedInPublishMediaUtils";
+import { resolvePublishMediaAttachment } from "./linkedInPublishMediaUtils";
 
 export interface ResolvedPublishMedia {
-  source: LinkedInPublishMediaSource | 'none';
+  source: LinkedInPublishMediaSource | "none";
   imageId?: string;
   localFile?: File;
 }
@@ -21,14 +21,14 @@ export function resolvePublishMedia(
   attachment: LinkedInPublishMediaAttachment | null,
 ): ResolvedPublishMedia {
   if (!attachment) {
-    return { source: 'none' };
+    return { source: "none" };
   }
 
-  if (attachment.source === 'ai') {
-    return { source: 'ai', imageId: attachment.imageId };
+  if (attachment.source === "ai") {
+    return { source: "ai", imageId: attachment.imageId };
   }
 
-  return { source: 'upload', localFile: attachment.localFile };
+  return { source: "upload", localFile: attachment.localFile };
 }
 
 export async function publishLinkedInWithMedia(options: {
@@ -37,7 +37,7 @@ export async function publishLinkedInWithMedia(options: {
   draft?: string;
   attachment: LinkedInPublishMediaAttachment | null;
 }): Promise<LinkedInPublishPostResponse> {
-  const { content, accountId, draft = '', attachment } = options;
+  const { content, accountId, draft = "", attachment } = options;
   const resolvedAttachment = resolvePublishMediaAttachment(draft, attachment);
   const media = resolvePublishMedia(resolvedAttachment);
   const payload = {
@@ -45,11 +45,11 @@ export async function publishLinkedInWithMedia(options: {
     account_id: accountId,
   };
 
-  if (media.source === 'upload' && media.localFile) {
+  if (media.source === "upload" && media.localFile) {
     return publishLinkedInPostWithFile(payload, media.localFile);
   }
 
-  if (media.source === 'ai' && media.imageId) {
+  if (media.source === "ai" && media.imageId) {
     return publishLinkedInPost({
       ...payload,
       image_ids: [media.imageId],
@@ -63,9 +63,9 @@ export function buildLinkedInPublishSuccessMessage(
   result: LinkedInPublishPostResponse,
 ): string {
   if (result.has_media) {
-    return result.message || 'Published to LinkedIn with image.';
+    return result.message || "Published to LinkedIn with image.";
   }
-  return result.message || 'Published to LinkedIn.';
+  return result.message || "Published to LinkedIn.";
 }
 
 export function getLinkedInPublishButtonLabel(
@@ -73,11 +73,13 @@ export function getLinkedInPublishButtonLabel(
   isPublishing: boolean,
 ): string {
   if (isPublishing) {
-    return hasAttachment ? 'Publishing text + image…' : 'Publishing…';
+    return hasAttachment ? "Publishing text + image…" : "Publishing…";
   }
-  return hasAttachment ? 'Publish text + image' : 'Publish';
+  return hasAttachment ? "Publish text + image" : "Publish";
 }
 
 export function getLinkedInPublishConfirmLabel(hasAttachment: boolean): string {
-  return hasAttachment ? '🚀 Confirm & Publish (text + image)' : '🚀 Confirm & Publish';
+  return hasAttachment
+    ? "🚀 Confirm & Publish (text + image)"
+    : "🚀 Confirm & Publish";
 }

@@ -14,7 +14,7 @@ export function resolveContentAnglesForDisplay(
   knowledgeDomains: string[] | null | undefined,
   primaryExpertise: string[] | null | undefined,
   targetAudience: string[] | null | undefined,
-  targetCount: number = PROFILE_CONTENT_ANGLES_TARGET
+  targetCount: number = PROFILE_CONTENT_ANGLES_TARGET,
 ): string[] {
   const seen = new Set<string>();
   const result: string[] = [];

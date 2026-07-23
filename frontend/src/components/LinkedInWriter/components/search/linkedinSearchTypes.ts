@@ -3,9 +3,9 @@
  * Shapes align with Unipile API responses for Phase 3 wiring.
  */
 
-export type LinkedInSearchCategory = 'posts' | 'jobs' | 'people' | 'companies';
+export type LinkedInSearchCategory = "posts" | "jobs" | "people" | "companies";
 
-export type LinkedInSearchResultType = 'POST' | 'JOB' | 'PEOPLE' | 'COMPANY';
+export type LinkedInSearchResultType = "POST" | "JOB" | "PEOPLE" | "COMPANY";
 
 export interface LinkedInSearchPaging {
   start?: number;
@@ -49,7 +49,7 @@ export interface LinkedInSearchJobCompany {
 
 export interface LinkedInSearchPeopleResult {
   object?: string;
-  type: 'PEOPLE';
+  type: "PEOPLE";
   id?: string;
   public_identifier?: string;
   public_profile_url?: string;
@@ -70,7 +70,7 @@ export interface LinkedInSearchPeopleResult {
 
 export interface LinkedInSearchCompanyResult {
   object?: string;
-  type: 'COMPANY';
+  type: "COMPANY";
   id?: string;
   name?: string;
   location?: string;
@@ -84,7 +84,7 @@ export interface LinkedInSearchCompanyResult {
 
 export interface LinkedInSearchPostResult {
   object?: string;
-  type: 'POST';
+  type: "POST";
   id?: string;
   share_url?: string;
   text?: string;
@@ -99,7 +99,7 @@ export interface LinkedInSearchPostResult {
 
 export interface LinkedInSearchJobResult {
   object?: string;
-  type: 'JOB';
+  type: "JOB";
   id?: string;
   title?: string;
   location?: string;
@@ -117,7 +117,7 @@ export type LinkedInSearchResultItem =
   | LinkedInSearchPostResult
   | LinkedInSearchJobResult;
 
-export type LinkedInSearchErrorType = 'not_connected' | 'generic';
+export type LinkedInSearchErrorType = "not_connected" | "generic";
 
 export interface UseLinkedInSearchOptions {
   connected: boolean;

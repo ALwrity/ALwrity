@@ -1,6 +1,6 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardRailIconButton } from './DashboardRailIconButton';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { DashboardRailIconButton } from "./DashboardRailIconButton";
 
 export const LibraryRailButton: React.FC = () => {
   const navigate = useNavigate();
@@ -9,7 +9,7 @@ export const LibraryRailButton: React.FC = () => {
     <DashboardRailIconButton
       label="Library"
       icon="library"
-      onClick={() => navigate('/asset-library?source_module=linkedin_writer')}
+      onClick={() => navigate("/asset-library?source_module=linkedin_writer")}
     />
   );
 };

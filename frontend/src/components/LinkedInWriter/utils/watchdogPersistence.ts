@@ -3,9 +3,9 @@ import type {
   WatchdogCompany,
   WatchdogPerson,
   WatchdogUpdate,
-} from '../../../services/linkedInWatchdogApi';
+} from "../../../services/linkedInWatchdogApi";
 
-const STORAGE_PREFIX = 'alwrity-watchdog-';
+const STORAGE_PREFIX = "alwrity-watchdog-";
 
 const KEYS = {
   INDUSTRIES: `${STORAGE_PREFIX}industries`,
@@ -29,7 +29,7 @@ function safeSet(key: string, value: any): void {
   try {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
-    console.error('[WatchdogPersistence] Failed to write', key, e);
+    console.error("[WatchdogPersistence] Failed to write", key, e);
   }
 }
 
@@ -135,7 +135,9 @@ export class WatchdogPersistenceManager {
     Object.values(KEYS).forEach((key) => {
       try {
         localStorage.removeItem(key);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
   }
 }

@@ -1,22 +1,24 @@
-import React from 'react';
+import React from "react";
 
-import type { LinkedInSearchJobResult } from '../linkedinSearchTypes';
+import type { LinkedInSearchJobResult } from "../linkedinSearchTypes";
 
 const cardStyle: React.CSSProperties = {
-  padding: '16px 0',
-  borderBottom: '1px solid rgba(10, 102, 194, 0.08)',
-  display: 'flex',
+  padding: "16px 0",
+  borderBottom: "1px solid rgba(10, 102, 194, 0.08)",
+  display: "flex",
   gap: 12,
-  alignItems: 'flex-start',
+  alignItems: "flex-start",
 };
 
 const formatPostedAt = (value?: string): string => {
-  if (!value) return '';
+  if (!value) return "";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 0) return 'Today';
-  if (diffDays === 1) return '1d ago';
+  const diffDays = Math.floor(
+    (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (diffDays <= 0) return "Today";
+  if (diffDays === 1) return "1d ago";
   return `${diffDays}d ago`;
 };
 
@@ -27,7 +29,9 @@ interface JobResultCardProps {
 export const JobResultCard: React.FC<JobResultCardProps> = ({ item }) => {
   const company = item.company;
   const postedLabel = formatPostedAt(item.posted_at);
-  const locationLine = [company?.name, item.location, postedLabel].filter(Boolean).join(' · ');
+  const locationLine = [company?.name, item.location, postedLabel]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <article style={cardStyle}>
@@ -37,7 +41,7 @@ export const JobResultCard: React.FC<JobResultCardProps> = ({ item }) => {
           alt=""
           width={48}
           height={48}
-          style={{ borderRadius: 8, objectFit: 'cover', flexShrink: 0 }}
+          style={{ borderRadius: 8, objectFit: "cover", flexShrink: 0 }}
         />
       ) : (
         <div
@@ -45,24 +49,40 @@ export const JobResultCard: React.FC<JobResultCardProps> = ({ item }) => {
             width: 48,
             height: 48,
             borderRadius: 8,
-            background: '#e8f4fc',
+            background: "#e8f4fc",
             flexShrink: 0,
           }}
         />
       )}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e' }}>{item.title || 'Untitled role'}</div>
-        {locationLine && <p style={{ margin: '4px 0 0', fontSize: 13, color: '#475569' }}>{locationLine}</p>}
-        <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: 12 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "#1a1a2e" }}>
+          {item.title || "Untitled role"}
+        </div>
+        {locationLine && (
+          <p style={{ margin: "4px 0 0", fontSize: 13, color: "#475569" }}>
+            {locationLine}
+          </p>
+        )}
+        <div
+          style={{
+            marginTop: 6,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            fontSize: 12,
+          }}
+        >
           {item.easy_apply && (
-            <span style={{ color: '#0a66c2', fontWeight: 600 }}>Easy Apply</span>
+            <span style={{ color: "#0a66c2", fontWeight: 600 }}>
+              Easy Apply
+            </span>
           )}
-          {item.promoted && <span style={{ color: '#64748b' }}>Promoted</span>}
+          {item.promoted && <span style={{ color: "#64748b" }}>Promoted</span>}
         </div>
         {item.benefits && item.benefits.length > 0 && (
-          <p style={{ margin: '6px 0 0', fontSize: 12, color: '#64748b' }}>
-            Benefits: {item.benefits.slice(0, 3).join(', ')}
-            {item.benefits.length > 3 ? '…' : ''}
+          <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748b" }}>
+            Benefits: {item.benefits.slice(0, 3).join(", ")}
+            {item.benefits.length > 3 ? "…" : ""}
           </p>
         )}
         {item.url && (
@@ -71,12 +91,12 @@ export const JobResultCard: React.FC<JobResultCardProps> = ({ item }) => {
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              display: 'inline-block',
+              display: "inline-block",
               marginTop: 8,
-              color: '#0a66c2',
+              color: "#0a66c2",
               fontWeight: 600,
               fontSize: 13,
-              textDecoration: 'none',
+              textDecoration: "none",
             }}
           >
             View job ↗

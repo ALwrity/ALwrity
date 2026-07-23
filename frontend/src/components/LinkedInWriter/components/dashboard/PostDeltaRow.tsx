@@ -1,19 +1,25 @@
-import React from 'react';
+import React from "react";
 
-import type { PostDelta } from '../../../../services/postAnalyticsApi';
-import { colors, rowBase } from '../GrowthEngine/styles';
-import { GrowthContributionBadge } from './GrowthContributionBadge';
-import { METRIC_LABELS, METRIC_TOOLTIPS } from './engagementTrendsCopy';
+import type { PostDelta } from "../../../../services/postAnalyticsApi";
+import { colors, rowBase } from "../GrowthEngine/styles";
+import { GrowthContributionBadge } from "./GrowthContributionBadge";
+import { METRIC_LABELS, METRIC_TOOLTIPS } from "./engagementTrendsCopy";
 
 const DeltaChip: React.FC<{ icon: string; delta: number; label?: string }> = ({
   icon,
   delta,
   label,
 }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }} title={label}>
+  <div style={{ display: "flex", alignItems: "center", gap: 3 }} title={label}>
     <span>{icon}</span>
-    <span style={{ fontSize: 12, fontWeight: 700, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>
-      {delta >= 0 ? '+' : ''}
+    <span
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        color: delta >= 0 ? "#16a34a" : "#dc2626",
+      }}
+    >
+      {delta >= 0 ? "+" : ""}
       {delta}
     </span>
   </div>
@@ -47,14 +53,14 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
       style={{
         ...rowBase,
         marginBottom: 8,
-        borderLeft: `3px solid ${gain ? '#16a34a' : '#dc2626'}`,
+        borderLeft: `3px solid ${gain ? "#16a34a" : "#dc2626"}`,
       }}
     >
       <div
         style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
           gap: 10,
           marginBottom: 6,
         }}
@@ -68,69 +74,104 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
             color: colors.textDark,
           }}
         >
-          {post.text ? `${post.text.slice(0, 100)}…` : '(no text)'}
+          {post.text ? `${post.text.slice(0, 100)}…` : "(no text)"}
         </div>
         {showContributionBadge && (
-          <GrowthContributionBadge contributionPct={post.growth_contribution_pct!} />
+          <GrowthContributionBadge
+            contributionPct={post.growth_contribution_pct!}
+          />
         )}
       </div>
-      <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
+      <div
+        style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}
+      >
         {post.author_name}
-        {post.share_url ? ' · ' : ''}
+        {post.share_url ? " · " : ""}
         {post.share_url && (
           <a
             href={post.share_url}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: colors.primary, textDecoration: 'none', fontWeight: 600 }}
+            style={{
+              color: colors.primary,
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
           >
             View on LinkedIn →
           </a>
         )}
       </div>
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <DeltaChip icon="❤️" delta={post.reactions_delta} label={METRIC_LABELS.reactions} />
-        <DeltaChip icon="💬" delta={post.comments_delta} label={METRIC_LABELS.comments} />
-        <DeltaChip icon="👁️" delta={post.impressions_delta} label={METRIC_LABELS.impressions} />
-        {typeof followersDelta === 'number' && (
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
+        <DeltaChip
+          icon="❤️"
+          delta={post.reactions_delta}
+          label={METRIC_LABELS.reactions}
+        />
+        <DeltaChip
+          icon="💬"
+          delta={post.comments_delta}
+          label={METRIC_LABELS.comments}
+        />
+        <DeltaChip
+          icon="👁️"
+          delta={post.impressions_delta}
+          label={METRIC_LABELS.impressions}
+        />
+        {typeof followersDelta === "number" && (
           <DeltaChip
             icon="👥"
             delta={followersDelta}
             label={METRIC_LABELS.followersFromPosts}
           />
         )}
-        {typeof clicksDelta === 'number' && (
-          <DeltaChip icon="🔗" delta={clicksDelta} label={METRIC_LABELS.clicks} />
+        {typeof clicksDelta === "number" && (
+          <DeltaChip
+            icon="🔗"
+            delta={clicksDelta}
+            label={METRIC_LABELS.clicks}
+          />
         )}
-        {typeof repostsDelta === 'number' && (
-          <DeltaChip icon="🔁" delta={repostsDelta} label={METRIC_LABELS.reposts} />
+        {typeof repostsDelta === "number" && (
+          <DeltaChip
+            icon="🔁"
+            delta={repostsDelta}
+            label={METRIC_LABELS.reposts}
+          />
         )}
         {showViewComments && (
           <button
             type="button"
             onClick={() => onViewComments(post)}
             style={{
-              marginLeft: 'auto',
-              padding: '5px 12px',
-              background: '#eff6ff',
+              marginLeft: "auto",
+              padding: "5px 12px",
+              background: "#eff6ff",
               color: colors.primary,
               border: `1px solid ${colors.primary}`,
               borderRadius: 6,
               fontSize: 11,
               fontWeight: 700,
-              cursor: 'pointer',
-              display: 'inline-flex',
-              alignItems: 'center',
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
               gap: 6,
             }}
           >
             💬 Reply
             <span
               style={{
-                background: '#16a34a',
-                color: '#fff',
+                background: "#16a34a",
+                color: "#fff",
                 borderRadius: 10,
-                padding: '1px 6px',
+                padding: "1px 6px",
                 fontSize: 10,
                 fontWeight: 800,
               }}
@@ -143,13 +184,13 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
       <div
         style={{
           fontSize: 11,
-          color: gain ? '#16a34a' : '#dc2626',
+          color: gain ? "#16a34a" : "#dc2626",
           fontWeight: 700,
           marginTop: 4,
         }}
         title={METRIC_TOOLTIPS.engagementRate}
       >
-        Engagement rate: {(post.engagement_rate_before * 100).toFixed(1)}% →{' '}
+        Engagement rate: {(post.engagement_rate_before * 100).toFixed(1)}% →{" "}
         {(post.engagement_rate_now * 100).toFixed(1)}%
       </div>
     </div>

@@ -1,11 +1,11 @@
 /**
  * LinkedIn-style reply composer: @mention prefix, emoji picker, image attach.
  */
-import React, { useEffect, useRef, useState } from 'react';
-import { colors } from '../GrowthEngine/styles';
-import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
-import { COMMENT_ASSISTANT_EMOJI_PALETTE } from './commentAssistantEmojis';
-import { UNIPILE_MAX_COMMENT_LENGTH } from './postCommentsTypes';
+import React, { useEffect, useRef, useState } from "react";
+import { colors } from "../GrowthEngine/styles";
+import { COMMENT_ASSISTANT_ACTIONS } from "./commentAssistantCopy";
+import { COMMENT_ASSISTANT_EMOJI_PALETTE } from "./commentAssistantEmojis";
+import { UNIPILE_MAX_COMMENT_LENGTH } from "./postCommentsTypes";
 
 export interface CommentAssistantReplyPayload {
   text: string;
@@ -31,7 +31,7 @@ export function toUnipileReplyPayload(
   displayText: string,
   authorName: string,
   authorId?: string | null,
-  imageFile?: File | null
+  imageFile?: File | null,
 ): CommentAssistantReplyPayload {
   const prefix = buildMentionPrefix(authorName);
   const trimmed = displayText.trim();
@@ -45,7 +45,7 @@ export function toUnipileReplyPayload(
       ? trimmed.slice(prefix.length).trim()
       : trimmed.slice(`@${authorName}`.length).trim();
     return {
-      text: rest ? `{{0}} ${rest}` : '{{0}}',
+      text: rest ? `{{0}} ${rest}` : "{{0}}",
       mentions: [{ name: authorName, profile_id: authorId }],
       imageFile: imageFile || null,
     };
@@ -54,10 +54,12 @@ export function toUnipileReplyPayload(
   return { text: trimmed, imageFile: imageFile || null };
 }
 
-export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyComposerProps> = ({
+export const CommentAssistantReplyComposer: React.FC<
+  CommentAssistantReplyComposerProps
+> = ({
   authorName,
   authorId,
-  initialText = '',
+  initialText = "",
   busy = false,
   onSend,
   onCancel,
@@ -123,8 +125,8 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
         style={{
           border: `1px solid ${colors.border}`,
           borderRadius: 10,
-          background: '#fff',
-          padding: '8px 10px',
+          background: "#fff",
+          padding: "8px 10px",
         }}
       >
         <textarea
@@ -136,13 +138,13 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
           maxLength={UNIPILE_MAX_COMMENT_LENGTH}
           disabled={busy}
           style={{
-            width: '100%',
-            boxSizing: 'border-box',
-            border: 'none',
-            outline: 'none',
-            resize: 'vertical',
+            width: "100%",
+            boxSizing: "border-box",
+            border: "none",
+            outline: "none",
+            resize: "vertical",
             fontSize: 12,
-            fontFamily: 'inherit',
+            fontFamily: "inherit",
             lineHeight: 1.45,
             color: colors.textBody,
             minHeight: 48,
@@ -150,7 +152,13 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
         />
 
         {imagePreview && (
-          <div style={{ position: 'relative', display: 'inline-block', marginTop: 6 }}>
+          <div
+            style={{
+              position: "relative",
+              display: "inline-block",
+              marginTop: 6,
+            }}
+          >
             <img
               src={imagePreview}
               alt=""
@@ -158,7 +166,7 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
                 maxWidth: 120,
                 maxHeight: 80,
                 borderRadius: 6,
-                objectFit: 'cover',
+                objectFit: "cover",
                 border: `1px solid ${colors.border}`,
               }}
             />
@@ -167,17 +175,17 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
               onClick={() => setImageFile(null)}
               disabled={busy}
               style={{
-                position: 'absolute',
+                position: "absolute",
                 top: -6,
                 right: -6,
                 width: 20,
                 height: 20,
-                borderRadius: '50%',
-                border: 'none',
-                background: '#111827',
-                color: '#fff',
+                borderRadius: "50%",
+                border: "none",
+                background: "#111827",
+                color: "#fff",
                 fontSize: 11,
-                cursor: 'pointer',
+                cursor: "pointer",
               }}
             >
               ×
@@ -187,25 +195,25 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
 
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             gap: 8,
             marginTop: 6,
-            position: 'relative',
+            position: "relative",
           }}
         >
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <button
               type="button"
               title="Add emoji"
               disabled={busy}
               onClick={() => setEmojiOpen((v) => !v)}
               style={{
-                border: 'none',
-                background: 'transparent',
+                border: "none",
+                background: "transparent",
                 fontSize: 18,
-                cursor: busy ? 'default' : 'pointer',
+                cursor: busy ? "default" : "pointer",
                 padding: 2,
                 lineHeight: 1,
               }}
@@ -218,10 +226,10 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
               disabled={busy}
               onClick={() => fileRef.current?.click()}
               style={{
-                border: 'none',
-                background: 'transparent',
+                border: "none",
+                background: "transparent",
                 fontSize: 16,
-                cursor: busy ? 'default' : 'pointer',
+                cursor: busy ? "default" : "pointer",
                 padding: 2,
                 lineHeight: 1,
                 color: colors.textSecondary,
@@ -237,7 +245,7 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
               onChange={(e) => {
                 const file = e.target.files?.[0] || null;
                 setImageFile(file);
-                e.target.value = '';
+                e.target.value = "";
               }}
             />
             {!authorId && (
@@ -255,13 +263,13 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
           <div
             style={{
               marginTop: 8,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(8, 1fr)',
+              display: "grid",
+              gridTemplateColumns: "repeat(8, 1fr)",
               gap: 4,
               padding: 8,
               borderRadius: 8,
               border: `1px solid ${colors.border}`,
-              background: '#fafbfc',
+              background: "#fafbfc",
             }}
           >
             {COMMENT_ASSISTANT_EMOJI_PALETTE.map((emoji) => (
@@ -270,10 +278,10 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
                 type="button"
                 onClick={() => insertEmoji(emoji)}
                 style={{
-                  border: 'none',
-                  background: 'transparent',
+                  border: "none",
+                  background: "transparent",
                   fontSize: 18,
-                  cursor: 'pointer',
+                  cursor: "pointer",
                   padding: 4,
                 }}
               >
@@ -284,7 +292,7 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
         <button
           type="button"
           disabled={!canSend}
@@ -292,33 +300,35 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
             onSend(toUnipileReplyPayload(text, authorName, authorId, imageFile))
           }
           style={{
-            padding: '5px 12px',
+            padding: "5px 12px",
             borderRadius: 999,
-            border: 'none',
-            background: canSend ? colors.primary : '#d1d5db',
-            color: '#fff',
+            border: "none",
+            background: canSend ? colors.primary : "#d1d5db",
+            color: "#fff",
             fontSize: 12,
             fontWeight: 700,
-            cursor: canSend ? 'pointer' : 'default',
+            cursor: canSend ? "pointer" : "default",
           }}
         >
           {busy ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <span
+              style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
               <span
                 style={{
-                  display: 'inline-block',
+                  display: "inline-block",
                   width: 12,
                   height: 12,
-                  border: '2px solid rgba(255,255,255,0.4)',
-                  borderTopColor: '#fff',
-                  borderRadius: '50%',
-                  animation: 'ca-inbox-spin 0.7s linear infinite',
+                  border: "2px solid rgba(255,255,255,0.4)",
+                  borderTopColor: "#fff",
+                  borderRadius: "50%",
+                  animation: "ca-inbox-spin 0.7s linear infinite",
                 }}
               />
               {COMMENT_ASSISTANT_ACTIONS.sending}
             </span>
           ) : (
-            'Reply'
+            "Reply"
           )}
         </button>
         <button
@@ -326,14 +336,14 @@ export const CommentAssistantReplyComposer: React.FC<CommentAssistantReplyCompos
           disabled={busy}
           onClick={onCancel}
           style={{
-            padding: '5px 10px',
+            padding: "5px 10px",
             borderRadius: 5,
             border: `1px solid ${colors.border}`,
-            background: '#fff',
+            background: "#fff",
             fontSize: 11,
             fontWeight: 600,
             color: colors.textSecondary,
-            cursor: busy ? 'default' : 'pointer',
+            cursor: busy ? "default" : "pointer",
           }}
         >
           {COMMENT_ASSISTANT_ACTIONS.cancel}

@@ -29,7 +29,7 @@ Rules:
 Return a JSON object with exactly these keys:
 - professional_identity (string)
 - primary_expertise (array of strings)
-- industry (string)
+- industry (string; preserve the LinkedIn profile industry and include any strongly supported secondary domain, e.g. "Artificial Intelligence & Digital Marketing")
 - experience_level (string; e.g. Junior, Mid, Senior, Executive, or Unknown)
 - knowledge_domains (array of strings)
 - writing_opportunities (array of exactly 5 strings)

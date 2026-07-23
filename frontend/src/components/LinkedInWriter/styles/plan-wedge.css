@@ -74,7 +74,9 @@
   line-height: 1.5;
   color: #111827;
   font-family: inherit;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .plan-wedge-brainstorm__input:focus {
@@ -113,7 +115,10 @@
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
 }
 
 .plan-wedge-source-chip:hover:not(:disabled) {
@@ -147,7 +152,9 @@
   font-size: 13px;
   cursor: not-allowed;
   white-space: nowrap;
-  transition: background 0.15s ease, opacity 0.15s ease;
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease;
 }
 
 .plan-wedge-brainstorm__generate--active {
@@ -169,7 +176,7 @@
 
 .plan-wedge-divider::before,
 .plan-wedge-divider::after {
-  content: '';
+  content: "";
   flex: 1;
   height: 1px;
   background: #e5e7eb;
@@ -201,7 +208,9 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .plan-wedge-tool-card:hover {
@@ -264,7 +273,11 @@
   padding: 12px 14px;
   border: 1px solid rgba(139, 92, 246, 0.28);
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.04) 0%, rgba(167, 139, 250, 0.06) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.04) 0%,
+    rgba(167, 139, 250, 0.06) 100%
+  );
 }
 
 .plan-wedge-calendar__icon {
@@ -325,7 +338,9 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
   white-space: nowrap;
 }
 
@@ -365,7 +380,9 @@
 }
 
 /* LinkedIn dashboard: hide default Co-Pilot launcher (Analytics FAB opens sidebar) */
-body.linkedin-dashboard-view .alwrity-copilot-sidebar.copilotKitSidebar .copilotKitButton,
+body.linkedin-dashboard-view
+  .alwrity-copilot-sidebar.copilotKitSidebar
+  .copilotKitButton,
 body.linkedin-dashboard-view .copilotKitSidebar .copilotKitButton,
 body.linkedin-dashboard-view cpk-web-inspector {
   display: none !important;
@@ -376,4 +393,3 @@ body.linkedin-dashboard-view cpk-web-inspector {
   height: 0 !important;
   overflow: hidden !important;
 }
-

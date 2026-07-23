@@ -2,9 +2,9 @@
  * Comment Assistant inbox — wired to backend inbox / like / reply (Phase 3+).
  * Compact accordion groups; Manual tab keeps paste → Generate Reply.
  */
-import React, { useEffect, useState } from 'react';
-import { DashboardActionModal } from './DashboardActionModal';
-import { colors } from '../GrowthEngine/styles';
+import React, { useEffect, useState } from "react";
+import { DashboardActionModal } from "./DashboardActionModal";
+import { colors } from "../GrowthEngine/styles";
 import {
   COMMENT_ASSISTANT_COOLDOWN,
   COMMENT_ASSISTANT_EMPTY,
@@ -18,15 +18,15 @@ import {
   COMMENT_ASSISTANT_SYNC,
   COMMENT_ASSISTANT_SYNCING,
   COMMENT_ASSISTANT_TITLE,
-} from './commentAssistantCopy';
-import { CommentAssistantManualPanel } from './CommentAssistantManualPanel';
+} from "./commentAssistantCopy";
+import { CommentAssistantManualPanel } from "./CommentAssistantManualPanel";
 import {
   CommentAssistantPostGroup,
   CommentAssistantPostGroupSkeleton,
-} from './commentAssistantPostGroup';
-import { CommentAssistantPriorityTabs } from './commentAssistantPriorityTabs';
-import { formatLocalizedRelativeTime } from './engagementTrendsLocaleFormat';
-import { useCommentAssistantInbox } from './useCommentAssistantInbox';
+} from "./commentAssistantPostGroup";
+import { CommentAssistantPriorityTabs } from "./commentAssistantPriorityTabs";
+import { formatLocalizedRelativeTime } from "./engagementTrendsLocaleFormat";
+import { useCommentAssistantInbox } from "./useCommentAssistantInbox";
 
 export interface CommentAssistantModalProps {
   open: boolean;
@@ -34,11 +34,9 @@ export interface CommentAssistantModalProps {
   connected?: boolean;
 }
 
-export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = ({
-  open,
-  onClose,
-  connected = true,
-}) => {
+export const CommentAssistantInboxModal: React.FC<
+  CommentAssistantModalProps
+> = ({ open, onClose, connected = true }) => {
   const {
     tab,
     setTab,
@@ -75,24 +73,27 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
   }, [open, groups]);
 
   const emptyCopy =
-    tab === 'manual'
+    tab === "manual"
       ? null
-      : emptyReason === 'no_analytics'
+      : emptyReason === "no_analytics"
         ? COMMENT_ASSISTANT_EMPTY_NO_ANALYTICS
-        : emptyReason === 'no_candidates'
+        : emptyReason === "no_candidates"
           ? COMMENT_ASSISTANT_EMPTY_NO_CANDIDATES
           : COMMENT_ASSISTANT_EMPTY[tab];
   /** Show shell headers while comments load; keep groups during refresh. */
-  const showGroups = connected && groups.length > 0 && tab !== 'manual';
+  const showGroups = connected && groups.length > 0 && tab !== "manual";
   const showEmpty =
     connected &&
-    loadState === 'ready' &&
+    loadState === "ready" &&
     groups.length === 0 &&
     !error &&
     emptyCopy &&
-    tab !== 'manual';
+    tab !== "manual";
   const showLoadingPlaceholders =
-    connected && loadState === 'loading' && groups.length === 0 && tab !== 'manual';
+    connected &&
+    loadState === "loading" &&
+    groups.length === 0 &&
+    tab !== "manual";
 
   return (
     <DashboardActionModal
@@ -104,30 +105,52 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
       maxHeight="80vh"
       height="80vh"
     >
-      <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+      <p
+        style={{
+          margin: "0 0 10px",
+          fontSize: 12,
+          color: colors.textSecondary,
+          lineHeight: 1.45,
+        }}
+      >
         {COMMENT_ASSISTANT_INTRO}
       </p>
 
-      <CommentAssistantPriorityTabs active={tab} onChange={setTab} counts={counts} />
+      <CommentAssistantPriorityTabs
+        active={tab}
+        onChange={setTab}
+        counts={counts}
+      />
 
-      {tab === 'manual' ? (
-        <CommentAssistantManualPanel active={open && tab === 'manual'} onClose={onClose} />
+      {tab === "manual" ? (
+        <CommentAssistantManualPanel
+          active={open && tab === "manual"}
+          onClose={onClose}
+        />
       ) : (
         <>
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
               gap: 8,
               marginBottom: 10,
             }}
           >
-            <div style={{ fontSize: 11, color: colors.textTertiary, lineHeight: 1.4 }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: colors.textTertiary,
+                lineHeight: 1.4,
+              }}
+            >
               {COMMENT_ASSISTANT_INBOX_HINT}
               {lastSyncedAt ? (
-                <span style={{ display: 'block', marginTop: 2 }}>
-                  {COMMENT_ASSISTANT_LAST_UPDATED(formatLocalizedRelativeTime(lastSyncedAt))}
+                <span style={{ display: "block", marginTop: 2 }}>
+                  {COMMENT_ASSISTANT_LAST_UPDATED(
+                    formatLocalizedRelativeTime(lastSyncedAt),
+                  )}
                 </span>
               ) : null}
             </div>
@@ -137,23 +160,31 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
               onClick={handleSync}
               style={{
                 flexShrink: 0,
-                padding: '5px 10px',
+                padding: "5px 10px",
                 borderRadius: 6,
                 border: `1px solid ${colors.border}`,
-                background: '#fff',
+                background: "#fff",
                 fontSize: 11,
                 fontWeight: 600,
                 color: colors.textSecondary,
-                cursor: syncDisabled ? 'default' : 'pointer',
+                cursor: syncDisabled ? "default" : "pointer",
                 opacity: syncDisabled ? 0.55 : 1,
               }}
             >
-              {loadState === 'loading' ? COMMENT_ASSISTANT_SYNCING : COMMENT_ASSISTANT_SYNC}
+              {loadState === "loading"
+                ? COMMENT_ASSISTANT_SYNCING
+                : COMMENT_ASSISTANT_SYNC}
             </button>
           </div>
 
           {cooldownLeft > 0 && (
-            <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 11,
+                color: colors.textTertiary,
+                marginBottom: 8,
+              }}
+            >
               {COMMENT_ASSISTANT_COOLDOWN(cooldownLeft)}
             </div>
           )}
@@ -162,29 +193,30 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
             <div
               role="status"
               style={{
-                padding: '10px 12px',
-                background: statusMessage.tone === 'success' ? '#ecfdf5' : '#eff6ff',
+                padding: "10px 12px",
+                background:
+                  statusMessage.tone === "success" ? "#ecfdf5" : "#eff6ff",
                 borderRadius: 8,
-                color: statusMessage.tone === 'success' ? '#047857' : '#1d4ed8',
+                color: statusMessage.tone === "success" ? "#047857" : "#1d4ed8",
                 fontSize: 12,
                 marginBottom: 10,
                 lineHeight: 1.45,
                 fontWeight: 600,
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 8,
               }}
             >
-              {statusMessage.tone === 'info' && (
+              {statusMessage.tone === "info" && (
                 <span
                   style={{
-                    display: 'inline-block',
+                    display: "inline-block",
                     width: 12,
                     height: 12,
-                    border: '2px solid #bfdbfe',
-                    borderTopColor: '#1d4ed8',
-                    borderRadius: '50%',
-                    animation: 'ca-inbox-spin 0.7s linear infinite',
+                    border: "2px solid #bfdbfe",
+                    borderTopColor: "#1d4ed8",
+                    borderRadius: "50%",
+                    animation: "ca-inbox-spin 0.7s linear infinite",
                     flexShrink: 0,
                   }}
                 />
@@ -196,10 +228,10 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
           {(error || actionError) && (
             <div
               style={{
-                padding: '10px 12px',
-                background: '#fef2f2',
+                padding: "10px 12px",
+                background: "#fef2f2",
                 borderRadius: 8,
-                color: '#dc2626',
+                color: "#dc2626",
                 fontSize: 12,
                 marginBottom: 10,
                 lineHeight: 1.45,
@@ -210,27 +242,44 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
           )}
 
           {!connected && (
-            <div style={{ textAlign: 'center', padding: '28px 8px' }}>
-              <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.7 }}>🔗</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>
+            <div style={{ textAlign: "center", padding: "28px 8px" }}>
+              <div style={{ fontSize: 36, marginBottom: 10, opacity: 0.7 }}>
+                🔗
+              </div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: colors.textDark,
+                  marginBottom: 6,
+                }}
+              >
                 {COMMENT_ASSISTANT_NOT_CONNECTED.title}
               </div>
-              <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.5, maxWidth: 300, margin: '0 auto' }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: colors.textSecondary,
+                  lineHeight: 1.5,
+                  maxWidth: 300,
+                  margin: "0 auto",
+                }}
+              >
                 {COMMENT_ASSISTANT_NOT_CONNECTED.desc}
               </div>
               <button
                 type="button"
-                onClick={() => setTab('manual')}
+                onClick={() => setTab("manual")}
                 style={{
                   marginTop: 14,
-                  padding: '8px 16px',
+                  padding: "8px 16px",
                   background: colors.primary,
-                  color: '#fff',
-                  border: 'none',
+                  color: "#fff",
+                  border: "none",
                   borderRadius: 7,
                   fontSize: 12,
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: "pointer",
                 }}
               >
                 Open Manual
@@ -238,11 +287,11 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
             </div>
           )}
 
-          {connected && loadState === 'loading' && (
+          {connected && loadState === "loading" && (
             <div
               style={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 8,
                 fontSize: 12,
                 color: colors.textSecondary,
@@ -251,13 +300,13 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
             >
               <span
                 style={{
-                  display: 'inline-block',
+                  display: "inline-block",
                   width: 14,
                   height: 14,
-                  border: '2px solid #d1d5db',
+                  border: "2px solid #d1d5db",
                   borderTopColor: colors.primary,
-                  borderRadius: '50%',
-                  animation: 'ca-inbox-spin 0.7s linear infinite',
+                  borderRadius: "50%",
+                  animation: "ca-inbox-spin 0.7s linear infinite",
                 }}
               />
               {COMMENT_ASSISTANT_LOADING}
@@ -273,26 +322,43 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
           )}
 
           {showEmpty && (
-            <div style={{ textAlign: 'center', padding: '24px 8px' }}>
-              <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.65 }}>💬</div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>
+            <div style={{ textAlign: "center", padding: "24px 8px" }}>
+              <div style={{ fontSize: 32, marginBottom: 10, opacity: 0.65 }}>
+                💬
+              </div>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: colors.textDark,
+                  marginBottom: 6,
+                }}
+              >
                 {emptyCopy.title}
               </div>
-              <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.5, maxWidth: 300, margin: '0 auto 12px' }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: colors.textSecondary,
+                  lineHeight: 1.5,
+                  maxWidth: 300,
+                  margin: "0 auto 12px",
+                }}
+              >
                 {emptyCopy.desc}
               </div>
               <button
                 type="button"
-                onClick={() => setTab('manual')}
+                onClick={() => setTab("manual")}
                 style={{
-                  padding: '7px 14px',
-                  background: 'none',
+                  padding: "7px 14px",
+                  background: "none",
                   border: `1px solid ${colors.primary}`,
                   borderRadius: 6,
                   fontSize: 12,
                   fontWeight: 600,
                   color: colors.primary,
-                  cursor: 'pointer',
+                  cursor: "pointer",
                 }}
               >
                 Draft with Manual instead
@@ -308,14 +374,28 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
                   group={g}
                   expanded={expandedPostId === g.postId}
                   onToggleExpanded={() =>
-                    setExpandedPostId((prev) => (prev === g.postId ? null : g.postId))
+                    setExpandedPostId((prev) =>
+                      prev === g.postId ? null : g.postId,
+                    )
                   }
-                  actionsEnabled={connected && !g.error && loadState === 'ready'}
+                  actionsEnabled={
+                    connected && !g.error && loadState === "ready"
+                  }
                   onReact={(commentId, reactionType) =>
-                    void handleReact(g.postId, g.socialId, commentId, reactionType)
+                    void handleReact(
+                      g.postId,
+                      g.socialId,
+                      commentId,
+                      reactionType,
+                    )
                   }
                   onSendReply={(commentId, payload) =>
-                    void handleSendReply(g.postId, g.socialId, commentId, payload)
+                    void handleSendReply(
+                      g.postId,
+                      g.socialId,
+                      commentId,
+                      payload,
+                    )
                   }
                   onDraftAi={(commentId) => {
                     const comment = g.comments?.find((c) => c.id === commentId);
@@ -324,17 +404,26 @@ export const CommentAssistantInboxModal: React.FC<CommentAssistantModalProps> = 
                       g.postId,
                       g.postText || g.postSnippet,
                       commentId,
-                      comment.text
+                      comment.text,
                     );
                   }}
                   onRetry={g.error ? () => retryPost() : undefined}
                   onLoadMore={
                     g.hasMoreComments && g.commentsCursor
-                      ? () => void handleLoadMore(g.postId, g.socialId, g.commentsCursor!)
+                      ? () =>
+                          void handleLoadMore(
+                            g.postId,
+                            g.socialId,
+                            g.commentsCursor!,
+                          )
                       : undefined
                   }
                   onShowThreadReplies={(commentId) =>
-                    void handleShowThreadReplies(g.postId, g.socialId, commentId)
+                    void handleShowThreadReplies(
+                      g.postId,
+                      g.socialId,
+                      commentId,
+                    )
                   }
                 />
               ))}

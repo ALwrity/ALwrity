@@ -2,7 +2,7 @@
  * Backward-compatible re-exports for Engagement Trends time helpers.
  * Prefer engagementTrendsLocaleFormat.ts for locale-aware formatting.
  */
-import { formatLocalizedSnapshotLabel } from './engagementTrendsLocaleFormat';
+import { formatLocalizedSnapshotLabel } from "./engagementTrendsLocaleFormat";
 
 export {
   parseUtcIso,
@@ -10,7 +10,7 @@ export {
   formatLocalizedDateTime as formatAbsoluteLocal,
   formatLocalizedSnapshotLabel,
   hasInsufficientSnapshots,
-} from './engagementTrendsLocaleFormat';
+} from "./engagementTrendsLocaleFormat";
 
 /** @deprecated Use formatLocalizedSnapshotLabel().display */
 export function formatSnapshotMoment(iso: string): string {

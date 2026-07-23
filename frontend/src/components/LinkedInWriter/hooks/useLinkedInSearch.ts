@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getLinkedInSearchErrorMessage,
   getLinkedInSearchErrorType,
   searchLinkedIn,
   type LinkedInSearchCategory as ApiSearchCategory,
-} from '../../../api/linkedinSocial';
+} from "../../../api/linkedinSocial";
 import {
   DEFAULT_LINKEDIN_SEARCH_CATEGORY,
   LINKEDIN_SEARCH_NOT_CONNECTED_MESSAGE,
-} from '../components/search/linkedinSearchConstants';
+} from "../components/search/linkedinSearchConstants";
 import type {
   LinkedInSearchCategory,
   LinkedInSearchErrorType,
@@ -17,16 +17,19 @@ import type {
   LinkedInSearchResultItem,
   LinkedInSearchResultType,
   UseLinkedInSearchOptions,
-} from '../components/search/linkedinSearchTypes';
+} from "../components/search/linkedinSearchTypes";
 
 const CATEGORY_DEBOUNCE_MS = 300;
 const DEFAULT_SEARCH_LIMIT = 10;
 
-const CATEGORY_TO_RESULT_TYPE: Record<LinkedInSearchCategory, LinkedInSearchResultType> = {
-  posts: 'POST',
-  jobs: 'JOB',
-  people: 'PEOPLE',
-  companies: 'COMPANY',
+const CATEGORY_TO_RESULT_TYPE: Record<
+  LinkedInSearchCategory,
+  LinkedInSearchResultType
+> = {
+  posts: "POST",
+  jobs: "JOB",
+  people: "PEOPLE",
+  companies: "COMPANY",
 };
 
 export interface UseLinkedInSearchReturn {
@@ -52,16 +55,16 @@ export interface UseLinkedInSearchReturn {
 
 function normalizeSearchItems(
   rawItems: Array<Record<string, unknown>>,
-  category: LinkedInSearchCategory
+  category: LinkedInSearchCategory,
 ): LinkedInSearchResultItem[] {
   const fallbackType = CATEGORY_TO_RESULT_TYPE[category];
 
   return rawItems
-    .filter((item) => item && typeof item === 'object')
+    .filter((item) => item && typeof item === "object")
     .map((item) => {
       const rawType = item.type;
       const type =
-        typeof rawType === 'string' && rawType.trim()
+        typeof rawType === "string" && rawType.trim()
           ? (rawType.toUpperCase() as LinkedInSearchResultType)
           : fallbackType;
       return { ...item, type } as LinkedInSearchResultItem;
@@ -71,23 +74,31 @@ function normalizeSearchItems(
 /**
  * LinkedIn search state hook — wired to backend Unipile search proxy (Phase 3).
  */
-export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedInSearchReturn {
+export function useLinkedInSearch(
+  options: UseLinkedInSearchOptions,
+): UseLinkedInSearchReturn {
   const { connected } = options;
 
-  const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<LinkedInSearchCategory>(DEFAULT_LINKEDIN_SEARCH_CATEGORY);
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<LinkedInSearchCategory>(
+    DEFAULT_LINKEDIN_SEARCH_CATEGORY,
+  );
   const [items, setItems] = useState<LinkedInSearchResultItem[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [errorType, setErrorType] = useState<LinkedInSearchErrorType | null>(null);
+  const [errorType, setErrorType] = useState<LinkedInSearchErrorType | null>(
+    null,
+  );
   const [paging, setPaging] = useState<LinkedInSearchPaging | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
-  const categoryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const categoryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const cancelInFlight = useCallback(() => {
     if (abortRef.current) {
@@ -111,7 +122,7 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
       clearTimeout(categoryDebounceRef.current);
       categoryDebounceRef.current = null;
     }
-    setQuery('');
+    setQuery("");
     setCategory(DEFAULT_LINKEDIN_SEARCH_CATEGORY);
     setItems([]);
     setCursor(null);
@@ -139,12 +150,17 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
       append?: boolean;
       cursorOverride?: string | null;
     }) => {
-      const { searchQuery, searchCategory, append = false, cursorOverride = null } = options;
+      const {
+        searchQuery,
+        searchCategory,
+        append = false,
+        cursorOverride = null,
+      } = options;
       const trimmed = searchQuery.trim();
       if (!trimmed) return;
 
       if (!connected) {
-        setErrorType('not_connected');
+        setErrorType("not_connected");
         setError(LINKEDIN_SEARCH_NOT_CONNECTED_MESSAGE);
         if (!append) {
           setItems([]);
@@ -174,14 +190,17 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
           {
             keywords: trimmed,
             category: searchCategory as ApiSearchCategory,
-            api: 'classic',
+            api: "classic",
             limit: DEFAULT_SEARCH_LIMIT,
             cursor: append ? cursorOverride : null,
           },
-          controller.signal
+          controller.signal,
         );
 
-        const normalized = normalizeSearchItems(response.items ?? [], searchCategory);
+        const normalized = normalizeSearchItems(
+          response.items ?? [],
+          searchCategory,
+        );
 
         setItems((prev) => (append ? [...prev, ...normalized] : normalized));
         setCursor(response.cursor ?? null);
@@ -196,7 +215,9 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
 
         const classified = getLinkedInSearchErrorType(err, connected);
         setError(message);
-        setErrorType(classified === 'not_connected' ? 'not_connected' : 'generic');
+        setErrorType(
+          classified === "not_connected" ? "not_connected" : "generic",
+        );
 
         if (!append) {
           setItems([]);
@@ -204,7 +225,7 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
           setPaging(null);
         }
 
-        console.warn('[LinkedInSearch] search failed', {
+        console.warn("[LinkedInSearch] search failed", {
           category: searchCategory,
           append,
           message,
@@ -217,7 +238,7 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
         setLoadingMore(false);
       }
     },
-    [connected, cancelInFlight]
+    [connected, cancelInFlight],
   );
 
   const runSearch = useCallback(
@@ -235,7 +256,7 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
       setHasSearched(true);
       await executeSearch({ searchQuery: trimmed, searchCategory: category });
     },
-    [query, category, executeSearch]
+    [query, category, executeSearch],
   );
 
   const setCategoryAndRefetch = useCallback(
@@ -255,7 +276,7 @@ export function useLinkedInSearch(options: UseLinkedInSearchOptions): UseLinkedI
         });
       }, CATEGORY_DEBOUNCE_MS);
     },
-    [hasSearched, query, executeSearch]
+    [hasSearched, query, executeSearch],
   );
 
   const loadMore = useCallback(async () => {

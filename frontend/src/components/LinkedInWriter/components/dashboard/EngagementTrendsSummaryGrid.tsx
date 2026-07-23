@@ -1,17 +1,24 @@
-import React from 'react';
+import React from "react";
 
-import { colors } from '../GrowthEngine/styles';
-import type { EngagementSummary, MetricDelta } from '../../../../services/postAnalyticsApi';
-import { METRIC_LABELS, METRIC_TOOLTIPS } from './engagementTrendsCopy';
+import { colors } from "../GrowthEngine/styles";
+import type {
+  EngagementSummary,
+  MetricDelta,
+} from "../../../../services/postAnalyticsApi";
+import { METRIC_LABELS, METRIC_TOOLTIPS } from "./engagementTrendsCopy";
 
 interface EngagementTrendsSummaryGridProps {
   summary: EngagementSummary;
 }
 
-function formatDeltaLabel(delta: number, isRate: boolean, unchangedLabel: string): string {
+function formatDeltaLabel(
+  delta: number,
+  isRate: boolean,
+  unchangedLabel: string,
+): string {
   if (delta === 0) return unchangedLabel;
-  if (isRate) return `${delta > 0 ? '+' : ''}${delta} points`;
-  return `${delta > 0 ? '+' : ''}${delta.toLocaleString()}`;
+  if (isRate) return `${delta > 0 ? "+" : ""}${delta} points`;
+  return `${delta > 0 ? "+" : ""}${delta.toLocaleString()}`;
 }
 
 const SummaryDeltaCard: React.FC<{
@@ -26,40 +33,56 @@ const SummaryDeltaCard: React.FC<{
 }> = ({ icon, label, before, now, delta, pct, isRate, tooltip }) => {
   const up = delta > 0;
   const flat = delta === 0;
-  const tone = flat ? colors.textSecondary : up ? '#16a34a' : '#dc2626';
+  const tone = flat ? colors.textSecondary : up ? "#16a34a" : "#dc2626";
 
   return (
     <div
       title={tooltip}
       style={{
-        flex: '1 1 calc(50% - 4px)',
+        flex: "1 1 calc(50% - 4px)",
         minWidth: 100,
-        padding: '8px 10px',
+        padding: "8px 10px",
         background: colors.rowBg,
         border: `1px solid ${colors.border}`,
         borderRadius: 8,
-        cursor: tooltip ? 'help' : 'default',
+        cursor: tooltip ? "help" : "default",
       }}
     >
-      <div style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2, fontWeight: 600 }}>
+      <div
+        style={{
+          fontSize: 10,
+          color: colors.textTertiary,
+          marginBottom: 2,
+          fontWeight: 600,
+        }}
+      >
         {icon} {label}
       </div>
-      <div style={{ fontSize: 16, fontWeight: 800, color: flat ? colors.textDark : tone, marginBottom: 1 }}>
+      <div
+        style={{
+          fontSize: 16,
+          fontWeight: 800,
+          color: flat ? colors.textDark : tone,
+          marginBottom: 1,
+        }}
+      >
         {isRate ? `${now}%` : now.toLocaleString()}
       </div>
-      <div style={{ fontSize: 10, color: colors.textSecondary, lineHeight: 1.35 }}>
+      <div
+        style={{ fontSize: 10, color: colors.textSecondary, lineHeight: 1.35 }}
+      >
         <span style={{ color: tone, fontWeight: 700 }}>
-          {formatDeltaLabel(delta, Boolean(isRate), 'unchanged')}
+          {formatDeltaLabel(delta, Boolean(isRate), "unchanged")}
         </span>
         {!isRate && !flat && pct !== 0 && (
           <span>
-            {' '}
-            ({up ? '+' : ''}
+            {" "}
+            ({up ? "+" : ""}
             {pct}%)
           </span>
         )}
         <span style={{ color: colors.textTertiary }}>
-          {' '}
+          {" "}
           from {isRate ? `${before}%` : before.toLocaleString()}
         </span>
       </div>
@@ -75,20 +98,38 @@ const PlaceholderMetricCard: React.FC<{
   <div
     title={tooltip}
     style={{
-      flex: '1 1 calc(50% - 4px)',
+      flex: "1 1 calc(50% - 4px)",
       minWidth: 100,
-      padding: '8px 10px',
+      padding: "8px 10px",
       background: colors.rowBg,
       border: `1px dashed ${colors.border}`,
       borderRadius: 8,
-      cursor: 'help',
+      cursor: "help",
     }}
   >
-    <div style={{ fontSize: 10, color: colors.textTertiary, marginBottom: 2, fontWeight: 600 }}>
+    <div
+      style={{
+        fontSize: 10,
+        color: colors.textTertiary,
+        marginBottom: 2,
+        fontWeight: 600,
+      }}
+    >
       {icon} {label}
     </div>
-    <div style={{ fontSize: 16, fontWeight: 800, color: colors.textTertiary, marginBottom: 1 }}>—</div>
-    <div style={{ fontSize: 10, color: colors.textSecondary, lineHeight: 1.35 }}>
+    <div
+      style={{
+        fontSize: 16,
+        fontWeight: 800,
+        color: colors.textTertiary,
+        marginBottom: 1,
+      }}
+    >
+      —
+    </div>
+    <div
+      style={{ fontSize: 10, color: colors.textSecondary, lineHeight: 1.35 }}
+    >
       Not available for this view yet
     </div>
   </div>
@@ -106,7 +147,9 @@ function OptionalMetricCard({
   tooltip: string;
 }) {
   if (!metric) {
-    return <PlaceholderMetricCard icon={icon} label={label} tooltip={tooltip} />;
+    return (
+      <PlaceholderMetricCard icon={icon} label={label} tooltip={tooltip} />
+    );
   }
   return (
     <SummaryDeltaCard
@@ -121,14 +164,16 @@ function OptionalMetricCard({
   );
 }
 
-export const EngagementTrendsSummaryGrid: React.FC<EngagementTrendsSummaryGridProps> = ({
-  summary,
-}) => {
+export const EngagementTrendsSummaryGrid: React.FC<
+  EngagementTrendsSummaryGridProps
+> = ({ summary }) => {
   const erBefore = Math.round(summary.avg_engagement_rate_before * 100);
   const erNow = Math.round(summary.avg_engagement_rate_now * 100);
 
   return (
-    <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+    <div
+      style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}
+    >
       <SummaryDeltaCard
         icon="❤️"
         label={METRIC_LABELS.reactions}

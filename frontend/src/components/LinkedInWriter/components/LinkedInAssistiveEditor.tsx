@@ -1,16 +1,26 @@
-import React, { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from 'react';
-import { Alert, Box } from '@mui/material';
-import { applyMarkdownFormat, type MarkdownFormatType } from '../../TextEditor/markdownFormatting';
-import { LinkedInEditorToolbar } from './LinkedInEditorToolbar';
-import { LinkedInEditorImageStrip } from './LinkedInEditorImageStrip';
-import { useLinkedInEditorImageUpload } from '../hooks/useLinkedInEditorImageUpload';
+import React, {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  forwardRef,
+} from "react";
+import { Alert, Box } from "@mui/material";
+import {
+  applyMarkdownFormat,
+  type MarkdownFormatType,
+} from "../../TextEditor/markdownFormatting";
+import { LinkedInEditorToolbar } from "./LinkedInEditorToolbar";
+import { LinkedInEditorImageStrip } from "./LinkedInEditorImageStrip";
+import { useLinkedInEditorImageUpload } from "../hooks/useLinkedInEditorImageUpload";
 import {
   mergeAssistiveEditorDraft,
   splitDraftForAssistiveEditor,
   type LinkedInEditorImageBlock,
-} from '../utils/linkedInEditorDraftUtils';
-import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from '../utils/linkedInPublishMediaConstants';
-import { normalizeLinkedInPostSpacing } from '../utils/linkedInPostSpacing';
+} from "../utils/linkedInEditorDraftUtils";
+import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from "../utils/linkedInPublishMediaConstants";
+import { normalizeLinkedInPostSpacing } from "../utils/linkedInPostSpacing";
 
 export interface LinkedInAssistiveEditorHandle {
   /** Flush pending edits and return the merged draft markdown. */
@@ -36,12 +46,7 @@ export const LinkedInAssistiveEditor = forwardRef<
   LinkedInAssistiveEditorHandle,
   LinkedInAssistiveEditorProps
 >(function LinkedInAssistiveEditor(
-  {
-  draft,
-  onDraftChange,
-  onTypingChange,
-  onTextareaSelection,
-  },
+  { draft, onDraftChange, onTypingChange, onTextareaSelection },
   ref,
 ) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,14 +58,20 @@ export const LinkedInAssistiveEditor = forwardRef<
   const [textContent, setTextContent] = useState(() =>
     maybeNormalizeAssistiveText(initial.textContent),
   );
-  const [images, setImages] = useState<LinkedInEditorImageBlock[]>(initial.images);
+  const [images, setImages] = useState<LinkedInEditorImageBlock[]>(
+    initial.images,
+  );
   const [isDragOver, setIsDragOver] = useState(false);
 
   const { isUploading, uploadError, uploadImageFile, clearUploadError } =
     useLinkedInEditorImageUpload();
 
   const emitDraft = useCallback(
-    (nextText: string, nextImages: LinkedInEditorImageBlock[], immediate = false) => {
+    (
+      nextText: string,
+      nextImages: LinkedInEditorImageBlock[],
+      immediate = false,
+    ) => {
       const merged = mergeAssistiveEditorDraft(nextText, nextImages);
 
       const commit = () => {
@@ -127,7 +138,7 @@ export const LinkedInAssistiveEditor = forwardRef<
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [textContent, images.length]);
@@ -186,7 +197,7 @@ export const LinkedInAssistiveEditor = forwardRef<
       if (file) {
         handleUploadFile(file);
       }
-      event.target.value = '';
+      event.target.value = "";
     },
     [handleUploadFile],
   );
@@ -230,9 +241,9 @@ export const LinkedInAssistiveEditor = forwardRef<
       onDragLeave={() => setIsDragOver(false)}
       sx={{
         borderRadius: 2,
-        outline: isDragOver ? '2px dashed #0A66C2' : 'none',
+        outline: isDragOver ? "2px dashed #0A66C2" : "none",
         outlineOffset: 2,
-        transition: 'outline-color 0.15s ease',
+        transition: "outline-color 0.15s ease",
       }}
     >
       <LinkedInEditorToolbar
@@ -257,19 +268,19 @@ export const LinkedInAssistiveEditor = forwardRef<
         autoFocus
         placeholder="What do you want to talk about?"
         style={{
-          width: '100%',
-          outline: 'none',
-          border: '1px solid #e2e8f0',
-          borderTop: 'none',
-          borderRadius: images.length > 0 ? 0 : '0 0 8px 8px',
-          padding: '12px',
-          background: '#fff',
-          color: '#333',
-          fontFamily: 'inherit',
-          fontSize: '14px',
-          lineHeight: '1.6',
-          whiteSpace: 'pre-wrap',
-          resize: 'vertical',
+          width: "100%",
+          outline: "none",
+          border: "1px solid #e2e8f0",
+          borderTop: "none",
+          borderRadius: images.length > 0 ? 0 : "0 0 8px 8px",
+          padding: "12px",
+          background: "#fff",
+          color: "#333",
+          fontFamily: "inherit",
+          fontSize: "14px",
+          lineHeight: "1.6",
+          whiteSpace: "pre-wrap",
+          resize: "vertical",
           minHeight: 160,
         }}
       />
@@ -280,7 +291,7 @@ export const LinkedInAssistiveEditor = forwardRef<
         ref={fileInputRef}
         type="file"
         accept={LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS}
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
         onChange={handleFileInputChange}
       />
 
@@ -302,4 +313,4 @@ export const LinkedInAssistiveEditor = forwardRef<
   );
 });
 
-LinkedInAssistiveEditor.displayName = 'LinkedInAssistiveEditor';
+LinkedInAssistiveEditor.displayName = "LinkedInAssistiveEditor";

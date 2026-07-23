@@ -1,36 +1,44 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback } from 'react';
-import { createPortal } from 'react-dom';
-import { LinkedInConnectionPlaceholder, LinkedInPlanConnectAction } from './LinkedInConnectionPlaceholder';
-import { LinkedInProfileHubStrip } from './LinkedInProfileHubStrip';
-import { DashboardMobileStudioContextNudge } from './dashboard/DashboardMobileStudioContextNudge';
-import { MobileStudioQuickActionsDock } from './dashboard/MobileStudioQuickActionsDock';
-import { useDesktopViewport } from '../hooks/useDesktopViewport';
-import { InfoModals } from './InfoModals';
-import { QuickCreate } from './QuickCreate';
-import { LinkedInPreferences } from '../utils/storageUtils';
-import { LinkedInDashboardHero } from './dashboard/LinkedInDashboardHero';
-import { DashboardRightRail } from './dashboard/DashboardRightRail';
-import { DashboardCopilotFab } from './dashboard/DashboardCopilotFab';
-import { WatchdogDashboard } from './WatchdogDashboard';
-import type { KnowledgeCenterAction } from './dashboard/KnowledgeCenterDock';
+import React, {
+  useState,
+  useEffect,
+  useLayoutEffect,
+  useCallback,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  LinkedInConnectionPlaceholder,
+  LinkedInPlanConnectAction,
+} from "./LinkedInConnectionPlaceholder";
+import { LinkedInProfileHubStrip } from "./LinkedInProfileHubStrip";
+import { DashboardMobileStudioContextNudge } from "./dashboard/DashboardMobileStudioContextNudge";
+import { MobileStudioQuickActionsDock } from "./dashboard/MobileStudioQuickActionsDock";
+import { useDesktopViewport } from "../hooks/useDesktopViewport";
+import { InfoModals } from "./InfoModals";
+import { QuickCreate } from "./QuickCreate";
+import { LinkedInPreferences } from "../utils/storageUtils";
+import { LinkedInDashboardHero } from "./dashboard/LinkedInDashboardHero";
+import { DashboardRightRail } from "./dashboard/DashboardRightRail";
+import { DashboardCopilotFab } from "./dashboard/DashboardCopilotFab";
+import { WatchdogDashboard } from "./WatchdogDashboard";
+import type { KnowledgeCenterAction } from "./dashboard/KnowledgeCenterDock";
 import {
   CONNECT_GATED_WORKFLOW_IDS,
   type DashboardWorkflowCardId,
-} from './dashboard/dashboardWorkflowConfig';
+} from "./dashboard/dashboardWorkflowConfig";
 import {
   WorkflowActionModals,
   isWorkflowModalId,
   type WorkflowModalId,
-} from './dashboard/WorkflowActionModals';
-import { DashboardActionModal } from './dashboard/DashboardActionModal';
-import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
-import { LinkedInStudioTour } from './dashboard/LinkedInStudioTour';
-import { TodayGrowthWalkthrough } from './dashboard/TodayGrowthWalkthrough';
-import { ResumeDraftRailChip } from './dashboard/ResumeDraftRailChip';
-import { OptimiseProfileRailChip } from './dashboard/OptimiseProfileRailChip';
-import { useMobileHeaderNav } from '../hooks/useMobileHeaderNav';
-import { useMobileVisualViewportInset } from '../hooks/useMobileVisualViewportInset';
-import { MOBILE_STUDIO_MAX_WIDTH_PX } from './dashboard/dashboardLayoutConstants';
+} from "./dashboard/WorkflowActionModals";
+import { DashboardActionModal } from "./dashboard/DashboardActionModal";
+import { DashboardSimpleErrorModal } from "./dashboard/DashboardSimpleErrorModal";
+import { LinkedInStudioTour } from "./dashboard/LinkedInStudioTour";
+import { TodayGrowthWalkthrough } from "./dashboard/TodayGrowthWalkthrough";
+import { ResumeDraftRailChip } from "./dashboard/ResumeDraftRailChip";
+import { OptimiseProfileRailChip } from "./dashboard/OptimiseProfileRailChip";
+import { useMobileHeaderNav } from "../hooks/useMobileHeaderNav";
+import { useMobileVisualViewportInset } from "../hooks/useMobileVisualViewportInset";
+import { MOBILE_STUDIO_MAX_WIDTH_PX } from "./dashboard/dashboardLayoutConstants";
 import {
   LINKEDIN_STUDIO_TOUR_SEEN_KEY,
   getLinkedInStudioTourSeenKey,
@@ -39,32 +47,42 @@ import {
   shouldShowLinkedInStudioSkipReminder,
   markLinkedInStudioSkipReminderShown,
   LINKEDIN_STUDIO_TOUR_SKIP_REMINDER_MESSAGE,
-} from '../../../utils/walkthroughs/linkedInStudioTourSteps';
-import { useAuth } from '@clerk/clerk-react';
-import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
-import { showToastNotification } from '../../../utils/toastNotifications';
+} from "../../../utils/walkthroughs/linkedInStudioTourSteps";
+import { useAuth } from "@clerk/clerk-react";
+import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
+import { showToastNotification } from "../../../utils/toastNotifications";
 import {
   ContentCoachModal,
   QuickStartWizardModal,
   BestPracticesModal,
   FeatureMapModal,
   AskAlwrityModal,
-} from './dashboard/KnowledgeCenterModals';
-import { PostAnalyticsModal } from './dashboard/PostAnalyticsModal';
-import { GrowthEngineModal } from './dashboard/GrowthEngineModal';
+} from "./dashboard/KnowledgeCenterModals";
+import { PostAnalyticsModal } from "./dashboard/PostAnalyticsModal";
+import { GrowthEngineModal } from "./dashboard/GrowthEngineModal";
 import {
   OPEN_GROWTH_ENGINE_EVENT,
   OPEN_POST_ANALYTICS_EVENT,
-} from '../utils/linkedInDashboardEvents';
+} from "../utils/linkedInDashboardEvents";
 
 interface WelcomeMessageProps {
   draft: string;
   isGenerating: boolean;
-  onGeneratePost: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-  onGenerateArticle: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-  onGenerateCarousel: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-  onGenerateVideoScript: (params?: any) => Promise<{ success: boolean; data?: any; error?: string }>;
-  onGenerateOutline: (params?: any) => Promise<{ success: boolean; outline?: any; error?: string }>;
+  onGeneratePost: (
+    params?: any,
+  ) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onGenerateArticle: (
+    params?: any,
+  ) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onGenerateCarousel: (
+    params?: any,
+  ) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onGenerateVideoScript: (
+    params?: any,
+  ) => Promise<{ success: boolean; data?: any; error?: string }>;
+  onGenerateOutline: (
+    params?: any,
+  ) => Promise<{ success: boolean; outline?: any; error?: string }>;
   outlineMode: boolean;
   userPreferences: LinkedInPreferences;
   onGenerateSimilarPost?: (prompt: string) => void;
@@ -93,7 +111,9 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [showCopilotModal, setShowCopilotModal] = useState(false);
   const [showAssistiveModal, setShowAssistiveModal] = useState(false);
   const [showFactCheckModal, setShowFactCheckModal] = useState(false);
-  const [workflowModal, setWorkflowModal] = useState<WorkflowModalId | null>(null);
+  const [workflowModal, setWorkflowModal] = useState<WorkflowModalId | null>(
+    null,
+  );
   const [postAnalyticsOpen, setPostAnalyticsOpen] = useState(false);
   const [growthEngineOpen, setGrowthEngineOpen] = useState(false);
   const [watchdogOpen, setWatchdogOpen] = useState(false);
@@ -121,12 +141,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [runStudioTour, setRunStudioTour] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
-    const mediaQuery = window.matchMedia(`(max-width: ${MOBILE_STUDIO_MAX_WIDTH_PX}px)`);
+    if (typeof window === "undefined" || !window.matchMedia) return undefined;
+    const mediaQuery = window.matchMedia(
+      `(max-width: ${MOBILE_STUDIO_MAX_WIDTH_PX}px)`,
+    );
     const handleChange = () => setIsMobileStudio(mediaQuery.matches);
     handleChange();
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   useMobileVisualViewportInset(isMobileStudio);
@@ -138,7 +160,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const [kcAskAlwrity, setKcAskAlwrity] = useState(false);
 
   const handleDisconnect = useCallback(async () => {
-    if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
+    if (!window.confirm("Disconnect LinkedIn? You can reconnect anytime.")) {
       return;
     }
     setIsDisconnecting(true);
@@ -158,8 +180,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   );
 
   useLayoutEffect(() => {
-    document.body.classList.add('linkedin-dashboard-view');
-    return () => document.body.classList.remove('linkedin-dashboard-view');
+    document.body.classList.add("linkedin-dashboard-view");
+    return () => document.body.classList.remove("linkedin-dashboard-view");
   }, []);
 
   useEffect(() => {
@@ -168,27 +190,36 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     window.addEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
     window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
     return () => {
-      window.removeEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
+      window.removeEventListener(
+        OPEN_POST_ANALYTICS_EVENT,
+        onOpenPostAnalytics,
+      );
       window.removeEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
     };
   }, []);
 
   useEffect(() => {
     const onOpenWatchdog = () => setWatchdogOpen(true);
-    window.addEventListener('linkedinwriter:openWatchdog', onOpenWatchdog);
-    return () => window.removeEventListener('linkedinwriter:openWatchdog', onOpenWatchdog);
+    window.addEventListener("linkedinwriter:openWatchdog", onOpenWatchdog);
+    return () =>
+      window.removeEventListener("linkedinwriter:openWatchdog", onOpenWatchdog);
   }, []);
 
   useEffect(() => {
-    const onOpenBrainstorm = () => setWorkflowModal('plan');
-    window.addEventListener('linkedinwriter:openBrainstorm', onOpenBrainstorm);
-    return () => window.removeEventListener('linkedinwriter:openBrainstorm', onOpenBrainstorm);
+    const onOpenBrainstorm = () => setWorkflowModal("plan");
+    window.addEventListener("linkedinwriter:openBrainstorm", onOpenBrainstorm);
+    return () =>
+      window.removeEventListener(
+        "linkedinwriter:openBrainstorm",
+        onOpenBrainstorm,
+      );
   }, []);
 
   useEffect(() => {
     const onStartTour = () => setRunStudioTour(true);
-    window.addEventListener('linkedinwriter:startStudioTour', onStartTour);
-    return () => window.removeEventListener('linkedinwriter:startStudioTour', onStartTour);
+    window.addEventListener("linkedinwriter:startStudioTour", onStartTour);
+    return () =>
+      window.removeEventListener("linkedinwriter:startStudioTour", onStartTour);
   }, []);
 
   useEffect(() => {
@@ -214,7 +245,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     if (hasSeenLinkedInStudioTour(userId)) return;
     if (!connected && !connectWelcomeHandled) return;
     if (connectWelcomeOpen) return;
-    if (workflowModal || postAnalyticsOpen || growthEngineOpen || watchdogOpen || copilotError) return;
+    if (
+      workflowModal ||
+      postAnalyticsOpen ||
+      growthEngineOpen ||
+      watchdogOpen ||
+      copilotError
+    )
+      return;
 
     const timer = window.setTimeout(() => {
       setRunStudioTour(true);
@@ -244,7 +282,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     if (!connected && !connectWelcomeHandled) return;
 
     const timer = window.setTimeout(() => {
-      showToastNotification(LINKEDIN_STUDIO_TOUR_SKIP_REMINDER_MESSAGE, 'info');
+      showToastNotification(LINKEDIN_STUDIO_TOUR_SKIP_REMINDER_MESSAGE, "info");
       markLinkedInStudioSkipReminderShown(userId);
     }, getTourAutoStartDelayMs() + 400);
     return () => window.clearTimeout(timer);
@@ -269,15 +307,39 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       openConnectGate();
     };
 
-    window.addEventListener('linkedinwriter:getTopicIdeas', requireConnection, true);
-    window.addEventListener('linkedinwriter:openOptimiseProfile', requireConnection, true);
+    window.addEventListener(
+      "linkedinwriter:getTopicIdeas",
+      requireConnection,
+      true,
+    );
+    window.addEventListener(
+      "linkedinwriter:openOptimiseProfile",
+      requireConnection,
+      true,
+    );
     window.addEventListener(OPEN_POST_ANALYTICS_EVENT, requireConnection, true);
     window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, requireConnection, true);
     return () => {
-      window.removeEventListener('linkedinwriter:getTopicIdeas', requireConnection, true);
-      window.removeEventListener('linkedinwriter:openOptimiseProfile', requireConnection, true);
-      window.removeEventListener(OPEN_POST_ANALYTICS_EVENT, requireConnection, true);
-      window.removeEventListener(OPEN_GROWTH_ENGINE_EVENT, requireConnection, true);
+      window.removeEventListener(
+        "linkedinwriter:getTopicIdeas",
+        requireConnection,
+        true,
+      );
+      window.removeEventListener(
+        "linkedinwriter:openOptimiseProfile",
+        requireConnection,
+        true,
+      );
+      window.removeEventListener(
+        OPEN_POST_ANALYTICS_EVENT,
+        requireConnection,
+        true,
+      );
+      window.removeEventListener(
+        OPEN_GROWTH_ENGINE_EVENT,
+        requireConnection,
+        true,
+      );
     };
   }, [connected, openConnectGate]);
 
@@ -287,8 +349,9 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
   const handleOpenCopilot = useCallback(() => {
     const copilotToggle =
-      document.querySelector('.alwrity-copilot-sidebar.copilotKitSidebar .copilotKitButton') ||
-      document.querySelector('.copilotKitSidebar .copilotKitButton');
+      document.querySelector(
+        ".alwrity-copilot-sidebar.copilotKitSidebar .copilotKitButton",
+      ) || document.querySelector(".copilotKitSidebar .copilotKitButton");
 
     const toggleHost = copilotToggle?.parentElement;
     if (toggleHost) {
@@ -297,8 +360,8 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     }
 
     const legacyButton =
-      document.querySelector('.copilotkit-open-button') ||
-      document.querySelector('[data-copilot-open]') ||
+      document.querySelector(".copilotkit-open-button") ||
+      document.querySelector("[data-copilot-open]") ||
       document.querySelector('button[aria-label*="Open"]');
 
     if (legacyButton) {
@@ -306,7 +369,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       return true;
     }
 
-    setCopilotError('Could not open Co-Pilot. Refresh the page and try again.');
+    setCopilotError("Could not open Co-Pilot. Refresh the page and try again.");
     return false;
   }, []);
 
@@ -314,7 +377,9 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
   const openQuickCreatePost = () => {
     window.dispatchEvent(
-      new CustomEvent('linkedinwriter:openQuickCreate', { detail: { type: 'post' } })
+      new CustomEvent("linkedinwriter:openQuickCreate", {
+        detail: { type: "post" },
+      }),
     );
   };
 
@@ -332,13 +397,13 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       return;
     }
 
-    if (cardId === 'engagement') {
-      setWorkflowModal('engagement');
+    if (cardId === "engagement") {
+      setWorkflowModal("engagement");
       return;
     }
 
-    if (cardId === 'remarket') {
-      setWorkflowModal('remarket');
+    if (cardId === "remarket") {
+      setWorkflowModal("remarket");
       return;
     }
 
@@ -350,39 +415,39 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   const handleKnowledgeCenterAction = (action: KnowledgeCenterAction) => {
     switch (action) {
       // ── New AI-first features ─────────────────────────────────────────────
-      case 'featureMap':
+      case "featureMap":
         setKcFeatureMap(true);
         break;
-      case 'contentCoach':
+      case "contentCoach":
         setKcContentCoach(true);
         break;
-      case 'bestPractices':
+      case "bestPractices":
         setKcBestPractices(true);
         break;
-      case 'quickStart':
+      case "quickStart":
         setKcQuickStart(true);
         break;
-      case 'askAlwrity':
+      case "askAlwrity":
         setKcAskAlwrity(true);
         break;
       // ── Unchanged ─────────────────────────────────────────────────────────
-      case 'persona':
-        window.dispatchEvent(new CustomEvent('linkedinwriter:openPreferences'));
+      case "persona":
+        window.dispatchEvent(new CustomEvent("linkedinwriter:openPreferences"));
         break;
-      case 'multimodal':
-        setWorkflowModal('create');
+      case "multimodal":
+        setWorkflowModal("create");
         break;
       // ── Legacy fallbacks (backward compat) ────────────────────────────────
-      case 'factCheck':
+      case "factCheck":
         setKcFeatureMap(true);
         break;
-      case 'googleGround':
+      case "googleGround":
         setKcAskAlwrity(true);
         break;
-      case 'assistive':
+      case "assistive":
         setKcBestPractices(true);
         break;
-      case 'copilot':
+      case "copilot":
         setKcQuickStart(true);
         break;
       default:
@@ -402,78 +467,72 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
               onClear={onClear}
             />
             <OptimiseProfileRailChip variant="main" />
-            {desktopViewport && !isSocialLoading && (
-              <DashboardMobileStudioContextNudge
-                variant="desktop"
-                connected={connected}
-                isConnecting={isConnecting}
-                onConnect={connectWithOAuth}
-              />
-            )}
           </div>
         )}
 
         <div className="linkedin-dashboard-hero-stage">
-        <LinkedInDashboardHero
-          connected={connected}
-          onWorkflowCardAction={handleWorkflowCardAction}
-          onViewAnalytics={openPostAnalytics}
-          onKnowledgeCenterAction={handleKnowledgeCenterAction}
-          planAnchorSlot={planConnectAction}
-          mobileStudioActionsSlot={
-            relocateMobileProfileStrip && !isSocialLoading ? (
-              <MobileStudioQuickActionsDock
-                dashboardDraft={draft}
-                onResumeDraft={onResumeDraft}
-                onClearDraft={onClear}
-                showPreferencesModal={showPreferencesModal}
-                onTogglePreferences={() =>
-                  onPreferencesModalChange?.(!showPreferencesModal)
-                }
-              />
-            ) : null
-          }
-          mobileProfileHubSlot={
-            relocateMobileProfileStrip && !isSocialLoading ? (
-              <LinkedInProfileHubStrip
-                variant="inline"
-                connected={connected}
-                displayName={displayName}
-                avatarUrl={avatarUrl}
-                isConnecting={isConnecting}
-                isDisconnecting={isDisconnecting}
-                onConnect={connectWithOAuth}
-                onDisconnect={handleDisconnect}
-              />
-            ) : null
-          }
-          mobileContextNudgeSlot={
-            relocateMobileProfileStrip && !isSocialLoading ? (
-              <DashboardMobileStudioContextNudge
-                variant="mobile"
-                connected={connected}
-                isConnecting={isConnecting}
-                onConnect={connectWithOAuth}
-              />
-            ) : null
-          }
-        >
-          <LinkedInConnectionPlaceholder
-            key={userId ?? 'signed-out'}
-            centered
-            splitConnectAction
-            relocateMobileProfileStrip={relocateMobileProfileStrip}
-            socialConnection={social}
-            isDisconnecting={isDisconnecting}
-            onDisconnect={handleDisconnect}
-            onConnectWelcomeDismissed={() => setConnectWelcomeHandled(true)}
-            onConnectWelcomeOpenChange={setConnectWelcomeOpen}
-            userId={userId}
-            blockDashboardErrorModal={
-              connectWelcomeOpen || runStudioTour || (!connected && !connectWelcomeHandled)
+          <LinkedInDashboardHero
+            connected={connected}
+            onWorkflowCardAction={handleWorkflowCardAction}
+            onViewAnalytics={openPostAnalytics}
+            onKnowledgeCenterAction={handleKnowledgeCenterAction}
+            planAnchorSlot={planConnectAction}
+            mobileStudioActionsSlot={
+              relocateMobileProfileStrip && !isSocialLoading ? (
+                <MobileStudioQuickActionsDock
+                  dashboardDraft={draft}
+                  onResumeDraft={onResumeDraft}
+                  onClearDraft={onClear}
+                  showPreferencesModal={showPreferencesModal}
+                  onTogglePreferences={() =>
+                    onPreferencesModalChange?.(!showPreferencesModal)
+                  }
+                />
+              ) : null
             }
-          />
-        </LinkedInDashboardHero>
+            mobileProfileHubSlot={
+              relocateMobileProfileStrip && !isSocialLoading ? (
+                <LinkedInProfileHubStrip
+                  variant="inline"
+                  connected={connected}
+                  displayName={displayName}
+                  avatarUrl={avatarUrl}
+                  isConnecting={isConnecting}
+                  isDisconnecting={isDisconnecting}
+                  onConnect={connectWithOAuth}
+                  onDisconnect={handleDisconnect}
+                />
+              ) : null
+            }
+            mobileContextNudgeSlot={
+              relocateMobileProfileStrip && !isSocialLoading ? (
+                <DashboardMobileStudioContextNudge
+                  variant="mobile"
+                  connected={connected}
+                  isConnecting={isConnecting}
+                  onConnect={connectWithOAuth}
+                />
+              ) : null
+            }
+          >
+            <LinkedInConnectionPlaceholder
+              key={userId ?? "signed-out"}
+              centered
+              splitConnectAction
+              relocateMobileProfileStrip={relocateMobileProfileStrip}
+              socialConnection={social}
+              isDisconnecting={isDisconnecting}
+              onDisconnect={handleDisconnect}
+              onConnectWelcomeDismissed={() => setConnectWelcomeHandled(true)}
+              onConnectWelcomeOpenChange={setConnectWelcomeOpen}
+              userId={userId}
+              blockDashboardErrorModal={
+                connectWelcomeOpen ||
+                runStudioTour ||
+                (!connected && !connectWelcomeHandled)
+              }
+            />
+          </LinkedInDashboardHero>
         </div>
 
         <QuickCreate
@@ -508,9 +567,18 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         />
 
         {/* ── Knowledge Center Modals ── */}
-        <ContentCoachModal open={kcContentCoach} onClose={() => setKcContentCoach(false)} />
-        <QuickStartWizardModal open={kcQuickStart} onClose={() => setKcQuickStart(false)} />
-        <BestPracticesModal open={kcBestPractices} onClose={() => setKcBestPractices(false)} />
+        <ContentCoachModal
+          open={kcContentCoach}
+          onClose={() => setKcContentCoach(false)}
+        />
+        <QuickStartWizardModal
+          open={kcQuickStart}
+          onClose={() => setKcQuickStart(false)}
+        />
+        <BestPracticesModal
+          open={kcBestPractices}
+          onClose={() => setKcBestPractices(false)}
+        />
         <FeatureMapModal
           open={kcFeatureMap}
           onClose={() => setKcFeatureMap(false)}
@@ -518,19 +586,36 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             const cardId = id as DashboardWorkflowCardId;
             if (isWorkflowModalId(cardId)) setWorkflowModal(cardId);
           }}
-          onOpenCapability={(id) => handleKnowledgeCenterAction(id as KnowledgeCenterAction)}
+          onOpenCapability={(id) =>
+            handleKnowledgeCenterAction(id as KnowledgeCenterAction)
+          }
         />
-        <AskAlwrityModal open={kcAskAlwrity} onClose={() => setKcAskAlwrity(false)} />
+        <AskAlwrityModal
+          open={kcAskAlwrity}
+          onClose={() => setKcAskAlwrity(false)}
+        />
 
-        <div className="linkedin-dashboard-bottom-dock" aria-label="Dashboard actions">
+        <div
+          className="linkedin-dashboard-bottom-dock"
+          aria-label="Dashboard actions"
+        >
           <div className="linkedin-dashboard-copilot-fab">
-            <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="corner" />
+            <DashboardCopilotFab
+              onOpenCopilot={handleOpenCopilot}
+              variant="corner"
+            />
           </div>
         </div>
 
         {/* Mobile floating Co-Pilot FAB (desktop-like corner icon, ≤960px) */}
-        <div className="linkedin-mobile-copilot-fab" data-tour="li-mobile-copilot-fab">
-          <DashboardCopilotFab onOpenCopilot={handleOpenCopilot} variant="fixed" />
+        <div
+          className="linkedin-mobile-copilot-fab"
+          data-tour="li-mobile-copilot-fab"
+        >
+          <DashboardCopilotFab
+            onOpenCopilot={handleOpenCopilot}
+            variant="fixed"
+          />
         </div>
 
         {watchdogOpen &&
@@ -541,7 +626,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
               userPreferences={userPreferences}
               onUnreadChanged={() => {}}
             />,
-            document.body
+            document.body,
           )}
       </div>
 
@@ -568,7 +653,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       <DashboardSimpleErrorModal
         open={Boolean(copilotError)}
         title="Co-Pilot unavailable"
-        message={copilotError ?? ''}
+        message={copilotError ?? ""}
         onClose={() => setCopilotError(null)}
       />
 
@@ -582,14 +667,14 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       >
         <p
           style={{
-            margin: '0 0 18px',
-            color: '#334155',
+            margin: "0 0 18px",
+            color: "#334155",
             fontSize: 15,
             lineHeight: 1.55,
           }}
         >
-          This action needs your LinkedIn profile. You can still use Plan and Create without
-          connecting.
+          This action needs your LinkedIn profile. You can still use Plan and
+          Create without connecting.
         </p>
         <button
           type="button"
@@ -599,17 +684,17 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
             void connectWithOAuth();
           }}
           style={{
-            width: '100%',
+            width: "100%",
             minHeight: 48,
-            padding: '12px 16px',
+            padding: "12px 16px",
             borderRadius: 12,
-            border: 'none',
-            background: 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
-            color: '#fff',
+            border: "none",
+            background: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+            color: "#fff",
             fontSize: 15,
             fontWeight: 700,
-            cursor: 'pointer',
-            boxShadow: '0 4px 15px rgba(10, 102, 194, 0.35)',
+            cursor: "pointer",
+            boxShadow: "0 4px 15px rgba(10, 102, 194, 0.35)",
           }}
         >
           Connect LinkedIn

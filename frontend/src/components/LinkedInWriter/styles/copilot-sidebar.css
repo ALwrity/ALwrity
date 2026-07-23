@@ -8,18 +8,18 @@
   width: 40% !important; /* Reduced from 100% */
   max-width: 320px !important; /* Reduced from typical 800px+ */
   min-width: 280px !important;
-  
+
   /* Compact height */
   height: 85vh !important; /* Reduced from 100vh */
   max-height: 600px !important;
-  
+
   /* Reduced padding and margins */
   padding: 8px !important; /* Reduced from 20px+ */
   margin: 8px !important;
-  
+
   /* Compact border radius */
   border-radius: 8px !important; /* Reduced from 16px+ */
-  
+
   /* Subtle shadow */
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15) !important; /* Reduced from 18px+ */
 }
@@ -43,7 +43,7 @@
   width: 32px !important; /* Reduced from 48px */
   height: 32px !important; /* Reduced from 48px */
   border-radius: 50% !important;
-  
+
   /* Compact shadow */
   box-shadow: 0 2px 8px rgba(10, 102, 194, 0.25) !important; /* Reduced from 12px */
   transition: all 0.2s ease !important; /* Reduced from 0.3s */
@@ -94,15 +94,15 @@
   border-radius: 8px !important; /* Reduced from 16px */
   margin: 6px 0 !important; /* Reduced from 12px */
   padding: 8px 12px !important; /* Reduced from 16px 20px */
-  
+
   /* Maximize message width for chat */
   max-width: 95% !important; /* Increased from 85% for better space usage */
   width: fit-content !important;
-  
+
   /* Compact shadows and effects */
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important; /* Reduced from 12px */
   transition: all 0.15s ease !important; /* Reduced from 0.2s */
-  
+
   /* Compact typography */
   line-height: 1.4 !important; /* Reduced from 1.5 */
   font-size: 13px !important; /* Reduced from 14px */
@@ -128,7 +128,7 @@
 .alwrity-copilot-sidebar .message.user::before,
 .alwrity-copilot-sidebar .chat-message.user::before,
 .alwrity-copilot-sidebar .user-message::before {
-  content: '' !important;
+  content: "" !important;
   position: absolute !important;
   right: -6px !important; /* Reduced from -8px */
   top: 50% !important;
@@ -160,7 +160,7 @@
 .alwrity-copilot-sidebar .message.assistant::before,
 .alwrity-copilot-sidebar .chat-message.assistant::before,
 .alwrity-copilot-sidebar .assistant-message::before {
-  content: '' !important;
+  content: "" !important;
   position: absolute !important;
   left: -6px !important; /* Reduced from -8px */
   top: 50% !important;
@@ -215,7 +215,7 @@
   border: 1px solid #e2e8f0 !important;
   border-radius: 4px !important; /* Reduced from 6px */
   padding: 1px 4px !important; /* Reduced from 2px 6px */
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace !important;
   font-size: 12px !important; /* Reduced from 13px */
   color: #2d3748 !important;
 }
@@ -229,16 +229,16 @@
   border-radius: 6px !important; /* Reduced from 10px */
   color: white !important;
   font-weight: 500 !important; /* Reduced from 600 */
-  
+
   /* Reduce padding by 60% */
   padding: 6px 12px !important; /* Reduced from 10px 20px */
-  
+
   /* Compact transitions */
   transition: all 0.15s ease !important; /* Reduced from 0.2s */
-  
+
   /* Compact shadows */
   box-shadow: 0 1px 4px rgba(10, 102, 194, 0.25) !important; /* Reduced from 8px */
-  
+
   /* Smaller font size */
   font-size: 12px !important; /* Reduced from 14px */
 }
@@ -257,16 +257,16 @@
 .alwrity-copilot-sidebar textarea {
   border: 1px solid #e2e8f0 !important; /* Reduced from 2px */
   border-radius: 6px !important; /* Reduced from 12px */
-  
+
   /* Reduce padding by 60% */
   padding: 8px 12px !important; /* Reduced from 14px 18px */
-  
+
   /* Compact font size */
   font-size: 13px !important; /* Reduced from 14px */
-  
+
   /* Compact transitions */
   transition: all 0.15s ease !important; /* Reduced from 0.2s */
-  
+
   background: #ffffff !important;
   color: #2d3748 !important;
 }
@@ -287,21 +287,21 @@
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%) !important;
   border: 1px solid #e2e8f0 !important;
   border-radius: 16px !important; /* Reduced from 24px */
-  
+
   /* Reduce padding by 60% */
   padding: 6px 12px !important; /* Reduced from 10px 18px */
-  
+
   /* Compact margins */
   margin: 3px !important; /* Reduced from 6px */
-  
+
   cursor: pointer !important;
   transition: all 0.15s ease !important; /* Reduced from 0.2s */
-  
+
   /* Compact font size */
   font-size: 12px !important; /* Reduced from 13px */
   color: #475569 !important;
   font-weight: 500 !important;
-  
+
   /* Compact shadows */
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important; /* Reduced from 3px */
 }
@@ -354,7 +354,7 @@
   border-radius: 6px !important; /* Reduced from 8px */
   padding: 8px 12px !important; /* Reduced from 12px 16px */
   margin: 4px 0 !important; /* Reduced from 8px */
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace !important;
   font-size: 11px !important; /* Reduced from 12px */
   color: #475569 !important;
   border-left: 3px solid #0a66c2 !important; /* Reduced from 4px */
@@ -476,13 +476,15 @@
 
 /* ===== COMPACT ANIMATIONS ===== */
 @keyframes typing {
-  0%, 60%, 100% { 
-    opacity: 0.4; 
+  0%,
+  60%,
+  100% {
+    opacity: 0.4;
     transform: scale(0.8); /* Reduced from 1.0 */
   }
-  30% { 
-    opacity: 1; 
-    transform: scale(1.0); 
+  30% {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -496,7 +498,7 @@
     min-width: 280px !important;
     height: 80vh !important;
   }
-  
+
   .alwrity-copilot-sidebar .copilotkit-suggestions,
   .alwrity-copilot-sidebar .copilot-suggestions {
     grid-template-columns: 1fr !important; /* Single column on mobile */
@@ -512,4 +514,3 @@
   outline: none !important;
   box-shadow: 0 0 0 2px rgba(10, 102, 194, 0.3) !important; /* Reduced from 4px */
 }
-

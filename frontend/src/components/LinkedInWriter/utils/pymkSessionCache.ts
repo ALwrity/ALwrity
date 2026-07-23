@@ -2,13 +2,13 @@ import type {
   PymkCohort,
   PymkCohortDefaults,
   PymkListResponse,
-} from '../../../services/linkedInPymkApi';
+} from "../../../services/linkedInPymkApi";
 
 /** Mirrors post analytics session cache TTL (usePostAnalytics). */
 export const PYMK_SESSION_CACHE_TTL_MS = 30 * 60 * 1000;
 
-const SUGGESTIONS_KEY = 'alwrity_pymk_suggestions';
-const DEFAULTS_KEY = 'alwrity_pymk_cohort_defaults';
+const SUGGESTIONS_KEY = "alwrity_pymk_suggestions";
+const DEFAULTS_KEY = "alwrity_pymk_cohort_defaults";
 
 export interface PymkCacheKey {
   cohort: PymkCohort;
@@ -54,7 +54,9 @@ function writeStore(store: PymkCacheStore): void {
 }
 
 /** Return cached PYMK suggestions for a cohort key when still within TTL. */
-export function getPymkSessionCache(key: PymkCacheKey): PymkListResponse | null {
+export function getPymkSessionCache(
+  key: PymkCacheKey,
+): PymkListResponse | null {
   try {
     const store = readStore();
     const entry = store.entries[pymkCacheKeyString(key)];
@@ -71,7 +73,10 @@ export function getPymkSessionCache(key: PymkCacheKey): PymkListResponse | null 
 }
 
 /** Persist PYMK suggestions for fast modal reopen (per cohort + cohort id). */
-export function setPymkSessionCache(key: PymkCacheKey, data: PymkListResponse): void {
+export function setPymkSessionCache(
+  key: PymkCacheKey,
+  data: PymkListResponse,
+): void {
   try {
     const store = readStore();
     store.entries[pymkCacheKeyString(key)] = {
@@ -119,7 +124,10 @@ export function setPymkDefaultsSessionCache(data: PymkCohortDefaults): void {
   try {
     sessionStorage.setItem(
       DEFAULTS_KEY,
-      JSON.stringify({ data, fetchedAt: Date.now() } satisfies PymkDefaultsCacheEntry),
+      JSON.stringify({
+        data,
+        fetchedAt: Date.now(),
+      } satisfies PymkDefaultsCacheEntry),
     );
   } catch {
     // ignore

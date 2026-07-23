@@ -1,22 +1,17 @@
-import React, { useCallback, useRef, useState } from 'react';
-import {
-  Alert,
-  Box,
-  Button,
-  Typography,
-} from '@mui/material';
+import React, { useCallback, useRef, useState } from "react";
+import { Alert, Box, Button, Typography } from "@mui/material";
 import {
   AutoAwesome as GenerateIcon,
   CloudUpload as UploadIcon,
-} from '@mui/icons-material';
-import { useLinkedInPublishMedia } from '../hooks/useLinkedInPublishMedia';
-import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
-import { LinkedInPublishMediaPreview } from './LinkedInPublishMediaPreview';
-import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
-import { readPrefs } from '../utils/linkedInWriterUtils';
-import { buildPromptFromSelection } from '../../../services/linkedInImageService';
-import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from '../utils/linkedInPublishMediaConstants';
-import { formatDraftForPublish } from '../utils/linkedInPublishFormatters';
+} from "@mui/icons-material";
+import { useLinkedInPublishMedia } from "../hooks/useLinkedInPublishMedia";
+import { useLinkedInSelectionImage } from "../hooks/useLinkedInSelectionImage";
+import { LinkedInPublishMediaPreview } from "./LinkedInPublishMediaPreview";
+import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
+import { readPrefs } from "../utils/linkedInWriterUtils";
+import { buildPromptFromSelection } from "../../../services/linkedInImageService";
+import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from "../utils/linkedInPublishMediaConstants";
+import { formatDraftForPublish } from "../utils/linkedInPublishFormatters";
 
 interface LinkedInPublishMediaSectionProps {
   draft: string;
@@ -26,17 +21,17 @@ interface LinkedInPublishMediaSectionProps {
   media?: ReturnType<typeof useLinkedInPublishMedia>;
 }
 
-export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionProps> = ({
-  draft,
-  topic,
-  compact = false,
-  media: externalMedia,
-}) => {
+export const LinkedInPublishMediaSection: React.FC<
+  LinkedInPublishMediaSectionProps
+> = ({ draft, topic, compact = false, media: externalMedia }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const prefs = readPrefs();
 
-  const internalMedia = useLinkedInPublishMedia({ draft, autoDetectFromDraft: true });
+  const internalMedia = useLinkedInPublishMedia({
+    draft,
+    autoDetectFromDraft: true,
+  });
   const publishMedia = externalMedia ?? internalMedia;
 
   const selectionImage = useLinkedInSelectionImage({
@@ -54,8 +49,11 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
 
   const openAiGenerator = useCallback(() => {
     const plainText = formatDraftForPublish(draft);
-    const seedText = plainText.trim().slice(0, 200) || 'LinkedIn post visual';
-    selectionImage.openForDraft(seedText, buildPromptFromSelection(seedText, topic, prefs.industry));
+    const seedText = plainText.trim().slice(0, 200) || "LinkedIn post visual";
+    selectionImage.openForDraft(
+      seedText,
+      buildPromptFromSelection(seedText, topic, prefs.industry),
+    );
   }, [draft, topic, prefs.industry, selectionImage]);
 
   const handleFileChange = useCallback(
@@ -64,7 +62,7 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
       if (file) {
         publishMedia.attachLocalFile(file);
       }
-      event.target.value = '';
+      event.target.value = "";
     },
     [publishMedia],
   );
@@ -81,10 +79,13 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
     [publishMedia],
   );
 
-  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    setIsDragOver(true);
-  }, []);
+  const handleDragOver = useCallback(
+    (event: React.DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      setIsDragOver(true);
+    },
+    [],
+  );
 
   const handleDragLeave = useCallback(() => {
     setIsDragOver(false);
@@ -95,11 +96,11 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
       <Typography
         variant="caption"
         sx={{
-          color: '#64748b',
+          color: "#64748b",
           fontWeight: 700,
-          textTransform: 'uppercase',
+          textTransform: "uppercase",
           letterSpacing: 0.5,
-          display: 'block',
+          display: "block",
           mb: 1,
         }}
       >
@@ -120,12 +121,15 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
           sx={{
             p: compact ? 1.25 : 1.5,
             borderRadius: 2,
-            border: `1.5px dashed ${isDragOver ? '#0A66C2' : '#cbd5e1'}`,
-            bgcolor: isDragOver ? '#f0f7ff' : '#f8fafc',
-            textAlign: 'center',
+            border: `1.5px dashed ${isDragOver ? "#0A66C2" : "#cbd5e1"}`,
+            bgcolor: isDragOver ? "#f0f7ff" : "#f8fafc",
+            textAlign: "center",
           }}
         >
-          <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: "#64748b", display: "block", mb: 1 }}
+          >
             Attach an image to publish with your post text.
           </Typography>
           <Box display="flex" flexWrap="wrap" gap={1} justifyContent="center">
@@ -136,10 +140,10 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
               onClick={openAiGenerator}
               disabled={selectionImage.isGenerating}
               sx={{
-                textTransform: 'none',
-                borderColor: '#0A66C2',
-                color: '#0A66C2',
-                '&:hover': { borderColor: '#004182', bgcolor: '#f0f7ff' },
+                textTransform: "none",
+                borderColor: "#0A66C2",
+                color: "#0A66C2",
+                "&:hover": { borderColor: "#004182", bgcolor: "#f0f7ff" },
               }}
             >
               Generate with AI
@@ -149,12 +153,15 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
               variant="outlined"
               startIcon={<UploadIcon />}
               onClick={() => fileInputRef.current?.click()}
-              sx={{ textTransform: 'none' }}
+              sx={{ textTransform: "none" }}
             >
               Upload image
             </Button>
           </Box>
-          <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mt: 1 }}>
+          <Typography
+            variant="caption"
+            sx={{ color: "#94a3b8", display: "block", mt: 1 }}
+          >
             or drag and drop · PNG, JPEG, GIF, WebP · max 8 MB
           </Typography>
         </Box>
@@ -164,7 +171,7 @@ export const LinkedInPublishMediaSection: React.FC<LinkedInPublishMediaSectionPr
         ref={fileInputRef}
         type="file"
         accept={LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS}
-        style={{ display: 'none' }}
+        style={{ display: "none" }}
         onChange={handleFileChange}
       />
 

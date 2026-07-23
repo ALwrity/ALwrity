@@ -1,6 +1,6 @@
-import { useCallback, useEffect } from 'react';
-import type { RefObject } from 'react';
-import useTextSelectionHandler from '../../TextEditor/TextSelectionHandler';
+import { useCallback, useEffect } from "react";
+import type { RefObject } from "react";
+import useTextSelectionHandler from "../../TextEditor/TextSelectionHandler";
 
 interface LinkedInEditorTextSelectionOptions {
   enabled: boolean;
@@ -59,8 +59,10 @@ export function useLinkedInEditorTextSelection(
       }
 
       const elRect = textarea.getBoundingClientRect();
-      const lineHeight = parseFloat(getComputedStyle(textarea).lineHeight) || 22;
-      const linesBefore = textarea.value.substring(0, start).split('\n').length - 1;
+      const lineHeight =
+        parseFloat(getComputedStyle(textarea).lineHeight) || 22;
+      const linesBefore =
+        textarea.value.substring(0, start).split("\n").length - 1;
       const x = Math.max(8, elRect.left + elRect.width / 2);
       const y = Math.max(8, elRect.top + linesBefore * lineHeight + 10);
 
