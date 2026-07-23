@@ -25,6 +25,7 @@ import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
+import { LinkedInConnectionProvider } from '../../contexts/LinkedInConnectionContext';
 import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
 // Optional debug flag: set to true to enable verbose logs locally
@@ -52,7 +53,9 @@ interface LinkedInWriterProps {
 const LinkedInWriter: React.FC<LinkedInWriterProps> = ({ className = '' }) => {
   return (
     <PlatformPersonaProvider platform="linkedin">
-      <LinkedInWriterContent className={className} />
+      <LinkedInConnectionProvider>
+        <LinkedInWriterContent className={className} />
+      </LinkedInConnectionProvider>
     </PlatformPersonaProvider>
   );
 };

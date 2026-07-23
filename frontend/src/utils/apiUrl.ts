@@ -47,10 +47,13 @@ function getLocalhostApiUrl(): string {
 /**
  * Returns the appropriate API base URL.
  *
- * Priority:
- *  1. REACT_APP_API_URL env var (if set — explicit user intent, always respected)
- *  2. When accessed via localhost in development with no env var → localhost:8000
- *  3. Fallback to http://localhost:8000
+ * Priority (development):
+ *  1. Non-localhost access (ngrok tunnel, etc.) → use window.location.origin
+ *  2. Localhost access with env var → use the explicit env var
+ *  3. Localhost access without env var → auto-detect localhost:8000
+ *
+ * Priority (production):
+ *  1. REACT_APP_API_URL env var (required, thrown if missing)
  */
 export const getApiBaseUrl = (): string => {
   const envUrl = process.env.REACT_APP_API_URL;
@@ -64,19 +67,24 @@ export const getApiBaseUrl = (): string => {
     return envUrl;
   }
 
-  // Always respect the explicit env var when set — this is the user's intent
-  // (e.g. pointing at a remote backend via ngrok, even when frontend is on localhost)
+  // Development: when accessed via a non-localhost origin (e.g., ngrok tunnel),
+  // use the browser's origin as the API base URL. The env var (usually
+  // localhost:8000) won't resolve from a remote client.
+  if (!isLocalhostAccess()) {
+    try {
+      return window.location.origin;
+    } catch {
+      return envUrl || 'http://localhost:8000';
+    }
+  }
+
+  // Localhost access: respect explicit env var (e.g., pointing at a remote
+  // backend via ngrok) or fall back to localhost:8000.
   if (envUrl) {
     return envUrl;
   }
 
-  // Development with no env var: auto-detect backend URL
-  if (isLocalhostAccess()) {
-    return getLocalhostApiUrl();
-  }
-
-  // Not on localhost and no env var set — best guess
-  return 'http://localhost:8000';
+  return getLocalhostApiUrl();
 };
 
 export default getApiBaseUrl;

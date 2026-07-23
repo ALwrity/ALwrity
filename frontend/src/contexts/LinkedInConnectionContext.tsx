@@ -1,19 +1,15 @@
 /**
- * LinkedIn social connection hook (Unipile).
+ * LinkedIn Connection Context — single source of truth for LinkedIn connection state.
  *
- * When rendered inside a <LinkedInConnectionProvider>, this hook reads
- * connection state from React Context — all consumers share a single
- * fetch and a single set of React state (no duplicate mounting).
+ * A single Provider fetches connection status once on mount and distributes the
+ * result to all descendent components via React Context, eliminating 14 duplicate
+ * mounting/fetching cycles previously caused by 14 independent hook instances.
  *
- * When rendered outside a Provider (e.g., OnboardingWizard), it falls
- * back to self-contained per-instance state with the shared module-level
- * promise cache in linkedInConnectionStatusCache.ts.
- *
- * Cross-instance sync is maintained via window events
- * (linkedin-oauth-success / linkedin-disconnected).
+ * Components outside the Provider (e.g., OnboardingWizard's LinkedInPlatformCard)
+ * automatically fall back to the self-contained hook path.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 
 import {
@@ -32,17 +28,14 @@ import {
 } from '../components/LinkedInWriter/utils/linkedInProfileSummary';
 import { connectWithLinkedInOAuth } from '../utils/linkedInOAuthConnect';
 import {
-  useLinkedInConnectionFromContext,
-} from '../contexts/LinkedInConnectionContext';
-import {
   LINKEDIN_DISCONNECTED_EVENT,
   LINKEDIN_OAUTH_SUCCESS_EVENT,
   dispatchLinkedInDisconnected,
-} from './linkedInConnectionEvents';
+} from '../hooks/linkedInConnectionEvents';
 import {
   statusAccountsToLinkedInAccounts,
   statusOrganizationsToLinkedInOrganizations,
-} from './linkedInConnectionMappers';
+} from '../hooks/linkedInConnectionMappers';
 import {
   type LinkedInPostTarget,
   clearCachedAvatar,
@@ -56,17 +49,55 @@ import {
   writeStoredAccountId,
   writeStoredOrgId,
   writeStoredTarget,
-} from './linkedInConnectionStorage';
+} from '../hooks/linkedInConnectionStorage';
 import {
   cacheSharedConnectionStatus,
   getCachedConnectionStatus,
   getOrCreateSharedStatusPromise,
   invalidateSharedConnectionStatus,
-} from './linkedInConnectionStatusCache';
+} from '../hooks/linkedInConnectionStatusCache';
 
 export type { LinkedInPostTarget };
 
-const useLinkedInSocialConnectionStandalone = () => {
+export interface LinkedInConnectionState {
+  connected: boolean;
+  provider: string;
+  hasPerUserToken: boolean;
+  accountName: string | undefined;
+  avatarUrl: string | null | undefined;
+  displayName: string;
+  accounts: LinkedInAccount[];
+  organizations: LinkedInOrganization[];
+  selectedAccountId: string;
+  selectedTarget: LinkedInPostTarget;
+  selectedOrgId: string;
+  isLoading: boolean;
+  isProfileLoading: boolean;
+  isConnecting: boolean;
+  error: string | null;
+  connectError: string | null;
+  disconnectError: string | null;
+  profileLoadWarning: string | null;
+  primaryProfile: LinkedInProfileSummary | null;
+  checkStatus: () => Promise<void>;
+  connectWithOAuth: () => Promise<boolean>;
+  handleAccountChange: (accountId: string) => Promise<void>;
+  handleTargetChange: (target: LinkedInPostTarget) => void;
+  handleOrgChange: (orgId: string) => void;
+  disconnect: () => Promise<boolean>;
+}
+
+const LinkedInConnectionContext = createContext<LinkedInConnectionState | null>(null);
+
+export const useLinkedInConnectionFromContext = (): LinkedInConnectionState | null => {
+  return useContext(LinkedInConnectionContext);
+};
+
+interface LinkedInConnectionProviderProps {
+  children: React.ReactNode;
+}
+
+export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProps> = ({ children }) => {
   const { userId } = useAuth();
   const uid = userId || '';
 
@@ -125,19 +156,12 @@ const useLinkedInSocialConnectionStandalone = () => {
     } else {
       try {
         connectionStatus = await getOrCreateSharedStatusPromise(getLinkedInConnectionStatus);
-        const wasAlreadyCached = !!getCachedConnectionStatus();
         cacheSharedConnectionStatus(connectionStatus);
         setStatus(connectionStatus);
-        if (wasAlreadyCached) {
-          console.debug('[LinkedInConnect] status resolved (shared promise)', {
-            connected: connectionStatus.connected,
-          });
-        } else {
-          console.info('[LinkedInConnect] status loaded (fresh)', {
-            connected: connectionStatus.connected,
-            provider: connectionStatus.provider,
-          });
-        }
+        console.info('[LinkedInConnect] status loaded (fresh)', {
+          connected: connectionStatus.connected,
+          provider: connectionStatus.provider,
+        });
       } catch (e: unknown) {
         const statusCode = (e as { response?: { status?: number } })?.response?.status;
         const detail = getLinkedInSocialErrorMessage(e);
@@ -453,47 +477,50 @@ const useLinkedInSocialConnectionStandalone = () => {
     [primaryProfile, status?.account_name]
   );
 
-  return {
-    connected,
-    provider,
-    hasPerUserToken,
-    accountName: status?.account_name,
-    avatarUrl,
-    displayName,
-    accounts,
-    organizations,
-    selectedAccountId,
-    selectedTarget,
-    selectedOrgId,
-    isLoading,
-    isProfileLoading,
-    isConnecting,
-    error,
-    connectError,
-    disconnectError,
-    profileLoadWarning,
-    primaryProfile,
-    checkStatus,
-    connectWithOAuth,
-    handleAccountChange,
-    handleTargetChange,
-    handleOrgChange,
-    disconnect,
-  };
-};
+  const value = useMemo<LinkedInConnectionState>(
+    () => ({
+      connected,
+      provider,
+      hasPerUserToken,
+      accountName: status?.account_name ?? undefined,
+      avatarUrl,
+      displayName,
+      accounts,
+      organizations,
+      selectedAccountId,
+      selectedTarget,
+      selectedOrgId,
+      isLoading,
+      isProfileLoading,
+      isConnecting,
+      error,
+      connectError,
+      disconnectError,
+      profileLoadWarning,
+      primaryProfile,
+      checkStatus,
+      connectWithOAuth,
+      handleAccountChange,
+      handleTargetChange,
+      handleOrgChange,
+      disconnect,
+    }),
+    [
+      connected, provider, hasPerUserToken, status?.account_name,
+      avatarUrl, displayName, accounts, organizations,
+      selectedAccountId, selectedTarget, selectedOrgId,
+      isLoading, isProfileLoading, isConnecting,
+      error, connectError, disconnectError, profileLoadWarning,
+      primaryProfile,
+      checkStatus, connectWithOAuth,
+      handleAccountChange, handleTargetChange, handleOrgChange,
+      disconnect,
+    ]
+  );
 
-/**
- * Primary hook — reads from <LinkedInConnectionProvider> context when
- * available (single fetch shared by all consumers).  Falls back to
- * self-contained per-instance state when rendered outside a Provider.
- *
- * Both code paths always execute to satisfy the Rules of Hooks.  When
- * inside a Provider the standalone state is discarded, but the shared
- * module-level cache prevents any duplicate network calls.
- */
-export const useLinkedInSocialConnection = () => {
-  const context = useLinkedInConnectionFromContext();
-  const standalone = useLinkedInSocialConnectionStandalone();
-
-  return context ?? standalone;
+  return (
+    <LinkedInConnectionContext.Provider value={value}>
+      {children}
+    </LinkedInConnectionContext.Provider>
+  );
 };
