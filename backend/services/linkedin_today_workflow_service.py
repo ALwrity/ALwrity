@@ -161,7 +161,7 @@ class LinkedInTodayWorkflowService:
                         estimated_time=max(5, min(120, int(t.get("estimatedTime", 15) or 15))),
                         action_type="navigate",
                         action_url=t.get("actionUrl")
-                        or LINKEDIN_PILLAR_ACTION_URLS.get(pillar_id, "/linkedin-writer"),
+                        or LINKEDIN_PILLAR_ACTION_URLS.get(pillar_id, "/linkedin-studio"),
                         enabled=True,
                         dependencies=[],
                         metadata_json={

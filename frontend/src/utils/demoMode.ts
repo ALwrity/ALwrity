@@ -128,7 +128,7 @@ const FEATURE_ROUTE_PRIORITY: [string, string][] = [
   ['podcast', '/podcast-maker'],
   ['blog_writer', '/blog-writer'],
   ['backlinking', '/backlink-outreach'],
-  ['linkedin', '/linkedin-writer'],
+  ['linkedin', '/linkedin-studio'],
   ['facebook', '/facebook-writer'],
   ['story_writer', '/story-writer'],
   ['image', '/image-studio'],

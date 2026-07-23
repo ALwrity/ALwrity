@@ -52,11 +52,11 @@ const PublishPillarChips: React.FC<PublishPillarChipsProps> = ({
       priority: 'high' as const,
       estimatedTime: 15,
       actionType: 'navigate' as const,
-      actionUrl: '/linkedin-writer',
+      actionUrl: '/linkedin-studio',
       icon: LinkedIn,
       color: "#0077B5",
       enabled: true,
-      action: () => navigate('/linkedin-writer')
+      action: () => navigate('/linkedin-studio')
     },
     {
       id: "publish-review-content",
@@ -81,7 +81,7 @@ const PublishPillarChips: React.FC<PublishPillarChipsProps> = ({
         navigate('/facebook-writer');
         break;
       case 'linkedin':
-        navigate('/linkedin-writer');
+        navigate('/linkedin-studio');
         break;
       default:
         break;

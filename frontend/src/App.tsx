@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import ProtectedRoute from './components/shared/ProtectedRoute';
@@ -37,6 +37,16 @@ const WixCallbackPage = React.lazy(() => import('./components/WixCallbackPage/Wi
 const WizardWithNavigate = () => {
   const navigate = useNavigate();
   return <Wizard onComplete={() => navigate('/dashboard')} />;
+};
+
+const LinkedInWriterLegacyRedirect = () => {
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{ pathname: '/linkedin-studio', search: location.search, hash: location.hash }}
+      replace
+    />
+  );
 };
 const WordPressCallbackPage = React.lazy(() => import('./components/WordPressCallbackPage/WordPressCallbackPage'));
 const BingCallbackPage = React.lazy(() => import('./components/BingCallbackPage/BingCallbackPage'));
@@ -227,7 +237,8 @@ const App: React.FC = () => {
                     <Route path="/backlink-outreach" element={<ProtectedRoute><FeatureRoute feature="backlinking"><BacklinkOutreachDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/content-planning" element={<ProtectedRoute><FeatureRoute feature="content-planning"><ContentPlanningDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/facebook-writer" element={<ProtectedRoute><FeatureRoute feature="facebook"><FacebookWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/linkedin-writer" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/linkedin-studio" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/linkedin-writer" element={<LinkedInWriterLegacyRedirect />} />
                     <Route path="/blog-writer" element={<ProtectedRoute><FeatureRoute feature="blog_writer"><BlogWriter /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />

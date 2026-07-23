@@ -136,7 +136,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to={route} replace />;
   }
 
-  // Subscription guard for non-bypass routes (feature apps like story-writer, linkedin-writer)
+  // Subscription guard for non-bypass routes (feature apps like story-writer, linkedin-studio)
   if (!isBypassRoute) {
     // Subscription data not yet loaded - show spinner
     if (subscription === null) {
