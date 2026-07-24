@@ -378,6 +378,8 @@ export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionS
     if (Date.now() >= statusCacheExpiry) {
       statusPromiseCache = null;
     }
+  }).catch(() => {
+    /* Suppress unhandled rejection — the caller handles the real error */
   });
   return promise;
 }
@@ -527,6 +529,8 @@ export async function listLinkedInAccounts(): Promise<LinkedInAccountsResponse> 
     if (Date.now() >= accountsCacheExpiry) {
       accountsPromiseCache = null;
     }
+  }).catch(() => {
+    /* Suppress unhandled rejection — the caller handles the real error */
   });
   return promise;
 }

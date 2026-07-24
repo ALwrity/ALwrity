@@ -29,18 +29,16 @@ import {
   WelcomeMessage,
   ProgressTracker,
   type ProgressStep,
-} from "./components";
-import OutlineEditor from "./components/OutlineEditor";
-import PublishLinkedInPanel from "./components/PublishLinkedInPanel";
-import type { LinkedInAssistiveEditorHandle } from "./components/LinkedInAssistiveEditor";
-import { useCopilotActions } from "./components/CopilotActions";
-import { useLinkedInWriter } from "./hooks/useLinkedInWriter";
-import { useCopilotPersistence } from "./utils/enhancedPersistence";
-import {
-  PlatformPersonaProvider,
-  usePlatformPersonaContext,
-} from "../shared/PersonaContext/PlatformPersonaProvider";
-import { useCopilotActionTyped } from "../../hooks/useCopilotActionTyped";
+} from './components';
+import OutlineEditor from './components/OutlineEditor';
+import PublishLinkedInPanel from './components/PublishLinkedInPanel';
+import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssistiveEditor';
+import { useCopilotActions } from './components/CopilotActions';
+import { useLinkedInWriter } from './hooks/useLinkedInWriter';
+import { useCopilotPersistence } from './utils/enhancedPersistence';
+import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
+import { LinkedInConnectionProvider } from '../../contexts/LinkedInConnectionContext';
+import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
 // Optional debug flag: set to true to enable verbose logs locally
 // const DEBUG_LINKEDIN = false;
@@ -70,7 +68,9 @@ interface LinkedInWriterProps {
 const LinkedInWriter: React.FC<LinkedInWriterProps> = ({ className = "" }) => {
   return (
     <PlatformPersonaProvider platform="linkedin">
-      <LinkedInWriterContent className={className} />
+      <LinkedInConnectionProvider>
+        <LinkedInWriterContent className={className} />
+      </LinkedInConnectionProvider>
     </PlatformPersonaProvider>
   );
 };
