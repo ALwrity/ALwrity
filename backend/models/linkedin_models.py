@@ -5,7 +5,7 @@ This module defines the data models for LinkedIn content generation endpoints.
 Enhanced to support grounding capabilities with source integration and quality metrics.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import AliasChoices, BaseModel, Field, validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -201,17 +201,45 @@ class LinkedInVideoScriptRequest(BaseModel):
 
 
 class LinkedInCommentResponseRequest(BaseModel):
-    """Request model for LinkedIn comment response generation."""
-    original_comment: str = Field(..., description="Original comment to respond to", min_length=10, max_length=1000)
-    post_context: str = Field(..., description="Context of the post being commented on", min_length=10, max_length=500)
-    industry: str = Field(..., description="Industry context", min_length=2, max_length=100)
+    """Request model for LinkedIn comment response generation.
+
+    Backward-compatible aliases: ``comment`` maps to ``original_comment`` and
+    ``original_post`` maps to ``post_context``. ``industry`` defaults to
+    ``General`` so Comment Assistant can call this endpoint without requiring it.
+    """
+    original_comment: str = Field(
+        ...,
+        validation_alias=AliasChoices("original_comment", "comment"),
+        description="Original comment to respond to",
+        min_length=10,
+        max_length=1000,
+    )
+    post_context: str = Field(
+        ...,
+        validation_alias=AliasChoices("post_context", "original_post"),
+        description="Context of the post being commented on",
+        min_length=10,
+        max_length=500,
+    )
+    industry: str = Field(
+        default="General",
+        description="Industry context",
+        min_length=2,
+        max_length=100,
+    )
     tone: LinkedInTone = Field(default=LinkedInTone.FRIENDLY, description="Tone of the response")
     response_length: str = Field(default="medium", description="Length of response: short, medium, long")
     include_questions: bool = Field(default=True, description="Whether to include engaging questions")
     research_enabled: bool = Field(default=False, description="Whether to include research-backed content")
     search_engine: SearchEngine = Field(default=SearchEngine.EXA, description="Search engine for research")
     grounding_level: GroundingLevel = Field(default=GroundingLevel.BASIC, description="Level of content grounding")
-    
+
+    @validator("original_comment", "post_context", "industry", pre=True)
+    def _strip_strings(cls, v):  # noqa: N805
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
