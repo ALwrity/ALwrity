@@ -4,22 +4,26 @@
  * Determines the correct backend URL based on:
  *  1. Explicit REACT_APP_API_URL env var (production)
  *  2. Browser origin when accessed via localhost (development)
- *  3. Fallback to http://localhost:8000
+ *  3. Fallback to http://127.0.0.1:8000
  *
  * This ensures that when a developer accesses the app via
- * `http://localhost:3000`, the API calls go to `http://localhost:8000`
+ * `http://localhost:3000`, the API calls go to `http://127.0.0.1:8000`
  * regardless of what REACT_APP_API_URL (e.g. an ngrok URL) is set to.
  * Conversely, when accessed via an ngrok URL, the API calls go to that
  * same ngrok URL.
+ *
+ * NOTE: We use 127.0.0.1 instead of localhost because the backend binds to
+ * IPv4 (0.0.0.0) by default, and browsers may resolve "localhost" to IPv6
+ * (::1) first, causing connection failures.
  */
 
 const LOCALHOST_PORTS = [3000, 3001, 5173, 5174, 8080, 4173];
 
 function isLocalhostAccess(): boolean {
   try {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === "undefined") return false;
     const { hostname } = window.location;
-    return hostname === 'localhost' || hostname === '127.0.0.1';
+    return hostname === "localhost" || hostname === "127.0.0.1";
   } catch {
     return false;
   }
@@ -27,20 +31,20 @@ function isLocalhostAccess(): boolean {
 
 function getLocalhostApiUrl(): string {
   try {
-    if (typeof window === 'undefined') return 'http://localhost:8000';
+    if (typeof window === "undefined") return "http://127.0.0.1:8000";
     const { port } = window.location;
     const numericPort = parseInt(port, 10);
     // If the frontend is running on a common dev port, assume backend is on 8000
     if (LOCALHOST_PORTS.includes(numericPort) || isNaN(numericPort)) {
-      return 'http://localhost:8000';
+      return "http://127.0.0.1:8000";
     }
     // If on port 8000 itself (served by backend), use same origin
     if (numericPort === 8000) {
       return `${window.location.origin}`;
     }
-    return 'http://localhost:8000';
+    return "http://127.0.0.1:8000";
   } catch {
-    return 'http://localhost:8000';
+    return "http://127.0.0.1:8000";
   }
 }
 
@@ -57,12 +61,16 @@ function getLocalhostApiUrl(): string {
  */
 export const getApiBaseUrl = (): string => {
   const envUrl = process.env.REACT_APP_API_URL;
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === "production";
 
   if (isProduction) {
     if (!envUrl) {
-      console.error('[getApiBaseUrl] REACT_APP_API_URL is not set for production!');
-      throw new Error('REACT_APP_API_URL environment variable is required for production.');
+      console.error(
+        "[getApiBaseUrl] REACT_APP_API_URL is not set for production!",
+      );
+      throw new Error(
+        "REACT_APP_API_URL environment variable is required for production.",
+      );
     }
     return envUrl;
   }

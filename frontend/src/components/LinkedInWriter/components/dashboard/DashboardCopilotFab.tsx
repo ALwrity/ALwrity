@@ -1,26 +1,26 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { ConnectLockIcon } from './ConnectLockIcon';
-import { LINKEDIN_COPILOT_COMING_SOON_HINT } from '../../utils/linkedInConnectLockedUi';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { ConnectLockIcon } from "./ConnectLockIcon";
+import { LINKEDIN_COPILOT_COMING_SOON_HINT } from "../../utils/linkedInConnectLockedUi";
 
 interface DashboardCopilotFabProps {
   onOpenCopilot: () => void;
-  variant?: 'rail' | 'fixed' | 'corner';
-  layout?: 'absolute' | 'stacked';
+  variant?: "rail" | "fixed" | "corner";
+  layout?: "absolute" | "stacked";
   /** Co-Pilot chat is not live yet — show lock + coming-soon hover instead of opening. */
   comingSoon?: boolean;
 }
 
 export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
   onOpenCopilot,
-  variant = 'rail',
-  layout = 'absolute',
+  variant = "rail",
+  layout = "absolute",
   comingSoon = true,
 }) => {
-  const isFixed = variant === 'fixed';
-  const isCorner = variant === 'corner';
-  const isStacked = layout === 'stacked';
-  const isRail = variant === 'rail';
+  const isFixed = variant === "fixed";
+  const isCorner = variant === "corner";
+  const isStacked = layout === "stacked";
+  const isRail = variant === "rail";
   const buttonSize = isFixed || isCorner ? 56 : isRail ? 56 : 48;
   const showLabelBadge = isFixed || isCorner;
   const btnRef = useRef<HTMLButtonElement>(null);
@@ -28,7 +28,9 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
   const pinnedHintRef = useRef(false);
   const [showSoonHint, setShowSoonHint] = useState(false);
   const [hintPos, setHintPos] = useState({ top: 0, left: 0 });
-  const [hintPlacement, setHintPlacement] = useState<'above' | 'below'>('above');
+  const [hintPlacement, setHintPlacement] = useState<"above" | "below">(
+    "above",
+  );
 
   const syncHintPosition = useCallback(() => {
     const node = btnRef.current;
@@ -37,12 +39,12 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
     const spaceAbove = rect.top;
     const spaceBelow = window.innerHeight - rect.bottom;
     const placeAbove = spaceAbove >= 72 || spaceAbove >= spaceBelow;
-    setHintPlacement(placeAbove ? 'above' : 'below');
+    setHintPlacement(placeAbove ? "above" : "below");
     setHintPos({
       top: placeAbove ? rect.top - 10 : rect.bottom + 10,
       left: Math.min(
         Math.max(rect.left + rect.width / 2, 148),
-        window.innerWidth - 148
+        window.innerWidth - 148,
       ),
     });
   }, []);
@@ -65,11 +67,11 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
   useEffect(() => {
     if (!showSoonHint) return undefined;
     const onReposition = () => syncHintPosition();
-    window.addEventListener('scroll', onReposition, true);
-    window.addEventListener('resize', onReposition);
+    window.addEventListener("scroll", onReposition, true);
+    window.addEventListener("resize", onReposition);
     return () => {
-      window.removeEventListener('scroll', onReposition, true);
-      window.removeEventListener('resize', onReposition);
+      window.removeEventListener("scroll", onReposition, true);
+      window.removeEventListener("resize", onReposition);
     };
   }, [showSoonHint, syncHintPosition]);
 
@@ -80,8 +82,8 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
       if (wrapRef.current?.contains(target)) return;
       dismissSoonHint();
     };
-    document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [showSoonHint, dismissSoonHint]);
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
@@ -101,18 +103,22 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
   };
 
   const innerClass = [
-    isFixed ? 'linkedin-copilot-fab-fixed-inner' : isCorner ? 'linkedin-copilot-fab-corner-inner' : '',
+    isFixed
+      ? "linkedin-copilot-fab-fixed-inner"
+      : isCorner
+        ? "linkedin-copilot-fab-corner-inner"
+        : "",
   ]
     .filter(Boolean)
-    .join(' ');
+    .join(" ");
 
   const iconControl = (
     <div
       ref={wrapRef}
       className={
         comingSoon
-          ? 'linkedin-copilot-fab-btn-wrap linkedin-copilot-fab-btn-wrap--coming-soon'
-          : 'linkedin-copilot-fab-btn-wrap'
+          ? "linkedin-copilot-fab-btn-wrap linkedin-copilot-fab-btn-wrap--coming-soon"
+          : "linkedin-copilot-fab-btn-wrap"
       }
     >
       <button
@@ -124,24 +130,26 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
         onMouseLeave={comingSoon ? closeSoonHint : undefined}
         aria-label={
           comingSoon
-            ? 'ALwrity Co-Pilot — coming in the next release'
-            : 'Ask ALwrity Co-Pilot'
+            ? "ALwrity Co-Pilot — coming in the next release"
+            : "Ask ALwrity Co-Pilot"
         }
         aria-disabled={comingSoon}
-        aria-describedby={comingSoon && showSoonHint ? 'linkedin-copilot-soon-hint' : undefined}
-        title={comingSoon ? undefined : 'Ask ALwrity Co-Pilot'}
+        aria-describedby={
+          comingSoon && showSoonHint ? "linkedin-copilot-soon-hint" : undefined
+        }
+        title={comingSoon ? undefined : "Ask ALwrity Co-Pilot"}
         style={{
           width: buttonSize,
           height: buttonSize,
-          borderRadius: '50%',
-          border: '3px solid #0a66c2',
-          background: '#ffffff',
+          borderRadius: "50%",
+          border: "3px solid #0a66c2",
+          background: "#ffffff",
           padding: 0,
-          cursor: comingSoon ? 'default' : 'pointer',
-          overflow: 'visible',
-          boxShadow: '0 8px 24px rgba(10, 102, 194, 0.28)',
-          transition: 'transform 160ms ease, box-shadow 160ms ease',
-          position: 'relative',
+          cursor: comingSoon ? "default" : "pointer",
+          overflow: "visible",
+          boxShadow: "0 8px 24px rgba(10, 102, 194, 0.28)",
+          transition: "transform 160ms ease, box-shadow 160ms ease",
+          position: "relative",
         }}
       >
         <span className="linkedin-copilot-fab-btn-photo" aria-hidden>
@@ -149,11 +157,11 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
             src="/ask-alwrity-girl.png"
             alt=""
             style={{
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: 'center top',
-              borderRadius: '50%',
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: "center top",
+              borderRadius: "50%",
             }}
           />
         </span>
@@ -169,23 +177,24 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
           <span
             id="linkedin-copilot-soon-hint"
             className={[
-              'linkedin-copilot-fab-soon-tooltip',
-              'linkedin-copilot-fab-soon-tooltip--portal',
-              hintPlacement === 'below' && 'linkedin-copilot-fab-soon-tooltip--portal-below',
+              "linkedin-copilot-fab-soon-tooltip",
+              "linkedin-copilot-fab-soon-tooltip--portal",
+              hintPlacement === "below" &&
+                "linkedin-copilot-fab-soon-tooltip--portal-below",
             ]
               .filter(Boolean)
-              .join(' ')}
+              .join(" ")}
             role="tooltip"
             style={{
               top: hintPos.top,
               left: hintPos.left,
               opacity: 1,
-              visibility: 'visible',
+              visibility: "visible",
             }}
           >
             {LINKEDIN_COPILOT_COMING_SOON_HINT}
           </span>,
-          document.body
+          document.body,
         )}
     </div>
   );
@@ -198,24 +207,24 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
           ? undefined
           : isStacked
             ? {
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
                 gap: 4,
-                width: '100%',
-                pointerEvents: 'auto',
+                width: "100%",
+                pointerEvents: "auto",
               }
             : {
-                position: 'absolute',
-                left: '50%',
+                position: "absolute",
+                left: "50%",
                 bottom: 16,
-                transform: 'translateX(-50%)',
+                transform: "translateX(-50%)",
                 zIndex: 20,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
                 gap: 5,
-                pointerEvents: 'auto',
+                pointerEvents: "auto",
               }
       }
     >
@@ -224,17 +233,17 @@ export const DashboardCopilotFab: React.FC<DashboardCopilotFabProps> = ({
         style={{
           fontSize: isRail ? 9 : 8,
           fontWeight: 700,
-          color: '#0a66c2',
-          textAlign: 'center',
+          color: "#0a66c2",
+          textAlign: "center",
           maxWidth: isCorner ? 120 : 108,
           lineHeight: 1.2,
           ...(showLabelBadge
             ? {
-                background: 'rgba(255,255,255,0.92)',
-                padding: '2px 6px',
+                background: "rgba(255,255,255,0.92)",
+                padding: "2px 6px",
                 borderRadius: 8,
-                border: '1px solid #BCE0FD',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                border: "1px solid #BCE0FD",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
               }
             : {}),
         }}

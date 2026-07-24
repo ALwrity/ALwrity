@@ -1,12 +1,12 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import type { GeneratedLinkedInImagePreview } from '../components/LinkedInSelectionImageModal';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { GeneratedLinkedInImagePreview } from "../components/LinkedInSelectionImageModal";
 import {
   getLastDraftImageForPublish,
   validatePublishImageFile,
   type LinkedInPublishMediaAttachment,
-} from '../utils/linkedInPublishMediaUtils';
+} from "../utils/linkedInPublishMediaUtils";
 
-export type LinkedInPublishMediaStatus = 'idle' | 'attached' | 'publishing';
+export type LinkedInPublishMediaStatus = "idle" | "attached" | "publishing";
 
 interface UseLinkedInPublishMediaOptions {
   draft?: string;
@@ -15,11 +15,12 @@ interface UseLinkedInPublishMediaOptions {
 }
 
 export function useLinkedInPublishMedia({
-  draft = '',
+  draft = "",
   autoDetectFromDraft = true,
 }: UseLinkedInPublishMediaOptions = {}) {
-  const [status, setStatus] = useState<LinkedInPublishMediaStatus>('idle');
-  const [attachment, setAttachment] = useState<LinkedInPublishMediaAttachment | null>(null);
+  const [status, setStatus] = useState<LinkedInPublishMediaStatus>("idle");
+  const [attachment, setAttachment] =
+    useState<LinkedInPublishMediaAttachment | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
   const uploadPreviewUrlRef = useRef<string | null>(null);
   const userClearedRef = useRef(false);
@@ -35,23 +36,27 @@ export function useLinkedInPublishMedia({
     revokeUploadPreview();
     setAttachment(null);
     setValidationError(null);
-    setStatus('idle');
+    setStatus("idle");
     userClearedRef.current = true;
   }, [revokeUploadPreview]);
 
   const attachAiImage = useCallback(
-    (preview: Pick<GeneratedLinkedInImagePreview, 'imageId' | 'imageUrl'> & { alt?: string }) => {
+    (
+      preview: Pick<GeneratedLinkedInImagePreview, "imageId" | "imageUrl"> & {
+        alt?: string;
+      },
+    ) => {
       if (!preview.imageId || !preview.imageUrl) return;
 
       revokeUploadPreview();
       setValidationError(null);
       setAttachment({
-        source: 'ai',
+        source: "ai",
         imageId: preview.imageId,
         imageUrl: preview.imageUrl,
-        alt: preview.alt || 'Generated LinkedIn image',
+        alt: preview.alt || "Generated LinkedIn image",
       });
-      setStatus('attached');
+      setStatus("attached");
       userClearedRef.current = false;
     },
     [revokeUploadPreview],
@@ -61,7 +66,7 @@ export function useLinkedInPublishMedia({
     (file: File) => {
       const validation = validatePublishImageFile(file);
       if (!validation.valid) {
-        setValidationError(validation.error || 'Invalid image file.');
+        setValidationError(validation.error || "Invalid image file.");
         return false;
       }
 
@@ -71,12 +76,12 @@ export function useLinkedInPublishMedia({
 
       setValidationError(null);
       setAttachment({
-        source: 'upload',
+        source: "upload",
         localFile: file,
         previewUrl,
         fileName: file.name,
       });
-      setStatus('attached');
+      setStatus("attached");
       userClearedRef.current = false;
       return true;
     },
@@ -84,11 +89,11 @@ export function useLinkedInPublishMedia({
   );
 
   const beginPublishing = useCallback(() => {
-    setStatus('publishing');
+    setStatus("publishing");
   }, []);
 
   const endPublishing = useCallback(() => {
-    setStatus(attachment ? 'attached' : 'idle');
+    setStatus(attachment ? "attached" : "idle");
   }, [attachment]);
 
   const reset = useCallback(() => {
@@ -96,7 +101,7 @@ export function useLinkedInPublishMedia({
     revokeUploadPreview();
     setAttachment(null);
     setValidationError(null);
-    setStatus('idle');
+    setStatus("idle");
   }, [revokeUploadPreview]);
 
   useEffect(() => {
@@ -106,16 +111,13 @@ export function useLinkedInPublishMedia({
     if (!detected) return;
 
     setAttachment((current) => {
-      if (current?.source === 'upload') return current;
-      if (
-        current?.source === 'ai' &&
-        current.imageId === detected.imageId
-      ) {
+      if (current?.source === "upload") return current;
+      if (current?.source === "ai" && current.imageId === detected.imageId) {
         return current;
       }
       return detected;
     });
-    setStatus('attached');
+    setStatus("attached");
   }, [draft, autoDetectFromDraft]);
 
   useEffect(() => {
@@ -131,12 +133,12 @@ export function useLinkedInPublishMedia({
     hasAttachment: attachment !== null,
     resolve: () => {
       if (!attachment) {
-        return { source: 'none' as const };
+        return { source: "none" as const };
       }
-      if (attachment.source === 'ai') {
-        return { source: 'ai' as const, imageId: attachment.imageId };
+      if (attachment.source === "ai") {
+        return { source: "ai" as const, imageId: attachment.imageId };
       }
-      return { source: 'upload' as const, localFile: attachment.localFile };
+      return { source: "upload" as const, localFile: attachment.localFile };
     },
     attachAiImage,
     attachLocalFile,

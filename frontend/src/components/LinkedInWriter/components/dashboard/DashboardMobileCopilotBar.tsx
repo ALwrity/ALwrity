@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
 interface DashboardMobileCopilotBarProps {
   onOpenCopilot: () => void;
@@ -8,26 +8,30 @@ interface DashboardMobileCopilotBarProps {
  * Phase 4 — Full-width sticky Co-Pilot bar for mobile (≤960px).
  * Looks like a chat input; tap opens the existing Co-Pilot sidebar.
  */
-export const DashboardMobileCopilotBar: React.FC<DashboardMobileCopilotBarProps> = ({
-  onOpenCopilot,
-}) => {
+export const DashboardMobileCopilotBar: React.FC<
+  DashboardMobileCopilotBarProps
+> = ({ onOpenCopilot }) => {
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !window.visualViewport) return undefined;
+    if (typeof window === "undefined" || !window.visualViewport)
+      return undefined;
 
     const viewport = window.visualViewport;
     const syncOffset = () => {
-      const covered = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
+      const covered = Math.max(
+        0,
+        window.innerHeight - viewport.height - viewport.offsetTop,
+      );
       setKeyboardOffset(covered > 40 ? covered : 0);
     };
 
     syncOffset();
-    viewport.addEventListener('resize', syncOffset);
-    viewport.addEventListener('scroll', syncOffset);
+    viewport.addEventListener("resize", syncOffset);
+    viewport.addEventListener("scroll", syncOffset);
     return () => {
-      viewport.removeEventListener('resize', syncOffset);
-      viewport.removeEventListener('scroll', syncOffset);
+      viewport.removeEventListener("resize", syncOffset);
+      viewport.removeEventListener("scroll", syncOffset);
     };
   }, []);
 
@@ -51,7 +55,9 @@ export const DashboardMobileCopilotBar: React.FC<DashboardMobileCopilotBarProps>
           alt=""
           aria-hidden
         />
-        <span className="linkedin-mobile-copilot-bar-placeholder">Ask ALwrity Co-Pilot…</span>
+        <span className="linkedin-mobile-copilot-bar-placeholder">
+          Ask ALwrity Co-Pilot…
+        </span>
         <span className="linkedin-mobile-copilot-bar-cta" aria-hidden>
           Ask
         </span>

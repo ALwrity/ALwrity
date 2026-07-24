@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from "react";
 import {
   Box,
   Grid,
@@ -22,8 +22,8 @@ import {
   LinearProgress,
   Chip,
   Divider,
-} from '@mui/material';
-import { alpha } from '@mui/material/styles';
+} from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import {
   Transform as TransformIcon,
   VideoLibrary,
@@ -33,12 +33,12 @@ import {
   AttachMoney,
   Info,
   Close,
-} from '@mui/icons-material';
-import { motion, type Variants, type Easing } from 'framer-motion';
-import { useTransformStudio } from '../../hooks/useTransformStudio';
-import { ImageStudioLayout } from './ImageStudioLayout';
-import { OperationButton } from '../shared/OperationButton';
-import { PreflightOperation } from '../../services/billingService';
+} from "@mui/icons-material";
+import { motion, type Variants, type Easing } from "framer-motion";
+import { useTransformStudio } from "../../hooks/useTransformStudio";
+import { ImageStudioLayout } from "./ImageStudioLayout";
+import { OperationButton } from "../shared/OperationButton";
+import { PreflightOperation } from "../../services/billingService";
 
 const MotionPaper = motion.create(Paper);
 const MotionCard = motion.create(Card);
@@ -76,13 +76,15 @@ function TabPanel(props: TabPanelProps) {
 
 export const TransformStudio: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
-  const [imageBase64, setImageBase64] = useState<string>('');
-  const [audioBase64, setAudioBase64] = useState<string>('');
-  const [prompt, setPrompt] = useState('');
-  const [negativePrompt, setNegativePrompt] = useState('');
-  const [resolution, setResolution] = useState<'480p' | '720p' | '1080p'>('720p');
+  const [imageBase64, setImageBase64] = useState<string>("");
+  const [audioBase64, setAudioBase64] = useState<string>("");
+  const [prompt, setPrompt] = useState("");
+  const [negativePrompt, setNegativePrompt] = useState("");
+  const [resolution, setResolution] = useState<"480p" | "720p" | "1080p">(
+    "720p",
+  );
   const [duration, setDuration] = useState<5 | 10>(5);
-  const [seed, setSeed] = useState<string>('');
+  const [seed, setSeed] = useState<string>("");
   const [enablePromptExpansion, setEnablePromptExpansion] = useState(true);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
 
@@ -105,39 +107,45 @@ export const TransformStudio: React.FC = () => {
     setVideoUrl(null);
   };
 
-  const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file');
-      return;
-    }
+      if (!file.type.startsWith("image/")) {
+        alert("Please upload an image file");
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setImageBase64(result);
-    };
-    reader.readAsDataURL(file);
-  }, []);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setImageBase64(result);
+      };
+      reader.readAsDataURL(file);
+    },
+    [],
+  );
 
-  const handleAudioUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleAudioUpload = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    if (!file.type.startsWith('audio/')) {
-      alert('Please upload an audio file (wav or mp3)');
-      return;
-    }
+      if (!file.type.startsWith("audio/")) {
+        alert("Please upload an audio file (wav or mp3)");
+        return;
+      }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      setAudioBase64(result);
-    };
-    reader.readAsDataURL(file);
-  }, []);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        setAudioBase64(result);
+      };
+      reader.readAsDataURL(file);
+    },
+    [],
+  );
 
   const canGenerateImageToVideo = useMemo(() => {
     return imageBase64 && prompt.trim().length > 0;
@@ -148,24 +156,30 @@ export const TransformStudio: React.FC = () => {
   }, [imageBase64, audioBase64]);
 
   // Define preflight operations for cost estimation
-  const imageToVideoOperation: PreflightOperation = useMemo(() => ({
-    provider: 'wavespeed',
-    model: 'alibaba/wan-2.5/image-to-video',
-    operation_type: 'image-to-video',
-  }), []);
+  const imageToVideoOperation: PreflightOperation = useMemo(
+    () => ({
+      provider: "wavespeed",
+      model: "alibaba/wan-2.5/image-to-video",
+      operation_type: "image-to-video",
+    }),
+    [],
+  );
 
-  const talkingAvatarOperation: PreflightOperation = useMemo(() => ({
-    provider: 'wavespeed',
-    model: 'wavespeed-ai/infinitetalk',
-    operation_type: 'talking-avatar',
-  }), []);
+  const talkingAvatarOperation: PreflightOperation = useMemo(
+    () => ({
+      provider: "wavespeed",
+      model: "wavespeed-ai/infinitetalk",
+      operation_type: "talking-avatar",
+    }),
+    [],
+  );
 
   const handleEstimateCost = useCallback(async () => {
     if (tabValue === 0) {
       // Image-to-video
       if (!canGenerateImageToVideo) return;
       await estimateCost({
-        operation: 'image-to-video',
+        operation: "image-to-video",
         resolution,
         duration,
       });
@@ -173,11 +187,18 @@ export const TransformStudio: React.FC = () => {
       // Talking avatar
       if (!canGenerateTalkingAvatar) return;
       await estimateCost({
-        operation: 'talking-avatar',
-        resolution: resolution as '480p' | '720p',
+        operation: "talking-avatar",
+        resolution: resolution as "480p" | "720p",
       });
     }
-  }, [tabValue, canGenerateImageToVideo, canGenerateTalkingAvatar, resolution, duration, estimateCost]);
+  }, [
+    tabValue,
+    canGenerateImageToVideo,
+    canGenerateTalkingAvatar,
+    resolution,
+    duration,
+    estimateCost,
+  ]);
 
   const handleGenerate = useCallback(async () => {
     clearError();
@@ -200,8 +221,9 @@ export const TransformStudio: React.FC = () => {
         if (response.video_url) {
           // Get auth token for video URL (video elements can't use headers)
           const token = await (window as any).Clerk?.session?.getToken();
-          const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
-          const videoUrlWithToken = token 
+          const baseUrl =
+            process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
+          const videoUrlWithToken = token
             ? `${baseUrl}${response.video_url}?token=${encodeURIComponent(token)}`
             : `${baseUrl}${response.video_url}`;
           setVideoUrl(videoUrlWithToken);
@@ -211,15 +233,16 @@ export const TransformStudio: React.FC = () => {
         const response = await createTalkingAvatar({
           image_base64: imageBase64,
           audio_base64: audioBase64,
-          resolution: resolution as '480p' | '720p',
+          resolution: resolution as "480p" | "720p",
           prompt: prompt || undefined,
           seed: seed ? parseInt(seed) : undefined,
         });
         if (response.video_url) {
           // Get auth token for video URL (video elements can't use headers)
           const token = await (window as any).Clerk?.session?.getToken();
-          const baseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
-          const videoUrlWithToken = token 
+          const baseUrl =
+            process.env.REACT_APP_API_BASE_URL || "http://127.0.0.1:8000";
+          const videoUrlWithToken = token
             ? `${baseUrl}${response.video_url}?token=${encodeURIComponent(token)}`
             : `${baseUrl}${response.video_url}`;
           setVideoUrl(videoUrlWithToken);
@@ -227,7 +250,7 @@ export const TransformStudio: React.FC = () => {
       }
     } catch (err) {
       // Error is handled by the hook
-      console.error('Generation failed:', err);
+      console.error("Generation failed:", err);
     }
   }, [
     tabValue,
@@ -247,7 +270,7 @@ export const TransformStudio: React.FC = () => {
 
   const handleDownload = useCallback(() => {
     if (videoUrl) {
-      window.open(videoUrl, '_blank');
+      window.open(videoUrl, "_blank");
     }
   }, [videoUrl]);
 
@@ -260,12 +283,12 @@ export const TransformStudio: React.FC = () => {
         animate="visible"
         sx={{
           maxWidth: 1400,
-          mx: 'auto',
+          mx: "auto",
           borderRadius: 4,
-          border: '1px solid rgba(255,255,255,0.08)',
-          background: 'rgba(15,23,42,0.72)',
+          border: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(15,23,42,0.72)",
           p: { xs: 3, md: 5 },
-          backdropFilter: 'blur(25px)',
+          backdropFilter: "blur(25px)",
         }}
       >
         <Stack spacing={3}>
@@ -274,9 +297,9 @@ export const TransformStudio: React.FC = () => {
               variant="h4"
               fontWeight={800}
               sx={{
-                background: 'linear-gradient(120deg,#ede9fe,#c7d2fe)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                background: "linear-gradient(120deg,#ede9fe,#c7d2fe)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
                 mb: 1,
               }}
             >
@@ -292,17 +315,25 @@ export const TransformStudio: React.FC = () => {
             onChange={handleTabChange}
             sx={{
               borderBottom: 1,
-              borderColor: 'divider',
-              '& .MuiTab-root': {
-                color: 'text.secondary',
-                '&.Mui-selected': {
-                  color: 'primary.main',
+              borderColor: "divider",
+              "& .MuiTab-root": {
+                color: "text.secondary",
+                "&.Mui-selected": {
+                  color: "primary.main",
                 },
               },
             }}
           >
-            <Tab label="Image to Video" icon={<VideoLibrary />} iconPosition="start" />
-            <Tab label="Talking Avatar" icon={<TransformIcon />} iconPosition="start" />
+            <Tab
+              label="Image to Video"
+              icon={<VideoLibrary />}
+              iconPosition="start"
+            />
+            <Tab
+              label="Talking Avatar"
+              icon={<TransformIcon />}
+              iconPosition="start"
+            />
           </Tabs>
 
           {error && (
@@ -315,7 +346,10 @@ export const TransformStudio: React.FC = () => {
           <TabPanel value={tabValue} index={0}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <MotionCard variants={cardVariants} sx={{ p: 3, background: 'rgba(255,255,255,0.05)' }}>
+                <MotionCard
+                  variants={cardVariants}
+                  sx={{ p: 3, background: "rgba(255,255,255,0.05)" }}
+                >
                   <Stack spacing={3}>
                     <Typography variant="h6" fontWeight={600}>
                       Upload Image
@@ -323,7 +357,7 @@ export const TransformStudio: React.FC = () => {
                     <Box>
                       <input
                         accept="image/*"
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         id="image-upload"
                         type="file"
                         onChange={handleImageUpload}
@@ -336,7 +370,7 @@ export const TransformStudio: React.FC = () => {
                           fullWidth
                           sx={{ py: 2 }}
                         >
-                          {imageBase64 ? 'Change Image' : 'Upload Image'}
+                          {imageBase64 ? "Change Image" : "Upload Image"}
                         </Button>
                       </label>
                       {imageBase64 && (
@@ -347,7 +381,7 @@ export const TransformStudio: React.FC = () => {
                             alt="Uploaded image"
                             sx={{
                               maxHeight: 300,
-                              objectFit: 'contain',
+                              objectFit: "contain",
                               borderRadius: 2,
                             }}
                           />
@@ -369,7 +403,7 @@ export const TransformStudio: React.FC = () => {
                     <Box>
                       <input
                         accept="audio/*"
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         id="audio-upload"
                         type="file"
                         onChange={handleAudioUpload}
@@ -382,7 +416,9 @@ export const TransformStudio: React.FC = () => {
                           fullWidth
                           sx={{ py: 1.5 }}
                         >
-                          {audioBase64 ? 'Change Audio (Optional)' : 'Upload Audio (Optional)'}
+                          {audioBase64
+                            ? "Change Audio (Optional)"
+                            : "Upload Audio (Optional)"}
                         </Button>
                       </label>
                     </Box>
@@ -404,7 +440,9 @@ export const TransformStudio: React.FC = () => {
                           <Select
                             value={resolution}
                             label="Resolution"
-                            onChange={(e) => setResolution(e.target.value as any)}
+                            onChange={(e) =>
+                              setResolution(e.target.value as any)
+                            }
                           >
                             <MenuItem value="480p">480p</MenuItem>
                             <MenuItem value="720p">720p</MenuItem>
@@ -418,7 +456,9 @@ export const TransformStudio: React.FC = () => {
                           <Select
                             value={duration}
                             label="Duration"
-                            onChange={(e) => setDuration(e.target.value as 5 | 10)}
+                            onChange={(e) =>
+                              setDuration(e.target.value as 5 | 10)
+                            }
                           >
                             <MenuItem value={5}>5 seconds</MenuItem>
                             <MenuItem value={10}>10 seconds</MenuItem>
@@ -439,9 +479,18 @@ export const TransformStudio: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <MotionCard variants={cardVariants} sx={{ p: 3, background: 'rgba(255,255,255,0.05)' }}>
+                <MotionCard
+                  variants={cardVariants}
+                  sx={{ p: 3, background: "rgba(255,255,255,0.05)" }}
+                >
                   <Stack spacing={3}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
                       <Typography variant="h6" fontWeight={600}>
                         Preview & Generate
                       </Typography>
@@ -458,7 +507,11 @@ export const TransformStudio: React.FC = () => {
                     {isGenerating && (
                       <Box>
                         <LinearProgress />
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1, textAlign: "center" }}
+                        >
                           Generating video... This may take 1-2 minutes.
                         </Typography>
                       </Box>
@@ -470,12 +523,12 @@ export const TransformStudio: React.FC = () => {
                           src={videoUrl}
                           controls
                           style={{
-                            width: '100%',
+                            width: "100%",
                             borderRadius: 8,
                             maxHeight: 400,
                           }}
                         />
-                        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                        <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
                           <Button
                             variant="contained"
                             startIcon={<Download />}
@@ -488,8 +541,13 @@ export const TransformStudio: React.FC = () => {
                         {result && (
                           <Box sx={{ mt: 2 }}>
                             <Divider sx={{ my: 1 }} />
-                            <Typography variant="caption" color="text.secondary">
-                              Duration: {result.duration}s | Resolution: {result.resolution} | Cost: ${result.cost.toFixed(2)}
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Duration: {result.duration}s | Resolution:{" "}
+                              {result.resolution} | Cost: $
+                              {result.cost.toFixed(2)}
                             </Typography>
                           </Box>
                         )}
@@ -499,14 +557,16 @@ export const TransformStudio: React.FC = () => {
                     {!videoUrl && !isGenerating && (
                       <Box
                         sx={{
-                          border: '2px dashed',
-                          borderColor: 'divider',
+                          border: "2px dashed",
+                          borderColor: "divider",
                           borderRadius: 2,
                           p: 4,
-                          textAlign: 'center',
+                          textAlign: "center",
                         }}
                       >
-                        <VideoLibrary sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                        <VideoLibrary
+                          sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
+                        />
                         <Typography variant="body2" color="text.secondary">
                           Generated video will appear here
                         </Typography>
@@ -542,7 +602,10 @@ export const TransformStudio: React.FC = () => {
           <TabPanel value={tabValue} index={1}>
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
-                <MotionCard variants={cardVariants} sx={{ p: 3, background: 'rgba(255,255,255,0.05)' }}>
+                <MotionCard
+                  variants={cardVariants}
+                  sx={{ p: 3, background: "rgba(255,255,255,0.05)" }}
+                >
                   <Stack spacing={3}>
                     <Typography variant="h6" fontWeight={600}>
                       Upload Image & Audio
@@ -550,7 +613,7 @@ export const TransformStudio: React.FC = () => {
                     <Box>
                       <input
                         accept="image/*"
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         id="avatar-image-upload"
                         type="file"
                         onChange={handleImageUpload}
@@ -563,7 +626,7 @@ export const TransformStudio: React.FC = () => {
                           fullWidth
                           sx={{ py: 2 }}
                         >
-                          {imageBase64 ? 'Change Image' : 'Upload Person Image'}
+                          {imageBase64 ? "Change Image" : "Upload Person Image"}
                         </Button>
                       </label>
                       {imageBase64 && (
@@ -574,7 +637,7 @@ export const TransformStudio: React.FC = () => {
                             alt="Uploaded image"
                             sx={{
                               maxHeight: 300,
-                              objectFit: 'contain',
+                              objectFit: "contain",
                               borderRadius: 2,
                             }}
                           />
@@ -585,7 +648,7 @@ export const TransformStudio: React.FC = () => {
                     <Box>
                       <input
                         accept="audio/*"
-                        style={{ display: 'none' }}
+                        style={{ display: "none" }}
                         id="avatar-audio-upload"
                         type="file"
                         onChange={handleAudioUpload}
@@ -598,7 +661,9 @@ export const TransformStudio: React.FC = () => {
                           fullWidth
                           sx={{ py: 2 }}
                         >
-                          {audioBase64 ? 'Change Audio' : 'Upload Audio (Required)'}
+                          {audioBase64
+                            ? "Change Audio"
+                            : "Upload Audio (Required)"}
                         </Button>
                       </label>
                     </Box>
@@ -618,7 +683,9 @@ export const TransformStudio: React.FC = () => {
                       <Select
                         value={resolution}
                         label="Resolution"
-                        onChange={(e) => setResolution(e.target.value as '480p' | '720p')}
+                        onChange={(e) =>
+                          setResolution(e.target.value as "480p" | "720p")
+                        }
                       >
                         <MenuItem value="480p">480p</MenuItem>
                         <MenuItem value="720p">720p</MenuItem>
@@ -637,9 +704,18 @@ export const TransformStudio: React.FC = () => {
               </Grid>
 
               <Grid item xs={12} md={6}>
-                <MotionCard variants={cardVariants} sx={{ p: 3, background: 'rgba(255,255,255,0.05)' }}>
+                <MotionCard
+                  variants={cardVariants}
+                  sx={{ p: 3, background: "rgba(255,255,255,0.05)" }}
+                >
                   <Stack spacing={3}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
                       <Typography variant="h6" fontWeight={600}>
                         Preview & Generate
                       </Typography>
@@ -656,8 +732,13 @@ export const TransformStudio: React.FC = () => {
                     {isGenerating && (
                       <Box>
                         <LinearProgress />
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
-                          Generating talking avatar... This may take up to 10 minutes.
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ mt: 1, textAlign: "center" }}
+                        >
+                          Generating talking avatar... This may take up to 10
+                          minutes.
                         </Typography>
                       </Box>
                     )}
@@ -668,12 +749,12 @@ export const TransformStudio: React.FC = () => {
                           src={videoUrl}
                           controls
                           style={{
-                            width: '100%',
+                            width: "100%",
                             borderRadius: 8,
                             maxHeight: 400,
                           }}
                         />
-                        <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
+                        <Box sx={{ mt: 2, display: "flex", gap: 1 }}>
                           <Button
                             variant="contained"
                             startIcon={<Download />}
@@ -686,8 +767,13 @@ export const TransformStudio: React.FC = () => {
                         {result && (
                           <Box sx={{ mt: 2 }}>
                             <Divider sx={{ my: 1 }} />
-                            <Typography variant="caption" color="text.secondary">
-                              Duration: {result.duration}s | Resolution: {result.resolution} | Cost: ${result.cost.toFixed(2)}
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Duration: {result.duration}s | Resolution:{" "}
+                              {result.resolution} | Cost: $
+                              {result.cost.toFixed(2)}
                             </Typography>
                           </Box>
                         )}
@@ -697,14 +783,16 @@ export const TransformStudio: React.FC = () => {
                     {!videoUrl && !isGenerating && (
                       <Box
                         sx={{
-                          border: '2px dashed',
-                          borderColor: 'divider',
+                          border: "2px dashed",
+                          borderColor: "divider",
                           borderRadius: 2,
                           p: 4,
-                          textAlign: 'center',
+                          textAlign: "center",
                         }}
                       >
-                        <TransformIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                        <TransformIcon
+                          sx={{ fontSize: 48, color: "text.secondary", mb: 2 }}
+                        />
                         <Typography variant="body2" color="text.secondary">
                           Generated talking avatar will appear here
                         </Typography>
@@ -740,4 +828,3 @@ export const TransformStudio: React.FC = () => {
     </ImageStudioLayout>
   );
 };
-

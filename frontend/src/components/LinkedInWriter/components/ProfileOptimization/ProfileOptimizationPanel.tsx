@@ -1,31 +1,31 @@
-﻿import React, { useRef } from 'react';
-import { CircularProgress, Tooltip } from '@mui/material';
+import React, { useRef } from "react";
+import { CircularProgress, Tooltip } from "@mui/material";
 
 import type {
   LinkedInAIProfileIntelligence,
   LinkedInProfileOptimizationItem,
   LinkedInProfileOptimizationMeta,
-} from '../../../../api/linkedinSocial';
-import { linkedInPlaceholderCardStyles } from '../linkedInPlaceholderStyles';
-import { formatRelativeUpdatedAt } from '../TopicRecommendations/topicRecommendationLabels';
-import { BrandIdentityCard } from './BrandIdentityCard';
-import { ProfileOptimizationCard } from './ProfileOptimizationCard';
-import { ProfileOptimizationSummaryBar } from './ProfileOptimizationSummaryBar';
-import { SectionScoresPanel } from './SectionScoresPanel';
+} from "../../../../api/linkedinSocial";
+import { linkedInPlaceholderCardStyles } from "../linkedInPlaceholderStyles";
+import { formatRelativeUpdatedAt } from "../TopicRecommendations/topicRecommendationLabels";
+import { BrandIdentityCard } from "./BrandIdentityCard";
+import { ProfileOptimizationCard } from "./ProfileOptimizationCard";
+import { ProfileOptimizationSummaryBar } from "./ProfileOptimizationSummaryBar";
+import { SectionScoresPanel } from "./SectionScoresPanel";
 import {
   ProfileOptimizationBatchBanner,
   ProfileOptimizationNoGapsState,
   ProfileOptimizationRecheckBadge,
-} from './ProfileOptimizationTerminalStates';
-import { ProfileOptimizationContentAnglesCard } from './ProfileOptimizationContentAnglesCard';
-import { ProfileOptimizationBatchImpactBar } from './ProfileOptimizationBatchImpactBar';
-import { computeBatchImpactProjection } from './profileOptimizationImpact';
-import { resolveContentAnglesForDisplay } from './profileOptimizationContentAngles';
+} from "./ProfileOptimizationTerminalStates";
+import { ProfileOptimizationContentAnglesCard } from "./ProfileOptimizationContentAnglesCard";
+import { ProfileOptimizationBatchImpactBar } from "./ProfileOptimizationBatchImpactBar";
+import { computeBatchImpactProjection } from "./profileOptimizationImpact";
+import { resolveContentAnglesForDisplay } from "./profileOptimizationContentAngles";
 
 interface ProfileOptimizationPanelProps {
   isOpen: boolean;
   /** When modal, chrome (header/footer) is supplied by the dialog wrapper. */
-  variant?: 'standalone' | 'modal';
+  variant?: "standalone" | "modal";
   isLoading?: boolean;
   recommendations?: LinkedInProfileOptimizationItem[] | null;
   optimizationMeta?: LinkedInProfileOptimizationMeta | null;
@@ -73,23 +73,23 @@ interface ProfileOptimizationPanelProps {
 }
 
 const SKELETON_CARD_STYLE: React.CSSProperties = {
-  padding: '16px 18px',
+  padding: "16px 18px",
   borderRadius: 12,
-  backgroundColor: '#fff',
-  border: '1px solid #e2e8f0',
+  backgroundColor: "#fff",
+  border: "1px solid #e2e8f0",
   minHeight: 120,
 };
 
 const SKELETON_COUNT = 3;
 
 const panelBackgroundGlowStyle: React.CSSProperties = {
-  position: 'absolute',
-  top: '-50%',
-  left: '-50%',
-  width: '200%',
-  height: '200%',
+  position: "absolute",
+  top: "-50%",
+  left: "-50%",
+  width: "200%",
+  height: "200%",
   background:
-    'radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)',
+    "radial-gradient(circle, rgba(10, 102, 194, 0.06) 0%, transparent 70%)",
   zIndex: 0,
 };
 
@@ -103,33 +103,35 @@ function computePriorityScore(item: LinkedInProfileOptimizationItem): number {
 }
 
 function findQuickWin(
-  items: LinkedInProfileOptimizationItem[]
+  items: LinkedInProfileOptimizationItem[],
 ): LinkedInProfileOptimizationItem | null {
   return (
-    items.find((item) => item.impact === 'High' && item.effort === 'Low') ??
-    items.find((item) => item.impact === 'High' && item.effort === 'Medium') ??
-    items.find((item) => item.impact === 'Medium' && item.effort === 'Low') ??
+    items.find((item) => item.impact === "High" && item.effort === "Low") ??
+    items.find((item) => item.impact === "High" && item.effort === "Medium") ??
+    items.find((item) => item.impact === "Medium" && item.effort === "Low") ??
     null
   );
 }
 
 function formatEffortTimeLabel(effort: string): string {
   switch (effort) {
-    case 'Low':
-      return 'Takes ~5 minutes';
-    case 'Medium':
-      return 'Takes ~20 minutes';
-    case 'High':
-      return 'Takes an afternoon';
+    case "Low":
+      return "Takes ~5 minutes";
+    case "Medium":
+      return "Takes ~20 minutes";
+    case "High":
+      return "Takes an afternoon";
     default:
-      return '';
+      return "";
   }
 }
 
 /** Phase 7 ΓÇö profile optimization recommendations panel. */
-export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> = ({
+export const ProfileOptimizationPanel: React.FC<
+  ProfileOptimizationPanelProps
+> = ({
   isOpen,
-  variant = 'standalone',
+  variant = "standalone",
   isLoading = false,
   recommendations,
   optimizationMeta,
@@ -185,7 +187,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   const sortedRecommendations = React.useMemo(() => {
     if (!recommendations) return [];
     return [...recommendations].sort(
-      (a, b) => computePriorityScore(a) - computePriorityScore(b)
+      (a, b) => computePriorityScore(a) - computePriorityScore(b),
     );
   }, [recommendations]);
 
@@ -199,44 +201,45 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     return sortedRecommendations.filter((item) => item.id !== quickWin.id);
   }, [sortedRecommendations, quickWin]);
 
-  const batchIndex = (optimizationMeta?.active_batch_index ?? 0) + 1;
   const quickWinsLabel =
     sortedRecommendations.length > 0
-      ? `${sortedRecommendations.length} Quick Win${sortedRecommendations.length === 1 ? '' : 's'}`
-      : 'Review your profile';
+      ? `${sortedRecommendations.length} Quick Win${sortedRecommendations.length === 1 ? "" : "s"}`
+      : "Review your profile";
+  const batchIndex = (optimizationMeta?.active_batch_index ?? 0) + 1;
   const batchNumberLabel = `Batch ${batchIndex}`;
   const batchProjection = computeBatchImpactProjection(
     profileStrengthPercent,
-    sortedRecommendations
+    sortedRecommendations,
   );
 
   const [showAllAngles, setShowAllAngles] = React.useState(false);
-  const [showAllRecommendations, setShowAllRecommendations] = React.useState(false);
+  const [showAllRecommendations, setShowAllRecommendations] =
+    React.useState(false);
   const VISIBLE_ANGLES_COUNT = 3;
   const VISIBLE_REC_COUNT = 3;
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const writingOpportunities = aiProfileIntelligence?.writing_opportunities ?? [];
   const displayContentAngles = React.useMemo(
     () =>
       resolveContentAnglesForDisplay(
-        writingOpportunities,
+        aiProfileIntelligence?.writing_opportunities ?? [],
         aiProfileIntelligence?.knowledge_domains,
         aiProfileIntelligence?.primary_expertise,
-        aiProfileIntelligence?.target_audience
+        aiProfileIntelligence?.target_audience,
       ),
     [
-      writingOpportunities,
+      aiProfileIntelligence?.writing_opportunities,
       aiProfileIntelligence?.knowledge_domains,
       aiProfileIntelligence?.primary_expertise,
       aiProfileIntelligence?.target_audience,
-    ]
+    ],
   );
   const contentBridgeIndustry =
-    aiProfileIntelligence?.industry && aiProfileIntelligence.industry !== 'Unknown'
+    aiProfileIntelligence?.industry &&
+    aiProfileIntelligence.industry !== "Unknown"
       ? aiProfileIntelligence.industry
-      : 'your industry';
+      : "your industry";
   const contentBridgeExpertise = aiProfileIntelligence?.primary_expertise?.[0];
-  const isModal = variant === 'modal';
+  const isModal = variant === "modal";
 
   const { showSkeleton, showCards } = React.useMemo(() => {
     const skeleton = Boolean(isLoading && !recommendations?.length);
@@ -260,7 +263,7 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
   }
 
   const updatedLabel = formatRelativeUpdatedAt(
-    optimizationMeta?.profile_optimization_updated_at
+    optimizationMeta?.profile_optimization_updated_at,
   );
   const recommendationCount = recommendations?.length ?? 0;
   const collapsedVisibleCount =
@@ -271,12 +274,18 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
     : showAllRecommendations
       ? remainingItems
       : remainingItems.slice(0, VISIBLE_REC_COUNT);
-  const canToggleAllSuggestions = !isModal && recommendationCount > collapsedVisibleCount;
+  const canToggleAllSuggestions =
+    !isModal && recommendationCount > collapsedVisibleCount;
   const showNoGaps = !showSkeleton && !showCards && Boolean(noGapsMessage);
   const showNextBatchBanner =
-    !showSkeleton && !showCards && !showNoGaps && showNextBatchCta && Boolean(onLoadNextBatch);
+    !showSkeleton &&
+    !showCards &&
+    !showNoGaps &&
+    showNextBatchCta &&
+    Boolean(onLoadNextBatch);
 
-  const showSectionScores = Boolean(sectionScores) && (showCards || showNextBatchBanner);
+  const showSectionScores =
+    Boolean(sectionScores) && (showCards || showNextBatchBanner);
 
   if (!isExpanded && (showCards || showNextBatchBanner) && onExpand) {
     return (
@@ -284,14 +293,14 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
         <div
           style={{
             ...linkedInPlaceholderCardStyles.inner,
-            minHeight: 'unset',
-            padding: '16px 20px',
-            position: 'relative',
-            overflow: 'hidden',
+            minHeight: "unset",
+            padding: "16px 20px",
+            position: "relative",
+            overflow: "hidden",
           }}
         >
           <div style={panelBackgroundGlowStyle} />
-          <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ position: "relative", zIndex: 1 }}>
             <ProfileOptimizationSummaryBar
               recommendationCount={recommendationCount}
               updatedLabel={updatedLabel}
@@ -322,514 +331,667 @@ export const ProfileOptimizationPanel: React.FC<ProfileOptimizationPanelProps> =
           }
         }
       `}</style>
-    <div
-      className={['profile-opt-panel', isModal && 'profile-opt-panel--modal'].filter(Boolean).join(' ')}
-      style={isModal ? undefined : { ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}
-    >
       <div
-        className={['profile-opt-panel__inner', isModal && 'profile-opt-panel__inner--modal']
+        className={["profile-opt-panel", isModal && "profile-opt-panel--modal"]
           .filter(Boolean)
-          .join(' ')}
-        style={isModal ? undefined : { ...linkedInPlaceholderCardStyles.inner }}
+          .join(" ")}
+        style={
+          isModal
+            ? undefined
+            : { ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }
+        }
       >
-        {!isModal && <div style={panelBackgroundGlowStyle} />}
-
         <div
-          className={isModal ? 'profile-opt-panel__modal-shell' : undefined}
-          style={isModal ? undefined : { position: 'relative', zIndex: 1 }}
-        >
-          {!isModal && (
-          <div className="profile-opt-panel__header">
-            <div style={{ flex: '1 1 220px', minWidth: 0 }}>
-              <h3 className="profile-opt-panel__title">Improve your LinkedIn profile</h3>
-              <p className="profile-opt-panel__subtitle">
-                {quickWin
-                  ? 'Prioritized by impact — start with your quick win below.'
-                  : 'Get more views, connections, and leads with prioritized suggestions.'}
-              </p>
-              {updatedLabel && (
-                <p className="profile-opt-panel__meta">
-                  {updatedLabel}
-                  {optimizationMeta?.source ? ` · Source: ${optimizationMeta.source}` : ''}
-                </p>
-              )}
-              {!updatedLabel && optimizationMeta?.source && (
-                <p className="profile-opt-panel__meta">
-                  Source: {optimizationMeta.source}
-                  {typeof optimizationMeta.remaining_in_backlog === 'number' &&
-                    optimizationMeta.remaining_in_backlog > 0 &&
-                    ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
-                </p>
-              )}
-            </div>
-
-            {showCards && onCollapse && (
-              <button
-                type="button"
-                className="profile-opt-panel__hide-link"
-                onClick={onCollapse}
-                aria-expanded
-                aria-controls="profile-optimization-list"
-              >
-                Hide suggestions
-              </button>
-            )}
-          </div>
-          )}
-
-          {!isModal && (
-          <>
-          {/* Profile Photo Card */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 16,
-              padding: '14px 18px',
-              borderRadius: 12,
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              marginBottom: 16,
-            }}
-          >
-            <div
-              style={{
-                width: 72,
-                height: 72,
-                borderRadius: '50%',
-                overflow: 'hidden',
-                flexShrink: 0,
-                backgroundColor: '#e2e8f0',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              {(localProfilePhotoUrl || profilePictureUrl) ? (
-                <img
-                  src={(localProfilePhotoUrl || profilePictureUrl) ?? undefined}
-                  alt="Profile"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="#94a3b8">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                </svg>
-              )}
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#1e293b' }}>
-                Profile Picture
-              </p>
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748b', lineHeight: 1.4 }}>
-                Upload a professional headshot to make a strong first impression.
-              </p>
-              {profilePhotoUploadError && (
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#dc2626' }}>
-                  {profilePhotoUploadError}
-                </p>
-              )}
-              {profilePhotoTransformError && (
-                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#dc2626' }}>
-                  {profilePhotoTransformError}
-                </p>
-              )}
-            </div>
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                style={{ display: 'none' }}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file && onUploadProfilePhoto) {
-                    onUploadProfilePhoto(file);
-                  }
-                  e.target.value = '';
-                }}
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingProfilePhoto || transformingProfilePhoto}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: 8,
-                  border: '1px solid #0A66C2',
-                  backgroundColor: uploadingProfilePhoto ? '#cbd5e1' : '#fff',
-                  color: uploadingProfilePhoto ? '#64748b' : '#0A66C2',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: uploadingProfilePhoto || transformingProfilePhoto ? 'wait' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  transition: 'background 150ms ease',
-                }}
-              >
-                {uploadingProfilePhoto ? 'Uploading…' : 'Upload Photo'}
-              </button>
-              {localProfilePhotoUrl && onMakeProfilePhotoPresentable && (
-                <button
-                  type="button"
-                  onClick={onMakeProfilePhotoPresentable}
-                  disabled={transformingProfilePhoto || uploadingProfilePhoto}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    border: 'none',
-                    background: transformingProfilePhoto
-                      ? '#cbd5e1'
-                      : 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
-                    color: transformingProfilePhoto ? '#64748b' : '#fff',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: transformingProfilePhoto || uploadingProfilePhoto ? 'wait' : 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'background 150ms ease',
-                  }}
-                >
-                  {transformingProfilePhoto ? 'Enhancing…' : '✨ Make Presentable'}
-                </button>
-              )}
-              {localProfilePhotoUrl && onDownloadProfilePhoto && (
-                <button
-                  type="button"
-                  onClick={onDownloadProfilePhoto}
-                  disabled={uploadingProfilePhoto || transformingProfilePhoto}
-                  style={{
-                    padding: '8px 16px',
-                    borderRadius: 8,
-                    border: '1px solid #10b981',
-                    backgroundColor: '#fff',
-                    color: '#059669',
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: uploadingProfilePhoto || transformingProfilePhoto ? 'wait' : 'pointer',
-                    whiteSpace: 'nowrap',
-                    transition: 'background 150ms ease',
-                  }}
-                >
-                  ⬇ Download Photo
-                </button>
-              )}
-            </div>
-          </div>
-
-          {transformedProfilePhotoUrl && (
-            <div
-              style={{
-                padding: '12px 16px',
-                borderRadius: 10,
-                backgroundColor: '#ecfdf5',
-                border: '1px solid #6ee7b7',
-                marginBottom: 16,
-              }}
-            >
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: '#065f46' }}>
-                Your enhanced profile photo is ready!
-              </p>
-              <p style={{ margin: '6px 0 0', fontSize: 12, color: '#047857', lineHeight: 1.5 }}>
-                To update your LinkedIn profile: Download the photo above, then go to{' '}
-                <strong>LinkedIn → Me → View Profile → Edit profile photo</strong> and upload the downloaded image.
-              </p>
-            </div>
-          )}
-
-          </>
-          )}
-
-          <div
-            className={['profile-opt-panel__grid', isModal && 'profile-opt-panel__grid--modal']
+          className={[
+            "profile-opt-panel__inner",
+            isModal && "profile-opt-panel__inner--modal",
+          ]
             .filter(Boolean)
-            .join(' ')}>
-            <aside className="profile-opt-panel__rail">
-              {aiProfileIntelligence && (
-                <BrandIdentityCard
-                  intelligence={aiProfileIntelligence}
-                  profileStrengthPercent={profileStrengthPercent}
-                  className={isModal ? 'profile-opt-brand-identity-card--modal' : undefined}
-                />
-              )}
+            .join(" ")}
+          style={
+            isModal ? undefined : { ...linkedInPlaceholderCardStyles.inner }
+          }
+        >
+          {!isModal && <div style={panelBackgroundGlowStyle} />}
 
-              {showSectionScores && sectionScores && !isModal && (
-                <SectionScoresPanel
-                  scores={sectionScores}
-                  activeSectionKeys={activeSectionKeys}
-                  activeSectionCount={activeSectionCount}
-                />
-              )}
-
-              {((showCards && displayContentAngles.length > 0) ||
-                (isModal && displayContentAngles.length > 0)) && (
-                <ProfileOptimizationContentAnglesCard
-                  industry={contentBridgeIndustry}
-                  expertise={contentBridgeExpertise}
-                  opportunities={displayContentAngles}
-                  showAllAngles={isModal || showAllAngles}
-                  onToggleShowAllAngles={() => setShowAllAngles((value) => !value)}
-                  visibleCount={isModal ? displayContentAngles.length : VISIBLE_ANGLES_COUNT}
-                  alwaysExpanded={isModal}
-                />
-              )}
-
-              {showCards && onRecheckProfile && !isModal && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    padding: '10px 12px',
-                    borderRadius: 10,
-                    backgroundColor: '#f8fafc',
-                    border: '1px solid #e2e8f0',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: '#475569',
-                      lineHeight: 1.4,
-                      flex: '1 1 200px',
-                    }}
-                  >
-                    Applied changes on LinkedIn? Re-check your live profile to verify your real score.
+          <div
+            className={isModal ? "profile-opt-panel__modal-shell" : undefined}
+            style={isModal ? undefined : { position: "relative", zIndex: 1 }}
+          >
+            {!isModal && (
+              <div className="profile-opt-panel__header">
+                <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+                  <h3 className="profile-opt-panel__title">
+                    Improve your LinkedIn profile
+                  </h3>
+                  <p className="profile-opt-panel__subtitle">
+                    {quickWin
+                      ? "Prioritized by impact — start with your quick win below."
+                      : "Get more views, connections, and leads with prioritized suggestions."}
                   </p>
+                  {updatedLabel && (
+                    <p className="profile-opt-panel__meta">
+                      {updatedLabel}
+                      {optimizationMeta?.source
+                        ? ` · Source: ${optimizationMeta.source}`
+                        : ""}
+                    </p>
+                  )}
+                  {!updatedLabel && optimizationMeta?.source && (
+                    <p className="profile-opt-panel__meta">
+                      Source: {optimizationMeta.source}
+                      {typeof optimizationMeta.remaining_in_backlog ===
+                        "number" &&
+                        optimizationMeta.remaining_in_backlog > 0 &&
+                        ` · ${optimizationMeta.remaining_in_backlog} more in backlog`}
+                    </p>
+                  )}
+                </div>
+
+                {showCards && onCollapse && (
                   <button
                     type="button"
-                    onClick={onRecheckProfile}
-                    disabled={isRechecking}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: 8,
-                      border: '1px solid #0A66C2',
-                      backgroundColor: isRechecking ? '#cbd5e1' : '#fff',
-                      color: isRechecking ? '#64748b' : '#0A66C2',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: isRechecking ? 'wait' : 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      whiteSpace: 'nowrap',
-                    }}
+                    className="profile-opt-panel__hide-link"
+                    onClick={onCollapse}
+                    aria-expanded
+                    aria-controls="profile-optimization-list"
                   >
-                    {isRechecking ? 'Re-checking…' : '🔄 Re-check my profile'}
+                    Hide suggestions
                   </button>
-                </div>
-              )}
+                )}
+              </div>
+            )}
 
-              {recheckDelta && onDismissRecheckDelta && !isModal && (
-                <ProfileOptimizationRecheckBadge
-                  recheckDelta={recheckDelta}
-                  onDismiss={onDismissRecheckDelta}
-                />
-              )}
-            </aside>
-
-            <div className="profile-opt-panel__main">
-          {showSkeleton && (
-            <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {!isModal && (
+              <>
+                {/* Profile Photo Card */}
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    color: '#64748b',
-                    fontSize: 14,
-                    marginBottom: 4,
-                  }}
-                >
-                  <CircularProgress size={20} sx={{ color: '#0A66C2' }} />
-                  Generating profile suggestions…
-                </div>
-                {Array.from({ length: SKELETON_COUNT }).map((_, index) => (
-                  <div
-                    key={index}
-                    className="profile-opt-panel__shimmer"
-                    style={SKELETON_CARD_STYLE}
-                    aria-hidden
-                  />
-                ))}
-              </div>
-            </>
-          )}
-
-          {showNoGaps && (
-            <ProfileOptimizationNoGapsState
-              message={noGapsMessage}
-              onClose={onCollapse}
-            />
-          )}
-
-          {showNextBatchBanner && (
-            <ProfileOptimizationBatchBanner
-              remainingInBacklog={optimizationMeta?.remaining_in_backlog ?? 0}
-              isLoadingNextBatch={isLoadingNextBatch}
-              onLoadNextBatch={onLoadNextBatch}
-              hideInlineAction={isModal}
-            />
-          )}
-
-          {showCards && isModal && (
-            <Tooltip
-              title={strengthHoverMessage ?? ''}
-              arrow
-              placement="left"
-              enterDelay={280}
-              disableHoverListener={!strengthHoverMessage}
-              slotProps={{
-                tooltip: {
-                  sx: { maxWidth: 300, fontSize: 13, lineHeight: 1.5, fontWeight: 500 },
-                },
-              }}
-            >
-              <div
-                id="profile-optimization-list"
-                className="profile-opt-panel__suggestions-stack profile-opt-panel__suggestions-stack--modal profile-opt-panel__suggestions-stack--hover-tip"
-              >
-                <div className="profile-opt-panel__suggestions-stack-header">
-                  <h3
-                    id="profile-opt-batch-stack-title"
-                    className="profile-opt-panel__suggestions-stack-title"
-                  >
-                    {quickWinsLabel}
-                  </h3>
-                </div>
-                <div className="profile-opt-panel__suggestions-stack-inner">
-                  <ProfileOptimizationBatchImpactBar
-                    stackCard
-                    hideSessionLabel
-                    batchLabel={batchNumberLabel}
-                    batchGainHint={
-                      batchProjection.gainPoints > 0
-                        ? `+${batchProjection.gainPoints}% profile strength if you apply this batch`
-                        : undefined
-                    }
-                    recommendations={sortedRecommendations}
-                    optimizationMeta={optimizationMeta}
-                    profileStrengthPercent={profileStrengthPercent}
-                    sectionScores={sectionScores ?? null}
-                    activeSectionKeys={activeSectionKeys}
-                    activeSectionCount={activeSectionCount}
-                  />
-                  {sortedRecommendations.map((item, index) => (
-                    <ProfileOptimizationCard
-                      key={item.id}
-                      recommendation={item}
-                      index={index}
-                      onMarkDone={onMarkDone}
-                      onSkip={onSkip}
-                      isMarking={markingRecommendationId === item.id}
-                      publicIdentifier={publicIdentifier}
-                      showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
-                      promotePrimaryActions={quickWin?.id === item.id}
-                      className="profile-opt-card--stack"
-                    />
-                  ))}
-                </div>
-              </div>
-            </Tooltip>
-          )}
-
-          {showCards && !isModal && (
-            <div
-              id="profile-optimization-list"
-              style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-            >
-              {quickWin && (
-                <div
-                  style={{
-                    padding: '12px 14px',
-                    borderRadius: 10,
-                    background: 'linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)',
-                    border: '1px solid #f59e0b',
-                    marginBottom: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                    padding: "14px 18px",
+                    borderRadius: 12,
+                    backgroundColor: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    marginBottom: 16,
                   }}
                 >
                   <div
                     style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: '5px 10px',
-                      borderRadius: 999,
-                      backgroundColor: '#f59e0b',
-                      color: '#fff',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      marginBottom: 10,
+                      width: 72,
+                      height: 72,
+                      borderRadius: "50%",
+                      overflow: "hidden",
+                      flexShrink: 0,
+                      backgroundColor: "#e2e8f0",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    <span style={{ fontSize: 14 }}>⚡</span>
-                    Do This First
-                    <span
+                    {localProfilePhotoUrl || profilePictureUrl ? (
+                      <img
+                        src={
+                          (localProfilePhotoUrl || profilePictureUrl) ??
+                          undefined
+                        }
+                        alt="Profile"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <svg
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="#94a3b8"
+                      >
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                      </svg>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p
                       style={{
-                        padding: '2px 8px',
-                        borderRadius: 999,
-                        backgroundColor: 'rgba(255,255,255,0.92)',
-                        color: '#92400e',
-                        fontSize: 11,
+                        margin: 0,
+                        fontSize: 13,
                         fontWeight: 600,
+                        color: "#1e293b",
                       }}
                     >
-                      {formatEffortTimeLabel(quickWin.effort)}
-                    </span>
+                      Profile Picture
+                    </p>
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        fontSize: 12,
+                        color: "#64748b",
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      Upload a professional headshot to make a strong first
+                      impression.
+                    </p>
+                    {profilePhotoUploadError && (
+                      <p
+                        style={{
+                          margin: "4px 0 0",
+                          fontSize: 12,
+                          color: "#dc2626",
+                        }}
+                      >
+                        {profilePhotoUploadError}
+                      </p>
+                    )}
+                    {profilePhotoTransformError && (
+                      <p
+                        style={{
+                          margin: "4px 0 0",
+                          fontSize: 12,
+                          color: "#dc2626",
+                        }}
+                      >
+                        {profilePhotoTransformError}
+                      </p>
+                    )}
                   </div>
-                  <ProfileOptimizationCard
-                    recommendation={quickWin}
-                    index={0}
-                    onMarkDone={onMarkDone}
-                    onSkip={onSkip}
-                    isMarking={markingRecommendationId === quickWin.id}
-                    publicIdentifier={publicIdentifier}
-                    showEffortTimeLabel={formatEffortTimeLabel(quickWin.effort)}
-                    promotePrimaryActions
-                  />
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                      alignItems: "flex-end",
+                    }}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file && onUploadProfilePhoto) {
+                          onUploadProfilePhoto(file);
+                        }
+                        e.target.value = "";
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={
+                        uploadingProfilePhoto || transformingProfilePhoto
+                      }
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: 8,
+                        border: "1px solid #0A66C2",
+                        backgroundColor: uploadingProfilePhoto
+                          ? "#cbd5e1"
+                          : "#fff",
+                        color: uploadingProfilePhoto ? "#64748b" : "#0A66C2",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor:
+                          uploadingProfilePhoto || transformingProfilePhoto
+                            ? "wait"
+                            : "pointer",
+                        whiteSpace: "nowrap",
+                        transition: "background 150ms ease",
+                      }}
+                    >
+                      {uploadingProfilePhoto ? "Uploading…" : "Upload Photo"}
+                    </button>
+                    {localProfilePhotoUrl && onMakeProfilePhotoPresentable && (
+                      <button
+                        type="button"
+                        onClick={onMakeProfilePhotoPresentable}
+                        disabled={
+                          transformingProfilePhoto || uploadingProfilePhoto
+                        }
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: 8,
+                          border: "none",
+                          background: transformingProfilePhoto
+                            ? "#cbd5e1"
+                            : "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+                          color: transformingProfilePhoto ? "#64748b" : "#fff",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor:
+                            transformingProfilePhoto || uploadingProfilePhoto
+                              ? "wait"
+                              : "pointer",
+                          whiteSpace: "nowrap",
+                          transition: "background 150ms ease",
+                        }}
+                      >
+                        {transformingProfilePhoto
+                          ? "Enhancing…"
+                          : "✨ Make Presentable"}
+                      </button>
+                    )}
+                    {localProfilePhotoUrl && onDownloadProfilePhoto && (
+                      <button
+                        type="button"
+                        onClick={onDownloadProfilePhoto}
+                        disabled={
+                          uploadingProfilePhoto || transformingProfilePhoto
+                        }
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: 8,
+                          border: "1px solid #10b981",
+                          backgroundColor: "#fff",
+                          color: "#059669",
+                          fontSize: 13,
+                          fontWeight: 600,
+                          cursor:
+                            uploadingProfilePhoto || transformingProfilePhoto
+                              ? "wait"
+                              : "pointer",
+                          whiteSpace: "nowrap",
+                          transition: "background 150ms ease",
+                        }}
+                      >
+                        ⬇ Download Photo
+                      </button>
+                    )}
+                  </div>
                 </div>
-              )}
 
-              {visibleRemainingItems.map((item, index) => (
-                <ProfileOptimizationCard
-                  key={item.id}
-                  recommendation={item}
-                  index={quickWin ? index + 1 : index}
-                  onMarkDone={onMarkDone}
-                  onSkip={onSkip}
-                  isMarking={markingRecommendationId === item.id}
-                  publicIdentifier={publicIdentifier}
-                  showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
-                />
-              ))}
+                {transformedProfilePhotoUrl && (
+                  <div
+                    style={{
+                      padding: "12px 16px",
+                      borderRadius: 10,
+                      backgroundColor: "#ecfdf5",
+                      border: "1px solid #6ee7b7",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: "#065f46",
+                      }}
+                    >
+                      Your enhanced profile photo is ready!
+                    </p>
+                    <p
+                      style={{
+                        margin: "6px 0 0",
+                        fontSize: 12,
+                        color: "#047857",
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      To update your LinkedIn profile: Download the photo above,
+                      then go to{" "}
+                      <strong>
+                        LinkedIn → Me → View Profile → Edit profile photo
+                      </strong>{" "}
+                      and upload the downloaded image.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
 
-              {canToggleAllSuggestions && (
-                <button
-                  type="button"
-                  className={[
-                    'profile-opt-panel__show-all',
-                    isModal && 'profile-opt-panel__show-all--modal',
-                  ]
-                    .filter(Boolean)
-                    .join(' ')}
-                  onClick={() => setShowAllRecommendations((value) => !value)}
-                  aria-expanded={showAllRecommendations}
-                >
-                  {showAllRecommendations
-                    ? 'Show fewer suggestions'
-                    : `Show all (${recommendationCount} suggestion${recommendationCount === 1 ? '' : 's'})`}
-                </button>
-              )}
-            </div>
-          )}
+            <div
+              className={[
+                "profile-opt-panel__grid",
+                isModal && "profile-opt-panel__grid--modal",
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <aside className="profile-opt-panel__rail">
+                <div className="profile-opt-panel__rail-inner">
+                  {aiProfileIntelligence && (
+                    <BrandIdentityCard
+                      intelligence={aiProfileIntelligence}
+                      profileStrengthPercent={profileStrengthPercent}
+                      showStrengthMessage={!isModal}
+                      className={
+                        isModal
+                          ? "profile-opt-brand-identity-card--modal"
+                          : undefined
+                      }
+                    />
+                  )}
 
+                  {showSectionScores && sectionScores && !isModal && (
+                    <SectionScoresPanel
+                      scores={sectionScores}
+                      activeSectionKeys={activeSectionKeys}
+                      activeSectionCount={activeSectionCount}
+                    />
+                  )}
+
+                  {((showCards && displayContentAngles.length > 0) ||
+                    (isModal && displayContentAngles.length > 0)) && (
+                    <ProfileOptimizationContentAnglesCard
+                      industry={contentBridgeIndustry}
+                      expertise={contentBridgeExpertise}
+                      opportunities={displayContentAngles}
+                      showAllAngles={isModal || showAllAngles}
+                      onToggleShowAllAngles={() =>
+                        setShowAllAngles((value) => !value)
+                      }
+                      visibleCount={
+                        isModal
+                          ? displayContentAngles.length
+                          : VISIBLE_ANGLES_COUNT
+                      }
+                      alwaysExpanded={isModal}
+                    />
+                  )}
+
+                  {showCards && onRecheckProfile && !isModal && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 12,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        backgroundColor: "#f8fafc",
+                        border: "1px solid #e2e8f0",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: "#475569",
+                          lineHeight: 1.4,
+                          flex: "1 1 200px",
+                        }}
+                      >
+                        Applied changes on LinkedIn? Re-check your live profile
+                        to verify your real score.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={onRecheckProfile}
+                        disabled={isRechecking}
+                        style={{
+                          padding: "6px 12px",
+                          borderRadius: 8,
+                          border: "1px solid #0A66C2",
+                          backgroundColor: isRechecking ? "#cbd5e1" : "#fff",
+                          color: isRechecking ? "#64748b" : "#0A66C2",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: isRechecking ? "wait" : "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {isRechecking
+                          ? "Re-checking…"
+                          : "🔄 Re-check my profile"}
+                      </button>
+                    </div>
+                  )}
+
+                  {recheckDelta && onDismissRecheckDelta && !isModal && (
+                    <ProfileOptimizationRecheckBadge
+                      recheckDelta={recheckDelta}
+                      onDismiss={onDismissRecheckDelta}
+                    />
+                  )}
+                </div>
+              </aside>
+
+              <div className="profile-opt-panel__main">
+                {showSkeleton && (
+                  <>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 12,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                          color: "#64748b",
+                          fontSize: 14,
+                          marginBottom: 4,
+                        }}
+                      >
+                        <CircularProgress size={20} sx={{ color: "#0A66C2" }} />
+                        Generating profile suggestions…
+                      </div>
+                      {Array.from({ length: SKELETON_COUNT }).map(
+                        (_, index) => (
+                          <div
+                            key={index}
+                            className="profile-opt-panel__shimmer"
+                            style={SKELETON_CARD_STYLE}
+                            aria-hidden
+                          />
+                        ),
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {showNoGaps && (
+                  <ProfileOptimizationNoGapsState
+                    message={noGapsMessage}
+                    onClose={onCollapse}
+                  />
+                )}
+
+                {showNextBatchBanner && (
+                  <ProfileOptimizationBatchBanner
+                    remainingInBacklog={
+                      optimizationMeta?.remaining_in_backlog ?? 0
+                    }
+                    isLoadingNextBatch={isLoadingNextBatch}
+                    onLoadNextBatch={onLoadNextBatch}
+                    hideInlineAction={isModal}
+                  />
+                )}
+
+                {showCards && isModal && (
+                  <Tooltip
+                    title={strengthHoverMessage ?? ""}
+                    arrow
+                    placement="left"
+                    enterDelay={280}
+                    disableHoverListener={!strengthHoverMessage}
+                    slotProps={{
+                      tooltip: {
+                        sx: {
+                          maxWidth: 300,
+                          fontSize: 13,
+                          lineHeight: 1.5,
+                          fontWeight: 500,
+                        },
+                      },
+                    }}
+                  >
+                    <div
+                      id="profile-optimization-list"
+                      className="profile-opt-panel__suggestions-stack profile-opt-panel__suggestions-stack--modal profile-opt-panel__suggestions-stack--hover-tip"
+                    >
+                      <div className="profile-opt-panel__suggestions-stack-header">
+                        <h3
+                          id="profile-opt-batch-stack-title"
+                          className="profile-opt-panel__suggestions-stack-title"
+                        >
+                          {profileStrengthPercent != null
+                            ? `Your profile currently communicates ${profileStrengthPercent}% of this positioning — here's how to strengthen it.`
+                            : quickWinsLabel}
+                        </h3>
+                      </div>
+                      <div className="profile-opt-panel__suggestions-stack-inner">
+                        <div className="profile-opt-panel__suggestions-cards">
+                          <ProfileOptimizationBatchImpactBar
+                            stackCard
+                            hideSessionLabel
+                            batchLabel={batchNumberLabel}
+                            batchGainHint={
+                              batchProjection.gainPoints > 0
+                                ? `+${batchProjection.gainPoints}% profile strength if you apply this batch`
+                                : undefined
+                            }
+                            recommendations={sortedRecommendations}
+                            optimizationMeta={optimizationMeta}
+                            profileStrengthPercent={profileStrengthPercent}
+                            sectionScores={sectionScores ?? null}
+                            activeSectionKeys={activeSectionKeys}
+                            activeSectionCount={activeSectionCount}
+                          />
+                          {sortedRecommendations.map((item, index) => (
+                            <ProfileOptimizationCard
+                              key={item.id}
+                              recommendation={item}
+                              index={index}
+                              onMarkDone={onMarkDone}
+                              onSkip={onSkip}
+                              isMarking={markingRecommendationId === item.id}
+                              publicIdentifier={publicIdentifier}
+                              showEffortTimeLabel={formatEffortTimeLabel(
+                                item.effort,
+                              )}
+                              promotePrimaryActions={quickWin?.id === item.id}
+                              className={[
+                                "profile-opt-card--stack",
+                                index === 0 && "profile-opt-card--first",
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </Tooltip>
+                )}
+
+                {showCards && !isModal && (
+                  <div
+                    id="profile-optimization-list"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 12,
+                    }}
+                  >
+                    {quickWin && (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: 10,
+                          background:
+                            "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                          border: "1px solid #f59e0b",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "5px 10px",
+                            borderRadius: 999,
+                            backgroundColor: "#f59e0b",
+                            color: "#fff",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            marginBottom: 10,
+                          }}
+                        >
+                          <span style={{ fontSize: 14 }}>⚡</span>
+                          Do This First
+                          <span
+                            style={{
+                              padding: "2px 8px",
+                              borderRadius: 999,
+                              backgroundColor: "rgba(255,255,255,0.92)",
+                              color: "#92400e",
+                              fontSize: 11,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {formatEffortTimeLabel(quickWin.effort)}
+                          </span>
+                        </div>
+                        <ProfileOptimizationCard
+                          recommendation={quickWin}
+                          index={0}
+                          onMarkDone={onMarkDone}
+                          onSkip={onSkip}
+                          isMarking={markingRecommendationId === quickWin.id}
+                          publicIdentifier={publicIdentifier}
+                          showEffortTimeLabel={formatEffortTimeLabel(
+                            quickWin.effort,
+                          )}
+                          promotePrimaryActions
+                        />
+                      </div>
+                    )}
+
+                    {visibleRemainingItems.map((item, index) => (
+                      <ProfileOptimizationCard
+                        key={item.id}
+                        recommendation={item}
+                        index={quickWin ? index + 1 : index}
+                        onMarkDone={onMarkDone}
+                        onSkip={onSkip}
+                        isMarking={markingRecommendationId === item.id}
+                        publicIdentifier={publicIdentifier}
+                        showEffortTimeLabel={formatEffortTimeLabel(item.effort)}
+                      />
+                    ))}
+
+                    {canToggleAllSuggestions && (
+                      <button
+                        type="button"
+                        className={[
+                          "profile-opt-panel__show-all",
+                          isModal && "profile-opt-panel__show-all--modal",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() =>
+                          setShowAllRecommendations((value) => !value)
+                        }
+                        aria-expanded={showAllRecommendations}
+                      >
+                        {showAllRecommendations
+                          ? "Show fewer suggestions"
+                          : `Show all (${recommendationCount} suggestion${recommendationCount === 1 ? "" : "s"})`}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     </>
   );
 };

@@ -1,16 +1,16 @@
-import React from 'react';
-import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
-import { useLinkedInStudioProfileStrength } from '../../hooks/useLinkedInStudioProfileStrength';
-import { OptimiseProfileRailButton } from './OptimiseProfileRailButton';
+import React from "react";
+import { useLinkedInSocialConnection } from "../../../../hooks/useLinkedInSocialConnection";
+import { useLinkedInStudioProfileStrength } from "../../hooks/useLinkedInStudioProfileStrength";
+import { OptimiseProfileRailButton } from "./OptimiseProfileRailButton";
 
 interface OptimiseProfileRailChipProps {
   /** main = dashboard toolbar pill; tab = mobile studio tab strip */
-  variant?: 'main' | 'tab';
+  variant?: "main" | "tab";
 }
 
-export const OptimiseProfileRailChip: React.FC<OptimiseProfileRailChipProps> = ({
-  variant = 'main',
-}) => {
+export const OptimiseProfileRailChip: React.FC<
+  OptimiseProfileRailChipProps
+> = ({ variant = "main" }) => {
   const { connected } = useLinkedInSocialConnection();
   const {
     profileStrengthPercent,
@@ -20,7 +20,7 @@ export const OptimiseProfileRailChip: React.FC<OptimiseProfileRailChipProps> = (
   } = useLinkedInStudioProfileStrength();
 
   const handleOpenOptimiseProfile = () => {
-    window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
+    window.dispatchEvent(new CustomEvent("linkedinwriter:openOptimiseProfile"));
   };
 
   return (
@@ -32,7 +32,9 @@ export const OptimiseProfileRailChip: React.FC<OptimiseProfileRailChipProps> = (
       profileStrengthPercent={connected ? profileStrengthPercent : null}
       strengthLabel={strengthLabel}
       strengthTooltip={
-        connected ? strengthTooltip : 'Connect LinkedIn to optimise your profile'
+        connected
+          ? strengthTooltip
+          : "Connect LinkedIn to optimise your profile"
       }
     />
   );

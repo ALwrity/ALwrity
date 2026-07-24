@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface ConnectLockIconProps {
   size?: number;
@@ -11,7 +11,9 @@ export const ConnectLockIcon: React.FC<ConnectLockIconProps> = ({
   className,
 }) => (
   <svg
-    className={['linkedin-studio-connect-lock-icon', className].filter(Boolean).join(' ')}
+    className={["linkedin-studio-connect-lock-icon", className]
+      .filter(Boolean)
+      .join(" ")}
     width={size}
     height={size}
     viewBox="0 0 24 24"
@@ -34,7 +36,12 @@ export const ConnectLockIcon: React.FC<ConnectLockIconProps> = ({
       strokeWidth="2"
     />
     <circle cx="12" cy="15.5" r="1.25" fill="currentColor" />
-    <path d="M12 16.75v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    <path
+      d="M12 16.75v2"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
   </svg>
 );
 
@@ -44,9 +51,14 @@ interface ConnectLockBadgeProps {
 }
 
 /** Right-aligned lock badge — does not replace the control icon. */
-export const ConnectLockBadge: React.FC<ConnectLockBadgeProps> = ({ className, size }) => (
+export const ConnectLockBadge: React.FC<ConnectLockBadgeProps> = ({
+  className,
+  size,
+}) => (
   <span
-    className={['linkedin-studio-connect-lock-badge', className].filter(Boolean).join(' ')}
+    className={["linkedin-studio-connect-lock-badge", className]
+      .filter(Boolean)
+      .join(" ")}
     aria-hidden
   >
     <ConnectLockIcon size={size} />

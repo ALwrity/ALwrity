@@ -1,20 +1,20 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-import { getDisplayProfileStrengthPercent } from '../../utils/profileStrengthUtils';
+import { getDisplayProfileStrengthPercent } from "../../utils/profileStrengthUtils";
 import {
   LINKEDIN_PRIORITY_ACTION_EVENT,
   PROFILE_STRENGTH_UPDATED_EVENT,
   readCachedPriorityAction,
   type PriorityActionSnapshot,
   type ProfileStrengthUpdatedDetail,
-} from '../../utils/profileStrengthEvents';
+} from "../../utils/profileStrengthEvents";
 
 const DISMISS_SESSION_KEYS = {
-  mobile: 'linkedin_mobile_studio_context_nudge_dismissed',
-  desktop: 'linkedin_desktop_studio_priority_nudge_dismissed',
+  mobile: "linkedin_mobile_studio_context_nudge_dismissed",
+  desktop: "linkedin_desktop_studio_priority_nudge_dismissed",
 } as const;
 
-type NudgeTone = 'priority' | 'strength' | 'ready' | 'connect';
+type NudgeTone = "priority" | "strength" | "ready" | "connect";
 
 interface NudgeContent {
   tone: NudgeTone;
@@ -29,7 +29,7 @@ export interface DashboardMobileStudioContextNudgeProps {
   isConnecting?: boolean;
   onConnect?: () => void;
   /** mobile = strength/connect hints; desktop = priority action only (≥961px). */
-  variant?: 'mobile' | 'desktop';
+  variant?: "mobile" | "desktop";
 }
 
 function resolveNudgeContent(
@@ -48,32 +48,40 @@ function resolveNudgeContent(
     profileStrengthPercent: number | null;
     runPriorityAction: () => void;
   },
-  { includePriority }: { includePriority: boolean }
+  { includePriority }: { includePriority: boolean },
 ): NudgeContent {
   if (includePriority && connected && priorityAction) {
     return {
-      tone: 'priority',
+      tone: "priority",
       label: `#1 today · ${priorityAction.title}`,
       detail: priorityAction.why,
-      actionLabel: priorityAction.type === 'topic' ? 'Open Plan' : 'Optimise',
+      actionLabel: priorityAction.type === "topic" ? "Open Plan" : "Optimise",
       onAction: runPriorityAction,
     };
   }
 
-  if (connected && profileStrengthPercent != null && profileStrengthPercent < 70) {
+  if (
+    connected &&
+    profileStrengthPercent != null &&
+    profileStrengthPercent < 70
+  ) {
     return {
-      tone: 'strength',
+      tone: "strength",
       label: `Profile ${profileStrengthPercent}% — strengthen your presence`,
-      detail: 'Use Optimise Profile in the tabs above for step-by-step suggestions.',
-      actionLabel: 'Optimise',
-      onAction: () => window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile')),
+      detail:
+        "Use Optimise Profile in the tabs above for step-by-step suggestions.",
+      actionLabel: "Optimise",
+      onAction: () =>
+        window.dispatchEvent(
+          new CustomEvent("linkedinwriter:openOptimiseProfile"),
+        ),
     };
   }
 
   if (connected) {
     return {
-      tone: 'ready',
-      label: 'AI drafts, you review — start with Plan or Create',
+      tone: "ready",
+      label: "AI drafts, you review — start with Plan or Create",
       detail: null,
       actionLabel: null,
       onAction: undefined,
@@ -81,10 +89,11 @@ function resolveNudgeContent(
   }
 
   return {
-    tone: 'connect',
-    label: 'Plan & Create work without connecting',
-    detail: 'Link LinkedIn when you are ready to publish and track performance.',
-    actionLabel: isConnecting ? 'Connecting…' : 'Connect',
+    tone: "connect",
+    label: "Plan & Create work without connecting",
+    detail:
+      "Link LinkedIn when you are ready to publish and track performance.",
+    actionLabel: isConnecting ? "Connecting…" : "Connect",
     onAction: onConnect,
   };
 }
@@ -93,22 +102,22 @@ function resolveNudgeContent(
  * Contextual studio hint — mobile strength only below workflow header (connect nudge hidden);
  * desktop priority action in the main toolbar stack (≥961px).
  */
-export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioContextNudgeProps> = ({
-  connected,
-  isConnecting = false,
-  onConnect,
-  variant = 'mobile',
-}) => {
-  const isDesktop = variant === 'desktop';
+export const DashboardMobileStudioContextNudge: React.FC<
+  DashboardMobileStudioContextNudgeProps
+> = ({ connected, isConnecting = false, onConnect, variant = "mobile" }) => {
+  const isDesktop = variant === "desktop";
   const dismissKey = DISMISS_SESSION_KEYS[variant];
 
   const [dismissed, setDismissed] = useState(
-    () => sessionStorage.getItem(dismissKey) === '1'
+    () => sessionStorage.getItem(dismissKey) === "1",
   );
-  const [priorityAction, setPriorityAction] = useState<PriorityActionSnapshot | null>(() =>
-    connected ? readCachedPriorityAction() : null
-  );
-  const [profileStrengthPercent, setProfileStrengthPercent] = useState<number | null>(null);
+  const [priorityAction, setPriorityAction] =
+    useState<PriorityActionSnapshot | null>(() =>
+      connected ? readCachedPriorityAction() : null,
+    );
+  const [profileStrengthPercent, setProfileStrengthPercent] = useState<
+    number | null
+  >(null);
 
   useEffect(() => {
     if (!connected) {
@@ -120,13 +129,14 @@ export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioCo
     setPriorityAction(readCachedPriorityAction());
 
     const onPriority = (event: Event) => {
-      const detail = (event as CustomEvent<PriorityActionSnapshot | null>).detail ?? null;
+      const detail =
+        (event as CustomEvent<PriorityActionSnapshot | null>).detail ?? null;
       setPriorityAction(detail);
     };
 
     const onStrength = (event: Event) => {
-      const validation = (event as CustomEvent<ProfileStrengthUpdatedDetail>).detail
-        ?.profileValidation;
+      const validation = (event as CustomEvent<ProfileStrengthUpdatedDetail>)
+        .detail?.profileValidation;
       if (validation) {
         setProfileStrengthPercent(getDisplayProfileStrengthPercent(validation));
       }
@@ -141,7 +151,7 @@ export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioCo
   }, [connected]);
 
   const dismiss = useCallback(() => {
-    sessionStorage.setItem(dismissKey, '1');
+    sessionStorage.setItem(dismissKey, "1");
     setDismissed(true);
   }, [dismissKey]);
 
@@ -161,7 +171,7 @@ export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioCo
           profileStrengthPercent,
           runPriorityAction,
         },
-        { includePriority: isDesktop }
+        { includePriority: isDesktop },
       ),
     [
       connected,
@@ -171,15 +181,15 @@ export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioCo
       priorityAction,
       profileStrengthPercent,
       runPriorityAction,
-    ]
+    ],
   );
 
   const shouldHide =
     dismissed ||
-    content.tone === 'ready' ||
-    (isDesktop && content.tone !== 'priority') ||
-    (!isDesktop && content.tone === 'priority') ||
-    (!isDesktop && content.tone === 'connect');
+    content.tone === "ready" ||
+    (isDesktop && content.tone !== "priority") ||
+    (!isDesktop && content.tone === "priority") ||
+    (!isDesktop && content.tone === "connect");
 
   if (shouldHide) {
     return null;
@@ -188,14 +198,20 @@ export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioCo
   return (
     <div
       className={`linkedin-dashboard-mobile-studio-nudge linkedin-dashboard-mobile-studio-nudge--${content.tone}${
-        isDesktop ? ' linkedin-dashboard-studio-nudge--desktop' : ''
+        isDesktop ? " linkedin-dashboard-studio-nudge--desktop" : ""
       }`}
-      data-tour={isDesktop ? 'li-desktop-priority-nudge' : 'li-mobile-studio-nudge'}
+      data-tour={
+        isDesktop ? "li-desktop-priority-nudge" : "li-mobile-studio-nudge"
+      }
     >
       <div className="linkedin-dashboard-mobile-studio-nudge-body">
-        <p className="linkedin-dashboard-mobile-studio-nudge-label">{content.label}</p>
+        <p className="linkedin-dashboard-mobile-studio-nudge-label">
+          {content.label}
+        </p>
         {content.detail && (
-          <p className="linkedin-dashboard-mobile-studio-nudge-detail">{content.detail}</p>
+          <p className="linkedin-dashboard-mobile-studio-nudge-detail">
+            {content.detail}
+          </p>
         )}
       </div>
       <div className="linkedin-dashboard-mobile-studio-nudge-actions">
@@ -204,7 +220,7 @@ export const DashboardMobileStudioContextNudge: React.FC<DashboardMobileStudioCo
             type="button"
             className="linkedin-dashboard-mobile-studio-nudge-cta"
             onClick={content.onAction}
-            disabled={content.tone === 'connect' && isConnecting}
+            disabled={content.tone === "connect" && isConnecting}
           >
             {content.actionLabel}
           </button>

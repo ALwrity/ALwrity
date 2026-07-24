@@ -1,4 +1,4 @@
-import type { LinkedInProfileAnalysisError } from '../../../../api/linkedinSocial';
+import type { LinkedInProfileAnalysisError } from "../../../../api/linkedinSocial";
 
 export interface DashboardErrorConfig {
   error: LinkedInProfileAnalysisError;
@@ -29,15 +29,15 @@ export function buildDashboardErrorConfig(input: {
   if (!input.centered) return null;
 
   if (
-    input.optimizationPanelState === 'error' &&
+    input.optimizationPanelState === "error" &&
     (input.optimizationError || input.optimizationUserError)
   ) {
     const error =
       input.optimizationError ??
       ({
         failed_phase: 7,
-        phase_label: 'Profile Optimization',
-        error_code: 'optimization_failed',
+        phase_label: "Profile Optimization",
+        error_code: "optimization_failed",
         user_message:
           input.optimizationUserError ??
           "We couldn't load profile suggestions right now. Please try again.",
@@ -47,41 +47,44 @@ export function buildDashboardErrorConfig(input: {
       error,
       onRetry: input.onRetryOptimization,
       isRetrying: input.isOptimizationLoading,
-      title: 'Profile optimisation',
+      title: "Profile optimisation",
       key: `opt-${error.error_code}-${error.user_message}`,
     };
   }
 
-  if (input.optimizationUserError && input.optimizationPanelState === 'complete') {
+  if (
+    input.optimizationUserError &&
+    input.optimizationPanelState === "complete"
+  ) {
     const error: LinkedInProfileAnalysisError = {
       failed_phase: 7,
-      phase_label: 'Profile Optimization',
-      error_code: 'batch_progression_failed',
+      phase_label: "Profile Optimization",
+      error_code: "batch_progression_failed",
       user_message: input.optimizationUserError,
     };
     return {
       error,
       onRetry: input.onRetryOptimization,
-      title: 'Profile optimisation',
+      title: "Profile optimisation",
       key: `opt-batch-${error.user_message}`,
     };
   }
 
-  if (input.foundationStatus === 'error' && input.foundationError) {
+  if (input.foundationStatus === "error" && input.foundationError) {
     return {
       error: input.foundationError,
       onRetry: input.onRetryFoundation,
-      title: 'Profile setup',
+      title: "Profile setup",
       key: `foundation-${input.foundationError.error_code}`,
     };
   }
 
-  if (input.topicState === 'error' && input.topicError) {
+  if (input.topicState === "error" && input.topicError) {
     return {
       error: input.topicError,
       onRetry: input.onRetryTopic,
       isRetrying: input.isAnalyzing,
-      title: 'Topic ideas',
+      title: "Topic ideas",
       key: `topic-${input.topicError.error_code}`,
     };
   }
@@ -90,11 +93,11 @@ export function buildDashboardErrorConfig(input: {
     return {
       error: {
         failed_phase: 0,
-        phase_label: 'Profile completion',
-        error_code: 'submit_failed',
+        phase_label: "Profile completion",
+        error_code: "submit_failed",
         user_message: input.submitError,
       },
-      title: 'Profile completion',
+      title: "Profile completion",
       key: `submit-${input.submitError}`,
     };
   }
@@ -103,13 +106,13 @@ export function buildDashboardErrorConfig(input: {
     return {
       error: {
         failed_phase: 6,
-        phase_label: 'Topic recommendations',
-        error_code: 'recommendations_failed',
+        phase_label: "Topic recommendations",
+        error_code: "recommendations_failed",
         user_message: input.recommendationsError,
       },
       onRetry: input.onRetryTopic,
       isRetrying: input.isAnalyzing,
-      title: 'Topic ideas',
+      title: "Topic ideas",
       key: `rec-${input.recommendationsError}`,
     };
   }

@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo } from 'react';
-import { usePostAnalytics } from '../../hooks/usePostAnalytics';
-import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
-import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
-import { ProfileGrowthWidget } from './ProfileGrowthWidget';
-import { DailyDigestWidget } from './DailyDigestWidget';
-import { ConnectLockBadge } from './ConnectLockIcon';
+import React, { useEffect, useMemo } from "react";
+import { usePostAnalytics } from "../../hooks/usePostAnalytics";
+import { useLinkedInSocialConnection } from "../../../../hooks/useLinkedInSocialConnection";
+import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
+import { ProfileGrowthWidget } from "./ProfileGrowthWidget";
+import { DailyDigestWidget } from "./DailyDigestWidget";
+import { ConnectLockBadge } from "./ConnectLockIcon";
 
 const SIDEBAR_WIDTH = 340;
 
@@ -21,10 +21,16 @@ function MiniBarChart({ posts }: { posts: LinkedInPost[] }) {
     const recent = posts.slice(0, 4);
     const max = Math.max(
       1,
-      ...recent.map((p) => p.engagement.reactions + p.engagement.comments + p.engagement.reposts)
+      ...recent.map(
+        (p) =>
+          p.engagement.reactions + p.engagement.comments + p.engagement.reposts,
+      ),
     );
     return recent.map((post, i) => {
-      const total = post.engagement.reactions + post.engagement.comments + post.engagement.reposts;
+      const total =
+        post.engagement.reactions +
+        post.engagement.comments +
+        post.engagement.reposts;
       return {
         label: `P${i + 1}`,
         heightPct: (total / max) * 100,
@@ -35,37 +41,51 @@ function MiniBarChart({ posts }: { posts: LinkedInPost[] }) {
   if (slices.length === 0) return null;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 36, paddingTop: 2 }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-end",
+        gap: 4,
+        height: 36,
+        paddingTop: 2,
+      }}
+    >
       {slices.map((slice) => (
         <div
           key={slice.label}
-          style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 2,
+          }}
         >
           <div
             style={{
-              width: '100%',
+              width: "100%",
               height: `${Math.max(8, slice.heightPct)}%`,
               minHeight: 4,
-              background: 'linear-gradient(180deg, #0a66c2 0%, #60a5fa 100%)',
+              background: "linear-gradient(180deg, #0a66c2 0%, #60a5fa 100%)",
               borderRadius: 3,
             }}
           />
-          <span style={{ fontSize: 7, color: '#64748b' }}>{slice.label}</span>
+          <span style={{ fontSize: 7, color: "#64748b" }}>{slice.label}</span>
         </div>
       ))}
     </div>
   );
 }
 
-export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps> = ({
-  onViewAll,
-}) => {
+export const DashboardAnalyticsSidebar: React.FC<
+  DashboardAnalyticsSidebarProps
+> = ({ onViewAll }) => {
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
   const { data, panelState, fetchPosts } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
 
   useEffect(() => {
-    if (panelState === 'idle' && connected) {
+    if (panelState === "idle" && connected) {
       void fetchPosts({ limit: 8 });
     }
   }, [panelState, fetchPosts, connected]);
@@ -83,29 +103,38 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
     return { impressions, clicks, followers, ctr };
   }, [posts]);
 
-  const isLoading = panelState === 'loading' && posts.length === 0;
+  const isLoading = panelState === "loading" && posts.length === 0;
 
   return (
     <div
       className={[
-        'linkedin-analytics-panel',
-        !connected && 'linkedin-analytics-panel--disconnected',
+        "linkedin-analytics-panel",
+        !connected && "linkedin-analytics-panel--disconnected",
       ]
         .filter(Boolean)
-        .join(' ')}
+        .join(" ")}
     >
       <div className="linkedin-analytics-panel-header">
         <div className="linkedin-analytics-panel-title-row">
           <h3
             className="linkedin-analytics-panel-title"
-            style={{ margin: 0, fontSize: 13, fontWeight: 700, color: '#0f172a' }}
+            style={{
+              margin: 0,
+              fontSize: 13,
+              fontWeight: 700,
+              color: "#0f172a",
+            }}
           >
             Analytics
           </h3>
           {!connected && <ConnectLockBadge size={10} />}
         </div>
         {onViewAll && (
-          <button type="button" className="linkedin-analytics-panel-link" onClick={onViewAll}>
+          <button
+            type="button"
+            className="linkedin-analytics-panel-link"
+            onClick={onViewAll}
+          >
             View all posts
           </button>
         )}
@@ -113,12 +142,13 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
 
       <div
         className="linkedin-analytics-panel-body"
-        style={{ maxHeight: 480, overflowY: 'auto' }}
+        style={{ maxHeight: 480, overflowY: "auto" }}
       >
         {!connected ? (
           <div className="linkedin-analytics-panel-disconnected">
             <p className="linkedin-analytics-panel-disconnected-text">
-              Connect your LinkedIn account to unlock post stats, follower growth, and content insights.
+              Connect your LinkedIn account to unlock post stats, follower
+              growth, and content insights.
             </p>
           </div>
         ) : (
@@ -128,14 +158,28 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
 
             {/* Post engagement mini chart */}
             {isLoading && posts.length === 0 ? (
-              <div style={{ fontSize: 10, color: '#64748b', padding: '4px 0', textAlign: 'center' }}>
+              <div
+                style={{
+                  fontSize: 10,
+                  color: "#64748b",
+                  padding: "4px 0",
+                  textAlign: "center",
+                }}
+              >
                 Loading posts…
               </div>
             ) : (
               <>
                 {posts.length > 0 && (
                   <div className="linkedin-analytics-panel-mini-chart">
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', marginBottom: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        color: "#475569",
+                        marginBottom: 4,
+                      }}
+                    >
                       Post engagement
                     </div>
                     <MiniBarChart posts={posts} />
@@ -144,22 +188,44 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
                 <div
                   className="linkedin-analytics-panel-stat-grid"
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr',
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
                     gap: 5,
                     marginTop: 8,
                   }}
                 >
                   <div className="linkedin-analytics-stat-chip">
-                    <div style={{ fontSize: 9, fontWeight: 600, color: '#64748b' }}>Followers</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#10b981', marginTop: 2 }}>
-                      {totals.followers > 0 ? `+${totals.followers}` : '—'}
+                    <div
+                      style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                    >
+                      Followers
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: "#10b981",
+                        marginTop: 2,
+                      }}
+                    >
+                      {totals.followers > 0 ? `+${totals.followers}` : "—"}
                     </div>
                   </div>
                   <div className="linkedin-analytics-stat-chip">
-                    <div style={{ fontSize: 9, fontWeight: 600, color: '#64748b' }}>CTR</div>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#0a66c2', marginTop: 2 }}>
-                      {totals.impressions > 0 ? formatPct(totals.ctr) : '—'}
+                    <div
+                      style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                    >
+                      CTR
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: "#0a66c2",
+                        marginTop: 2,
+                      }}
+                    >
+                      {totals.impressions > 0 ? formatPct(totals.ctr) : "—"}
                     </div>
                   </div>
                 </div>
@@ -177,17 +243,17 @@ export const DashboardAnalyticsSidebar: React.FC<DashboardAnalyticsSidebarProps>
             className="linkedin-analytics-panel-connect-btn"
             onClick={() => void connectWithOAuth()}
             style={{
-              width: '100%',
+              width: "100%",
               marginTop: 8,
-              padding: '7px 8px',
+              padding: "7px 8px",
               borderRadius: 8,
-              border: 'none',
-              background: '#0a66c2',
-              color: '#fff',
+              border: "none",
+              background: "#0a66c2",
+              color: "#fff",
               fontSize: 10,
               fontWeight: 700,
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
+              cursor: "pointer",
+              whiteSpace: "nowrap",
             }}
           >
             Connect LinkedIn

@@ -1,10 +1,13 @@
-import React from 'react';
-import { LinkedIn as LinkedInIcon, Business as BusinessIcon } from '@mui/icons-material';
-import type { LinkedInOrganization } from '../../../api/linkedinSocial';
-import type { LinkedInPostTarget } from '../../../hooks/useLinkedInSocialConnection';
-import type { LinkedInProfileSummary } from '../utils/linkedInProfileSummary';
-import { getInitials } from '../utils/linkedInProfileSummary';
-import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
+import React from "react";
+import {
+  LinkedIn as LinkedInIcon,
+  Business as BusinessIcon,
+} from "@mui/icons-material";
+import type { LinkedInOrganization } from "../../../api/linkedinSocial";
+import type { LinkedInPostTarget } from "../../../hooks/useLinkedInSocialConnection";
+import type { LinkedInProfileSummary } from "../utils/linkedInProfileSummary";
+import { getInitials } from "../utils/linkedInProfileSummary";
+import { linkedInPlaceholderCardStyles } from "./linkedInPlaceholderStyles";
 
 /**
  * @deprecated Replaced by `LinkedInAnalyticsDashboard` for the Writer landing page.
@@ -12,13 +15,13 @@ import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
  */
 
 const SELECT_STYLE: React.CSSProperties = {
-  width: '100%',
-  padding: '10px 12px',
+  width: "100%",
+  padding: "10px 12px",
   borderRadius: 10,
-  border: '1px solid #e2e8f0',
-  backgroundColor: '#fff',
+  border: "1px solid #e2e8f0",
+  backgroundColor: "#fff",
   fontSize: 14,
-  color: '#334155',
+  color: "#334155",
   marginTop: 6,
 };
 
@@ -35,12 +38,14 @@ interface LinkedInConnectedProfileProps {
   disconnectError?: string | null;
 }
 
-export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> = ({
+export const LinkedInConnectedProfile: React.FC<
+  LinkedInConnectedProfileProps
+> = ({
   summary,
   warning,
   organizations = [],
-  selectedTarget = 'profile',
-  selectedOrgId = '',
+  selectedTarget = "profile",
+  selectedOrgId = "",
   onTargetChange,
   onOrgChange,
   onDisconnect,
@@ -56,23 +61,23 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
       <div style={linkedInPlaceholderCardStyles.inner}>
         <div
           style={{
-            position: 'absolute',
-            top: '-50%',
-            left: '-50%',
-            width: '200%',
-            height: '200%',
+            position: "absolute",
+            top: "-50%",
+            left: "-50%",
+            width: "200%",
+            height: "200%",
             background:
-              'radial-gradient(circle, rgba(10, 102, 194, 0.08) 0%, transparent 70%)',
+              "radial-gradient(circle, rgba(10, 102, 194, 0.08) 0%, transparent 70%)",
             zIndex: 0,
           }}
         />
 
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ position: "relative", zIndex: 1 }}>
           {showDisconnect && (
             <div
               style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
+                display: "flex",
+                justifyContent: "flex-end",
                 marginBottom: 12,
               }}
             >
@@ -81,18 +86,18 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                 onClick={onDisconnect}
                 disabled={isDisconnecting}
                 style={{
-                  padding: '6px 14px',
+                  padding: "6px 14px",
                   borderRadius: 8,
-                  border: '1px solid #fca5a5',
-                  backgroundColor: '#fff',
-                  color: '#b91c1c',
+                  border: "1px solid #fca5a5",
+                  backgroundColor: "#fff",
+                  color: "#b91c1c",
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: isDisconnecting ? 'default' : 'pointer',
+                  cursor: isDisconnecting ? "default" : "pointer",
                   opacity: isDisconnecting ? 0.7 : 1,
                 }}
               >
-                {isDisconnecting ? 'Disconnecting...' : 'Disconnect'}
+                {isDisconnecting ? "Disconnecting..." : "Disconnect"}
               </button>
             </div>
           )}
@@ -101,12 +106,12 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
             <p
               role="alert"
               style={{
-                margin: '0 0 12px',
-                padding: '10px 12px',
+                margin: "0 0 12px",
+                padding: "10px 12px",
                 borderRadius: 8,
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                color: '#b91c1c',
+                backgroundColor: "#fef2f2",
+                border: "1px solid #fecaca",
+                color: "#b91c1c",
                 fontSize: 13,
                 lineHeight: 1.5,
               }}
@@ -117,26 +122,26 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
 
           <div
             style={{
-              display: 'flex',
-              alignItems: 'flex-start',
+              display: "flex",
+              alignItems: "flex-start",
               gap: 16,
-              flexWrap: 'wrap',
+              flexWrap: "wrap",
             }}
           >
             <div
               style={{
                 width: 56,
                 height: 56,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#fff',
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
                 fontWeight: 700,
                 fontSize: 18,
                 flexShrink: 0,
-                boxShadow: '0 4px 12px rgba(10, 102, 194, 0.35)',
+                boxShadow: "0 4px 12px rgba(10, 102, 194, 0.35)",
               }}
               aria-hidden
             >
@@ -146,19 +151,19 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
             <div style={{ flex: 1, minWidth: 200 }}>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: "flex",
+                  alignItems: "center",
                   gap: 8,
                   marginBottom: 4,
                 }}
               >
-                <LinkedInIcon sx={{ color: '#0A66C2', fontSize: 22 }} />
+                <LinkedInIcon sx={{ color: "#0A66C2", fontSize: 22 }} />
                 <h3
                   style={{
                     margin: 0,
                     fontSize: 18,
                     fontWeight: 700,
-                    color: '#1e293b',
+                    color: "#1e293b",
                     lineHeight: 1.3,
                   }}
                 >
@@ -168,9 +173,9 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
 
               <p
                 style={{
-                  margin: '0 0 4px',
+                  margin: "0 0 4px",
                   fontSize: 14,
-                  color: '#64748b',
+                  color: "#64748b",
                   lineHeight: 1.4,
                 }}
               >
@@ -181,12 +186,14 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                 style={{
                   margin: 0,
                   fontSize: 13,
-                  color: '#94a3b8',
+                  color: "#94a3b8",
                   lineHeight: 1.4,
                 }}
               >
                 Connected via {summary.connectionSourceLabel.toLowerCase()}
-                {summary.accountIdDisplay ? ` · ID ${summary.accountIdDisplay}` : ''}
+                {summary.accountIdDisplay
+                  ? ` · ID ${summary.accountIdDisplay}`
+                  : ""}
               </p>
             </div>
           </div>
@@ -195,12 +202,12 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
             <p
               role="status"
               style={{
-                margin: '16px 0 0',
-                padding: '10px 12px',
+                margin: "16px 0 0",
+                padding: "10px 12px",
                 borderRadius: 8,
-                backgroundColor: '#fffbeb',
-                border: '1px solid #fde68a',
-                color: '#92400e',
+                backgroundColor: "#fffbeb",
+                border: "1px solid #fde68a",
+                color: "#92400e",
                 fontSize: 13,
                 lineHeight: 1.5,
               }}
@@ -210,15 +217,21 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
           )}
 
           {showPostAs && (
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+            <div
+              style={{
+                marginTop: 20,
+                paddingTop: 16,
+                borderTop: "1px solid #e2e8f0",
+              }}
+            >
               <label
                 htmlFor="linkedin-writer-post-as"
                 style={{
                   fontSize: 13,
                   fontWeight: 600,
-                  color: '#475569',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.04em',
+                  color: "#475569",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
                 }}
               >
                 Post as
@@ -235,18 +248,18 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                 <option value="organization">Company page</option>
               </select>
 
-              {selectedTarget === 'organization' && (
+              {selectedTarget === "organization" && (
                 <>
                   <label
                     htmlFor="linkedin-writer-company-page"
                     style={{
-                      display: 'block',
+                      display: "block",
                       marginTop: 14,
                       fontSize: 13,
                       fontWeight: 600,
-                      color: '#475569',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
+                      color: "#475569",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.04em",
                     }}
                   >
                     Company page
@@ -262,7 +275,10 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                       <option value="">No company pages found</option>
                     ) : (
                       organizations.map((org) => (
-                        <option key={org.organization_id} value={org.organization_id}>
+                        <option
+                          key={org.organization_id}
+                          value={org.organization_id}
+                        >
                           {org.name || org.organization_id}
                         </option>
                       ))
@@ -274,23 +290,29 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
           )}
 
           {visiblePages.length > 0 && (
-            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+            <div
+              style={{
+                marginTop: 20,
+                paddingTop: 16,
+                borderTop: "1px solid #e2e8f0",
+              }}
+            >
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
+                  display: "flex",
+                  alignItems: "center",
                   gap: 6,
                   marginBottom: 10,
                 }}
               >
-                <BusinessIcon sx={{ color: '#64748b', fontSize: 18 }} />
+                <BusinessIcon sx={{ color: "#64748b", fontSize: 18 }} />
                 <span
                   style={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: '#475569',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
+                    color: "#475569",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
                   }}
                 >
                   Company pages you manage
@@ -300,9 +322,9 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                 style={{
                   margin: 0,
                   padding: 0,
-                  listStyle: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
+                  listStyle: "none",
+                  display: "flex",
+                  flexDirection: "column",
                   gap: 8,
                 }}
               >
@@ -311,10 +333,10 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                     key={page.id}
                     style={{
                       fontSize: 14,
-                      color: '#334155',
+                      color: "#334155",
                       paddingLeft: 4,
-                      display: 'flex',
-                      alignItems: 'center',
+                      display: "flex",
+                      alignItems: "center",
                       gap: 8,
                     }}
                   >
@@ -322,8 +344,8 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
                       style={{
                         width: 6,
                         height: 6,
-                        borderRadius: '50%',
-                        backgroundColor: '#0A66C2',
+                        borderRadius: "50%",
+                        backgroundColor: "#0A66C2",
                         flexShrink: 0,
                       }}
                     />
@@ -338,4 +360,3 @@ export const LinkedInConnectedProfile: React.FC<LinkedInConnectedProfileProps> =
     </div>
   );
 };
-

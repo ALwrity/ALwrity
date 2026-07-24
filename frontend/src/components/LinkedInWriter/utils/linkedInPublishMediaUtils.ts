@@ -5,31 +5,30 @@
 import {
   extractLinkedInImageId,
   splitDraftByImageMarkdown,
-} from './linkedInImageDraftUtils';
+} from "./linkedInImageDraftUtils";
 import {
   LINKEDIN_PUBLISH_ACCEPTED_IMAGE_TYPES,
   LINKEDIN_PUBLISH_MAX_IMAGE_BYTES,
-} from './linkedInPublishMediaConstants';
+} from "./linkedInPublishMediaConstants";
 
-export type LinkedInPublishMediaSource = 'ai' | 'upload';
+export type LinkedInPublishMediaSource = "ai" | "upload";
 
 export interface LinkedInDraftImageAttachment {
-  source: 'ai';
+  source: "ai";
   imageId: string;
   imageUrl: string;
   alt: string;
 }
 
 export interface LinkedInUploadImageAttachment {
-  source: 'upload';
+  source: "upload";
   localFile: File;
   previewUrl: string;
   fileName: string;
 }
 
 export type LinkedInPublishMediaAttachment =
-  | LinkedInDraftImageAttachment
-  | LinkedInUploadImageAttachment;
+  LinkedInDraftImageAttachment | LinkedInUploadImageAttachment;
 
 export interface LinkedInPublishImageValidationResult {
   valid: boolean;
@@ -39,27 +38,29 @@ export interface LinkedInPublishImageValidationResult {
 /** Extract all LinkedIn image IDs referenced in draft markdown. */
 export function extractPublishImageIds(draft: string): string[] {
   return splitDraftByImageMarkdown(draft)
-    .filter((segment) => segment.type === 'image' && segment.imageId)
-    .map((segment) => (segment.type === 'image' ? segment.imageId : null))
+    .filter((segment) => segment.type === "image" && segment.imageId)
+    .map((segment) => (segment.type === "image" ? segment.imageId : null))
     .filter((id): id is string => Boolean(id));
 }
 
 /** Return the last AI-generated image segment from a draft (publish v1 uses one image). */
-export function getLastDraftImageForPublish(draft: string): LinkedInDraftImageAttachment | null {
+export function getLastDraftImageForPublish(
+  draft: string,
+): LinkedInDraftImageAttachment | null {
   const imageSegments = splitDraftByImageMarkdown(draft).filter(
-    (segment) => segment.type === 'image',
+    (segment) => segment.type === "image",
   );
 
   if (imageSegments.length === 0) return null;
 
   const last = imageSegments[imageSegments.length - 1];
-  if (last.type !== 'image') return null;
+  if (last.type !== "image") return null;
 
   const imageId = last.imageId || extractLinkedInImageId(last.url);
   if (!imageId) return null;
 
   return {
-    source: 'ai',
+    source: "ai",
     imageId,
     imageUrl: last.url,
     alt: last.alt,
@@ -74,7 +75,7 @@ export function resolvePublishMediaAttachment(
   draft: string,
   hookAttachment: LinkedInPublishMediaAttachment | null,
 ): LinkedInPublishMediaAttachment | null {
-  if (hookAttachment?.source === 'upload' && hookAttachment.localFile) {
+  if (hookAttachment?.source === "upload" && hookAttachment.localFile) {
     return hookAttachment;
   }
 
@@ -87,23 +88,25 @@ export function resolvePublishMediaAttachment(
 }
 
 /** Validate a local image file before attach (client-side preflight). */
-export function validatePublishImageFile(file: File): LinkedInPublishImageValidationResult {
+export function validatePublishImageFile(
+  file: File,
+): LinkedInPublishImageValidationResult {
   if (!file) {
-    return { valid: false, error: 'No file selected.' };
+    return { valid: false, error: "No file selected." };
   }
 
   const mime = file.type.toLowerCase();
   const accepted = LINKEDIN_PUBLISH_ACCEPTED_IMAGE_TYPES as readonly string[];
   if (!accepted.includes(mime)) {
-    return { valid: false, error: 'Use PNG, JPEG, GIF, or WebP images only.' };
+    return { valid: false, error: "Use PNG, JPEG, GIF, or WebP images only." };
   }
 
   if (file.size > LINKEDIN_PUBLISH_MAX_IMAGE_BYTES) {
-    return { valid: false, error: 'Image must be under 8 MB.' };
+    return { valid: false, error: "Image must be under 8 MB." };
   }
 
   if (file.size === 0) {
-    return { valid: false, error: 'Selected file is empty.' };
+    return { valid: false, error: "Selected file is empty." };
   }
 
   return { valid: true };
@@ -113,9 +116,9 @@ export function validatePublishImageFile(file: File): LinkedInPublishImageValida
 export function describePublishMediaAttachment(
   attachment: LinkedInPublishMediaAttachment | null,
 ): string {
-  if (!attachment) return 'No image attached';
+  if (!attachment) return "No image attached";
 
-  if (attachment.source === 'ai') {
+  if (attachment.source === "ai") {
     return `AI image (${attachment.imageId.slice(0, 8)}…)`;
   }
 

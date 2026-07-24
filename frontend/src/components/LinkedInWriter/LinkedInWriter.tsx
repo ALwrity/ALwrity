@@ -1,15 +1,27 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { Button, Snackbar, Alert, CircularProgress } from '@mui/material';
-import { Save as SaveIcon, RateReview as RateReviewIcon } from '@mui/icons-material';
-import { QualityCheckModal } from './components/dashboard/PublishWedgeModals';
-import { linkedInWriterApi, saveLinkedInToAssetLibrary } from '../../services/linkedInWriterApi';
-import { CopilotSidebar } from '@copilotkit/react-ui';
-import '@copilotkit/react-ui/styles.css';
-import './styles/alwrity-copilot.css';
-import RegisterLinkedInActions from './RegisterLinkedInActions';
-import RegisterLinkedInEditActions from './RegisterLinkedInEditActions';
-import RegisterLinkedInActionsEnhanced from './RegisterLinkedInActionsEnhanced';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { useLocation } from "react-router-dom";
+import { Button, Snackbar, Alert, CircularProgress } from "@mui/material";
+import {
+  Save as SaveIcon,
+  RateReview as RateReviewIcon,
+} from "@mui/icons-material";
+import { QualityCheckModal } from "./components/dashboard/PublishWedgeModals";
+import {
+  linkedInWriterApi,
+  saveLinkedInToAssetLibrary,
+} from "../../services/linkedInWriterApi";
+import { CopilotSidebar } from "@copilotkit/react-ui";
+import "@copilotkit/react-ui/styles.css";
+import "./styles/alwrity-copilot.css";
+import RegisterLinkedInActions from "./RegisterLinkedInActions";
+import RegisterLinkedInEditActions from "./RegisterLinkedInEditActions";
+import RegisterLinkedInActionsEnhanced from "./RegisterLinkedInActionsEnhanced";
 import {
   Header,
   ContentEditor,
@@ -33,24 +45,27 @@ import { useCopilotActionTyped } from '../../hooks/useCopilotActionTyped';
 
 const observabilityHooks = {
   onChatExpanded: () => {
-    console.log('[LinkedIn Writer] Sidebar opened');
+    console.log("[LinkedIn Writer] Sidebar opened");
   },
   onMessageSent: (message: any) => {
-    const text = typeof message === 'string' ? message : (message?.content ?? '');
+    const text =
+      typeof message === "string" ? message : (message?.content ?? "");
     if (text) {
-      console.log('[LinkedIn Writer] User message tracked:', { content_length: text.length });
+      console.log("[LinkedIn Writer] User message tracked:", {
+        content_length: text.length,
+      });
     }
   },
   onFeedbackGiven: (id: string, type: string) => {
-    console.log('[LinkedIn Writer] Feedback given:', { id, type });
-  }
+    console.log("[LinkedIn Writer] Feedback given:", { id, type });
+  },
 };
 
 interface LinkedInWriterProps {
   className?: string;
 }
 
-const LinkedInWriter: React.FC<LinkedInWriterProps> = ({ className = '' }) => {
+const LinkedInWriter: React.FC<LinkedInWriterProps> = ({ className = "" }) => {
   return (
     <PlatformPersonaProvider platform="linkedin">
       <LinkedInConnectionProvider>
@@ -61,7 +76,9 @@ const LinkedInWriter: React.FC<LinkedInWriterProps> = ({ className = '' }) => {
 };
 
 // Main LinkedIn Writer Content Component
-const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }) => {
+const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
+  className = "",
+}) => {
   const {
     // State
     draft,
@@ -80,7 +97,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     // showContextModal,
     showPreview,
     justGeneratedContent,
-    
+
     // Grounding data
     researchSources,
     citations,
@@ -89,7 +106,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     searchQueries,
     progressSteps,
     progressActive,
-    
+
     // Setters
     setDraft,
     setShowEditor,
@@ -101,19 +118,19 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     setShowPreferencesModal,
     // setShowContextModal,
     setShowPreview,
-    
+
     // Handlers
     handleDraftChange,
     handleContextChange,
     handleClear,
     // handleCopy,
     handleClearHistory,
-    
+
     // Utilities
     getHistoryLength,
     savePreferences,
     summarizeHistory,
-    
+
     // Direct generation methods
     generatePost,
     generateArticle,
@@ -154,11 +171,13 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     loadDraftContent,
     saveLastSession,
     loadLastSession,
-    getStorageStats
+    getStorageStats,
   } = useCopilotPersistence();
-  
+
   // Save-to-asset-library state
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
   const [saveErrorMessage, setSaveErrorMessage] = useState<string | null>(null);
 
   // Quality Check state
@@ -176,9 +195,9 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   } | null;
 
   useEffect(() => {
-    document.title = 'LinkedIn Studio | ALwrity';
+    document.title = "LinkedIn Studio | ALwrity";
     return () => {
-      document.title = 'ALwrity — AI Digital Marketing Operating System';
+      document.title = "ALwrity — AI Digital Marketing Operating System";
     };
   }, []);
 
@@ -186,8 +205,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   useEffect(() => {
     const topic = locationState?.calendarTopic;
     if (topic) {
-      const description = locationState?.calendarDescription || '';
-      const contextText = `Topic: ${topic}${description ? `\nDescription: ${description}` : ''}`;
+      const description = locationState?.calendarDescription || "";
+      const contextText = `Topic: ${topic}${description ? `\nDescription: ${description}` : ""}`;
       handleContextChange(contextText);
       // Clear navigation state so refresh doesn't re-trigger
       window.history.replaceState({}, document.title);
@@ -208,27 +227,31 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
   }, [generateArticle, setOutlineMode]);
 
   // ── Generate similar post handler ──
-  const handleGenerateSimilarPost = useCallback((prompt: string) => {
-    handleContextChange(prompt);
-  }, [handleContextChange]);
+  const handleGenerateSimilarPost = useCallback(
+    (prompt: string) => {
+      handleContextChange(prompt);
+    },
+    [handleContextChange],
+  );
 
   // ── Share a Link (Quick Post from URL) ──
   const [showShareLinkModal, setShowShareLinkModal] = useState(false);
-  const [shareLinkUrl, setShareLinkUrl] = useState('');
-  const [shareLinkTone, setShareLinkTone] = useState('professional');
-  const [shareLinkMyTake, setShareLinkMyTake] = useState('');
+  const [shareLinkUrl, setShareLinkUrl] = useState("");
+  const [shareLinkTone, setShareLinkTone] = useState("professional");
+  const [shareLinkMyTake, setShareLinkMyTake] = useState("");
   const [shareLinkGenerating, setShareLinkGenerating] = useState(false);
   const [shareLinkError, setShareLinkError] = useState<string | null>(null);
 
   useEffect(() => {
     const onOpen = () => {
-      setShareLinkUrl('');
-      setShareLinkMyTake('');
+      setShareLinkUrl("");
+      setShareLinkMyTake("");
       setShareLinkError(null);
       setShowShareLinkModal(true);
     };
-    window.addEventListener('linkedinwriter:openShareLink', onOpen);
-    return () => window.removeEventListener('linkedinwriter:openShareLink', onOpen);
+    window.addEventListener("linkedinwriter:openShareLink", onOpen);
+    return () =>
+      window.removeEventListener("linkedinwriter:openShareLink", onOpen);
   }, []);
 
   const handleGenerateFromUrl = async () => {
@@ -245,109 +268,129 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
       if (result?.success && result?.data?.content) {
         setShowShareLinkModal(false);
         window.dispatchEvent(
-          new CustomEvent('linkedinwriter:updateDraft', { detail: { content: result.data.content } })
+          new CustomEvent("linkedinwriter:updateDraft", {
+            detail: { content: result.data.content },
+          }),
         );
       } else {
-        setShareLinkError(result?.error || 'Generation failed');
+        setShareLinkError(result?.error || "Generation failed");
       }
     } catch (err: any) {
-      setShareLinkError(err?.response?.data?.detail || err?.message || 'Failed to generate from URL');
+      setShareLinkError(
+        err?.response?.data?.detail ||
+          err?.message ||
+          "Failed to generate from URL",
+      );
     } finally {
       setShareLinkGenerating(false);
     }
   };
 
   // ── Save to Asset Library (podcast-maker pattern: save only, stay on page) ──
-  
+
   const handleSaveToAssetLibrary = async () => {
     if (!draft) return;
-    setSaveStatus('saving');
+    setSaveStatus("saving");
     setSaveErrorMessage(null);
     try {
-      const topic = context?.startsWith('Topic:') 
-        ? context.replace(/^Topic:\s*/, '').split('\n')[0].trim()
+      const topic = context?.startsWith("Topic:")
+        ? context
+            .replace(/^Topic:\s*/, "")
+            .split("\n")[0]
+            .trim()
         : undefined;
-      const title = draft.split('\n')[0].substring(0, 100) || 'LinkedIn Post';
+      const title = draft.split("\n")[0].substring(0, 100) || "LinkedIn Post";
 
       const result = await saveLinkedInToAssetLibrary({
         title,
         content: draft,
         topic,
-        tags: ['linkedin_post', 'social_media'],
+        tags: ["linkedin_post", "social_media"],
         assetMetadata: {
           word_count: draft.split(/\s+/).length,
-          source: locationState?.calendarTopic ? 'calendar' : 'manual',
+          source: locationState?.calendarTopic ? "calendar" : "manual",
         },
       });
 
-      console.log('[LinkedInWriter] Saved to Asset Library, assetId:', result.assetId);
+      console.log(
+        "[LinkedInWriter] Saved to Asset Library, assetId:",
+        result.assetId,
+      );
 
-      setSaveStatus('saved');
-
+      setSaveStatus("saved");
     } catch (err: any) {
-      const message = err?.response?.data?.detail || err?.message || 'Please try again.';
-      console.error('[LinkedInWriter] Save failed:', err);
+      const message =
+        err?.response?.data?.detail || err?.message || "Please try again.";
+      console.error("[LinkedInWriter] Save failed:", err);
       setSaveErrorMessage(message);
-      setSaveStatus('error');
+      setSaveStatus("error");
     }
   };
 
   // Sync component state with enhanced persistence
   useEffect(() => {
-    console.log('[LinkedIn Writer] Component mounted, enhanced persistence enabled');
-    
+    console.log(
+      "[LinkedIn Writer] Component mounted, enhanced persistence enabled",
+    );
+
     // Load persisted data on component mount
     const loadPersistedData = () => {
       try {
         // Load chat history
         const persistedChatHistory = loadChatHistory();
         if (persistedChatHistory.length > 0) {
-          setChatHistory(persistedChatHistory.map(m => ({
-            role: m.role,
-            content: m.content,
-            ts: m.timestamp || Date.now(),
-            action: m.metadata?.action,
-            result: m.metadata?.result
-          })));
-          console.log(`📖 Restored ${persistedChatHistory.length} persisted chat messages`);
+          setChatHistory(
+            persistedChatHistory.map((m) => ({
+              role: m.role,
+              content: m.content,
+              ts: m.timestamp || Date.now(),
+              action: m.metadata?.action,
+              result: m.metadata?.result,
+            })),
+          );
+          console.log(
+            `📖 Restored ${persistedChatHistory.length} persisted chat messages`,
+          );
         }
-        
+
         // Load user preferences
         const persistedPrefs = loadPersistedPreferences();
         if (persistedPrefs) {
           setUserPreferences(persistedPrefs);
-          console.log('📖 Restored persisted user preferences');
+          console.log("📖 Restored persisted user preferences");
         }
-        
+
         // Load conversation context (for future use)
         const conversationContext = loadConversationContext();
-        console.log('📖 Loaded persisted conversation context:', conversationContext);
-        
+        console.log(
+          "📖 Loaded persisted conversation context:",
+          conversationContext,
+        );
+
         // Load draft content
         const persistedDraft = loadDraftContent();
         if (persistedDraft && !draft) {
           setDraft(persistedDraft);
-          console.log('📖 Restored persisted draft content');
+          console.log("📖 Restored persisted draft content");
         }
-        
+
         // Load last session
         const lastSession = loadLastSession();
         if (lastSession) {
-          console.log('📖 Last session:', lastSession);
+          console.log("📖 Last session:", lastSession);
         }
-        
+
         // Get storage statistics
         const stats = getStorageStats();
-        console.log('📊 Persistence stats:', stats);
-        
+        console.log("📊 Persistence stats:", stats);
       } catch (error) {
-        console.error('❌ Error loading persisted data:', error);
+        console.error("❌ Error loading persisted data:", error);
       }
     };
-    
+
     // Load data after a short delay to allow CopilotKit to initialize
     setTimeout(loadPersistedData, 1000);
-    
+
     // Save session data when component unmounts
     return () => {
       saveLastSession();
@@ -362,13 +405,13 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     }
     setIsPreviewing(false);
     setPendingEdit(null);
-    setLivePreviewHtml('');
+    setLivePreviewHtml("");
   };
 
   const handleDiscardChanges = () => {
     setIsPreviewing(false);
     setPendingEdit(null);
-    setLivePreviewHtml('');
+    setLivePreviewHtml("");
   };
 
   const handlePreviewToggle = () => {
@@ -379,7 +422,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     const updated = { ...userPreferences, ...prefs };
     setUserPreferences(updated);
     savePreferences(prefs);
-    
+
     // Also save to enhanced persistence
     savePersistedPreferences(prefs);
   };
@@ -393,30 +436,39 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
 
   // Allow Copilot to update the draft directly
   useCopilotActionTyped({
-    name: 'updateLinkedInDraft',
-    description: 'Replace the LinkedIn content draft with provided content',
+    name: "updateLinkedInDraft",
+    description: "Replace the LinkedIn content draft with provided content",
     parameters: [
-      { name: 'content', type: 'string', description: 'The full content to set', required: true }
+      {
+        name: "content",
+        type: "string",
+        description: "The full content to set",
+        required: true,
+      },
     ],
     handler: async ({ content }: { content: string }) => {
       setDraft(content);
-      return { success: true, message: 'Draft updated' };
-    }
+      return { success: true, message: "Draft updated" };
+    },
   });
 
   // Let Copilot append text to the draft
   useCopilotActionTyped({
-    name: 'appendToLinkedInDraft',
-    description: 'Append text to the current LinkedIn content draft',
+    name: "appendToLinkedInDraft",
+    description: "Append text to the current LinkedIn content draft",
     parameters: [
-      { name: 'content', type: 'string', description: 'The text to append', required: true }
+      {
+        name: "content",
+        type: "string",
+        description: "The text to append",
+        required: true,
+      },
     ],
     handler: async ({ content }: { content: string }) => {
-      setDraft(prev => (prev ? `${prev}\n\n${content}` : content));
-      return { success: true, message: 'Text appended' };
-    }
+      setDraft((prev) => (prev ? `${prev}\n\n${content}` : content));
+      return { success: true, message: "Text appended" };
+    },
   });
-
 
   // Use the CopilotActions hook to handle all copilot-related functionality
   const getIntelligentSuggestions = useCopilotActions({
@@ -425,44 +477,57 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({ className = '' }
     userPreferences,
     justGeneratedContent,
     handleContextChange,
-    setDraft
+    setDraft,
   });
 
-  const labels = useMemo(() => ({
-    title: 'ALwrity Co-Pilot',
-    initial: draft
-      ? 'Great! I can see you have content to work with. Use the quick edit suggestions below to refine your post in real-time, or ask me to make specific changes.'
-      : `Hi! I'm your ALwrity Co-Pilot, your LinkedIn writing assistant${corePersona ? ` with ${corePersona.persona_name} persona optimization` : ''}. I can help you create professional posts, articles, carousels, video scripts, and comment responses. Try the new persona-aware actions for enhanced content generation!`
-  }), [draft, corePersona]);
+  const labels = useMemo(
+    () => ({
+      title: "ALwrity Co-Pilot",
+      initial: draft
+        ? "Great! I can see you have content to work with. Use the quick edit suggestions below to refine your post in real-time, or ask me to make specific changes."
+        : `Hi! I'm your ALwrity Co-Pilot, your LinkedIn writing assistant${corePersona ? ` with ${corePersona.persona_name} persona optimization` : ""}. I can help you create professional posts, articles, carousels, video scripts, and comment responses. Try the new persona-aware actions for enhanced content generation!`,
+    }),
+    [draft, corePersona],
+  );
 
-  const makeSystemMessage = useCallback((context: string, additional?: string) => {
-    const prefs = userPreferences;
-    const prefsLine = Object.keys(prefs).length ? `User preferences (remember and respect unless changed): ${JSON.stringify(prefs)}` : '';
-    const history = summarizeHistory();
-    const historyLine = history ? `Recent conversation (last 15 messages):\n${history}` : '';
-    const currentDraft = draft ? `Current draft content:\n${draft}` : 'No current draft content.';
-    const tone = prefs.tone || 'professional';
-    const industry = prefs.industry || 'Technology';
-    const audience = prefs.target_audience || 'professionals';
-    
-    const personaGuidance = corePersona && platformPersona ? `
+  const makeSystemMessage = useCallback(
+    (context: string, additional?: string) => {
+      const prefs = userPreferences;
+      const prefsLine = Object.keys(prefs).length
+        ? `User preferences (remember and respect unless changed): ${JSON.stringify(prefs)}`
+        : "";
+      const history = summarizeHistory();
+      const historyLine = history
+        ? `Recent conversation (last 15 messages):\n${history}`
+        : "";
+      const currentDraft = draft
+        ? `Current draft content:\n${draft}`
+        : "No current draft content.";
+      const tone = prefs.tone || "professional";
+      const industry = prefs.industry || "Technology";
+      const audience = prefs.target_audience || "professionals";
+
+      const personaGuidance =
+        corePersona && platformPersona
+          ? `
 PERSONA-AWARE WRITING GUIDANCE:
 - PERSONA: ${corePersona.persona_name} (${corePersona.archetype})
 - CORE BELIEF: ${corePersona.core_belief}
 - CONFIDENCE SCORE: ${corePersona.confidence_score}%
-- LINGUISTIC STYLE: ${corePersona.linguistic_fingerprint?.sentence_metrics?.average_sentence_length_words || 'Unknown'} words average, ${corePersona.linguistic_fingerprint?.sentence_metrics?.active_to_passive_ratio || 'Unknown'} active/passive ratio
-- GO-TO WORDS: ${corePersona.linguistic_fingerprint?.lexical_features?.go_to_words?.join(', ') || 'None specified'}
-- AVOID WORDS: ${corePersona.linguistic_fingerprint?.lexical_features?.avoid_words?.join(', ') || 'None specified'}
+- LINGUISTIC STYLE: ${corePersona.linguistic_fingerprint?.sentence_metrics?.average_sentence_length_words || "Unknown"} words average, ${corePersona.linguistic_fingerprint?.sentence_metrics?.active_to_passive_ratio || "Unknown"} active/passive ratio
+- GO-TO WORDS: ${corePersona.linguistic_fingerprint?.lexical_features?.go_to_words?.join(", ") || "None specified"}
+- AVOID WORDS: ${corePersona.linguistic_fingerprint?.lexical_features?.avoid_words?.join(", ") || "None specified"}
 
 PLATFORM OPTIMIZATION (LinkedIn):
-- CHARACTER LIMIT: ${platformPersona.content_format_rules?.character_limit || '3000'} characters
-- OPTIMAL LENGTH: ${platformPersona.content_format_rules?.optimal_length || '150-300 words'}
-- ENGAGEMENT PATTERN: ${platformPersona.engagement_patterns?.posting_frequency || '2-3 times per week'}
-- HASHTAG STRATEGY: ${platformPersona.lexical_features?.hashtag_strategy || '3-5 relevant hashtags'}
+- CHARACTER LIMIT: ${platformPersona.content_format_rules?.character_limit || "3000"} characters
+- OPTIMAL LENGTH: ${platformPersona.content_format_rules?.optimal_length || "150-300 words"}
+- ENGAGEMENT PATTERN: ${platformPersona.engagement_patterns?.posting_frequency || "2-3 times per week"}
+- HASHTAG STRATEGY: ${platformPersona.lexical_features?.hashtag_strategy || "3-5 relevant hashtags"}
 
-ALWAYS generate content that matches this persona's linguistic fingerprint and platform optimization rules.` : '';
+ALWAYS generate content that matches this persona's linguistic fingerprint and platform optimization rules.`
+          : "";
 
-    const guidance = `
+      const guidance = `
 You are ALwrity's LinkedIn Writing Assistant specializing in ${industry} content.
 
 CRITICAL CONSTRAINTS:
@@ -470,7 +535,7 @@ CRITICAL CONSTRAINTS:
 - INDUSTRY: Focus specifically on ${industry} industry context and terminology
 - AUDIENCE: Target content specifically for ${audience}
 - QUALITY: Ensure all content meets LinkedIn professional standards
-${personaGuidance ? `\n${personaGuidance}` : ''}
+${personaGuidance ? `\n${personaGuidance}` : ""}
 
 CURRENT CONTEXT:
 ${currentDraft}
@@ -500,17 +565,21 @@ For quick edits, use editLinkedInDraft with the appropriate operation. This will
 Use user preferences, context, conversation history, and persona data to personalize all content.
 Always respect the user's preferred ${tone} tone, ${industry} industry focus, and writing persona style.
 Always use the most appropriate tool for the user's request.`.trim();
-    return [prefsLine, historyLine, currentDraft, guidance, additional].filter(Boolean).join('\n\n');
-  }, [draft, userPreferences, corePersona, platformPersona, summarizeHistory]);
+      return [prefsLine, historyLine, currentDraft, guidance, additional]
+        .filter(Boolean)
+        .join("\n\n");
+    },
+    [draft, userPreferences, corePersona, platformPersona, summarizeHistory],
+  );
 
   return (
-    <div 
-      className={`linkedin-writer ${className}`} 
-      style={{ 
-        height: '100vh', 
-        display: 'flex', 
-        flexDirection: 'column',
-        backgroundColor: '#ffffff' // White professional background
+    <div
+      className={`linkedin-writer ${className}`}
+      style={{
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        backgroundColor: "#ffffff", // White professional background
       }}
     >
       {/* Header */}
@@ -527,109 +596,136 @@ Always use the most appropriate tool for the user's request.`.trim();
         onClearDraft={handleClear}
       />
 
-
       {/* Main Content */}
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff', overflowY: 'auto' }}>
-        {(showEditor && draft) || isGenerating ? (<>
-          {draft && !isGenerating && (
-            <div style={{ 
-              padding: '8px 24px', 
-              display: 'flex', 
-              alignItems: 'center',
-              gap: 12,
-              flexShrink: 0,
-              borderBottom: '1px solid #e2e8f0',
-              background: '#f8fafc'
-            }}>
-              <Button
-                type="button"
-                variant="contained"
-                onClick={() => setShowEditor(false)}
-                startIcon={<span style={{ fontSize: 18, lineHeight: 1 }}>←</span>}
-                sx={{ 
-                  fontWeight: 700,
-                  bgcolor: '#0a66c2', 
-                  '&:hover': { bgcolor: '#004182' },
-                  textTransform: 'none',
-                  fontSize: 14,
-                  px: 2.5,
-                  py: 1,
-                  boxShadow: '0 2px 8px rgba(10, 102, 194, 0.3)',
+      <div
+        style={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: "#ffffff",
+          overflowY: "auto",
+        }}
+      >
+        {(showEditor && draft) || isGenerating ? (
+          <>
+            {draft && !isGenerating && (
+              <div
+                style={{
+                  padding: "8px 24px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  flexShrink: 0,
+                  borderBottom: "1px solid #e2e8f0",
+                  background: "#f8fafc",
                 }}
               >
-                Back to Dashboard
-              </Button>
+                <Button
+                  type="button"
+                  variant="contained"
+                  onClick={() => setShowEditor(false)}
+                  startIcon={
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
+                  }
+                  sx={{
+                    fontWeight: 700,
+                    bgcolor: "#0a66c2",
+                    "&:hover": { bgcolor: "#004182" },
+                    textTransform: "none",
+                    fontSize: 14,
+                    px: 2.5,
+                    py: 1,
+                    boxShadow: "0 2px 8px rgba(10, 102, 194, 0.3)",
+                  }}
+                >
+                  Back to Dashboard
+                </Button>
 
-              <Button
-                type='button'
-                variant="outlined"
-                color="primary"
-                startIcon={saveStatus === 'saving' ? <CircularProgress size={18} color="inherit" /> : <SaveIcon />}
-                onClick={handleSaveToAssetLibrary}
-                disabled={saveStatus === 'saving' || saveStatus === 'saved'}
-                sx={{ textTransform: 'none', fontSize: 13, fontWeight: 600 }}
-              >
-                {saveStatus === 'saving' ? 'Saving...' : 
-                 saveStatus === 'saved' ? 'Saved ✓' : 
-                 'Save to Asset Library'}
-              </Button>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  color="primary"
+                  startIcon={
+                    saveStatus === "saving" ? (
+                      <CircularProgress size={18} color="inherit" />
+                    ) : (
+                      <SaveIcon />
+                    )
+                  }
+                  onClick={handleSaveToAssetLibrary}
+                  disabled={saveStatus === "saving" || saveStatus === "saved"}
+                  sx={{ textTransform: "none", fontSize: 13, fontWeight: 600 }}
+                >
+                  {saveStatus === "saving"
+                    ? "Saving..."
+                    : saveStatus === "saved"
+                      ? "Saved ✓"
+                      : "Save to Asset Library"}
+                </Button>
 
-              <Button
-                type='button'
-                variant="outlined"
-                color="secondary"
-                startIcon={<RateReviewIcon />}
-                onClick={() => setQualityCheckOpen(true)}
-                disabled={!draft}
-                sx={{ textTransform: 'none', fontSize: 13, fontWeight: 600 }}
-              >
-                Quality Check
-              </Button>
+                <Button
+                  type="button"
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<RateReviewIcon />}
+                  onClick={() => setQualityCheckOpen(true)}
+                  disabled={!draft}
+                  sx={{ textTransform: "none", fontSize: 13, fontWeight: 600 }}
+                >
+                  Quality Check
+                </Button>
 
-              <div style={{ flex: 1 }} />
+                <div style={{ flex: 1 }} />
 
-              <PublishLinkedInPanel
-                draft={draft}
-                getDraftForPublish={getDraftForPublish}
-                topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
-                compact
-              />
-            </div>
-          )}
+                <PublishLinkedInPanel
+                  draft={draft}
+                  getDraftForPublish={getDraftForPublish}
+                  topic={
+                    context
+                      ? context.split("\n")[0].substring(0, 50)
+                      : undefined
+                  }
+                  compact
+                />
+              </div>
+            )}
 
-          <ContentEditor
-            isPreviewing={isPreviewing}
-            pendingEdit={pendingEdit}
-            livePreviewHtml={livePreviewHtml}
-            draft={draft}
-            showPreview={showPreview}
-            isGenerating={isGenerating}
-            loadingMessage={loadingMessage}
-            // Grounding data
-            researchSources={researchSources}
-            citations={citations}
-            qualityMetrics={qualityMetrics}
-            groundingEnabled={groundingEnabled}
-            searchQueries={searchQueries}
-            onConfirmChanges={handleConfirmChanges}
-            onDiscardChanges={handleDiscardChanges}
-            onDraftChange={handleDraftChange}
-            onPreviewToggle={handlePreviewToggle}
-            topic={context ? context.split('\n')[0].substring(0, 50) : undefined}
-            assistiveEditorRef={assistiveEditorRef}
-          />
-        </>) : (
-          /* Outline Editor - Show when planning sections */
-          outlineMode && outlineSections.length > 0 ? (
-            <OutlineEditor
-              outline={outlineSections}
-              titleSuggestions={outlineTitleSuggestions}
-              onRefine={refineOutline}
-              onGenerateArticle={handleGenerateArticleFromOutline}
-              onBack={() => setOutlineMode(false)}
+            <ContentEditor
+              isPreviewing={isPreviewing}
+              pendingEdit={pendingEdit}
+              livePreviewHtml={livePreviewHtml}
+              draft={draft}
+              showPreview={showPreview}
               isGenerating={isGenerating}
+              loadingMessage={loadingMessage}
+              // Grounding data
+              researchSources={researchSources}
+              citations={citations}
+              qualityMetrics={qualityMetrics}
+              groundingEnabled={groundingEnabled}
+              searchQueries={searchQueries}
+              onConfirmChanges={handleConfirmChanges}
+              onDiscardChanges={handleDiscardChanges}
+              onDraftChange={handleDraftChange}
+              onPreviewToggle={handlePreviewToggle}
+              topic={
+                context ? context.split("\n")[0].substring(0, 50) : undefined
+              }
+              assistiveEditorRef={assistiveEditorRef}
             />
-          ) : (
+          </>
+        ) : /* Outline Editor - Show when planning sections */
+        outlineMode && outlineSections.length > 0 ? (
+          <OutlineEditor
+            outline={outlineSections}
+            titleSuggestions={outlineTitleSuggestions}
+            onRefine={refineOutline}
+            onGenerateArticle={handleGenerateArticleFromOutline}
+            onBack={() => setOutlineMode(false)}
+            isGenerating={isGenerating}
+          />
+        ) : (
           /* Welcome Message - Show when no content or draft exists but editor is hidden */
           <WelcomeMessage
             draft={draft}
@@ -646,25 +742,28 @@ Always use the most appropriate tool for the user's request.`.trim();
             onClear={handleClear}
             showPreferencesModal={showPreferencesModal}
             onPreferencesModalChange={setShowPreferencesModal}
-          />)
+          />
         )}
       </div>
 
       {/* Save feedback snackbar */}
       <Snackbar
-        open={saveStatus === 'saved' || saveStatus === 'error'}
+        open={saveStatus === "saved" || saveStatus === "error"}
         autoHideDuration={6000}
-        onClose={() => { setSaveStatus('idle'); setSaveErrorMessage(null); }}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        onClose={() => {
+          setSaveStatus("idle");
+          setSaveErrorMessage(null);
+        }}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
         <Alert
-          severity={saveStatus === 'saved' ? 'success' : 'error'}
+          severity={saveStatus === "saved" ? "success" : "error"}
           variant="filled"
-          sx={{ width: '100%' }}
+          sx={{ width: "100%" }}
         >
-          {saveStatus === 'saved'
-            ? 'LinkedIn post saved to Asset Library!'
-            : `Failed to save: ${saveErrorMessage || 'Please try again.'}`}
+          {saveStatus === "saved"
+            ? "LinkedIn post saved to Asset Library!"
+            : `Failed to save: ${saveErrorMessage || "Please try again."}`}
         </Alert>
       </Snackbar>
 
@@ -680,54 +779,109 @@ Always use the most appropriate tool for the user's request.`.trim();
       {showShareLinkModal && (
         <div
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000,
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
           }}
           onClick={() => setShowShareLinkModal(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: 'white', width: 520, maxWidth: '92vw', borderRadius: 16,
-              boxShadow: '0 20px 60px rgba(0,0,0,0.25)', overflow: 'hidden',
+              background: "white",
+              width: 520,
+              maxWidth: "92vw",
+              borderRadius: 16,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              overflow: "hidden",
             }}
           >
             <div
               style={{
-                padding: '16px 20px', background: 'linear-gradient(135deg, #0a66c2 0%, #125ea2 100%)',
-                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: "16px 20px",
+                background: "linear-gradient(135deg, #0a66c2 0%, #125ea2 100%)",
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
               }}
             >
-              <span style={{ fontWeight: 800, fontSize: 16 }}>🔗 Share a Link</span>
+              <span style={{ fontWeight: 800, fontSize: 16 }}>
+                🔗 Share a Link
+              </span>
               <button
                 onClick={() => setShowShareLinkModal(false)}
-                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', borderRadius: 8, padding: '6px 10px', cursor: 'pointer' }}
+                style={{
+                  background: "rgba(255,255,255,0.2)",
+                  border: "none",
+                  color: "white",
+                  borderRadius: 8,
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                }}
               >
                 ✕
               </button>
             </div>
-            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div
+              style={{
+                padding: 20,
+                display: "flex",
+                flexDirection: "column",
+                gap: 14,
+              }}
+            >
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>URL *</div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#374151",
+                    marginBottom: 4,
+                  }}
+                >
+                  URL *
+                </div>
                 <input
                   value={shareLinkUrl}
                   onChange={(e) => setShareLinkUrl(e.target.value)}
                   placeholder="https://example.com/article"
                   style={{
-                    width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
-                    fontSize: 14, boxSizing: 'border-box',
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    boxSizing: "border-box",
                   }}
                 />
               </div>
-              <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ display: "flex", gap: 12 }}>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Tone</div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "#374151",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Tone
+                  </div>
                   <select
                     value={shareLinkTone}
                     onChange={(e) => setShareLinkTone(e.target.value)}
                     style={{
-                      width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
-                      fontSize: 14, background: 'white',
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1px solid #d1d5db",
+                      borderRadius: 8,
+                      fontSize: 14,
+                      background: "white",
                     }}
                   >
                     <option value="professional">Professional</option>
@@ -739,8 +893,18 @@ Always use the most appropriate tool for the user's request.`.trim();
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
-                  Your Take <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#374151",
+                    marginBottom: 4,
+                  }}
+                >
+                  Your Take{" "}
+                  <span style={{ fontWeight: 400, color: "#9ca3af" }}>
+                    (optional)
+                  </span>
                 </div>
                 <textarea
                   value={shareLinkMyTake}
@@ -748,23 +912,49 @@ Always use the most appropriate tool for the user's request.`.trim();
                   placeholder="Add your perspective, opinion, or key insight..."
                   rows={3}
                   style={{
-                    width: '100%', padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8,
-                    fontSize: 14, resize: 'vertical', boxSizing: 'border-box', fontFamily: 'inherit',
+                    width: "100%",
+                    padding: "10px 12px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 8,
+                    fontSize: 14,
+                    resize: "vertical",
+                    boxSizing: "border-box",
+                    fontFamily: "inherit",
                   }}
                 />
               </div>
               {shareLinkError && (
-                <div style={{ padding: '8px 12px', background: '#fef2f2', color: '#dc2626', borderRadius: 8, fontSize: 13 }}>
+                <div
+                  style={{
+                    padding: "8px 12px",
+                    background: "#fef2f2",
+                    color: "#dc2626",
+                    borderRadius: 8,
+                    fontSize: 13,
+                  }}
+                >
                   {shareLinkError}
                 </div>
               )}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 10,
+                  marginTop: 4,
+                }}
+              >
                 <button
                   onClick={() => setShowShareLinkModal(false)}
                   style={{
-                    padding: '10px 20px', background: '#fff', color: '#374151',
-                    border: '1px solid #d1d5db', borderRadius: 8, cursor: 'pointer',
-                    fontSize: 14, fontWeight: 600,
+                    padding: "10px 20px",
+                    background: "#fff",
+                    color: "#374151",
+                    border: "1px solid #d1d5db",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 600,
                   }}
                 >
                   Cancel
@@ -773,13 +963,20 @@ Always use the most appropriate tool for the user's request.`.trim();
                   onClick={handleGenerateFromUrl}
                   disabled={!shareLinkUrl.trim() || shareLinkGenerating}
                   style={{
-                    padding: '10px 20px',
-                    background: !shareLinkUrl.trim() || shareLinkGenerating ? '#93c5fd' : '#0a66c2',
-                    color: '#fff', border: 'none', borderRadius: 8, cursor: 'pointer',
-                    fontSize: 14, fontWeight: 600,
+                    padding: "10px 20px",
+                    background:
+                      !shareLinkUrl.trim() || shareLinkGenerating
+                        ? "#93c5fd"
+                        : "#0a66c2",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 600,
                   }}
                 >
-                  {shareLinkGenerating ? 'Generating...' : 'Generate Post'}
+                  {shareLinkGenerating ? "Generating..." : "Generate Post"}
                 </button>
               </div>
             </div>
@@ -793,9 +990,8 @@ Always use the most appropriate tool for the user's request.`.trim();
       {/* Enhanced Persona-Aware Actions */}
       <RegisterLinkedInActionsEnhanced />
 
-
       {/* CopilotKit Sidebar */}
-      <CopilotSidebar 
+      <CopilotSidebar
         className="alwrity-copilot-sidebar linkedin-writer"
         labels={labels}
         suggestions={getIntelligentSuggestions}
@@ -804,7 +1000,10 @@ Always use the most appropriate tool for the user's request.`.trim();
       />
 
       {/* Progress overlay — renders as fixed-position modal via portal */}
-      <ProgressTracker steps={progressSteps as ProgressStep[]} active={progressActive} />
+      <ProgressTracker
+        steps={progressSteps as ProgressStep[]}
+        active={progressActive}
+      />
     </div>
   );
 };

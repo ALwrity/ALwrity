@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   linkedInAssistiveWritingApi,
   mapAssistiveWritingError,
   type LinkedInAssistiveSuggestion,
-} from '../services/linkedInAssistiveWritingApi';
+} from "../services/linkedInAssistiveWritingApi";
 
 const TYPING_DEBOUNCE_MS = 3000;
 const CONTINUE_COOLDOWN_MS = 15000;
@@ -28,8 +28,11 @@ export function useLinkedInAssistiveWriting({
   onDraftChange,
   onInsertWithPreview,
 }: UseLinkedInAssistiveWritingOptions) {
-  const [suggestion, setSuggestion] = useState<LinkedInAssistiveSuggestion | null>(null);
-  const [allSuggestions, setAllSuggestions] = useState<LinkedInAssistiveSuggestion[]>([]);
+  const [suggestion, setSuggestion] =
+    useState<LinkedInAssistiveSuggestion | null>(null);
+  const [allSuggestions, setAllSuggestions] = useState<
+    LinkedInAssistiveSuggestion[]
+  >([]);
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +64,8 @@ export function useLinkedInAssistiveWriting({
     isGeneratingRef.current = false;
     suggestionRef.current = null;
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    if (enablePromptTimerRef.current) clearTimeout(enablePromptTimerRef.current);
+    if (enablePromptTimerRef.current)
+      clearTimeout(enablePromptTimerRef.current);
     if (ctaDebounceRef.current) clearTimeout(ctaDebounceRef.current);
   }, []);
 
@@ -109,7 +113,7 @@ export function useLinkedInAssistiveWriting({
 
         const msg = err instanceof Error ? err.message : String(err);
         const match = msg.match(/"retryDelay"\s*:\s*"(\d+)s"/);
-        if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
+        if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
           const retryMs = match ? parseInt(match[1], 10) * 1000 : 40000;
           apiCooldownUntilRef.current = Date.now() + retryMs;
         }
@@ -131,7 +135,10 @@ export function useLinkedInAssistiveWriting({
       }
 
       typingTimeoutRef.current = setTimeout(() => {
-        if (apiCooldownUntilRef.current && Date.now() < apiCooldownUntilRef.current) {
+        if (
+          apiCooldownUntilRef.current &&
+          Date.now() < apiCooldownUntilRef.current
+        ) {
           return;
         }
 
@@ -168,7 +175,10 @@ export function useLinkedInAssistiveWriting({
           !isGeneratingRef.current &&
           !suggestionRef.current
         ) {
-          if (ctaCooldownUntilRef.current && Date.now() < ctaCooldownUntilRef.current) {
+          if (
+            ctaCooldownUntilRef.current &&
+            Date.now() < ctaCooldownUntilRef.current
+          ) {
             return;
           }
 
@@ -230,7 +240,10 @@ export function useLinkedInAssistiveWriting({
   }, []);
 
   const handleNextSuggestion = useCallback(() => {
-    if (allSuggestions.length === 0 || suggestionIndex >= allSuggestions.length - 1) {
+    if (
+      allSuggestions.length === 0 ||
+      suggestionIndex >= allSuggestions.length - 1
+    ) {
       return;
     }
     const nextIndex = suggestionIndex + 1;
@@ -277,14 +290,19 @@ export function useLinkedInAssistiveWriting({
 
     if (draft.length >= MIN_TOTAL_CHARS_FIRST) {
       enablePromptTimerRef.current = setTimeout(() => {
-        if (!hasShownFirstRef.current && !isGeneratingRef.current && !suggestionRef.current) {
+        if (
+          !hasShownFirstRef.current &&
+          !isGeneratingRef.current &&
+          !suggestionRef.current
+        ) {
           setShowContinuePrompt(true);
         }
       }, TYPING_DEBOUNCE_MS);
     }
 
     return () => {
-      if (enablePromptTimerRef.current) clearTimeout(enablePromptTimerRef.current);
+      if (enablePromptTimerRef.current)
+        clearTimeout(enablePromptTimerRef.current);
     };
   }, [enabled, resetState]);
 
@@ -293,7 +311,8 @@ export function useLinkedInAssistiveWriting({
     return () => {
       mountedRef.current = false;
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-      if (enablePromptTimerRef.current) clearTimeout(enablePromptTimerRef.current);
+      if (enablePromptTimerRef.current)
+        clearTimeout(enablePromptTimerRef.current);
       if (ctaDebounceRef.current) clearTimeout(ctaDebounceRef.current);
     };
   }, []);

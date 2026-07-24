@@ -1,9 +1,15 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import { usePeopleYouMayKnow } from '../../hooks/usePeopleYouMayKnow';
-import { PymkCohortFilter } from './PymkCohortFilter';
-import { PymkPersonCard } from './PymkPersonCard';
-import { EmptyState } from '../GrowthEngine/EmptyState';
-import { cardBase, colors, headerRow, primaryBtn, secondaryBtn } from '../GrowthEngine/styles';
+import React, { useCallback, useEffect, useRef } from "react";
+import { usePeopleYouMayKnow } from "../../hooks/usePeopleYouMayKnow";
+import { PymkCohortFilter } from "./PymkCohortFilter";
+import { PymkPersonCard } from "./PymkPersonCard";
+import { EmptyState } from "../GrowthEngine/EmptyState";
+import {
+  cardBase,
+  colors,
+  headerRow,
+  primaryBtn,
+  secondaryBtn,
+} from "../GrowthEngine/styles";
 
 export const PeopleYouMayKnowPanel: React.FC = () => {
   const {
@@ -52,10 +58,14 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
   return (
     <div style={cardBase}>
       <div style={headerRow}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 20 }} aria-hidden="true">👥</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 20 }} aria-hidden="true">
+            👥
+          </span>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: colors.textDark }}>
+            <div
+              style={{ fontWeight: 700, fontSize: 15, color: colors.textDark }}
+            >
               People You May Know
             </div>
             <div style={{ fontSize: 12, color: colors.textMuted }}>
@@ -63,7 +73,12 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
             </div>
           </div>
         </div>
-        <button type="button" onClick={handleRefresh} style={secondaryBtn} disabled={loading}>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          style={secondaryBtn}
+          disabled={loading}
+        >
           Refresh
         </button>
       </div>
@@ -78,9 +93,14 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
         />
       </div>
 
-      <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-        <button type="button" onClick={handleLoad} style={primaryBtn} disabled={loading}>
-          {loading ? 'Loading…' : 'Load suggestions'}
+      <div style={{ marginTop: 12, display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          onClick={handleLoad}
+          style={primaryBtn}
+          disabled={loading}
+        >
+          {loading ? "Loading…" : "Load suggestions"}
         </button>
       </div>
 
@@ -88,10 +108,10 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
         <div
           style={{
             marginTop: 12,
-            padding: '10px 12px',
+            padding: "10px 12px",
             borderRadius: 8,
-            background: '#fef2f2',
-            color: '#b91c1c',
+            background: "#fef2f2",
+            color: "#b91c1c",
             fontSize: 13,
           }}
         >
@@ -117,8 +137,8 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
       {suggestions.length > 0 && (
         <div
           style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
             gap: 16,
             marginTop: 16,
           }}
@@ -138,7 +158,7 @@ export const PeopleYouMayKnowPanel: React.FC = () => {
             style={secondaryBtn}
             disabled={loadingMore}
           >
-            {loadingMore ? 'Loading more…' : 'Load more'}
+            {loadingMore ? "Loading more…" : "Load more"}
           </button>
         </div>
       )}

@@ -6,12 +6,12 @@ This document describes how **Radial workflow hero**, **Profile hub**, and **Con
 
 **Canonical constants:** `dashboardLayoutConstants.ts` — import these instead of hard-coding pixel values.
 
-| Name | Constant | CSS / JS | Layout effect |
-|------|----------|----------|---------------|
-| **Mobile Studio** | `MOBILE_STUDIO_MAX_WIDTH_PX` = **960** | `@media (max-width: 960px)` | Mobile workflow grid, floating Co-Pilot FAB, Analytics section; radial ring hidden |
-| **Desktop Studio** | `DESKTOP_DASHBOARD_MIN_WIDTH_PX` = **961** | `@media (min-width: 961px)` + `useDesktopViewport()` | Radial ring, right rail, desktop Co-Pilot dock |
-| **Header compact** | `HEADER_COMPACT_MAX_WIDTH_PX` = **768** | `@media (max-width: 768px)` | Two-row app header |
-| **Tour phone** | `TOUR_PHONE_MAX_WIDTH_PX` = **640** | Tour variant only | Compact tour tooltips (641–960 uses tablet tour) |
+| Name               | Constant                                   | CSS / JS                                             | Layout effect                                                                      |
+| ------------------ | ------------------------------------------ | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **Mobile Studio**  | `MOBILE_STUDIO_MAX_WIDTH_PX` = **960**     | `@media (max-width: 960px)`                          | Mobile workflow grid, floating Co-Pilot FAB, Analytics section; radial ring hidden |
+| **Desktop Studio** | `DESKTOP_DASHBOARD_MIN_WIDTH_PX` = **961** | `@media (min-width: 961px)` + `useDesktopViewport()` | Radial ring, right rail, desktop Co-Pilot dock                                     |
+| **Header compact** | `HEADER_COMPACT_MAX_WIDTH_PX` = **768**    | `@media (max-width: 768px)`                          | Two-row app header                                                                 |
+| **Tour phone**     | `TOUR_PHONE_MAX_WIDTH_PX` = **640**        | Tour variant only                                    | Compact tour tooltips (641–960 uses tablet tour)                                   |
 
 **960 vs 961:** Mobile CSS uses `max-width: 960px`; JS desktop detection uses `min-width: 961px`. There is no gap — at exactly 960px you get mobile; at 961px you get desktop.
 
@@ -43,12 +43,12 @@ See also: `docs/dashboardDesktopHeroPlacement.md` (QA breakpoint reference).
 
 ### Calculation (`dashboardRadialLayout.ts`)
 
-| Step | Formula | Notes |
-|------|---------|-------|
-| Canvas width | `viewW = max(320, round(containerWidth))` | From `canvas.clientWidth` |
-| Horizontal nudge | `ringHorizontalOffset(viewW) = round(clamp(20, viewW × 0.08, 100))` | Shifts stack right to balance analytics rail |
-| **Hub / ring center X** | `centerX = viewW / 2 + ringHorizontalOffset(viewW)` | Single anchor for SVG + overlays |
-| CSS percentage | `hubCenterLeft = (centerX / viewW) × 100` | Exported as `layoutHubCenterPercent()` |
+| Step                    | Formula                                                             | Notes                                        |
+| ----------------------- | ------------------------------------------------------------------- | -------------------------------------------- |
+| Canvas width            | `viewW = max(320, round(containerWidth))`                           | From `canvas.clientWidth`                    |
+| Horizontal nudge        | `ringHorizontalOffset(viewW) = round(clamp(20, viewW × 0.08, 100))` | Shifts stack right to balance analytics rail |
+| **Hub / ring center X** | `centerX = viewW / 2 + ringHorizontalOffset(viewW)`                 | Single anchor for SVG + overlays             |
+| CSS percentage          | `hubCenterLeft = (centerX / viewW) × 100`                           | Exported as `layoutHubCenterPercent()`       |
 
 ### Runtime wiring (`LinkedInDashboardHero.tsx`)
 
@@ -74,26 +74,26 @@ Vertical layout splits into **two layers**: (A) canvas geometry, (B) stage flex/
 
 ### A) Canvas geometry (ring + hub inside SVG canvas)
 
-| Constant / field | Desktop value | Role |
-|------------------|---------------|------|
-| `reserveConnectSlot` | `false` | Canvas height excludes connect button (docked outside) |
-| `centerY` | `extent + RING_EDGE_PAD + slack × RING_VERTICAL_BIAS_DESKTOP` | Ring center in SVG space |
-| `RING_VERTICAL_BIAS_DESKTOP` | `0.5` | Fraction of extra stage slack (weak effect on page position) |
-| `viewH` | `bottom_extent − viewBoxY` | Canvas pixel height |
-| Hub overlay `top` | `layoutHubCenterY(layout)` | `centerY` converted to canvas pixels |
-| `hubVisualR` | `64 × (1 + 0.3) ≈ 83px` radius | Profile hub size (independent of wedge scale) |
+| Constant / field             | Desktop value                                                 | Role                                                         |
+| ---------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------ |
+| `reserveConnectSlot`         | `false`                                                       | Canvas height excludes connect button (docked outside)       |
+| `centerY`                    | `extent + RING_EDGE_PAD + slack × RING_VERTICAL_BIAS_DESKTOP` | Ring center in SVG space                                     |
+| `RING_VERTICAL_BIAS_DESKTOP` | `0.5`                                                         | Fraction of extra stage slack (weak effect on page position) |
+| `viewH`                      | `bottom_extent − viewBoxY`                                    | Canvas pixel height                                          |
+| Hub overlay `top`            | `layoutHubCenterY(layout)`                                    | `centerY` converted to canvas pixels                         |
+| `hubVisualR`                 | `64 × (1 + 0.3) ≈ 83px` radius                                | Profile hub size (independent of wedge scale)                |
 
 **Important:** Changing `centerY` alone does **not** move the ring on the page — it only shifts the SVG viewBox. Page vertical position is controlled by CSS (section B).
 
 ### B) Stage flex/CSS (page position)
 
-| Location | Property | Desktop value | Effect |
-|----------|----------|---------------|--------|
-| `alwrity-copilot.css` | `.linkedin-dashboard-layout` `height` | `calc(100dvh - 80px)` | 80px = header (`.linkedin-writer-header`) |
-| `alwrity-copilot.css` | `.linkedin-dashboard-hero-stage` `justify-content` | `flex-end` | Pushes radial canvas toward bottom |
-| `alwrity-copilot.css` | `.linkedin-dashboard-hero-stage` `padding-bottom` | `30px` | Gap above connect row (tune here) |
-| `alwrity-copilot.css` | `.linkedin-dashboard-hero` `margin-bottom` | `4px` | Small gap between canvas and connect |
-| `alwrity-copilot.css` | `.linkedin-dashboard-plan-anchor--hub-bottom` `bottom` | `12px` | Connect button distance from stage bottom |
+| Location              | Property                                               | Desktop value         | Effect                                    |
+| --------------------- | ------------------------------------------------------ | --------------------- | ----------------------------------------- |
+| `alwrity-copilot.css` | `.linkedin-dashboard-layout` `height`                  | `calc(100dvh - 80px)` | 80px = header (`.linkedin-writer-header`) |
+| `alwrity-copilot.css` | `.linkedin-dashboard-hero-stage` `justify-content`     | `flex-end`            | Pushes radial canvas toward bottom        |
+| `alwrity-copilot.css` | `.linkedin-dashboard-hero-stage` `padding-bottom`      | `30px`                | Gap above connect row (tune here)         |
+| `alwrity-copilot.css` | `.linkedin-dashboard-hero` `margin-bottom`             | `4px`                 | Small gap between canvas and connect      |
+| `alwrity-copilot.css` | `.linkedin-dashboard-plan-anchor--hub-bottom` `bottom` | `12px`                | Connect button distance from stage bottom |
 
 ### Connect button vertical position
 
@@ -103,25 +103,25 @@ Vertical layout splits into **two layers**: (A) canvas geometry, (B) stage flex/
 
 ## Wedge ring size (geometry only)
 
-| Constant | Value | Affects |
-|----------|-------|---------|
-| `WEDGE_PANEL_SIZE_SCALE` | `0.9` | Ring radii −10%; not text/icons |
-| `WEDGE_CARD_SCALE` | `1.2` | Annulus depth |
-| `WEDGE_VOLUME_BOOST` | `1.2 × 1.3 × 1.344` | Base ring fit |
-| `OUTER_BULGE_FACTOR` | `0.14` | Convex outer edge |
+| Constant                 | Value               | Affects                         |
+| ------------------------ | ------------------- | ------------------------------- |
+| `WEDGE_PANEL_SIZE_SCALE` | `0.9`               | Ring radii −10%; not text/icons |
+| `WEDGE_CARD_SCALE`       | `1.2`               | Annulus depth                   |
+| `WEDGE_VOLUME_BOOST`     | `1.2 × 1.3 × 1.344` | Base ring fit                   |
+| `OUTER_BULGE_FACTOR`     | `0.14`              | Convex outer edge               |
 
 Font sizes (`iconFontSize`, `labelFontSize`, `descFontSize`) depend only on `viewW`, not wedge radii.
 
 ## Files to edit for common tweaks
 
-| Goal | File | What to change |
-|------|------|----------------|
-| Move stack closer/farther from connect | `alwrity-copilot.css` | `padding-bottom` on `.linkedin-dashboard-hero-stage` (currently `30px`) |
-| Move connect up/down | `alwrity-copilot.css` | `bottom` on `.linkedin-dashboard-plan-anchor--hub-bottom` (currently `12px`) |
-| Shift stack left/right | `dashboardRadialLayout.ts` | `ringHorizontalOffset()` |
-| Smaller/larger wedges (not text) | `dashboardRadialLayout.ts` | `WEDGE_PANEL_SIZE_SCALE` |
-| Desktop vs mobile breakpoint | `dashboardLayoutConstants.ts` + CSS `@media (min-width: 961px)` + `useDesktopViewport.ts` | Keep all three in sync |
-| Hub avatar size | `dashboardRadialLayout.ts` | `PROFILE_AVATAR_OUTER_RADIUS`, `INNER_PROFILE_GAP_RATIO` |
+| Goal                                   | File                                                                                      | What to change                                                               |
+| -------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Move stack closer/farther from connect | `alwrity-copilot.css`                                                                     | `padding-bottom` on `.linkedin-dashboard-hero-stage` (currently `30px`)      |
+| Move connect up/down                   | `alwrity-copilot.css`                                                                     | `bottom` on `.linkedin-dashboard-plan-anchor--hub-bottom` (currently `12px`) |
+| Shift stack left/right                 | `dashboardRadialLayout.ts`                                                                | `ringHorizontalOffset()`                                                     |
+| Smaller/larger wedges (not text)       | `dashboardRadialLayout.ts`                                                                | `WEDGE_PANEL_SIZE_SCALE`                                                     |
+| Desktop vs mobile breakpoint           | `dashboardLayoutConstants.ts` + CSS `@media (min-width: 961px)` + `useDesktopViewport.ts` | Keep all three in sync                                                       |
+| Hub avatar size                        | `dashboardRadialLayout.ts`                                                                | `PROFILE_AVATAR_OUTER_RADIUS`, `INNER_PROFILE_GAP_RATIO`                     |
 
 ## Troubleshooting checklist
 

@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
-import { formatDraftContent } from '../utils/contentFormatters';
-import { splitDraftByImageMarkdown } from '../utils/linkedInImageDraftUtils';
-import { LinkedInAuthenticatedImage } from './LinkedInAuthenticatedImage';
+import React, { useMemo } from "react";
+import { formatDraftContent } from "../utils/contentFormatters";
+import { splitDraftByImageMarkdown } from "../utils/linkedInImageDraftUtils";
+import { LinkedInAuthenticatedImage } from "./LinkedInAuthenticatedImage";
 
 interface LinkedInDraftPreviewProps {
   draft: string;
@@ -20,9 +20,9 @@ export const LinkedInDraftPreview: React.FC<LinkedInDraftPreviewProps> = ({
   const segments = useMemo(() => splitDraftByImageMarkdown(draft), [draft]);
 
   return (
-    <div style={{ userSelect: 'text' }}>
+    <div style={{ userSelect: "text" }}>
       {segments.map((segment, index) => {
-        if (segment.type === 'image') {
+        if (segment.type === "image") {
           if (segment.imageId) {
             return (
               <LinkedInAuthenticatedImage
@@ -39,12 +39,12 @@ export const LinkedInDraftPreview: React.FC<LinkedInDraftPreviewProps> = ({
               src={segment.url}
               alt={segment.alt}
               style={{
-                maxWidth: '100%',
+                maxWidth: "100%",
                 maxHeight: 480,
                 borderRadius: 8,
-                margin: '12px 0',
-                display: 'block',
-                border: '1px solid #e0e0e0',
+                margin: "12px 0",
+                display: "block",
+                border: "1px solid #e0e0e0",
               }}
             />
           );
@@ -52,7 +52,11 @@ export const LinkedInDraftPreview: React.FC<LinkedInDraftPreviewProps> = ({
 
         if (!segment.content.trim()) return null;
 
-        const html = formatDraftContent(segment.content, citations, researchSources);
+        const html = formatDraftContent(
+          segment.content,
+          citations,
+          researchSources,
+        );
         if (!html?.trim()) return null;
 
         return (

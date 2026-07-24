@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
 import {
   linkedInPymkApi,
   PYMK_COHORT_OPTIONS,
@@ -6,7 +6,7 @@ import {
   type PymkCohortDefaults,
   type PymkListResponse,
   type PymkSuggestionItem,
-} from '../../../services/linkedInPymkApi';
+} from "../../../services/linkedInPymkApi";
 import {
   clearPymkSessionCache,
   getPymkDefaultsSessionCache,
@@ -14,7 +14,7 @@ import {
   setPymkDefaultsSessionCache,
   setPymkSessionCache,
   type PymkCacheKey,
-} from '../utils/pymkSessionCache';
+} from "../utils/pymkSessionCache";
 
 const PAGE_SIZE = 10;
 
@@ -22,14 +22,18 @@ function defaultIdForCohort(
   cohort: PymkCohort,
   defaults: PymkCohortDefaults | null,
 ): string {
-  if (!defaults) return '';
+  if (!defaults) return "";
   const option = PYMK_COHORT_OPTIONS.find((item) => item.id === cohort);
-  if (!option?.defaultsKey) return '';
+  if (!option?.defaultsKey) return "";
   const value = defaults[option.defaultsKey];
-  return value ? String(value) : '';
+  return value ? String(value) : "";
 }
 
-function buildCacheKey(cohort: PymkCohort, cohortId: string, defaults: PymkCohortDefaults | null): PymkCacheKey {
+function buildCacheKey(
+  cohort: PymkCohort,
+  cohortId: string,
+  defaults: PymkCohortDefaults | null,
+): PymkCacheKey {
   const effectiveId = cohortId.trim() || defaultIdForCohort(cohort, defaults);
   return { cohort, cohortId: effectiveId };
 }
@@ -38,12 +42,11 @@ export function usePeopleYouMayKnow() {
   const [data, setData] = useState<PymkListResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState('');
-  const [cohort, setCohort] = useState<PymkCohort>('recent_activity');
-  const [cohortId, setCohortId] = useState('');
-  const [cohortDefaults, setCohortDefaults] = useState<PymkCohortDefaults | null>(() =>
-    getPymkDefaultsSessionCache(),
-  );
+  const [error, setError] = useState("");
+  const [cohort, setCohort] = useState<PymkCohort>("recent_activity");
+  const [cohortId, setCohortId] = useState("");
+  const [cohortDefaults, setCohortDefaults] =
+    useState<PymkCohortDefaults | null>(() => getPymkDefaultsSessionCache());
 
   useEffect(() => {
     const cachedDefaults = getPymkDefaultsSessionCache();
@@ -65,23 +68,28 @@ export function usePeopleYouMayKnow() {
     const cached = getPymkSessionCache(cacheKey);
     if (cached && cached.cohort === cohort) {
       setData(cached);
-      setError('');
+      setError("");
     }
   }, [cohort, cohortId, cohortDefaults]);
 
   const fetchSuggestions = useCallback(
-    async (opts?: { append?: boolean; pageStart?: number; refresh?: boolean }) => {
+    async (opts?: {
+      append?: boolean;
+      pageStart?: number;
+      refresh?: boolean;
+    }) => {
       const pageStart = opts?.pageStart ?? 0;
       const append = opts?.append ?? false;
       const forceRefresh = opts?.refresh ?? false;
-      const effectiveCohortId = cohortId.trim() || defaultIdForCohort(cohort, cohortDefaults);
+      const effectiveCohortId =
+        cohortId.trim() || defaultIdForCohort(cohort, cohortDefaults);
       const cacheKey = buildCacheKey(cohort, cohortId, cohortDefaults);
 
       if (!append && pageStart === 0 && !forceRefresh) {
         const sessionCached = getPymkSessionCache(cacheKey);
         if (sessionCached && sessionCached.cohort === cohort) {
           setData(sessionCached);
-          setError('');
+          setError("");
           return sessionCached;
         }
       }
@@ -94,7 +102,7 @@ export function usePeopleYouMayKnow() {
           setData(null);
         }
       }
-      setError('');
+      setError("");
 
       try {
         const response = await linkedInPymkApi.fetchSuggestions({
@@ -106,7 +114,7 @@ export function usePeopleYouMayKnow() {
         });
 
         if (response.cohort !== cohort) {
-          throw new Error('Cohort mismatch in PYMK response. Please reload.');
+          throw new Error("Cohort mismatch in PYMK response. Please reload.");
         }
 
         setData((prev) => {
@@ -115,7 +123,10 @@ export function usePeopleYouMayKnow() {
               ? response
               : {
                   ...response,
-                  suggestions: mergeSuggestions(prev.suggestions, response.suggestions),
+                  suggestions: mergeSuggestions(
+                    prev.suggestions,
+                    response.suggestions,
+                  ),
                 };
           setPymkSessionCache(cacheKey, next);
           return next;
@@ -135,34 +146,50 @@ export function usePeopleYouMayKnow() {
         const detail = axiosError.response?.data?.detail;
 
         let message: string;
-        const errorCode = typeof detail === 'object' ? detail?.error_code : null;
+        const errorCode =
+          typeof detail === "object" ? detail?.error_code : null;
         const detailMessage =
-          typeof detail === 'object' ? detail?.message : typeof detail === 'string' ? detail : null;
+          typeof detail === "object"
+            ? detail?.message
+            : typeof detail === "string"
+              ? detail
+              : null;
 
         if (status === 401) {
-          if (errorCode === 'NOT_CONNECTED') {
+          if (errorCode === "NOT_CONNECTED") {
             message =
-              detailMessage || 'LinkedIn not connected. Please connect your LinkedIn profile in Settings.';
+              detailMessage ||
+              "LinkedIn not connected. Please connect your LinkedIn profile in Settings.";
           } else {
-            message = 'Authentication failed. Please sign in again.';
+            message = "Authentication failed. Please sign in again.";
           }
         } else if (status === 429) {
-          message = 'Too many requests to LinkedIn. Please wait a minute and try again.';
-        } else if (status === 502 && errorCode === 'MEDIA_FETCH_FAILED') {
-          message = 'Could not load LinkedIn profile images. The images may be temporarily unavailable.';
-        } else if (status === 502 && errorCode === 'PYMK_FETCH_FAILED') {
-          message = detailMessage || 'LinkedIn is temporarily unavailable. Please try again in a moment.';
-        } else if (status === 400 && errorCode === 'INVALID_REQUEST') {
-          message = detailMessage || 'Invalid request. Please check your filters and try again.';
-        } else if (errorCode === 'INVALID_COHORT') {
-          message = detailMessage || 'Invalid filter selected. Please choose a different option.';
+          message =
+            "Too many requests to LinkedIn. Please wait a minute and try again.";
+        } else if (status === 502 && errorCode === "MEDIA_FETCH_FAILED") {
+          message =
+            "Could not load LinkedIn profile images. The images may be temporarily unavailable.";
+        } else if (status === 502 && errorCode === "PYMK_FETCH_FAILED") {
+          message =
+            detailMessage ||
+            "LinkedIn is temporarily unavailable. Please try again in a moment.";
+        } else if (status === 400 && errorCode === "INVALID_REQUEST") {
+          message =
+            detailMessage ||
+            "Invalid request. Please check your filters and try again.";
+        } else if (errorCode === "INVALID_COHORT") {
+          message =
+            detailMessage ||
+            "Invalid filter selected. Please choose a different option.";
         } else {
           message =
             detailMessage ||
-            (err instanceof Error ? err.message : 'Failed to load People You May Know');
+            (err instanceof Error
+              ? err.message
+              : "Failed to load People You May Know");
         }
 
-        console.error('[PYMK] Fetch failed:', {
+        console.error("[PYMK] Fetch failed:", {
           status,
           errorCode,
           message: detailMessage,
@@ -190,7 +217,7 @@ export function usePeopleYouMayKnow() {
     try {
       await fetchSuggestions({ append: true, pageStart: nextStart });
     } catch (err) {
-      console.error('[PYMK] Load more failed:', err);
+      console.error("[PYMK] Load more failed:", err);
     }
   }, [data, fetchSuggestions, loadingMore]);
 
@@ -206,7 +233,7 @@ export function usePeopleYouMayKnow() {
       const nextId = defaultIdForCohort(next, cohortDefaults);
       setCohort(next);
       setCohortId(nextId);
-      setError('');
+      setError("");
       const cached = getPymkSessionCache({ cohort: next, cohortId: nextId });
       setData(cached && cached.cohort === next ? cached : null);
     },
@@ -216,8 +243,10 @@ export function usePeopleYouMayKnow() {
   const changeCohortId = useCallback(
     (value: string) => {
       setCohortId(value);
-      setError('');
-      const cached = getPymkSessionCache(buildCacheKey(cohort, value, cohortDefaults));
+      setError("");
+      const cached = getPymkSessionCache(
+        buildCacheKey(cohort, value, cohortDefaults),
+      );
       setData(cached && cached.cohort === cohort ? cached : null);
     },
     [cohort, cohortDefaults],

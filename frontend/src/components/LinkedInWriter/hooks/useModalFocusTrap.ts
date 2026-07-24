@@ -1,11 +1,16 @@
-import { useEffect, type RefObject } from 'react';
+import { useEffect, type RefObject } from "react";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function getFocusableElements(root: HTMLElement): HTMLElement[] {
-  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
-    (el) => !el.hasAttribute('disabled') && el.tabIndex !== -1 && el.offsetParent !== null
+  return Array.from(
+    root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+  ).filter(
+    (el) =>
+      !el.hasAttribute("disabled") &&
+      el.tabIndex !== -1 &&
+      el.offsetParent !== null,
   );
 }
 
@@ -13,7 +18,7 @@ function getFocusableElements(root: HTMLElement): HTMLElement[] {
 export function useModalFocusTrap(
   containerRef: RefObject<HTMLElement | null>,
   active: boolean,
-  onEscape?: () => void
+  onEscape?: () => void,
 ): void {
   useEffect(() => {
     if (!active || !containerRef.current) return;
@@ -24,19 +29,22 @@ export function useModalFocusTrap(
     const focusInitial = () => {
       const focusable = getFocusableElements(root);
       const closeBtn = root.querySelector<HTMLElement>(
-        '.linkedin-profile-optimization-dialog__close'
+        ".linkedin-profile-optimization-dialog__close",
       );
-      (closeBtn && focusable.includes(closeBtn) ? closeBtn : focusable[0])?.focus();
+      (closeBtn && focusable.includes(closeBtn)
+        ? closeBtn
+        : focusable[0]
+      )?.focus();
     };
 
     const raf = window.requestAnimationFrame(focusInitial);
 
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onEscape?.();
         return;
       }
-      if (event.key !== 'Tab') return;
+      if (event.key !== "Tab") return;
 
       const focusable = getFocusableElements(root);
       if (focusable.length === 0) return;
@@ -54,11 +62,11 @@ export function useModalFocusTrap(
       }
     };
 
-    root.addEventListener('keydown', onKeyDown);
+    root.addEventListener("keydown", onKeyDown);
 
     return () => {
       window.cancelAnimationFrame(raf);
-      root.removeEventListener('keydown', onKeyDown);
+      root.removeEventListener("keydown", onKeyDown);
       previousActive?.focus?.();
     };
   }, [active, containerRef, onEscape]);

@@ -11,9 +11,9 @@
  *   image-generation-demo.css       — .image-generation-demo* (demo component)
  */
 
-@import url('./copilot-sidebar.css');
-@import url('./dashboard-layout.css');
-@import url('./writer-header.css');
-@import url('./plan-wedge.css');
-@import url('./image-generation-suggestions.css');
-@import url('./image-generation-demo.css');
+@import url("./copilot-sidebar.css");
+@import url("./dashboard-layout.css");
+@import url("./writer-header.css");
+@import url("./plan-wedge.css");
+@import url("./image-generation-suggestions.css");
+@import url("./image-generation-demo.css");

@@ -1,15 +1,18 @@
-import React from 'react';
-import { linkedInWriterApi, LinkedInVideoScriptRequest } from '../../../services/linkedInWriterApi';
-import { 
-  readPrefs, 
-  writePrefs, 
-  logAssistant, 
-  mapTone, 
+import React from "react";
+import {
+  linkedInWriterApi,
+  LinkedInVideoScriptRequest,
+} from "../../../services/linkedInWriterApi";
+import {
+  readPrefs,
+  writePrefs,
+  logAssistant,
+  mapTone,
   mapIndustry,
   getPersonalizedPlaceholder,
-  VALID_TONES, 
-  VALID_INDUSTRIES
-} from '../utils/linkedInWriterUtils';
+  VALID_TONES,
+  VALID_INDUSTRIES,
+} from "../utils/linkedInWriterUtils";
 
 interface VideoScriptHITLProps {
   args: any;
@@ -19,14 +22,14 @@ interface VideoScriptHITLProps {
 const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
   const prefs = React.useMemo(() => readPrefs(), []);
   const [form, setForm] = React.useState({
-    topic: args.topic ?? prefs.topic ?? '',
-    target_audience: args.target_audience ?? prefs.target_audience ?? '',
-    tone: args.tone ?? prefs.tone ?? 'professional',
-    industry: args.industry ?? prefs.industry ?? 'technology',
-    video_length: args.video_length ?? (prefs.video_length ?? 60),
-    key_messages: args.key_messages ?? (prefs.key_messages ?? []),
-    include_hook: args.include_hook ?? (prefs.include_hook ?? true),
-    include_captions: args.include_captions ?? (prefs.include_captions ?? true)
+    topic: args.topic ?? prefs.topic ?? "",
+    target_audience: args.target_audience ?? prefs.target_audience ?? "",
+    tone: args.tone ?? prefs.tone ?? "professional",
+    industry: args.industry ?? prefs.industry ?? "technology",
+    video_length: args.video_length ?? prefs.video_length ?? 60,
+    key_messages: args.key_messages ?? prefs.key_messages ?? [],
+    include_hook: args.include_hook ?? prefs.include_hook ?? true,
+    include_captions: args.include_captions ?? prefs.include_captions ?? true,
   });
 
   const [isLoading, setIsLoading] = React.useState(false);
@@ -34,16 +37,18 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
   const run = async () => {
     try {
       setIsLoading(true);
-      
+
       // Emit loading start event
-      window.dispatchEvent(new CustomEvent('linkedinwriter:loadingStart', {
-        detail: {
-          action: 'Generating LinkedIn Video Script',
-          message: `Creating a ${form.video_length}-second video script about "${form.topic}". This will include a compelling hook, engaging content, and clear conclusion for your ${form.target_audience}.`
-        }
-      }));
-      
-      logAssistant('Starting LinkedIn video script generation...');
+      window.dispatchEvent(
+        new CustomEvent("linkedinwriter:loadingStart", {
+          detail: {
+            action: "Generating LinkedIn Video Script",
+            message: `Creating a ${form.video_length}-second video script about "${form.topic}". This will include a compelling hook, engaging content, and clear conclusion for your ${form.target_audience}.`,
+          },
+        }),
+      );
+
+      logAssistant("Starting LinkedIn video script generation...");
 
       // Read user preferences
       const prefs = readPrefs();
@@ -61,23 +66,23 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
         video_length: form.video_length,
         key_messages: form.key_messages,
         include_hook: form.include_hook,
-        include_captions: form.include_captions
+        include_captions: form.include_captions,
       };
 
       const res = await linkedInWriterApi.generateVideoScript(request);
-      
+
       // Write preferences
-      writePrefs({ 
-        tone: form.tone, 
+      writePrefs({
+        tone: form.tone,
         industry: form.industry,
         target_audience: form.target_audience,
         video_length: form.video_length,
         key_messages: form.key_messages,
         include_hook: form.include_hook,
-        include_captions: form.include_captions
+        include_captions: form.include_captions,
       });
 
-      logAssistant('LinkedIn video script generated successfully');
+      logAssistant("LinkedIn video script generated successfully");
 
       // Update draft content
       if (res.data) {
@@ -85,18 +90,20 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
         content += `## Hook\n${res.data.hook}\n\n`;
         content += `## Main Content\n`;
         res.data.main_content.forEach((scene, index) => {
-          content += `### Scene ${index + 1} (${scene.duration || '30s'})\n${scene.content}\n\n`;
+          content += `### Scene ${index + 1} (${scene.duration || "30s"})\n${scene.content}\n\n`;
         });
         content += `## Conclusion\n${res.data.conclusion}\n\n`;
         content += `## Video Description\n${res.data.video_description}\n\n`;
-        
+
         if (res.data.captions) {
-          content += `## Captions\n${res.data.captions.join('\n')}\n\n`;
+          content += `## Captions\n${res.data.captions.join("\n")}\n\n`;
         }
-        
-        window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { 
-          detail: content 
-        }));
+
+        window.dispatchEvent(
+          new CustomEvent("linkedinwriter:updateDraft", {
+            detail: content,
+          }),
+        );
 
         respond({
           success: true,
@@ -105,19 +112,19 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           main_content: res.data.main_content,
           conclusion: res.data.conclusion,
           captions: res.data.captions,
-          video_description: res.data.video_description
+          video_description: res.data.video_description,
         });
       } else {
-        throw new Error('No data received from API');
+        throw new Error("No data received from API");
       }
-
     } catch (error) {
-      console.error('LinkedIn Video Script Generation Error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      console.error("LinkedIn Video Script Generation Error:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
       logAssistant(`Error generating LinkedIn video script: ${errorMessage}`);
       respond({
         success: false,
-        error: errorMessage
+        error: errorMessage,
       });
     } finally {
       setIsLoading(false);
@@ -127,7 +134,7 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
   return (
     <div className="hitl-form linkedin-video-script-form">
       <h3>Generate LinkedIn Video Script</h3>
-      
+
       <div className="form-group">
         <label htmlFor="topic">Video Topic *</label>
         <input
@@ -135,7 +142,7 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           type="text"
           value={form.topic}
           onChange={(e) => setForm({ ...form, topic: e.target.value })}
-          placeholder={getPersonalizedPlaceholder('video', 'topic', prefs)}
+          placeholder={getPersonalizedPlaceholder("video", "topic", prefs)}
           required
         />
       </div>
@@ -146,8 +153,14 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           id="target_audience"
           type="text"
           value={form.target_audience}
-          onChange={(e) => setForm({ ...form, target_audience: e.target.value })}
-          placeholder={getPersonalizedPlaceholder('video', 'target_audience', prefs)}
+          onChange={(e) =>
+            setForm({ ...form, target_audience: e.target.value })
+          }
+          placeholder={getPersonalizedPlaceholder(
+            "video",
+            "target_audience",
+            prefs,
+          )}
         />
       </div>
 
@@ -158,7 +171,7 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           value={form.tone}
           onChange={(e) => setForm({ ...form, tone: e.target.value })}
         >
-          {VALID_TONES.map(tone => (
+          {VALID_TONES.map((tone) => (
             <option key={tone} value={tone}>
               {tone.charAt(0).toUpperCase() + tone.slice(1)}
             </option>
@@ -173,7 +186,7 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           value={form.industry}
           onChange={(e) => setForm({ ...form, industry: e.target.value })}
         >
-          {VALID_INDUSTRIES.map(industry => (
+          {VALID_INDUSTRIES.map((industry) => (
             <option key={industry} value={industry}>
               {industry.charAt(0).toUpperCase() + industry.slice(1)}
             </option>
@@ -186,7 +199,9 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
         <select
           id="video_length"
           value={form.video_length}
-          onChange={(e) => setForm({ ...form, video_length: parseInt(e.target.value) })}
+          onChange={(e) =>
+            setForm({ ...form, video_length: parseInt(e.target.value) })
+          }
         >
           <option value={30}>30 seconds (Quick tip)</option>
           <option value={60}>60 seconds (Standard)</option>
@@ -199,9 +214,18 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
         <label htmlFor="key_messages">Key Messages</label>
         <textarea
           id="key_messages"
-          value={form.key_messages?.join('\n') || ''}
-          onChange={(e) => setForm({ ...form, key_messages: e.target.value.split('\n').filter(s => s.trim()) })}
-          placeholder={getPersonalizedPlaceholder('video', 'key_messages', prefs)}
+          value={form.key_messages?.join("\n") || ""}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              key_messages: e.target.value.split("\n").filter((s) => s.trim()),
+            })
+          }
+          placeholder={getPersonalizedPlaceholder(
+            "video",
+            "key_messages",
+            prefs,
+          )}
           rows={3}
         />
       </div>
@@ -211,7 +235,9 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           <input
             type="checkbox"
             checked={form.include_hook}
-            onChange={(e) => setForm({ ...form, include_hook: e.target.checked })}
+            onChange={(e) =>
+              setForm({ ...form, include_hook: e.target.checked })
+            }
           />
           Include attention-grabbing hook
         </label>
@@ -222,19 +248,21 @@ const VideoScriptHITL: React.FC<VideoScriptHITLProps> = ({ args, respond }) => {
           <input
             type="checkbox"
             checked={form.include_captions}
-            onChange={(e) => setForm({ ...form, include_captions: e.target.checked })}
+            onChange={(e) =>
+              setForm({ ...form, include_captions: e.target.checked })
+            }
           />
           Include video captions
         </label>
       </div>
 
       <div className="form-actions">
-        <button 
-          onClick={run} 
+        <button
+          onClick={run}
           disabled={isLoading || !form.topic.trim()}
           className="generate-btn"
         >
-          {isLoading ? 'Generating Video Script...' : 'Generate Video Script'}
+          {isLoading ? "Generating Video Script..." : "Generate Video Script"}
         </button>
       </div>
     </div>

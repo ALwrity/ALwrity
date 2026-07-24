@@ -2,33 +2,38 @@
  * Period helpers for Engagement Since You Joined ALwrity (Phase 3 wired to API).
  */
 
-import type { PostAnalyticsHistoryResponse, PostDelta } from '../../../../services/postAnalyticsApi';
-import { BASELINE_REASON_COPY, EMPTY_COPY } from './engagementTrendsCopy';
-import { hasInsufficientSnapshots } from './engagementTrendsTimeUtils';
+import type {
+  PostAnalyticsHistoryResponse,
+  PostDelta,
+} from "../../../../services/postAnalyticsApi";
+import { BASELINE_REASON_COPY, EMPTY_COPY } from "./engagementTrendsCopy";
+import { hasInsufficientSnapshots } from "./engagementTrendsTimeUtils";
 
-export type EngagementPeriodKey = '1d' | '7d' | '15d' | '30d' | 'since_joining';
+export type EngagementPeriodKey = "1d" | "7d" | "15d" | "30d" | "since_joining";
 
-export type EngagementPostTab = 'top' | 'rising' | 'falling';
+export type EngagementPostTab = "top" | "rising" | "falling";
 
 export const ENGAGEMENT_PERIOD_KEYS: EngagementPeriodKey[] = [
-  '1d',
-  '7d',
-  '15d',
-  '30d',
-  'since_joining',
+  "1d",
+  "7d",
+  "15d",
+  "30d",
+  "since_joining",
 ];
 
 /** Fallback Sync cooldown when API omits recommended_sync_cooldown_seconds. */
 export const SYNC_COOLDOWN_MS = 5 * 60 * 1000;
 
 const INSUFFICIENT_REASONS = new Set([
-  'no_snapshots',
-  'insufficient_history',
-  'baseline_too_close',
-  'no_current_posts',
+  "no_snapshots",
+  "insufficient_history",
+  "baseline_too_close",
+  "no_current_posts",
 ]);
 
-export function isInsufficientHistory(data: PostAnalyticsHistoryResponse | null): boolean {
+export function isInsufficientHistory(
+  data: PostAnalyticsHistoryResponse | null,
+): boolean {
   if (!data) return true;
   if (data.baseline_reason && INSUFFICIENT_REASONS.has(data.baseline_reason)) {
     return true;
@@ -36,26 +41,35 @@ export function isInsufficientHistory(data: PostAnalyticsHistoryResponse | null)
   return (
     hasInsufficientSnapshots(data.period) &&
     data.summary.total_posts === 0 &&
-    !(data.top_posts?.length || data.rising_posts?.length || data.falling_posts?.length)
+    !(
+      data.top_posts?.length ||
+      data.rising_posts?.length ||
+      data.falling_posts?.length
+    )
   );
 }
 
 export function resolveDefaultPeriod(
   data: PostAnalyticsHistoryResponse | null,
 ): EngagementPeriodKey {
-  if (isInsufficientHistory(data)) return '1d';
-  return 'since_joining';
+  if (isInsufficientHistory(data)) return "1d";
+  return "since_joining";
 }
 
-export function insufficientHistoryMessage(data: PostAnalyticsHistoryResponse | null): string {
+export function insufficientHistoryMessage(
+  data: PostAnalyticsHistoryResponse | null,
+): string {
   const reason = data?.baseline_reason;
-  if (reason && BASELINE_REASON_COPY[reason]) return BASELINE_REASON_COPY[reason];
+  if (reason && BASELINE_REASON_COPY[reason])
+    return BASELINE_REASON_COPY[reason];
   return EMPTY_COPY.insufficientDescription;
 }
 
-export function resolveSyncCooldownMs(data: PostAnalyticsHistoryResponse | null): number {
+export function resolveSyncCooldownMs(
+  data: PostAnalyticsHistoryResponse | null,
+): number {
   const seconds = data?.recommended_sync_cooldown_seconds;
-  if (typeof seconds === 'number' && seconds > 0) return seconds * 1000;
+  if (typeof seconds === "number" && seconds > 0) return seconds * 1000;
   return SYNC_COOLDOWN_MS;
 }
 
@@ -75,7 +89,8 @@ export function syncCooldownRemainingLabel(
   nowMs: number = Date.now(),
   cooldownMs: number = SYNC_COOLDOWN_MS,
 ): string | null {
-  if (!lastSyncedAt || !isSyncOnCooldown(lastSyncedAt, nowMs, cooldownMs)) return null;
+  if (!lastSyncedAt || !isSyncOnCooldown(lastSyncedAt, nowMs, cooldownMs))
+    return null;
   const syncedMs = Date.parse(lastSyncedAt);
   const remainingMs = cooldownMs - (nowMs - syncedMs);
   const mins = Math.max(1, Math.ceil(remainingMs / 60000));
@@ -96,10 +111,10 @@ export function postsForTab(
   tab: EngagementPostTab,
   data: PostAnalyticsHistoryResponse,
 ): PostDelta[] {
-  if (tab === 'rising') {
+  if (tab === "rising") {
     return data.rising_posts?.length ? data.rising_posts : data.top_gainers;
   }
-  if (tab === 'falling') {
+  if (tab === "falling") {
     return data.falling_posts?.length ? data.falling_posts : data.top_decliners;
   }
   if (data.top_posts?.length) {

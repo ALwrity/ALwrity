@@ -1,10 +1,10 @@
-import React from 'react';
+import React from "react";
 
-import { colors } from '../GrowthEngine/styles';
-import { TAB_COPY } from './engagementTrendsCopy';
-import type { EngagementPostTab } from './engagementTrendsPeriodUtils';
+import { colors } from "../GrowthEngine/styles";
+import { TAB_COPY } from "./engagementTrendsCopy";
+import type { EngagementPostTab } from "./engagementTrendsPeriodUtils";
 
-const TABS: EngagementPostTab[] = ['top', 'rising', 'falling'];
+const TABS: EngagementPostTab[] = ["top", "rising", "falling"];
 
 export interface EngagementTrendsPostTabsProps {
   value: EngagementPostTab;
@@ -13,18 +13,15 @@ export interface EngagementTrendsPostTabsProps {
   disabled?: boolean;
 }
 
-export const EngagementTrendsPostTabs: React.FC<EngagementTrendsPostTabsProps> = ({
-  value,
-  onChange,
-  counts,
-  disabled = false,
-}) => (
+export const EngagementTrendsPostTabs: React.FC<
+  EngagementTrendsPostTabsProps
+> = ({ value, onChange, counts, disabled = false }) => (
   <div style={{ marginBottom: 10 }}>
     <div
       role="tablist"
       aria-label="Post performance views"
       style={{
-        display: 'flex',
+        display: "flex",
         gap: 4,
         padding: 3,
         background: colors.rowBg,
@@ -46,21 +43,27 @@ export const EngagementTrendsPostTabs: React.FC<EngagementTrendsPostTabsProps> =
             onClick={() => onChange(tab)}
             style={{
               flex: 1,
-              padding: '7px 8px',
-              border: 'none',
+              padding: "7px 8px",
+              border: "none",
               borderRadius: 8,
-              background: selected ? '#fff' : 'transparent',
-              boxShadow: selected ? '0 1px 2px rgba(15, 23, 42, 0.08)' : 'none',
+              background: selected ? "#fff" : "transparent",
+              boxShadow: selected ? "0 1px 2px rgba(15, 23, 42, 0.08)" : "none",
               color: selected ? colors.textDark : colors.textSecondary,
               fontSize: 12,
               fontWeight: selected ? 800 : 600,
-              cursor: disabled ? 'not-allowed' : 'pointer',
+              cursor: disabled ? "not-allowed" : "pointer",
               opacity: disabled ? 0.6 : 1,
             }}
           >
             {TAB_COPY[tab].label}
-            {typeof count === 'number' ? (
-              <span style={{ marginLeft: 4, fontWeight: 600, color: colors.textTertiary }}>
+            {typeof count === "number" ? (
+              <span
+                style={{
+                  marginLeft: 4,
+                  fontWeight: 600,
+                  color: colors.textTertiary,
+                }}
+              >
                 ({count})
               </span>
             ) : null}

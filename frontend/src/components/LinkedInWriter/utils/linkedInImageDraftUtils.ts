@@ -7,7 +7,7 @@ const LINKEDIN_IMAGE_URL_PATTERN = /\/api\/linkedin\/images\/([^/?#]+)/;
 /** Build markdown image syntax for a generated LinkedIn image. */
 export function buildLinkedInImageMarkdown(
   imageUrl: string,
-  alt = 'Generated LinkedIn image',
+  alt = "Generated LinkedIn image",
 ): string {
   return `![${alt}](${imageUrl})`;
 }
@@ -23,7 +23,11 @@ export function appendImageMarkdownToDraft(
     return `${markdown}\n`;
   }
 
-  const separator = draft.endsWith('\n\n') ? '' : draft.endsWith('\n') ? '\n' : '\n\n';
+  const separator = draft.endsWith("\n\n")
+    ? ""
+    : draft.endsWith("\n")
+      ? "\n"
+      : "\n\n";
   return `${draft}${separator}${markdown}\n`;
 }
 
@@ -36,40 +40,43 @@ export function extractLinkedInImageId(imageUrl: string): string | null {
 export const LINKEDIN_IMAGE_MARKDOWN_REGEX = /!\[([^\]]*)\]\(([^)]+)\)/g;
 
 export interface LinkedInDraftImageSegment {
-  type: 'image';
+  type: "image";
   alt: string;
   url: string;
   imageId: string | null;
 }
 
 export interface LinkedInDraftTextSegment {
-  type: 'text';
+  type: "text";
   content: string;
 }
 
-export type LinkedInDraftSegment = LinkedInDraftImageSegment | LinkedInDraftTextSegment;
+export type LinkedInDraftSegment =
+  LinkedInDraftImageSegment | LinkedInDraftTextSegment;
 
 /** Split draft content into text and image markdown segments for preview rendering. */
-export function splitDraftByImageMarkdown(draft: string): LinkedInDraftSegment[] {
+export function splitDraftByImageMarkdown(
+  draft: string,
+): LinkedInDraftSegment[] {
   if (!draft) return [];
 
   const segments: LinkedInDraftSegment[] = [];
-  const regex = new RegExp(LINKEDIN_IMAGE_MARKDOWN_REGEX.source, 'g');
+  const regex = new RegExp(LINKEDIN_IMAGE_MARKDOWN_REGEX.source, "g");
   let lastIndex = 0;
   let match: RegExpExecArray | null = regex.exec(draft);
 
   while (match) {
     if (match.index > lastIndex) {
       segments.push({
-        type: 'text',
+        type: "text",
         content: draft.slice(lastIndex, match.index),
       });
     }
 
     const url = match[2].trim();
     segments.push({
-      type: 'image',
-      alt: match[1].trim() || 'Generated LinkedIn image',
+      type: "image",
+      alt: match[1].trim() || "Generated LinkedIn image",
       url,
       imageId: extractLinkedInImageId(url),
     });
@@ -80,7 +87,7 @@ export function splitDraftByImageMarkdown(draft: string): LinkedInDraftSegment[]
 
   if (lastIndex < draft.length) {
     segments.push({
-      type: 'text',
+      type: "text",
       content: draft.slice(lastIndex),
     });
   }

@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, timedelta
 from middleware.auth_middleware import get_current_user
 from sqlalchemy.orm import Session
 from services.database import get_db as get_db_dependency
@@ -1333,6 +1333,126 @@ async def get_publish_history(
         raise
     except Exception as e:
         logger.error(f"Failed to get publish history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/analytics/summary")
+async def get_blog_analytics_summary(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Lightweight analytics summary powering the Blog Writer radial workflow hero.
+
+    Pure read aggregation over the current user's existing ContentAsset rows
+    (source_module=blog_writer) — no new tables, no schema changes. Feeds the
+    Plan / Create / Publish / Analysis / Engagement / Remarket wedge badges.
+    """
+    try:
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = str(current_user.get("id", ""))
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
+
+        svc = ContentAssetService(db)
+        assets, _ = svc.get_user_assets(
+            user_id=user_id,
+            source_module=AssetSource.BLOG_WRITER,
+            asset_type=AssetType.TEXT,
+            sort_by="created_at",
+            sort_order="desc",
+            limit=500,
+        )
+
+        now = datetime.utcnow()
+        seven_days_ago = now - timedelta(days=7)
+        thirty_days_ago = now - timedelta(days=30)
+        ninety_days_ago = now - timedelta(days=90)
+
+        research_sessions_7d = 0
+        drafts_in_progress = 0
+        published_30d = 0
+        platform_breakdown: Dict[str, int] = {}
+        seo_scores: List[float] = []
+        pending_recommendations = 0
+        refresh_candidates: List[Dict[str, Any]] = []
+        most_recent_draft: Optional[Dict[str, Any]] = None
+
+        # `assets` is already sorted created_at desc, so the first draft-phase
+        # asset encountered is the most recently touched one.
+        for asset in assets:
+            meta = asset.asset_metadata or {}
+            phase = meta.get("phase")
+            tags = asset.tags or []
+            created_at = asset.created_at
+
+            if created_at and created_at >= seven_days_ago:
+                research_sessions_7d += 1
+
+            if phase in ("outline", "content"):
+                drafts_in_progress += 1
+                if most_recent_draft is None:
+                    most_recent_draft = {
+                        "asset_id": asset.id,
+                        "title": asset.title,
+                        "phase": phase,
+                    }
+
+            is_published = "published" in tags or phase == "publish"
+            if is_published and created_at and created_at >= thirty_days_ago:
+                published_30d += 1
+                publish_data = meta.get("publish_data") or {}
+                platform = (publish_data.get("platform") if isinstance(publish_data, dict) else None) or "unknown"
+                platform_breakdown[platform] = platform_breakdown.get(platform, 0) + 1
+
+            seo_data = meta.get("seo_data")
+            seo_score = None
+            if isinstance(seo_data, dict):
+                seo_score = seo_data.get("seo_score")
+                recs = seo_data.get("recommendations") or []
+                if isinstance(recs, list):
+                    pending_recommendations += len(recs)
+            if isinstance(seo_score, (int, float)):
+                seo_scores.append(float(seo_score))
+
+            if is_published:
+                is_stale = bool(created_at and created_at <= ninety_days_ago)
+                is_low_score = isinstance(seo_score, (int, float)) and seo_score < 70
+                if is_stale or is_low_score:
+                    refresh_candidates.append({
+                        "asset_id": asset.id,
+                        "title": asset.title,
+                        "seo_score": seo_score,
+                        "published_at": created_at.isoformat() if created_at else None,
+                    })
+
+        # Lowest-scoring / stalest candidates first (None scores sort last).
+        refresh_candidates.sort(
+            key=lambda c: (c["seo_score"] is None, c["seo_score"] if c["seo_score"] is not None else 0)
+        )
+        refresh_candidates = refresh_candidates[:5]
+
+        avg_seo_score = round(sum(seo_scores) / len(seo_scores), 1) if seo_scores else None
+
+        return {
+            "success": True,
+            "research_sessions_7d": research_sessions_7d,
+            "drafts_in_progress": drafts_in_progress,
+            "published_30d": published_30d,
+            "platform_breakdown": platform_breakdown,
+            "avg_seo_score": avg_seo_score,
+            "analyzed_count": len(seo_scores),
+            "pending_seo_recommendations": pending_recommendations,
+            "refresh_candidates": refresh_candidates,
+            "most_recent_draft": most_recent_draft,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get blog analytics summary: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

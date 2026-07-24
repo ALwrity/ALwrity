@@ -1,9 +1,9 @@
-import React from 'react';
-import { CircularProgress } from '@mui/material';
+import React from "react";
+import { CircularProgress } from "@mui/material";
 
 const NO_GAPS_MAINTENANCE_TIPS = [
-  'Re-check your profile after headline, role, or photo changes.',
-  'Post consistently — fresh activity keeps your profile discoverable.',
+  "Re-check your profile after headline, role, or photo changes.",
+  "Post consistently — fresh activity keeps your profile discoverable.",
 ] as const;
 
 interface ProfileOptimizationBatchBannerProps {
@@ -14,7 +14,9 @@ interface ProfileOptimizationBatchBannerProps {
   hideInlineAction?: boolean;
 }
 
-export const ProfileOptimizationBatchBanner: React.FC<ProfileOptimizationBatchBannerProps> = ({
+export const ProfileOptimizationBatchBanner: React.FC<
+  ProfileOptimizationBatchBannerProps
+> = ({
   remainingInBacklog,
   isLoadingNextBatch = false,
   onLoadNextBatch,
@@ -22,7 +24,7 @@ export const ProfileOptimizationBatchBanner: React.FC<ProfileOptimizationBatchBa
 }) => {
   const backlogLabel =
     remainingInBacklog === 1
-      ? '1 more suggestion in your backlog'
+      ? "1 more suggestion in your backlog"
       : `${remainingInBacklog} more suggestions in your backlog`;
 
   return (
@@ -42,11 +44,11 @@ export const ProfileOptimizationBatchBanner: React.FC<ProfileOptimizationBatchBa
         >
           {isLoadingNextBatch ? (
             <>
-              <CircularProgress size={14} sx={{ color: 'inherit' }} />
+              <CircularProgress size={14} sx={{ color: "inherit" }} />
               Loading…
             </>
           ) : (
-            'Load next batch'
+            "Load next batch"
           )}
         </button>
       )}
@@ -59,10 +61,9 @@ interface ProfileOptimizationNoGapsStateProps {
   onClose?: () => void;
 }
 
-export const ProfileOptimizationNoGapsState: React.FC<ProfileOptimizationNoGapsStateProps> = ({
-  message,
-  onClose,
-}) => (
+export const ProfileOptimizationNoGapsState: React.FC<
+  ProfileOptimizationNoGapsStateProps
+> = ({ message, onClose }) => (
   <div className="profile-opt-no-gaps">
     <div className="profile-opt-no-gaps__head">
       <span className="profile-opt-no-gaps__icon" aria-hidden>
@@ -72,7 +73,7 @@ export const ProfileOptimizationNoGapsState: React.FC<ProfileOptimizationNoGapsS
         <p className="profile-opt-no-gaps__title">Your profile looks strong</p>
         <p className="profile-opt-no-gaps__message">
           {message ||
-            'No high-priority gaps found right now. Keep your profile fresh with the tips below.'}
+            "No high-priority gaps found right now. Keep your profile fresh with the tips below."}
         </p>
       </div>
     </div>
@@ -82,7 +83,11 @@ export const ProfileOptimizationNoGapsState: React.FC<ProfileOptimizationNoGapsS
       ))}
     </ul>
     {onClose && (
-      <button type="button" className="profile-opt-no-gaps__close" onClick={onClose}>
+      <button
+        type="button"
+        className="profile-opt-no-gaps__close"
+        onClick={onClose}
+      >
         Done
       </button>
     )}
@@ -95,7 +100,10 @@ interface ProfileOptimizationRecheckBadgeProps {
   className?: string;
 }
 
-export function formatRecheckDeltaLabel(delta: { previous: number; current: number }): string {
+export function formatRecheckDeltaLabel(delta: {
+  previous: number;
+  current: number;
+}): string {
   if (delta.current > delta.previous) {
     return `+${delta.current - delta.previous}% · ${delta.previous}→${delta.current}`;
   }
@@ -105,7 +113,10 @@ export function formatRecheckDeltaLabel(delta: { previous: number; current: numb
   return `Unchanged at ${delta.current}%`;
 }
 
-export function formatRecheckDeltaTooltip(delta: { previous: number; current: number }): string {
+export function formatRecheckDeltaTooltip(delta: {
+  previous: number;
+  current: number;
+}): string {
   if (delta.current > delta.previous) {
     return `Score improved from ${delta.previous}% to ${delta.current}% based on your live LinkedIn profile.`;
   }
@@ -115,25 +126,23 @@ export function formatRecheckDeltaTooltip(delta: { previous: number; current: nu
   return `Score stayed at ${delta.current}%. No new gaps detected on your live LinkedIn profile.`;
 }
 
-export const ProfileOptimizationRecheckBadge: React.FC<ProfileOptimizationRecheckBadgeProps> = ({
-  recheckDelta,
-  onDismiss,
-  className,
-}) => {
+export const ProfileOptimizationRecheckBadge: React.FC<
+  ProfileOptimizationRecheckBadgeProps
+> = ({ recheckDelta, onDismiss, className }) => {
   const improved = recheckDelta.current > recheckDelta.previous;
   const declined = recheckDelta.current < recheckDelta.previous;
 
   return (
     <p
       className={[
-        'profile-opt-recheck-badge',
-        improved && 'profile-opt-recheck-badge--up',
-        declined && 'profile-opt-recheck-badge--down',
-        !improved && !declined && 'profile-opt-recheck-badge--neutral',
+        "profile-opt-recheck-badge",
+        improved && "profile-opt-recheck-badge--up",
+        declined && "profile-opt-recheck-badge--down",
+        !improved && !declined && "profile-opt-recheck-badge--neutral",
         className,
       ]
         .filter(Boolean)
-        .join(' ')}
+        .join(" ")}
       role="status"
       title={formatRecheckDeltaTooltip(recheckDelta)}
     >

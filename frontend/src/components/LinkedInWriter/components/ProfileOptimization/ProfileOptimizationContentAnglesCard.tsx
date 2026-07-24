@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface ProfileOptimizationContentAnglesCardProps {
   industry: string;
@@ -39,42 +39,53 @@ export const ProfileOptimizationContentAnglesCard: React.FC<
   return (
     <section
       className={[
-        'profile-opt-content-angles',
-        alwaysExpanded && 'profile-opt-content-angles--expanded',
-        alwaysExpanded && 'profile-opt-content-angles--modal',
+        "profile-opt-content-angles",
+        alwaysExpanded && "profile-opt-content-angles--expanded",
+        alwaysExpanded && "profile-opt-content-angles--modal",
       ]
         .filter(Boolean)
-        .join(' ')}
+        .join(" ")}
       aria-labelledby="profile-opt-content-angles-title"
     >
       <div className="profile-opt-content-angles__head">
-        <span className="profile-opt-content-angles__icon" aria-hidden>
-          ✎
-        </span>
-        <div className="profile-opt-content-angles__intro">
-          <h4 id="profile-opt-content-angles-title" className="profile-opt-content-angles__title">
-            Content angles from your profile
+        <div className="profile-opt-content-angles__title-row">
+          <span className="profile-opt-content-angles__icon" aria-hidden>
+            ✎
+          </span>
+          <h4
+            id="profile-opt-content-angles-title"
+            className="profile-opt-content-angles__title"
+          >
+            Content Angles from Your Profile
           </h4>
-          <p className="profile-opt-content-angles__subtitle">
-            Your experience in <strong>{industry}</strong>
-            {expertise && (
-              <>
-                {' '}
-                and expertise in <strong>{expertise}</strong>
-              </>
-            )}{' '}
-            makes these content angles native to you — not generic topics.
-          </p>
         </div>
+        <p className="profile-opt-content-angles__subtitle">
+          Your experience in <strong>{industry}</strong>
+          {expertise && (
+            <>
+              {" "}
+              and expertise in <strong>{expertise}</strong>
+            </>
+          )}{" "}
+          makes these content angles native to you — not generic topics.
+        </p>
       </div>
 
-      <ul className="profile-opt-content-angles__list" aria-label={`${visibleOpportunities.length} content angles`}>
+      <ul
+        className="profile-opt-content-angles__list"
+        aria-label={`${visibleOpportunities.length} content angles`}
+      >
         {visibleOpportunities.map((opportunity, idx) => (
-          <li key={`${idx}-${opportunity}`} className="profile-opt-content-angles__item">
+          <li
+            key={`${idx}-${opportunity}`}
+            className="profile-opt-content-angles__item"
+          >
             <span className="profile-opt-content-angles__index" aria-hidden>
               {idx + 1}
             </span>
-            <span className="profile-opt-content-angles__text">{opportunity}</span>
+            <span className="profile-opt-content-angles__text">
+              {opportunity}
+            </span>
           </li>
         ))}
       </ul>
@@ -87,8 +98,8 @@ export const ProfileOptimizationContentAnglesCard: React.FC<
           aria-expanded={expanded}
         >
           {expanded
-            ? 'Show fewer angles ▲'
-            : `Show ${hiddenCount} more angle${hiddenCount !== 1 ? 's' : ''} ▼`}
+            ? "Show fewer angles ▲"
+            : `Show ${hiddenCount} more angle${hiddenCount !== 1 ? "s" : ""} ▼`}
         </button>
       )}
 
@@ -96,7 +107,7 @@ export const ProfileOptimizationContentAnglesCard: React.FC<
         type="button"
         className="profile-opt-content-angles__cta"
         onClick={() => {
-          window.dispatchEvent(new CustomEvent('linkedinwriter:getTopicIdeas'));
+          window.dispatchEvent(new CustomEvent("linkedinwriter:getTopicIdeas"));
         }}
       >
         + Get topic ideas from these angles

@@ -1,18 +1,18 @@
 /**
  * Inbox load helpers — progressive shell + full fetch (keeps hook under 500 lines).
  */
-import { commentAssistantApi } from '../../../../services/commentAssistantApi';
-import { mapGroupToView } from './commentAssistantMappers';
+import { commentAssistantApi } from "../../../../services/commentAssistantApi";
+import { mapGroupToView } from "./commentAssistantMappers";
 import type {
   CommentAssistantEmptyReason,
   CommentAssistantInboxResponse,
   CommentAssistantPostGroupView,
   CommentAssistantPriority,
-} from './commentAssistantTypes';
+} from "./commentAssistantTypes";
 
 export type InboxLoadResult = {
   groups: CommentAssistantPostGroupView[];
-  counts: Partial<Record<'needs_reply' | 'active' | 'older', number>>;
+  counts: Partial<Record<"needs_reply" | "active" | "older", number>>;
   lastSyncedAt: string | null;
   emptyReason: CommentAssistantEmptyReason | null;
 };
@@ -35,7 +35,7 @@ function toLoadResult(data: CommentAssistantInboxResponse): InboxLoadResult {
  * Shell is skipped when we already have groups (tab switch) to avoid flicker.
  */
 export async function loadCommentAssistantInbox(options: {
-  priority: Exclude<CommentAssistantPriority, 'all'>;
+  priority: Exclude<CommentAssistantPriority, "all">;
   refresh: boolean;
   showShell: boolean;
   isCurrent: () => boolean;

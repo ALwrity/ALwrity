@@ -3,33 +3,39 @@
  *
  * Phase 3: period chips refetch `?period=`; tabs bind Top/Rising/Falling from API.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-import { DashboardActionModal } from './DashboardActionModal';
+import { DashboardActionModal } from "./DashboardActionModal";
 import {
   postAnalyticsApi,
   type PostAnalyticsHistoryResponse,
   type PostDelta,
-} from '../../../../services/postAnalyticsApi';
-import { colors } from '../GrowthEngine/styles';
+} from "../../../../services/postAnalyticsApi";
+import { colors } from "../GrowthEngine/styles";
 import {
   ENGAGEMENT_TRENDS_BODY_STYLE,
   ENGAGEMENT_TRENDS_MODAL_SIZE,
-} from './engagementTrendsModalLayout';
-import { shouldShowContributionBadges } from './engagementTrendsGrowthUtils';
-import { PostCommentsModal } from './PostCommentsModal';
-import { EngagementGrowthDriversSection } from './EngagementGrowthDriversSection';
-import { EngagementTrendsSummaryGrid } from './EngagementTrendsSummaryGrid';
-import { EngagementTrendsMetadataFooter } from './EngagementTrendsMetadataFooter';
-import { EngagementTrendsPeriodChips } from './engagementTrendsPeriodChips';
-import { EngagementTrendsPostTabs } from './engagementTrendsPostTabs';
-import { EngagementTrendsPostList } from './engagementTrendsPostList';
+} from "./engagementTrendsModalLayout";
+import { shouldShowContributionBadges } from "./engagementTrendsGrowthUtils";
+import { PostCommentsModal } from "./PostCommentsModal";
+import { EngagementGrowthDriversSection } from "./EngagementGrowthDriversSection";
+import { EngagementTrendsSummaryGrid } from "./EngagementTrendsSummaryGrid";
+import { EngagementTrendsMetadataFooter } from "./EngagementTrendsMetadataFooter";
+import { EngagementTrendsPeriodChips } from "./engagementTrendsPeriodChips";
+import { EngagementTrendsPostTabs } from "./engagementTrendsPostTabs";
+import { EngagementTrendsPostList } from "./engagementTrendsPostList";
 import {
   EMPTY_COPY,
   ENGAGEMENT_SINCE_SUBTITLE,
   ENGAGEMENT_SINCE_TITLE,
-} from './engagementTrendsCopy';
-import { extractEngagementTrendsErrorMessage } from './engagementTrendsErrors';
+} from "./engagementTrendsCopy";
+import { extractEngagementTrendsErrorMessage } from "./engagementTrendsErrors";
 import {
   insufficientHistoryMessage,
   isInsufficientHistory,
@@ -40,23 +46,31 @@ import {
   syncCooldownRemainingLabel,
   type EngagementPeriodKey,
   type EngagementPostTab,
-} from './engagementTrendsPeriodUtils';
+} from "./engagementTrendsPeriodUtils";
 
 function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
-  const rising = data.rising_posts?.length ? data.rising_posts : data.top_gainers;
-  const falling = data.falling_posts?.length ? data.falling_posts : data.top_decliners;
-  return data.summary.total_posts === 0 && rising.length === 0 && falling.length === 0;
+  const rising = data.rising_posts?.length
+    ? data.rising_posts
+    : data.top_gainers;
+  const falling = data.falling_posts?.length
+    ? data.falling_posts
+    : data.top_decliners;
+  return (
+    data.summary.total_posts === 0 &&
+    rising.length === 0 &&
+    falling.length === 0
+  );
 }
 
 const primaryLoadBtn: React.CSSProperties = {
-  padding: '8px 18px',
+  padding: "8px 18px",
   background: colors.primary,
-  color: '#fff',
-  border: 'none',
+  color: "#fff",
+  border: "none",
   borderRadius: 8,
   fontSize: 13,
   fontWeight: 700,
-  cursor: 'pointer',
+  cursor: "pointer",
 };
 
 const CacheEmptyPrompt: React.FC<{
@@ -67,10 +81,23 @@ const CacheEmptyPrompt: React.FC<{
   onLoad: () => void;
   disabled?: boolean;
 }> = ({ icon, title, description, buttonLabel, onLoad, disabled }) => (
-  <div style={{ textAlign: 'center', padding: '16px 0' }}>
+  <div style={{ textAlign: "center", padding: "16px 0" }}>
     <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
-    <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>{title}</div>
-    <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 14 }}>{description}</div>
+    <div
+      style={{
+        fontWeight: 600,
+        fontSize: 13,
+        color: colors.textDark,
+        marginBottom: 4,
+      }}
+    >
+      {title}
+    </div>
+    <div
+      style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 14 }}
+    >
+      {description}
+    </div>
     <button
       type="button"
       onClick={onLoad}
@@ -78,7 +105,7 @@ const CacheEmptyPrompt: React.FC<{
       style={{
         ...primaryLoadBtn,
         opacity: disabled ? 0.6 : 1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     >
       {buttonLabel}
@@ -89,24 +116,24 @@ const CacheEmptyPrompt: React.FC<{
 const LoadingRow: React.FC<{ message: string }> = ({ message }) => (
   <div
     style={{
-      display: 'flex',
-      alignItems: 'center',
+      display: "flex",
+      alignItems: "center",
       gap: 10,
-      padding: '16px 0',
-      justifyContent: 'center',
+      padding: "16px 0",
+      justifyContent: "center",
       color: colors.textSecondary,
       fontSize: 12,
     }}
   >
     <span
       style={{
-        display: 'inline-block',
+        display: "inline-block",
         width: 14,
         height: 14,
-        border: '2px solid #d1d5db',
+        border: "2px solid #d1d5db",
         borderTopColor: colors.primary,
-        borderRadius: '50%',
-        animation: 'aw-spin 0.7s linear infinite',
+        borderRadius: "50%",
+        animation: "aw-spin 0.7s linear infinite",
         flexShrink: 0,
       }}
     />
@@ -117,8 +144,8 @@ const LoadingRow: React.FC<{ message: string }> = ({ message }) => (
 const NoChangesEmptyState: React.FC = () => (
   <div
     style={{
-      textAlign: 'center',
-      padding: '16px 12px',
+      textAlign: "center",
+      padding: "16px 12px",
       marginBottom: 8,
       background: colors.rowBg,
       border: `1px solid ${colors.border}`,
@@ -126,10 +153,19 @@ const NoChangesEmptyState: React.FC = () => (
     }}
   >
     <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
-    <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
+    <div
+      style={{
+        fontWeight: 600,
+        fontSize: 13,
+        color: colors.textDark,
+        marginBottom: 4,
+      }}
+    >
       {EMPTY_COPY.noChangesTitle}
     </div>
-    <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+    <div
+      style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}
+    >
       {EMPTY_COPY.noChangesDescription}
     </div>
   </div>
@@ -148,10 +184,10 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 }) => {
   const [data, setData] = useState<PostAnalyticsHistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [commentsPost, setCommentsPost] = useState<PostDelta | null>(null);
-  const [period, setPeriod] = useState<EngagementPeriodKey>('since_joining');
-  const [activeTab, setActiveTab] = useState<EngagementPostTab>('rising');
+  const [period, setPeriod] = useState<EngagementPeriodKey>("since_joining");
+  const [activeTab, setActiveTab] = useState<EngagementPostTab>("rising");
   const [nowTick, setNowTick] = useState(() => Date.now());
   const mountedRef = useRef(true);
   const periodInitializedRef = useRef(false);
@@ -165,12 +201,14 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
       initDefault?: boolean;
     }) => {
       setLoading(true);
-      setError('');
+      setError("");
       try {
         if (opts.refreshFirst) {
           await postAnalyticsApi.fetchStoredAnalytics(true);
         }
-        let result = await postAnalyticsApi.fetchEngagementHistory(opts.periodKey);
+        let result = await postAnalyticsApi.fetchEngagementHistory(
+          opts.periodKey,
+        );
         if (!mountedRef.current) return;
 
         if (opts.initDefault && !periodInitializedRef.current) {
@@ -185,7 +223,8 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 
         setData(result);
       } catch (err: unknown) {
-        if (mountedRef.current) setError(extractEngagementTrendsErrorMessage(err));
+        if (mountedRef.current)
+          setError(extractEngagementTrendsErrorMessage(err));
       } finally {
         if (mountedRef.current) {
           setLoading(false);
@@ -200,7 +239,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
     mountedRef.current = true;
     if (!open) return;
     periodInitializedRef.current = false;
-    void fetchData({ periodKey: 'since_joining', initDefault: true });
+    void fetchData({ periodKey: "since_joining", initDefault: true });
     return () => {
       mountedRef.current = false;
     };
@@ -213,40 +252,51 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
 
   const handleLoad = () => void fetchData({ periodKey: periodRef.current });
   const cooldownMs = resolveSyncCooldownMs(data);
-  const syncOnCooldown = isSyncOnCooldown(data?.last_synced_at, nowTick, cooldownMs);
-  const cooldownHint = syncCooldownRemainingLabel(data?.last_synced_at, nowTick, cooldownMs);
+  const syncOnCooldown = isSyncOnCooldown(
+    data?.last_synced_at,
+    nowTick,
+    cooldownMs,
+  );
+  const cooldownHint = syncCooldownRemainingLabel(
+    data?.last_synced_at,
+    nowTick,
+    cooldownMs,
+  );
   const handleSync = () => {
     if (syncOnCooldown) return;
     void fetchData({ periodKey: periodRef.current, refreshFirst: true });
   };
 
   const insufficient = Boolean(data && !loading && isInsufficientHistory(data));
-  const showNoChanges =
-    Boolean(data && !loading && !insufficient && hasNoComparableChanges(data));
-  const risingList = data ? postsForTab('rising', data) : [];
-  const hasTrendData =
-    Boolean(
-      data &&
-        !loading &&
-        !insufficient &&
-        (data.summary.total_posts > 0 ||
-          postsForTab('top', data).length > 0 ||
-          risingList.length > 0 ||
-          postsForTab('falling', data).length > 0),
-    );
+  const showNoChanges = Boolean(
+    data && !loading && !insufficient && hasNoComparableChanges(data),
+  );
+  const risingList = data ? postsForTab("rising", data) : [];
+  const hasTrendData = Boolean(
+    data &&
+    !loading &&
+    !insufficient &&
+    (data.summary.total_posts > 0 ||
+      postsForTab("top", data).length > 0 ||
+      risingList.length > 0 ||
+      postsForTab("falling", data).length > 0),
+  );
 
   const showContributionBadges = useMemo(
     () => shouldShowContributionBadges(risingList),
     [risingList],
   );
 
-  const tabPosts = useMemo(() => (data ? postsForTab(activeTab, data) : []), [activeTab, data]);
+  const tabPosts = useMemo(
+    () => (data ? postsForTab(activeTab, data) : []),
+    [activeTab, data],
+  );
   const tabCounts = useMemo(() => {
     if (!data) return undefined;
     return {
-      top: postsForTab('top', data).length,
-      rising: postsForTab('rising', data).length,
-      falling: postsForTab('falling', data).length,
+      top: postsForTab("top", data).length,
+      rising: postsForTab("rising", data).length,
+      falling: postsForTab("falling", data).length,
     };
   }, [data]);
 
@@ -258,7 +308,14 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
       {...ENGAGEMENT_TRENDS_MODAL_SIZE}
     >
       <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
-        <p style={{ margin: '0 0 10px', fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+        <p
+          style={{
+            margin: "0 0 10px",
+            fontSize: 12,
+            color: colors.textSecondary,
+            lineHeight: 1.45,
+          }}
+        >
           {ENGAGEMENT_SINCE_SUBTITLE}
         </p>
 
@@ -291,12 +348,21 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
         )}
 
         {connected && !data && !loading && error && (
-          <div style={{ textAlign: 'center', padding: '16px 0' }}>
+          <div style={{ textAlign: "center", padding: "16px 0" }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-            <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
+            <div
+              style={{
+                fontWeight: 600,
+                fontSize: 13,
+                color: colors.textDark,
+                marginBottom: 4,
+              }}
+            >
               {EMPTY_COPY.loadErrorTitle}
             </div>
-            <div style={{ fontSize: 12, color: '#dc2626', marginBottom: 14 }}>{error}</div>
+            <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 14 }}>
+              {error}
+            </div>
             <button
               type="button"
               onClick={handleLoad}
@@ -304,7 +370,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
               style={{
                 ...primaryLoadBtn,
                 opacity: loading ? 0.6 : 1,
-                cursor: loading ? 'not-allowed' : 'pointer',
+                cursor: loading ? "not-allowed" : "pointer",
               }}
             >
               {EMPTY_COPY.retry}
@@ -330,8 +396,8 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
             {insufficient && data.last_synced_at && (
               <div
                 style={{
-                  textAlign: 'center',
-                  padding: '14px 12px',
+                  textAlign: "center",
+                  padding: "14px 12px",
                   marginBottom: 8,
                   background: colors.rowBg,
                   border: `1px solid ${colors.border}`,
@@ -339,10 +405,23 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                 }}
               >
                 <div style={{ fontSize: 24, marginBottom: 8 }}>📈</div>
-                <div style={{ fontWeight: 600, fontSize: 13, color: colors.textDark, marginBottom: 4 }}>
+                <div
+                  style={{
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: colors.textDark,
+                    marginBottom: 4,
+                  }}
+                >
                   {EMPTY_COPY.insufficientTitle}
                 </div>
-                <div style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: colors.textSecondary,
+                    lineHeight: 1.45,
+                  }}
+                >
                   {insufficientHistoryMessage(data)}
                 </div>
               </div>
@@ -363,7 +442,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   disabled={loading}
                 />
 
-                {activeTab === 'rising' && risingList.length > 0 && (
+                {activeTab === "rising" && risingList.length > 0 && (
                   <EngagementGrowthDriversSection
                     summary={data.summary}
                     showContributionBadges={showContributionBadges}
@@ -377,7 +456,7 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   </EngagementGrowthDriversSection>
                 )}
 
-                {(activeTab !== 'rising' || risingList.length === 0) && (
+                {(activeTab !== "rising" || risingList.length === 0) && (
                   <EngagementTrendsPostList
                     tab={activeTab}
                     posts={tabPosts}
@@ -398,14 +477,14 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                   : undefined
               }
               style={{
-                width: '100%',
-                padding: '7px',
-                background: 'none',
+                width: "100%",
+                padding: "7px",
+                background: "none",
                 border: `1px solid ${colors.border}`,
                 borderRadius: 6,
                 fontSize: 11,
                 color: colors.textSecondary,
-                cursor: loading || syncOnCooldown ? 'not-allowed' : 'pointer',
+                cursor: loading || syncOnCooldown ? "not-allowed" : "pointer",
                 fontWeight: 600,
                 marginTop: 4,
                 opacity: loading || syncOnCooldown ? 0.6 : 1,
@@ -418,8 +497,8 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
                 style={{
                   marginTop: 6,
                   fontSize: 10,
-                  color: '#b45309',
-                  textAlign: 'center',
+                  color: "#b45309",
+                  textAlign: "center",
                   lineHeight: 1.4,
                 }}
               >
