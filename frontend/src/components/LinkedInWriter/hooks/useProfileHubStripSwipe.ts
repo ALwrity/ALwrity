@@ -10,7 +10,6 @@ import {
 export {
   PROFILE_HUB_SWIPE_AXIS_LOCK_PX,
   PROFILE_HUB_SWIPE_MAX_OFFSET_PX,
-  PROFILE_HUB_SWIPE_THRESHOLD_PX,
   clampProfileHubSwipeOffset,
   deriveProfileHubAvatarShift,
   deriveProfileHubComboLayout,
@@ -41,6 +40,7 @@ export function useProfileHubStripSwipe({
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const axisLockedRef = useRef<"horizontal" | "vertical" | null>(null);
   const offsetRef = useRef(0);
+  const pointerIdRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
   const [offsetX, setOffsetX] = useState(0);
 
@@ -59,27 +59,43 @@ export function useProfileHubStripSwipe({
     setOffsetX(0);
   }, []);
 
-  const onTouchStart = useCallback(
-    (event: React.TouchEvent<HTMLElement>) => {
+  const capturePointer = useCallback((target: HTMLElement, pointerId: number) => {
+    try {
+      target.setPointerCapture(pointerId);
+    } catch {
+      // setPointerCapture may fail if the pointer is already released
+    }
+  }, []);
+
+  const releasePointer = useCallback((target: HTMLElement, pointerId: number) => {
+    try {
+      target.releasePointerCapture(pointerId);
+    } catch {
+      // ignore release errors
+    }
+  }, []);
+
+  const onPointerDown = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
       if (!enabled) return;
-      const touch = event.touches[0];
-      if (!touch) return;
-      startRef.current = { x: touch.clientX, y: touch.clientY };
+      if (pointerIdRef.current !== null) return;
+      pointerIdRef.current = event.pointerId;
+      capturePointer(event.currentTarget, event.pointerId);
+      startRef.current = { x: event.clientX, y: event.clientY };
       axisLockedRef.current = null;
       offsetRef.current = 0;
       setOffsetX(0);
     },
-    [enabled],
+    [enabled, capturePointer],
   );
 
-  const onTouchMove = useCallback(
-    (event: React.TouchEvent<HTMLElement>) => {
-      if (!enabled || !startRef.current) return;
-      const touch = event.touches[0];
-      if (!touch) return;
+  const onPointerMove = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (!enabled || !startRef.current || pointerIdRef.current !== event.pointerId)
+        return;
 
-      const deltaX = touch.clientX - startRef.current.x;
-      const deltaY = touch.clientY - startRef.current.y;
+      const deltaX = event.clientX - startRef.current.x;
+      const deltaY = event.clientY - startRef.current.y;
 
       if (!axisLockedRef.current) {
         if (
@@ -94,6 +110,7 @@ export function useProfileHubStripSwipe({
 
       if (axisLockedRef.current !== "horizontal") return;
 
+      event.preventDefault();
       const clamped = clampProfileHubSwipeOffset(deltaX, swipeContext);
       offsetRef.current = clamped;
       setOffsetX(clamped);
@@ -108,36 +125,56 @@ export function useProfileHubStripSwipe({
     ],
   );
 
-  const onTouchEnd = useCallback(() => {
-    if (!enabled) {
+  const onPointerUp = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (pointerIdRef.current === event.pointerId) {
+        releasePointer(event.currentTarget, event.pointerId);
+        pointerIdRef.current = null;
+      }
+
+      if (!enabled) {
+        resetSwipe();
+        return;
+      }
+
+      const action = resolveProfileHubSwipeAction(
+        offsetRef.current,
+        swipeContext,
+      );
+      if (action === "connect") {
+        suppressClickRef.current = true;
+        onConnect?.();
+      } else if (action === "disconnect") {
+        suppressClickRef.current = true;
+        onDisconnect?.();
+      }
+
       resetSwipe();
-      return;
-    }
+    },
+    [
+      enabled,
+      releasePointer,
+      onConnect,
+      onDisconnect,
+      resetSwipe,
+      swipeContext.connected,
+      swipeContext.hasConnect,
+      swipeContext.hasDisconnect,
+      swipeContext.isConnecting,
+      swipeContext.isDisconnecting,
+    ],
+  );
 
-    const action = resolveProfileHubSwipeAction(
-      offsetRef.current,
-      swipeContext,
-    );
-    if (action === "connect") {
-      suppressClickRef.current = true;
-      onConnect?.();
-    } else if (action === "disconnect") {
-      suppressClickRef.current = true;
-      onDisconnect?.();
-    }
-
-    resetSwipe();
-  }, [
-    enabled,
-    onConnect,
-    onDisconnect,
-    resetSwipe,
-    swipeContext.connected,
-    swipeContext.hasConnect,
-    swipeContext.hasDisconnect,
-    swipeContext.isConnecting,
-    swipeContext.isDisconnecting,
-  ]);
+  const onPointerCancel = useCallback(
+    (event: React.PointerEvent<HTMLElement>) => {
+      if (pointerIdRef.current === event.pointerId) {
+        releasePointer(event.currentTarget, event.pointerId);
+        pointerIdRef.current = null;
+      }
+      resetSwipe();
+    },
+    [releasePointer, resetSwipe],
+  );
 
   const onClickCapture = useCallback((event: React.MouseEvent<HTMLElement>) => {
     if (!suppressClickRef.current) return;
@@ -150,10 +187,10 @@ export function useProfileHubStripSwipe({
     offsetX,
     swipeIntent: deriveProfileHubSwipeIntent(offsetX),
     swipeHandlers: {
-      onTouchStart,
-      onTouchMove,
-      onTouchEnd,
-      onTouchCancel: resetSwipe,
+      onPointerDown,
+      onPointerMove,
+      onPointerUp,
+      onPointerCancel,
       onClickCapture,
     },
   };

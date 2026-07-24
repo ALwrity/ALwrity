@@ -72,7 +72,8 @@ export const DashboardMobileWorkflowGrid: React.FC<
       >
         {isRecommended && (
           <span className="linkedin-dashboard-mobile-workflow-badge">
-            Start here
+            <span>START</span>
+            <span>HERE</span>
           </span>
         )}
         <span className="linkedin-dashboard-mobile-workflow-card-head">
@@ -106,11 +107,11 @@ export const DashboardMobileWorkflowGrid: React.FC<
       <div className="linkedin-dashboard-mobile-workflow-header">
         <h2
           className="linkedin-dashboard-mobile-workflow-title linkedin-dashboard-mobile-workflow-title--stacked"
-          aria-label="What are You Creating today"
+          aria-label="What are You Creating Today"
         >
           <span>What are You</span>
           <span>
-            Creating today{" "}
+            Creating Today{" "}
             <span
               className="linkedin-dashboard-mobile-workflow-title-emoji"
               aria-hidden
