@@ -289,7 +289,8 @@ jobs:
               # they're migrated or rewritten).
               python -m pytest tests/api/ tests/services/ tests/test_*.py \
                 --ignore=tests/test_linkedin_publish_media_service.py \
-                -v --tb=line -p no:cacheprovider
+                -v --tb=line -p no:cacheprovider \
+                --continue-on-collection-errors
               ;;
             *)
               echo "::error::Unknown suite '${{ matrix.suite }}'"
