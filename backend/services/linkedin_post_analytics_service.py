@@ -35,6 +35,7 @@ from services.linkedin_post_analytics_mappers import (
     row_to_linkedin_post,
     utc_iso,
 )
+from services.integrations.linkedin.post_attachments import attachments_to_json
 
 TOP_TREND_POSTS_LIMIT = 5
 
@@ -472,6 +473,7 @@ class LinkedInPostAnalyticsService:
         row.author_public_identifier = post.author.public_identifier
         row.author_avatar_url = post.author.avatar_url
         row.share_url = post.share_url
+        row.attachments_json = attachments_to_json(post.attachments) or None
         row.is_repost = post.is_repost
         row.is_company_post = post.is_company_post
         row.last_synced_at = now
@@ -499,6 +501,7 @@ class LinkedInPostAnalyticsService:
             author_public_identifier=post.author.public_identifier,
             author_avatar_url=post.author.avatar_url,
             share_url=post.share_url,
+            attachments_json=attachments_to_json(post.attachments) or None,
             is_repost=post.is_repost,
             is_company_post=post.is_company_post,
             last_synced_at=now,

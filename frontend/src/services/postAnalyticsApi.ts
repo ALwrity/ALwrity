@@ -12,6 +12,13 @@ export interface PostEngagementMetrics {
   followers_gained: number;
 }
 
+export interface PostAttachment {
+  type?: string;
+  url?: string;
+  unavailable?: boolean;
+  title?: string;
+}
+
 export interface PostAuthor {
   name: string;
   avatar_url?: string | null;
@@ -31,6 +38,7 @@ export interface LinkedInPost {
   is_repost: boolean;
   is_company_post: boolean;
   user_reacted?: string | null;
+  attachments?: PostAttachment[];
 }
 
 export interface PostListResponse {

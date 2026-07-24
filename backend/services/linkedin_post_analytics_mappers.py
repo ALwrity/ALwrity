@@ -7,6 +7,10 @@ from typing import Optional
 
 from models.linkedin_post_analytics_model import LinkedInPostAnalytics
 from models.linkedin_posts_models import LinkedInPost, PostAuthor, PostEngagementMetrics
+from services.integrations.linkedin.post_attachments import (
+    attachments_from_json,
+    attachments_to_json,
+)
 
 
 def utc_iso(dt: Optional[datetime]) -> Optional[str]:
@@ -50,4 +54,5 @@ def row_to_linkedin_post(row: LinkedInPostAnalytics) -> LinkedInPost:
         share_url=row.share_url,
         is_repost=row.is_repost or False,
         is_company_post=row.is_company_post or False,
+        attachments=attachments_from_json(row.attachments_json),
     )

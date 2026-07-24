@@ -37,6 +37,21 @@ class PostEngagementMetrics(BaseModel):
     )
 
 
+class PostAttachment(BaseModel):
+    """Media attachment on a LinkedIn post (Unipile attachments[] shape)."""
+
+    type: str = Field(default="img", description="Attachment type: img, video, file, etc.")
+    url: Optional[str] = Field(default=None, description="Media URL from Unipile")
+    unavailable: bool = Field(
+        default=False,
+        description="True when Unipile marks the attachment as no longer fetchable",
+    )
+    title: Optional[str] = Field(
+        default=None,
+        description="Optional label for documents/files",
+    )
+
+
 class PostAuthor(BaseModel):
     """Author information for a LinkedIn post."""
 
@@ -89,6 +104,10 @@ class LinkedInPost(BaseModel):
     user_reacted: Optional[str] = Field(
         default=None,
         description="Type of reaction by current user (LIKE, etc.)"
+    )
+    attachments: list[PostAttachment] = Field(
+        default_factory=list,
+        description="Post media attachments (images, video, documents)",
     )
 
 
