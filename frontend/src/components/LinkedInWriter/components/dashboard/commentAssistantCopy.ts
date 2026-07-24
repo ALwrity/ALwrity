@@ -75,8 +75,13 @@ export const COMMENT_ASSISTANT_ACTIONS = {
   loadMore: "Load more comments",
 } as const;
 
+/** Shown under the draft button while ALwrity is generating. */
+export const COMMENT_ASSISTANT_DRAFT_PROGRESS =
+  "Reading your post and comment, then drafting a reply…";
+
 export const COMMENT_ASSISTANT_REPLY_SENDING = "Sending your reply…";
-export const COMMENT_ASSISTANT_REPLY_SUCCESS = "Reply posted successfully.";
+export const COMMENT_ASSISTANT_REPLY_SUCCESS =
+  "Reply posted on LinkedIn successfully.";
 
 export const COMMENT_ASSISTANT_MANUAL_INTRO =
   "Paste a comment and draft a reply with ALwrity in your voice — then copy it to LinkedIn.";

@@ -192,10 +192,18 @@ export const CommentAssistantInboxModal: React.FC<
           {statusMessage && (
             <div
               role="status"
+              aria-live="polite"
               style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 2,
                 padding: "10px 12px",
                 background:
                   statusMessage.tone === "success" ? "#ecfdf5" : "#eff6ff",
+                border:
+                  statusMessage.tone === "success"
+                    ? "1px solid #a7f3d0"
+                    : "1px solid #bfdbfe",
                 borderRadius: 8,
                 color: statusMessage.tone === "success" ? "#047857" : "#1d4ed8",
                 fontSize: 12,
@@ -205,6 +213,7 @@ export const CommentAssistantInboxModal: React.FC<
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
               }}
             >
               {statusMessage.tone === "info" && (

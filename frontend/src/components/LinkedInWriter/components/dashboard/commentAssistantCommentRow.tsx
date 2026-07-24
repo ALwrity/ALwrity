@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import { colors } from "../GrowthEngine/styles";
 import { CommentAssistantAttachedImage } from "./commentAssistantAttachedImage";
 import { CommentAssistantAuthorRow } from "./commentAssistantAuthorRow";
-import { COMMENT_ASSISTANT_ACTIONS } from "./commentAssistantCopy";
+import {
+  COMMENT_ASSISTANT_ACTIONS,
+  COMMENT_ASSISTANT_DRAFT_PROGRESS,
+} from "./commentAssistantCopy";
 import { CommentAssistantNestedReplyRow } from "./commentAssistantNestedReplyRow";
 import { CommentAssistantReactionPicker } from "./commentAssistantReactionPicker";
 import { CommentAssistantSpinner } from "./commentAssistantSpinner";
@@ -271,7 +274,7 @@ export const CommentAssistantCommentRow: React.FC<
         >
           {comment.draftBusy ? (
             <>
-              <CommentAssistantSpinner size={11} color="#fff" />
+              <CommentAssistantSpinner size={12} color="#fff" />
               {COMMENT_ASSISTANT_ACTIONS.drafting}
             </>
           ) : (
@@ -280,7 +283,21 @@ export const CommentAssistantCommentRow: React.FC<
         </button>
       </div>
 
-      {comment.draftText ? (
+      {comment.draftBusy ? (
+        <div
+          style={{
+            fontSize: 10,
+            color: colors.primary,
+            marginTop: 4,
+            marginBottom: 2,
+            fontWeight: 600,
+          }}
+        >
+          {COMMENT_ASSISTANT_DRAFT_PROGRESS}
+        </div>
+      ) : null}
+
+      {comment.draftText && !comment.draftBusy ? (
         <div
           style={{
             fontSize: 10,

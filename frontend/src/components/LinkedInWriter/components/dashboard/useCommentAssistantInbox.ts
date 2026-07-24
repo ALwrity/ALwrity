@@ -10,6 +10,10 @@ import {
   getCommentAssistantReplyErrorMessage,
 } from "../../../../services/commentAssistantApi";
 import { postCommentsApi } from "../../../../services/postCommentsApi";
+import {
+  COMMENT_ASSISTANT_REPLY_SENDING,
+  COMMENT_ASSISTANT_REPLY_SUCCESS,
+} from "./commentAssistantCopy";
 import { loadCommentAssistantInbox } from "./commentAssistantInboxLoad";
 import { formatTimeLabel } from "./commentAssistantMappers";
 import type { CommentAssistantReplyPayload } from "./commentAssistantReplyComposer";
@@ -296,7 +300,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       payload: CommentAssistantReplyPayload,
     ) => {
       setActionError("");
-      showStatus("info", "Sending your reply…");
+      showStatus("info", COMMENT_ASSISTANT_REPLY_SENDING);
       updateComment(postId, commentId, { replyBusy: true });
       try {
         // Same multipart reply path; commentId may be a nested reply id.
@@ -313,10 +317,20 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           draftText: "",
           threadReplies: undefined,
         });
-        showStatus("success", "Reply posted successfully.", 4500);
+        // Reload first, then show success so the banner is not buried under
+        // the "Loading comments…" state during refresh. Reply already posted —
+        // inbox reload failures must not hide the success confirmation.
         if (isPriorityTab(tab)) {
-          await loadInbox(tab, false);
+          try {
+            await loadInbox(tab, false);
+          } catch (reloadErr) {
+            console.error(
+              "[CommentAssistant] inbox reload after reply failed",
+              reloadErr,
+            );
+          }
         }
+        showStatus("success", COMMENT_ASSISTANT_REPLY_SUCCESS, 7000);
       } catch (err) {
         updateComment(postId, commentId, { replyBusy: false });
         setStatusMessage(null);
