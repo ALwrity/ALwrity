@@ -35,12 +35,12 @@ LINKEDIN_PILLAR_LABELS = {
 }
 
 LINKEDIN_PILLAR_ACTION_URLS = {
-    "plan": "/linkedin-writer?wedge=plan",
-    "create": "/linkedin-writer?wedge=create",
-    "publish": "/linkedin-writer?wedge=publish",
-    "analysis": "/linkedin-writer?wedge=analysis",
-    "engagement": "/linkedin-writer?wedge=engagement",
-    "remarket": "/linkedin-writer?wedge=remarket",
+    "plan": "/linkedin-studio?wedge=plan",
+    "create": "/linkedin-studio?wedge=create",
+    "publish": "/linkedin-studio?wedge=publish",
+    "analysis": "/linkedin-studio?wedge=analysis",
+    "engagement": "/linkedin-studio?wedge=engagement",
+    "remarket": "/linkedin-studio?wedge=remarket",
 }
 
 MAX_TASKS_PER_PILLAR = 2

@@ -1,15 +1,18 @@
-import React from 'react';
-import ComponentErrorBoundary from '../../../../components/shared/ComponentErrorBoundary';
-import { DashboardActionModal } from '../dashboard/DashboardActionModal';
-import { PYMK_MODAL_SIZE } from '../dashboard/pymkModalLayout';
-import { PeopleYouMayKnowPanel } from './PeopleYouMayKnowPanel';
+import React from "react";
+import ComponentErrorBoundary from "../../../../components/shared/ComponentErrorBoundary";
+import { DashboardActionModal } from "../dashboard/DashboardActionModal";
+import { PYMK_MODAL_SIZE } from "../dashboard/pymkModalLayout";
+import { PeopleYouMayKnowPanel } from "./PeopleYouMayKnowPanel";
 
 interface PeopleYouMayKnowModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-export const PeopleYouMayKnowModal: React.FC<PeopleYouMayKnowModalProps> = ({ open, onClose }) => (
+export const PeopleYouMayKnowModal: React.FC<PeopleYouMayKnowModalProps> = ({
+  open,
+  onClose,
+}) => (
   <DashboardActionModal
     open={open}
     title="People You May Know"

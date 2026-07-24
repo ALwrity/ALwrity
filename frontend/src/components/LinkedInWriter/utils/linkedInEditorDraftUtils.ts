@@ -5,7 +5,7 @@
 import {
   buildLinkedInImageMarkdown,
   splitDraftByImageMarkdown,
-} from './linkedInImageDraftUtils';
+} from "./linkedInImageDraftUtils";
 
 export interface LinkedInEditorImageBlock {
   id: string;
@@ -26,13 +26,15 @@ function blockIdFromUrl(url: string, index: number): string {
 }
 
 /** Separate post text from image markdown for LinkedIn-style editor display. */
-export function splitDraftForAssistiveEditor(draft: string): LinkedInAssistiveEditorDraft {
+export function splitDraftForAssistiveEditor(
+  draft: string,
+): LinkedInAssistiveEditorDraft {
   const segments = splitDraftByImageMarkdown(draft);
   const images: LinkedInEditorImageBlock[] = [];
   const textParts: string[] = [];
 
   segments.forEach((segment, index) => {
-    if (segment.type === 'image') {
+    if (segment.type === "image") {
       images.push({
         id: blockIdFromUrl(segment.url, index),
         alt: segment.alt,
@@ -44,12 +46,12 @@ export function splitDraftForAssistiveEditor(draft: string): LinkedInAssistiveEd
     }
 
     if (segment.content.trim()) {
-      textParts.push(segment.content.replace(/\s+$/, ''));
+      textParts.push(segment.content.replace(/\s+$/, ""));
     }
   });
 
   return {
-    textContent: textParts.join('\n\n'),
+    textContent: textParts.join("\n\n"),
     images,
   };
 }
@@ -59,12 +61,12 @@ export function mergeAssistiveEditorDraft(
   textContent: string,
   images: LinkedInEditorImageBlock[],
 ): string {
-  const text = textContent.replace(/\n{3,}/g, '\n\n').trimEnd();
+  const text = textContent.replace(/\n{3,}/g, "\n\n").trimEnd();
   if (images.length === 0) {
     return text;
   }
 
-  const imageMarkdown = images.map((image) => image.markdown).join('\n\n');
+  const imageMarkdown = images.map((image) => image.markdown).join("\n\n");
   if (!text) {
     return `${imageMarkdown}\n`;
   }
@@ -76,7 +78,7 @@ export function mergeAssistiveEditorDraft(
 export function createEditorImageBlock(
   imageUrl: string,
   imageId: string,
-  alt = 'Post image',
+  alt = "Post image",
 ): LinkedInEditorImageBlock {
   return {
     id: imageId,

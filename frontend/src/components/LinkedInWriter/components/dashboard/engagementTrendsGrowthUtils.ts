@@ -1,7 +1,12 @@
-import type { EngagementSummary, PostDelta } from '../../../../services/postAnalyticsApi';
+import type {
+  EngagementSummary,
+  PostDelta,
+} from "../../../../services/postAnalyticsApi";
 
 /** True when aggregate summary shows any positive metric movement. */
-export function hasPositiveAggregateGrowth(summary: EngagementSummary): boolean {
+export function hasPositiveAggregateGrowth(
+  summary: EngagementSummary,
+): boolean {
   return (
     summary.reactions.delta > 0 ||
     summary.comments.delta > 0 ||

@@ -1,27 +1,27 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   CitationHoverHandler,
   DiffPreviewModal,
   ContentPreviewHeaderWithModals,
-  ContentDisplayArea
-} from '../../TextEditor';
-import { GroundingDataDisplay } from './GroundingDataDisplay';
-import { readPrefs } from '../utils/linkedInWriterUtils';
-import { useLinkedInSelectionImage } from '../hooks/useLinkedInSelectionImage';
-import { useLinkedInSelectionVideo } from '../hooks/useLinkedInSelectionVideo';
-import { useLinkedInAssistiveWriting } from '../hooks/useLinkedInAssistiveWriting';
-import { useLinkedInEditorTextSelection } from '../hooks/useLinkedInEditorTextSelection';
-import { appendImageMarkdownToDraft } from '../utils/linkedInImageDraftUtils';
-import type { LinkedInAssistiveEditorHandle } from './LinkedInAssistiveEditor';
-import { LinkedInSelectionImageModal } from './LinkedInSelectionImageModal';
-import { LinkedInSelectionVideoModal } from './LinkedInSelectionVideoModal';
+  ContentDisplayArea,
+} from "../../TextEditor";
+import { GroundingDataDisplay } from "./GroundingDataDisplay";
+import { readPrefs } from "../utils/linkedInWriterUtils";
+import { useLinkedInSelectionImage } from "../hooks/useLinkedInSelectionImage";
+import { useLinkedInSelectionVideo } from "../hooks/useLinkedInSelectionVideo";
+import { useLinkedInAssistiveWriting } from "../hooks/useLinkedInAssistiveWriting";
+import { useLinkedInEditorTextSelection } from "../hooks/useLinkedInEditorTextSelection";
+import { appendImageMarkdownToDraft } from "../utils/linkedInImageDraftUtils";
+import type { LinkedInAssistiveEditorHandle } from "./LinkedInAssistiveEditor";
+import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
+import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
+import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
   pendingEdit: { src: string; target: string } | null;
   livePreviewHtml: string;
   draft: string;
-  showPreview: boolean;
   isGenerating: boolean;
   loadingMessage: string;
   researchSources?: any[];
@@ -32,7 +32,6 @@ interface ContentEditorProps {
   onConfirmChanges: () => void;
   onDiscardChanges: () => void;
   onDraftChange: (value: string) => void;
-  onPreviewToggle: () => void;
   topic?: string;
   assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
 }
@@ -42,7 +41,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   pendingEdit,
   livePreviewHtml,
   draft,
-  showPreview,
   isGenerating,
   loadingMessage,
   researchSources,
@@ -53,15 +51,15 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   onConfirmChanges,
   onDiscardChanges,
   onDraftChange,
-  onPreviewToggle,
   topic,
   assistiveEditorRef,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [assistantOn, setAssistantOn] = useState(false);
+  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('linkedin');
 
   const getTextarea = useCallback(
-    () => contentRef.current?.querySelector('textarea') ?? null,
+    () => contentRef.current?.querySelector("textarea") ?? null,
     [],
   );
 
@@ -73,7 +71,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       const newDraft = beforeCaret + insertion + afterCaret;
 
       window.dispatchEvent(
-        new CustomEvent('linkedinwriter:applyEdit', {
+        new CustomEvent("linkedinwriter:applyEdit", {
           detail: { src: draft, target: newDraft },
         }),
       );
@@ -120,7 +118,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   useEffect(() => {
     const handleReplaceSelectedText = (event: CustomEvent) => {
       const { originalText, editedText, editType } = event.detail;
-      const textarea = contentRef.current?.querySelector('textarea');
+      const textarea = contentRef.current?.querySelector("textarea");
 
       if (textarea) {
         const start = textarea.selectionStart;
@@ -128,7 +126,10 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         const selectedText = textarea.value.substring(start, end);
 
         if (selectedText.trim() === originalText.trim()) {
-          const newValue = textarea.value.substring(0, start) + editedText + textarea.value.substring(end);
+          const newValue =
+            textarea.value.substring(0, start) +
+            editedText +
+            textarea.value.substring(end);
           onDraftChange(newValue);
 
           setTimeout(() => {
@@ -143,23 +144,25 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         onDraftChange(draft.replace(originalText, editedText));
       }
 
-      console.log(`✅ [ContentEditor] Quick edit "${editType}" applied successfully`);
+      console.log(
+        `✅ [ContentEditor] Quick edit "${editType}" applied successfully`,
+      );
     };
 
-    window.addEventListener('linkedinwriter:replaceSelectedText', handleReplaceSelectedText as EventListener);
+    window.addEventListener(
+      "linkedinwriter:replaceSelectedText",
+      handleReplaceSelectedText as EventListener,
+    );
     return () => {
-      window.removeEventListener('linkedinwriter:replaceSelectedText', handleReplaceSelectedText as EventListener);
+      window.removeEventListener(
+        "linkedinwriter:replaceSelectedText",
+        handleReplaceSelectedText as EventListener,
+      );
     };
   }, [draft, onDraftChange]);
 
-  useEffect(() => {
-    if (draft && !showPreview) {
-      onPreviewToggle();
-    }
-  }, [draft, showPreview, onPreviewToggle]);
-
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <DiffPreviewModal
         isPreviewing={isPreviewing}
         pendingEdit={pendingEdit}
@@ -168,14 +171,13 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         onDiscardChanges={onDiscardChanges}
       />
 
-      <div style={{ flex: 1, padding: '24px', overflow: 'visible' }}>
-        {showPreview && (
+      <div style={{ flex: 1, padding: "24px", overflow: "visible" }}>
           <div
             style={{
-              border: '1px solid #e1f5fe',
-              borderRadius: '8px',
-              background: '#f8fdff',
-              overflow: 'visible',
+              border: "1px solid #e1f5fe",
+              borderRadius: "8px",
+              background: "#f8fdff",
+              overflow: "visible",
             }}
           >
             <ContentPreviewHeaderWithModals
@@ -184,8 +186,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               searchQueries={searchQueries}
               qualityMetrics={qualityMetrics}
               draft={draft}
-              showPreview={showPreview}
-              onPreviewToggle={onPreviewToggle}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
               assistantOn={assistantOn}
               onAssistantToggle={setAssistantOn}
               topic={topic}
@@ -199,6 +201,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               citations={citations}
               researchSources={researchSources}
               assistantOn={assistantOn}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
               assistiveWriting={{
                 suggestion: assistiveWriting.suggestion,
                 error: assistiveWriting.error,
@@ -226,7 +230,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               groundingEnabled={groundingEnabled || false}
             />
           </div>
-        )}
       </div>
 
       <CitationHoverHandler researchSources={researchSources || []} />

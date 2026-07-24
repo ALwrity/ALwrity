@@ -1,15 +1,15 @@
-import React from 'react';
-import { CircularProgress } from '@mui/material';
-import RefreshIcon from '@mui/icons-material/Refresh';
+import React from "react";
+import { CircularProgress } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
-import type { LinkedInProfileOptimizationItem } from '../../../../api/linkedinSocial';
-import { ProfileStrengthTicker } from '../dashboard/ProfileStrengthTicker';
+import type { LinkedInProfileOptimizationItem } from "../../../../api/linkedinSocial";
+import { ProfileStrengthTicker } from "../dashboard/ProfileStrengthTicker";
 import {
   formatRecheckDeltaLabel,
   formatRecheckDeltaTooltip,
-} from './ProfileOptimizationTerminalStates';
-import { ProfileOptimizationHeaderPhoto } from './ProfileOptimizationHeaderPhoto';
-import { StudioModalCloseButton } from '../dashboard/StudioModalCloseButton';
+} from "./ProfileOptimizationTerminalStates";
+import { ProfileOptimizationHeaderPhoto } from "./ProfileOptimizationHeaderPhoto";
+import { StudioModalCloseButton } from "../dashboard/StudioModalCloseButton";
 
 interface ProfileOptimizationModalHeaderProps {
   profileStrengthPercent?: number | null;
@@ -39,10 +39,12 @@ interface ProfileOptimizationModalFooterProps {
   onLoadNextBatch?: () => void;
 }
 
-export const ProfileOptimizationModalHeader: React.FC<ProfileOptimizationModalHeaderProps> = ({
+export const ProfileOptimizationModalHeader: React.FC<
+  ProfileOptimizationModalHeaderProps
+> = ({
   profileStrengthPercent,
-  strengthLabel = '',
-  strengthTooltip = '',
+  strengthLabel = "",
+  strengthTooltip = "",
   isRechecking = false,
   recheckDelta,
   onRecheckProfile,
@@ -59,8 +61,13 @@ export const ProfileOptimizationModalHeader: React.FC<ProfileOptimizationModalHe
   <header className="linkedin-profile-optimization-dialog__header">
     <div className="linkedin-profile-optimization-dialog__header-row">
       <div className="linkedin-profile-optimization-dialog__header-brand">
-        <h2 id="profile-optimization-dialog-title" className="linkedin-profile-optimization-dialog__title">
-          <span className="linkedin-profile-optimization-dialog__title-line">Optimise</span>
+        <h2
+          id="profile-optimization-dialog-title"
+          className="linkedin-profile-optimization-dialog__title"
+        >
+          <span className="linkedin-profile-optimization-dialog__title-line">
+            Optimise
+          </span>
           <span className="linkedin-profile-optimization-dialog__title-line linkedin-profile-optimization-dialog__title-line--sub">
             LinkedIn Profile
           </span>
@@ -95,25 +102,31 @@ export const ProfileOptimizationModalHeader: React.FC<ProfileOptimizationModalHe
             onClick={onRecheckProfile}
             disabled={isRechecking}
           >
-            <RefreshIcon className="linkedin-profile-optimization-dialog__refer-icon" aria-hidden />
-            {isRechecking ? 'Refreshing…' : 'Refer Profile'}
+            <RefreshIcon
+              className="linkedin-profile-optimization-dialog__refer-icon"
+              aria-hidden
+            />
+            {isRechecking ? "Refreshing…" : "Refresh Profile"}
           </button>
         )}
-        <StudioModalCloseButton onClick={onClose} ariaLabel="Close profile optimization" />
+        <StudioModalCloseButton
+          onClick={onClose}
+          ariaLabel="Close profile optimization"
+        />
       </div>
     </div>
 
     {recheckDelta && onDismissRecheckDelta && (
       <p
         className={[
-          'linkedin-profile-optimization-dialog__recheck-badge',
+          "linkedin-profile-optimization-dialog__recheck-badge",
           recheckDelta.current > recheckDelta.previous &&
-            'linkedin-profile-optimization-dialog__recheck-badge--up',
+            "linkedin-profile-optimization-dialog__recheck-badge--up",
           recheckDelta.current < recheckDelta.previous &&
-            'linkedin-profile-optimization-dialog__recheck-badge--down',
+            "linkedin-profile-optimization-dialog__recheck-badge--down",
         ]
           .filter(Boolean)
-          .join(' ')}
+          .join(" ")}
         role="status"
         title={formatRecheckDeltaTooltip(recheckDelta)}
       >
@@ -121,7 +134,7 @@ export const ProfileOptimizationModalHeader: React.FC<ProfileOptimizationModalHe
         <button
           type="button"
           onClick={onDismissRecheckDelta}
-          aria-label="Dismiss refer profile result"
+          aria-label="Dismiss refresh profile result"
           className="linkedin-profile-optimization-dialog__recheck-dismiss"
         >
           ×
@@ -131,7 +144,9 @@ export const ProfileOptimizationModalHeader: React.FC<ProfileOptimizationModalHe
   </header>
 );
 
-export const ProfileOptimizationModalFooter: React.FC<ProfileOptimizationModalFooterProps> = ({
+export const ProfileOptimizationModalFooter: React.FC<
+  ProfileOptimizationModalFooterProps
+> = ({
   focusedItem,
   markingRecommendationId = null,
   showNextBatchCta = false,
@@ -140,7 +155,9 @@ export const ProfileOptimizationModalFooter: React.FC<ProfileOptimizationModalFo
   onMarkDone,
   onLoadNextBatch,
 }) => {
-  const isMarking = Boolean(focusedItem && markingRecommendationId === focusedItem.id);
+  const isMarking = Boolean(
+    focusedItem && markingRecommendationId === focusedItem.id,
+  );
   const canAct = Boolean(focusedItem && onSkip && onMarkDone);
 
   return (
@@ -148,8 +165,13 @@ export const ProfileOptimizationModalFooter: React.FC<ProfileOptimizationModalFo
       <div className="linkedin-profile-optimization-dialog__footer-context">
         {focusedItem ? (
           <>
-            <span className="linkedin-profile-optimization-dialog__footer-label">Focus</span>
-            <span className="linkedin-profile-optimization-dialog__footer-focus" title={focusedItem.issue}>
+            <span className="linkedin-profile-optimization-dialog__footer-label">
+              Focus
+            </span>
+            <span
+              className="linkedin-profile-optimization-dialog__footer-focus"
+              title={focusedItem.issue}
+            >
               {focusedItem.issue}
             </span>
           </>
@@ -158,7 +180,9 @@ export const ProfileOptimizationModalFooter: React.FC<ProfileOptimizationModalFo
             Batch complete — load more suggestions
           </span>
         ) : (
-          <span className="linkedin-profile-optimization-dialog__footer-focus">Profile suggestions</span>
+          <span className="linkedin-profile-optimization-dialog__footer-focus">
+            Profile suggestions
+          </span>
         )}
       </div>
       <div className="linkedin-profile-optimization-dialog__footer-actions">
@@ -180,11 +204,11 @@ export const ProfileOptimizationModalFooter: React.FC<ProfileOptimizationModalFo
             >
               {isMarking ? (
                 <>
-                  <CircularProgress size={14} sx={{ color: 'inherit' }} />
+                  <CircularProgress size={14} sx={{ color: "inherit" }} />
                   Saving…
                 </>
               ) : (
-                'Mark done'
+                "Mark done"
               )}
             </button>
           </>
@@ -196,7 +220,7 @@ export const ProfileOptimizationModalFooter: React.FC<ProfileOptimizationModalFo
             disabled={isLoadingNextBatch}
             onClick={onLoadNextBatch}
           >
-            {isLoadingNextBatch ? 'Loading…' : 'Load next batch'}
+            {isLoadingNextBatch ? "Loading…" : "Load next batch"}
           </button>
         )}
       </div>

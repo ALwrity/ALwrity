@@ -1,12 +1,12 @@
-import React from 'react';
-import { ImageGenerationSuggestions } from './index';
+import React from "react";
+import { ImageGenerationSuggestions } from "./index";
 
 const ImageGenerationDemo: React.FC = () => {
   // Sample LinkedIn content for demonstration
   const sampleContent = {
-    contentType: 'post' as const,
-    topic: 'AI in Marketing',
-    industry: 'Technology',
+    contentType: "post" as const,
+    topic: "AI in Marketing",
+    industry: "Technology",
     content: `🚀 Exciting news! Artificial Intelligence is revolutionizing how we approach marketing strategies. 
 
 Here are 3 game-changing ways AI is transforming the industry:
@@ -21,11 +21,11 @@ The future of marketing is here, and it's powered by AI! 🎯
 
 What's your experience with AI in marketing? Share your thoughts below! 👇
 
-#AIMarketing #DigitalTransformation #MarketingInnovation #TechTrends #FutureOfMarketing`
+#AIMarketing #DigitalTransformation #MarketingInnovation #TechTrends #FutureOfMarketing`,
   };
 
   const handleImageGenerated = (imageData: any) => {
-    console.log('Image generated successfully:', imageData);
+    console.log("Image generated successfully:", imageData);
     // Here you would typically:
     // 1. Update the LinkedIn preview editor
     // 2. Store the image in your content
@@ -37,8 +37,9 @@ What's your experience with AI in marketing? Share your thoughts below! 👇
       <div className="demo-header">
         <h1 className="demo-title">LinkedIn Image Generation Demo</h1>
         <p className="demo-description">
-          This demo showcases the ImageGenerationSuggestions component integrated with CopilotKit.
-          Try generating image prompts and creating images for the sample LinkedIn content below.
+          This demo showcases the ImageGenerationSuggestions component
+          integrated with CopilotKit. Try generating image prompts and creating
+          images for the sample LinkedIn content below.
         </p>
       </div>
 
@@ -47,13 +48,13 @@ What's your experience with AI in marketing? Share your thoughts below! 👇
           <h2 className="content-title">Sample LinkedIn Content</h2>
           <div className="content-display">
             <div className="content-header">
-              <span className="content-type-badge">{sampleContent.contentType}</span>
+              <span className="content-type-badge">
+                {sampleContent.contentType}
+              </span>
               <span className="content-topic">{sampleContent.topic}</span>
               <span className="content-industry">{sampleContent.industry}</span>
             </div>
-            <div className="content-text">
-              {sampleContent.content}
-            </div>
+            <div className="content-text">{sampleContent.content}</div>
           </div>
         </div>
 
@@ -77,28 +78,40 @@ What's your experience with AI in marketing? Share your thoughts below! 👇
             <div className="step-number">1</div>
             <div className="step-content">
               <h4>Content Analysis</h4>
-              <p>The system analyzes your LinkedIn content to understand context, tone, and target audience.</p>
+              <p>
+                The system analyzes your LinkedIn content to understand context,
+                tone, and target audience.
+              </p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">2</div>
             <div className="step-content">
               <h4>Prompt Generation</h4>
-              <p>AI generates three distinct image prompts: Professional, Creative, and Industry-Specific.</p>
+              <p>
+                AI generates three distinct image prompts: Professional,
+                Creative, and Industry-Specific.
+              </p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">3</div>
             <div className="step-content">
               <h4>Image Creation</h4>
-              <p>Using Gemini API, creates LinkedIn-optimized images from your selected prompt.</p>
+              <p>
+                Using Gemini API, creates LinkedIn-optimized images from your
+                selected prompt.
+              </p>
             </div>
           </div>
           <div className="step">
             <div className="step-number">4</div>
             <div className="step-content">
               <h4>Integration</h4>
-              <p>Generated images are ready to use in your LinkedIn content editor.</p>
+              <p>
+                Generated images are ready to use in your LinkedIn content
+                editor.
+              </p>
             </div>
           </div>
         </div>

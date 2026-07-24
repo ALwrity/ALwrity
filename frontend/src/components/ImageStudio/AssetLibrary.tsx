@@ -336,14 +336,14 @@ export const AssetLibrary: React.FC = () => {
           content = data.content || '';
         }
       }
-      navigate('/linkedin-writer', {
+      navigate('/linkedin-studio', {
         state: {
           linkedinDraftContent: content,
           linkedinDraftAssetId: asset.id,
         },
       });
     } catch {
-      navigate('/linkedin-writer', {
+      navigate('/linkedin-studio', {
         state: { linkedinDraftContent: getContent(asset) },
       });
     }
@@ -499,7 +499,7 @@ export const AssetLibrary: React.FC = () => {
                     variant="outlined"
                     size="small"
                     startIcon={<ArrowBack />}
-                    onClick={() => navigate('/linkedin-writer')}
+                    onClick={() => navigate('/linkedin-studio')}
                     sx={{
                       color: '#c7d2fe',
                       borderColor: 'rgba(99,102,241,0.4)',
@@ -517,7 +517,7 @@ export const AssetLibrary: React.FC = () => {
                   variant="contained"
                   size="small"
                   startIcon={<Add />}
-                  onClick={() => navigate(urlSourceModule === 'linkedin_writer' ? '/linkedin-writer' : '/blog-writer?new=true')}
+                  onClick={() => navigate(urlSourceModule === 'linkedin_writer' ? '/linkedin-studio' : '/blog-writer?new=true')}
                   sx={{
                     background: 'linear-gradient(135deg, #2563eb 0%, #3b82f6 100%)',
                     textTransform: 'none',

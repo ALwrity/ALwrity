@@ -1,25 +1,25 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { LinkedInPreferences } from '../utils/storageUtils';
-import { usePlatformPersonaContext } from '../../shared/PersonaContext/PlatformPersonaProvider';
-import HeaderControls from '../../shared/HeaderControls';
-import BrainstormFlow from './BrainstormFlow';
+import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
+import { LinkedInPreferences } from "../utils/storageUtils";
+import { usePlatformPersonaContext } from "../../shared/PersonaContext/PlatformPersonaProvider";
+import HeaderControls from "../../shared/HeaderControls";
+import BrainstormFlow from "./BrainstormFlow";
 
-import { useLinkedInStudioProfileStrength } from '../hooks/useLinkedInStudioProfileStrength';
-import { dispatchLinkedInPersonaUpdated } from '../utils/profileStrengthEvents';
-import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
-import { useLinkedInSearch } from '../hooks/useLinkedInSearch';
-import { LinkedInSearchBar } from './search/LinkedInSearchBar';
-import { LinkedInSearchModal } from './search/LinkedInSearchModal';
-import { useMobileHeaderNav } from '../hooks/useMobileHeaderNav';
-import { StudioTourTrigger } from './dashboard/StudioTourTrigger';
-import { ContentPersonaPreferencesBody } from './ContentPersonaPreferencesBody';
-import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
-import { DashboardActionModal } from './dashboard/DashboardActionModal';
-import { STUDIO_TAB_ACTION_MODAL_CLASS } from './dashboard/dashboardLayoutConstants';
+import { useLinkedInStudioProfileStrength } from "../hooks/useLinkedInStudioProfileStrength";
+import { dispatchLinkedInPersonaUpdated } from "../utils/profileStrengthEvents";
+import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
+import { useLinkedInSearch } from "../hooks/useLinkedInSearch";
+import { LinkedInSearchBar } from "./search/LinkedInSearchBar";
+import { LinkedInSearchModal } from "./search/LinkedInSearchModal";
+import { useMobileHeaderNav } from "../hooks/useMobileHeaderNav";
+import { StudioTourTrigger } from "./dashboard/StudioTourTrigger";
+import { ContentPersonaPreferencesBody } from "./ContentPersonaPreferencesBody";
+import { StudioModalCloseButton } from "./dashboard/StudioModalCloseButton";
+import { DashboardActionModal } from "./dashboard/DashboardActionModal";
+import { STUDIO_TAB_ACTION_MODAL_CLASS } from "./dashboard/dashboardLayoutConstants";
 
-const NAV_TITLE_CLASS = 'linkedin-writer-header-title';
-const PERSONA_VOICE_HINT_KEY = 'linkedin_persona_voice_hint_seen';
+const NAV_TITLE_CLASS = "linkedin-writer-header-title";
+const PERSONA_VOICE_HINT_KEY = "linkedin_persona_voice_hint_seen";
 
 interface HeaderProps {
   userPreferences: LinkedInPreferences;
@@ -42,7 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   onPreferencesChange,
   hasDraft,
   onResetDraft,
-  dashboardDraft = '',
+  dashboardDraft = "",
   onResumeDraft,
   onClearDraft,
 }) => {
@@ -87,16 +87,25 @@ export const Header: React.FC<HeaderProps> = ({
   // BrainstormFlow state management
   const [brainstormVisible, setBrainstormVisible] = useState(false);
 
-  const handlePreferenceChange = (key: keyof LinkedInPreferences, value: any) => {
+  const handlePreferenceChange = (
+    key: keyof LinkedInPreferences,
+    value: any,
+  ) => {
     onPreferencesChange({ [key]: value });
   };
 
   useEffect(() => {
     const onOpenPreferences = () => onPreferencesModalChange(true);
 
-    window.addEventListener('linkedinwriter:openPreferences', onOpenPreferences);
+    window.addEventListener(
+      "linkedinwriter:openPreferences",
+      onOpenPreferences,
+    );
     return () => {
-      window.removeEventListener('linkedinwriter:openPreferences', onOpenPreferences);
+      window.removeEventListener(
+        "linkedinwriter:openPreferences",
+        onOpenPreferences,
+      );
     };
   }, [onPreferencesModalChange]);
 
@@ -108,8 +117,8 @@ export const Header: React.FC<HeaderProps> = ({
       if (personaPanelRef.current?.contains(target)) return;
       onPreferencesModalChange(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showPreferencesModal, onPreferencesModalChange]);
 
   useLayoutEffect(() => {
@@ -125,7 +134,7 @@ export const Header: React.FC<HeaderProps> = ({
       const panelWidth = 400;
       const left = Math.min(
         Math.max(16, rect.left + rect.width / 2 - panelWidth / 2),
-        window.innerWidth - panelWidth - 16
+        window.innerWidth - panelWidth - 16,
       );
       const top = rect.bottom + 8;
       const maxHeight = Math.max(240, window.innerHeight - top - 16);
@@ -133,16 +142,16 @@ export const Header: React.FC<HeaderProps> = ({
     };
 
     updatePosition();
-    window.addEventListener('resize', updatePosition);
-    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
     return () => {
-      window.removeEventListener('resize', updatePosition);
-      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
     };
   }, [showPreferencesModal]);
 
   const handlePersonaUpdate = (personaData: any) => {
-    console.log('Persona updated in LinkedIn writer:', personaData);
+    console.log("Persona updated in LinkedIn writer:", personaData);
     // setPersonaOverride(personaData);
     // You can also save this to user preferences or pass it up to the parent component
   };
@@ -154,13 +163,13 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const handleOpenOptimiseProfile = () => {
-    window.dispatchEvent(new CustomEvent('linkedinwriter:openOptimiseProfile'));
+    window.dispatchEvent(new CustomEvent("linkedinwriter:openOptimiseProfile"));
   };
 
   const togglePreferencesPanel = () => {
     if (showPersonaVoiceHint) {
       try {
-        localStorage.setItem(PERSONA_VOICE_HINT_KEY, '1');
+        localStorage.setItem(PERSONA_VOICE_HINT_KEY, "1");
       } catch {
         // ignore storage errors
       }
@@ -196,32 +205,39 @@ export const Header: React.FC<HeaderProps> = ({
         role="dialog"
         aria-label="Content persona settings"
         style={{
-          position: 'fixed',
+          position: "fixed",
           top: personaPanelPos.top,
           left: personaPanelPos.left,
           width: 400,
-          maxWidth: 'min(400px, calc(100vw - 32px))',
+          maxWidth: "min(400px, calc(100vw - 32px))",
           maxHeight: personaPanelPos.maxHeight,
-          overflowY: 'auto',
-          background: 'white',
-          borderRadius: '12px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
-          border: '1px solid #e9ecef',
-          padding: '20px',
+          overflowY: "auto",
+          background: "white",
+          borderRadius: "12px",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
+          border: "1px solid #e9ecef",
+          padding: "20px",
           zIndex: 10050,
-          animation: 'slideIn 0.2s ease-out',
+          animation: "slideIn 0.2s ease-out",
         }}
       >
         <div
           style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'space-between',
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
             gap: 12,
-            marginBottom: '16px',
+            marginBottom: "16px",
           }}
         >
-          <h4 style={{ margin: 0, color: '#333', fontSize: '16px', fontWeight: 600 }}>
+          <h4
+            style={{
+              margin: 0,
+              color: "#333",
+              fontSize: "16px",
+              fontWeight: 600,
+            }}
+          >
             Content Preferences & Persona
           </h4>
           <StudioModalCloseButton
@@ -249,7 +265,10 @@ export const Header: React.FC<HeaderProps> = ({
       maxHeight="min(85dvh, 640px)"
       modalClassName={STUDIO_TAB_ACTION_MODAL_CLASS}
     >
-      <ContentPersonaPreferencesBody {...personaPreferencesBodyProps} showProfileStrength={false} />
+      <ContentPersonaPreferencesBody
+        {...personaPreferencesBodyProps}
+        showProfileStrength={false}
+      />
     </DashboardActionModal>
   );
 
@@ -259,8 +278,10 @@ export const Header: React.FC<HeaderProps> = ({
         type="button"
         className="linkedin-writer-header-brand-logo"
         onClick={handleLogoClick}
-        title={hasDraft ? 'Back to LinkedIn Dashboard' : 'LinkedIn Studio home'}
-        aria-label={hasDraft ? 'Back to LinkedIn Dashboard' : 'LinkedIn Studio home'}
+        title={hasDraft ? "Back to LinkedIn Dashboard" : "LinkedIn Studio home"}
+        aria-label={
+          hasDraft ? "Back to LinkedIn Dashboard" : "LinkedIn Studio home"
+        }
       >
         <img src="/alwrity-icon.png" alt="ALwrity" />
       </button>
@@ -277,13 +298,13 @@ export const Header: React.FC<HeaderProps> = ({
       onChange={linkedInSearch.setQuery}
       onSearch={() => void linkedInSearch.runSearch()}
       disabled={!connected}
-      size={isMobileHeaderNav ? 'mobileStrip' : 'nav'}
+      size={isMobileHeaderNav ? "mobileStrip" : "nav"}
     />
   );
 
   return (
     <div
-      className={`linkedin-writer-header${isMobileHeaderNav ? ' linkedin-writer-header--mobile-nav' : ''}`}
+      className={`linkedin-writer-header${isMobileHeaderNav ? " linkedin-writer-header--mobile-nav" : ""}`}
     >
       {isMobileHeaderNav ? (
         <>
@@ -291,17 +312,15 @@ export const Header: React.FC<HeaderProps> = ({
             {brandBlock}
             <div className="linkedin-writer-header-nav-actions">
               <StudioTourTrigger variant="headerNav" />
-              <HeaderControls
-                colorMode="light"
-                showPlanChip={false}
-                gap={1}
-              />
+              <HeaderControls colorMode="light" showPlanChip={false} gap={1} />
             </div>
           </div>
 
           <div className="linkedin-writer-header-mobile-stack">
             {showMobileSearchRow && (
-              <div className="linkedin-writer-header-search-row">{searchBar}</div>
+              <div className="linkedin-writer-header-search-row">
+                {searchBar}
+              </div>
             )}
           </div>
         </>
@@ -310,7 +329,10 @@ export const Header: React.FC<HeaderProps> = ({
           {brandBlock}
 
           <div className="linkedin-writer-header-center">
-            <div ref={personaDropdownRef} className="linkedin-writer-header-persona">
+            <div
+              ref={personaDropdownRef}
+              className="linkedin-writer-header-persona"
+            >
               <button
                 ref={personaButtonRef}
                 type="button"
@@ -323,13 +345,17 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="linkedin-writer-header-pill-icon" aria-hidden>
                   ⚙️
                 </span>
-                <span className="linkedin-writer-header-pill-label">Content Persona</span>
+                <span className="linkedin-writer-header-pill-label">
+                  Content Persona
+                </span>
               </button>
             </div>
           </div>
 
           <div className="linkedin-writer-header-right">
-            <div className="linkedin-writer-header-search-slot">{searchBar}</div>
+            <div className="linkedin-writer-header-search-slot">
+              {searchBar}
+            </div>
             <div className="linkedin-writer-header-icon-cluster">
               <HeaderControls colorMode="light" gap={1} />
             </div>
@@ -339,7 +365,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {personaPreferencesPanel}
       {personaMobileModal}
-      
+
       {/* LinkedIn Search modal */}
       <LinkedInSearchModal
         open={linkedInSearch.modalOpen}
@@ -367,7 +393,12 @@ export const Header: React.FC<HeaderProps> = ({
       <BrainstormFlow
         brainstormVisible={brainstormVisible}
         setBrainstormVisible={setBrainstormVisible}
-        onBackToOptions={() => { setBrainstormVisible(false); window.dispatchEvent(new CustomEvent('linkedinwriter:openBrainstorm')); }}
+        onBackToOptions={() => {
+          setBrainstormVisible(false);
+          window.dispatchEvent(
+            new CustomEvent("linkedinwriter:openBrainstorm"),
+          );
+        }}
       />
     </div>
   );

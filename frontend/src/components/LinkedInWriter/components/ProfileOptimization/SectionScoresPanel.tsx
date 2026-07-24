@@ -6,113 +6,113 @@
  * "→ N action" badge so the user can see which sections to fix first.
  */
 
-import React from 'react';
-import { formatProfileSection } from './profileOptimizationLabels';
+import React from "react";
+import { formatProfileSection } from "./profileOptimizationLabels";
 
 interface SectionScoresPanelProps {
   scores: Record<string, number>;
   activeSectionKeys?: Set<string> | null;
   activeSectionCount?: Map<string, number> | null;
   /** panel = table rows; chips = horizontal compact chips; embedded = compact rows inside a parent card. */
-  variant?: 'panel' | 'chips' | 'embedded';
+  variant?: "panel" | "chips" | "embedded";
   /** Tighter two-column grid for side-by-side batch impact layout. */
   compactGrid?: boolean;
 }
 
 const SECTION_ORDER: readonly string[] = [
-  'profile_photo',
-  'headline',
-  'custom_url',
-  'summary',
-  'experience',
-  'skills',
-  'recommendations',
-  'education',
-  'certifications',
-  'featured',
+  "profile_photo",
+  "headline",
+  "custom_url",
+  "summary",
+  "experience",
+  "skills",
+  "recommendations",
+  "education",
+  "certifications",
+  "featured",
 ];
 
 const PANEL_STYLE: React.CSSProperties = {
-  padding: '14px 16px',
+  padding: "14px 16px",
   borderRadius: 12,
-  backgroundColor: '#fff',
-  border: '1px solid #e2e8f0',
-  boxShadow: '0 1px 3px rgba(15, 23, 42, 0.06)',
+  backgroundColor: "#fff",
+  border: "1px solid #e2e8f0",
+  boxShadow: "0 1px 3px rgba(15, 23, 42, 0.06)",
 };
 
 const HEADER_STYLE: React.CSSProperties = {
-  margin: '0 0 10px',
+  margin: "0 0 10px",
   fontSize: 13,
   fontWeight: 700,
-  color: '#0f172a',
-  textTransform: 'uppercase',
-  letterSpacing: '0.04em',
+  color: "#0f172a",
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
 };
 
 const ROW_STYLE: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
+  display: "flex",
+  alignItems: "center",
   gap: 10,
-  padding: '6px 0',
-  borderBottom: '1px solid #f1f5f9',
+  padding: "6px 0",
+  borderBottom: "1px solid #f1f5f9",
 };
 
 const LABEL_STYLE: React.CSSProperties = {
   flex: 1,
   fontSize: 13,
-  color: '#334155',
+  color: "#334155",
   fontWeight: 500,
 };
 
 const SCORE_STYLE: React.CSSProperties = {
   fontSize: 13,
   fontWeight: 700,
-  color: '#0f172a',
+  color: "#0f172a",
   minWidth: 36,
-  textAlign: 'right',
+  textAlign: "right",
 };
 
 const ACTION_BADGE_STYLE: React.CSSProperties = {
-  padding: '2px 8px',
+  padding: "2px 8px",
   borderRadius: 999,
-  backgroundColor: '#eff6ff',
-  color: '#1d4ed8',
+  backgroundColor: "#eff6ff",
+  color: "#1d4ed8",
   fontSize: 11,
   fontWeight: 600,
-  border: '1px solid #bfdbfe',
+  border: "1px solid #bfdbfe",
 };
 
 function scoreColor(score: number): string {
-  if (score >= 80) return '#16a34a';
-  if (score >= 50) return '#d97706';
-  return '#dc2626';
+  if (score >= 80) return "#16a34a";
+  if (score >= 50) return "#d97706";
+  return "#dc2626";
 }
 
 export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
   scores,
   activeSectionKeys = null,
   activeSectionCount = null,
-  variant = 'panel',
+  variant = "panel",
   compactGrid = false,
 }) => {
   if (!scores) {
     return null;
   }
 
-  if (variant === 'embedded') {
+  if (variant === "embedded") {
     return (
       <div
         className={[
-          'profile-opt-section-embedded',
-          compactGrid && 'profile-opt-section-embedded--compact-grid',
+          "profile-opt-section-embedded",
+          compactGrid && "profile-opt-section-embedded--compact-grid",
         ]
           .filter(Boolean)
-          .join(' ')}
+          .join(" ")}
         aria-label="Per-section profile scores"
       >
         {SECTION_ORDER.map((sectionKey) => {
           const rawScore = scores[sectionKey];
-          if (typeof rawScore !== 'number') return null;
+          if (typeof rawScore !== "number") return null;
           const score = Math.max(0, Math.min(100, Math.round(rawScore)));
           const actionCount = activeSectionCount?.get(sectionKey) ?? 0;
           const hasActiveAction =
@@ -121,11 +121,11 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
             <div
               key={sectionKey}
               className={[
-                'profile-opt-section-embedded__row',
-                hasActiveAction && 'profile-opt-section-embedded__row--active',
+                "profile-opt-section-embedded__row",
+                hasActiveAction && "profile-opt-section-embedded__row--active",
               ]
                 .filter(Boolean)
-                .join(' ')}
+                .join(" ")}
             >
               <span className="profile-opt-section-embedded__label">
                 {formatProfileSection(sectionKey)}
@@ -148,14 +148,17 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
     );
   }
 
-  if (variant === 'chips') {
+  if (variant === "chips") {
     return (
-      <div className="profile-opt-section-chips" aria-label="Per-section profile scores">
+      <div
+        className="profile-opt-section-chips"
+        aria-label="Per-section profile scores"
+      >
         <p className="profile-opt-section-chips__heading">Section scores</p>
         <div className="profile-opt-section-chips__row">
           {SECTION_ORDER.map((sectionKey) => {
             const rawScore = scores[sectionKey];
-            if (typeof rawScore !== 'number') return null;
+            if (typeof rawScore !== "number") return null;
             const score = Math.max(0, Math.min(100, Math.round(rawScore)));
             const actionCount = activeSectionCount?.get(sectionKey) ?? 0;
             const hasActiveAction =
@@ -164,13 +167,15 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
               <span
                 key={sectionKey}
                 className={[
-                  'profile-opt-section-chip',
-                  hasActiveAction && 'profile-opt-section-chip--active',
+                  "profile-opt-section-chip",
+                  hasActiveAction && "profile-opt-section-chip--active",
                 ]
                   .filter(Boolean)
-                  .join(' ')}
+                  .join(" ")}
                 title={`${formatProfileSection(sectionKey)}: ${score}/100${
-                  hasActiveAction ? ` · ${actionCount} action${actionCount === 1 ? '' : 's'}` : ''
+                  hasActiveAction
+                    ? ` · ${actionCount} action${actionCount === 1 ? "" : "s"}`
+                    : ""
                 }`}
               >
                 <span className="profile-opt-section-chip__label">
@@ -195,7 +200,7 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
       <p style={HEADER_STYLE}>Section-by-section</p>
       {SECTION_ORDER.map((sectionKey) => {
         const rawScore = scores[sectionKey];
-        if (typeof rawScore !== 'number') {
+        if (typeof rawScore !== "number") {
           return null;
         }
         const score = Math.max(0, Math.min(100, Math.round(rawScore)));
@@ -210,8 +215,11 @@ export const SectionScoresPanel: React.FC<SectionScoresPanelProps> = ({
           >
             <span style={LABEL_STYLE}>{formatProfileSection(sectionKey)}</span>
             {hasActiveAction && (
-              <span style={ACTION_BADGE_STYLE} aria-label={`${actionCount} action${actionCount === 1 ? '' : 's'} queued`}>
-                → {actionCount} action{actionCount === 1 ? '' : 's'}
+              <span
+                style={ACTION_BADGE_STYLE}
+                aria-label={`${actionCount} action${actionCount === 1 ? "" : "s"} queued`}
+              >
+                → {actionCount} action{actionCount === 1 ? "" : "s"}
               </span>
             )}
             <span

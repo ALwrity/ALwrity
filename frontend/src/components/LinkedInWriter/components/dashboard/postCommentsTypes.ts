@@ -52,9 +52,9 @@ export interface PostCommentReplyResponse {
 export const UNIPILE_MAX_COMMENT_LENGTH = 1250;
 
 export function formatReplyCountLabel(count: number): string {
-  return count === 1 ? '1 reply' : `${count} replies`;
+  return count === 1 ? "1 reply" : `${count} replies`;
 }
 
 export function formatReactionCountLabel(count: number): string {
-  return count === 1 ? '1 reaction' : `${count} reactions`;
+  return count === 1 ? "1 reaction" : `${count} reactions`;
 }

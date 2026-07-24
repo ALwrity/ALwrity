@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { usePolling } from '../../../hooks/usePolling';
-import { showToastNotification } from '../../../utils/toastNotifications';
+import { useState, useCallback, useRef, useEffect } from "react";
+import { usePolling } from "../../../hooks/usePolling";
+import { showToastNotification } from "../../../utils/toastNotifications";
 import {
   buildVideoPromptFromSelection,
   generateLinkedInVideo,
@@ -9,11 +9,11 @@ import {
   resolveLinkedInVideoUrl,
   buildLinkedInAssetLibraryUrl,
   type LinkedInVideoTaskResult,
-} from '../../../services/linkedInVideoService';
+} from "../../../services/linkedInVideoService";
 import type {
   LinkedInVideoGenerationSettings,
   GeneratedLinkedInVideoPreview,
-} from '../components/LinkedInSelectionVideoModal';
+} from "../components/LinkedInSelectionVideoModal";
 
 interface UseLinkedInSelectionVideoOptions {
   topic?: string;
@@ -25,13 +25,15 @@ export function useLinkedInSelectionVideo({
   industry,
 }: UseLinkedInSelectionVideoOptions) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
-  const [initialPrompt, setInitialPrompt] = useState('');
+  const [selectedText, setSelectedText] = useState("");
+  const [initialPrompt, setInitialPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedLinkedInVideoPreview | null>(null);
   const blobUrlRef = useRef<string | null>(null);
-  const pendingSettingsRef = useRef<LinkedInVideoGenerationSettings | null>(null);
+  const pendingSettingsRef = useRef<LinkedInVideoGenerationSettings | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
@@ -46,10 +48,14 @@ export function useLinkedInSelectionVideo({
       try {
         const videoId = result.video_id;
         const videoUrl =
-          result.video_url || (videoId ? resolveLinkedInVideoUrl(videoId) : undefined);
+          result.video_url ||
+          (videoId ? resolveLinkedInVideoUrl(videoId) : undefined);
 
         if (!videoUrl) {
-          showToastNotification('Video generated but URL was not returned', 'error');
+          showToastNotification(
+            "Video generated but URL was not returned",
+            "error",
+          );
           setIsGenerating(false);
           return;
         }
@@ -57,7 +63,7 @@ export function useLinkedInSelectionVideo({
         const assetLibraryPath =
           result.asset_library_path || buildLinkedInAssetLibraryUrl();
 
-        console.log('[LinkedInSelectionVideo] Generated video:', {
+        console.log("[LinkedInSelectionVideo] Generated video:", {
           videoId,
           videoUrl,
           assetId: result.asset_id,
@@ -86,22 +92,27 @@ export function useLinkedInSelectionVideo({
 
         const assetMsg = result.asset_id
           ? ` Saved to asset library (ID: ${result.asset_id}).`
-          : '';
-        showToastNotification(`Video generated successfully.${assetMsg}`, 'success');
+          : "";
+        showToastNotification(
+          `Video generated successfully.${assetMsg}`,
+          "success",
+        );
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Failed to load generated video';
-        showToastNotification(message, 'error');
+          error instanceof Error
+            ? error.message
+            : "Failed to load generated video";
+        showToastNotification(message, "error");
       } finally {
         setIsGenerating(false);
         pendingSettingsRef.current = null;
       }
     },
-    []
+    [],
   );
 
   const handlePollError = useCallback((error: string) => {
-    showToastNotification(error || 'Video generation failed', 'error');
+    showToastNotification(error || "Video generation failed", "error");
     setIsGenerating(false);
     pendingSettingsRef.current = null;
   }, []);
@@ -125,15 +136,15 @@ export function useLinkedInSelectionVideo({
       setGeneratedPreview(null);
       setModalOpen(true);
     },
-    [topic, industry]
+    [topic, industry],
   );
 
   const closeModal = useCallback(() => {
     if (isGenerating) return;
     stopPolling();
     setModalOpen(false);
-    setSelectedText('');
-    setInitialPrompt('');
+    setSelectedText("");
+    setInitialPrompt("");
   }, [isGenerating, stopPolling]);
 
   const closePreview = useCallback(() => {
@@ -143,8 +154,8 @@ export function useLinkedInSelectionVideo({
     }
     setGeneratedPreview(null);
     setModalOpen(false);
-    setSelectedText('');
-    setInitialPrompt('');
+    setSelectedText("");
+    setInitialPrompt("");
   }, []);
 
   const handleGenerate = useCallback(
@@ -166,7 +177,10 @@ export function useLinkedInSelectionVideo({
         });
 
         if (!result.success || !result.taskId) {
-          showToastNotification(result.error || 'Video generation failed to start', 'error');
+          showToastNotification(
+            result.error || "Video generation failed to start",
+            "error",
+          );
           setIsGenerating(false);
           return;
         }
@@ -174,12 +188,12 @@ export function useLinkedInSelectionVideo({
         startPolling(result.taskId);
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Video generation failed';
-        showToastNotification(message, 'error');
+          error instanceof Error ? error.message : "Video generation failed";
+        showToastNotification(message, "error");
         setIsGenerating(false);
       }
     },
-    [selectedText, topic, industry, startPolling]
+    [selectedText, topic, industry, startPolling],
   );
 
   return {

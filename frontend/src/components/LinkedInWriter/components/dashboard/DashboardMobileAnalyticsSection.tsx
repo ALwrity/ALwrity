@@ -1,17 +1,17 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import AnalyticsIcon from '@mui/icons-material/Analytics';
-import CollectionsBookmarkIcon from '@mui/icons-material/CollectionsBookmark';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import AnalyticsIcon from "@mui/icons-material/Analytics";
+import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
+import MenuBookIcon from "@mui/icons-material/MenuBook";
 import {
   KNOWLEDGE_CENTER_FEATURES,
   type KnowledgeCenterFeature,
-} from './knowledgeCenterFeatures';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
-import type { KnowledgeCenterAction } from './KnowledgeCenterDock';
-import { ConnectLockBadge } from './ConnectLockIcon';
-import { DashboardActionModal } from './DashboardActionModal';
-import { STUDIO_TAB_ACTION_MODAL_CLASS } from './dashboardLayoutConstants';
+} from "./knowledgeCenterFeatures";
+import { FRAME_COLOR } from "./dashboardWorkflowConfig";
+import type { KnowledgeCenterAction } from "./KnowledgeCenterDock";
+import { ConnectLockBadge } from "./ConnectLockIcon";
+import { DashboardActionModal } from "./DashboardActionModal";
+import { STUDIO_TAB_ACTION_MODAL_CLASS } from "./dashboardLayoutConstants";
 
 interface DashboardMobileAnalyticsSectionProps {
   onViewAnalytics: () => void;
@@ -41,12 +41,12 @@ const MobileBottomIconAction: React.FC<MobileBottomIconActionProps> = ({
   <button
     type="button"
     className={[
-      'linkedin-mobile-analytics-icon-btn',
-      connectLocked && 'linkedin-studio-connect-locked',
-      connectLocked && 'linkedin-studio-connect-locked--lock-right',
+      "linkedin-mobile-analytics-icon-btn",
+      connectLocked && "linkedin-studio-connect-locked",
+      connectLocked && "linkedin-studio-connect-locked--lock-right",
     ]
       .filter(Boolean)
-      .join(' ')}
+      .join(" ")}
     data-tour={tourTarget}
     onClick={onClick}
     aria-label={ariaLabel}
@@ -57,7 +57,12 @@ const MobileBottomIconAction: React.FC<MobileBottomIconActionProps> = ({
       {children}
     </span>
     <span className="linkedin-mobile-analytics-icon-btn-label">{label}</span>
-    {connectLocked && <ConnectLockBadge size={10} className="linkedin-mobile-analytics-icon-btn__lock" />}
+    {connectLocked && (
+      <ConnectLockBadge
+        size={10}
+        className="linkedin-mobile-analytics-icon-btn__lock"
+      />
+    )}
   </button>
 );
 
@@ -65,11 +70,9 @@ const MobileBottomIconAction: React.FC<MobileBottomIconActionProps> = ({
  * Mobile-only (≤960px) entry for Analytics, Knowledge Center & Library — M-17, M-18, M-19.
  * Three equal circular icon actions in one row; Knowledge opens a centered modal.
  */
-export const DashboardMobileAnalyticsSection: React.FC<DashboardMobileAnalyticsSectionProps> = ({
-  onViewAnalytics,
-  onKnowledgeCenterAction,
-  connected = true,
-}) => {
+export const DashboardMobileAnalyticsSection: React.FC<
+  DashboardMobileAnalyticsSectionProps
+> = ({ onViewAnalytics, onKnowledgeCenterAction, connected = true }) => {
   const navigate = useNavigate();
   const [knowledgeOpen, setKnowledgeOpen] = useState(false);
 
@@ -79,7 +82,7 @@ export const DashboardMobileAnalyticsSection: React.FC<DashboardMobileAnalyticsS
   };
 
   const openLibrary = () => {
-    navigate('/asset-library?source_module=linkedin_writer');
+    navigate("/asset-library?source_module=linkedin_writer");
   };
 
   return (
@@ -136,14 +139,24 @@ export const DashboardMobileAnalyticsSection: React.FC<DashboardMobileAnalyticsS
               type="button"
               className="linkedin-mobile-analytics-knowledge-feature"
               onClick={() => handleFeatureClick(feature)}
-              style={{ borderColor: FRAME_COLOR, ['--feature-accent' as string]: feature.accent }}
+              style={{
+                borderColor: FRAME_COLOR,
+                ["--feature-accent" as string]: feature.accent,
+              }}
             >
               {feature.image ? (
-                <img src={feature.image} alt="" aria-hidden style={{ width: 38, height: 28, objectFit: 'contain' }} />
+                <img
+                  src={feature.image}
+                  alt=""
+                  aria-hidden
+                  style={{ width: 38, height: 28, objectFit: "contain" }}
+                />
               ) : (
                 <span aria-hidden>{feature.icon}</span>
               )}
-              <span className="linkedin-mobile-analytics-knowledge-feature-title">{feature.title}</span>
+              <span className="linkedin-mobile-analytics-knowledge-feature-title">
+                {feature.title}
+              </span>
             </button>
           ))}
         </div>

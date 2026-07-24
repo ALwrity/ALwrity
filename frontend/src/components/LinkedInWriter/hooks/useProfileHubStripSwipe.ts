@@ -1,11 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from "react";
 import {
   clampProfileHubSwipeOffset,
   deriveProfileHubSwipeIntent,
   PROFILE_HUB_SWIPE_AXIS_LOCK_PX,
   resolveProfileHubSwipeAction,
   type ProfileHubSwipeContext,
-} from './profileHubStripSwipeUtils';
+} from "./profileHubStripSwipeUtils";
 
 export {
   PROFILE_HUB_SWIPE_AXIS_LOCK_PX,
@@ -19,7 +19,7 @@ export {
   type ProfileHubComboLayout,
   type ProfileHubSwipeAction,
   type ProfileHubSwipeIntent,
-} from './profileHubStripSwipeUtils';
+} from "./profileHubStripSwipeUtils";
 
 interface UseProfileHubStripSwipeOptions {
   connected: boolean;
@@ -39,7 +39,7 @@ export function useProfileHubStripSwipe({
   enabled = true,
 }: UseProfileHubStripSwipeOptions) {
   const startRef = useRef<{ x: number; y: number } | null>(null);
-  const axisLockedRef = useRef<'horizontal' | 'vertical' | null>(null);
+  const axisLockedRef = useRef<"horizontal" | "vertical" | null>(null);
   const offsetRef = useRef(0);
   const suppressClickRef = useRef(false);
   const [offsetX, setOffsetX] = useState(0);
@@ -69,7 +69,7 @@ export function useProfileHubStripSwipe({
       offsetRef.current = 0;
       setOffsetX(0);
     },
-    [enabled]
+    [enabled],
   );
 
   const onTouchMove = useCallback(
@@ -89,10 +89,10 @@ export function useProfileHubStripSwipe({
           return;
         }
         axisLockedRef.current =
-          Math.abs(deltaX) > Math.abs(deltaY) ? 'horizontal' : 'vertical';
+          Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
       }
 
-      if (axisLockedRef.current !== 'horizontal') return;
+      if (axisLockedRef.current !== "horizontal") return;
 
       const clamped = clampProfileHubSwipeOffset(deltaX, swipeContext);
       offsetRef.current = clamped;
@@ -105,7 +105,7 @@ export function useProfileHubStripSwipe({
       swipeContext.hasDisconnect,
       swipeContext.isConnecting,
       swipeContext.isDisconnecting,
-    ]
+    ],
   );
 
   const onTouchEnd = useCallback(() => {
@@ -114,11 +114,14 @@ export function useProfileHubStripSwipe({
       return;
     }
 
-    const action = resolveProfileHubSwipeAction(offsetRef.current, swipeContext);
-    if (action === 'connect') {
+    const action = resolveProfileHubSwipeAction(
+      offsetRef.current,
+      swipeContext,
+    );
+    if (action === "connect") {
       suppressClickRef.current = true;
       onConnect?.();
-    } else if (action === 'disconnect') {
+    } else if (action === "disconnect") {
       suppressClickRef.current = true;
       onDisconnect?.();
     }

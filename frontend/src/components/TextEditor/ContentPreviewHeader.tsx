@@ -7,8 +7,6 @@ interface ContentPreviewHeaderProps {
   searchQueries?: string[];
   qualityMetrics?: any;
   draft: string;
-  showPreview: boolean;
-  onPreviewToggle: () => void;
   assistantOn?: boolean;
   onAssistantToggle?: (enabled: boolean) => void;
   topic?: string;

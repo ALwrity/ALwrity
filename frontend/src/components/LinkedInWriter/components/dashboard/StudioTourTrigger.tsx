@@ -1,20 +1,23 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from "react";
 
-const TOUR_FLOATING_HINT_KEY = 'linkedin_studio_tour_floating_hint_seen';
+const TOUR_FLOATING_HINT_KEY = "linkedin_studio_tour_floating_hint_seen";
 
 interface StudioTourTriggerProps {
   /** Compact circle for mobile header nav (after GIF). */
-  variant?: 'toolbar' | 'headerNav' | 'analyticsPanel';
+  variant?: "toolbar" | "headerNav" | "analyticsPanel";
 }
 
-export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 'toolbar' }) => {
+export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({
+  variant = "toolbar",
+}) => {
   const [showFloatingHint, setShowFloatingHint] = useState(false);
-  const isHeaderNav = variant === 'headerNav';
-  const isAnalyticsPanel = variant === 'analyticsPanel';
+  const isHeaderNav = variant === "headerNav";
+  const isAnalyticsPanel = variant === "analyticsPanel";
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(TOUR_FLOATING_HINT_KEY) === '1') return undefined;
+      if (localStorage.getItem(TOUR_FLOATING_HINT_KEY) === "1")
+        return undefined;
     } catch {
       return undefined;
     }
@@ -23,7 +26,7 @@ export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 
     const timer = window.setTimeout(() => {
       setShowFloatingHint(false);
       try {
-        localStorage.setItem(TOUR_FLOATING_HINT_KEY, '1');
+        localStorage.setItem(TOUR_FLOATING_HINT_KEY, "1");
       } catch {
         // ignore storage errors
       }
@@ -36,23 +39,24 @@ export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 
     if (showFloatingHint) {
       setShowFloatingHint(false);
       try {
-        localStorage.setItem(TOUR_FLOATING_HINT_KEY, '1');
+        localStorage.setItem(TOUR_FLOATING_HINT_KEY, "1");
       } catch {
         // ignore storage errors
       }
     }
-    window.dispatchEvent(new CustomEvent('linkedinwriter:startStudioTour'));
+    window.dispatchEvent(new CustomEvent("linkedinwriter:startStudioTour"));
   };
 
   return (
     <div
       className={[
-        'linkedin-studio-tour-trigger-wrap',
-        isHeaderNav && 'linkedin-studio-tour-trigger-wrap--header-nav',
-        isAnalyticsPanel && 'linkedin-studio-tour-trigger-wrap--analytics-panel',
+        "linkedin-studio-tour-trigger-wrap",
+        isHeaderNav && "linkedin-studio-tour-trigger-wrap--header-nav",
+        isAnalyticsPanel &&
+          "linkedin-studio-tour-trigger-wrap--analytics-panel",
       ]
         .filter(Boolean)
-        .join(' ')}
+        .join(" ")}
     >
       {showFloatingHint && (
         <span className="linkedin-studio-tour-floating-hint" role="status">
@@ -62,14 +66,14 @@ export const StudioTourTrigger: React.FC<StudioTourTriggerProps> = ({ variant = 
       <button
         type="button"
         className={[
-          'linkedin-studio-tour-trigger',
-          'linkedin-studio-tour-trigger--icon-only',
-          'linkedin-studio-tour-trigger--tooltip',
-          isHeaderNav && 'linkedin-studio-tour-trigger--header-nav',
-          isAnalyticsPanel && 'linkedin-studio-tour-trigger--rail-adjacent',
+          "linkedin-studio-tour-trigger",
+          "linkedin-studio-tour-trigger--icon-only",
+          "linkedin-studio-tour-trigger--tooltip",
+          isHeaderNav && "linkedin-studio-tour-trigger--header-nav",
+          isAnalyticsPanel && "linkedin-studio-tour-trigger--rail-adjacent",
         ]
           .filter(Boolean)
-          .join(' ')}
+          .join(" ")}
         data-tour="li-tour-trigger"
         onClick={handleStartTour}
         aria-label="Tour guide"

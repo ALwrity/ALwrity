@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { fetchLinkedInImageBlobUrl } from '../../../services/linkedInImageService';
+import React, { useEffect, useState } from "react";
+import { fetchLinkedInImageBlobUrl } from "../../../services/linkedInImageService";
 
 interface LinkedInAuthenticatedImageProps {
   imageId: string;
@@ -10,10 +10,9 @@ interface LinkedInAuthenticatedImageProps {
  * Renders a LinkedIn stored image using an authenticated blob fetch.
  * Required because image endpoints are protected and cannot be used directly in <img src>.
  */
-export const LinkedInAuthenticatedImage: React.FC<LinkedInAuthenticatedImageProps> = ({
-  imageId,
-  alt = 'Generated LinkedIn image',
-}) => {
+export const LinkedInAuthenticatedImage: React.FC<
+  LinkedInAuthenticatedImageProps
+> = ({ imageId, alt = "Generated LinkedIn image" }) => {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState(false);
 
@@ -48,11 +47,11 @@ export const LinkedInAuthenticatedImage: React.FC<LinkedInAuthenticatedImageProp
     return (
       <div
         style={{
-          margin: '12px 0',
-          padding: '12px',
+          margin: "12px 0",
+          padding: "12px",
           borderRadius: 8,
-          border: '1px dashed #cbd5e1',
-          color: '#64748b',
+          border: "1px dashed #cbd5e1",
+          color: "#64748b",
           fontSize: 14,
         }}
       >
@@ -65,11 +64,11 @@ export const LinkedInAuthenticatedImage: React.FC<LinkedInAuthenticatedImageProp
     return (
       <div
         style={{
-          margin: '12px 0',
-          padding: '12px',
+          margin: "12px 0",
+          padding: "12px",
           borderRadius: 8,
-          border: '1px solid #e2e8f0',
-          color: '#64748b',
+          border: "1px solid #e2e8f0",
+          color: "#64748b",
           fontSize: 14,
         }}
       >
@@ -83,12 +82,12 @@ export const LinkedInAuthenticatedImage: React.FC<LinkedInAuthenticatedImageProp
       src={src}
       alt={alt}
       style={{
-        maxWidth: '100%',
+        maxWidth: "100%",
         maxHeight: 480,
         borderRadius: 8,
-        margin: '12px 0',
-        display: 'block',
-        border: '1px solid #e0e0e0',
+        margin: "12px 0",
+        display: "block",
+        border: "1px solid #e0e0e0",
       }}
     />
   );

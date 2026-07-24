@@ -62,7 +62,7 @@ const TodayModal: React.FC<{
       icon: LinkedInIcon,
       color: '#0077B5',
       enabled: true,
-      action: () => navigate('/linkedin-writer')
+      action: () => navigate('/linkedin-studio')
     }
   ];
 
@@ -504,11 +504,11 @@ const GeneratePillarChips: React.FC<{
       priority: 'high' as const,
       estimatedTime: 15,
       actionType: 'navigate' as const,
-      actionUrl: '/linkedin-writer',
+      actionUrl: '/linkedin-studio',
       icon: LinkedInIcon,
       color: '#0077B5',
       enabled: true,
-      action: () => navigate('/linkedin-writer')
+      action: () => navigate('/linkedin-studio')
     },
     {
       id: 'youtube-video',

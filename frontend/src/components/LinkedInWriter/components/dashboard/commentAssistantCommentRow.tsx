@@ -1,38 +1,46 @@
-import React, { useEffect, useState } from 'react';
-import { colors } from '../GrowthEngine/styles';
-import { CommentAssistantAttachedImage } from './commentAssistantAttachedImage';
-import { CommentAssistantAuthorRow } from './commentAssistantAuthorRow';
-import { COMMENT_ASSISTANT_ACTIONS } from './commentAssistantCopy';
-import { CommentAssistantNestedReplyRow } from './commentAssistantNestedReplyRow';
-import { CommentAssistantReactionPicker } from './commentAssistantReactionPicker';
+import React, { useEffect, useState } from "react";
+import { colors } from "../GrowthEngine/styles";
+import { CommentAssistantAttachedImage } from "./commentAssistantAttachedImage";
+import { CommentAssistantAuthorRow } from "./commentAssistantAuthorRow";
+import { COMMENT_ASSISTANT_ACTIONS } from "./commentAssistantCopy";
+import { CommentAssistantNestedReplyRow } from "./commentAssistantNestedReplyRow";
+import { CommentAssistantReactionPicker } from "./commentAssistantReactionPicker";
 import {
   CommentAssistantReplyComposer,
   type CommentAssistantReplyPayload,
-} from './commentAssistantReplyComposer';
-import type { CommentAssistantReactionType } from './commentAssistantReactions';
-import type { CommentAssistantCommentView } from './commentAssistantTypes';
+} from "./commentAssistantReplyComposer";
+import type { CommentAssistantReactionType } from "./commentAssistantReactions";
+import type { CommentAssistantCommentView } from "./commentAssistantTypes";
 
 interface CommentAssistantCommentRowProps {
   comment: CommentAssistantCommentView;
   actionsEnabled?: boolean;
-  onReact?: (commentId: string, reactionType: CommentAssistantReactionType) => void;
-  onSendReply?: (commentId: string, payload: CommentAssistantReplyPayload) => void;
+  onReact?: (
+    commentId: string,
+    reactionType: CommentAssistantReactionType,
+  ) => void;
+  onSendReply?: (
+    commentId: string,
+    payload: CommentAssistantReplyPayload,
+  ) => void;
   onDraftAi?: (commentId: string) => void;
   onShowThreadReplies?: (commentId: string) => void;
 }
 
 const actionBtn = (primary?: boolean): React.CSSProperties => ({
-  padding: '3px 8px',
+  padding: "3px 8px",
   borderRadius: 5,
   fontSize: 11,
   fontWeight: 600,
-  cursor: 'pointer',
-  border: primary ? 'none' : `1px solid ${colors.border}`,
-  background: primary ? colors.primary : '#fff',
-  color: primary ? '#fff' : colors.textSecondary,
+  cursor: "pointer",
+  border: primary ? "none" : `1px solid ${colors.border}`,
+  background: primary ? colors.primary : "#fff",
+  color: primary ? "#fff" : colors.textSecondary,
 });
 
-export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProps> = ({
+export const CommentAssistantCommentRow: React.FC<
+  CommentAssistantCommentRowProps
+> = ({
   comment,
   actionsEnabled = false,
   onReact,
@@ -41,10 +49,12 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
   onShowThreadReplies,
 }) => {
   const [replyOpen, setReplyOpen] = useState(false);
-  const [repliesOpen, setRepliesOpen] = useState(Boolean(comment.myReplies?.length));
+  const [repliesOpen, setRepliesOpen] = useState(
+    Boolean(comment.myReplies?.length),
+  );
 
   useEffect(() => {
-    if (comment.draftText != null && comment.draftText !== '') {
+    if (comment.draftText != null && comment.draftText !== "") {
       setReplyOpen(true);
     }
   }, [comment.draftText]);
@@ -55,7 +65,9 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
     }
   }, [comment.myReplies]);
 
-  const busy = Boolean(comment.replyBusy || comment.draftBusy || comment.likeBusy);
+  const busy = Boolean(
+    comment.replyBusy || comment.draftBusy || comment.likeBusy,
+  );
   const canAct = actionsEnabled && !busy;
   const myReplies = comment.myReplies || [];
   const replyCount = comment.replyCount ?? 0;
@@ -68,10 +80,10 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
     <div
       style={{
         marginBottom: 6,
-        padding: '8px 10px',
+        padding: "8px 10px",
         borderRadius: 7,
         border: `1px solid ${colors.border}`,
-        background: '#fff',
+        background: "#fff",
       }}
     >
       <CommentAssistantAuthorRow
@@ -89,12 +101,14 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
           lineHeight: 1.45,
           marginTop: 6,
           marginBottom: 6,
-          whiteSpace: 'pre-wrap',
+          whiteSpace: "pre-wrap",
         }}
       >
         {comment.text}
       </div>
-      {comment.imageUrl ? <CommentAssistantAttachedImage src={comment.imageUrl} /> : null}
+      {comment.imageUrl ? (
+        <CommentAssistantAttachedImage src={comment.imageUrl} />
+      ) : null}
 
       {myReplies.length > 0 && (
         <div style={{ marginBottom: 6 }}>
@@ -102,22 +116,22 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
             type="button"
             onClick={() => setRepliesOpen((v) => !v)}
             style={{
-              background: 'none',
-              border: 'none',
+              background: "none",
+              border: "none",
               padding: 0,
               fontSize: 11,
               fontWeight: 700,
               color: colors.primary,
-              cursor: 'pointer',
+              cursor: "pointer",
             }}
           >
             {repliesOpen
               ? myReplies.length > 1
-                ? 'Hide your replies'
-                : 'Hide your reply'
+                ? "Hide your replies"
+                : "Hide your reply"
               : myReplies.length > 1
                 ? `Your replies (${myReplies.length})`
-                : 'Your reply'}
+                : "Your reply"}
           </button>
           {repliesOpen && (
             <div
@@ -149,14 +163,14 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
           type="button"
           onClick={() => onShowThreadReplies(comment.id)}
           style={{
-            background: 'none',
-            border: 'none',
+            background: "none",
+            border: "none",
             padding: 0,
             marginBottom: 6,
             fontSize: 11,
             fontWeight: 600,
             color: colors.primary,
-            cursor: 'pointer',
+            cursor: "pointer",
           }}
         >
           Show all replies ({replyCount})
@@ -172,7 +186,14 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
             borderLeft: `2px solid ${colors.border}`,
           }}
         >
-          <div style={{ fontSize: 10, fontWeight: 700, color: colors.textTertiary, marginBottom: 4 }}>
+          <div
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: colors.textTertiary,
+              marginBottom: 4,
+            }}
+          >
             Thread replies
           </div>
           {comment.threadReplies.map((r) => (
@@ -189,7 +210,14 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <CommentAssistantReactionPicker
           disabled={!canAct}
           activeReaction={comment.userReacted}
@@ -203,7 +231,7 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
           style={{
             ...actionBtn(),
             opacity: canAct ? 1 : 0.55,
-            cursor: canAct ? 'pointer' : 'default',
+            cursor: canAct ? "pointer" : "default",
           }}
         >
           {COMMENT_ASSISTANT_ACTIONS.reply}
@@ -215,7 +243,7 @@ export const CommentAssistantCommentRow: React.FC<CommentAssistantCommentRowProp
           style={{
             ...actionBtn(true),
             opacity: canAct ? 1 : 0.55,
-            cursor: canAct ? 'pointer' : 'default',
+            cursor: canAct ? "pointer" : "default",
           }}
         >
           {comment.draftBusy

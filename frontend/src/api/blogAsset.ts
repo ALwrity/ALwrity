@@ -45,6 +45,28 @@ export interface UpdateAssetParams {
   publish_data?: any;
 }
 
+export interface BlogAnalyticsSummary {
+  success: boolean;
+  research_sessions_7d: number;
+  drafts_in_progress: number;
+  published_30d: number;
+  platform_breakdown: Record<string, number>;
+  avg_seo_score: number | null;
+  analyzed_count: number;
+  pending_seo_recommendations: number;
+  refresh_candidates: Array<{
+    asset_id: number;
+    title: string | null;
+    seo_score: number | null;
+    published_at: string | null;
+  }>;
+  most_recent_draft: {
+    asset_id: number;
+    title: string | null;
+    phase: string;
+  } | null;
+}
+
 class BlogAssetAPI {
   async create(params: CreateAssetParams): Promise<{ success: boolean; asset: BlogAsset; existing: boolean }> {
     const res = await apiClient.post('/api/blog/asset', params);
@@ -58,6 +80,12 @@ class BlogAssetAPI {
 
   async get(assetId: number): Promise<{ success: boolean; asset: BlogAssetFull }> {
     const res = await apiClient.get(`/api/blog/asset/${assetId}`);
+    return res.data;
+  }
+
+  /** Powers the Blog Writer radial workflow hero's per-wedge metric badges. */
+  async getAnalyticsSummary(): Promise<BlogAnalyticsSummary> {
+    const res = await apiClient.get('/api/blog/analytics/summary');
     return res.data;
   }
 }

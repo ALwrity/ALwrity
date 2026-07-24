@@ -59,7 +59,7 @@ async def test_generate_agent_enhanced_plan_preserves_full_committee_coverage(mo
         TaskProposal("G", "desc", "generate", "high", 10, "content", "why", {}, "navigate", "/blog-writer"),
         TaskProposal("Pu", "desc", "publish", "high", 10, "content", "why", {}, "navigate", "/scheduler-dashboard"),
         TaskProposal("A", "desc", "analyze", "high", 10, "content", "why", {}, "navigate", "/seo-dashboard"),
-        TaskProposal("E", "desc", "engage", "high", 10, "content", "why", {}, "navigate", "/linkedin-writer"),
+        TaskProposal("E", "desc", "engage", "high", 10, "content", "why", {}, "navigate", "/linkedin-studio"),
         TaskProposal("R", "desc", "remarket", "high", 10, "content", "why", {}, "navigate", "/facebook-writer"),
     ]
 

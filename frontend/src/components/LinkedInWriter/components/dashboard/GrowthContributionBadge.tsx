@@ -1,32 +1,50 @@
-import React from 'react';
+import React from "react";
 
-import { GROWTH_CONTRIBUTION_BADGE_SUBLABEL, GROWTH_CONTRIBUTION_TOOLTIP } from './engagementTrendsCopy';
+import {
+  GROWTH_CONTRIBUTION_BADGE_SUBLABEL,
+  GROWTH_CONTRIBUTION_TOOLTIP,
+} from "./engagementTrendsCopy";
 
 interface GrowthContributionBadgeProps {
   contributionPct: number;
 }
 
-export const GrowthContributionBadge: React.FC<GrowthContributionBadgeProps> = ({
-  contributionPct,
-}) => (
+export const GrowthContributionBadge: React.FC<
+  GrowthContributionBadgeProps
+> = ({ contributionPct }) => (
   <div
     title={GROWTH_CONTRIBUTION_TOOLTIP}
     aria-label={`${contributionPct}% share of growth. ${GROWTH_CONTRIBUTION_TOOLTIP}`}
     style={{
       flexShrink: 0,
-      textAlign: 'right',
-      padding: '3px 7px',
-      background: '#dcfce7',
-      border: '1px solid #86efac',
+      textAlign: "right",
+      padding: "3px 7px",
+      background: "#dcfce7",
+      border: "1px solid #86efac",
       borderRadius: 8,
       maxWidth: 120,
-      cursor: 'help',
+      cursor: "help",
     }}
   >
-    <div style={{ fontSize: 11, fontWeight: 800, color: '#15803d', lineHeight: 1.2 }}>
+    <div
+      style={{
+        fontSize: 11,
+        fontWeight: 800,
+        color: "#15803d",
+        lineHeight: 1.2,
+      }}
+    >
       {contributionPct}% of growth
     </div>
-    <div style={{ fontSize: 8, fontWeight: 600, color: '#166534', marginTop: 1, lineHeight: 1.2 }}>
+    <div
+      style={{
+        fontSize: 8,
+        fontWeight: 600,
+        color: "#166534",
+        marginTop: 1,
+        lineHeight: 1.2,
+      }}
+    >
       {GROWTH_CONTRIBUTION_BADGE_SUBLABEL}
     </div>
   </div>

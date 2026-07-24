@@ -1,7 +1,7 @@
-import React from 'react';
-import { ConnectLockBadge } from './ConnectLockIcon';
+import React from "react";
+import { ConnectLockBadge } from "./ConnectLockIcon";
 
-export type DashboardRailIconId = 'knowledge' | 'library' | 'growth' | 'resume';
+export type DashboardRailIconId = "knowledge" | "library" | "growth" | "resume";
 
 interface DashboardRailIconButtonProps {
   label: string;
@@ -11,7 +11,7 @@ interface DashboardRailIconButtonProps {
   ariaExpanded?: boolean;
   alwaysShowLabel?: boolean;
   iconLeading?: boolean;
-  layout?: 'pill' | 'tab';
+  layout?: "pill" | "tab";
   emojiIcon?: string;
   shortLabel?: string;
   stackedLabel?: readonly [string, string];
@@ -65,7 +65,12 @@ const ICONS: Record<DashboardRailIconId, React.ReactNode> = {
         strokeWidth="1.75"
         strokeLinejoin="round"
       />
-      <path d="M6.5 8h1M11.5 8h1M17.5 12h1" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path
+        d="M6.5 8h1M11.5 8h1M17.5 12h1"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
     </svg>
   ),
   growth: (
@@ -84,7 +89,12 @@ const ICONS: Record<DashboardRailIconId, React.ReactNode> = {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path d="M6 19h12" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path
+        d="M6 19h12"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
     </svg>
   ),
   resume: (
@@ -95,13 +105,25 @@ const ICONS: Record<DashboardRailIconId, React.ReactNode> = {
         strokeWidth="1.75"
         strokeLinejoin="round"
       />
-      <path d="M14 3v5h5" stroke="currentColor" strokeWidth="1.75" strokeLinejoin="round" />
-      <path d="M9 13h6M9 17h4" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+      <path
+        d="M14 3v5h5"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 13h6M9 17h4"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+      />
     </svg>
   ),
 };
 
-export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = ({
+export const DashboardRailIconButton: React.FC<
+  DashboardRailIconButtonProps
+> = ({
   label,
   icon,
   onClick,
@@ -109,7 +131,7 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
   ariaExpanded,
   alwaysShowLabel = false,
   iconLeading = false,
-  layout = 'pill',
+  layout = "pill",
   emojiIcon,
   shortLabel,
   stackedLabel,
@@ -119,54 +141,63 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
   connectLockedBadge = false,
 }) => {
   const iconNode = emojiIcon ?? ICONS[icon];
-  const isTab = layout === 'tab';
+  const isTab = layout === "tab";
   const showLockBadge = connectLocked && connectLockedBadge;
 
   return (
     <button
       type="button"
       className={[
-        'linkedin-rail-icon-trigger',
+        "linkedin-rail-icon-trigger",
         `linkedin-rail-icon-trigger--${icon}`,
-        open && 'linkedin-rail-icon-trigger--open',
-        alwaysShowLabel && 'linkedin-rail-icon-trigger--labeled',
-        iconLeading && 'linkedin-rail-icon-trigger--icon-leading',
-        shortLabel && 'linkedin-rail-icon-trigger--responsive-label',
-        isTab && 'linkedin-writer-header-studio-tab',
-        isTab && open && 'linkedin-writer-header-studio-tab--active',
-        connectLocked && 'linkedin-studio-connect-locked',
-        showLockBadge && 'linkedin-studio-connect-locked--lock-right',
-      ].filter(Boolean).join(' ')}
+        open && "linkedin-rail-icon-trigger--open",
+        alwaysShowLabel && "linkedin-rail-icon-trigger--labeled",
+        iconLeading && "linkedin-rail-icon-trigger--icon-leading",
+        shortLabel && "linkedin-rail-icon-trigger--responsive-label",
+        isTab && "linkedin-writer-header-studio-tab",
+        isTab && open && "linkedin-writer-header-studio-tab--active",
+        connectLocked && "linkedin-studio-connect-locked",
+        showLockBadge && "linkedin-studio-connect-locked--lock-right",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       onClick={onClick}
       aria-label={label}
       aria-expanded={ariaExpanded}
       title={connectLocked && connectLockedBadge ? undefined : (title ?? label)}
-      role={isTab ? 'tab' : undefined}
+      role={isTab ? "tab" : undefined}
     >
       {isTab ? (
         <>
           <span
             className={[
-              'linkedin-writer-header-studio-tab-label',
-              stackedLabel && 'linkedin-writer-header-studio-tab-label--stacked',
+              "linkedin-writer-header-studio-tab-label",
+              stackedLabel &&
+                "linkedin-writer-header-studio-tab-label--stacked",
             ]
               .filter(Boolean)
-              .join(' ')}
+              .join(" ")}
           >
             {stackedLabel ? (
               <>
-                <span className="linkedin-writer-header-studio-tab-label-line">{stackedLabel[0]}</span>
-                <span className="linkedin-writer-header-studio-tab-label-line">{stackedLabel[1]}</span>
+                <span className="linkedin-writer-header-studio-tab-label-line">
+                  {stackedLabel[0]}
+                </span>
+                <span className="linkedin-writer-header-studio-tab-label-line">
+                  {stackedLabel[1]}
+                </span>
               </>
             ) : (
-              shortLabel ?? label
+              (shortLabel ?? label)
             )}
           </span>
           <span
             className={[
-              'linkedin-writer-header-studio-tab-icon',
-              showBadge && 'linkedin-writer-header-studio-tab-icon--badged',
-            ].filter(Boolean).join(' ')}
+              "linkedin-writer-header-studio-tab-icon",
+              showBadge && "linkedin-writer-header-studio-tab-icon--badged",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             aria-hidden
           >
             {emojiIcon ?? iconNode}
@@ -176,17 +207,23 @@ export const DashboardRailIconButton: React.FC<DashboardRailIconButtonProps> = (
         <>
           <span
             className={[
-              'linkedin-rail-icon-trigger-icon',
-              emojiIcon && 'linkedin-rail-icon-trigger-icon--emoji',
-              showBadge && 'linkedin-rail-icon-trigger-icon--badged',
-            ].filter(Boolean).join(' ')}
+              "linkedin-rail-icon-trigger-icon",
+              emojiIcon && "linkedin-rail-icon-trigger-icon--emoji",
+              showBadge && "linkedin-rail-icon-trigger-icon--badged",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {emojiIcon ?? iconNode}
           </span>
           {shortLabel ? (
             <>
-              <span className="linkedin-rail-icon-trigger-label linkedin-rail-icon-trigger-label--full">{label}</span>
-              <span className="linkedin-rail-icon-trigger-label linkedin-rail-icon-trigger-label--short">{shortLabel}</span>
+              <span className="linkedin-rail-icon-trigger-label linkedin-rail-icon-trigger-label--full">
+                {label}
+              </span>
+              <span className="linkedin-rail-icon-trigger-label linkedin-rail-icon-trigger-label--short">
+                {shortLabel}
+              </span>
             </>
           ) : (
             <span className="linkedin-rail-icon-trigger-label">{label}</span>

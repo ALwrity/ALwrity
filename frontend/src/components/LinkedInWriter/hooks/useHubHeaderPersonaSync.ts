@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 
-import type { RadialLayout } from '../components/dashboard/dashboardRadialLayout';
+import type { RadialLayout } from "../components/dashboard/dashboardRadialLayout";
 import {
   clearHubHeaderPersonaSync,
   syncHubHeaderPersona,
-} from '../utils/syncHubHeaderPersona';
+} from "../utils/syncHubHeaderPersona";
 
 interface UseHubHeaderPersonaSyncOptions {
   canvasRef: React.RefObject<HTMLElement | null>;
@@ -52,9 +52,9 @@ export function useHubHeaderPersonaSync({
     if (!desktopViewport) return undefined;
 
     const canvas = canvasRef.current;
-    const headerRow = document.querySelector('.linkedin-writer-header-row');
-    const heroStage = canvas?.closest('.linkedin-dashboard-hero-stage');
-    const hubRoot = document.querySelector('.linkedin-dashboard-hero-hub');
+    const headerRow = document.querySelector(".linkedin-writer-header-row");
+    const heroStage = canvas?.closest(".linkedin-dashboard-hero-stage");
+    const hubRoot = document.querySelector(".linkedin-dashboard-hero-hub");
 
     const ro = new ResizeObserver(() => runSync());
     if (canvas) ro.observe(canvas);
@@ -73,19 +73,19 @@ export function useHubHeaderPersonaSync({
     const onViewportChange = () => {
       window.requestAnimationFrame(() => runSync());
     };
-    window.addEventListener('resize', onViewportChange);
-    window.addEventListener('scroll', onViewportChange, { passive: true });
+    window.addEventListener("resize", onViewportChange);
+    window.addEventListener("scroll", onViewportChange, { passive: true });
 
     const fontsReady =
-      typeof document !== 'undefined' && document.fonts?.ready
+      typeof document !== "undefined" && document.fonts?.ready
         ? document.fonts.ready.then(() => runSync())
         : undefined;
 
     return () => {
       ro.disconnect();
       mo?.disconnect();
-      window.removeEventListener('resize', onViewportChange);
-      window.removeEventListener('scroll', onViewportChange);
+      window.removeEventListener("resize", onViewportChange);
+      window.removeEventListener("scroll", onViewportChange);
       void fontsReady;
       clearHubHeaderPersonaSync();
     };

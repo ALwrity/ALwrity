@@ -1,11 +1,11 @@
-import { useCallback, useState } from 'react';
-import { uploadLinkedInImage } from '../../../services/linkedInImageService';
-import { validatePublishImageFile } from '../utils/linkedInPublishMediaUtils';
+import { useCallback, useState } from "react";
+import { uploadLinkedInImage } from "../../../services/linkedInImageService";
+import { validatePublishImageFile } from "../utils/linkedInPublishMediaUtils";
 import {
   createEditorImageBlock,
   type LinkedInEditorImageBlock,
-} from '../utils/linkedInEditorDraftUtils';
-import { showToastNotification } from '../../../utils/toastNotifications';
+} from "../utils/linkedInEditorDraftUtils";
+import { showToastNotification } from "../../../utils/toastNotifications";
 
 interface UseLinkedInEditorImageUploadResult {
   isUploading: boolean;
@@ -23,36 +23,44 @@ export function useLinkedInEditorImageUpload(): UseLinkedInEditorImageUploadResu
     setUploadError(null);
   }, []);
 
-  const uploadImageFile = useCallback(async (file: File): Promise<LinkedInEditorImageBlock | null> => {
-    const validation = validatePublishImageFile(file);
-    if (!validation.valid) {
-      setUploadError(validation.error || 'Invalid image file.');
-      return null;
-    }
-
-    setIsUploading(true);
-    setUploadError(null);
-
-    try {
-      const result = await uploadLinkedInImage(file);
-      if (!result.success || !result.imageId || !result.imageUrl) {
-        const message = result.error || 'Image upload failed';
-        setUploadError(message);
-        showToastNotification(message, 'error');
+  const uploadImageFile = useCallback(
+    async (file: File): Promise<LinkedInEditorImageBlock | null> => {
+      const validation = validatePublishImageFile(file);
+      if (!validation.valid) {
+        setUploadError(validation.error || "Invalid image file.");
         return null;
       }
 
-      showToastNotification('Image added to your post', 'success');
-      return createEditorImageBlock(result.imageUrl, result.imageId, 'Post image');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Image upload failed';
-      setUploadError(message);
-      showToastNotification(message, 'error');
-      return null;
-    } finally {
-      setIsUploading(false);
-    }
-  }, []);
+      setIsUploading(true);
+      setUploadError(null);
+
+      try {
+        const result = await uploadLinkedInImage(file);
+        if (!result.success || !result.imageId || !result.imageUrl) {
+          const message = result.error || "Image upload failed";
+          setUploadError(message);
+          showToastNotification(message, "error");
+          return null;
+        }
+
+        showToastNotification("Image added to your post", "success");
+        return createEditorImageBlock(
+          result.imageUrl,
+          result.imageId,
+          "Post image",
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Image upload failed";
+        setUploadError(message);
+        showToastNotification(message, "error");
+        return null;
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [],
+  );
 
   return {
     isUploading,

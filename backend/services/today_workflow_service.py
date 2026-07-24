@@ -130,7 +130,7 @@ def _resolve_calendar_pillar(content_type: str, platform: str) -> str:
 
 
 _PLATFORM_ACTION_URL = {
-    "linkedin": "/linkedin-writer",
+    "linkedin": "/linkedin-studio",
     "facebook": "/facebook-writer",
     "twitter": "/twitter-writer",
     "instagram": "/instagram-writer",
@@ -140,7 +140,7 @@ _PLATFORM_ACTION_URL = {
 
 _CONTENT_ACTION_URL = {
     "blog_post": "/blog-writer",
-    "linkedin_post": "/linkedin-writer",
+    "linkedin_post": "/linkedin-studio",
     "facebook_post": "/facebook-writer",
     "seo_page": "/seo-dashboard",
     "video": "/video-writer",
@@ -911,7 +911,7 @@ async def generate_agent_enhanced_plan(
         "- If competitors are listed, include a task to analyze one of them.\n"
         "- Prefer actionable tasks that can be completed today.\n"
         "- Use these common actionUrl routes when relevant: "
-        "/content-planning-dashboard, /blog-writer, /linkedin-writer, /facebook-writer, /seo-dashboard, /scheduler-dashboard.\n"
+        "/content-planning-dashboard, /blog-writer, /linkedin-studio, /facebook-writer, /seo-dashboard, /scheduler-dashboard.\n"
         "- Keep descriptions concise.\n\n"
         f"Grounding context (Alerts):\n{json.dumps(grounding.get('recent_agent_alerts', []), indent=2)}\n\n"
         f"Calendar events scheduled for today (must inform the 'generate' pillar):\n"

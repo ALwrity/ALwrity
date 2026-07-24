@@ -2,7 +2,7 @@ import {
   WEDGE_PANEL_GAP_DEG,
   WORKFLOW_FIRST_WEDGE_CENTER_DEG,
   WORKFLOW_WEDGE_SLICE_DEG,
-} from './dashboardWorkflowConfig';
+} from "./dashboardWorkflowConfig";
 
 /**
  * Desktop hero placement contract — see `dashboardDesktopHeroPlacement.md`.
@@ -65,7 +65,9 @@ const PLAN_ANCHOR_BELOW_EXTENT = 12;
 export const PLAN_CONNECT_UI_LIFT_PX = 18;
 
 function computeInnerRadius(): number {
-  return Math.round(PROFILE_AVATAR_OUTER_RADIUS * (1 + INNER_PROFILE_GAP_RATIO));
+  return Math.round(
+    PROFILE_AVATAR_OUTER_RADIUS * (1 + INNER_PROFILE_GAP_RATIO),
+  );
 }
 
 /** Thickens wedge annulus by scale; grows outerR when width allows, else shrinks innerR. Hub size unchanged. */
@@ -73,7 +75,7 @@ function applyWedgeCardScale(
   hubVisualR: number,
   outerR: number,
   widthCap: number,
-  scale: number
+  scale: number,
 ): { innerR: number; outerR: number } {
   const baseDepth = Math.max(0, outerR - hubVisualR);
   if (baseDepth <= 0 || scale <= 1) {
@@ -92,14 +94,23 @@ function toRad(deg: number): number {
   return (deg * Math.PI) / 180;
 }
 
-function polar(cx: number, cy: number, r: number, deg: number): { x: number; y: number } {
+function polar(
+  cx: number,
+  cy: number,
+  r: number,
+  deg: number,
+): { x: number; y: number } {
   return {
     x: cx + r * Math.cos(toRad(deg)),
     y: cy - r * Math.sin(toRad(deg)),
   };
 }
 
-function computePlanAnchor(centerX: number, centerY: number, outerR: number): { x: number; y: number } {
+function computePlanAnchor(
+  centerX: number,
+  centerY: number,
+  outerR: number,
+): { x: number; y: number } {
   const anchorR = outerVisualRadius(outerR) + PLAN_ANCHOR_BELOW_EXTENT;
   return polar(centerX, centerY, anchorR, WORKFLOW_FIRST_WEDGE_CENTER_DEG);
 }
@@ -122,11 +133,14 @@ function estimateViewHeight(
   outerR: number,
   viewBoxY: number,
   planAnchorY: number,
-  reserveConnectSlot = true
+  reserveConnectSlot = true,
 ): number {
   const extent = outerVisualRadius(outerR);
   const bottom = reserveConnectSlot
-    ? Math.max(planAnchorY + PLAN_CONNECT_SLOT_HEIGHT, centerY + extent + RING_EDGE_PAD)
+    ? Math.max(
+        planAnchorY + PLAN_CONNECT_SLOT_HEIGHT,
+        centerY + extent + RING_EDGE_PAD,
+      )
     : centerY + extent + RING_EDGE_PAD;
   return Math.round(bottom - viewBoxY);
 }
@@ -142,13 +156,16 @@ function maxOuterRadiusForHeight(
   maxHeight: number,
   minOuter: number,
   maxOuter: number,
-  reserveConnectSlot = true
+  reserveConnectSlot = true,
 ): number {
   let lo = minOuter;
   let hi = maxOuter;
   while (lo < hi) {
     const mid = Math.ceil((lo + hi) / 2);
-    if (ringVerticalSpan(mid, reserveConnectSlot) <= maxHeight + RING_HEIGHT_FIT_SLACK) {
+    if (
+      ringVerticalSpan(mid, reserveConnectSlot) <=
+      maxHeight + RING_HEIGHT_FIT_SLACK
+    ) {
       lo = mid;
     } else {
       hi = mid - 1;
@@ -169,7 +186,7 @@ function scaleWedgePanelRadii(
   hubVisualR: number,
   innerR: number,
   outerR: number,
-  scale: number
+  scale: number,
 ): { innerR: number; outerR: number } {
   if (scale === 1) return { innerR, outerR };
   return {
@@ -187,7 +204,7 @@ function scaleWedgePanelRadii(
 export function computeRadialLayout(
   containerWidth: number,
   maxHeight?: number,
-  desktopViewport = false
+  desktopViewport = false,
 ): RadialLayout {
   const viewW = Math.max(320, Math.round(containerWidth));
   const centerX = viewW / 2 + ringHorizontalOffset(viewW);
@@ -202,14 +219,23 @@ export function computeRadialLayout(
 
   const desktop = desktopViewport;
   const reserveConnectSlot = !desktop;
-  const ringVerticalBias = desktop ? RING_VERTICAL_BIAS_DESKTOP : RING_VERTICAL_BIAS_MOBILE;
-  const heroTopNudge = desktop ? HERO_TOP_NUDGE_DESKTOP_PX : HERO_TOP_NUDGE_MOBILE_PX;
+  const ringVerticalBias = desktop
+    ? RING_VERTICAL_BIAS_DESKTOP
+    : RING_VERTICAL_BIAS_MOBILE;
+  const heroTopNudge = desktop
+    ? HERO_TOP_NUDGE_DESKTOP_PX
+    : HERO_TOP_NUDGE_MOBILE_PX;
 
   let fitOuter = widthCap;
   if (maxHeight && maxHeight > 0) {
     fitOuter = Math.min(
       widthCap,
-      maxOuterRadiusForHeight(maxHeight, minOuter, widthCap, reserveConnectSlot)
+      maxOuterRadiusForHeight(
+        maxHeight,
+        minOuter,
+        widthCap,
+        reserveConnectSlot,
+      ),
     );
   }
   fitOuter = Math.max(minOuter, fitOuter);
@@ -217,7 +243,7 @@ export function computeRadialLayout(
   const fitDepth = fitOuter - hubVisualR;
   const boostedDepth = Math.max(
     minWedgeDepth,
-    Math.round(fitDepth * WEDGE_VOLUME_BOOST)
+    Math.round(fitDepth * WEDGE_VOLUME_BOOST),
   );
   const boostedOuter = Math.min(widthCap, hubVisualR + boostedDepth);
 
@@ -225,13 +251,17 @@ export function computeRadialLayout(
   if (
     maxHeight &&
     maxHeight > 0 &&
-    ringVerticalSpan(outerR, reserveConnectSlot) > maxHeight + RING_HEIGHT_FIT_SLACK
+    ringVerticalSpan(outerR, reserveConnectSlot) >
+      maxHeight + RING_HEIGHT_FIT_SLACK
   ) {
     let lo = fitOuter;
     let hi = boostedOuter;
     while (lo < hi) {
       const mid = Math.ceil((lo + hi) / 2);
-      if (ringVerticalSpan(mid, reserveConnectSlot) <= maxHeight + RING_HEIGHT_FIT_SLACK) {
+      if (
+        ringVerticalSpan(mid, reserveConnectSlot) <=
+        maxHeight + RING_HEIGHT_FIT_SLACK
+      ) {
         lo = mid;
       } else {
         hi = mid - 1;
@@ -241,18 +271,27 @@ export function computeRadialLayout(
   }
 
   const outerBeforeWedgeScale = outerR;
-  const wedgeScaled = applyWedgeCardScale(hubVisualR, outerR, widthCap, WEDGE_CARD_SCALE);
+  const wedgeScaled = applyWedgeCardScale(
+    hubVisualR,
+    outerR,
+    widthCap,
+    WEDGE_CARD_SCALE,
+  );
   outerR = wedgeScaled.outerR;
   if (
     maxHeight &&
     maxHeight > 0 &&
-    ringVerticalSpan(outerR, reserveConnectSlot) > maxHeight + RING_HEIGHT_FIT_SLACK
+    ringVerticalSpan(outerR, reserveConnectSlot) >
+      maxHeight + RING_HEIGHT_FIT_SLACK
   ) {
     let lo = outerBeforeWedgeScale;
     let hi = outerR;
     while (lo < hi) {
       const mid = Math.ceil((lo + hi) / 2);
-      if (ringVerticalSpan(mid, reserveConnectSlot) <= maxHeight + RING_HEIGHT_FIT_SLACK) {
+      if (
+        ringVerticalSpan(mid, reserveConnectSlot) <=
+        maxHeight + RING_HEIGHT_FIT_SLACK
+      ) {
         lo = mid;
       } else {
         hi = mid - 1;
@@ -260,9 +299,19 @@ export function computeRadialLayout(
     }
     outerR = lo;
   }
-  const innerR = applyWedgeCardScale(hubVisualR, outerR, widthCap, WEDGE_CARD_SCALE).innerR;
+  const innerR = applyWedgeCardScale(
+    hubVisualR,
+    outerR,
+    widthCap,
+    WEDGE_CARD_SCALE,
+  ).innerR;
 
-  const scaledRadii = scaleWedgePanelRadii(hubVisualR, innerR, outerR, WEDGE_PANEL_SIZE_SCALE);
+  const scaledRadii = scaleWedgePanelRadii(
+    hubVisualR,
+    innerR,
+    outerR,
+    WEDGE_PANEL_SIZE_SCALE,
+  );
   const finalInnerR = scaledRadii.innerR;
   const finalOuterR = scaledRadii.outerR;
 
@@ -273,17 +322,29 @@ export function computeRadialLayout(
   let centerY: number;
   if (desktop) {
     const drop =
-      slackBelowRing > 0 ? Math.round(slackBelowRing * ringVerticalBias) : DESKTOP_FALLBACK_DROP_PX;
+      slackBelowRing > 0
+        ? Math.round(slackBelowRing * ringVerticalBias)
+        : DESKTOP_FALLBACK_DROP_PX;
     centerY = Math.round(extent + RING_EDGE_PAD + drop);
   } else {
     centerY = Math.round(
-      TOP_CLEARANCE + extent + RING_EDGE_PAD - heroTopNudge + slackBelowRing * ringVerticalBias
+      TOP_CLEARANCE +
+        extent +
+        RING_EDGE_PAD -
+        heroTopNudge +
+        slackBelowRing * ringVerticalBias,
     );
   }
   const viewBoxY = computeViewBoxY(centerY, finalOuterR);
   const planAnchor = computePlanAnchor(centerX, centerY, finalOuterR);
   const labelBoxWidth = computeLabelBoxWidth(finalInnerR, finalOuterR);
-  const viewH = estimateViewHeight(centerY, finalOuterR, viewBoxY, planAnchor.y, reserveConnectSlot);
+  const viewH = estimateViewHeight(
+    centerY,
+    finalOuterR,
+    viewBoxY,
+    planAnchor.y,
+    reserveConnectSlot,
+  );
 
   return {
     viewW,

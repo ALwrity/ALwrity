@@ -3,7 +3,7 @@
  * Never render raw objects in the UI.
  */
 
-import { EMPTY_COPY } from './engagementTrendsCopy';
+import { EMPTY_COPY } from "./engagementTrendsCopy";
 
 export function extractEngagementTrendsErrorMessage(err: unknown): string {
   const axiosErr = err as {
@@ -17,13 +17,13 @@ export function extractEngagementTrendsErrorMessage(err: unknown): string {
   let errorCode: string | undefined;
   let message: string | undefined;
 
-  if (typeof detail === 'string' && detail.trim()) {
+  if (typeof detail === "string" && detail.trim()) {
     message = detail;
-  } else if (detail && typeof detail === 'object') {
-    if (typeof detail.message === 'string' && detail.message.trim()) {
+  } else if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string" && detail.message.trim()) {
       message = detail.message;
     }
-    if (typeof detail.error_code === 'string') {
+    if (typeof detail.error_code === "string") {
       errorCode = detail.error_code;
     }
   } else if (err instanceof Error && err.message) {
@@ -33,7 +33,10 @@ export function extractEngagementTrendsErrorMessage(err: unknown): string {
   if (status || errorCode) {
     // Safe debug trail only — no post bodies / PII.
     // eslint-disable-next-line no-console
-    console.warn('[EngagementTrends]', { status, error_code: errorCode ?? null });
+    console.warn("[EngagementTrends]", {
+      status,
+      error_code: errorCode ?? null,
+    });
   }
 
   return message?.trim() || EMPTY_COPY.loadErrorFallback;

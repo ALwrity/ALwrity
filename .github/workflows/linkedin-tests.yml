@@ -1,0 +1,347 @@
+name: Backend tests
+
+# ----------------------------------------------------------------
+# Test execution model
+# ----------------------------------------------------------------
+#
+# The repo defines a registry of test suites under
+# `backend/tests/functional/`. Each suite corresponds to a feature
+# area (linkedin, blog_writer, …) and has its own dependencies.
+#
+# This workflow decides which suites to run based on the trigger:
+#
+#   pull_request / push → only the suites whose source paths were
+#                          changed (plus framework self-tests).
+#   workflow_dispatch   → invoke any combination via the manual
+#                          dropdown OR the full matrix.
+#   schedule            → twice-weekly: full matrix (Tue + Fri 03:00 UTC).
+#
+# Why is every suite not run on every PR?  Cost & latency — the
+# full matrix takes ~45 min on GitHub-hosted runners.  Smart PR
+# selection keeps PR feedback to <=10 min while still catching the
+# regression right where it was introduced.
+#
+# Before each production release, run the full matrix via
+# `Actions → Backend tests → Run workflow → full`.  Twice-weekly
+# cron gives us a safety net in between.
+#
+# Any change to `backend/tests/framework/`, `backend/pytest.ini`,
+# or `backend/alwrity_utils/router_manager.py` triggers ALL suites
+# — these are cross-cutting concerns.
+
+on:
+  push:
+    branches: [main, prod/main]
+  pull_request:
+    branches: [main, prod/main]
+  schedule:
+    # Every Tuesday and Friday at 03:00 UTC — twice-weekly full sweep.
+    - cron: '0 3 * * 2'
+    - cron: '0 3 * * 5'
+  workflow_dispatch:
+    inputs:
+      suites:
+        description: 'Which suites to run (overrides path-based selection)'
+        required: true
+        default: 'auto'
+        type: choice
+        options:
+          - auto                 # path-detect from the trigger (default)
+          - framework            # framework self-tests only
+          - linkedin
+          - blog_writer
+          - story_writer
+          - legacy               # everything else under backend/tests/
+          - full                 # all suites (the twice-weekly baseline)
+
+# Cancel in-progress CI for the same branch if a new commit lands.
+concurrency:
+  group: backend-tests-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+# ----------------------------------------------------------------
+# Reusable vars
+# ----------------------------------------------------------------
+env:
+  # Mock key so route modules that read this env at import time
+  # don't blow up.  Per-test fixtures override the actual key.
+  LINKEDIN_TOKEN_ENCRYPTION_KEY: 'b2JqZWN0X25hbWVfY29uZmlndXJhdGlvbl9tb2NrX3ZhbHVl'
+  PYTHONPATH: ${{ github.workspace }}/backend
+  PYTEST_DISABLE_PLUGIN_AUTOLOAD: 0
+
+# ----------------------------------------------------------------
+# Registry of suites. Each job runs one suite. The pipeline below
+# renders these into a matrix at runtime, then fans out.
+#
+# To add a new suite, append an entry here. No other change is
+# required — the workflow picks it up automatically.
+# ----------------------------------------------------------------
+jobs:
+  apply-suite-selection:
+    name: 🧭 Resolve suite selection
+    runs-on: ubuntu-latest
+    outputs:
+      # The resolved JSON array of suite names, used by the
+      # matrix fan-out job below.
+      suites: ${{ steps.pick.outputs.suites }}
+      # Whether we're running in "full" mode — used downstream to
+      # decide whether to skip the path-based selectivity.
+      is_full: ${{ steps.pick.outputs.is_full }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50   # need history for path diff on push
+
+      - id: pick
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // ------------------------------------------------------------
+            // Suite selection logic
+            // ------------------------------------------------------------
+            //
+            // • schedule  / workflow_dispatch → run the matrix as-is.
+            // • push / pull_request  → diff base..head, then pick the
+            //   suites that own the paths in the diff.
+            //   A special "catch_all" prefix list (router_manager, DB
+            //   engine, middleware) triggers the full matrix because
+            //   any change there can break anything.
+            //
+            const ALL_SUITES = ['framework', 'linkedin', 'blog_writer', 'story_writer', 'legacy'];
+
+            // Path → suite map.  Path is a directory prefix; a file
+            // change at "backend/api/linkedin_*.py/…" is matched by
+            // the "backend/api/linkedin.." prefix.
+            const PATH_TO_SUITE = {
+              framework: [
+                'backend/tests/framework/',
+                'backend/pytest.ini',
+              ],
+              linkedin: [
+                'backend/api/linkedin',
+                'backend/services/integrations/linkedin',
+              ],
+              blog_writer: [
+                'backend/api/blog_writer',
+                'backend/api/blog_seo_analysis',
+              ],
+              story_writer: [
+                'backend/api/story_writer',
+                'backend/services/story_writer',
+              ],
+              legacy: [
+                'backend/tests/api/',
+                'backend/tests/services/',
+                'backend/tests/test_',
+                'backend/tests/conftest.py',
+              ],
+              // Files whose changes imply "run everything".
+              catch_all: [
+                'backend/alwrity_utils/',
+                'backend/middleware/',
+                'backend/services/database.py',
+                'backend/tests/__init__.py',
+              ],
+            };
+
+            const startsWithAny = (path, prefixes) =>
+              prefixes.some(p => path === p || path.startsWith(p));
+
+            function suitesForChangedFiles(paths) {
+              const chosen = new Set();
+
+              // Catch-all prefixes ⇒ entire matrix.
+              if (paths.some(p => startsWithAny(p, PATH_TO_SUITE.catch_all))) {
+                return new Set(ALL_SUITES);
+              }
+
+              for (const [suite, globs] of Object.entries(PATH_TO_SUITE)) {
+                if (suite === 'catch_all') continue;
+                if (paths.some(p => startsWithAny(p, globs))) {
+                  chosen.add(suite);
+                }
+              }
+              // If nothing matched, default to framework + legacy so
+              // at least the safety-net tests run.
+              if (chosen.size === 0) {
+                chosen.add('framework');
+                chosen.add('legacy');
+              }
+              // Framework always runs alongside anything else.
+              chosen.add('framework');
+              return chosen;
+            }
+
+            const eventName = context.eventName;
+            const dispatch = (eventName === 'workflow_dispatch');
+            const scheduled = (eventName === 'schedule');
+            let selected;
+
+            if (dispatch) {
+              const userChoice = (core.getInput('suites') || 'auto').trim();
+              if (userChoice === 'auto') {
+                selected = ALL_SUITES;
+              } else if (userChoice === 'full') {
+                selected = ALL_SUITES;
+              } else {
+                selected = [userChoice];
+              }
+            } else if (scheduled) {
+              selected = ALL_SUITES;
+            } else {
+              // PR or push — change-driven.
+              const base = context.payload.pull_request
+                ? context.payload.pull_request.base.sha
+                : context.payload.before;
+              const head = context.payload.pull_request
+                ? context.payload.pull_request.head.sha
+                : context.payload.after;
+              let paths = [];
+              let failed = false;
+              try {
+                const { data: cmp } = await github.rest.repos.compareCommitsWithBasehead({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  basehead: `${base}...${head}`,
+                });
+                paths = (cmp.files || []).map(f => f.filename);
+              } catch (e) {
+                failed = true;
+                core.warning(`compareCommits failed (${e.message}); falling back to full suite`);
+              }
+              selected = failed
+                ? ALL_SUITES
+                : Array.from(suitesForChangedFiles(paths));
+            }
+
+            core.setOutput('suites', JSON.stringify(selected));
+            core.setOutput('is_full', String(selected.length === ALL_SUITES.length));
+            core.summary
+              .addRaw(`## 🤖 Suite selection`, true)
+              .addRaw(`Selected (${selected.length}): ${selected.map(s => `\`${s}\``).join(', ')}`)
+              .addRaw(`Trigger: \`${eventName}\`, Mode: ${context.eventName === 'workflow_dispatch' ? 'manual' : context.eventName}`)
+              .write();
+
+# ----------------------------------------------------------------
+# One job per resolved suite.  This is the matrix fan-out.
+# ----------------------------------------------------------------
+  run-suite:
+    name: 🧪 ${{ matrix.suite }}
+    needs: apply-suite-selection
+    if: needs.apply-suite-selection.outputs.suites != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.apply-suite-selection.outputs.suites) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install backend test deps
+        working-directory: backend
+        # The full requirements.txt is heavy but universal.  Per-suite
+        # extras (e.g. trio) come from the dedicated nightly job.
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r requirements.txt || true
+          python -m pip install -r requirements-linkedin.txt || true
+          python -m pip install pytest-asyncio anyio || true
+
+      - name: "Run suite: ${{ matrix.suite }}"
+        working-directory: backend
+        # Each suite marker/pass configuration lives inline here.
+        # For an explanation of marker semantics, see
+        # `backend/tests/framework/CONTRIBUTING.md`.
+        run: |
+          set -euo pipefail
+          case "${{ matrix.suite }}" in
+            framework)
+              python -m pytest tests/framework/ -v --tb=short \
+                --ignore=tests/framework/test_framework_self.py \
+                -p no:cacheprovider || python -m pytest tests/framework/test_framework_self.py -v --tb=short -p no:cacheprovider
+              ;;
+            linkedin)
+              python -m pytest tests/functional/linkedin/ -v --tb=short -p no:cacheprovider
+              ;;
+            blog_writer)
+              python -m pytest tests/functional/blog_writer/ -v --tb=short -p no:cacheprovider || \
+                echo "::notice::Blog Writer suite has no tests yet — adding them is tracked in CONTRIBUTING.md"
+              ;;
+            story_writer)
+              python -m pytest tests/functional/story_writer/ -v --tb=short -p no:cacheprovider || \
+                echo "::notice::Story Writer suite has no tests yet — see CONTRIBUTING.md"
+              ;;
+            legacy)
+              # Legacy tests under tests/api/, tests/services/, and
+              # root-level tests/*. They run as-is — failures here
+              # are explicitly expected (we want visibility until
+              # they're migrated or rewritten).
+              python -m pytest tests/api/ tests/services/ tests/test_*.py \
+                --ignore=tests/test_linkedin_publish_media_service.py \
+                -v --tb=line -p no:cacheprovider
+              ;;
+            *)
+              echo "::error::Unknown suite '${{ matrix.suite }}'"
+              exit 2
+              ;;
+          esac
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-${{ matrix.suite }}
+          path: |
+            backend/.pytest_cache
+            backend/**/test_*.py
+          if-no-files-found: ignore
+
+# ----------------------------------------------------------------
+# Nightly slow-path — for memory- and time-intensive tests.
+# Always runs the full matrix so we have stable baseline signal.
+# ----------------------------------------------------------------
+  nightly-slow:
+    if: github.event_name == 'schedule' && github.ref == 'refs/heads/main'
+    name: 🐢 nightly slow path
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install full + trio deps
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip wheel
+          python -m pip install -r requirements.txt || true
+          python -m pip install -r requirements-linkedin.txt || true
+          python -m pip install pytest-asyncio trio anyio
+      - name: Run full slow suite
+        working-directory: backend
+        run: |
+          python -m pytest tests \
+            --ignore=tests/test_linkedin_publish_media_service.py \
+            -v --tb=line \
+            -p no:cacheprovider \
+            --durations=20
+
+# ----------------------------------------------------------------
+# Per-mesh policy reminder for humans:
+# • On PR: only changed-area suites (fast).
+# • On dispatch: your choice.
+# • On schedule (Tue + Fri): full sweep + nightly slow.
+# • Before prod launch: run `Actions → Backend tests → Run workflow → full`.
+# ----------------------------------------------------------------

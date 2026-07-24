@@ -1,35 +1,36 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
-import { useLinkedInProfileCompletion } from '../../../../hooks/useLinkedInProfileCompletion';
-import { useLinkedInProfileOptimization } from '../../../../hooks/useLinkedInProfileOptimization';
-import { LinkedInConnectedProfileCard } from '../LinkedInConnectedProfileCard';
-import { LinkedInProfileHubStrip } from '../LinkedInProfileHubStrip';
-import { TopicRecommendationsPanel } from '../TopicRecommendations/TopicRecommendationsPanel';
-import { AnalysisErrorAlert } from '../TopicRecommendations/TopicSuggestionIntro';
-import { LinkedInAdvisorActionsBar } from '../ProfileOptimization/LinkedInAdvisorActionsBar';
-import { ProfileOptimizationPanel } from '../ProfileOptimization/ProfileOptimizationPanel';
+import { useLinkedInProfileCompletion } from "../../../../hooks/useLinkedInProfileCompletion";
+import { useLinkedInProfileOptimization } from "../../../../hooks/useLinkedInProfileOptimization";
+import { LinkedInConnectedProfileCard } from "../LinkedInConnectedProfileCard";
+import { LinkedInProfileHubStrip } from "../LinkedInProfileHubStrip";
+import { TopicRecommendationsPanel } from "../TopicRecommendations/TopicRecommendationsPanel";
+import { AnalysisErrorAlert } from "../TopicRecommendations/TopicSuggestionIntro";
+import { LinkedInAdvisorActionsBar } from "../ProfileOptimization/LinkedInAdvisorActionsBar";
+import { ProfileOptimizationPanel } from "../ProfileOptimization/ProfileOptimizationPanel";
 import {
   ProfileOptimizationModalFooter,
   ProfileOptimizationModalHeader,
-} from '../ProfileOptimization/ProfileOptimizationModalChrome';
-import { findProfileOptimizationQuickWin } from '../ProfileOptimization/profileOptimizationQuickWin';
-import { ProfileCompletionForm } from './ProfileCompletionForm';
+} from "../ProfileOptimization/ProfileOptimizationModalChrome";
+import { findProfileOptimizationQuickWin } from "../ProfileOptimization/profileOptimizationQuickWin";
+import { ProfileCompletionForm } from "./ProfileCompletionForm";
 import {
   ProfileAnalysisReadyModal,
   buildProfileActionPoints,
-} from '../dashboard/ProfileAnalysisReadyModal';
+} from "../dashboard/ProfileAnalysisReadyModal";
 import {
   getDisplayProfileStrengthPercent,
   getProfileStrengthDisplayLabel,
   getProfileStrengthTooltip,
-} from '../../utils/profileStrengthUtils';
-import { DashboardErrorModal } from '../dashboard/DashboardErrorModal';
-import { DashboardActionModal } from '../dashboard/DashboardActionModal';
-import { buildDashboardErrorConfig } from '../dashboard/dashboardErrorConfig';
-import { useModalFocusTrap } from '../../hooks/useModalFocusTrap';
+} from "../../utils/profileStrengthUtils";
+import { DashboardErrorModal } from "../dashboard/DashboardErrorModal";
+import { DashboardActionModal } from "../dashboard/DashboardActionModal";
+import { buildDashboardErrorConfig } from "../dashboard/dashboardErrorConfig";
+import { useModalFocusTrap } from "../../hooks/useModalFocusTrap";
 
-const ANALYSIS_MODAL_DISMISSED_KEY = 'linkedin_profile_analysis_modal_dismissed_v2';
+const ANALYSIS_MODAL_DISMISSED_KEY =
+  "linkedin_profile_analysis_modal_dismissed_v2";
 const DISMISSAL_EXPIRY_HOURS = 24;
 
 /** Check if dismissal is still valid (within expiry window) */
@@ -54,7 +55,7 @@ function storeDismissal(): void {
       JSON.stringify({
         timestamp: Date.now(),
         expires: Date.now() + dismissForHours * 60 * 60 * 1000,
-      })
+      }),
     );
   } catch {
     // localStorage may be unavailable in private mode
@@ -75,7 +76,9 @@ interface LinkedInProfileSetupPanelProps {
   blockDashboardErrorModal?: boolean;
 }
 
-export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps> = ({
+export const LinkedInProfileSetupPanel: React.FC<
+  LinkedInProfileSetupPanelProps
+> = ({
   displayName,
   avatarUrl,
   onDisconnect,
@@ -108,10 +111,13 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     loadFoundation,
     runTopicAnalysis,
     submitCompletion,
+    applyProfileRefreshResponse,
   } = useLinkedInProfileCompletion();
 
   const publicIdentifier =
-    typeof profile?.public_identifier === 'string' ? profile.public_identifier : null;
+    typeof profile?.public_identifier === "string"
+      ? profile.public_identifier
+      : null;
 
   const {
     optimizationPanelState,
@@ -149,6 +155,13 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
     handleDownloadProfilePhoto,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
+  const handleRecheckProfile = useCallback(async () => {
+    const data = await recheckProfile();
+    if (data) {
+      applyProfileRefreshResponse(data);
+    }
+  }, [recheckProfile, applyProfileRefreshResponse]);
+
   const handleImproveProfile = () => {
     storeDismissal();
     setShowAnalysisModal(false);
@@ -176,13 +189,17 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
   const showAdvisorBar =
     !centered &&
-    (foundationStatus === 'loading' ||
-      foundationStatus === 'ready' ||
-      foundationStatus === 'needs_completion' ||
-      (foundationStatus === 'error' && !questions.length));
+    (foundationStatus === "loading" ||
+      foundationStatus === "ready" ||
+      foundationStatus === "needs_completion" ||
+      (foundationStatus === "error" && !questions.length));
 
-  const profileStrengthPercent = getDisplayProfileStrengthPercent(profileValidation);
-  const strengthLabel = getProfileStrengthDisplayLabel(profileValidation, profileStrengthPercent);
+  const profileStrengthPercent =
+    getDisplayProfileStrengthPercent(profileValidation);
+  const strengthLabel = getProfileStrengthDisplayLabel(
+    profileValidation,
+    profileStrengthPercent,
+  );
   const strengthTooltip = getProfileStrengthTooltip(profileValidation);
 
   const actionPoints = useMemo(
@@ -191,32 +208,36 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         profileValidation?.missing_fields,
         profileValidation?.optional_missing_fields,
         aiProfileIntelligence?.writing_opportunities,
-        profileValidation?.optimization_gaps_count
+        profileValidation?.optimization_gaps_count,
       ),
-    [profileValidation, aiProfileIntelligence]
+    [profileValidation, aiProfileIntelligence],
   );
 
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
   const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
   const optimizationDialogRef = useRef<HTMLDivElement>(null);
 
-  useModalFocusTrap(
-    optimizationDialogRef,
-    centered && isOptimizationOpen,
-    () => closeOptimizationPanel()
+  useModalFocusTrap(optimizationDialogRef, centered && isOptimizationOpen, () =>
+    closeOptimizationPanel(),
   );
 
   const modalFocusedRecommendation = useMemo(
     () => findProfileOptimizationQuickWin(optimizationRecommendations),
-    [optimizationRecommendations]
+    [optimizationRecommendations],
   );
 
   /** Phase 4 — skip the ready modal when analysis/optimisation data already exists or was dismissed. */
   const skipAnalysisReadyModal = useMemo(() => {
     if (isDismissalValid()) return true;
-    if (optimizationRecommendations && optimizationRecommendations.length > 0) return true;
+    if (optimizationRecommendations && optimizationRecommendations.length > 0)
+      return true;
     const source = optimizationMeta?.source;
-    if (source === 'cache' || source === 'generated' || source === 'no_gaps' || source === 'batch_advanced') {
+    if (
+      source === "cache" ||
+      source === "generated" ||
+      source === "no_gaps" ||
+      source === "batch_advanced"
+    ) {
       return true;
     }
     if (optimizationMeta?.profile_optimization_updated_at) return true;
@@ -225,9 +246,9 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
   useEffect(() => {
     if (!centered || !isOptimizationOpen) return;
-    document.body.classList.add('linkedin-profile-optimization-open');
+    document.body.classList.add("linkedin-profile-optimization-open");
     return () => {
-      document.body.classList.remove('linkedin-profile-optimization-open');
+      document.body.classList.remove("linkedin-profile-optimization-open");
     };
   }, [centered, isOptimizationOpen]);
 
@@ -240,7 +261,9 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       const overlay = dialog?.parentElement;
       overlay?.scrollTo({ top: 0, left: 0 });
       dialog
-        ?.querySelector<HTMLElement>('.linkedin-profile-optimization-dialog__body')
+        ?.querySelector<HTMLElement>(
+          ".linkedin-profile-optimization-dialog__body",
+        )
         ?.scrollTo({ top: 0, left: 0 });
     };
 
@@ -253,13 +276,15 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       window.clearTimeout(timeoutId);
     };
   }, [centered, isOptimizationOpen, optimizationRecommendations?.length]);
-  const [dismissedErrorKey, setDismissedErrorKey] = useState<string | null>(null);
+  const [dismissedErrorKey, setDismissedErrorKey] = useState<string | null>(
+    null,
+  );
 
   // TC-007: Auto-show analysis modal when profile data is ready and not recently dismissed
   useEffect(() => {
     if (
       centered &&
-      foundationStatus === 'ready' &&
+      foundationStatus === "ready" &&
       profileValidation &&
       !skipAnalysisReadyModal
     ) {
@@ -281,7 +306,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   const showTopicModal =
     centered &&
     isTopicPanelOpen &&
-    (topicState === 'running' || topicState === 'complete');
+    (topicState === "running" || topicState === "complete");
 
   const dashboardErrorConfig = useMemo(
     () =>
@@ -317,7 +342,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       recommendationsError,
       isOptimizationLoading,
       isAnalyzing,
-    ]
+    ],
   );
 
   useEffect(() => {
@@ -328,13 +353,13 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
   const showDashboardErrorModal = Boolean(
     centered &&
-      dashboardErrorConfig &&
-      dismissedErrorKey !== dashboardErrorConfig.key &&
-      !blockDashboardErrorModal
+    dashboardErrorConfig &&
+    dismissedErrorKey !== dashboardErrorConfig.key &&
+    !blockDashboardErrorModal,
   );
 
   useEffect(() => {
-    if (topicState === 'error') {
+    if (topicState === "error") {
       setIsTopicPanelOpen(false);
     }
   }, [topicState]);
@@ -349,11 +374,20 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       setShowAnalysisModal(false);
       void openOptimizationPanel();
     };
-    window.addEventListener('linkedinwriter:getTopicIdeas', onGetTopicIdeas);
-    window.addEventListener('linkedinwriter:openOptimiseProfile', onOpenOptimise);
+    window.addEventListener("linkedinwriter:getTopicIdeas", onGetTopicIdeas);
+    window.addEventListener(
+      "linkedinwriter:openOptimiseProfile",
+      onOpenOptimise,
+    );
     return () => {
-      window.removeEventListener('linkedinwriter:getTopicIdeas', onGetTopicIdeas);
-      window.removeEventListener('linkedinwriter:openOptimiseProfile', onOpenOptimise);
+      window.removeEventListener(
+        "linkedinwriter:getTopicIdeas",
+        onGetTopicIdeas,
+      );
+      window.removeEventListener(
+        "linkedinwriter:openOptimiseProfile",
+        onOpenOptimise,
+      );
     };
   }, [runTopicAnalysis, openOptimizationPanel]);
 
@@ -368,7 +402,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
   };
 
   return (
-    <div style={{ width: '100%', maxWidth: centered ? undefined : 1200 }}>
+    <div style={{ width: "100%", maxWidth: centered ? undefined : 1200 }}>
       <ProfileAnalysisReadyModal
         open={showAnalysisModal}
         profileStrengthPercent={profileStrengthPercent ?? 0}
@@ -412,7 +446,9 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           profileStrengthPercent={centered ? profileStrengthPercent : null}
           strengthLabel={centered ? strengthLabel : undefined}
           strengthTooltip={centered ? strengthTooltip : undefined}
-          isOptimiseDisabled={isOptimizationDisabled || foundationStatus !== 'ready'}
+          isOptimiseDisabled={
+            isOptimizationDisabled || foundationStatus !== "ready"
+          }
           isOptimiseLoading={isOptimizationLoading}
           hideDisconnectButton={hideDisconnectButton}
         />
@@ -429,7 +465,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         />
       )}
 
-      {!centered && foundationStatus === 'error' && foundationError && (
+      {!centered && foundationStatus === "error" && foundationError && (
         <AnalysisErrorAlert
           error={foundationError}
           onRetry={handleRetryFoundation}
@@ -438,7 +474,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
       {centered ? (
         isOptimizationOpen &&
-        typeof document !== 'undefined' &&
+        typeof document !== "undefined" &&
         createPortal(
           <div
             className="linkedin-profile-optimization-overlay"
@@ -460,7 +496,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 isRechecking={isRechecking}
                 recheckDelta={recheckDelta}
                 onRecheckProfile={() => {
-                  void recheckProfile();
+                  void handleRecheckProfile();
                 }}
                 onDismissRecheckDelta={dismissRecheckDelta}
                 onClose={() => closeOptimizationPanel()}
@@ -476,52 +512,59 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 <ProfileOptimizationPanel
                   variant="modal"
                   isOpen={isOptimizationOpen}
-                isLoading={isOptimizationLoading}
-                recommendations={optimizationRecommendations}
-                optimizationMeta={optimizationMeta}
-                noGapsMessage={
-                  optimizationMeta?.source === 'no_gaps' ? optimizationMeta.message ?? null : null
-                }
-                isExpanded={isOptimizationExpanded}
-                isRefreshing={isOptimizationLoading}
-                showNextBatchCta={showNextBatchCta}
-                isLoadingNextBatch={isLoadingNextBatch}
-                markingRecommendationId={markingRecommendationId}
-                publicIdentifier={publicIdentifier}
-                sectionScores={profileValidation?.section_scores ?? null}
-                aiProfileIntelligence={aiProfileIntelligence}
-                profileStrengthPercent={profileStrengthPercent}
-                recheckDelta={recheckDelta}
-                isRechecking={isRechecking}
+                  isLoading={isOptimizationLoading}
+                  recommendations={optimizationRecommendations}
+                  optimizationMeta={optimizationMeta}
+                  noGapsMessage={
+                    optimizationMeta?.source === "no_gaps"
+                      ? (optimizationMeta.message ?? null)
+                      : null
+                  }
+                  isExpanded={isOptimizationExpanded}
+                  isRefreshing={isOptimizationLoading}
+                  showNextBatchCta={showNextBatchCta}
+                  isLoadingNextBatch={isLoadingNextBatch}
+                  markingRecommendationId={markingRecommendationId}
+                  publicIdentifier={publicIdentifier}
+                  sectionScores={profileValidation?.section_scores ?? null}
+                  aiProfileIntelligence={aiProfileIntelligence}
+                  profileStrengthPercent={profileStrengthPercent}
+                  recheckDelta={recheckDelta}
+                  isRechecking={isRechecking}
                 onRecheckProfile={() => {
-                  void recheckProfile();
+                  void handleRecheckProfile();
                 }}
                 onDismissRecheckDelta={dismissRecheckDelta}
                 onCollapse={closeOptimizationPanel}
-                onExpand={expandOptimization}
-                onRefresh={() => {
-                  void refreshOptimization();
-                }}
-                onMarkDone={(recommendationId) => {
-                  void markOptimizationItemComplete(recommendationId, 'done');
-                }}
-                onSkip={(recommendationId) => {
-                  void markOptimizationItemComplete(recommendationId, 'skipped');
-                }}
-                onLoadNextBatch={() => {
-                  void loadNextOptimizationBatch();
-                }}
-                profilePictureUrl={avatarUrl}
-                localProfilePhotoUrl={localProfilePhotoUrl}
-                transformedProfilePhotoUrl={transformedProfilePhotoUrl}
-                uploadingProfilePhoto={uploadingProfilePhoto}
-                profilePhotoUploadError={profilePhotoUploadError}
-                onUploadProfilePhoto={handleUploadProfilePhoto}
-                transformingProfilePhoto={transformingProfilePhoto}
-                profilePhotoTransformError={profilePhotoTransformError}
-                onMakeProfilePhotoPresentable={handleMakeProfilePhotoPresentable}
-                onDownloadProfilePhoto={handleDownloadProfilePhoto}
-              />
+                  onExpand={expandOptimization}
+                  onRefresh={() => {
+                    void refreshOptimization();
+                  }}
+                  onMarkDone={(recommendationId) => {
+                    void markOptimizationItemComplete(recommendationId, "done");
+                  }}
+                  onSkip={(recommendationId) => {
+                    void markOptimizationItemComplete(
+                      recommendationId,
+                      "skipped",
+                    );
+                  }}
+                  onLoadNextBatch={() => {
+                    void loadNextOptimizationBatch();
+                  }}
+                  profilePictureUrl={avatarUrl}
+                  localProfilePhotoUrl={localProfilePhotoUrl}
+                  transformedProfilePhotoUrl={transformedProfilePhotoUrl}
+                  uploadingProfilePhoto={uploadingProfilePhoto}
+                  profilePhotoUploadError={profilePhotoUploadError}
+                  onUploadProfilePhoto={handleUploadProfilePhoto}
+                  transformingProfilePhoto={transformingProfilePhoto}
+                  profilePhotoTransformError={profilePhotoTransformError}
+                  onMakeProfilePhotoPresentable={
+                    handleMakeProfilePhotoPresentable
+                  }
+                  onDownloadProfilePhoto={handleDownloadProfilePhoto}
+                />
               </div>
               <ProfileOptimizationModalFooter
                 focusedItem={modalFocusedRecommendation}
@@ -529,10 +572,13 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
                 showNextBatchCta={showNextBatchCta}
                 isLoadingNextBatch={isLoadingNextBatch}
                 onSkip={(recommendationId) => {
-                  void markOptimizationItemComplete(recommendationId, 'skipped');
+                  void markOptimizationItemComplete(
+                    recommendationId,
+                    "skipped",
+                  );
                 }}
                 onMarkDone={(recommendationId) => {
-                  void markOptimizationItemComplete(recommendationId, 'done');
+                  void markOptimizationItemComplete(recommendationId, "done");
                 }}
                 onLoadNextBatch={() => {
                   void loadNextOptimizationBatch();
@@ -540,7 +586,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
               />
             </div>
           </div>,
-          document.body
+          document.body,
         )
       ) : (
         <ProfileOptimizationPanel
@@ -549,7 +595,9 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           recommendations={optimizationRecommendations}
           optimizationMeta={optimizationMeta}
           noGapsMessage={
-            optimizationMeta?.source === 'no_gaps' ? optimizationMeta.message ?? null : null
+            optimizationMeta?.source === "no_gaps"
+              ? (optimizationMeta.message ?? null)
+              : null
           }
           isExpanded={isOptimizationExpanded}
           isRefreshing={isOptimizationLoading}
@@ -563,7 +611,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
           recheckDelta={recheckDelta}
           isRechecking={isRechecking}
           onRecheckProfile={() => {
-            void recheckProfile();
+            void handleRecheckProfile();
           }}
           onDismissRecheckDelta={dismissRecheckDelta}
           onCollapse={collapseOptimization}
@@ -572,10 +620,10 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
             void refreshOptimization();
           }}
           onMarkDone={(recommendationId) => {
-            void markOptimizationItemComplete(recommendationId, 'done');
+            void markOptimizationItemComplete(recommendationId, "done");
           }}
           onSkip={(recommendationId) => {
-            void markOptimizationItemComplete(recommendationId, 'skipped');
+            void markOptimizationItemComplete(recommendationId, "skipped");
           }}
           onLoadNextBatch={() => {
             void loadNextOptimizationBatch();
@@ -585,40 +633,42 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
 
       {!centered &&
         (optimizationError || optimizationUserError) &&
-        optimizationPanelState === 'error' && (
-        <AnalysisErrorAlert
-          error={
-            optimizationError ?? {
-              failed_phase: 7,
-              phase_label: 'Profile Optimization',
-              error_code: 'optimization_failed',
-              user_message:
-                optimizationUserError ??
-                "We couldn't load profile suggestions right now. Please try again.",
+        optimizationPanelState === "error" && (
+          <AnalysisErrorAlert
+            error={
+              optimizationError ?? {
+                failed_phase: 7,
+                phase_label: "Profile Optimization",
+                error_code: "optimization_failed",
+                user_message:
+                  optimizationUserError ??
+                  "We couldn't load profile suggestions right now. Please try again.",
+              }
             }
-          }
-          onRetry={() => {
-            void retryOptimization();
-          }}
-          isRetrying={isOptimizationLoading}
-        />
+            onRetry={() => {
+              void retryOptimization();
+            }}
+            isRetrying={isOptimizationLoading}
+          />
         )}
 
-      {!centered && optimizationUserError && optimizationPanelState === 'complete' && (
-        <AnalysisErrorAlert
-          error={{
-            failed_phase: 7,
-            phase_label: 'Profile Optimization',
-            error_code: 'batch_progression_failed',
-            user_message: optimizationUserError,
-          }}
-          onRetry={() => {
-            void retryOptimization();
-          }}
-        />
-      )}
+      {!centered &&
+        optimizationUserError &&
+        optimizationPanelState === "complete" && (
+          <AnalysisErrorAlert
+            error={{
+              failed_phase: 7,
+              phase_label: "Profile Optimization",
+              error_code: "batch_progression_failed",
+              user_message: optimizationUserError,
+            }}
+            onRetry={() => {
+              void retryOptimization();
+            }}
+          />
+        )}
 
-      {foundationStatus === 'needs_completion' && questions.length > 0 && (
+      {foundationStatus === "needs_completion" && questions.length > 0 && (
         <ProfileCompletionForm
           questions={questions}
           onSubmit={submitCompletion}
@@ -627,7 +677,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         />
       )}
 
-      {!centered && topicState === 'error' && topicError && (
+      {!centered && topicState === "error" && topicError && (
         <AnalysisErrorAlert
           error={topicError}
           onRetry={handleRetryTopic}
@@ -638,7 +688,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
       {showTopicModal && (
         <DashboardActionModal
           open
-          title={isAnalyzing ? 'Generating topic ideas…' : 'Topic ideas'}
+          title={isAnalyzing ? "Generating topic ideas…" : "Topic ideas"}
           onClose={closeTopicPanel}
           maxWidth={640}
           maxHeight="min(90vh, 720px)"
@@ -658,7 +708,7 @@ export const LinkedInProfileSetupPanel: React.FC<LinkedInProfileSetupPanelProps>
         </DashboardActionModal>
       )}
 
-      {!centered && topicState === 'complete' && (
+      {!centered && topicState === "complete" && (
         <TopicRecommendationsPanel
           recommendations={recommendations}
           recommendationsMeta={recommendationsMeta}

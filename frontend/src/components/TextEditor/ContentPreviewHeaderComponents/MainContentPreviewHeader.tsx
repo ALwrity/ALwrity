@@ -1,4 +1,6 @@
-import React, { useMemo } from 'react';
+import React from 'react';
+import { Tooltip, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { type LinkedInPreviewMode } from '../../LinkedInWriter/components/LinkedInPreviewModeToggle';
 import PersonaChip from './PersonaChip';
 import { TextToSpeechButton } from '../../shared/TextToSpeechButton';
 
@@ -16,63 +18,27 @@ interface MainContentPreviewHeaderProps {
   researchSources?: any[];
   citations?: any[];
   searchQueries?: string[];
-  qualityMetrics?: any;
   draft: string;
-  showPreview: boolean;
-  onPreviewToggle: () => void;
   assistantOn?: boolean;
   onAssistantToggle?: (enabled: boolean) => void;
   topic?: string;
   platform?: string;
+  previewMode?: LinkedInPreviewMode;
+  onPreviewModeChange?: (mode: LinkedInPreviewMode) => void;
 }
 
 const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
   researchSources,
   citations,
   searchQueries,
-  qualityMetrics,
   draft,
-  showPreview,
-  onPreviewToggle,
   assistantOn,
   onAssistantToggle,
   topic,
-  platform = 'linkedin'
+  platform = 'linkedin',
+  previewMode,
+  onPreviewModeChange,
 }) => {
-  const getChipColor = (v?: number) => {
-    if (typeof v !== 'number') return '#6b7280';
-    if (v >= 0.8) return '#10b981';
-    if (v >= 0.6) return '#f59e0b';
-    return '#ef4444';
-  };
-
-  // Memoize chips array to prevent infinite re-rendering
-  const chips = useMemo(() => {
-    const chipArray = qualityMetrics ? [
-      { label: 'Overall', value: qualityMetrics.overall_score },
-      { label: 'Accuracy', value: qualityMetrics.factual_accuracy },
-      { label: 'Verification', value: qualityMetrics.source_verification },
-      { label: 'Coverage', value: qualityMetrics.citation_coverage }
-    ] : [];
-    
-    console.log('🔍 [ContentPreviewHeader] Chips array created:', {
-      qualityMetrics: qualityMetrics,
-      chips: chipArray,
-      chipsLength: chipArray.length
-    });
-    
-    return chipArray;
-  }, [qualityMetrics]);
-
-  // Helper to build descriptive chip tooltip text
-  const chipDescriptions: Record<string, string> = {
-    Overall: 'Overall blends accuracy, verification and coverage into a single reliability score for this draft.',
-    Accuracy: 'Factual Accuracy estimates how likely statements are to be factually correct based on grounding signals.',
-    Verification: 'Source Verification reflects how well claims are linked to credible sources and whether citations match claims.',
-    Coverage: 'Citation Coverage indicates how much of the content is supported with citations. Higher is better.'
-  };
-
-  const displayPlatform = platform.charAt(0).toUpperCase() + platform.slice(1);
 
   return (
     <div style={{
@@ -87,7 +53,17 @@ const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
       justifyContent: 'space-between'
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        <span>{topic ? `${topic} - ${displayPlatform} Content Preview` : `${displayPlatform} Content Preview`}</span>
+        {topic && (
+          <Tooltip
+            title={<span style={{ fontSize: 12, lineHeight: 1.6 }}>{topic}</span>}
+            arrow placement="bottom-start"
+            componentsProps={{ tooltip: { sx: { maxWidth: 420, bgcolor: '#1e293b', color: '#f1f5f9', fontSize: 12, lineHeight: 1.6, p: 1.5, borderRadius: 2 } } }}
+          >
+            <div style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '4px 12px', fontSize: 11, fontWeight: 600, color: '#0f172a', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 999, cursor: 'pointer' }}>
+              {topic}
+            </div>
+          </Tooltip>
+        )}
         
         {/* Persona Chip */}
         <PersonaChip 
@@ -281,185 +257,7 @@ const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
         )}
       </div>
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-        {/* Quality Metrics Chip */}
-        {chips.length > 0 && (
-          <div style={{ position: 'relative' }}>
-            {/* Main Quality Metrics Chip */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                border: '1px solid #047857',
-                borderRadius: '999px',
-                padding: '6px 14px',
-                fontSize: '11px',
-                fontWeight: '700',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-                transform: 'translateZ(0)',
-                userSelect: 'none'
-              }}
-              title="Quality metrics available. Hover to see detailed progress bars and explanations."
-              onMouseEnter={(e) => {
-                // Clear any existing timeout
-                const target = e.currentTarget as ExtendedDivElement;
-                if (target._qualityTooltipTimeout) {
-                  clearTimeout(target._qualityTooltipTimeout);
-                  target._qualityTooltipTimeout = null;
-                }
-                
-                // Create and show quality metrics tooltip with circular progress bars
-                const tooltip = document.createElement('div');
-                tooltip.style.cssText = `
-                  position: fixed;
-                  z-index: 100000;
-                  background: white;
-                  border: 1px solid #d1fae5;
-                  border-radius: 16px;
-                  box-shadow: 0 12px 40px rgba(0,0,0,0.15);
-                  padding: 24px;
-                  max-width: 500px;
-                  font-size: 12px;
-                  opacity: 0;
-                  transform: translateY(-8px);
-                  transition: all 0.2s ease;
-                  pointer-events: auto;
-                `;
-                
-                // Create circular progress bars for each metric
-                const createCircularProgress = (label: string, value: number, description: string) => {
-                  const percentage = Math.round(value * 100);
-                  const color = getChipColor(value);
-                  const circumference = 2 * Math.PI * 45; // radius = 45
-                  const strokeDasharray = circumference;
-                  const strokeDashoffset = circumference - (percentage / 100) * circumference;
-                  
-                  return `
-                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding: 12px; background: #f8fafc; border-radius: 12px; border-left: 4px solid ${color};">
-                      <div style="position: relative; width: 60px; height: 60px;">
-                        <svg width="60" height="60" style="transform: rotate(-90deg);">
-                          <circle cx="30" cy="30" r="45" stroke="#e5e7eb" stroke-width="6" fill="none"/>
-                          <circle cx="30" cy="30" r="45" stroke="${color}" stroke-width="6" fill="none" 
-                                  stroke-dasharray="${strokeDasharray}" stroke-dashoffset="${strokeDashoffset}"
-                                  style="transition: stroke-dashoffset 0.5s ease;"/>
-                        </svg>
-                        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 700; font-size: 14px; color: ${color};">
-                          ${percentage}%
-                        </div>
-                      </div>
-                      <div style="flex: 1;">
-                        <div style="font-weight: 700; color: #1f2937; margin-bottom: 4px; font-size: 14px;">${label}</div>
-                        <div style="color: #6b7280; line-height: 1.4; font-size: 11px;">${description}</div>
-                      </div>
-                    </div>
-                  `;
-                };
-                
-                let progressBarsHtml = '<div style="margin-bottom: 16px; font-weight: 700; color: #059669; font-size: 16px; text-align: center;">Quality Metrics</div>';
-                
-                chips.forEach(chip => {
-                  progressBarsHtml += createCircularProgress(
-                    chip.label, 
-                    chip.value || 0, 
-                    chipDescriptions[chip.label] || ''
-                  );
-                });
-                
-                tooltip.innerHTML = progressBarsHtml;
-                
-                // Add mouse events to tooltip to keep it visible
-                tooltip.addEventListener('mouseenter', () => {
-                  if (target._qualityTooltipTimeout) {
-                    clearTimeout(target._qualityTooltipTimeout);
-                    target._qualityTooltipTimeout = null;
-                  }
-                });
-                
-                tooltip.addEventListener('mouseleave', () => {
-                  target._qualityTooltipTimeout = setTimeout(() => {
-                    if (tooltip.parentNode) {
-                      tooltip.style.opacity = '0';
-                      tooltip.style.transform = 'translateY(-8px)';
-                      setTimeout(() => {
-                        if (tooltip.parentNode) {
-                          tooltip.remove();
-                        }
-                      }, 200);
-                    }
-                    target._qualityTooltip = null;
-                  }, 100);
-                });
-                
-                document.body.appendChild(tooltip);
-                const rect = e.currentTarget.getBoundingClientRect();
-                tooltip.style.left = Math.min(rect.left, window.innerWidth - 520) + 'px';
-                tooltip.style.top = (rect.bottom + 8) + 'px';
-                
-                // Animate in
-                setTimeout(() => {
-                  tooltip.style.opacity = '1';
-                  tooltip.style.transform = 'translateY(0)';
-                }, 10);
-                
-                target._qualityTooltip = tooltip;
-              }}
-              onMouseLeave={(e) => {
-                const target = e.currentTarget as ExtendedDivElement;
-                if (target._qualityTooltip) {
-                  // Add delay before hiding to allow moving to tooltip
-                  target._qualityTooltipTimeout = setTimeout(() => {
-                    const tooltip = target._qualityTooltip;
-                    if (tooltip && tooltip.parentNode) {
-                      tooltip.style.opacity = '0';
-                      tooltip.style.transform = 'translateY(-8px)';
-                      setTimeout(() => {
-                        if (tooltip.parentNode) {
-                          tooltip.remove();
-                        }
-                      }, 200);
-                    }
-                    target._qualityTooltip = null;
-                  }, 100);
-                }
-              }}
-              onMouseMove={(e) => {
-                // Keep tooltip visible when moving to progress bars
-                const target = e.currentTarget as ExtendedDivElement;
-                if (target._qualityTooltip) {
-                  const tooltip = target._qualityTooltip;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  tooltip.style.left = Math.min(rect.left, window.innerWidth - 520) + 'px';
-                  tooltip.style.top = (rect.bottom + 8) + 'px';
-                }
-              }}
-              onMouseOver={(e) => {
-                // Add hover effect to the chip itself
-                e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(16, 185, 129, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                // Remove hover effect
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(16, 185, 129, 0.3)';
-              }}
-            >
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.9)',
-                flexShrink: 0,
-                boxShadow: '0 0 6px rgba(255, 255, 255, 0.5)'
-              }} />
-              Quality Metrics
-            </div>
-          </div>
-        )}
+        
                 <span style={{ fontSize: '10px', opacity: 0.8 }}>
                   {draft.split(/\s+/).length} words • {Math.ceil(draft.split(/\s+/).length / 200)} min read
                 </span>
@@ -479,18 +277,13 @@ const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
                     Assistive Writing
                   </label>
                 )}
-                <label 
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#666', cursor: 'pointer' }}
-                  title="Toggle preview visibility"
-                >
-                  <input 
-                    type="checkbox" 
-                    checked={!showPreview} 
-                    onChange={() => onPreviewToggle()} 
-                    style={{ margin: 0 }}
-                  />
-                  Hide Preview
-                </label>
+{previewMode && onPreviewModeChange && (
+  <ToggleButtonGroup size="small" exclusive value={previewMode} onChange={(_, next) => { if (next) onPreviewModeChange(next); }} aria-label="Preview mode">
+    <ToggleButton value="linkedin" sx={{ textTransform: 'none', px: 1, py: 0.25, fontSize: 10 }}>LinkedIn</ToggleButton>
+    <ToggleButton value="studio" sx={{ textTransform: 'none', px: 1, py: 0.25, fontSize: 10 }}>Studio</ToggleButton>
+  </ToggleButtonGroup>
+)}
+                
       </div>
     </div>
   );

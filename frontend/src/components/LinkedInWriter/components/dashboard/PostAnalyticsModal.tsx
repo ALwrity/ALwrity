@@ -1,6 +1,6 @@
-import React, { useCallback } from 'react';
-import { DashboardActionModal } from './DashboardActionModal';
-import { PostAnalyticsPanel } from '../PostAnalytics/PostAnalyticsPanel';
+import React, { useCallback } from "react";
+import { DashboardActionModal } from "./DashboardActionModal";
+import { PostAnalyticsPanel } from "../PostAnalytics/PostAnalyticsPanel";
 
 interface PostAnalyticsModalProps {
   open: boolean;
@@ -18,7 +18,7 @@ export const PostAnalyticsModal: React.FC<PostAnalyticsModalProps> = ({
       onClose();
       onGenerateSimilarPost?.(prompt);
     },
-    [onClose, onGenerateSimilarPost]
+    [onClose, onGenerateSimilarPost],
   );
 
   return (

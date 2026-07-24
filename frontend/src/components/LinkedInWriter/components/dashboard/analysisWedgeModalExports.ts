@@ -8,6 +8,6 @@ export {
   BrandScorecardModal,
   WeeklyPlanModal,
   ViralCopywriterModal,
-} from './AnalysisWedgeModals';
+} from "./AnalysisWedgeModals";
 
-export { EngagementTrendsModal } from './EngagementTrendsModal';
+export { EngagementTrendsModal } from "./EngagementTrendsModal";

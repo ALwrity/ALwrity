@@ -195,6 +195,20 @@ export function useLinkedInProfileCompletion() {
     });
   }, []);
 
+  const applyProfileRefreshResponse = useCallback((data: LinkedInProfileAcquireResponse) => {
+    setProfile(data.profile ?? null);
+    setProfileValidation(data.profile_validation ?? null);
+    setAiProfileIntelligence(data.ai_profile_intelligence ?? null);
+    setAiProfileIntelligenceMeta(data.ai_profile_intelligence_meta ?? null);
+    setLastCompletedPhase(data.last_completed_phase ?? null);
+
+    console.info(`${LOG_PREFIX} profile refresh response applied`, {
+      lastCompletedPhase: data.last_completed_phase ?? null,
+      isProfileComplete: data.profile_validation?.is_profile_complete ?? false,
+      hasIntelligence: Boolean(data.ai_profile_intelligence),
+    });
+  }, []);
+
   const loadFoundation = useCallback(async () => {
     const attemptId = ++foundationAttemptRef.current;
     console.info(`${LOG_PREFIX} foundation load start`);
@@ -339,5 +353,6 @@ export function useLinkedInProfileCompletion() {
     loadFoundation,
     runTopicAnalysis,
     submitCompletion,
+    applyProfileRefreshResponse,
   };
 }

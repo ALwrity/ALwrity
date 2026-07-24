@@ -1,8 +1,8 @@
-import React from 'react';
-import { createPortal } from 'react-dom';
-import { LI_Z_TOUR } from '../../utils/linkedInStudioZIndex';
-import type { LinkedInProfileAnalysisError } from '../../../../api/linkedinSocial';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
+import React from "react";
+import { createPortal } from "react-dom";
+import { LI_Z_TOUR } from "../../utils/linkedInStudioZIndex";
+import type { LinkedInProfileAnalysisError } from "../../../../api/linkedinSocial";
+import { FRAME_COLOR } from "./dashboardWorkflowConfig";
 
 interface DashboardErrorModalProps {
   open: boolean;
@@ -19,7 +19,7 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
   onRetry,
   onDismiss,
   isRetrying = false,
-  title = 'Something went wrong',
+  title = "Something went wrong",
 }) => {
   if (!open) return null;
 
@@ -29,13 +29,13 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
       aria-modal="true"
       aria-labelledby="dashboard-error-title"
       style={{
-        position: 'fixed',
+        position: "fixed",
         inset: 0,
         zIndex: LI_Z_TOUR,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.5)',
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(15, 23, 42, 0.5)",
         padding: 20,
       }}
       onClick={onDismiss}
@@ -43,31 +43,36 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(460px, 100%)',
+          width: "min(460px, 100%)",
           maxWidth: 420,
-          maxHeight: 'calc(100vh - 40px)',
-          overflowY: 'auto',
-          background: '#fffbeb',
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto",
+          background: "#fffbeb",
           borderRadius: 14,
-          border: '2px solid #fde68a',
-          boxShadow: '0 20px 48px rgba(0, 0, 0, 0.18)',
-          overflow: 'hidden',
+          border: "2px solid #fde68a",
+          boxShadow: "0 20px 48px rgba(0, 0, 0, 0.18)",
+          overflow: "hidden",
         }}
       >
         <div
           style={{
-            padding: '14px 18px',
-            borderBottom: '1px solid #fde68a',
-            background: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            padding: "14px 18px",
+            borderBottom: "1px solid #fde68a",
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             gap: 12,
           }}
         >
           <h2
             id="dashboard-error-title"
-            style={{ margin: 0, fontSize: 15, fontWeight: 700, color: '#92400e' }}
+            style={{
+              margin: 0,
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#92400e",
+            }}
           >
             {title}
           </h2>
@@ -76,12 +81,12 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
             onClick={onDismiss}
             aria-label="Close"
             style={{
-              background: 'transparent',
-              border: 'none',
+              background: "transparent",
+              border: "none",
               fontSize: 20,
               lineHeight: 1,
-              cursor: 'pointer',
-              color: '#78716c',
+              cursor: "pointer",
+              color: "#78716c",
               padding: 4,
             }}
           >
@@ -89,21 +94,29 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
           </button>
         </div>
 
-        <div style={{ padding: '16px 18px', color: '#92400e' }}>
-          <p style={{ margin: '0 0 8px', fontWeight: 600, fontSize: 14, lineHeight: 1.45 }}>
+        <div style={{ padding: "16px 18px", color: "#92400e" }}>
+          <p
+            style={{
+              margin: "0 0 8px",
+              fontWeight: 600,
+              fontSize: 14,
+              lineHeight: 1.45,
+            }}
+          >
             {error.user_message}
           </p>
-          <p style={{ margin: 0, fontSize: 12, color: '#b45309' }}>
-            Failed at Phase {error.failed_phase}: {error.phase_label} ({error.error_code})
+          <p style={{ margin: 0, fontSize: 12, color: "#b45309" }}>
+            Failed at Phase {error.failed_phase}: {error.phase_label} (
+            {error.error_code})
           </p>
-          {process.env.NODE_ENV === 'development' && error.debug_message && (
+          {process.env.NODE_ENV === "development" && error.debug_message && (
             <p
               style={{
-                margin: '10px 0 0',
+                margin: "10px 0 0",
                 fontSize: 11,
-                color: '#78716c',
-                fontFamily: 'monospace',
-                wordBreak: 'break-word',
+                color: "#78716c",
+                fontFamily: "monospace",
+                wordBreak: "break-word",
                 lineHeight: 1.4,
               }}
             >
@@ -111,39 +124,46 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
             </p>
           )}
 
-          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              marginTop: 16,
+              flexWrap: "wrap",
+            }}
+          >
             {onRetry && (
               <button
                 type="button"
                 onClick={onRetry}
                 disabled={isRetrying}
                 style={{
-                  padding: '9px 18px',
+                  padding: "9px 18px",
                   borderRadius: 8,
-                  border: '1px solid #f59e0b',
-                  backgroundColor: '#fff',
-                  color: '#92400e',
+                  border: "1px solid #f59e0b",
+                  backgroundColor: "#fff",
+                  color: "#92400e",
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: isRetrying ? 'default' : 'pointer',
+                  cursor: isRetrying ? "default" : "pointer",
                   opacity: isRetrying ? 0.7 : 1,
                 }}
               >
-                {isRetrying ? 'Retrying…' : 'Retry'}
+                {isRetrying ? "Retrying…" : "Retry"}
               </button>
             )}
             <button
               type="button"
               onClick={onDismiss}
               style={{
-                padding: '9px 18px',
+                padding: "9px 18px",
                 borderRadius: 8,
                 border: `1px solid ${FRAME_COLOR}`,
-                backgroundColor: '#fff',
-                color: '#475569',
+                backgroundColor: "#fff",
+                color: "#475569",
                 fontSize: 13,
                 fontWeight: 600,
-                cursor: 'pointer',
+                cursor: "pointer",
               }}
             >
               Close
@@ -154,5 +174,7 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
     </div>
   );
 
-  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
+  return typeof document !== "undefined"
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };

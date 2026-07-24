@@ -2,35 +2,35 @@
  * Comment Assistant inbox data + actions (Phase 3).
  * Keeps CommentAssistantInboxModal under the 500-line limit.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   commentAssistantApi,
   getCommentAssistantErrorMessage,
   getCommentAssistantReplyErrorMessage,
-} from '../../../../services/commentAssistantApi';
-import { linkedInWriterApi } from '../../../../services/linkedInWriterApi';
-import { postCommentsApi } from '../../../../services/postCommentsApi';
-import { loadCommentAssistantInbox } from './commentAssistantInboxLoad';
-import { formatTimeLabel } from './commentAssistantMappers';
-import type { CommentAssistantReplyPayload } from './commentAssistantReplyComposer';
-import type { CommentAssistantReactionType } from './commentAssistantReactions';
+} from "../../../../services/commentAssistantApi";
+import { linkedInWriterApi } from "../../../../services/linkedInWriterApi";
+import { postCommentsApi } from "../../../../services/postCommentsApi";
+import { loadCommentAssistantInbox } from "./commentAssistantInboxLoad";
+import { formatTimeLabel } from "./commentAssistantMappers";
+import type { CommentAssistantReplyPayload } from "./commentAssistantReplyComposer";
+import type { CommentAssistantReactionType } from "./commentAssistantReactions";
 import type {
   CommentAssistantCommentView,
   CommentAssistantEmptyReason,
   CommentAssistantPostGroupView,
   CommentAssistantReplyView,
   CommentAssistantTab,
-} from './commentAssistantTypes';
+} from "./commentAssistantTypes";
 
 /** Match server cache TTL so Sync cannot hammer Unipile every minute. */
 const SYNC_COOLDOWN_MS = 300_000;
 
-type InboxLoadState = 'idle' | 'loading' | 'ready';
+type InboxLoadState = "idle" | "loading" | "ready";
 
 function isPriorityTab(
-  tab: CommentAssistantTab
-): tab is Exclude<CommentAssistantTab, 'manual'> {
-  return tab !== 'manual';
+  tab: CommentAssistantTab,
+): tab is Exclude<CommentAssistantTab, "manual"> {
+  return tab !== "manual";
 }
 
 type CommentActionState = {
@@ -42,7 +42,7 @@ type CommentActionState = {
 function findCommentOrReply(
   groups: CommentAssistantPostGroupView[],
   postId: string,
-  commentId: string
+  commentId: string,
 ): CommentActionState | null {
   const group = groups.find((g) => g.postId === postId);
   if (!group?.comments) return null;
@@ -60,24 +60,23 @@ type CommentOrReplyPatch = Partial<CommentAssistantCommentView> &
   Partial<CommentAssistantReplyView>;
 
 export function useCommentAssistantInbox(open: boolean, connected: boolean) {
-  const [tab, setTab] = useState<CommentAssistantTab>('needs_reply');
-  const [loadState, setLoadState] = useState<InboxLoadState>('idle');
+  const [tab, setTab] = useState<CommentAssistantTab>("needs_reply");
+  const [loadState, setLoadState] = useState<InboxLoadState>("idle");
   const [groups, setGroups] = useState<CommentAssistantPostGroupView[]>([]);
   const [counts, setCounts] = useState<
-    Partial<Record<'needs_reply' | 'active' | 'older', number>>
+    Partial<Record<"needs_reply" | "active" | "older", number>>
   >({});
-  const [error, setError] = useState('');
-  const [actionError, setActionError] = useState('');
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [statusMessage, setStatusMessage] = useState<{
-    tone: 'info' | 'success';
+    tone: "info" | "success";
     text: string;
   } | null>(null);
   const [cooldownUntil, setCooldownUntil] = useState(0);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
-  const [emptyReason, setEmptyReason] = useState<CommentAssistantEmptyReason | null>(
-    null
-  );
+  const [emptyReason, setEmptyReason] =
+    useState<CommentAssistantEmptyReason | null>(null);
   const requestIdRef = useRef(0);
   const statusTimerRef = useRef<number | null>(null);
   const groupsRef = useRef<CommentAssistantPostGroupView[]>([]);
@@ -94,7 +93,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   }, []);
 
   const showStatus = useCallback(
-    (tone: 'info' | 'success', text: string, autoClearMs?: number) => {
+    (tone: "info" | "success", text: string, autoClearMs?: number) => {
       clearStatusTimer();
       setStatusMessage({ tone, text });
       if (autoClearMs && autoClearMs > 0) {
@@ -104,36 +103,39 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         }, autoClearMs);
       }
     },
-    [clearStatusTimer]
+    [clearStatusTimer],
   );
 
   const resetInboxShell = useCallback(() => {
     clearStatusTimer();
-    setTab('needs_reply');
+    setTab("needs_reply");
     setGroups([]);
     setCounts({});
-    setLoadState('idle');
-    setError('');
-    setActionError('');
+    setLoadState("idle");
+    setError("");
+    setActionError("");
     setStatusMessage(null);
     setLastSyncedAt(null);
     setEmptyReason(null);
   }, [clearStatusTimer]);
 
   const loadInbox = useCallback(
-    async (priority: Exclude<CommentAssistantTab, 'manual'>, refresh = false) => {
+    async (
+      priority: Exclude<CommentAssistantTab, "manual">,
+      refresh = false,
+    ) => {
       if (!connected) {
         setGroups([]);
-        setLoadState('ready');
-        setError('');
+        setLoadState("ready");
+        setError("");
         setEmptyReason(null);
         return;
       }
 
       const reqId = ++requestIdRef.current;
-      setLoadState('loading');
-      setError('');
-      setActionError('');
+      setLoadState("loading");
+      setError("");
+      setActionError("");
       // Keep existing groups visible while refreshing (stale-while-revalidate).
 
       try {
@@ -152,7 +154,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         setCounts(result.counts);
         setLastSyncedAt(result.lastSyncedAt);
         setEmptyReason(result.emptyReason);
-        setLoadState('ready');
+        setLoadState("ready");
       } catch (err) {
         if (reqId !== requestIdRef.current) return;
         setGroups([]);
@@ -160,10 +162,10 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         setLastSyncedAt(null);
         setEmptyReason(null);
         setError(getCommentAssistantErrorMessage(err));
-        setLoadState('ready');
+        setLoadState("ready");
       }
     },
-    [connected]
+    [connected],
   );
 
   useEffect(() => {
@@ -172,9 +174,9 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       return;
     }
     if (!connected) {
-      setLoadState('ready');
+      setLoadState("ready");
       setGroups([]);
-      setError('');
+      setError("");
       return;
     }
     if (isPriorityTab(tab)) {
@@ -198,14 +200,14 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
   }, [open, cooldownUntil]);
 
   const handleSync = useCallback(() => {
-    if (!connected || loadState === 'loading' || !isPriorityTab(tab)) return;
+    if (!connected || loadState === "loading" || !isPriorityTab(tab)) return;
     if (Date.now() < cooldownUntil) return;
     setCooldownUntil(Date.now() + SYNC_COOLDOWN_MS);
     void loadInbox(tab, true);
   }, [connected, loadState, tab, cooldownUntil, loadInbox]);
 
   const retryPost = useCallback(() => {
-    if (!connected || loadState === 'loading' || !isPriorityTab(tab)) return;
+    if (!connected || loadState === "loading" || !isPriorityTab(tab)) return;
     // Must bypass cache — soft-failed posts are stored in the warm snapshot.
     if (Date.now() < cooldownUntil) return;
     setCooldownUntil(Date.now() + SYNC_COOLDOWN_MS);
@@ -225,11 +227,11 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
                 return { ...c, ...patch };
               }
               const patchReplies = (
-                replies?: CommentAssistantReplyView[]
+                replies?: CommentAssistantReplyView[],
               ): CommentAssistantReplyView[] | undefined => {
                 if (!replies) return replies;
                 return replies.map((r) =>
-                  r.id === commentId ? { ...r, ...patch } : r
+                  r.id === commentId ? { ...r, ...patch } : r,
                 );
               };
               return {
@@ -239,10 +241,10 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
               };
             }),
           };
-        })
+        }),
       );
     },
-    []
+    [],
   );
 
   const handleReact = useCallback(
@@ -250,19 +252,24 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       postId: string,
       socialId: string,
       commentId: string,
-      reactionType: CommentAssistantReactionType
+      reactionType: CommentAssistantReactionType,
     ) => {
-      setActionError('');
+      setActionError("");
       const prev = findCommentOrReply(groups, postId, commentId);
       updateComment(postId, commentId, {
         liked: true,
         userReacted: reactionType,
         likeBusy: true,
-        reactionCount: Math.max((prev?.reactionCount ?? 0), 0) + (prev?.userReacted ? 0 : 1),
+        reactionCount:
+          Math.max(prev?.reactionCount ?? 0, 0) + (prev?.userReacted ? 0 : 1),
       });
       try {
         // Same Unipile like path as top-level comments (works for nested reply ids).
-        await commentAssistantApi.likeComment(commentId, socialId, reactionType);
+        await commentAssistantApi.likeComment(
+          commentId,
+          socialId,
+          reactionType,
+        );
         updateComment(postId, commentId, {
           liked: true,
           userReacted: reactionType,
@@ -278,7 +285,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         setActionError(getCommentAssistantErrorMessage(err));
       }
     },
-    [groups, updateComment]
+    [groups, updateComment],
   );
 
   const handleSendReply = useCallback(
@@ -286,10 +293,10 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       postId: string,
       socialId: string,
       commentId: string,
-      payload: CommentAssistantReplyPayload
+      payload: CommentAssistantReplyPayload,
     ) => {
-      setActionError('');
-      showStatus('info', 'Sending your reply…');
+      setActionError("");
+      showStatus("info", "Sending your reply…");
       updateComment(postId, commentId, { replyBusy: true });
       try {
         // Same multipart reply path; commentId may be a nested reply id.
@@ -299,8 +306,8 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           mentions: payload.mentions,
           imageFile: payload.imageFile,
         });
-        updateComment(postId, commentId, { replyBusy: false, draftText: '' });
-        showStatus('success', 'Reply posted successfully.', 4500);
+        updateComment(postId, commentId, { replyBusy: false, draftText: "" });
+        showStatus("success", "Reply posted successfully.", 4500);
         if (isPriorityTab(tab)) {
           await loadInbox(tab, false);
         }
@@ -310,7 +317,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         setActionError(getCommentAssistantReplyErrorMessage(err));
       }
     },
-    [tab, loadInbox, updateComment, showStatus]
+    [tab, loadInbox, updateComment, showStatus],
   );
 
   const handleDraftAi = useCallback(
@@ -318,32 +325,32 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       postId: string,
       postText: string,
       commentId: string,
-      commentText: string
+      commentText: string,
     ) => {
-      setActionError('');
+      setActionError("");
       updateComment(postId, commentId, { draftBusy: true });
       try {
         const res = await linkedInWriterApi.generateCommentResponse({
           original_post: postText,
           comment: commentText,
-          response_type: 'professional',
+          response_type: "professional",
           include_question: false,
         });
         updateComment(postId, commentId, {
           draftBusy: false,
-          draftText: res.response ?? '',
+          draftText: res.response ?? "",
         });
       } catch {
         updateComment(postId, commentId, { draftBusy: false });
-        setActionError('Could not draft a reply. Please try again.');
+        setActionError("Could not draft a reply. Please try again.");
       }
     },
-    [updateComment]
+    [updateComment],
   );
 
   const handleLoadMore = useCallback(
     async (postId: string, socialId: string, cursor: string) => {
-      setActionError('');
+      setActionError("");
       try {
         const page = await postCommentsApi.fetchPostComments(socialId, {
           cursor,
@@ -357,11 +364,11 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
               .filter((item) => item.id && !existing.has(item.id))
               .map((item) => ({
                 id: item.id,
-                authorName: item.author?.name || 'Unknown',
+                authorName: item.author?.name || "Unknown",
                 authorId: item.author_id || null,
                 headline: item.author?.headline || null,
                 avatarUrl: item.author?.avatar_url || null,
-                text: item.text || '',
+                text: item.text || "",
                 timeLabel: formatTimeLabel(item.created_at),
                 liked: Boolean(item.user_reacted),
                 userReacted: item.user_reacted || null,
@@ -375,28 +382,30 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
               hasMoreComments: Boolean(page.has_more),
               commentsCursor: page.cursor || null,
             };
-          })
+          }),
         );
       } catch (err) {
         setActionError(getCommentAssistantErrorMessage(err));
       }
     },
-    []
+    [],
   );
 
   /** Lazy-load full thread (same Unipile path as Engagement Trends). */
   const handleShowThreadReplies = useCallback(
     async (postId: string, socialId: string, commentId: string) => {
-      setActionError('');
+      setActionError("");
       try {
         const page = await postCommentsApi.fetchPostComments(socialId, {
           commentId,
           limit: 50,
         });
-        const threadReplies: CommentAssistantReplyView[] = (page.items || []).map((item) => ({
+        const threadReplies: CommentAssistantReplyView[] = (
+          page.items || []
+        ).map((item) => ({
           id: item.id,
-          text: item.text || '',
-          authorName: item.author?.name || 'Someone',
+          text: item.text || "",
+          authorName: item.author?.name || "Someone",
           authorId: item.author_id || null,
           timeLabel: formatTimeLabel(item.created_at),
           isMine: false,
@@ -410,7 +419,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
         setActionError(getCommentAssistantErrorMessage(err));
       }
     },
-    [updateComment]
+    [updateComment],
   );
 
   return {
@@ -426,7 +435,10 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     lastSyncedAt,
     emptyReason,
     syncDisabled:
-      !connected || loadState === 'loading' || cooldownLeft > 0 || tab === 'manual',
+      !connected ||
+      loadState === "loading" ||
+      cooldownLeft > 0 ||
+      tab === "manual",
     handleSync,
     retryPost,
     handleReact,

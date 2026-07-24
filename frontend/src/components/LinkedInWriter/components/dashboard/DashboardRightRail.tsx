@@ -1,8 +1,14 @@
-import React from 'react';
-import { DashboardAnalyticsSidebar, DASHBOARD_RIGHT_RAIL_WIDTH } from './DashboardAnalyticsSidebar';
-import { KnowledgeCenterDock, type KnowledgeCenterAction } from './KnowledgeCenterDock';
-import { LibraryRailButton } from './LibraryRailButton';
-import { StudioTourTrigger } from './StudioTourTrigger';
+import React from "react";
+import {
+  DashboardAnalyticsSidebar,
+  DASHBOARD_RIGHT_RAIL_WIDTH,
+} from "./DashboardAnalyticsSidebar";
+import {
+  KnowledgeCenterDock,
+  type KnowledgeCenterAction,
+} from "./KnowledgeCenterDock";
+import { LibraryRailButton } from "./LibraryRailButton";
+import { StudioTourTrigger } from "./StudioTourTrigger";
 
 interface DashboardRightRailProps {
   onViewAllAnalytics?: () => void;
@@ -21,17 +27,19 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
       style={{
         width: DASHBOARD_RIGHT_RAIL_WIDTH,
         flexShrink: 0,
-        alignSelf: 'stretch',
-        background: 'transparent',
-        padding: '10px 10px 12px',
-        display: 'flex',
-        flexDirection: 'column',
+        alignSelf: "stretch",
+        background: "transparent",
+        padding: "10px 10px 12px",
+        display: "flex",
+        flexDirection: "column",
         gap: 10,
         minHeight: 0,
-        overflow: 'visible',
+        overflow: "visible",
       }}
     >
-      <h2 className="linkedin-dashboard-data-section-title">Analytics &amp; Knowledge</h2>
+      <h2 className="linkedin-dashboard-data-section-title">
+        Analytics &amp; Knowledge
+      </h2>
 
       <div className="linkedin-dashboard-analytics-row">
         <div className="linkedin-dashboard-rail-tour-slot">
@@ -46,7 +54,10 @@ export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
         <LibraryRailButton />
 
         {onKnowledgeCenterAction && (
-          <KnowledgeCenterDock variant="rail" onFeatureAction={onKnowledgeCenterAction} />
+          <KnowledgeCenterDock
+            variant="rail"
+            onFeatureAction={onKnowledgeCenterAction}
+          />
         )}
       </div>
     </aside>

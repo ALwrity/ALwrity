@@ -9,32 +9,34 @@ import type {
   CommentAssistantPostGroupView,
   CommentAssistantReplyApi,
   CommentAssistantReplyView,
-} from './commentAssistantTypes';
+} from "./commentAssistantTypes";
 
 export function formatTimeLabel(iso: string | undefined): string {
-  if (!iso) return '';
+  if (!iso) return "";
   const dt = new Date(iso);
   if (Number.isNaN(dt.getTime())) return iso;
   const diffMs = Date.now() - dt.getTime();
   const mins = Math.floor(diffMs / 60_000);
-  if (mins < 1) return 'just now';
+  if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 14) return `${days}d ago`;
   try {
-    return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    return dt.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   } catch {
     return iso;
   }
 }
 
-function mapReplyToView(reply: CommentAssistantReplyApi): CommentAssistantReplyView {
+function mapReplyToView(
+  reply: CommentAssistantReplyApi,
+): CommentAssistantReplyView {
   return {
     id: reply.id,
-    text: reply.text || '',
-    authorName: reply.is_mine ? 'You' : reply.author_name || 'Someone',
+    text: reply.text || "",
+    authorName: reply.is_mine ? "You" : reply.author_name || "Someone",
     authorId: reply.author_id || null,
     timeLabel: formatTimeLabel(reply.created_at),
     isMine: Boolean(reply.is_mine),
@@ -46,15 +48,15 @@ function mapReplyToView(reply: CommentAssistantReplyApi): CommentAssistantReplyV
 }
 
 export function mapCommentToView(
-  comment: CommentAssistantCommentApi
+  comment: CommentAssistantCommentApi,
 ): CommentAssistantCommentView {
   return {
     id: comment.id,
-    authorName: comment.author?.name || 'Unknown',
+    authorName: comment.author?.name || "Unknown",
     authorId: comment.author_id || null,
     headline: comment.author?.headline || null,
     avatarUrl: comment.author?.avatar_url || null,
-    text: comment.text || '',
+    text: comment.text || "",
     timeLabel: formatTimeLabel(comment.created_at),
     liked: Boolean(comment.user_reacted),
     userReacted: comment.user_reacted || null,
@@ -66,13 +68,13 @@ export function mapCommentToView(
 }
 
 export function mapGroupToView(
-  group: CommentAssistantPostGroupApi
+  group: CommentAssistantPostGroupApi,
 ): CommentAssistantPostGroupView {
-  const fullText = (group.post_text || group.post_snippet || '').trim();
+  const fullText = (group.post_text || group.post_snippet || "").trim();
   return {
     postId: group.post_id,
     socialId: group.social_id,
-    postSnippet: group.post_snippet || '',
+    postSnippet: group.post_snippet || "",
     postText: fullText,
     comments: group.comments_pending
       ? null

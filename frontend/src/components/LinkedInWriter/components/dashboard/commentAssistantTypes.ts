@@ -2,9 +2,10 @@
  * UI + API types for Comment Assistant inbox.
  */
 
-export type CommentAssistantTab = 'needs_reply' | 'active' | 'older' | 'manual';
+export type CommentAssistantTab = "needs_reply" | "active" | "older" | "manual";
 
-export type CommentAssistantPriority = 'needs_reply' | 'active' | 'older' | 'all';
+export type CommentAssistantPriority =
+  "needs_reply" | "active" | "older" | "all";
 
 export interface CommentAssistantReplyView {
   id: string;
@@ -89,7 +90,7 @@ export interface CommentAssistantCommentApi {
   user_reacted?: string | null;
   image_url?: string | null;
   needs_reply?: boolean;
-  priority?: 'needs_reply' | 'active' | 'older';
+  priority?: "needs_reply" | "active" | "older";
   my_replies?: CommentAssistantReplyApi[];
 }
 
@@ -107,7 +108,7 @@ export interface CommentAssistantPostGroupApi {
   error?: string | null;
 }
 
-export type CommentAssistantEmptyReason = 'no_analytics' | 'no_candidates';
+export type CommentAssistantEmptyReason = "no_analytics" | "no_candidates";
 
 export interface CommentAssistantInboxResponse {
   groups: CommentAssistantPostGroupApi[];

@@ -1,10 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from "react";
 
 import {
   getPostCommentsErrorMessage,
   postCommentsApi,
-} from '../../../../services/postCommentsApi';
-import type { PostComment } from './postCommentsTypes';
+} from "../../../../services/postCommentsApi";
+import type { PostComment } from "./postCommentsTypes";
 
 export type CommentRepliesMap = Record<string, PostComment[]>;
 
@@ -16,11 +16,20 @@ export interface UsePostCommentRepliesOptions {
 /**
  * Lazy-load and cache nested replies for parent comments.
  */
-export function usePostCommentReplies({ socialId, connected }: UsePostCommentRepliesOptions) {
+export function usePostCommentReplies({
+  socialId,
+  connected,
+}: UsePostCommentRepliesOptions) {
   const [repliesByParent, setRepliesByParent] = useState<CommentRepliesMap>({});
-  const [expandedParents, setExpandedParents] = useState<Record<string, boolean>>({});
-  const [loadingParents, setLoadingParents] = useState<Record<string, boolean>>({});
-  const [errorsByParent, setErrorsByParent] = useState<Record<string, string>>({});
+  const [expandedParents, setExpandedParents] = useState<
+    Record<string, boolean>
+  >({});
+  const [loadingParents, setLoadingParents] = useState<Record<string, boolean>>(
+    {},
+  );
+  const [errorsByParent, setErrorsByParent] = useState<Record<string, string>>(
+    {},
+  );
   const mountedRef = useRef(true);
 
   const resetReplies = useCallback(() => {
@@ -35,10 +44,17 @@ export function usePostCommentReplies({ socialId, connected }: UsePostCommentRep
   }, []);
 
   const fetchReplies = useCallback(
-    async (parentCommentId: string, { force = false }: { force?: boolean } = {}) => {
+    async (
+      parentCommentId: string,
+      { force = false }: { force?: boolean } = {},
+    ) => {
       if (!socialId || !connected || !parentCommentId) return;
 
-      if (!force && repliesByParent[parentCommentId] && !errorsByParent[parentCommentId]) {
+      if (
+        !force &&
+        repliesByParent[parentCommentId] &&
+        !errorsByParent[parentCommentId]
+      ) {
         setExpandedParents((prev) => ({ ...prev, [parentCommentId]: true }));
         return;
       }
@@ -74,7 +90,7 @@ export function usePostCommentReplies({ socialId, connected }: UsePostCommentRep
         }
       }
     },
-    [socialId, connected, repliesByParent, errorsByParent]
+    [socialId, connected, repliesByParent, errorsByParent],
   );
 
   const toggleReplies = useCallback(
@@ -85,14 +101,14 @@ export function usePostCommentReplies({ socialId, connected }: UsePostCommentRep
       }
       await fetchReplies(parentCommentId);
     },
-    [expandedParents, fetchReplies]
+    [expandedParents, fetchReplies],
   );
 
   const refreshReplies = useCallback(
     async (parentCommentId: string) => {
       await fetchReplies(parentCommentId, { force: true });
     },
-    [fetchReplies]
+    [fetchReplies],
   );
 
   return {

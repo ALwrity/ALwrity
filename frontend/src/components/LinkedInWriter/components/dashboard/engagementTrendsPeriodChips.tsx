@@ -1,11 +1,11 @@
-import React from 'react';
+import React from "react";
 
-import { colors } from '../GrowthEngine/styles';
-import { PERIOD_CHIP_LABELS } from './engagementTrendsCopy';
+import { colors } from "../GrowthEngine/styles";
+import { PERIOD_CHIP_LABELS } from "./engagementTrendsCopy";
 import {
   ENGAGEMENT_PERIOD_KEYS,
   type EngagementPeriodKey,
-} from './engagementTrendsPeriodUtils';
+} from "./engagementTrendsPeriodUtils";
 
 export interface EngagementTrendsPeriodChipsProps {
   value: EngagementPeriodKey;
@@ -13,17 +13,15 @@ export interface EngagementTrendsPeriodChipsProps {
   disabled?: boolean;
 }
 
-export const EngagementTrendsPeriodChips: React.FC<EngagementTrendsPeriodChipsProps> = ({
-  value,
-  onChange,
-  disabled = false,
-}) => (
+export const EngagementTrendsPeriodChips: React.FC<
+  EngagementTrendsPeriodChipsProps
+> = ({ value, onChange, disabled = false }) => (
   <div
     role="group"
     aria-label="Time range"
     style={{
-      display: 'flex',
-      flexWrap: 'wrap',
+      display: "flex",
+      flexWrap: "wrap",
       gap: 6,
       marginBottom: 10,
     }}
@@ -38,14 +36,14 @@ export const EngagementTrendsPeriodChips: React.FC<EngagementTrendsPeriodChipsPr
           aria-pressed={selected}
           onClick={() => onChange(key)}
           style={{
-            padding: '5px 10px',
+            padding: "5px 10px",
             borderRadius: 999,
             border: `1px solid ${selected ? colors.primary : colors.border}`,
-            background: selected ? '#eff6ff' : colors.rowBg,
+            background: selected ? "#eff6ff" : colors.rowBg,
             color: selected ? colors.primary : colors.textSecondary,
             fontSize: 11,
             fontWeight: selected ? 700 : 600,
-            cursor: disabled ? 'not-allowed' : 'pointer',
+            cursor: disabled ? "not-allowed" : "pointer",
             opacity: disabled ? 0.6 : 1,
             lineHeight: 1.2,
           }}

@@ -227,7 +227,7 @@ export const pillarData: PillarData[] = [
         priority: 'high' as const,
         estimatedTime: 20,
         actionType: 'navigate' as const,
-        actionUrl: '/linkedin-writer',
+        actionUrl: '/linkedin-studio',
         icon: LinkedInIcon,
         color: '#0077B5',
         enabled: true,

@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import {
-  LinkedInPreviewModeToggle,
-  type LinkedInPreviewMode,
-} from '../LinkedInWriter/components/LinkedInPreviewModeToggle';
+import React from 'react';
+import { LinkedInDraftPreview } from '../LinkedInWriter/components/LinkedInDraftPreview';
+import { LinkedInPublishPreviewPlain } from '../LinkedInWriter/components/LinkedInPublishPreviewPlain';
+import { type LinkedInPreviewMode } from '../LinkedInWriter/components/LinkedInPreviewModeToggle';
 import { LinkedInAssistiveEditor, type LinkedInAssistiveEditorHandle } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
 import type { LinkedInAssistiveSuggestion } from '../LinkedInWriter/services/linkedInAssistiveWritingApi';
@@ -35,6 +34,8 @@ interface ContentDisplayAreaProps {
   renderSelectionMenu: () => React.ReactNode;
   onTypingChange?: (text: string, caretIndex?: number) => void;
   assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
+  previewMode: LinkedInPreviewMode;
+  onPreviewModeChange: (mode: LinkedInPreviewMode) => void;
 }
 
 const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
@@ -51,8 +52,8 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   renderSelectionMenu,
   onTypingChange,
   assistiveEditorRef,
+  previewMode,
 }) => {
-  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('linkedin');
 
   return (
     <div
@@ -127,13 +128,11 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                 onTextareaSelection={onTextareaSelection}
               />
             ) : (
-              <LinkedInPreviewModeToggle
-                draft={draft}
-                citations={citations}
-                researchSources={researchSources}
-                mode={previewMode}
-                onModeChange={setPreviewMode}
-              />
+              previewMode === 'studio' ? (
+                <LinkedInDraftPreview draft={draft} citations={citations} researchSources={researchSources} />
+              ) : (
+                <LinkedInPublishPreviewPlain draft={draft} title="LinkedIn-style preview" />
+              )
             )}
           </div>
         ) : (

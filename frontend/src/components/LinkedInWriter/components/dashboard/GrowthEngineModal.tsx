@@ -1,12 +1,14 @@
-import React from 'react';
-import { DashboardActionModal } from './DashboardActionModal';
-import { GrowthEnginePanel } from '../GrowthEngine/GrowthEnginePanel';
-import { type LinkedInPreferences } from '../../utils/storageUtils';
+import React from "react";
+import { DashboardActionModal } from "./DashboardActionModal";
+import { GrowthEnginePanel } from "../GrowthEngine/GrowthEnginePanel";
+import { type LinkedInPreferences } from "../../utils/storageUtils";
 
 interface GrowthEngineModalProps {
   open: boolean;
   onClose: () => void;
-  generatePost: (params?: Record<string, unknown>) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  generatePost: (
+    params?: Record<string, unknown>,
+  ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
   userPreferences: LinkedInPreferences;
 }
 

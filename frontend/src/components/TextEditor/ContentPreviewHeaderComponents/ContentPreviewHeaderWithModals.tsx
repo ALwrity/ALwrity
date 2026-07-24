@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import MainContentPreviewHeader from './MainContentPreviewHeader';
+import { type LinkedInPreviewMode } from '../../LinkedInWriter/components/LinkedInPreviewModeToggle';
 
 interface ContentPreviewHeaderProps {
   researchSources?: any[];
@@ -7,8 +8,8 @@ interface ContentPreviewHeaderProps {
   searchQueries?: string[];
   qualityMetrics?: any;
   draft: string;
-  showPreview: boolean;
-  onPreviewToggle: () => void;
+  previewMode?: LinkedInPreviewMode;
+  onPreviewModeChange?: (mode: LinkedInPreviewMode) => void;
   assistantOn?: boolean;
   onAssistantToggle?: (enabled: boolean) => void;
   topic?: string;

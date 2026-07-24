@@ -1,8 +1,16 @@
 /**
  * LinkedIn social connection hook (Unipile).
- * Connection state is per-instance; sync across instances via window events
+ *
+ * When rendered inside a <LinkedInConnectionProvider>, this hook reads
+ * connection state from React Context — all consumers share a single
+ * fetch and a single set of React state (no duplicate mounting).
+ *
+ * When rendered outside a Provider (e.g., OnboardingWizard), it falls
+ * back to self-contained per-instance state with the shared module-level
+ * promise cache in linkedInConnectionStatusCache.ts.
+ *
+ * Cross-instance sync is maintained via window events
  * (linkedin-oauth-success / linkedin-disconnected).
- * Shared status cache lives in linkedInConnectionStatusCache.ts.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -23,6 +31,9 @@ import {
   type LinkedInProfileSummary,
 } from '../components/LinkedInWriter/utils/linkedInProfileSummary';
 import { connectWithLinkedInOAuth } from '../utils/linkedInOAuthConnect';
+import {
+  useLinkedInConnectionFromContext,
+} from '../contexts/LinkedInConnectionContext';
 import {
   LINKEDIN_DISCONNECTED_EVENT,
   LINKEDIN_OAUTH_SUCCESS_EVENT,
@@ -55,7 +66,7 @@ import {
 
 export type { LinkedInPostTarget };
 
-export const useLinkedInSocialConnection = () => {
+const useLinkedInSocialConnectionStandalone = () => {
   const { userId } = useAuth();
   const uid = userId || '';
 
@@ -114,12 +125,19 @@ export const useLinkedInSocialConnection = () => {
     } else {
       try {
         connectionStatus = await getOrCreateSharedStatusPromise(getLinkedInConnectionStatus);
+        const wasAlreadyCached = !!getCachedConnectionStatus();
         cacheSharedConnectionStatus(connectionStatus);
         setStatus(connectionStatus);
-        console.info('[LinkedInConnect] status loaded (fresh)', {
-          connected: connectionStatus.connected,
-          provider: connectionStatus.provider,
-        });
+        if (wasAlreadyCached) {
+          console.debug('[LinkedInConnect] status resolved (shared promise)', {
+            connected: connectionStatus.connected,
+          });
+        } else {
+          console.info('[LinkedInConnect] status loaded (fresh)', {
+            connected: connectionStatus.connected,
+            provider: connectionStatus.provider,
+          });
+        }
       } catch (e: unknown) {
         const statusCode = (e as { response?: { status?: number } })?.response?.status;
         const detail = getLinkedInSocialErrorMessage(e);
@@ -462,4 +480,20 @@ export const useLinkedInSocialConnection = () => {
     handleOrgChange,
     disconnect,
   };
+};
+
+/**
+ * Primary hook — reads from <LinkedInConnectionProvider> context when
+ * available (single fetch shared by all consumers).  Falls back to
+ * self-contained per-instance state when rendered outside a Provider.
+ *
+ * Both code paths always execute to satisfy the Rules of Hooks.  When
+ * inside a Provider the standalone state is discarded, but the shared
+ * module-level cache prevents any duplicate network calls.
+ */
+export const useLinkedInSocialConnection = () => {
+  const context = useLinkedInConnectionFromContext();
+  const standalone = useLinkedInSocialConnectionStandalone();
+
+  return context ?? standalone;
 };

@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from "react";
 
-import { colors } from '../GrowthEngine/styles';
-import { UNIPILE_MAX_COMMENT_LENGTH } from './postCommentsTypes';
+import { colors } from "../GrowthEngine/styles";
+import { UNIPILE_MAX_COMMENT_LENGTH } from "./postCommentsTypes";
 
 export interface PostCommentInlineReplyProps {
   replyText: string;
@@ -40,18 +40,20 @@ export const PostCommentInlineReply: React.FC<PostCommentInlineReplyProps> = ({
         padding: 10,
         borderRadius: 8,
         border: `1px solid ${colors.border}`,
-        background: '#fff',
+        background: "#fff",
       }}
     >
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: 8,
         }}
       >
-        <div style={{ fontSize: 11, fontWeight: 600, color: colors.textTertiary }}>
+        <div
+          style={{ fontSize: 11, fontWeight: 600, color: colors.textTertiary }}
+        >
           Replying to this
         </div>
         <button
@@ -59,13 +61,13 @@ export const PostCommentInlineReply: React.FC<PostCommentInlineReplyProps> = ({
           onClick={onCancel}
           disabled={sending}
           style={{
-            background: 'transparent',
-            border: 'none',
+            background: "transparent",
+            border: "none",
             color: colors.textTertiary,
             fontSize: 11,
             fontWeight: 600,
-            cursor: sending ? 'not-allowed' : 'pointer',
-            padding: '2px 4px',
+            cursor: sending ? "not-allowed" : "pointer",
+            padding: "2px 4px",
           }}
         >
           Cancel
@@ -80,25 +82,25 @@ export const PostCommentInlineReply: React.FC<PostCommentInlineReplyProps> = ({
         disabled={disabled || sending}
         rows={3}
         style={{
-          width: '100%',
-          boxSizing: 'border-box',
-          padding: '8px 10px',
+          width: "100%",
+          boxSizing: "border-box",
+          padding: "8px 10px",
           border: `1px solid ${colors.border}`,
           borderRadius: 8,
           fontSize: 13,
-          resize: 'vertical',
-          fontFamily: 'inherit',
+          resize: "vertical",
+          fontFamily: "inherit",
           marginBottom: 6,
           maxHeight: 140,
         }}
       />
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           gap: 8,
-          flexWrap: 'wrap',
+          flexWrap: "wrap",
         }}
       >
         <div style={{ fontSize: 11, color: colors.textTertiary }}>
@@ -109,23 +111,25 @@ export const PostCommentInlineReply: React.FC<PostCommentInlineReplyProps> = ({
           onClick={onSend}
           disabled={!canSend}
           style={{
-            padding: '7px 14px',
-            background: canSend ? colors.primary : '#d1d5db',
-            color: '#fff',
-            border: 'none',
+            padding: "7px 14px",
+            background: canSend ? colors.primary : "#d1d5db",
+            color: "#fff",
+            border: "none",
             borderRadius: 6,
             fontSize: 12,
             fontWeight: 700,
-            cursor: canSend ? 'pointer' : 'not-allowed',
+            cursor: canSend ? "pointer" : "not-allowed",
             opacity: sending ? 0.7 : 1,
-            marginLeft: 'auto',
+            marginLeft: "auto",
           }}
         >
-          {sending ? 'Sending…' : 'Send Reply'}
+          {sending ? "Sending…" : "Send Reply"}
         </button>
       </div>
       {error && (
-        <div style={{ fontSize: 12, color: '#dc2626', marginTop: 8 }}>{error}</div>
+        <div style={{ fontSize: 12, color: "#dc2626", marginTop: 8 }}>
+          {error}
+        </div>
       )}
     </div>
   );

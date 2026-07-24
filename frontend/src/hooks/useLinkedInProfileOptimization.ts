@@ -249,7 +249,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const recheckProfile = useCallback(async () => {
     if (!isProfileComplete) {
       console.warn(`${LOG_PREFIX} recheck blocked — profile incomplete`);
-      return;
+      return null;
     }
     console.info(`${LOG_PREFIX} user requested live profile re-check`);
     const previousScore = lastScoreRef.current;
@@ -260,7 +260,10 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     setIsOptimizationExpanded(true);
 
     try {
-      const data = await runLinkedInProfileOptimization({ refreshProfile: true });
+      const data = await runLinkedInProfileOptimization({
+        refreshProfile: true,
+        refreshIntelligence: true,
+      });
       const items = data.profile_optimization ?? null;
       const meta = data.profile_optimization_meta ?? null;
 
@@ -290,6 +293,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
         newScore,
         delta: newScore != null && previousScore != null ? newScore - previousScore : null,
       });
+      return data;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to re-check your LinkedIn profile';
@@ -297,6 +301,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setOptimizationUserError(message);
       setOptimizationError(null);
       setPanelState('error');
+      return null;
     }
   }, [isProfileComplete]);
 
