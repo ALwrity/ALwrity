@@ -15,6 +15,8 @@ interface BlogWriterLandingSectionProps {
   restoreAttempted?: boolean;
   onBrainstormResult?: (result: import('../../../api/gscBrainstorm').BrainstormResult) => void;
   initialKeywords?: string;
+  /** Restores a saved blog asset — powers the radial hero's Create/Remarket wedges. */
+  onRestoreAsset?: (assetId: number) => void;
 }
 
 const VALID_PHASES = ['research', 'outline', 'content', 'seo', 'publish'];
@@ -31,6 +33,7 @@ export const BlogWriterLandingSection: React.FC<BlogWriterLandingSectionProps> =
   restoreAttempted = false,
   onBrainstormResult,
   initialKeywords,
+  onRestoreAsset,
 }) => {
   if (!research) {
     if (currentPhase === 'research') {
@@ -52,6 +55,9 @@ export const BlogWriterLandingSection: React.FC<BlogWriterLandingSectionProps> =
           onStartWriting={() => {
             navigateToPhase('research');
           }}
+          navigateToPhase={navigateToPhase}
+          hasResearch={!!research}
+          onRestoreAsset={onRestoreAsset}
         />
       );
     }
@@ -62,6 +68,9 @@ export const BlogWriterLandingSection: React.FC<BlogWriterLandingSectionProps> =
           onStartWriting={() => {
             navigateToPhase('research');
           }}
+          navigateToPhase={navigateToPhase}
+          hasResearch={!!research}
+          onRestoreAsset={onRestoreAsset}
         />
       );
     }

@@ -294,6 +294,18 @@ const BlogWriter: React.FC = () => {
     try { localStorage.setItem('blog_last_asset_id', id.toString()); } catch { /* noop */ }
   }, []);
 
+  // Restore a saved blog asset into the editor — same mechanism used by the
+  // Asset Library handoff above. Reused by the radial workflow hero's
+  // "Continue draft" (Create wedge) and "Refresh this post" (Remarket wedge).
+  const handleRestoreAssetId = useCallback((id: number) => {
+    loadAsset(id).then(loaded => {
+      if (!loaded) return;
+      saveLastAssetId(id);
+      restoreFromAsset(loaded);
+      debug.log('[BlogWriter] Restored blog asset from workflow hero', { asset_id: id, phase: loaded.phase });
+    });
+  }, [loadAsset, saveLastAssetId, restoreFromAsset]);
+
   React.useEffect(() => {
     const assetIdFromState = locationState?.restoreBlogAssetId;
     if (assetIdFromState) {
@@ -821,6 +833,7 @@ const BlogWriter: React.FC = () => {
         restoreAttempted={restoreAttempted}
         onBrainstormResult={handleBrainstormResult}
         initialKeywords={researchKeywords}
+        onRestoreAsset={handleRestoreAssetId}
       />
 
       {research && (

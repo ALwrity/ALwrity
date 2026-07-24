@@ -1,12 +1,23 @@
 import React, { useState } from 'react';
 import { useCopilotTrigger } from '../../hooks/useCopilotTrigger';
 import BlogWriterPhasesSection from './BlogWriterPhasesSection';
+import { BlogWorkflowHeroSection } from './dashboard/BlogWorkflowHeroSection';
 
 interface BlogWriterLandingProps {
   onStartWriting: () => void;
+  /** Optional: lets the new radial workflow wedges jump straight to a specific phase. */
+  navigateToPhase?: (phase: string) => void;
+  hasResearch?: boolean;
+  /** Optional: restores a saved blog asset (Remarket wedge "Refresh this post", Create wedge "Continue draft"). */
+  onRestoreAsset?: (assetId: number) => void;
 }
 
-const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting }) => {
+const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({
+  onStartWriting,
+  navigateToPhase,
+  hasResearch,
+  onRestoreAsset,
+}) => {
   const [showSuperPowers, setShowSuperPowers] = useState(false);
   const { triggerResearch } = useCopilotTrigger();
 
@@ -72,8 +83,10 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting })
         backgroundRepeat: 'no-repeat',
         backgroundColor: '#ffffff',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        flexWrap: 'wrap',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+        gap: '16px',
         overflow: 'hidden'
       }}>
 
@@ -81,23 +94,25 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting })
         <div style={{
           position: 'relative',
           zIndex: 2,
-          textAlign: 'center',
-          maxWidth: '800px',
-          padding: '40px 20px'
+          textAlign: 'left',
+          maxWidth: '400px',
+          padding: '20px 16px',
+          flex: '0 0 auto',
+          boxSizing: 'border-box'
         }}>
           {/* Main heading */}
           <div style={{
-            marginBottom: '40px'
+            marginBottom: '20px'
           }}>
             <h1 style={{
-              fontSize: '3.5rem',
+              fontSize: '1.75rem',
               fontWeight: '700',
               background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
               backgroundClip: 'text',
               margin: '0 0 20px 0',
-              textShadow: '0 4px 8px rgba(0,0,0,0.1)',
+              textShadow: '0 2px 4px rgba(0,0,0,0.1)',
               lineHeight: '1.2'
             }}>
               AI-First, Contextual, Click through Blog Writer
@@ -108,8 +123,8 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting })
           <div style={{
             display: 'flex',
             flexDirection: 'column',
-            gap: '24px',
-            alignItems: 'center'
+            gap: '12px',
+            alignItems: 'flex-start'
           }}>
             {/* Primary CTA Button */}
             <button
@@ -118,24 +133,24 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting })
                 background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
                 color: 'white',
                 border: 'none',
-                padding: '18px 48px',
+                padding: '9px 24px',
                 borderRadius: '50px',
-                fontSize: '1.2rem',
+                fontSize: '0.6rem',
                 fontWeight: '600',
                 cursor: 'pointer',
-                boxShadow: '0 8px 25px rgba(25, 118, 210, 0.3)',
+                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
                 transition: 'all 0.3s ease',
                 position: 'relative',
                 overflow: 'hidden',
-                minWidth: '280px'
+                minWidth: '140px'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-3px) scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 12px 35px rgba(25, 118, 210, 0.4)';
+                e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(25, 118, 210, 0.4)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 8px 25px rgba(25, 118, 210, 0.3)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(25, 118, 210, 0.3)';
               }}
             >
               <span style={{ position: 'relative', zIndex: 2 }}>
@@ -159,27 +174,27 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting })
                 background: 'rgba(255, 255, 255, 0.9)',
                 color: '#1976d2',
                 border: '2px solid #1976d2',
-                padding: '14px 36px',
+                padding: '7px 18px',
                 borderRadius: '50px',
-                fontSize: '1rem',
+                fontSize: '0.5rem',
                 fontWeight: '600',
                 cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+                boxShadow: '0 2px 7px rgba(0,0,0,0.1)',
                 transition: 'all 0.3s ease',
                 backdropFilter: 'blur(10px)',
-                minWidth: '280px'
+                minWidth: '140px'
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = '#1976d2';
                 e.currentTarget.style.color = 'white';
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(25, 118, 210, 0.3)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 3px 10px rgba(25, 118, 210, 0.3)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
                 e.currentTarget.style.color = '#1976d2';
                 e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
+                e.currentTarget.style.boxShadow = '0 2px 7px rgba(0,0,0,0.1)';
               }}
             >
               🚀 ALwrity Blog Writer SuperPowers
@@ -188,6 +203,16 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({ onStartWriting })
 
 
         </div>
+
+        {/* Radial Workflow Hero (6 wedges) — now part of the same hero section,
+            sitting beside the headline and CTAs on desktop and stacking below on mobile. */}
+        <BlogWorkflowHeroSection
+          inline
+          onStartWriting={handleStartWriting}
+          navigateToPhase={navigateToPhase}
+          hasResearch={hasResearch}
+          onRestoreAsset={onRestoreAsset}
+        />
       </div>
 
       {/* SuperPowers Modal with 6 Phases */}
