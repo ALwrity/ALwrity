@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   Box,
   Button,
@@ -86,6 +86,44 @@ const IntroducingAlwrity: React.FC = () => {
   const [expandedCardIndex, setExpandedCardIndex] = useState<number | null>(null);
   const bgUrl = useDeferredBackground(VORTEX_BG);
 
+  // Swipe-to-collapse: a vertical swipe on an expanded mobile card collapses it
+  // back to its compact shape.
+  const touchStartYRef = useRef<number | null>(null);
+  const isSwipeRef = useRef(false);
+  const SWIPE_COLLAPSE_THRESHOLD_PX = 24;
+
+  const handleTouchStart = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    isSwipeRef.current = false;
+    touchStartYRef.current = event.touches[0].clientY;
+  }, []);
+
+  const handleTouchMove = useCallback((event: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartYRef.current === null) return;
+    const deltaY = Math.abs(event.touches[0].clientY - touchStartYRef.current);
+    if (deltaY > SWIPE_COLLAPSE_THRESHOLD_PX) {
+      isSwipeRef.current = true;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (isSwipeRef.current && expandedCardIndex !== null) {
+      setExpandedCardIndex(null);
+    }
+    touchStartYRef.current = null;
+  }, [expandedCardIndex]);
+
+  const handleCardToggle = useCallback(
+    (index: number) => {
+      if (isSwipeRef.current) {
+        isSwipeRef.current = false;
+        return;
+      }
+      if (!isMobile) return;
+      setExpandedCardIndex((prev) => (prev === index ? null : index));
+    },
+    [isMobile]
+  );
+
   const fadeInUp = {
     hidden: { opacity: 0, y: 20 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
@@ -117,14 +155,6 @@ const IntroducingAlwrity: React.FC = () => {
     '& .MuiSvgIcon-root': { fontSize: { xs: 18, md: 22 } },
   } as const;
 
-  const handleCardToggle = useCallback(
-    (index: number) => {
-      if (!isMobile) return;
-      setExpandedCardIndex((prev) => (prev === index ? null : index));
-    },
-    [isMobile]
-  );
-
   const handleCardKeyDown = useCallback(
     (event: React.KeyboardEvent, index: number) => {
       if (!isMobile) return;
@@ -138,12 +168,15 @@ const IntroducingAlwrity: React.FC = () => {
 
   return (
     <Box
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         sx={{
           ...landingDarkSectionSx,
           minHeight: { xs: 'auto', md: 'auto' },
           mt: { xs: 0, md: 0 },
           pt: { xs: 1.5, md: 4.5 },
-          pb: { xs: 4.5, md: 4.5 },
+          pb: { xs: 3.5, md: 4.5 },
           position: 'relative',
           zIndex: 1,
           display: 'flex',

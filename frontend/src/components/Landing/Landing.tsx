@@ -325,7 +325,7 @@ const Landing: React.FC = () => {
         sx={{
           ...landingDarkSectionSx,
           minHeight: { xs: 'auto', md: 'calc(100vh - 48px)' },
-          pt: { xs: 3, md: 4 },
+          pt: { xs: 2.5, md: 4 },
           pb: { xs: 2.5, md: 4 },
           position: 'relative',
           zIndex: 0,
@@ -619,8 +619,9 @@ const Landing: React.FC = () => {
                                   background: alpha(theme.palette.primary.main, 0.2),
                                   color: theme.palette.primary.main,
                                   fontWeight: 600,
-                                  fontSize: { xs: '0.62rem', md: '0.7rem' },
-                                  height: { xs: 22, md: 24 },
+                                  fontSize: { xs: '0.58rem', md: '0.7rem' },
+                                  height: { xs: 20, md: 24 },
+                                  px: 0.25,
                                 }} 
                               />
                             </Stack>
@@ -629,7 +630,7 @@ const Landing: React.FC = () => {
                               component="h3"
                               fontWeight={700}
                               sx={{
-                                fontSize: { xs: '0.92rem', md: '0.95rem' },
+                                fontSize: { xs: '0.88rem', md: '0.95rem' },
                                 color: 'white',
                                 lineHeight: 1.2,
                                 textAlign: { xs: 'center', md: 'left' },
@@ -764,83 +765,157 @@ const Landing: React.FC = () => {
                   >
                     <CardContent sx={{ p: { xs: 1.75, md: 2.25 } }}>
                       {/* Mobile: plan name (left) → price (center) → CTA (right) */}
-                      <Box
-                        sx={{
-                          display: { xs: 'grid', md: 'none' },
-                          gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
-                          alignItems: 'center',
-                          columnGap: 1.25,
-                          px: { xs: 0.75, md: 0 },
-                          mb: 1.5,
-                          width: '100%',
-                        }}
-                      >
-                        <Typography
-                          variant="subtitle1"
-                          component="h3"
-                          fontWeight={700}
-                          noWrap
+                      {plan.name === 'Enterprise' ? (
+                        <Box
                           sx={{
-                            fontSize: '1.25rem',
-                            justifySelf: 'start',
-                            minWidth: 0,
-                            pl: { xs: 0.25, md: 0 },
+                            display: { xs: 'flex', md: 'none' },
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            px: { xs: 0.75, md: 0 },
+                            mb: 1.5,
+                            width: '100%',
                           }}
                         >
-                          {plan.name}
-                        </Typography>
-                        <Stack
-                          direction="row"
-                          alignItems="baseline"
-                          spacing={0.35}
-                          sx={{ justifySelf: 'center' }}
+                          <Stack spacing={0.25} alignItems="flex-start">
+                            <Typography
+                              variant="subtitle1"
+                              component="h3"
+                              fontWeight={700}
+                              noWrap
+                              sx={{
+                                fontSize: '1.25rem',
+                                minWidth: 0,
+                                pl: { xs: 0.25, md: 0 },
+                              }}
+                            >
+                              {plan.name}
+                            </Typography>
+                            <Stack direction="row" alignItems="baseline" spacing={0.35}>
+                              <Typography
+                                variant="h6"
+                                component="span"
+                                fontWeight={800}
+                                color="primary.main"
+                                sx={{ fontSize: '1.48rem', lineHeight: 1 }}
+                              >
+                                {plan.price}
+                              </Typography>
+                              {plan.period && (
+                                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                                  {plan.period}
+                                </Typography>
+                              )}
+                            </Stack>
+                          </Stack>
+                          <Button
+                            variant={plan.highlight ? 'contained' : 'outlined'}
+                            size="small"
+                            onClick={() => {
+                              if (plan.ctaAction === 'signin') {
+                                openSignIn({ forceRedirectUrl: getPostAuthDestination() });
+                                return;
+                              }
+                              navigate('/pricing');
+                            }}
+                            sx={{
+                              mr: { xs: 0.25, md: 0 },
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              py: 0.65,
+                              px: 1.25,
+                              minWidth: 'auto',
+                              minHeight: 40,
+                              whiteSpace: 'nowrap',
+                              ...(plan.highlight
+                                ? {
+                                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                                  }
+                                : {}),
+                            }}
+                          >
+                            {plan.mobileCtaLabel ?? plan.ctaLabel}
+                          </Button>
+                        </Box>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: { xs: 'grid', md: 'none' },
+                            gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
+                            alignItems: 'center',
+                            columnGap: 1.25,
+                            px: { xs: 0.75, md: 0 },
+                            mb: 1.5,
+                            width: '100%',
+                          }}
                         >
                           <Typography
-                            variant="h6"
-                            component="span"
-                            fontWeight={800}
-                            color="primary.main"
-                            sx={{ fontSize: '1.48rem', lineHeight: 1 }}
+                            variant="subtitle1"
+                            component="h3"
+                            fontWeight={700}
+                            noWrap
+                            sx={{
+                              fontSize: '1.25rem',
+                              justifySelf: 'start',
+                              minWidth: 0,
+                              pl: { xs: 0.25, md: 0 },
+                            }}
                           >
-                            {plan.price}
+                            {plan.name}
                           </Typography>
-                          {plan.period && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
-                              {plan.period}
+                          <Stack
+                            direction="row"
+                            alignItems="baseline"
+                            spacing={0.35}
+                            sx={{ justifySelf: 'center' }}
+                          >
+                            <Typography
+                              variant="h6"
+                              component="span"
+                              fontWeight={800}
+                              color="primary.main"
+                              sx={{ fontSize: '1.48rem', lineHeight: 1 }}
+                            >
+                              {plan.price}
                             </Typography>
-                          )}
-                        </Stack>
-                        <Button
-                          variant={plan.highlight ? 'contained' : 'outlined'}
-                          size="small"
-                          onClick={() => {
-                            if (plan.ctaAction === 'signin') {
-                              openSignIn({ forceRedirectUrl: getPostAuthDestination() });
-                              return;
-                            }
-                            navigate('/pricing');
-                          }}
-                          sx={{
-                            justifySelf: 'end',
-                            mr: { xs: 0.25, md: 0 },
-                            textTransform: 'none',
-                            fontWeight: 600,
-                            fontSize: '0.82rem',
-                            py: 0.65,
-                            px: 1.25,
-                            minWidth: 'auto',
-                            minHeight: 40,
-                            whiteSpace: 'nowrap',
-                            ...(plan.highlight
-                              ? {
-                                  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
-                                }
-                              : {}),
-                          }}
-                        >
-                          {plan.mobileCtaLabel ?? plan.ctaLabel}
-                        </Button>
-                      </Box>
+                            {plan.period && (
+                              <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                                {plan.period}
+                              </Typography>
+                            )}
+                          </Stack>
+                          <Button
+                            variant={plan.highlight ? 'contained' : 'outlined'}
+                            size="small"
+                            onClick={() => {
+                              if (plan.ctaAction === 'signin') {
+                                openSignIn({ forceRedirectUrl: getPostAuthDestination() });
+                                return;
+                              }
+                              navigate('/pricing');
+                            }}
+                            sx={{
+                              justifySelf: 'end',
+                              mr: { xs: 0.25, md: 0 },
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.82rem',
+                              py: 0.65,
+                              px: 1.25,
+                              minWidth: 'auto',
+                              minHeight: 40,
+                              whiteSpace: 'nowrap',
+                              ...(plan.highlight
+                                ? {
+                                    background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.secondary.main} 100%)`,
+                                  }
+                                : {}),
+                            }}
+                          >
+                            {plan.mobileCtaLabel ?? plan.ctaLabel}
+                          </Button>
+                        </Box>
+                      )}
 
                       {/* Desktop: stacked header */}
                       <Box sx={{ display: { xs: 'none', md: 'block' } }}>

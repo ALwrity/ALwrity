@@ -1,4 +1,3 @@
-export const PROFILE_HUB_SWIPE_THRESHOLD_PX = 72;
 export const PROFILE_HUB_SWIPE_AXIS_LOCK_PX = 12;
 export const PROFILE_HUB_SWIPE_MAX_OFFSET_PX = 96;
 
@@ -72,10 +71,10 @@ export function deriveProfileHubAvatarShift(
   layout: ProfileHubComboLayout,
 ): number {
   if (layout === "connect-swipe") {
-    return Math.max(0, offsetX * 0.45);
+    return Math.max(0, offsetX);
   }
   if (layout === "disconnect-swipe") {
-    return Math.min(0, offsetX * 0.45);
+    return Math.min(0, offsetX);
   }
   return 0;
 }
@@ -90,8 +89,13 @@ export function resolveProfileHubSwipeAction(
     isDisconnecting,
   }: ProfileHubSwipeContext,
 ): ProfileHubSwipeAction | null {
+  // Thresholds mirror the max avatar travel distance so the action fires
+  // as the profile circle reaches the far side of the button.
+  const connectThreshold = 74;
+  const disconnectThreshold = 68;
+
   if (
-    offsetX >= PROFILE_HUB_SWIPE_THRESHOLD_PX &&
+    offsetX >= connectThreshold &&
     !connected &&
     hasConnect &&
     !isConnecting
@@ -99,7 +103,7 @@ export function resolveProfileHubSwipeAction(
     return "connect";
   }
   if (
-    offsetX <= -PROFILE_HUB_SWIPE_THRESHOLD_PX &&
+    offsetX <= -disconnectThreshold &&
     connected &&
     hasDisconnect &&
     !isDisconnecting

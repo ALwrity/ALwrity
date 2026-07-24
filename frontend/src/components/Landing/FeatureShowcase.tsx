@@ -79,7 +79,7 @@ const features: Feature[] = [
   },
   {
     image: '/fact-check1.png',
-    title: 'Hallucination-Free Content',
+    title: 'Fact-Checked Output',
     description: 'Advanced fact-checking with source verification and credibility scoring. Every claim is analyzed, validated, and cited with authority ratings.',
     icon: <FactCheck />,
     badge: 'Verified',
