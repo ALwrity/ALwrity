@@ -250,11 +250,12 @@ jobs:
 
       - name: Install backend test deps
         working-directory: backend
-        # The full requirements.txt is heavy but universal.  Per-suite
-        # extras (e.g. trio) come from the dedicated nightly job.
+        # Minimal test-only deps — avoids pulling 6GB+ of torch/tensorflow/nvidia.
+        # The test framework stubs all LLM/image modules, so ML packages are
+        # unnecessary for CI. requirements-linkedin.txt provides OAuth extras.
         run: |
           python -m pip install --upgrade pip wheel
-          python -m pip install -r requirements.txt || true
+          python -m pip install -r requirements-test.txt
           python -m pip install -r requirements-linkedin.txt || true
           python -m pip install pytest-asyncio anyio || true
 
