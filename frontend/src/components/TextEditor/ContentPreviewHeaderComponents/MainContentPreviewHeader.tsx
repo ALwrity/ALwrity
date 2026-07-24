@@ -1,18 +1,7 @@
 import React from 'react';
-import { Tooltip, ToggleButton, ToggleButtonGroup } from '@mui/material';
+import { Tooltip } from '@mui/material';
 import { type LinkedInPreviewMode } from '../../LinkedInWriter/components/LinkedInPreviewModeToggle';
-import PersonaChip from './PersonaChip';
 import { TextToSpeechButton } from '../../shared/TextToSpeechButton';
-
-// Extend HTMLDivElement interface for custom tooltip properties
-interface ExtendedDivElement extends HTMLDivElement {
-  _researchTooltip?: HTMLDivElement | null;
-  _citationsTooltip?: HTMLDivElement | null;
-  _searchQueriesTooltip?: HTMLDivElement | null;
-  _qualityTooltip?: HTMLDivElement | null;
-  _researchTooltipTimeout?: NodeJS.Timeout | null;
-  _qualityTooltipTimeout?: NodeJS.Timeout | null;
-}
 
 interface MainContentPreviewHeaderProps {
   researchSources?: any[];
@@ -65,202 +54,11 @@ const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
           </Tooltip>
         )}
         
-        {/* Persona Chip */}
-        <PersonaChip 
-          platform={platform} 
-          onPersonaUpdate={(personaData) => {
-            console.log('Persona updated:', personaData);
-            // You can add additional logic here to handle persona updates
-          }}
-        />
-        
-        {/* Research Chip with Hover Sub-chips */}
-        {((researchSources && researchSources.length > 0) || (citations && citations.length > 0) || (searchQueries && searchQueries.length > 0)) && (
-          <div style={{ position: 'relative' }}>
-            {/* Main Research Chip */}
-            <div
-              style={{
-                background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-                border: '1px solid #0284c7',
-                borderRadius: '999px',
-                padding: '6px 14px',
-                fontSize: '11px',
-                fontWeight: '700',
-                color: 'white',
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                boxShadow: '0 2px 8px rgba(14, 165, 233, 0.3)',
-                transform: 'translateZ(0)',
-                userSelect: 'none'
-              }}
-              title="Research data available. Hover to see sources, citations, and queries."
-              onMouseEnter={(e) => {
-                // Clear any existing timeout
-                const target = e.currentTarget as ExtendedDivElement;
-                if (target._researchTooltipTimeout) {
-                  clearTimeout(target._researchTooltipTimeout);
-                  target._researchTooltipTimeout = null;
-                }
-                
-                // Create and show research sub-chips tooltip
-                const tooltip = document.createElement('div');
-                tooltip.style.cssText = `
-                  position: fixed;
-                  z-index: 100000;
-                  background: white;
-                  border: 1px solid #cfe9f7;
-                  border-radius: 12px;
-                  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
-                  padding: 16px;
-                  max-width: 400px;
-                  font-size: 12px;
-                  opacity: 0;
-                  transform: translateY(-8px);
-                  transition: all 0.2s ease;
-                  pointer-events: auto;
-                `;
-                
-                let subChipsHtml = '<div style="margin-bottom: 12px; font-weight: 600; color: #0a66c2; font-size: 14px;">Research Data</div>';
-                
-                // Add Sources sub-chip
-                if (researchSources && researchSources.length > 0) {
-                  subChipsHtml += `
-                    <div style="display: inline-block; margin: 3px; padding: 6px 12px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 16px; font-size: 11px; cursor: pointer; font-weight: 600; transition: all 0.2s ease;" 
-                         onmouseenter="this.style.background='#e0f2fe'; this.style.transform='scale(1.05)'" 
-                         onmouseleave="this.style.background='#f0f9ff'; this.style.transform='scale(1)'"
-                         onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('showResearchSourcesModal', { detail: 'sources' }))">
-                      <span style="display: inline-block; width: 6px; height: 6px; background: #10b981; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 4px rgba(16, 185, 129, 0.5);"></span>
-                      Sources: ${researchSources.length}
-                    </div>
-                  `;
-                }
-                
-                // Add Citations sub-chip
-                if (citations && citations.length > 0) {
-                  subChipsHtml += `
-                    <div style="display: inline-block; margin: 3px; padding: 6px 12px; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 16px; font-size: 11px; cursor: pointer; font-weight: 600; transition: all 0.2s ease;"
-                         onmouseenter="this.style.background='#fde68a'; this.style.transform='scale(1.05)'" 
-                         onmouseleave="this.style.background='#fef3c7'; this.style.transform='scale(1)'"
-                         onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('showCitationsModal', { detail: 'citations' }))">
-                      <span style="display: inline-block; width: 6px; height: 6px; background: #f59e0b; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 4px rgba(245, 158, 11, 0.5);"></span>
-                      Citations: ${citations.length}
-                    </div>
-                  `;
-                }
-                
-                // Add Queries sub-chip
-                if (searchQueries && searchQueries.length > 0) {
-                  subChipsHtml += `
-                    <div style="display: inline-block; margin: 3px; padding: 6px 12px; background: #f3e8ff; border: 1px solid #8b5cf6; border-radius: 16px; font-size: 11px; cursor: pointer; font-weight: 600; transition: all 0.2s ease;"
-                         onmouseenter="this.style.background='#e9d5ff'; this.style.transform='scale(1.05)'" 
-                         onmouseleave="this.style.background='#f3e8ff'; this.style.transform='scale(1)'"
-                         onclick="event.stopPropagation(); window.dispatchEvent(new CustomEvent('showSearchQueriesModal', { detail: 'queries' }))">
-                      <span style="display: inline-block; width: 6px; height: 6px; background: #8b5cf6; border-radius: 50%; margin-right: 6px; box-shadow: 0 0 4px rgba(139, 92, 246, 0.5);"></span>
-                      Queries: ${searchQueries.length}
-                    </div>
-                  `;
-                }
-                
-                tooltip.innerHTML = subChipsHtml;
-                
-                // Add mouse events to tooltip to keep it visible
-                tooltip.addEventListener('mouseenter', () => {
-                  if (target._researchTooltipTimeout) {
-                    clearTimeout(target._researchTooltipTimeout);
-                    target._researchTooltipTimeout = null;
-                  }
-                });
-                
-                tooltip.addEventListener('mouseleave', () => {
-                  target._researchTooltipTimeout = setTimeout(() => {
-                    if (tooltip.parentNode) {
-                      tooltip.style.opacity = '0';
-                      tooltip.style.transform = 'translateY(-8px)';
-                      setTimeout(() => {
-                        if (tooltip.parentNode) {
-                          tooltip.remove();
-                        }
-                      }, 200);
-                    }
-                    target._researchTooltip = null;
-                  }, 100);
-                });
-                
-                document.body.appendChild(tooltip);
-                const rect = e.currentTarget.getBoundingClientRect();
-                tooltip.style.left = Math.min(rect.left, window.innerWidth - 420) + 'px';
-                tooltip.style.top = (rect.bottom + 8) + 'px';
-                
-                // Animate in
-                setTimeout(() => {
-                  tooltip.style.opacity = '1';
-                  tooltip.style.transform = 'translateY(0)';
-                }, 10);
-                
-                target._researchTooltip = tooltip;
-              }}
-              onMouseLeave={(e) => {
-                const target = e.currentTarget as ExtendedDivElement;
-                if (target._researchTooltip) {
-                  // Add delay before hiding to allow moving to tooltip
-                  target._researchTooltipTimeout = setTimeout(() => {
-                    const tooltip = target._researchTooltip;
-                    if (tooltip && tooltip.parentNode) {
-                      tooltip.style.opacity = '0';
-                      tooltip.style.transform = 'translateY(-8px)';
-                      setTimeout(() => {
-                        if (tooltip.parentNode) {
-                          tooltip.remove();
-                        }
-                      }, 200);
-                    }
-                    target._researchTooltip = null;
-                  }, 100);
-                }
-              }}
-              onMouseMove={(e) => {
-                // Keep tooltip visible when moving to sub-chips
-                const target = e.currentTarget as ExtendedDivElement;
-                if (target._researchTooltip) {
-                  const tooltip = target._researchTooltip;
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  tooltip.style.left = Math.min(rect.left, window.innerWidth - 420) + 'px';
-                  tooltip.style.top = (rect.bottom + 8) + 'px';
-                }
-              }}
-              onMouseOver={(e) => {
-                // Add hover effect to the chip itself
-                e.currentTarget.style.transform = 'translateY(-2px) scale(1.05)';
-                e.currentTarget.style.boxShadow = '0 4px 16px rgba(14, 165, 233, 0.4)';
-              }}
-              onMouseOut={(e) => {
-                // Remove hover effect
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(14, 165, 233, 0.3)';
-              }}
-            >
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: 'rgba(255, 255, 255, 0.9)',
-                flexShrink: 0,
-                boxShadow: '0 0 6px rgba(255, 255, 255, 0.5)'
-              }} />
-              Research
-            </div>
-          </div>
-        )}
+        {/* Persona Chip — moved to editor toolbar */}
+        {/* Research Chip — moved to editor toolbar */}
       </div>
       <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
         
-                <span style={{ fontSize: '10px', opacity: 0.8 }}>
-                  {draft.split(/\s+/).length} words • {Math.ceil(draft.split(/\s+/).length / 200)} min read
-                </span>
                 {/* Read aloud */}
                 <TextToSpeechButton text={draft} size="small" showSettings={false} />
                 {/* Assistive Writing toggle */}
@@ -277,13 +75,7 @@ const MainContentPreviewHeader: React.FC<MainContentPreviewHeaderProps> = ({
                     Assistive Writing
                   </label>
                 )}
-{previewMode && onPreviewModeChange && (
-  <ToggleButtonGroup size="small" exclusive value={previewMode} onChange={(_, next) => { if (next) onPreviewModeChange(next); }} aria-label="Preview mode">
-    <ToggleButton value="linkedin" sx={{ textTransform: 'none', px: 1, py: 0.25, fontSize: 10 }}>LinkedIn</ToggleButton>
-    <ToggleButton value="studio" sx={{ textTransform: 'none', px: 1, py: 0.25, fontSize: 10 }}>Studio</ToggleButton>
-  </ToggleButtonGroup>
-)}
-                
+                 
       </div>
     </div>
   );

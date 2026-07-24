@@ -14,7 +14,6 @@ import {
 import {
   Image as ImageIcon,
   LinkedIn as LinkedInIcon,
-  Visibility as PreviewIcon,
 } from "@mui/icons-material";
 import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
 import { getLinkedInPublishErrorMessage } from "../../../api/linkedinSocial";
@@ -69,7 +68,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mediaAnchor, setMediaAnchor] = useState<HTMLElement | null>(null);
-  const [previewAnchor, setPreviewAnchor] = useState<HTMLElement | null>(null);
 
   const publishMedia = useLinkedInPublishMedia({
     draft,
@@ -166,17 +164,28 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   ) : null;
 
   const charCaption = (
-    <Typography
-      variant="caption"
-      sx={{
-        color: chars.hardOk ? "#64748b" : "#dc2626",
-        display: "block",
-        whiteSpace: "nowrap",
-      }}
+    <Tooltip
+      title={
+        seeMoreCaption
+          ? "Posts over ~1,300 characters show a \"see more\" cut-off on LinkedIn. Your hook and first 2 lines should capture attention before the fold."
+          : `${chars.count} / 3,000 LinkedIn character limit`
+      }
+      arrow
+      placement="top"
     >
-      {formatCharCountLabel(chars.count)}
-      {seeMoreCaption ? " · see more" : ""}
-    </Typography>
+      <Typography
+        variant="caption"
+        sx={{
+          color: chars.hardOk ? "#64748b" : "#dc2626",
+          display: "block",
+          whiteSpace: "nowrap",
+          cursor: "help",
+        }}
+      >
+        {formatCharCountLabel(chars.count)}
+        {seeMoreCaption ? " · see more" : ""}
+      </Typography>
+    </Tooltip>
   );
 
   const mediaControls = (
@@ -205,15 +214,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           }}
         />
       ) : null}
-      <Tooltip title="Preview what LinkedIn will see">
-        <IconButton
-          size="small"
-          onClick={(event) => setPreviewAnchor(event.currentTarget)}
-          sx={{ color: "#64748b", border: "1px solid #e2e8f0" }}
-        >
-          <PreviewIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
       <Popover
         open={Boolean(mediaAnchor)}
         anchorEl={mediaAnchor}
@@ -231,24 +231,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           topic={topic}
           compact
           media={publishMedia}
-        />
-      </Popover>
-      <Popover
-        open={Boolean(previewAnchor)}
-        anchorEl={previewAnchor}
-        onClose={() => setPreviewAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            sx: { p: 1.5, width: 380, maxWidth: "94vw" },
-          },
-        }}
-      >
-        <LinkedInPublishPreviewPlain
-          draft={draft}
-          attachment={previewAttachment}
-          compact
         />
       </Popover>
     </>

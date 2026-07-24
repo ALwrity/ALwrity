@@ -42,7 +42,8 @@ export function formatDraftContent(
     researchSources &&
     researchSources.length > 0
   ) {
-    // Soft fallback: append one badge after the first sentence only.
+    // No explicit [Source N] markers — append citation badges at natural break
+    // points throughout the text so they're visible in the body, not just headings.
     const sourceNums = citations
       .map((citation) => {
         if (
@@ -56,14 +57,20 @@ export function formatDraftContent(
       .filter(Boolean) as string[];
 
     if (sourceNums.length > 0) {
-      const firstSentenceEnd = formatted.search(/[.!?]/);
-      if (firstSentenceEnd >= 0) {
-        const badge = ` ${citationBadge(sourceNums[0])}`;
-        formatted =
-          formatted.slice(0, firstSentenceEnd + 1) +
-          badge +
-          formatted.slice(firstSentenceEnd + 1);
+      // Split text into paragraphs and distribute badges across them
+      const paragraphs = formatted.split("\n");
+      let result = "";
+      for (let i = 0; i < paragraphs.length; i++) {
+        const para = paragraphs[i];
+        if (!para.trim()) {
+          result += (result ? "\n" : "") + para;
+          continue;
+        }
+        // Assign one citation badge per substantive paragraph
+        const badgeIdx = i % sourceNums.length;
+        result += (result ? "\n" : "") + para + " " + citationBadge(sourceNums[badgeIdx]);
       }
+      formatted = result;
     }
   }
 
