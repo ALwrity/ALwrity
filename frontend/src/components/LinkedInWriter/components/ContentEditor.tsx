@@ -34,6 +34,8 @@ interface ContentEditorProps {
   onDraftChange: (value: string) => void;
   topic?: string;
   assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
+  previewMode?: LinkedInPreviewMode;
+  onPreviewModeChange?: (mode: LinkedInPreviewMode) => void;
 }
 
 const ContentEditor: React.FC<ContentEditorProps> = ({
@@ -53,10 +55,18 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   onDraftChange,
   topic,
   assistiveEditorRef,
+  previewMode: externalPreviewMode,
+  onPreviewModeChange,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [assistantOn, setAssistantOn] = useState(false);
-  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('linkedin');
+  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>(
+    externalPreviewMode || 'studio'
+  );
+
+  // Sync external preview mode when controlled
+  const effectivePreviewMode = onPreviewModeChange ? (externalPreviewMode ?? 'linkedin') : previewMode;
+  const effectiveSetPreviewMode = onPreviewModeChange || setPreviewMode;
 
   const getTextarea = useCallback(
     () => contentRef.current?.querySelector("textarea") ?? null,
@@ -186,8 +196,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               searchQueries={searchQueries}
               qualityMetrics={qualityMetrics}
               draft={draft}
-              previewMode={previewMode}
-              onPreviewModeChange={setPreviewMode}
+              previewMode={effectivePreviewMode}
+              onPreviewModeChange={effectiveSetPreviewMode}
               assistantOn={assistantOn}
               onAssistantToggle={setAssistantOn}
               topic={topic}
@@ -201,8 +211,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               citations={citations}
               researchSources={researchSources}
               assistantOn={assistantOn}
-              previewMode={previewMode}
-              onPreviewModeChange={setPreviewMode}
+              previewMode={effectivePreviewMode}
+              onPreviewModeChange={effectiveSetPreviewMode}
               assistiveWriting={{
                 suggestion: assistiveWriting.suggestion,
                 error: assistiveWriting.error,
