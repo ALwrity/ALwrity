@@ -15,6 +15,26 @@ export {
   getPostCommentsErrorType as getCommentAssistantErrorType,
 } from './postCommentsErrorUtils';
 
+export interface CommentAssistantDraftReplyRequest {
+  social_id: string;
+  comment_id: string;
+  post_text: string;
+  comment_text: string;
+  parent_comment_text?: string | null;
+  tone?: 'professional' | 'friendly' | 'appreciative' | 'value_add' | 'clarifying';
+  include_question?: boolean;
+  refresh?: boolean;
+}
+
+export interface CommentAssistantDraftReplyResponse {
+  success: boolean;
+  reply?: string | null;
+  alternative_replies?: string[];
+  from_cache?: boolean;
+  generation_metadata?: Record<string, unknown>;
+  error?: string | null;
+}
+
 const BASE = '/api/linkedin/comment-assistant';
 
 export const commentAssistantApi = {
@@ -50,6 +70,21 @@ export const commentAssistantApi = {
         post_social_id: postSocialId,
         reaction_type: reactionType,
       }
+    );
+    return data;
+  },
+
+  /**
+   * Draft a reply with ALwrity for a given comment (or nested reply).
+   * TODO(Phase 3): Wire to the backend route once implemented.
+   * In Phase 1 this stub targets the planned endpoint so the UI can be tested.
+   */
+  async draftReply(
+    payload: CommentAssistantDraftReplyRequest
+  ): Promise<CommentAssistantDraftReplyResponse> {
+    const { data } = await aiApiClient.post<CommentAssistantDraftReplyResponse>(
+      `${BASE}/draft-reply`,
+      payload
     );
     return data;
   },

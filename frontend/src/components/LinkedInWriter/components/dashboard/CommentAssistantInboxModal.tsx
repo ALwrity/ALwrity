@@ -54,7 +54,7 @@ export const CommentAssistantInboxModal: React.FC<
     retryPost,
     handleReact,
     handleSendReply,
-    handleDraftAi,
+    handleDraftAlwrity,
     handleLoadMore,
     handleShowThreadReplies,
   } = useCommentAssistantInbox(open, connected);
@@ -397,15 +397,8 @@ export const CommentAssistantInboxModal: React.FC<
                       payload,
                     )
                   }
-                  onDraftAi={(commentId) => {
-                    const comment = g.comments?.find((c) => c.id === commentId);
-                    if (!comment) return;
-                    void handleDraftAi(
-                      g.postId,
-                      g.postText || g.postSnippet,
-                      commentId,
-                      comment.text,
-                    );
+                  onDraftAlwrity={(commentId) => {
+                    void handleDraftAlwrity(g.postId, g.socialId, commentId);
                   }}
                   onRetry={g.error ? () => retryPost() : undefined}
                   onLoadMore={

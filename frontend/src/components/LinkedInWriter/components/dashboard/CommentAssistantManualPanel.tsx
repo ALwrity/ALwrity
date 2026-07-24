@@ -328,10 +328,10 @@ export const CommentAssistantManualPanel: React.FC<
         >
           {loading ? (
             <>
-              <Spinner /> Drafting reply…
+              <Spinner /> Drafting with ALwrity…
             </>
           ) : (
-            "💬 Generate Reply"
+            "💬 Generate with ALwrity"
           )}
         </button>
       )}
@@ -355,7 +355,7 @@ export const CommentAssistantManualPanel: React.FC<
                 marginBottom: 8,
               }}
             >
-              AI Reply
+              ALwrity Reply
             </div>
             <div
               style={{

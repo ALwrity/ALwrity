@@ -385,7 +385,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           />
           <DashboardToolTile
             title="Comment Assistant"
-            description="Draft the perfect AI reply to any comment, in your voice"
+            description="Draft the perfect reply with ALwrity to any comment, in your voice"
             icon="💬"
             accent="#0a66c2"
             onClick={() => {

@@ -19,7 +19,10 @@ export interface CommentAssistantReplyView {
   liked?: boolean;
   userReacted?: string | null;
   reactionCount?: number;
+  /** Prefilled text when ALwrity drafted a reply for this item. */
+  draftText?: string;
   replyBusy?: boolean;
+  draftBusy?: boolean;
   likeBusy?: boolean;
 }
 

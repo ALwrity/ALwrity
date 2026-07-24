@@ -23,7 +23,7 @@ interface CommentAssistantCommentRowProps {
     commentId: string,
     payload: CommentAssistantReplyPayload,
   ) => void;
-  onDraftAi?: (commentId: string) => void;
+  onDraftAlwrity?: (commentId: string) => void;
   onShowThreadReplies?: (commentId: string) => void;
 }
 
@@ -45,7 +45,7 @@ export const CommentAssistantCommentRow: React.FC<
   actionsEnabled = false,
   onReact,
   onSendReply,
-  onDraftAi,
+  onDraftAlwrity,
   onShowThreadReplies,
 }) => {
   const [replyOpen, setReplyOpen] = useState(false);
@@ -151,6 +151,7 @@ export const CommentAssistantCommentRow: React.FC<
                   mentionAuthorId={parentMentionId}
                   onReact={onReact}
                   onSendReply={onSendReply}
+                  onDraftAlwrity={onDraftAlwrity}
                 />
               ))}
             </div>
@@ -205,6 +206,7 @@ export const CommentAssistantCommentRow: React.FC<
               mentionAuthorId={r.isMine ? parentMentionId : r.authorId}
               onReact={onReact}
               onSendReply={onSendReply}
+              onDraftAlwrity={onDraftAlwrity}
             />
           ))}
         </div>
@@ -239,7 +241,8 @@ export const CommentAssistantCommentRow: React.FC<
         <button
           type="button"
           disabled={!canAct}
-          onClick={() => onDraftAi?.(comment.id)}
+          aria-label="Draft a reply with ALwrity"
+          onClick={() => onDraftAlwrity?.(comment.id)}
           style={{
             ...actionBtn(true),
             opacity: canAct ? 1 : 0.55,
@@ -248,9 +251,22 @@ export const CommentAssistantCommentRow: React.FC<
         >
           {comment.draftBusy
             ? COMMENT_ASSISTANT_ACTIONS.drafting
-            : COMMENT_ASSISTANT_ACTIONS.draftAi}
+            : COMMENT_ASSISTANT_ACTIONS.draftAlwrity}
         </button>
       </div>
+
+      {comment.draftText ? (
+        <div
+          style={{
+            fontSize: 10,
+            color: colors.textTertiary,
+            marginTop: 4,
+            marginBottom: 2,
+          }}
+        >
+          Review and edit the draft before sending.
+        </div>
+      ) : null}
 
       {replyOpen && (
         <CommentAssistantReplyComposer
