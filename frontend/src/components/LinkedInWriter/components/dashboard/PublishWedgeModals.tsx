@@ -7,7 +7,7 @@
  * F3  ScheduleQuickModal     — calendar quick-add
  * F5  PublishNowModal        — direct LinkedIn publish with pre-flight (see PublishNowModal.tsx)
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardActionModal } from "./DashboardActionModal";
 import { PreviewScoreCard } from "../GrowthEngine/PreviewScoreCard";
@@ -16,6 +16,7 @@ import { linkedInGrowthApi } from "../../../../services/linkedInGrowthApi";
 import type { PostPreviewScoreResponse } from "../../../../services/linkedInGrowthApi";
 import { contentPlanningApi } from "../../../../services/contentPlanningApi";
 import { formatDraftForPublish } from "../../utils/linkedInPublishFormatters";
+import { LinkedInPublishChecklist } from "../LinkedInPublishChecklist";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -494,6 +495,7 @@ interface QualityCheckModalProps {
   initialContent?: string;
   /** Optional topic/context hint passed to the scoring API */
   contextHint?: string;
+  qualityMetrics?: { overall_score?: number; factual_accuracy?: number; source_verification?: number; citation_coverage?: number } | null;
 }
 
 export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
@@ -501,12 +503,20 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
   onClose,
   initialContent,
   contextHint,
+  qualityMetrics,
 }) => {
   const [content, setContent] = useState("");
   const [scoreResult, setScoreResult] =
     useState<PostPreviewScoreResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const hasQualityMetrics = qualityMetrics && (typeof qualityMetrics.overall_score === 'number' || typeof qualityMetrics.factual_accuracy === 'number' || typeof qualityMetrics.source_verification === 'number' || typeof qualityMetrics.citation_coverage === 'number');
+  const metricItems = useMemo(() => hasQualityMetrics ? [
+    { label: 'Overall', value: qualityMetrics!.overall_score || 0 },
+    { label: 'Accuracy', value: qualityMetrics!.factual_accuracy || 0 },
+    { label: 'Verification', value: qualityMetrics!.source_verification || 0 },
+    { label: 'Coverage', value: qualityMetrics!.citation_coverage || 0 },
+  ] : [], [hasQualityMetrics, qualityMetrics]);
 
   useEffect(() => {
     if (open) {
@@ -562,6 +572,28 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
               Score your post across 6 dimensions (Hook, Clarity, Engagement,
               Value, CTA, Readability) before publishing.
             </p>
+            {hasQualityMetrics && (
+              <div style={{ marginBottom: 16, padding: '14px 16px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #bbf7d0' }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#059669', marginBottom: 10 }}>AI Content Quality</div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {metricItems.map((m) => {
+                    const pct = Math.round((m.value || 0) * 100);
+                    const color = pct >= 70 ? '#059669' : pct >= 40 ? '#d97706' : '#dc2626';
+                    return (
+                      <div key={m.label} style={{ flex: '1 1 calc(50% - 5px)', minWidth: 120, padding: '8px 10px', background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{m.label}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color }}>{pct}%</span>
+                        </div>
+                        <div style={{ height: 4, background: '#e5e7eb', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 2, transition: 'width 0.4s ease' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div style={sectionLabel}>Your Post Content</div>
             <textarea
               value={content}
@@ -648,6 +680,10 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
             </div>
           </>
         )}
+        <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e5e7eb' }}>
+          <div style={{ fontWeight: 700, fontSize: 14, color: '#b45309', marginBottom: 10 }}>Best Practices Checklist</div>
+          <LinkedInPublishChecklist draft={content || initialContent || ''} hasMedia={false} compact />
+        </div>
       </div>
     </DashboardActionModal>
   );

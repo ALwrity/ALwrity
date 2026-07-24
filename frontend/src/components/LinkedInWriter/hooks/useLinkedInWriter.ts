@@ -113,7 +113,6 @@ export function useLinkedInWriter() {
   const [showContextPanel, setShowContextPanel] = useState(false);
   const [showPreferencesModal, setShowPreferencesModal] = useState(false);
   const [showContextModal, setShowContextModal] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [justGeneratedContent, setJustGeneratedContent] = useState(false);
 
   // Track action usage and update preferences
@@ -962,8 +961,6 @@ export function useLinkedInWriter() {
       setShowEditor(true);
       setLoadingMessage("");
       setCurrentAction(null);
-      // Auto-show preview when new content is generated
-      setShowPreview(true);
       // Progress is finalized by the progressStep/progressComplete events dispatched after this
       console.log("[LinkedIn Writer] Draft update complete");
     };
@@ -1206,7 +1203,6 @@ export function useLinkedInWriter() {
     showContextPanel,
     showPreferencesModal,
     showContextModal,
-    showPreview,
     justGeneratedContent,
 
     // Setters
@@ -1225,7 +1221,6 @@ export function useLinkedInWriter() {
     setShowContextPanel,
     setShowPreferencesModal,
     setShowContextModal,
-    setShowPreview,
     setJustGeneratedContent: setJustGeneratedContent,
 
     // Handlers

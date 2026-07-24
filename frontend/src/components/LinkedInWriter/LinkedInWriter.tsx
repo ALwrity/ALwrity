@@ -6,10 +6,13 @@ import React, {
   useState,
 } from "react";
 import { useLocation } from "react-router-dom";
-import { Button, Snackbar, Alert, CircularProgress } from "@mui/material";
+import { Button, Snackbar, Alert, CircularProgress, Tooltip } from "@mui/material";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
 import {
   Save as SaveIcon,
   RateReview as RateReviewIcon,
+  ArrowBack as ArrowBackIcon,
+  Check as CheckIcon,
 } from "@mui/icons-material";
 import { QualityCheckModal } from "./components/dashboard/PublishWedgeModals";
 import {
@@ -95,7 +98,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     // currentSuggestions,
     showPreferencesModal,
     // showContextModal,
-    showPreview,
     justGeneratedContent,
 
     // Grounding data
@@ -117,7 +119,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     setUserPreferences,
     setShowPreferencesModal,
     // setShowContextModal,
-    setShowPreview,
 
     // Handlers
     handleDraftChange,
@@ -182,6 +183,14 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
 
   // Quality Check state
   const [qualityCheckOpen, setQualityCheckOpen] = useState(false);
+
+  const editorTheme = useMemo(() => createTheme({
+    palette: {
+      mode: 'light',
+      primary: { main: '#0a66c2' },
+      text: { primary: '#1e293b', secondary: '#64748b' },
+    },
+  }), []);
 
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
@@ -414,10 +423,6 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     setLivePreviewHtml("");
   };
 
-  const handlePreviewToggle = () => {
-    setShowPreview(!showPreview);
-  };
-
   const handlePreferencesChange = (prefs: Partial<typeof userPreferences>) => {
     const updated = { ...userPreferences, ...prefs };
     setUserPreferences(updated);
@@ -610,73 +615,105 @@ Always use the most appropriate tool for the user's request.`.trim();
         {(showEditor && draft) || isGenerating ? (
           <>
             {draft && !isGenerating && (
+              <ThemeProvider theme={editorTheme}>
               <div
                 style={{
-                  padding: "8px 24px",
+                  padding: "6px 14px",
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
+                  gap: 6,
                   flexShrink: 0,
-                  borderBottom: "1px solid #e2e8f0",
-                  background: "#f8fafc",
+                  borderBottom: "1px solid #e8ecf1",
+                  background: "#fafbfc",
+                  minHeight: 42,
                 }}
               >
                 <Button
                   type="button"
                   variant="contained"
                   onClick={() => setShowEditor(false)}
-                  startIcon={
-                    <span style={{ fontSize: 18, lineHeight: 1 }}>←</span>
-                  }
+                  startIcon={<ArrowBackIcon fontSize="small" />}
                   sx={{
-                    fontWeight: 700,
+                    fontWeight: 600,
                     bgcolor: "#0a66c2",
                     "&:hover": { bgcolor: "#004182" },
                     textTransform: "none",
-                    fontSize: 14,
-                    px: 2.5,
-                    py: 1,
-                    boxShadow: "0 2px 8px rgba(10, 102, 194, 0.3)",
+                    fontSize: 12.5,
+                    px: 1.8,
+                    py: 0.4,
+                    boxShadow: "none",
+                    borderRadius: 1.5,
+                    lineHeight: 1.6,
+                    minHeight: 30,
                   }}
                 >
-                  Back to Dashboard
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outlined"
-                  color="primary"
-                  startIcon={
-                    saveStatus === "saving" ? (
-                      <CircularProgress size={18} color="inherit" />
-                    ) : (
-                      <SaveIcon />
-                    )
-                  }
-                  onClick={handleSaveToAssetLibrary}
-                  disabled={saveStatus === "saving" || saveStatus === "saved"}
-                  sx={{ textTransform: "none", fontSize: 13, fontWeight: 600 }}
-                >
-                  {saveStatus === "saving"
-                    ? "Saving..."
-                    : saveStatus === "saved"
-                      ? "Saved ✓"
-                      : "Save to Asset Library"}
-                </Button>
-
-                <Button
-                  type="button"
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<RateReviewIcon />}
-                  onClick={() => setQualityCheckOpen(true)}
-                  disabled={!draft}
-                  sx={{ textTransform: "none", fontSize: 13, fontWeight: 600 }}
-                >
-                  Quality Check
+                  Dashboard
                 </Button>
 
                 <div style={{ flex: 1 }} />
+
+                <Tooltip title={saveStatus === "saved" ? "Saved to Asset Library" : "Save draft to Asset Library"} arrow>
+                  <Button
+                    type="button"
+                    variant="text"
+                    size="small"
+                    startIcon={
+                      saveStatus === "saving" ? (
+                        <CircularProgress size={16} />
+                      ) : saveStatus === "saved" ? (
+                        <CheckIcon fontSize="small" />
+                      ) : (
+                        <SaveIcon fontSize="small" />
+                      )
+                    }
+                    onClick={handleSaveToAssetLibrary}
+                    disabled={saveStatus === "saving" || saveStatus === "saved"}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: "text.secondary",
+                      px: 1.2,
+                      py: 0.4,
+                      minWidth: "auto",
+                      minHeight: 30,
+                      borderRadius: 1.5,
+                      "&:hover": { bgcolor: "action.hover", color: "text.primary" },
+                      "&.Mui-disabled": { color: saveStatus === "saved" ? "success.main" : "text.disabled" },
+                    }}
+                  >
+                    {saveStatus === "saving"
+                      ? "Saving..."
+                      : saveStatus === "saved"
+                        ? "Saved"
+                        : "Save"}
+                  </Button>
+                </Tooltip>
+
+                <Tooltip title="Run pre-publish quality check" arrow>
+                  <Button
+                    type="button"
+                    variant="text"
+                    size="small"
+                    startIcon={<RateReviewIcon fontSize="small" />}
+                    onClick={() => setQualityCheckOpen(true)}
+                    disabled={!draft}
+                    sx={{
+                      textTransform: "none",
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: "text.secondary",
+                      px: 1.2,
+                      py: 0.4,
+                      minWidth: "auto",
+                      minHeight: 30,
+                      borderRadius: 1.5,
+                      "&:hover": { bgcolor: "action.hover", color: "text.primary" },
+                    }}
+                  >
+                    Quality
+                  </Button>
+                </Tooltip>
 
                 <PublishLinkedInPanel
                   draft={draft}
@@ -689,6 +726,7 @@ Always use the most appropriate tool for the user's request.`.trim();
                   compact
                 />
               </div>
+              </ThemeProvider>
             )}
 
             <ContentEditor
@@ -696,7 +734,6 @@ Always use the most appropriate tool for the user's request.`.trim();
               pendingEdit={pendingEdit}
               livePreviewHtml={livePreviewHtml}
               draft={draft}
-              showPreview={showPreview}
               isGenerating={isGenerating}
               loadingMessage={loadingMessage}
               // Grounding data
@@ -708,7 +745,6 @@ Always use the most appropriate tool for the user's request.`.trim();
               onConfirmChanges={handleConfirmChanges}
               onDiscardChanges={handleDiscardChanges}
               onDraftChange={handleDraftChange}
-              onPreviewToggle={handlePreviewToggle}
               topic={
                 context ? context.split("\n")[0].substring(0, 50) : undefined
               }
@@ -773,6 +809,7 @@ Always use the most appropriate tool for the user's request.`.trim();
         onClose={() => setQualityCheckOpen(false)}
         initialContent={draft}
         contextHint={context || undefined}
+        qualityMetrics={qualityMetrics}
       />
 
       {/* ── Share a Link Modal ── */}

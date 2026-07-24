@@ -15,13 +15,13 @@ import { appendImageMarkdownToDraft } from "../utils/linkedInImageDraftUtils";
 import type { LinkedInAssistiveEditorHandle } from "./LinkedInAssistiveEditor";
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
+import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
   pendingEdit: { src: string; target: string } | null;
   livePreviewHtml: string;
   draft: string;
-  showPreview: boolean;
   isGenerating: boolean;
   loadingMessage: string;
   researchSources?: any[];
@@ -32,7 +32,6 @@ interface ContentEditorProps {
   onConfirmChanges: () => void;
   onDiscardChanges: () => void;
   onDraftChange: (value: string) => void;
-  onPreviewToggle: () => void;
   topic?: string;
   assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
 }
@@ -42,7 +41,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   pendingEdit,
   livePreviewHtml,
   draft,
-  showPreview,
   isGenerating,
   loadingMessage,
   researchSources,
@@ -53,12 +51,12 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   onConfirmChanges,
   onDiscardChanges,
   onDraftChange,
-  onPreviewToggle,
   topic,
   assistiveEditorRef,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [assistantOn, setAssistantOn] = useState(false);
+  const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>('linkedin');
 
   const getTextarea = useCallback(
     () => contentRef.current?.querySelector("textarea") ?? null,
@@ -163,12 +161,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     };
   }, [draft, onDraftChange]);
 
-  useEffect(() => {
-    if (draft && !showPreview) {
-      onPreviewToggle();
-    }
-  }, [draft, showPreview, onPreviewToggle]);
-
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
       <DiffPreviewModal
@@ -180,7 +172,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       />
 
       <div style={{ flex: 1, padding: "24px", overflow: "visible" }}>
-        {showPreview && (
           <div
             style={{
               border: "1px solid #e1f5fe",
@@ -195,8 +186,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               searchQueries={searchQueries}
               qualityMetrics={qualityMetrics}
               draft={draft}
-              showPreview={showPreview}
-              onPreviewToggle={onPreviewToggle}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
               assistantOn={assistantOn}
               onAssistantToggle={setAssistantOn}
               topic={topic}
@@ -210,6 +201,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               citations={citations}
               researchSources={researchSources}
               assistantOn={assistantOn}
+              previewMode={previewMode}
+              onPreviewModeChange={setPreviewMode}
               assistiveWriting={{
                 suggestion: assistiveWriting.suggestion,
                 error: assistiveWriting.error,
@@ -237,7 +230,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               groundingEnabled={groundingEnabled || false}
             />
           </div>
-        )}
       </div>
 
       <CitationHoverHandler researchSources={researchSources || []} />

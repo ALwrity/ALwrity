@@ -13,7 +13,6 @@ import {
 } from "@mui/material";
 import {
   Image as ImageIcon,
-  LightbulbOutlined as TipsIcon,
   LinkedIn as LinkedInIcon,
   Visibility as PreviewIcon,
 } from "@mui/icons-material";
@@ -71,7 +70,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mediaAnchor, setMediaAnchor] = useState<HTMLElement | null>(null);
   const [previewAnchor, setPreviewAnchor] = useState<HTMLElement | null>(null);
-  const [tipsAnchor, setTipsAnchor] = useState<HTMLElement | null>(null);
 
   const publishMedia = useLinkedInPublishMedia({
     draft,
@@ -216,15 +214,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           <PreviewIcon fontSize="small" />
         </IconButton>
       </Tooltip>
-      <Tooltip title="Post tips (Best Practices)">
-        <IconButton
-          size="small"
-          onClick={(event) => setTipsAnchor(event.currentTarget)}
-          sx={{ color: "#b45309", border: "1px solid #fde68a" }}
-        >
-          <TipsIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
       <Popover
         open={Boolean(mediaAnchor)}
         anchorEl={mediaAnchor}
@@ -262,71 +251,39 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           compact
         />
       </Popover>
-      <Popover
-        open={Boolean(tipsAnchor)}
-        anchorEl={tipsAnchor}
-        onClose={() => setTipsAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            sx: {
-              p: 1.5,
-              width: 360,
-              maxWidth: "94vw",
-              maxHeight: 420,
-              overflowY: "auto",
-            },
-          },
-        }}
-      >
-        <LinkedInPublishChecklist
-          draft={publishContent}
-          hasMedia={hasPublishMedia}
-          compact
-        />
-      </Popover>
     </>
   );
 
   if (compact) {
     return (
       <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
-        <Chip
-          size="small"
-          label={
-            isLoading
-              ? "Checking..."
-              : connected
-                ? "Connected"
-                : "Not connected"
-          }
-          color={connected ? "success" : "default"}
-          variant="outlined"
-        />
         {mediaControls}
         {charCaption}
-        <Button
-          variant="contained"
-          disabled={!canPublish}
-          onClick={handlePublish}
-          startIcon={
-            isPublishing ? (
-              <CircularProgress size={16} color="inherit" />
-            ) : (
-              <LinkedInIcon />
-            )
-          }
-          sx={{
-            bgcolor: "#0A66C2",
-            "&:hover": { bgcolor: "#004182" },
-            textTransform: "none",
-            fontSize: 13,
-            fontWeight: 600,
-          }}
-        >
-          {publishLabel}
-        </Button>
+        <Tooltip title={connected ? 'Publish to LinkedIn' : 'Not connected — connect LinkedIn to publish'} arrow>
+          <span>
+            <Button
+              variant="contained"
+              disabled={!canPublish}
+              onClick={handlePublish}
+              startIcon={
+                isPublishing ? (
+                  <CircularProgress size={16} color="inherit" />
+                ) : (
+                  <LinkedInIcon />
+                )
+              }
+              sx={{
+                bgcolor: "#0A66C2",
+                "&:hover": { bgcolor: "#004182" },
+                textTransform: "none",
+                fontSize: 13,
+                fontWeight: 600,
+              }}
+            >
+              {publishLabel}
+            </Button>
+          </span>
+        </Tooltip>
         {successDetails}
         {errorMessage && (
           <Typography
@@ -359,18 +316,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         >
           Publish to LinkedIn
         </Typography>
-        <Chip
-          size="small"
-          label={
-            isLoading
-              ? "Checking..."
-              : connected
-                ? "Connected"
-                : "Not connected"
-          }
-          color={connected ? "success" : "default"}
-          variant="outlined"
-        />
       </Box>
 
       <Typography
@@ -462,19 +407,23 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         </Alert>
       )}
 
-      <Button
-        variant="contained"
-        disabled={!canPublish}
-        onClick={handlePublish}
-        startIcon={
-          isPublishing ? (
-            <CircularProgress size={16} color="inherit" />
-          ) : undefined
-        }
-        sx={{ bgcolor: "#0A66C2", "&:hover": { bgcolor: "#004182" } }}
-      >
-        {publishLabel}
-      </Button>
+      <Tooltip title={connected ? 'Publish to LinkedIn' : 'Not connected — connect LinkedIn to publish'} arrow>
+        <span>
+          <Button
+            variant="contained"
+            disabled={!canPublish}
+            onClick={handlePublish}
+            startIcon={
+              isPublishing ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : undefined
+            }
+            sx={{ bgcolor: "#0A66C2", "&:hover": { bgcolor: "#004182" } }}
+          >
+            {publishLabel}
+          </Button>
+        </span>
+      </Tooltip>
     </Box>
   );
 };
