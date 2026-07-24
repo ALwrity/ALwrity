@@ -10,6 +10,7 @@ import {
 } from "../../../../services/commentAssistantApi";
 import { colors, rowBase } from "../GrowthEngine/styles";
 import { COMMENT_ASSISTANT_MANUAL_INTRO } from "./commentAssistantCopy";
+import { CommentAssistantSpinner } from "./commentAssistantSpinner";
 
 const DRAFT_KEY = "alwrity-copilot-draft-content";
 
@@ -52,23 +53,7 @@ function textareaStyle(minH: number): React.CSSProperties {
   };
 }
 
-const Spinner = () => (
-  <>
-    <style>{`@keyframes ca-spin { to { transform: rotate(360deg); } }`}</style>
-    <span
-      style={{
-        display: "inline-block",
-        width: 16,
-        height: 16,
-        border: "2px solid #d1d5db",
-        borderTopColor: colors.primary,
-        borderRadius: "50%",
-        animation: "ca-spin 0.7s linear infinite",
-        flexShrink: 0,
-      }}
-    />
-  </>
-);
+const Spinner = () => <CommentAssistantSpinner size={16} />;
 
 const FieldLabel: React.FC<{ label: string }> = ({ label }) => (
   <div

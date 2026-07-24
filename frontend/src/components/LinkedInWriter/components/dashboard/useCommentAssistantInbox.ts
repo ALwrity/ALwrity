@@ -306,7 +306,13 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           mentions: payload.mentions,
           imageFile: payload.imageFile,
         });
-        updateComment(postId, commentId, { replyBusy: false, draftText: "" });
+        // Clear the draft and thread replies so the composer closes and the
+        // thread view rebuilds fresh after posting (avoids duplicate replies).
+        updateComment(postId, commentId, {
+          replyBusy: false,
+          draftText: "",
+          threadReplies: undefined,
+        });
         showStatus("success", "Reply posted successfully.", 4500);
         if (isPriorityTab(tab)) {
           await loadInbox(tab, false);

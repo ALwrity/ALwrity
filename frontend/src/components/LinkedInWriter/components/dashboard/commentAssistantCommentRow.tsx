@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { colors } from "../GrowthEngine/styles";
 import { CommentAssistantAttachedImage } from "./commentAssistantAttachedImage";
 import { CommentAssistantAuthorRow } from "./commentAssistantAuthorRow";
 import { COMMENT_ASSISTANT_ACTIONS } from "./commentAssistantCopy";
 import { CommentAssistantNestedReplyRow } from "./commentAssistantNestedReplyRow";
 import { CommentAssistantReactionPicker } from "./commentAssistantReactionPicker";
+import { CommentAssistantSpinner } from "./commentAssistantSpinner";
 import {
   CommentAssistantReplyComposer,
   type CommentAssistantReplyPayload,
@@ -52,11 +53,21 @@ export const CommentAssistantCommentRow: React.FC<
   const [repliesOpen, setRepliesOpen] = useState(
     Boolean(comment.myReplies?.length),
   );
+  const prevDraftTextRef = useRef(comment.draftText);
 
   useEffect(() => {
     if (comment.draftText != null && comment.draftText !== "") {
       setReplyOpen(true);
     }
+    // Close the composer when the draft has been sent/cleared.
+    if (
+      prevDraftTextRef.current &&
+      prevDraftTextRef.current !== "" &&
+      !comment.draftText
+    ) {
+      setReplyOpen(false);
+    }
+    prevDraftTextRef.current = comment.draftText;
   }, [comment.draftText]);
 
   useEffect(() => {
@@ -70,6 +81,11 @@ export const CommentAssistantCommentRow: React.FC<
   );
   const canAct = actionsEnabled && !busy;
   const myReplies = comment.myReplies || [];
+  const myReplyIds = new Set(myReplies.map((r) => r.id));
+  // Avoid showing the same reply twice when a posted reply also appears in thread replies.
+  const threadReplies = (comment.threadReplies || []).filter(
+    (r) => !myReplyIds.has(r.id),
+  );
   const replyCount = comment.replyCount ?? 0;
 
   /** When replying under own reply, keep @mention on the audience author. */
@@ -178,7 +194,7 @@ export const CommentAssistantCommentRow: React.FC<
         </button>
       )}
 
-      {comment.threadReplies && comment.threadReplies.length > 0 && (
+      {threadReplies.length > 0 && (
         <div
           style={{
             marginBottom: 6,
@@ -197,7 +213,7 @@ export const CommentAssistantCommentRow: React.FC<
           >
             Thread replies
           </div>
-          {comment.threadReplies.map((r) => (
+          {threadReplies.map((r) => (
             <CommentAssistantNestedReplyRow
               key={r.id}
               reply={r}
@@ -242,16 +258,25 @@ export const CommentAssistantCommentRow: React.FC<
           type="button"
           disabled={!canAct}
           aria-label="Draft a reply with ALwrity"
+          aria-busy={comment.draftBusy}
           onClick={() => onDraftAlwrity?.(comment.id)}
           style={{
             ...actionBtn(true),
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
             opacity: canAct ? 1 : 0.55,
             cursor: canAct ? "pointer" : "default",
           }}
         >
-          {comment.draftBusy
-            ? COMMENT_ASSISTANT_ACTIONS.drafting
-            : COMMENT_ASSISTANT_ACTIONS.draftAlwrity}
+          {comment.draftBusy ? (
+            <>
+              <CommentAssistantSpinner size={11} color="#fff" />
+              {COMMENT_ASSISTANT_ACTIONS.drafting}
+            </>
+          ) : (
+            COMMENT_ASSISTANT_ACTIONS.draftAlwrity
+          )}
         </button>
       </div>
 

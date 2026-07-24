@@ -221,6 +221,25 @@ export const CommentAssistantInboxModal: React.FC<
                   }}
                 />
               )}
+              {statusMessage.tone === "success" && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "#047857",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  ✓
+                </span>
+              )}
               {statusMessage.text}
             </div>
           )}
