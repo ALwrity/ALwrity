@@ -84,7 +84,7 @@ jobs:
     name: 🧭 Resolve suite selection
     runs-on: ubuntu-latest
     outputs:
-      # The resolved comma-separated list of suites, used by the
+      # The resolved JSON array of suite names, used by the
       # matrix fan-out job below.
       suites: ${{ steps.pick.outputs.suites }}
       # Whether we're running in "full" mode — used downstream to
@@ -218,7 +218,7 @@ jobs:
                 : Array.from(suitesForChangedFiles(paths));
             }
 
-            core.setOutput('suites', selected.join(','));
+            core.setOutput('suites', JSON.stringify(selected));
             core.setOutput('is_full', String(selected.length === ALL_SUITES.length));
             core.summary
               .addRaw(`## 🤖 Suite selection`, true)
