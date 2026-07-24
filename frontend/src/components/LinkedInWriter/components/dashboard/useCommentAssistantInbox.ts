@@ -5,7 +5,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   commentAssistantApi,
-  getCommentAssistantDraftErrorMessage,
   getCommentAssistantErrorMessage,
   getCommentAssistantReplyErrorMessage,
 } from "../../../../services/commentAssistantApi";
@@ -14,6 +13,7 @@ import {
   COMMENT_ASSISTANT_REPLY_SENDING,
   COMMENT_ASSISTANT_REPLY_SUCCESS,
 } from "./commentAssistantCopy";
+import { clearSessionDraft } from "./commentAssistantDraftCache";
 import { loadCommentAssistantInbox } from "./commentAssistantInboxLoad";
 import { formatTimeLabel } from "./commentAssistantMappers";
 import type { CommentAssistantReplyPayload } from "./commentAssistantReplyComposer";
@@ -25,6 +25,7 @@ import type {
   CommentAssistantReplyView,
   CommentAssistantTab,
 } from "./commentAssistantTypes";
+import { useCommentAssistantDraftAction } from "./useCommentAssistantDraftAction";
 
 /** Match server cache TTL so Sync cannot hammer Unipile every minute. */
 const SYNC_COOLDOWN_MS = 300_000;
@@ -317,6 +318,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           draftText: "",
           threadReplies: undefined,
         });
+        clearSessionDraft(commentId);
         // Reload first, then show success so the banner is not buried under
         // the "Loading comments…" state during refresh. Reply already posted —
         // inbox reload failures must not hide the success confirmation.
@@ -340,62 +342,11 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     [tab, loadInbox, updateComment, showStatus],
   );
 
-  const handleDraftAlwrity = useCallback(
-    async (postId: string, socialId: string, commentId: string) => {
-      setActionError("");
-      const group = groupsRef.current.find((g) => g.postId === postId);
-      const postText = group?.postText || group?.postSnippet || "";
-      let commentText = "";
-      let parentCommentText: string | undefined;
-
-      const topLevel = group?.comments?.find((c) => c.id === commentId);
-      if (topLevel) {
-        commentText = topLevel.text;
-      } else {
-        for (const c of group?.comments || []) {
-          const nested =
-            c.myReplies?.find((r) => r.id === commentId) ||
-            c.threadReplies?.find((r) => r.id === commentId);
-          if (nested) {
-            commentText = nested.text;
-            parentCommentText = c.text;
-            break;
-          }
-        }
-      }
-
-      if (!commentText) {
-        console.error(
-          "[CommentAssistantDraft] comment not found for draft",
-          { postId, commentId },
-        );
-        setActionError("Could not find the comment to draft a reply.");
-        return;
-      }
-
-      updateComment(postId, commentId, { draftBusy: true });
-      try {
-        const res = await commentAssistantApi.draftReply({
-          social_id: socialId,
-          comment_id: commentId,
-          post_text: postText,
-          comment_text: commentText,
-          parent_comment_text: parentCommentText || null,
-          tone: "professional",
-          include_question: false,
-        });
-        updateComment(postId, commentId, {
-          draftBusy: false,
-          draftText: res.reply ?? "",
-        });
-      } catch (err) {
-        updateComment(postId, commentId, { draftBusy: false });
-        console.error("[CommentAssistantDraft] failed", err);
-        setActionError(getCommentAssistantDraftErrorMessage(err));
-      }
-    },
-    [updateComment],
-  );
+  const { handleDraftAlwrity } = useCommentAssistantDraftAction({
+    getGroups: () => groupsRef.current,
+    updateComment,
+    setActionError,
+  });
 
   const handleLoadMore = useCallback(
     async (postId: string, socialId: string, cursor: string) => {

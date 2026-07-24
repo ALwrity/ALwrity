@@ -6,7 +6,9 @@ import json
 import time
 from typing import Any, Callable, Optional
 
+from fastapi import HTTPException
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from models.linkedin_comment_assistant_draft_models import (
     CommentAssistantDraftReplyRequest,
@@ -16,6 +18,9 @@ from models.linkedin_comment_assistant_draft_models import (
 from prompts.linkedin.comment_assistant_draft_prompt import (
     COMMENT_DRAFT_SYSTEM_PROMPT,
     build_comment_assistant_draft_prompt,
+)
+from services.linkedin_comment_assistant_draft_cache_service import (
+    LinkedInCommentAssistantDraftCacheService,
 )
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.persona_analysis_service import PersonaAnalysisService
@@ -111,6 +116,7 @@ def _call_llm(
     generate_fn: Optional[_DraftLLMFn] = None,
 ) -> dict[str, Any]:
     """Call the LLM gateway and parse the structured JSON response."""
+    llm_start = time.time()
     try:
         if generate_fn is not None:
             raw = generate_fn(
@@ -130,15 +136,31 @@ def _call_llm(
                 max_tokens=500,
                 temperature=0.7,
             )
+        logger.info(
+            "{} LLM call ok user={} flow_type=linkedin_comment_assistant_draft "
+            "duration_ms={}",
+            _LOG_PREFIX,
+            _mask_user_id(user_id),
+            int((time.time() - llm_start) * 1000),
+        )
+    except HTTPException:
+        # Preserve subscription 429 detail (billing message) for the route layer.
+        logger.warning(
+            "{} LLM HTTPException user={} duration_ms={}",
+            _LOG_PREFIX,
+            _mask_user_id(user_id),
+            int((time.time() - llm_start) * 1000),
+        )
+        raise
     except Exception as exc:
         error_code = _classify_llm_error(exc)
         logger.error(
-            "{} LLM failure user_id={} kind={} type={} message={}",
+            "{} LLM failure user={} error_code={} type={} duration_ms={}",
             _LOG_PREFIX,
             _mask_user_id(user_id),
             error_code,
             type(exc).__name__,
-            str(exc)[:500],
+            int((time.time() - llm_start) * 1000),
         )
         raise CommentAssistantDraftLLMError(
             "ALwrity couldn't draft a reply right now. Please try again.",
@@ -220,6 +242,15 @@ def _mask_user_id(user_id: str) -> str:
     return f"{user_id[:8]}…" if len(user_id) > 8 else user_id
 
 
+def _failure_response(exc: CommentAssistantDraftError) -> CommentAssistantDraftReplyResponse:
+    """Build a failed draft response with a stable error_code for the route layer."""
+    return CommentAssistantDraftReplyResponse(
+        success=False,
+        error=str(exc),
+        generation_metadata={"error_code": exc.error_code},
+    )
+
+
 async def _draft_reply_core(
     request: CommentAssistantDraftReplyRequest | CommentAssistantManualDraftReplyRequest,
     user_id: str,
@@ -227,13 +258,17 @@ async def _draft_reply_core(
     log_context: dict[str, Any],
     generate_fn: Optional[_DraftLLMFn] = None,
     require_post: bool = True,
+    db: Optional[Session] = None,
+    comment_id: Optional[str] = None,
+    refresh: bool = False,
 ) -> CommentAssistantDraftReplyResponse:
     """Shared core for inbox and manual draft generation."""
     start_time = time.time()
     logger.info(
-        "{} start user={} {}",
+        "{} start user={} refresh={} {}",
         _LOG_PREFIX,
         _mask_user_id(user_id),
+        refresh,
         " ".join(f"{k}={v}" for k, v in log_context.items()),
     )
 
@@ -245,16 +280,49 @@ async def _draft_reply_core(
         )
     except CommentAssistantDraftError as exc:
         logger.warning(
-            "{} validation failed user={}: {}",
+            "{} validation failed user={} error_code={}",
             _LOG_PREFIX,
             _mask_user_id(user_id),
             exc.error_code,
         )
-        return CommentAssistantDraftReplyResponse(
-            success=False,
-            error=str(exc),
-            generation_metadata={"error_code": exc.error_code},
-        )
+        return _failure_response(exc)
+
+    cache: Optional[LinkedInCommentAssistantDraftCacheService] = None
+    if db is not None and comment_id:
+        cache = LinkedInCommentAssistantDraftCacheService(db)
+        if not refresh:
+            cached = cache.get_draft_fresh(user_id, comment_id)
+            if cached:
+                reply = str(cached.get("reply") or "").strip()
+                alternatives = cached.get("alternative_replies") or []
+                if not isinstance(alternatives, list):
+                    alternatives = []
+                meta = cached.get("generation_metadata") or {}
+                if not isinstance(meta, dict):
+                    meta = {}
+                duration = round(time.time() - start_time, 3)
+                logger.info(
+                    "{} success user={} reply_length={} from_cache=true duration_ms={}",
+                    _LOG_PREFIX,
+                    _mask_user_id(user_id),
+                    len(reply),
+                    int(duration * 1000),
+                )
+                return CommentAssistantDraftReplyResponse(
+                    success=True,
+                    reply=reply,
+                    alternative_replies=[
+                        str(a).strip()
+                        for a in alternatives
+                        if isinstance(a, str) and str(a).strip()
+                    ][:2],
+                    from_cache=True,
+                    generation_metadata={
+                        **meta,
+                        "from_cache": True,
+                        "generation_time": duration,
+                    },
+                )
 
     persona_data = _load_persona(user_id)
     industry = _resolve_industry(persona_data)
@@ -270,23 +338,47 @@ async def _draft_reply_core(
     try:
         raw = _call_llm(prompt, user_id, generate_fn=generate_fn)
         result = _parse_draft_result(raw)
+    except HTTPException:
+        raise
     except CommentAssistantDraftError as exc:
         logger.warning(
-            "{} generation failed user={} code={}: {}",
+            "{} failure user={} error_code={} type={}",
             _LOG_PREFIX,
             _mask_user_id(user_id),
             exc.error_code,
-            str(exc)[:200],
+            type(exc).__name__,
         )
-        return CommentAssistantDraftReplyResponse(
-            success=False,
-            error=str(exc),
-            generation_metadata={"error_code": exc.error_code},
-        )
+        return _failure_response(exc)
 
     duration = round(time.time() - start_time, 3)
+    metadata = {
+        "model_used": "llm_text_gen",
+        "flow_type": "linkedin_comment_assistant_draft",
+        "generation_time": duration,
+        "industry": industry,
+        "has_persona": bool(persona_data),
+        "from_cache": False,
+    }
+    if cache is not None and comment_id:
+        try:
+            cache.store_draft(
+                user_id,
+                comment_id,
+                reply=result["reply"],
+                alternative_replies=result["alternative_replies"],
+                generation_metadata=metadata,
+            )
+        except Exception as exc:
+            logger.warning(
+                "{} store failed user={} type={} — returning live draft",
+                _LOG_PREFIX,
+                _mask_user_id(user_id),
+                type(exc).__name__,
+            )
+
     logger.info(
-        "{} success user={} reply_len={} alternatives={} duration_ms={}",
+        "{} success user={} reply_length={} from_cache=false alternatives={} "
+        "duration_ms={}",
         _LOG_PREFIX,
         _mask_user_id(user_id),
         len(result["reply"]),
@@ -298,13 +390,7 @@ async def _draft_reply_core(
         reply=result["reply"],
         alternative_replies=result["alternative_replies"],
         from_cache=False,
-        generation_metadata={
-            "model_used": "llm_text_gen",
-            "flow_type": "linkedin_comment_assistant_draft",
-            "generation_time": duration,
-            "industry": industry,
-            "has_persona": bool(persona_data),
-        },
+        generation_metadata=metadata,
     )
 
 
@@ -312,6 +398,7 @@ async def draft_comment_reply(
     request: CommentAssistantDraftReplyRequest,
     user_id: str,
     *,
+    db: Optional[Session] = None,
     generate_fn: Optional[_DraftLLMFn] = None,
 ) -> CommentAssistantDraftReplyResponse:
     """Draft a LinkedIn comment reply for an inbox comment (post + comment ids known)."""
@@ -324,6 +411,9 @@ async def draft_comment_reply(
         },
         generate_fn=generate_fn,
         require_post=True,
+        db=db,
+        comment_id=request.comment_id,
+        refresh=bool(request.refresh),
     )
 
 

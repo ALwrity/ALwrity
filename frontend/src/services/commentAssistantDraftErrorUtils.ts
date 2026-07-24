@@ -23,9 +23,10 @@ function extractApiDetail(detail: unknown): ApiErrorDetail {
   }
   if (detail && typeof detail === 'object') {
     const record = detail as { message?: string; error_code?: string };
+    const code = record.error_code;
     return {
       message: (record.message || '').trim(),
-      errorCode: record.error_code,
+      errorCode: typeof code === 'string' ? code.toUpperCase() : undefined,
     };
   }
   return { message: '' };

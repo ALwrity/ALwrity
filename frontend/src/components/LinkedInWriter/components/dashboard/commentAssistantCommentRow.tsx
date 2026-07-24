@@ -5,6 +5,7 @@ import { CommentAssistantAuthorRow } from "./commentAssistantAuthorRow";
 import {
   COMMENT_ASSISTANT_ACTIONS,
   COMMENT_ASSISTANT_DRAFT_PROGRESS,
+  COMMENT_ASSISTANT_DRAFT_REVIEW,
 } from "./commentAssistantCopy";
 import { CommentAssistantNestedReplyRow } from "./commentAssistantNestedReplyRow";
 import { CommentAssistantReactionPicker } from "./commentAssistantReactionPicker";
@@ -27,7 +28,10 @@ interface CommentAssistantCommentRowProps {
     commentId: string,
     payload: CommentAssistantReplyPayload,
   ) => void;
-  onDraftAlwrity?: (commentId: string) => void;
+  onDraftAlwrity?: (
+    commentId: string,
+    options?: { refresh?: boolean },
+  ) => void;
   onShowThreadReplies?: (commentId: string) => void;
 }
 
@@ -300,13 +304,36 @@ export const CommentAssistantCommentRow: React.FC<
       {comment.draftText && !comment.draftBusy ? (
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
             fontSize: 10,
             color: colors.textTertiary,
             marginTop: 4,
             marginBottom: 2,
           }}
         >
-          Review and edit the draft before sending.
+          <span>{COMMENT_ASSISTANT_DRAFT_REVIEW}</span>
+          {actionsEnabled && onDraftAlwrity ? (
+            <button
+              type="button"
+              onClick={() =>
+                onDraftAlwrity(comment.id, { refresh: true })
+              }
+              style={{
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                color: colors.primary,
+                fontSize: 10,
+                fontWeight: 600,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              {COMMENT_ASSISTANT_ACTIONS.regenerate}
+            </button>
+          ) : null}
         </div>
       ) : null}
 

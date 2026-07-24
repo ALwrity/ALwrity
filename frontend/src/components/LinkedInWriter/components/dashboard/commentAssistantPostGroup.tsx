@@ -25,7 +25,10 @@ interface CommentAssistantPostGroupProps {
     commentId: string,
     payload: CommentAssistantReplyPayload,
   ) => void;
-  onDraftAlwrity?: (commentId: string) => void;
+  onDraftAlwrity?: (
+    commentId: string,
+    options?: { refresh?: boolean },
+  ) => void;
   onRetry?: () => void;
   onLoadMore?: () => void;
   onShowThreadReplies?: (commentId: string) => void;

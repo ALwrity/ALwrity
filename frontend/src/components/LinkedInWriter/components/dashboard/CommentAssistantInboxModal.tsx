@@ -425,8 +425,13 @@ export const CommentAssistantInboxModal: React.FC<
                       payload,
                     )
                   }
-                  onDraftAlwrity={(commentId) => {
-                    void handleDraftAlwrity(g.postId, g.socialId, commentId);
+                  onDraftAlwrity={(commentId, options) => {
+                    void handleDraftAlwrity(
+                      g.postId,
+                      g.socialId,
+                      commentId,
+                      options,
+                    );
                   }}
                   onRetry={g.error ? () => retryPost() : undefined}
                   onLoadMore={

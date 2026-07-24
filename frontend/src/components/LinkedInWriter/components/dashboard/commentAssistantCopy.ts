@@ -68,6 +68,7 @@ export const COMMENT_ASSISTANT_ACTIONS = {
   reply: "Reply",
   draftAlwrity: "Draft with ALwrity",
   drafting: "Drafting with ALwrity…",
+  regenerate: "Regenerate",
   send: "Send reply",
   sending: "Sending…",
   cancel: "Cancel",
@@ -78,6 +79,10 @@ export const COMMENT_ASSISTANT_ACTIONS = {
 /** Shown under the draft button while ALwrity is generating. */
 export const COMMENT_ASSISTANT_DRAFT_PROGRESS =
   "Reading your post and comment, then drafting a reply…";
+
+/** Hint shown above the composer after a draft loads. */
+export const COMMENT_ASSISTANT_DRAFT_REVIEW =
+  "Review and edit the draft before sending.";
 
 export const COMMENT_ASSISTANT_REPLY_SENDING = "Sending your reply…";
 export const COMMENT_ASSISTANT_REPLY_SUCCESS =
