@@ -1,0 +1,23 @@
+feat(linkedin): Comment Assistant Draft with ALwrity — Phase 3 wiring
+
+Wire the frontend to the new backend draft endpoints and add focused
+error handling.
+
+Frontend:
+- Remove Phase 1 TODO from commentAssistantApi.draftReply()
+- Add commentAssistantApi.draftManualReply() for the Manual tab
+- Add CommentAssistantDraftErrorUtils with user-friendly messages for
+  validation, subscription limit, not connected, LLM, network, and timeout
+- Use draft-specific error messages in useCommentAssistantInbox.ts
+- Update CommentAssistantManualPanel.tsx to call draftManualReply() and
+  map alternative_replies into the existing alternatives UI
+
+Backend:
+- Add CommentAssistantManualDraftReplyRequest model
+- Refactor draft service into a shared _draft_reply_core() helper used by
+  draft_comment_reply() and draft_manual_comment_reply()
+- Add POST /comment-assistant/draft-reply-manual route for paste-based drafts
+- Add "disagreement" tone to support the Manual tab response type
+- Manual mode does not require a LinkedIn social_id/comment_id (no fake data)
+
+Issue: #188

@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any, Optional, Protocol
 
 from models.linkedin_comment_assistant_draft_models import (
     CommentAssistantDraftReplyRequest,
+    CommentAssistantManualDraftReplyRequest,
 )
+
+
+class _DraftPromptInputs(Protocol):
+    post_text: str | None
+    comment_text: str
+    parent_comment_text: str | None
+    tone: str
+    include_question: bool
 
 
 COMMENT_DRAFT_SYSTEM_PROMPT = """You are ALwrity, a LinkedIn engagement assistant.
@@ -43,20 +52,22 @@ def _voice_snippet(persona_data: Optional[dict[str, Any]]) -> str:
 
 
 def build_comment_assistant_draft_prompt(
-    request: CommentAssistantDraftReplyRequest,
+    request: CommentAssistantDraftReplyRequest | CommentAssistantManualDraftReplyRequest,
     persona_data: Optional[dict[str, Any]],
     industry: str,
 ) -> str:
     """Build a user prompt for drafting a LinkedIn comment reply."""
     voice = _voice_snippet(persona_data)
     tone = request.tone
+    post_text = request.post_text or "(No original post text provided)"
+    comment_text = request.comment_text
 
     lines = [
         "ORIGINAL POST:",
-        request.post_text,
+        post_text,
         "",
         "COMMENT TO REPLY TO:",
-        request.comment_text,
+        comment_text,
     ]
     if request.parent_comment_text:
         lines.extend(

@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   commentAssistantApi,
+  getCommentAssistantDraftErrorMessage,
   getCommentAssistantErrorMessage,
   getCommentAssistantReplyErrorMessage,
 } from "../../../../services/commentAssistantApi";
@@ -370,7 +371,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       } catch (err) {
         updateComment(postId, commentId, { draftBusy: false });
         console.error("[CommentAssistantDraft] failed", err);
-        setActionError(getCommentAssistantErrorMessage(err));
+        setActionError(getCommentAssistantDraftErrorMessage(err));
       }
     },
     [updateComment],

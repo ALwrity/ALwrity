@@ -12,6 +12,7 @@ CommentAssistantDraftTone = Literal[
     "appreciative",
     "value_add",
     "clarifying",
+    "disagreement",
 ]
 
 
@@ -61,6 +62,37 @@ class CommentAssistantDraftReplyRequest(BaseModel):
     )
 
     @field_validator("post_text", "comment_text", "parent_comment_text")
+    @classmethod
+    def _strip_whitespace(cls, v: Optional[str]) -> Optional[str]:
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
+
+class CommentAssistantManualDraftReplyRequest(BaseModel):
+    """Request to draft a reply from pasted post + comment text (Manual tab)."""
+
+    post_text: Optional[str] = Field(
+        default=None,
+        description="Optional original post text for context",
+        max_length=8000,
+    )
+    comment_text: str = Field(
+        ...,
+        description="Text of the comment to respond to",
+        min_length=3,
+        max_length=2000,
+    )
+    tone: CommentAssistantDraftTone = Field(
+        default="professional",
+        description="Desired tone of the drafted reply",
+    )
+    include_question: bool = Field(
+        default=False,
+        description="Whether the reply should end with an engaging question",
+    )
+
+    @field_validator("post_text", "comment_text")
     @classmethod
     def _strip_whitespace(cls, v: Optional[str]) -> Optional[str]:
         if isinstance(v, str):

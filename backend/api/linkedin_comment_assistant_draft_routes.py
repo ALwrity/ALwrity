@@ -9,12 +9,14 @@ from middleware.auth_middleware import get_current_user
 from models.linkedin_comment_assistant_draft_models import (
     CommentAssistantDraftReplyRequest,
     CommentAssistantDraftReplyResponse,
+    CommentAssistantManualDraftReplyRequest,
 )
 from models.linkedin_posts_models import PostsErrorResponse
 from services.linkedin_comment_assistant_cache_service import mask_user_id
 from services.linkedin_comment_assistant_draft_service import (
     CommentAssistantDraftError,
     draft_comment_reply,
+    draft_manual_comment_reply,
 )
 
 router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn Comment Assistant"])
@@ -94,6 +96,82 @@ async def post_comment_draft_reply(
     except Exception as exc:
         logger.exception(
             "[CommentAssistant] POST draft-reply unexpected error user={}",
+            mask_user_id(user_id),
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "error_code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred while drafting the reply.",
+            },
+        ) from exc
+
+
+@router.post(
+    "/comment-assistant/draft-reply-manual",
+    response_model=CommentAssistantDraftReplyResponse,
+    responses={
+        401: {"model": PostsErrorResponse},
+        400: {"model": PostsErrorResponse},
+        429: {"model": PostsErrorResponse},
+        502: {"model": PostsErrorResponse},
+        503: {"model": PostsErrorResponse},
+    },
+    summary="Draft a reply from pasted comment text (Manual tab)",
+    description=(
+        "Manual paste flow: draft a reply to a comment using optional post context. "
+        "No LinkedIn ids are required."
+    ),
+)
+async def post_comment_manual_draft_reply(
+    body: CommentAssistantManualDraftReplyRequest,
+    current_user: dict = Depends(get_current_user),
+) -> CommentAssistantDraftReplyResponse:
+    """Draft a LinkedIn comment reply from pasted text (Manual tab)."""
+    user_id = _user_id(current_user)
+    logger.info(
+        "[CommentAssistant] POST draft-reply-manual user={}",
+        mask_user_id(user_id),
+    )
+    try:
+        result = await draft_manual_comment_reply(body, user_id)
+        if result.success:
+            logger.info(
+                "[CommentAssistant] POST draft-reply-manual ok user={} reply_len={}",
+                mask_user_id(user_id),
+                len(result.reply or ""),
+            )
+        else:
+            logger.warning(
+                "[CommentAssistant] POST draft-reply-manual business error user={} error={}",
+                mask_user_id(user_id),
+                result.generation_metadata.get("error_code")
+                if result.generation_metadata
+                else None,
+            )
+        return result
+    except CommentAssistantDraftError as exc:
+        logger.warning(
+            "[CommentAssistant] POST draft-reply-manual error user={} code={}: {}",
+            mask_user_id(user_id),
+            exc.error_code,
+            str(exc)[:200],
+        )
+        status_code = (
+            status.HTTP_400_BAD_REQUEST
+            if exc.error_code == "validation_error"
+            else status.HTTP_502_BAD_GATEWAY
+        )
+        raise HTTPException(
+            status_code=status_code,
+            detail={
+                "error_code": exc.error_code.upper(),
+                "message": str(exc),
+            },
+        ) from exc
+    except Exception as exc:
+        logger.exception(
+            "[CommentAssistant] POST draft-reply-manual unexpected error user={}",
             mask_user_id(user_id),
         )
         raise HTTPException(

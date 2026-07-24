@@ -11,6 +11,7 @@ from loguru import logger
 from models.linkedin_comment_assistant_draft_models import (
     CommentAssistantDraftReplyRequest,
     CommentAssistantDraftReplyResponse,
+    CommentAssistantManualDraftReplyRequest,
 )
 from prompts.linkedin.comment_assistant_draft_prompt import (
     COMMENT_DRAFT_SYSTEM_PROMPT,
@@ -73,7 +74,7 @@ def _load_persona(user_id: str) -> Optional[dict[str, Any]]:
         logger.warning(
             "{} Cannot parse user_id as int for persona lookup user_id={}",
             _LOG_PREFIX,
-            user_id[:8] if user_id else "(none)",
+            _mask_user_id(user_id),
         )
         return None
 
@@ -84,7 +85,7 @@ def _load_persona(user_id: str) -> Optional[dict[str, Any]]:
         logger.warning(
             "{} Persona load failed user_id={}: {}",
             _LOG_PREFIX,
-            user_id[:8] if user_id else "(none)",
+            _mask_user_id(user_id),
             exc,
         )
         return None
@@ -134,7 +135,7 @@ def _call_llm(
         logger.error(
             "{} LLM failure user_id={} kind={} type={} message={}",
             _LOG_PREFIX,
-            user_id[:8] if user_id else "(none)",
+            _mask_user_id(user_id),
             error_code,
             type(exc).__name__,
             str(exc)[:500],
@@ -159,7 +160,7 @@ def _call_llm(
             logger.error(
                 "{} LLM returned invalid JSON user_id={} raw_len={}",
                 _LOG_PREFIX,
-                user_id[:8] if user_id else "(none)",
+                _mask_user_id(user_id),
                 len(raw),
             )
             raise CommentAssistantDraftLLMError(
@@ -193,14 +194,19 @@ def _parse_draft_result(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _validate_request(request: CommentAssistantDraftReplyRequest) -> None:
-    """Validate request fields before calling the LLM."""
-    if not request.post_text or len(request.post_text.strip()) < 10:
+def _validate_inputs(
+    post_text: Optional[str],
+    comment_text: str,
+    *,
+    require_post: bool = True,
+) -> None:
+    """Validate inputs before calling the LLM."""
+    if require_post and (not post_text or len(post_text.strip()) < 10):
         raise CommentAssistantDraftError(
             "Post text is too short to draft a reply.",
             error_code="validation_error",
         )
-    if not request.comment_text or len(request.comment_text.strip()) < 3:
+    if not comment_text or len(comment_text.strip()) < 3:
         raise CommentAssistantDraftError(
             "Comment text is too short to draft a reply.",
             error_code="validation_error",
@@ -214,33 +220,29 @@ def _mask_user_id(user_id: str) -> str:
     return f"{user_id[:8]}…" if len(user_id) > 8 else user_id
 
 
-async def draft_comment_reply(
-    request: CommentAssistantDraftReplyRequest,
+async def _draft_reply_core(
+    request: CommentAssistantDraftReplyRequest | CommentAssistantManualDraftReplyRequest,
     user_id: str,
     *,
+    log_context: dict[str, Any],
     generate_fn: Optional[_DraftLLMFn] = None,
+    require_post: bool = True,
 ) -> CommentAssistantDraftReplyResponse:
-    """Draft a LinkedIn comment reply using the user's persona and ALwrity LLM stack.
-
-    Args:
-        request: Draft inputs (post text, comment text, tone, etc.).
-        user_id: Authenticated Clerk user id.
-        generate_fn: Optional injectable LLM function for tests.
-
-    Returns:
-        CommentAssistantDraftReplyResponse with the drafted reply or a clear error.
-    """
+    """Shared core for inbox and manual draft generation."""
     start_time = time.time()
     logger.info(
-        "{} start user={} social_id_suffix={} comment_id_suffix={}",
+        "{} start user={} {}",
         _LOG_PREFIX,
         _mask_user_id(user_id),
-        request.social_id[-20:] if request.social_id else "(none)",
-        request.comment_id[-20:] if request.comment_id else "(none)",
+        " ".join(f"{k}={v}" for k, v in log_context.items()),
     )
 
     try:
-        _validate_request(request)
+        _validate_inputs(
+            request.post_text,
+            request.comment_text,
+            require_post=require_post,
+        )
     except CommentAssistantDraftError as exc:
         logger.warning(
             "{} validation failed user={}: {}",
@@ -303,4 +305,39 @@ async def draft_comment_reply(
             "industry": industry,
             "has_persona": bool(persona_data),
         },
+    )
+
+
+async def draft_comment_reply(
+    request: CommentAssistantDraftReplyRequest,
+    user_id: str,
+    *,
+    generate_fn: Optional[_DraftLLMFn] = None,
+) -> CommentAssistantDraftReplyResponse:
+    """Draft a LinkedIn comment reply for an inbox comment (post + comment ids known)."""
+    return await _draft_reply_core(
+        request,
+        user_id,
+        log_context={
+            "social_id_suffix": request.social_id[-20:] if request.social_id else "(none)",
+            "comment_id_suffix": request.comment_id[-20:] if request.comment_id else "(none)",
+        },
+        generate_fn=generate_fn,
+        require_post=True,
+    )
+
+
+async def draft_manual_comment_reply(
+    request: CommentAssistantManualDraftReplyRequest,
+    user_id: str,
+    *,
+    generate_fn: Optional[_DraftLLMFn] = None,
+) -> CommentAssistantDraftReplyResponse:
+    """Draft a LinkedIn comment reply from pasted text (Manual tab)."""
+    return await _draft_reply_core(
+        request,
+        user_id,
+        log_context={"source": "manual"},
+        generate_fn=generate_fn,
+        require_post=False,
     )

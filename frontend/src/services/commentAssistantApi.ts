@@ -15,16 +15,36 @@ export {
   getPostCommentsErrorType as getCommentAssistantErrorType,
 } from './postCommentsErrorUtils';
 
+export {
+  getCommentAssistantDraftErrorMessage,
+  getCommentAssistantDraftErrorType,
+} from './commentAssistantDraftErrorUtils';
+
 export interface CommentAssistantDraftReplyRequest {
   social_id: string;
   comment_id: string;
   post_text: string;
   comment_text: string;
   parent_comment_text?: string | null;
-  tone?: 'professional' | 'friendly' | 'appreciative' | 'value_add' | 'clarifying';
+  tone?: CommentAssistantDraftTone;
   include_question?: boolean;
   refresh?: boolean;
 }
+
+export interface CommentAssistantManualDraftReplyRequest {
+  post_text?: string;
+  comment_text: string;
+  tone?: CommentAssistantDraftTone;
+  include_question?: boolean;
+}
+
+export type CommentAssistantDraftTone =
+  | 'professional'
+  | 'friendly'
+  | 'appreciative'
+  | 'value_add'
+  | 'clarifying'
+  | 'disagreement';
 
 export interface CommentAssistantDraftReplyResponse {
   success: boolean;
@@ -74,16 +94,23 @@ export const commentAssistantApi = {
     return data;
   },
 
-  /**
-   * Draft a reply with ALwrity for a given comment (or nested reply).
-   * TODO(Phase 3): Wire to the backend route once implemented.
-   * In Phase 1 this stub targets the planned endpoint so the UI can be tested.
-   */
+  /** Draft a reply with ALwrity for a given comment (or nested reply). */
   async draftReply(
     payload: CommentAssistantDraftReplyRequest
   ): Promise<CommentAssistantDraftReplyResponse> {
     const { data } = await aiApiClient.post<CommentAssistantDraftReplyResponse>(
       `${BASE}/draft-reply`,
+      payload
+    );
+    return data;
+  },
+
+  /** Draft a reply from pasted comment text (Manual tab). */
+  async draftManualReply(
+    payload: CommentAssistantManualDraftReplyRequest
+  ): Promise<CommentAssistantDraftReplyResponse> {
+    const { data } = await aiApiClient.post<CommentAssistantDraftReplyResponse>(
+      `${BASE}/draft-reply-manual`,
       payload
     );
     return data;
