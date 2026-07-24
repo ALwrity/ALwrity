@@ -5,27 +5,31 @@ interface CitationHoverHandlerProps {
 }
 
 const CitationHoverHandler: React.FC<CitationHoverHandlerProps> = ({ researchSources }) => {
-  const initializedRef = useRef(false);
+  const mountedRef = useRef(true);
+  const listenersRef = useRef<Array<{ el: Element; type: string; handler: EventListener }>>([]);
 
   useEffect(() => {
-    // Always attempt to attach hover listeners when .liw-cite elements exist,
-    // even if researchSources hasn't loaded yet (e.g., page refresh with persisted draft).
-    // Tooltip will show a minimal fallback if source data isn't available.
-
-    // Prevent duplicate initialization on re-renders
-    if (initializedRef.current) return;
-    initializedRef.current = true;
-
+    mountedRef.current = true;
     let currentTooltip: HTMLDivElement | null = null;
-    const attachedListeners: Array<{ el: Element; type: string; handler: EventListener }> = [];
+
+    const cleanupListeners = () => {
+      listenersRef.current.forEach(({ el, type, handler }) => {
+        try { el.removeEventListener(type, handler); } catch (_) {}
+      });
+      listenersRef.current = [];
+    };
 
     const init = () => {
+      if (!mountedRef.current) return;
       try {
         const citations = document.querySelectorAll('.liw-cite');
         if (citations.length === 0) {
           setTimeout(init, 200);
           return;
         }
+
+        // Re-attach on every researchSources change (not just once)
+        cleanupListeners();
 
         citations.forEach((cite) => {
           const onEnter = () => {
@@ -103,8 +107,8 @@ const CitationHoverHandler: React.FC<CitationHoverHandlerProps> = ({ researchSou
 
           cite.addEventListener('mouseenter', onEnter);
           cite.addEventListener('mouseleave', onLeave);
-          attachedListeners.push({ el: cite, type: 'mouseenter', handler: onEnter });
-          attachedListeners.push({ el: cite, type: 'mouseleave', handler: onLeave });
+          listenersRef.current.push({ el: cite, type: 'mouseenter', handler: onEnter });
+          listenersRef.current.push({ el: cite, type: 'mouseleave', handler: onLeave });
         });
       } catch (_) {
         // Silently fail
@@ -160,14 +164,12 @@ const CitationHoverHandler: React.FC<CitationHoverHandlerProps> = ({ researchSou
       document.addEventListener('keydown', escHandler);
     };
 
-    const timer = setTimeout(init, 500);
+    const timer = setTimeout(init, 300);
 
     return () => {
+      mountedRef.current = false;
       clearTimeout(timer);
-      initializedRef.current = false;
-      attachedListeners.forEach(({ el, type, handler }) => {
-        el.removeEventListener(type, handler);
-      });
+      cleanupListeners();
       document.querySelectorAll('.liw-cite-tip').forEach(t => t.remove());
       const overlay = document.getElementById('liw-cite-overlay');
       if (overlay) overlay.remove();

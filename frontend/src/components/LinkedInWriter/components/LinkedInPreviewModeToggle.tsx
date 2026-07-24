@@ -1,7 +1,10 @@
 /**
- * Studio vs LinkedIn-style preview toggle.
- * Default = LinkedIn-style (plain, Best Practices spacing, no citation chips).
- * Studio keeps research citations for power users.
+ * Citations vs LinkedIn-style preview toggle.
+ * Default = Citations view (research sources and citation markers visible).
+ * LinkedIn-style = plain text with Best Practices spacing, no citations.
+ *
+ * Linkedin view for end user to see what they post.
+ * Citations view for power users to audit and edit research-backed content.
  */
 
 import React from "react";
@@ -58,13 +61,13 @@ export const LinkedInPreviewModeToggle: React.FC<
             value="studio"
             sx={{ textTransform: "none", px: 1.5, fontSize: 12 }}
           >
-            Studio (citations)
+            Citations
           </ToggleButton>
         </ToggleButtonGroup>
         <Typography variant="caption" sx={{ color: "#64748b", maxWidth: 300 }}>
           {mode === "linkedin"
-            ? "How the post reads on LinkedIn — plain text, line breaks, no citation chips."
-            : "Studio view keeps research citation markers for editing."}
+            ? "How the post reads on LinkedIn — plain text, line breaks, no citation badges."
+            : "Research view — shows cited sources and reference markers inline."}
         </Typography>
       </Box>
 

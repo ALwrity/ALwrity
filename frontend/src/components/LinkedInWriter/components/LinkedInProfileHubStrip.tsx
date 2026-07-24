@@ -58,12 +58,23 @@ export const LinkedInProfileHubStrip: React.FC<
     enabled: isInline,
   });
 
+  // Max travel is tuned so the profile circle reaches the far edge of the
+  // inline connect/disconnect button without leaving the pill bounds.
+  const MAX_INLINE_CONNECT_SHIFT_PX = 74;
+  const MAX_INLINE_DISCONNECT_SHIFT_PX = 68;
   const comboLayout = isInline
     ? deriveProfileHubComboLayout(connected, offsetX, swipeIntent)
     : null;
-  const avatarShift = comboLayout
+  const rawAvatarShift = comboLayout
     ? deriveProfileHubAvatarShift(offsetX, comboLayout)
     : 0;
+  const avatarShift = Math.max(
+    comboLayout === "disconnect-swipe" ? -MAX_INLINE_DISCONNECT_SHIFT_PX : 0,
+    Math.min(
+      comboLayout === "connect-swipe" ? MAX_INLINE_CONNECT_SHIFT_PX : 0,
+      rawAvatarShift,
+    ),
+  );
 
   const swipeHint = isBusy
     ? connected
@@ -113,7 +124,7 @@ export const LinkedInProfileHubStrip: React.FC<
           <LinkedInIcon
             sx={{
               color: "#0A66C2",
-              fontSize: inlineInsideButton ? 18 : isInline ? 40 : 28,
+              fontSize: inlineInsideButton ? 24 : isInline ? 40 : 28,
             }}
           />
         )}
@@ -135,27 +146,15 @@ export const LinkedInProfileHubStrip: React.FC<
     const avatar = renderAvatarCircle(true, avatarShift);
 
     switch (comboLayout) {
-      case "connect-swipe":
-        return (
-          <>
-            {renderComboLabel(label)}
-            {avatar}
-          </>
-        );
       case "disconnect-swipe":
-        return (
-          <>
-            {avatar}
-            {renderComboLabel(label)}
-          </>
-        );
       case "connected-rest":
         return (
           <>
-            {avatar}
             {renderComboLabel(label)}
+            {avatar}
           </>
         );
+      case "connect-swipe":
       default:
         return (
           <>
@@ -175,22 +174,6 @@ export const LinkedInProfileHubStrip: React.FC<
         ? "Connecting…"
         : "Connect";
 
-    if (inlineCombo && !connected) {
-      return (
-        <button
-          type="button"
-          className="linkedin-profile-hub-strip-btn linkedin-profile-hub-strip-btn--connect linkedin-profile-hub-strip-btn--inline-header"
-          onClick={onConnect}
-          disabled={isConnecting || !onConnect}
-          data-tour="li-connect-action"
-          aria-label={isConnecting ? "Connecting account" : "Connect account"}
-          {...swipeHandlers}
-        >
-          {label}
-        </button>
-      );
-    }
-
     if (inlineCombo) {
       return (
         <button
@@ -205,8 +188,7 @@ export const LinkedInProfileHubStrip: React.FC<
               "linkedin-profile-hub-strip-btn--combo-connect-swipe",
             comboLayout === "disconnect-swipe" &&
               "linkedin-profile-hub-strip-btn--combo-disconnect-swipe",
-            (comboLayout === "connect-swipe" ||
-              comboLayout === "disconnect-swipe") &&
+            comboLayout === "disconnect-swipe" &&
               "linkedin-profile-hub-strip-btn--combo-spread",
           ]
             .filter(Boolean)
