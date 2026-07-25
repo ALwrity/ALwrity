@@ -218,7 +218,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         >
           <DashboardToolTile
             title="My Drafts"
-            description="Browse and restore your saved LinkedIn posts"
+            description="Browse your last 5 saved drafts. Open any in Studio, run a quality check, or schedule. No LinkedIn needed."
             icon="📁"
             accent="#0a66c2"
             onClick={() => {
@@ -228,7 +228,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           />
           <DashboardToolTile
             title="Post Today"
-            description="AI ranks your top 3 post opportunities right now"
+            description="AI ranks your top 3 post opportunities from drafts, trends & past posts. Get timing & hookline tips. No LinkedIn needed."
             icon="🎯"
             accent="#0a66c2"
             onClick={() => {
@@ -241,6 +241,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             description="Publish your draft directly with a 3-step pre-flight check"
             icon="🚀"
             accent="#dc2626"
+            disabled={!connected}
+            disabledReason="Connect LinkedIn to publish posts"
             onClick={() => {
               onClose();
               setPublishSub("publish_now");

@@ -14,8 +14,9 @@ const STATUS_POLL_MS = 1500;
 /**
  * Unipile often finishes via notify_url webhook after the popup closes.
  * Keep verifying connection status for this long before treating connect as failed.
+ * Webhook delivery can take 30-45s under load — 60s provides safe margin.
  */
-const POPUP_CLOSE_GRACE_MS = 20000;
+const POPUP_CLOSE_GRACE_MS = 60_000;
 
 export interface LinkedInOAuthConnectOptions {
   /** When postMessage is missed, confirm connection via GET /connection/status. */
@@ -128,8 +129,9 @@ export function connectWithLinkedInOAuth(
     const buildPopupCloseFailureMessage = (): string => {
       if (oauthSuccessSignalReceived) {
         return (
-          'LinkedIn login finished, but the connection was not confirmed in time. ' +
-          'Wait a moment and refresh, or try connecting again.'
+          'LinkedIn login was successful, but the connection took too long to confirm. ' +
+          'This is normal — refresh the page and your account should be connected. ' +
+          'If not, try connecting again.'
         );
       }
       if (lastVerifyErrorMessage) {

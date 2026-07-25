@@ -127,7 +127,6 @@ export const MOBILE_PRIMARY_WORKFLOW_IDS: readonly DashboardWorkflowCardId[] = [
 
 /** Workflow cards that require LinkedIn connection when disconnected. */
 export const CONNECT_GATED_WORKFLOW_IDS: readonly DashboardWorkflowCardId[] = [
-  "publish",
   "analysis",
   "engagement",
   "remarket",

@@ -20,6 +20,7 @@ import {
 import { contentPlanningApi } from "../../../../services/contentPlanningApi";
 import { BrandScorecard } from "../GrowthEngine/BrandScorecard";
 import { ViralAnalysisCard } from "../GrowthEngine/ViralAnalysisCard";
+import { PostTodayCandidateList, type PostCandidate } from "./PostTodayCandidateList";
 import {
   colors,
   rowBase,
@@ -800,7 +801,6 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
   const { data, cachedAt, loading, error, loadAll } = useGrowthInsights(open);
   const candidates = useMemo(() => (data ? rankCandidates(data) : []), [data]);
   const handleLoadAll = () => void loadAll();
-  const top3 = candidates.slice(0, 3);
 
   return (
     <DashboardActionModal
@@ -853,8 +853,8 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
           />
         )}
 
-        {/* Ranked candidates */}
-        {!loading && top3.length > 0 && (
+        {/* Ranked candidates with tabs */}
+        {!loading && candidates.length > 0 && (
           <>
             {cachedAt && (
               <RefreshBar
@@ -863,48 +863,13 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
                 label="Based on analysis from"
               />
             )}
-
-            {top3.map((candidate, idx) => (
-              <PostCandidateCard
-                key={idx}
-                candidate={candidate}
-                rank={idx + 1}
-                onUse={() => {
-                  openInCreate(candidate.topic, candidate.hook);
-                  onClose();
-                }}
-              />
-            ))}
-
-            {candidates.length > 3 && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: colors.textTertiary,
-                  marginTop: 8,
-                  textAlign: "center",
-                }}
-              >
-                + {candidates.length - 3} more opportunities in the{" "}
-                <button
-                  onClick={() => {
-                    openGrowthEngineModal();
-                    onClose();
-                  }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: colors.primary,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: 0,
-                  }}
-                >
-                  Growth Engine →
-                </button>
-              </div>
-            )}
+            <PostTodayCandidateList
+              candidates={candidates}
+              onUseCandidate={(topic, hook) => {
+                openInCreate(topic, hook);
+                onClose();
+              }}
+            />
           </>
         )}
       </div>
