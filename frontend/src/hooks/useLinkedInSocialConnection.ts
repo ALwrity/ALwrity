@@ -21,6 +21,7 @@ import {
   listLinkedInAccounts,
   listLinkedInOrganizations,
   disconnectLinkedIn,
+  buildAvatarProxyUrl,
   getLinkedInSocialErrorMessage,
   type LinkedInAccount,
   type LinkedInConnectionStatus,
@@ -205,8 +206,10 @@ const useLinkedInSocialConnectionStandalone = () => {
           accountList.find((a) => a.account_type === 'personal')?.avatar_url ||
           accountList[0]?.avatar_url;
         if (freshAvatar) {
-          writeCachedAvatar(uid, freshAvatar);
-          setCachedAvatarUrl(freshAvatar);
+          // Proxy once and cache the proxied URL
+          const proxied = buildAvatarProxyUrl(freshAvatar) ?? freshAvatar;
+          writeCachedAvatar(uid, proxied);
+          setCachedAvatarUrl(proxied);
         }
       } catch (accountsErr) {
         const detail = getLinkedInSocialErrorMessage(accountsErr);
@@ -450,6 +453,8 @@ const useLinkedInSocialConnectionStandalone = () => {
   }, [connected, status, accounts, organizations, provider]);
 
   const avatarUrl = useMemo(() => {
+    // Use cached URL directly — avoids re-proxying on every render
+    if (cachedAvatarUrl) return cachedAvatarUrl;
     const personalAccount =
       accounts.find((a) => a.account_type === 'personal') ||
       accounts.find((a) => a.account_type !== 'organization') ||

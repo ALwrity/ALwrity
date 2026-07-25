@@ -495,8 +495,9 @@ export const ProfileOptimizationPanel: React.FC<
                         lineHeight: 1.4,
                       }}
                     >
-                      Upload a professional headshot to make a strong first
-                      impression.
+                      {localProfilePhotoUrl || profilePictureUrl
+                        ? "Use AI to enhance your photo into a professional headshot."
+                        : "Upload a photo to enhance it with AI into a professional headshot."}
                     </p>
                     {profilePhotoUploadError && (
                       <p
@@ -543,6 +544,8 @@ export const ProfileOptimizationPanel: React.FC<
                         e.target.value = "";
                       }}
                     />
+
+                    {/* Upload — always available as secondary action */}
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
@@ -550,79 +553,75 @@ export const ProfileOptimizationPanel: React.FC<
                         uploadingProfilePhoto || transformingProfilePhoto
                       }
                       style={{
-                        padding: "8px 16px",
+                        padding: "6px 14px",
                         borderRadius: 8,
-                        border: "1px solid #0A66C2",
+                        border: "1px solid #d1d5db",
                         backgroundColor: uploadingProfilePhoto
-                          ? "#cbd5e1"
+                          ? "#f1f5f9"
                           : "#fff",
-                        color: uploadingProfilePhoto ? "#64748b" : "#0A66C2",
-                        fontSize: 13,
+                        color: uploadingProfilePhoto ? "#94a3b8" : "#64748b",
+                        fontSize: 12,
                         fontWeight: 600,
                         cursor:
                           uploadingProfilePhoto || transformingProfilePhoto
                             ? "wait"
                             : "pointer",
                         whiteSpace: "nowrap",
-                        transition: "background 150ms ease",
                       }}
                     >
-                      {uploadingProfilePhoto ? "Uploading…" : "Upload Photo"}
+                      {uploadingProfilePhoto ? "Uploading…" : "📷 Upload"}
                     </button>
-                    {localProfilePhotoUrl && onMakeProfilePhotoPresentable && (
-                      <button
-                        type="button"
-                        onClick={onMakeProfilePhotoPresentable}
-                        disabled={
-                          transformingProfilePhoto || uploadingProfilePhoto
-                        }
-                        style={{
-                          padding: "8px 16px",
-                          borderRadius: 8,
-                          border: "none",
-                          background: transformingProfilePhoto
-                            ? "#cbd5e1"
-                            : "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
-                          color: transformingProfilePhoto ? "#64748b" : "#fff",
-                          fontSize: 13,
-                          fontWeight: 600,
-                          cursor:
+
+                    {/* Make Presentable — show when any photo exists (existing or uploaded) */}
+                    {(localProfilePhotoUrl || profilePictureUrl) &&
+                      onMakeProfilePhotoPresentable && (
+                        <button
+                          type="button"
+                          onClick={onMakeProfilePhotoPresentable}
+                          disabled={
                             transformingProfilePhoto || uploadingProfilePhoto
-                              ? "wait"
-                              : "pointer",
-                          whiteSpace: "nowrap",
-                          transition: "background 150ms ease",
-                        }}
-                      >
-                        {transformingProfilePhoto
-                          ? "Enhancing…"
-                          : "✨ Make Presentable"}
-                      </button>
-                    )}
-                    {localProfilePhotoUrl && onDownloadProfilePhoto && (
+                          }
+                          style={{
+                            padding: "6px 14px",
+                            borderRadius: 8,
+                            border: "none",
+                            background: transformingProfilePhoto
+                              ? "#cbd5e1"
+                              : "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+                            color: transformingProfilePhoto ? "#64748b" : "#fff",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor:
+                              transformingProfilePhoto || uploadingProfilePhoto
+                                ? "wait"
+                                : "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {transformingProfilePhoto
+                            ? "Enhancing…"
+                            : "✨ Make Presentable"}
+                        </button>
+                      )}
+
+                    {/* Download transformed photo */}
+                    {transformedProfilePhotoUrl && onDownloadProfilePhoto && (
                       <button
                         type="button"
                         onClick={onDownloadProfilePhoto}
-                        disabled={
-                          uploadingProfilePhoto || transformingProfilePhoto
-                        }
                         style={{
-                          padding: "8px 16px",
+                          padding: "6px 14px",
                           borderRadius: 8,
-                          border: "1px solid #10b981",
-                          backgroundColor: "#fff",
+                          border: "1px solid #059669",
+                          background: "#ecfdf5",
                           color: "#059669",
-                          fontSize: 13,
+                          fontSize: 12,
                           fontWeight: 600,
-                          cursor:
-                            uploadingProfilePhoto || transformingProfilePhoto
-                              ? "wait"
-                              : "pointer",
+                          cursor: "pointer",
                           whiteSpace: "nowrap",
-                          transition: "background 150ms ease",
                         }}
                       >
-                        ⬇ Download Photo
+                        ⬇ Download
                       </button>
                     )}
                   </div>
