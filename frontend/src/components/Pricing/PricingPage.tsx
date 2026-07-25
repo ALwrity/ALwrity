@@ -61,7 +61,7 @@ const pageHeader = (
         ...landingSectionTitleSx,
         color: '#1a1a2e',
         mb: 0,
-        fontSize: { xs: '1.65rem', sm: '2rem', md: '2.5rem' },
+        fontSize: { xs: 'calc(1.65rem - 2px)', sm: '2rem', md: '2.5rem' },
       }}
     >
       ALwrity Pricing — Plans Built for Your Creative Footprint
@@ -71,10 +71,15 @@ const pageHeader = (
       direction="row"
       alignItems="center"
       justifyContent="center"
-      flexWrap="wrap"
+      flexWrap={{ xs: 'nowrap', md: 'wrap' }}
       useFlexGap
       spacing={1.5}
-      sx={{ mt: { xs: 3, md: 3.5 }, mb: { xs: 1, md: 1.5 }, gap: { xs: 1.25, md: 1.5 }, rowGap: 1.25 }}
+      sx={{
+        mt: { xs: 2, md: 3.5 },
+        mb: { xs: 0.75, md: 1.5 },
+        gap: { xs: 0.85, md: 1.5 },
+        rowGap: { xs: 0.85, md: 1.25 },
+      }}
     >
       <Tooltip
         title={<Typography sx={{ fontSize: '0.85rem', lineHeight: 1.55 }}>{TRANSPARENT_PRICING_TOOLTIP}</Typography>}
@@ -83,20 +88,25 @@ const pageHeader = (
         enterTouchDelay={0}
       >
         <Chip
-          icon={<Box component="span" sx={{ fontSize: '0.9rem', ml: 0.5 }}>💡</Box>}
+          icon={
+            <Box component="span" sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, ml: { xs: 0.25, md: 0.5 } }}>
+              💡
+            </Box>
+          }
           label="Transparent pricing"
           size="small"
           clickable
           component="span"
           sx={{
-            height: 28,
+            height: { xs: 24, md: 28 },
             fontWeight: 600,
-            fontSize: '0.75rem',
+            fontSize: { xs: '0.65rem', md: '0.75rem' },
             bgcolor: 'rgba(143, 203, 219, 0.12)',
             color: '#5BA8BC',
             border: '1px solid rgba(143, 203, 219, 0.45)',
             cursor: 'help',
-            '& .MuiChip-icon': { ml: 0.75 },
+            '& .MuiChip-icon': { ml: { xs: 0.25, md: 0.75 } },
+            '& .MuiChip-label': { px: { xs: 0.5, md: 1 } },
             '&:hover': { bgcolor: 'rgba(143, 203, 219, 0.22)' },
           }}
         />
@@ -109,20 +119,25 @@ const pageHeader = (
         enterTouchDelay={0}
       >
         <Chip
-          icon={<Box component="span" sx={{ fontSize: '0.9rem', ml: 0.5 }}>⚡</Box>}
+          icon={
+            <Box component="span" sx={{ fontSize: { xs: '0.75rem', md: '0.9rem' }, ml: { xs: 0.25, md: 0.5 } }}>
+              ⚡
+            </Box>
+          }
           label="All plans included"
           size="small"
           clickable
           component="span"
           sx={{
-            height: 28,
+            height: { xs: 24, md: 28 },
             fontWeight: 600,
-            fontSize: '0.75rem',
+            fontSize: { xs: '0.65rem', md: '0.75rem' },
             bgcolor: 'rgba(239, 136, 190, 0.1)',
             color: '#D45A96',
             border: '1px solid rgba(239, 136, 190, 0.4)',
             cursor: 'help',
-            '& .MuiChip-icon': { ml: 0.75 },
+            '& .MuiChip-icon': { ml: { xs: 0.25, md: 0.75 } },
+            '& .MuiChip-label': { px: { xs: 0.5, md: 1 } },
             '&:hover': { bgcolor: 'rgba(239, 136, 190, 0.18)' },
           }}
         />

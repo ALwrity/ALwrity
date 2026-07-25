@@ -38,12 +38,23 @@ export function getPlanColor(tier: string): PlanColor | undefined {
 
 export function getCtaLabel(tier: string, isSelfServe: boolean, compact = false): string {
   if (!isSelfServe) {
-    if (compact) return 'Contact us';
-    return tier === 'enterprise' ? 'Contact for Enterprise' : 'Contact for Pro';
+    return compact ? 'Contact us' : tier === 'enterprise' ? 'Contact for Enterprise' : 'Contact for Pro';
+  }
+  if (compact) {
+    if (tier === 'free') return 'Start free';
+    if (tier === 'basic') return 'Get Basic';
+    if (tier === 'pro') return 'Get Pro';
+    if (tier === 'enterprise') return 'Get Enterprise';
   }
   if (tier === 'free') return 'Start for Free';
   if (tier === 'basic') return 'Subscribe to Basic';
   if (tier === 'pro') return 'Subscribe to Pro';
   if (tier === 'enterprise') return 'Subscribe to Enterprise';
   return `Subscribe to ${tier}`;
+}
+
+/** Compact visible copy on mobile — replaces " and " with " & " */
+export function formatMobilePricingText(text: string, isMobile: boolean): string {
+  if (!isMobile) return text;
+  return text.replace(/\s+and\s+/gi, ' & ');
 }
