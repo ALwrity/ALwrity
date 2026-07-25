@@ -15,6 +15,7 @@ import {
 } from "../ProfileOptimization/ProfileOptimizationModalChrome";
 import { findProfileOptimizationQuickWin } from "../ProfileOptimization/profileOptimizationQuickWin";
 import { ProfileCompletionForm } from "./ProfileCompletionForm";
+import { ProfileCompletionQuestionsModal } from "./ProfileCompletionQuestionsModal";
 import {
   ProfileAnalysisReadyModal,
   buildProfileActionPoints,
@@ -668,14 +669,23 @@ export const LinkedInProfileSetupPanel: React.FC<
           />
         )}
 
-      {foundationStatus === "needs_completion" && questions.length > 0 && (
-        <ProfileCompletionForm
-          questions={questions}
-          onSubmit={submitCompletion}
-          isSubmitting={isSubmitting}
-          error={centered ? null : submitError}
-        />
-      )}
+      {foundationStatus === "needs_completion" &&
+        questions.length > 0 &&
+        (centered ? (
+          <ProfileCompletionQuestionsModal
+            questions={questions}
+            onSubmit={submitCompletion}
+            isSubmitting={isSubmitting}
+            error={submitError}
+          />
+        ) : (
+          <ProfileCompletionForm
+            questions={questions}
+            onSubmit={submitCompletion}
+            isSubmitting={isSubmitting}
+            error={submitError}
+          />
+        ))}
 
       {!centered && topicState === "error" && topicError && (
         <AnalysisErrorAlert
