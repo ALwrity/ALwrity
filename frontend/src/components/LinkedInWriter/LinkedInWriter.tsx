@@ -660,6 +660,7 @@ Always use the most appropriate tool for the user's request.`.trim();
                 <div style={{ flex: 1 }} />
 
                 <Tooltip title={saveStatus === "saved" ? "Saved to Asset Library" : "Save draft to Asset Library"} arrow>
+                  <span>
                   <Button
                     type="button"
                     variant="text"
@@ -695,6 +696,7 @@ Always use the most appropriate tool for the user's request.`.trim();
                         ? "Saved"
                         : "Save"}
                   </Button>
+                  </span>
                 </Tooltip>
 
                 <Tooltip title="Run pre-publish quality check" arrow>

@@ -1,12 +1,16 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
   IconButton,
   Link,
+  LinearProgress,
   Popover,
   Tooltip,
   Typography,
@@ -14,6 +18,10 @@ import {
 import {
   Image as ImageIcon,
   LinkedIn as LinkedInIcon,
+  OpenInNew as OpenInNewIcon,
+  CheckCircle as CheckCircleIcon,
+  Error as ErrorIcon,
+  Close as CloseIcon,
 } from "@mui/icons-material";
 import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
 import { getLinkedInPublishErrorMessage } from "../../../api/linkedinSocial";
@@ -23,7 +31,6 @@ import { LinkedInPublishPreviewPlain } from "./LinkedInPublishPreviewPlain";
 import { LinkedInPublishChecklist } from "./LinkedInPublishChecklist";
 import {
   buildLinkedInPublishSuccessMessage,
-  getLinkedInPublishButtonLabel,
   publishLinkedInWithMedia,
 } from "../utils/linkedInPublishHandler";
 import {
@@ -53,16 +60,29 @@ interface PublishSuccessState {
   hasMedia?: boolean;
 }
 
+type PublishStep = "idle" | "formatting" | "uploading" | "publishing" | "done" | "error";
+
+const PUBLISH_STEPS: { step: PublishStep; label: string }[] = [
+  { step: "formatting", label: "Formatting content for LinkedIn..." },
+  { step: "uploading", label: "Uploading media..." },
+  { step: "publishing", label: "Publishing to LinkedIn..." },
+  { step: "done", label: "Published!" },
+];
+
 const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   draft,
   topic,
   compact = false,
   getDraftForPublish,
 }) => {
-  const { connected, provider, selectedAccountId, selectedTarget, isLoading } =
+  const { connected, provider, selectedAccountId, selectedTarget, isLoading,
+    isConnecting, connectWithOAuth } =
     useLinkedInSocialConnection();
 
   const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStep, setPublishStep] = useState<PublishStep>("idle");
+  const [showProgress, setShowProgress] = useState(false);
+  const [publishError, setPublishError] = useState<string | null>(null);
   const [successState, setSuccessState] = useState<PublishSuccessState | null>(
     null,
   );
@@ -92,11 +112,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
     ? `Connected via ${provider}`
     : "Not connected — connect LinkedIn to publish";
 
-  const publishLabel = getLinkedInPublishButtonLabel(
-    hasPublishMedia,
-    isPublishing,
-  );
-
   const handlePublish = async () => {
     if (!canPublish) return;
 
@@ -110,11 +125,25 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
     }
 
     setIsPublishing(true);
+    setShowProgress(true);
+    setPublishStep("formatting");
+    setPublishError(null);
     publishMedia.beginPublishing();
     setSuccessState(null);
     setErrorMessage(null);
 
     try {
+      // Step 1: Formatting (brief pause for UX)
+      await new Promise(r => setTimeout(r, 300));
+
+      // Step 2: Uploading media (if any)
+      if (publishMedia.hasAttachment) {
+        setPublishStep("uploading");
+        await new Promise(r => setTimeout(r, 400));
+      }
+
+      // Step 3: Publishing
+      setPublishStep("publishing");
       const result = await publishLinkedInWithMedia({
         content: contentForPublish,
         accountId: selectedAccountId || undefined,
@@ -122,6 +151,8 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         attachment: publishMedia.attachment,
       });
 
+      // Step 4: Done
+      setPublishStep("done");
       setSuccessState({
         message: buildLinkedInPublishSuccessMessage(result),
         shareUrl: result.share_url,
@@ -129,6 +160,8 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
       });
     } catch (err) {
       console.error("[LinkedInPublish] publish failed:", err);
+      setPublishStep("error");
+      setPublishError(getLinkedInPublishErrorMessage(err));
       setErrorMessage(getLinkedInPublishErrorMessage(err));
     } finally {
       setIsPublishing(false);
@@ -239,16 +272,25 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   if (compact) {
     return (
       <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+        {/* Progress modal */}
+        <PublishProgressModal
+          open={showProgress}
+          step={publishStep}
+          error={publishError}
+          successState={successState}
+          onClose={() => setShowProgress(false)}
+        />
+
         {mediaControls}
         {charCaption}
-        <Tooltip title={connected ? 'Publish to LinkedIn' : 'Not connected — connect LinkedIn to publish'} arrow>
+        <Tooltip title={connected ? 'Publish to LinkedIn' : 'Connect your LinkedIn account to publish posts'} arrow>
           <span>
             <Button
               variant="contained"
-              disabled={!canPublish}
-              onClick={handlePublish}
+              disabled={isPublishing || isConnecting || (connected && !hardChecksOk)}
+              onClick={connected ? handlePublish : () => { void connectWithOAuth(); }}
               startIcon={
-                isPublishing ? (
+                isPublishing || isConnecting ? (
                   <CircularProgress size={16} color="inherit" />
                 ) : (
                   <LinkedInIcon />
@@ -262,7 +304,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
                 fontWeight: 600,
               }}
             >
-              {publishLabel}
+              {isPublishing ? 'Publishing...' : isConnecting ? 'Connecting...' : connected ? 'Publish' : 'Connect'}
             </Button>
           </span>
         </Tooltip>
@@ -280,7 +322,15 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   }
 
   return (
-    <Box
+    <>
+      <PublishProgressModal
+        open={showProgress}
+        step={publishStep}
+        error={publishError}
+        successState={successState}
+        onClose={() => setShowProgress(false)}
+      />
+      <Box
       sx={{
         mx: 3,
         mb: 2,
@@ -389,25 +439,127 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         </Alert>
       )}
 
-      <Tooltip title={connected ? 'Publish to LinkedIn' : 'Not connected — connect LinkedIn to publish'} arrow>
+      <Tooltip title={connected ? 'Publish to LinkedIn' : 'Connect your LinkedIn account to publish posts'} arrow>
         <span>
           <Button
             variant="contained"
-            disabled={!canPublish}
-            onClick={handlePublish}
+            disabled={isPublishing || isConnecting || (connected && !hardChecksOk)}
+            onClick={connected ? handlePublish : () => { void connectWithOAuth(); }}
             startIcon={
-              isPublishing ? (
+              isPublishing || isConnecting ? (
                 <CircularProgress size={16} color="inherit" />
               ) : undefined
             }
             sx={{ bgcolor: "#0A66C2", "&:hover": { bgcolor: "#004182" } }}
           >
-            {publishLabel}
+            {isPublishing ? 'Publishing...' : isConnecting ? 'Connecting...' : connected ? 'Publish' : 'Connect'}
           </Button>
         </span>
       </Tooltip>
     </Box>
+    </>
   );
 };
+
+// ── Publish Progress Modal ──
+
+interface PublishProgressModalProps {
+  open: boolean;
+  step: PublishStep;
+  error: string | null;
+  successState: PublishSuccessState | null;
+  onClose: () => void;
+}
+
+const PublishProgressModal: React.FC<PublishProgressModalProps> = ({
+  open, step, error, successState, onClose,
+}) => (
+  <Dialog
+    open={open}
+    onClose={step === "done" || step === "error" ? onClose : undefined}
+    maxWidth="xs"
+    fullWidth
+    slotProps={{ backdrop: { sx: { backdropFilter: 'blur(2px)' } } }}
+    PaperProps={{ sx: { borderRadius: 3, p: 1 } }}
+  >
+    <DialogTitle sx={{ textAlign: "center", pb: 0 }}>
+      {step === "error" ? (
+        <ErrorIcon sx={{ fontSize: 44, color: "#dc2626" }} />
+      ) : step === "done" ? (
+        <CheckCircleIcon sx={{ fontSize: 44, color: "#059669" }} />
+      ) : (
+        <LinkedInIcon sx={{ fontSize: 44, color: "#0A66C2" }} />
+      )}
+    </DialogTitle>
+    <DialogContent sx={{ textAlign: "center", pt: 2 }}>
+      {step === "done" && successState ? (
+        <>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            Published to LinkedIn!
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {successState.message}
+          </Typography>
+          {successState.shareUrl && (
+            <Button
+              variant="contained"
+              href={successState.shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNewIcon />}
+              sx={{ bgcolor: "#0A66C2", "&:hover": { bgcolor: "#004182" }, mb: 1 }}
+            >
+              View on LinkedIn
+            </Button>
+          )}
+          <br />
+          <Button variant="text" onClick={onClose} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
+        </>
+      ) : step === "error" ? (
+        <>
+          <Typography variant="h6" sx={{ fontWeight: 700, color: "#dc2626", mb: 1 }}>
+            Publish Failed
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {error || "An unexpected error occurred. Please try again."}
+          </Typography>
+          <Button variant="outlined" onClick={onClose} sx={{ textTransform: "none" }}>
+            Close
+          </Button>
+        </>
+      ) : (
+        <>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            Publishing...
+          </Typography>
+          <LinearProgress
+            sx={{ mb: 2, height: 6, borderRadius: 3 }}
+            variant={step === "idle" ? "indeterminate" : "determinate"}
+            value={
+              step === "formatting" ? 25 :
+              step === "uploading" ? 50 :
+              step === "publishing" ? 75 : 0
+            }
+          />
+          {PUBLISH_STEPS.map((s) => (
+            <Typography
+              key={s.step}
+              variant="body2"
+              sx={{
+                color: step === s.step ? "text.primary" : step === "done" ? "#059669" : "text.disabled",
+                fontWeight: step === s.step ? 600 : 400,
+                mb: 0.5,
+              }}
+            >
+              {step === "done" ? "✅" : s.step === step ? "⏳" : "○"} {s.label}
+            </Typography>
+          ))}
+        </>
+      )}
+    </DialogContent>
+  </Dialog>
+);
 
 export default PublishLinkedInPanel;
