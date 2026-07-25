@@ -8,8 +8,12 @@ import {
   getCommentAssistantErrorMessage,
   getCommentAssistantReplyErrorMessage,
 } from "../../../../services/commentAssistantApi";
-import { linkedInWriterApi } from "../../../../services/linkedInWriterApi";
 import { postCommentsApi } from "../../../../services/postCommentsApi";
+import {
+  COMMENT_ASSISTANT_REPLY_SENDING,
+  COMMENT_ASSISTANT_REPLY_SUCCESS,
+} from "./commentAssistantCopy";
+import { clearSessionDraft } from "./commentAssistantDraftCache";
 import { loadCommentAssistantInbox } from "./commentAssistantInboxLoad";
 import { formatTimeLabel } from "./commentAssistantMappers";
 import type { CommentAssistantReplyPayload } from "./commentAssistantReplyComposer";
@@ -21,6 +25,7 @@ import type {
   CommentAssistantReplyView,
   CommentAssistantTab,
 } from "./commentAssistantTypes";
+import { useCommentAssistantDraftAction } from "./useCommentAssistantDraftAction";
 
 /** Match server cache TTL so Sync cannot hammer Unipile every minute. */
 const SYNC_COOLDOWN_MS = 300_000;
@@ -296,7 +301,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
       payload: CommentAssistantReplyPayload,
     ) => {
       setActionError("");
-      showStatus("info", "Sending your reply…");
+      showStatus("info", COMMENT_ASSISTANT_REPLY_SENDING);
       updateComment(postId, commentId, { replyBusy: true });
       try {
         // Same multipart reply path; commentId may be a nested reply id.
@@ -306,11 +311,28 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
           mentions: payload.mentions,
           imageFile: payload.imageFile,
         });
-        updateComment(postId, commentId, { replyBusy: false, draftText: "" });
-        showStatus("success", "Reply posted successfully.", 4500);
+        // Clear the draft and thread replies so the composer closes and the
+        // thread view rebuilds fresh after posting (avoids duplicate replies).
+        updateComment(postId, commentId, {
+          replyBusy: false,
+          draftText: "",
+          threadReplies: undefined,
+        });
+        clearSessionDraft(commentId);
+        // Reload first, then show success so the banner is not buried under
+        // the "Loading comments…" state during refresh. Reply already posted —
+        // inbox reload failures must not hide the success confirmation.
         if (isPriorityTab(tab)) {
-          await loadInbox(tab, false);
+          try {
+            await loadInbox(tab, false);
+          } catch (reloadErr) {
+            console.error(
+              "[CommentAssistant] inbox reload after reply failed",
+              reloadErr,
+            );
+          }
         }
+        showStatus("success", COMMENT_ASSISTANT_REPLY_SUCCESS, 7000);
       } catch (err) {
         updateComment(postId, commentId, { replyBusy: false });
         setStatusMessage(null);
@@ -320,33 +342,11 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     [tab, loadInbox, updateComment, showStatus],
   );
 
-  const handleDraftAi = useCallback(
-    async (
-      postId: string,
-      postText: string,
-      commentId: string,
-      commentText: string,
-    ) => {
-      setActionError("");
-      updateComment(postId, commentId, { draftBusy: true });
-      try {
-        const res = await linkedInWriterApi.generateCommentResponse({
-          original_post: postText,
-          comment: commentText,
-          response_type: "professional",
-          include_question: false,
-        });
-        updateComment(postId, commentId, {
-          draftBusy: false,
-          draftText: res.response ?? "",
-        });
-      } catch {
-        updateComment(postId, commentId, { draftBusy: false });
-        setActionError("Could not draft a reply. Please try again.");
-      }
-    },
-    [updateComment],
-  );
+  const { handleDraftAlwrity } = useCommentAssistantDraftAction({
+    getGroups: () => groupsRef.current,
+    updateComment,
+    setActionError,
+  });
 
   const handleLoadMore = useCallback(
     async (postId: string, socialId: string, cursor: string) => {
@@ -443,7 +443,7 @@ export function useCommentAssistantInbox(open: boolean, connected: boolean) {
     retryPost,
     handleReact,
     handleSendReply,
-    handleDraftAi,
+    handleDraftAlwrity,
     handleLoadMore,
     handleShowThreadReplies,
   };

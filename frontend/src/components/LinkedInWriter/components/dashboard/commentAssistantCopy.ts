@@ -66,8 +66,9 @@ export const COMMENT_ASSISTANT_ACTIONS = {
   like: "Like",
   liked: "Liked",
   reply: "Reply",
-  draftAi: "Draft with AI",
-  drafting: "Drafting…",
+  draftAlwrity: "Draft with ALwrity",
+  drafting: "Drafting with ALwrity…",
+  regenerate: "Regenerate",
   send: "Send reply",
   sending: "Sending…",
   cancel: "Cancel",
@@ -75,11 +76,20 @@ export const COMMENT_ASSISTANT_ACTIONS = {
   loadMore: "Load more comments",
 } as const;
 
+/** Shown under the draft button while ALwrity is generating. */
+export const COMMENT_ASSISTANT_DRAFT_PROGRESS =
+  "Reading your post and comment, then drafting a reply…";
+
+/** Hint shown above the composer after a draft loads. */
+export const COMMENT_ASSISTANT_DRAFT_REVIEW =
+  "Review and edit the draft before sending.";
+
 export const COMMENT_ASSISTANT_REPLY_SENDING = "Sending your reply…";
-export const COMMENT_ASSISTANT_REPLY_SUCCESS = "Reply posted successfully.";
+export const COMMENT_ASSISTANT_REPLY_SUCCESS =
+  "Reply posted on LinkedIn successfully.";
 
 export const COMMENT_ASSISTANT_MANUAL_INTRO =
-  "Paste a comment and draft an AI reply in your voice — then copy it to LinkedIn.";
+  "Paste a comment and draft a reply with ALwrity in your voice — then copy it to LinkedIn.";
 
 export const COMMENT_ASSISTANT_INBOX_HINT =
   "Comments on your recent posts. Sync to refresh from LinkedIn.";

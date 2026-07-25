@@ -25,7 +25,10 @@ interface CommentAssistantPostGroupProps {
     commentId: string,
     payload: CommentAssistantReplyPayload,
   ) => void;
-  onDraftAi?: (commentId: string) => void;
+  onDraftAlwrity?: (
+    commentId: string,
+    options?: { refresh?: boolean },
+  ) => void;
   onRetry?: () => void;
   onLoadMore?: () => void;
   onShowThreadReplies?: (commentId: string) => void;
@@ -68,7 +71,7 @@ export const CommentAssistantPostGroup: React.FC<
   actionsEnabled,
   onReact,
   onSendReply,
-  onDraftAi,
+  onDraftAlwrity,
   onRetry,
   onLoadMore,
   onShowThreadReplies,
@@ -277,7 +280,7 @@ export const CommentAssistantPostGroup: React.FC<
               actionsEnabled={actionsEnabled && !group.error}
               onReact={onReact}
               onSendReply={onSendReply}
-              onDraftAi={onDraftAi}
+              onDraftAlwrity={onDraftAlwrity}
               onShowThreadReplies={onShowThreadReplies}
             />
           ))}

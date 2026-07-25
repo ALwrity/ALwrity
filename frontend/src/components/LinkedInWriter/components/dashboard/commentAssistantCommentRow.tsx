@@ -1,10 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { colors } from "../GrowthEngine/styles";
 import { CommentAssistantAttachedImage } from "./commentAssistantAttachedImage";
 import { CommentAssistantAuthorRow } from "./commentAssistantAuthorRow";
-import { COMMENT_ASSISTANT_ACTIONS } from "./commentAssistantCopy";
+import {
+  COMMENT_ASSISTANT_ACTIONS,
+  COMMENT_ASSISTANT_DRAFT_PROGRESS,
+  COMMENT_ASSISTANT_DRAFT_REVIEW,
+} from "./commentAssistantCopy";
 import { CommentAssistantNestedReplyRow } from "./commentAssistantNestedReplyRow";
 import { CommentAssistantReactionPicker } from "./commentAssistantReactionPicker";
+import { CommentAssistantSpinner } from "./commentAssistantSpinner";
 import {
   CommentAssistantReplyComposer,
   type CommentAssistantReplyPayload,
@@ -23,7 +28,10 @@ interface CommentAssistantCommentRowProps {
     commentId: string,
     payload: CommentAssistantReplyPayload,
   ) => void;
-  onDraftAi?: (commentId: string) => void;
+  onDraftAlwrity?: (
+    commentId: string,
+    options?: { refresh?: boolean },
+  ) => void;
   onShowThreadReplies?: (commentId: string) => void;
 }
 
@@ -45,18 +53,28 @@ export const CommentAssistantCommentRow: React.FC<
   actionsEnabled = false,
   onReact,
   onSendReply,
-  onDraftAi,
+  onDraftAlwrity,
   onShowThreadReplies,
 }) => {
   const [replyOpen, setReplyOpen] = useState(false);
   const [repliesOpen, setRepliesOpen] = useState(
     Boolean(comment.myReplies?.length),
   );
+  const prevDraftTextRef = useRef(comment.draftText);
 
   useEffect(() => {
     if (comment.draftText != null && comment.draftText !== "") {
       setReplyOpen(true);
     }
+    // Close the composer when the draft has been sent/cleared.
+    if (
+      prevDraftTextRef.current &&
+      prevDraftTextRef.current !== "" &&
+      !comment.draftText
+    ) {
+      setReplyOpen(false);
+    }
+    prevDraftTextRef.current = comment.draftText;
   }, [comment.draftText]);
 
   useEffect(() => {
@@ -70,6 +88,11 @@ export const CommentAssistantCommentRow: React.FC<
   );
   const canAct = actionsEnabled && !busy;
   const myReplies = comment.myReplies || [];
+  const myReplyIds = new Set(myReplies.map((r) => r.id));
+  // Avoid showing the same reply twice when a posted reply also appears in thread replies.
+  const threadReplies = (comment.threadReplies || []).filter(
+    (r) => !myReplyIds.has(r.id),
+  );
   const replyCount = comment.replyCount ?? 0;
 
   /** When replying under own reply, keep @mention on the audience author. */
@@ -151,6 +174,7 @@ export const CommentAssistantCommentRow: React.FC<
                   mentionAuthorId={parentMentionId}
                   onReact={onReact}
                   onSendReply={onSendReply}
+                  onDraftAlwrity={onDraftAlwrity}
                 />
               ))}
             </div>
@@ -177,7 +201,7 @@ export const CommentAssistantCommentRow: React.FC<
         </button>
       )}
 
-      {comment.threadReplies && comment.threadReplies.length > 0 && (
+      {threadReplies.length > 0 && (
         <div
           style={{
             marginBottom: 6,
@@ -196,7 +220,7 @@ export const CommentAssistantCommentRow: React.FC<
           >
             Thread replies
           </div>
-          {comment.threadReplies.map((r) => (
+          {threadReplies.map((r) => (
             <CommentAssistantNestedReplyRow
               key={r.id}
               reply={r}
@@ -205,6 +229,7 @@ export const CommentAssistantCommentRow: React.FC<
               mentionAuthorId={r.isMine ? parentMentionId : r.authorId}
               onReact={onReact}
               onSendReply={onSendReply}
+              onDraftAlwrity={onDraftAlwrity}
             />
           ))}
         </div>
@@ -239,18 +264,78 @@ export const CommentAssistantCommentRow: React.FC<
         <button
           type="button"
           disabled={!canAct}
-          onClick={() => onDraftAi?.(comment.id)}
+          aria-label="Draft a reply with ALwrity"
+          aria-busy={comment.draftBusy}
+          onClick={() => onDraftAlwrity?.(comment.id)}
           style={{
             ...actionBtn(true),
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
             opacity: canAct ? 1 : 0.55,
             cursor: canAct ? "pointer" : "default",
           }}
         >
-          {comment.draftBusy
-            ? COMMENT_ASSISTANT_ACTIONS.drafting
-            : COMMENT_ASSISTANT_ACTIONS.draftAi}
+          {comment.draftBusy ? (
+            <>
+              <CommentAssistantSpinner size={12} color="#fff" />
+              {COMMENT_ASSISTANT_ACTIONS.drafting}
+            </>
+          ) : (
+            COMMENT_ASSISTANT_ACTIONS.draftAlwrity
+          )}
         </button>
       </div>
+
+      {comment.draftBusy ? (
+        <div
+          style={{
+            fontSize: 10,
+            color: colors.primary,
+            marginTop: 4,
+            marginBottom: 2,
+            fontWeight: 600,
+          }}
+        >
+          {COMMENT_ASSISTANT_DRAFT_PROGRESS}
+        </div>
+      ) : null}
+
+      {comment.draftText && !comment.draftBusy ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            fontSize: 10,
+            color: colors.textTertiary,
+            marginTop: 4,
+            marginBottom: 2,
+          }}
+        >
+          <span>{COMMENT_ASSISTANT_DRAFT_REVIEW}</span>
+          {actionsEnabled && onDraftAlwrity ? (
+            <button
+              type="button"
+              onClick={() =>
+                onDraftAlwrity(comment.id, { refresh: true })
+              }
+              style={{
+                padding: 0,
+                border: "none",
+                background: "transparent",
+                color: colors.primary,
+                fontSize: 10,
+                fontWeight: 600,
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              {COMMENT_ASSISTANT_ACTIONS.regenerate}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {replyOpen && (
         <CommentAssistantReplyComposer

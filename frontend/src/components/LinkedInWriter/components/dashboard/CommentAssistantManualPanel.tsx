@@ -4,11 +4,13 @@
  */
 import React, { useEffect, useState } from "react";
 import {
-  linkedInWriterApi,
-  type LinkedInCommentResponseRequest,
-} from "../../../../services/linkedInWriterApi";
+  commentAssistantApi,
+  getCommentAssistantDraftErrorMessage,
+  type CommentAssistantManualDraftReplyRequest,
+} from "../../../../services/commentAssistantApi";
 import { colors, rowBase } from "../GrowthEngine/styles";
 import { COMMENT_ASSISTANT_MANUAL_INTRO } from "./commentAssistantCopy";
+import { CommentAssistantSpinner } from "./commentAssistantSpinner";
 
 const DRAFT_KEY = "alwrity-copilot-draft-content";
 
@@ -51,23 +53,7 @@ function textareaStyle(minH: number): React.CSSProperties {
   };
 }
 
-const Spinner = () => (
-  <>
-    <style>{`@keyframes ca-spin { to { transform: rotate(360deg); } }`}</style>
-    <span
-      style={{
-        display: "inline-block",
-        width: 16,
-        height: 16,
-        border: "2px solid #d1d5db",
-        borderTopColor: colors.primary,
-        borderRadius: "50%",
-        animation: "ca-spin 0.7s linear infinite",
-        flexShrink: 0,
-      }}
-    />
-  </>
-);
+const Spinner = () => <CommentAssistantSpinner size={16} />;
 
 const FieldLabel: React.FC<{ label: string }> = ({ label }) => (
   <div
@@ -180,20 +166,22 @@ export const CommentAssistantManualPanel: React.FC<
     setError("");
     setResult(null);
     try {
-      const req: LinkedInCommentResponseRequest = {
-        original_post: originalPost,
-        comment,
-        response_type:
-          responseType as LinkedInCommentResponseRequest["response_type"],
+      const req: CommentAssistantManualDraftReplyRequest = {
+        post_text: originalPost || undefined,
+        comment_text: comment,
+        tone: responseType as CommentAssistantManualDraftReplyRequest["tone"],
         include_question: includeQuestion,
       };
-      const res = await linkedInWriterApi.generateCommentResponse(req);
+      const res = await commentAssistantApi.draftManualReply(req);
+      if (!res.success) {
+        throw new Error(res.error || "Draft generation failed");
+      }
       setResult({
-        reply: res.response ?? "",
-        alternatives: res.alternative_responses ?? [],
+        reply: res.reply ?? "",
+        alternatives: res.alternative_replies ?? [],
       });
-    } catch {
-      setError("Could not generate reply. Please try again.");
+    } catch (err) {
+      setError(getCommentAssistantDraftErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -328,10 +316,10 @@ export const CommentAssistantManualPanel: React.FC<
         >
           {loading ? (
             <>
-              <Spinner /> Drafting reply…
+              <Spinner /> Drafting with ALwrity…
             </>
           ) : (
-            "💬 Generate Reply"
+            "💬 Generate with ALwrity"
           )}
         </button>
       )}
@@ -355,7 +343,7 @@ export const CommentAssistantManualPanel: React.FC<
                 marginBottom: 8,
               }}
             >
-              AI Reply
+              ALwrity Reply
             </div>
             <div
               style={{
