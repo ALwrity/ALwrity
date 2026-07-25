@@ -57,6 +57,7 @@ import {
   writeStoredOrgId,
   writeStoredTarget,
 } from './linkedInConnectionStorage';
+import { showToastNotification } from '../../utils/toastNotifications';
 import {
   cacheSharedConnectionStatus,
   getCachedConnectionStatus,
@@ -172,6 +173,14 @@ const useLinkedInSocialConnectionStandalone = () => {
     }
 
     if (!connectionStatus.connected) {
+      // If the user was previously connected, show a toast notification
+      if (status?.connected) {
+        showToastNotification(
+          'LinkedIn connection was lost. Reconnect to restore publishing and analytics.',
+          'warning',
+          { duration: 8000 },
+        );
+      }
       setAccounts([]);
       setOrganizations([]);
       setIsLoading(false);

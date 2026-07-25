@@ -9,6 +9,11 @@ export interface ProfileCompletionFormProps {
   onSubmit: (answers: Record<string, string | string[]>) => Promise<void>;
   isSubmitting?: boolean;
   error?: string | null;
+  /**
+   * `plain` — body content for DashboardActionModal (no glass card / heading).
+   * `inline` — self-contained card for non-landing layouts.
+   */
+  variant?: "plain" | "inline";
 }
 
 const fieldWrapperStyle: React.CSSProperties = {
@@ -26,13 +31,24 @@ const labelStyle: React.CSSProperties = {
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  padding: "10px 12px",
+  padding: "12px 14px",
   borderRadius: 10,
   border: "1px solid #e2e8f0",
   backgroundColor: "#fff",
   fontSize: 14,
   color: "#334155",
   fontFamily: "inherit",
+  boxSizing: "border-box",
+};
+
+const formStyle: React.CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  display: "flex",
+  flexDirection: "column",
+  gap: 16,
+  width: "100%",
+  margin: 0,
   boxSizing: "border-box",
 };
 
@@ -74,6 +90,7 @@ export const ProfileCompletionForm: React.FC<ProfileCompletionFormProps> = ({
   onSubmit,
   isSubmitting = false,
   error = null,
+  variant = "inline",
 }) => {
   const initialValues = useMemo(() => {
     const next: Record<string, string> = {};
@@ -118,126 +135,143 @@ export const ProfileCompletionForm: React.FC<ProfileCompletionFormProps> = ({
   }
 
   const displayError = localError ?? error;
+  const isPlain = variant === "plain";
 
-  return (
-    <div style={{ ...linkedInPlaceholderCardStyles.wrapper, marginTop: 16 }}>
-      <div style={linkedInPlaceholderCardStyles.inner}>
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            position: "relative",
-            zIndex: 1,
-            display: "flex",
-            flexDirection: "column",
-            gap: 16,
-            maxWidth: 560,
-            margin: "0 auto",
-          }}
-        >
-          <div>
-            <h3
-              style={{
-                margin: "0 0 6px",
-                fontSize: 18,
-                fontWeight: 700,
-                color: "#0f172a",
-              }}
-            >
-              Help us understand you better.
-            </h3>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 14,
-                color: "#64748b",
-                lineHeight: 1.5,
-              }}
-            >
-              Please answer a few quick questions.
-            </p>
-          </div>
-
-          {questions.map((question) => (
-            <div key={question.field_key} style={fieldWrapperStyle}>
-              <label htmlFor={question.field_key} style={labelStyle}>
-                {question.label}
-                {question.required ? " *" : ""}
-              </label>
-              {question.input_type === "textarea" ? (
-                <textarea
-                  id={question.field_key}
-                  value={values[question.field_key] ?? ""}
-                  onChange={(event) =>
-                    handleChange(question.field_key, event.target.value)
-                  }
-                  rows={4}
-                  disabled={isSubmitting}
-                  style={{ ...inputStyle, resize: "vertical", minHeight: 96 }}
-                />
-              ) : (
-                <input
-                  id={question.field_key}
-                  type="text"
-                  value={values[question.field_key] ?? ""}
-                  onChange={(event) =>
-                    handleChange(question.field_key, event.target.value)
-                  }
-                  disabled={isSubmitting}
-                  placeholder={
-                    question.input_type === "tags"
-                      ? "e.g. Python, FastAPI, Leadership"
-                      : undefined
-                  }
-                  style={inputStyle}
-                />
-              )}
-            </div>
-          ))}
-
-          {displayError && (
-            <p
-              role="alert"
-              style={{
-                margin: 0,
-                padding: "10px 12px",
-                borderRadius: 8,
-                backgroundColor: "#fef2f2",
-                border: "1px solid #fecaca",
-                color: "#b91c1c",
-                fontSize: 13,
-                lineHeight: 1.5,
-              }}
-            >
-              {displayError}
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isSubmitting}
+  const formBody = (
+    <form onSubmit={handleSubmit} style={formStyle}>
+      {!isPlain && (
+        <div>
+          <h3
             style={{
-              alignSelf: "flex-start",
-              background: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
-              border: "none",
-              borderRadius: 12,
-              padding: "12px 28px",
-              color: "white",
-              fontSize: 15,
+              margin: "0 0 6px",
+              fontSize: 18,
               fontWeight: 700,
-              cursor: isSubmitting ? "default" : "pointer",
-              opacity: isSubmitting ? 0.75 : 1,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 10,
+              color: "#0f172a",
             }}
           >
-            {isSubmitting && (
-              <CircularProgress size={18} sx={{ color: "#fff" }} />
-            )}
-            {isSubmitting ? "Saving..." : "Save answers"}
-          </button>
-        </form>
-      </div>
+            Help us understand you better.
+          </h3>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 14,
+              color: "#64748b",
+              lineHeight: 1.5,
+            }}
+          >
+            Please answer a few quick questions.
+          </p>
+        </div>
+      )}
+
+      {isPlain && (
+        <p
+          style={{
+            margin: 0,
+            fontSize: 14,
+            color: "#64748b",
+            lineHeight: 1.5,
+          }}
+        >
+          Please answer a few quick questions so ALwrity can personalize your
+          LinkedIn Studio experience.
+        </p>
+      )}
+
+      {questions.map((question) => (
+        <div key={question.field_key} style={fieldWrapperStyle}>
+          <label htmlFor={question.field_key} style={labelStyle}>
+            {question.label}
+            {question.required ? " *" : ""}
+          </label>
+          {question.input_type === "textarea" ? (
+            <textarea
+              id={question.field_key}
+              value={values[question.field_key] ?? ""}
+              onChange={(event) =>
+                handleChange(question.field_key, event.target.value)
+              }
+              rows={5}
+              disabled={isSubmitting}
+              style={{ ...inputStyle, resize: "vertical", minHeight: 120 }}
+            />
+          ) : (
+            <input
+              id={question.field_key}
+              type="text"
+              value={values[question.field_key] ?? ""}
+              onChange={(event) =>
+                handleChange(question.field_key, event.target.value)
+              }
+              disabled={isSubmitting}
+              placeholder={
+                question.input_type === "tags"
+                  ? "e.g. Python, FastAPI, Leadership"
+                  : undefined
+              }
+              style={inputStyle}
+            />
+          )}
+        </div>
+      ))}
+
+      {displayError && (
+        <p
+          role="alert"
+          style={{
+            margin: 0,
+            padding: "10px 12px",
+            borderRadius: 8,
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#b91c1c",
+            fontSize: 13,
+            lineHeight: 1.5,
+          }}
+        >
+          {displayError}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={isSubmitting}
+        style={{
+          alignSelf: "flex-start",
+          background: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+          border: "none",
+          borderRadius: 12,
+          padding: "12px 28px",
+          color: "white",
+          fontSize: 15,
+          fontWeight: 700,
+          cursor: isSubmitting ? "default" : "pointer",
+          opacity: isSubmitting ? 0.75 : 1,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 10,
+        }}
+      >
+        {isSubmitting && (
+          <CircularProgress size={18} sx={{ color: "#fff" }} />
+        )}
+        {isSubmitting ? "Saving..." : "Save answers"}
+      </button>
+    </form>
+  );
+
+  if (isPlain) {
+    return formBody;
+  }
+
+  return (
+    <div
+      style={{
+        ...linkedInPlaceholderCardStyles.wrapper,
+        marginTop: 16,
+      }}
+    >
+      <div style={linkedInPlaceholderCardStyles.inner}>{formBody}</div>
     </div>
   );
 };
