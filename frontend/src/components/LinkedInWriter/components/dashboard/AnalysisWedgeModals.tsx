@@ -684,15 +684,8 @@ const NoDataRow: React.FC<{ label: string; onRefresh: () => void }> = ({
 // ---------------------------------------------------------------------------
 // F2 — Post Today Modal
 // ---------------------------------------------------------------------------
-
-interface PostCandidate {
-  topic: string;
-  hook: string;
-  sourceLabel: string;
-  sourceIcon: string;
-  confidence: "high" | "medium" | "low";
-  score: number;
-}
+// PostCandidate type imported from PostTodayCandidateList.tsx
+// ---------------------------------------------------------------------------
 
 const CARD_PRIORITY: Record<string, number> = {
   trending: 0.5,
