@@ -57,7 +57,7 @@ import {
   writeStoredOrgId,
   writeStoredTarget,
 } from './linkedInConnectionStorage';
-import { showToastNotification } from '../../utils/toastNotifications';
+import { showToastNotification } from '../utils/toastNotifications';
 import {
   cacheSharedConnectionStatus,
   getCachedConnectionStatus,
