@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { showToastNotification } from '../../utils/toastNotifications';
 
 import {
   getLinkedInConnectionStatus,
@@ -196,6 +197,14 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
     }
 
     if (!connectionStatus.connected) {
+      // If the user was previously connected, show a toast notification
+      if (status?.connected) {
+        showToastNotification(
+          'LinkedIn connection was lost. Reconnect to restore publishing and analytics.',
+          'warning',
+          { duration: 8000 },
+        );
+      }
       setAccounts([]);
       setOrganizations([]);
       setIsLoading(false);
