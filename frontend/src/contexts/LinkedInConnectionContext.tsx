@@ -11,7 +11,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { showToastNotification } from '../../utils/toastNotifications';
+import { showToastNotification } from '../utils/toastNotifications';
 
 import {
   getLinkedInConnectionStatus,
