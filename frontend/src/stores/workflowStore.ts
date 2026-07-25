@@ -169,10 +169,14 @@ export const useWorkflowStore = create<WorkflowState>()(
       lastCachedAt: null,
 
       loadTodayWorkflow: async (date?: string, workflowType?: string) => {
-        const { currentWorkflow, lastCachedAt } = get();
-        if (currentWorkflow && lastCachedAt && (Date.now() - lastCachedAt < DAILY_CACHE_TTL)) {
-          const requestedDate = date || new Date().toISOString().slice(0, 10);
-          if (currentWorkflow.date === requestedDate) {
+        const today = new Date().toISOString().slice(0, 10);
+        const requestedDate = date || today;
+
+        // Only cache today's workflow. Past dates always hit the server
+        // so task history works without a page refresh.
+        if (requestedDate === today) {
+          const { currentWorkflow, lastCachedAt } = get();
+          if (currentWorkflow && lastCachedAt && (Date.now() - lastCachedAt < DAILY_CACHE_TTL)) {
             return;
           }
         }

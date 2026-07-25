@@ -113,6 +113,7 @@ export const DashboardAnalyticsSidebar: React.FC<
       ]
         .filter(Boolean)
         .join(" ")}
+      style={!connected ? { maxHeight: "fit-content" } : undefined}
     >
       <div className="linkedin-analytics-panel-header">
         <div className="linkedin-analytics-panel-title-row">
@@ -129,7 +130,7 @@ export const DashboardAnalyticsSidebar: React.FC<
           </h3>
           {!connected && <ConnectLockBadge size={10} />}
         </div>
-        {onViewAll && (
+        {onViewAll && connected && (
           <button
             type="button"
             className="linkedin-analytics-panel-link"
@@ -140,126 +141,128 @@ export const DashboardAnalyticsSidebar: React.FC<
         )}
       </div>
 
-      <div
-        className="linkedin-analytics-panel-body"
-        style={{ maxHeight: 480, overflowY: "auto" }}
-      >
-        {!connected ? (
-          <div className="linkedin-analytics-panel-disconnected">
-            <p className="linkedin-analytics-panel-disconnected-text">
-              Connect your LinkedIn account to unlock post stats, follower
-              growth, and content insights.
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* F1 — Profile Growth Snapshot */}
-            <ProfileGrowthWidget onViewAnalytics={onViewAll} />
-
-            {/* Post engagement mini chart */}
-            {isLoading && posts.length === 0 ? (
-              <div
-                style={{
-                  fontSize: 10,
-                  color: "#64748b",
-                  padding: "4px 0",
-                  textAlign: "center",
-                }}
-              >
-                Loading posts…
-              </div>
-            ) : (
-              <>
-                {posts.length > 0 && (
-                  <div className="linkedin-analytics-panel-mini-chart">
-                    <div
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        color: "#475569",
-                        marginBottom: 4,
-                      }}
-                    >
-                      Post engagement
-                    </div>
-                    <MiniBarChart posts={posts} />
-                  </div>
-                )}
-                <div
-                  className="linkedin-analytics-panel-stat-grid"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 5,
-                    marginTop: 8,
-                  }}
-                >
-                  <div className="linkedin-analytics-stat-chip">
-                    <div
-                      style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
-                    >
-                      Followers
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 800,
-                        color: "#10b981",
-                        marginTop: 2,
-                      }}
-                    >
-                      {totals.followers > 0 ? `+${totals.followers}` : "—"}
-                    </div>
-                  </div>
-                  <div className="linkedin-analytics-stat-chip">
-                    <div
-                      style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
-                    >
-                      CTR
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 800,
-                        color: "#0a66c2",
-                        marginTop: 2,
-                      }}
-                    >
-                      {totals.impressions > 0 ? formatPct(totals.ctr) : "—"}
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* F3 — Daily AI Digest */}
-            <DailyDigestWidget />
-          </>
-        )}
-
-        {!connected && (
+      {!connected ? (
+        <div style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 6,
+          padding: "10px 12px 12px",
+        }}>
+          <p style={{
+            margin: 0,
+            fontSize: 11,
+            color: "#94a3b8",
+            textAlign: "center",
+            lineHeight: 1.4,
+          }}>
+            Connect LinkedIn to see post analytics
+          </p>
           <button
             type="button"
-            className="linkedin-analytics-panel-connect-btn"
             onClick={() => void connectWithOAuth()}
             style={{
-              width: "100%",
-              marginTop: 8,
-              padding: "7px 8px",
-              borderRadius: 8,
+              padding: "5px 16px",
+              borderRadius: 6,
               border: "none",
               background: "#0a66c2",
               color: "#fff",
-              fontSize: 10,
+              fontSize: 11,
               fontWeight: 700,
               cursor: "pointer",
-              whiteSpace: "nowrap",
             }}
           >
-            Connect LinkedIn
+            Connect
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div
+          className="linkedin-analytics-panel-body"
+          style={{ maxHeight: 480, overflowY: "auto" }}
+        >
+          {/* F1 — Profile Growth Snapshot */}
+          <ProfileGrowthWidget onViewAnalytics={onViewAll} />
+
+          {/* Post engagement mini chart */}
+          {isLoading && posts.length === 0 ? (
+            <div
+              style={{
+                fontSize: 10,
+                color: "#64748b",
+                padding: "4px 0",
+                textAlign: "center",
+              }}
+            >
+              Loading posts…
+            </div>
+          ) : (
+            <>
+              {posts.length > 0 && (
+                <div className="linkedin-analytics-panel-mini-chart">
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: "#475569",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Post engagement
+                  </div>
+                  <MiniBarChart posts={posts} />
+                </div>
+              )}
+              <div
+                className="linkedin-analytics-panel-stat-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 5,
+                  marginTop: 8,
+                }}
+              >
+                <div className="linkedin-analytics-stat-chip">
+                  <div
+                    style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                  >
+                    Followers
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#10b981",
+                      marginTop: 2,
+                    }}
+                  >
+                    {totals.followers > 0 ? `+${totals.followers}` : "—"}
+                  </div>
+                </div>
+                <div className="linkedin-analytics-stat-chip">
+                  <div
+                    style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                  >
+                    CTR
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#0a66c2",
+                      marginTop: 2,
+                    }}
+                  >
+                    {totals.impressions > 0 ? formatPct(totals.ctr) : "—"}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* F3 — Daily AI Digest */}
+          <DailyDigestWidget />
+        </div>
+      )}
     </div>
   );
 };

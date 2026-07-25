@@ -194,7 +194,6 @@ export const LinkedInConnectedProfileCard: React.FC<
                 <img
                   src={proxiedAvatarUrl ?? avatarUrl}
                   alt="LinkedIn profile"
-                  fetchPriority="high"
                   style={{
                     width: avatarSize,
                     height: avatarSize,

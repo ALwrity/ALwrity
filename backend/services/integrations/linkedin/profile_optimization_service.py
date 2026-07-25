@@ -581,6 +581,7 @@ def _meta_from_stored(
         "profile_optimization_updated_at": row.get("profile_optimization_updated_at"),
         "remaining_in_backlog": remaining,
         "active_batch_index": active_batch_index,
+        "completed_ids_count": len(meta_block.get("completed_ids") or []) if isinstance(meta_block, dict) else 0,
     }
 
 

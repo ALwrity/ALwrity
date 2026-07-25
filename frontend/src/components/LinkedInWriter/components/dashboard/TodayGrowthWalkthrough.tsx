@@ -961,7 +961,6 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({
         label="Today's Growth"
         stackedLabel={isTab ? GROWTH_TAB_STACKED_LABEL : undefined}
         icon="growth"
-        emojiIcon="🚀"
         alwaysShowLabel
         iconLeading={!isTab}
         layout={isTab ? "tab" : "pill"}

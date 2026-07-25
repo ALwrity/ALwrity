@@ -55,7 +55,12 @@ router = APIRouter(prefix="/api/linkedin-social", tags=["LinkedIn Social"])
 
 
 def _user_id(current_user: dict) -> str:
-    return str(current_user.get("uid", ""))
+    return str(
+        current_user.get("clerk_user_id")
+        or current_user.get("sub")
+        or current_user.get("id")
+        or ""
+    )
 
 
 @router.post("/profile/complete", response_model=LinkedInProfileCompleteResponse)

@@ -3,12 +3,15 @@ import { useCallback, useRef, useState } from 'react';
 import {
   completeProfileOptimizationRecommendation,
   downloadProfilePhoto,
+  getLinkedInProfileFoundation,
   getLinkedInSocialErrorMessage,
   loadNextProfileOptimizationBatch,
   logProfileAnalysisError,
   makeProfilePhotoPresentable,
   runLinkedInProfileOptimization,
+  updateProfileCache,
   uploadProfilePhoto,
+  type LinkedInAIProfileIntelligence,
   type LinkedInProfileAnalysisError,
   type LinkedInProfileOptimizationBatchActionResponse,
   type LinkedInProfileOptimizationItem,
@@ -46,6 +49,47 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [markingRecommendationId, setMarkingRecommendationId] = useState<string | null>(null);
   const [isLoadingNextBatch, setIsLoadingNextBatch] = useState(false);
   const [showNextBatchCta, setShowNextBatchCta] = useState(false);
+
+  // Phase 5 intelligence — loaded immediately on panel open (fast, from 2h cache)
+  const [profileIntelligence, setProfileIntelligence] =
+    useState<LinkedInAIProfileIntelligence | null>(null);
+
+  // Load Phase 5 intelligence only (fast, cache-first). Recommendations
+  // (Phase 7) are triggered separately by user click.
+  const loadIntelligence = useCallback(async () => {
+    if (!isProfileComplete) return;
+    console.info(`${LOG_PREFIX} loading profile intelligence (Phases 1-5)`);
+    setPanelState('loading');
+    try {
+      const data = await getLinkedInProfileFoundation();
+      setProfileIntelligence(data.ai_profile_intelligence ?? null);
+
+      // Restore recommendations from localStorage cache if the foundation
+      // call doesn't include Phase 7 data (which it doesn't). This makes
+      // previously-generated recommendations visible after page refresh.
+      if (data.profile_optimization != null) {
+        setRecommendations(data.profile_optimization);
+        setOptimizationMeta(data.profile_optimization_meta ?? null);
+      } else if (data.profile_optimization == null) {
+        // Foundation call never includes Phase 7 — try cached data from
+        // a prior optimization session (saved by loadOptimization).
+        try {
+          const raw = localStorage.getItem('alwrity_linkedin_profile');
+          if (raw) {
+            const cached = JSON.parse(raw);
+            if (cached?.data?.profile_optimization?.length) {
+              setRecommendations(cached.data.profile_optimization);
+              setOptimizationMeta(cached.data.profile_optimization_meta ?? null);
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      setPanelState('complete');
+    } catch (err) {
+      console.warn(`${LOG_PREFIX} intelligence load failed`, err);
+      setPanelState('error');
+    }
+  }, [isProfileComplete]);
 
   const [localProfilePhotoUrl, setLocalProfilePhotoUrl] = useState<string | null>(null);
   const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
@@ -159,6 +203,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setShowNextBatchCta(false);
       setPanelState('complete');
       setIsOptimizationExpanded(true);
+      // Persist to localStorage so recommendations survive page refreshes
+      try { updateProfileCache(data); } catch { /* best-effort */ }
       if (data.profile_validation?.optimization_score != null) {
         lastScoreRef.current = data.profile_validation.optimization_score;
       }
@@ -191,7 +237,12 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       } catch (err) {
         const message = getLinkedInSocialErrorMessage(err);
         console.error(`${LOG_PREFIX} mark item failed`, { recommendationId, message, err });
-        setOptimizationUserError(message);
+        // Show toast instead of panel-level error — item stays visible for retry
+        try {
+          window.dispatchEvent(new CustomEvent('linkedinwriter:toast', {
+            detail: { message: message || 'Failed to save. Tap again to retry.', severity: 'error' },
+          }));
+        } catch { /* best-effort toast */ }
       } finally {
         setMarkingRecommendationId(null);
       }
@@ -217,8 +268,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   }, [applyBatchActionResponse]);
 
   const openOptimizationPanel = useCallback(async () => {
-    await loadOptimization(false);
-  }, [loadOptimization]);
+    await loadIntelligence();
+  }, [loadIntelligence]);
 
   const closeOptimizationPanel = useCallback(() => {
     console.info(`${LOG_PREFIX} user collapsed profile optimization panel to idle`);
@@ -384,6 +435,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     isRechecking: panelState === 'loading',
     markOptimizationItemComplete,
     loadNextOptimizationBatch,
+    profileIntelligence,
+    loadOptimization,
     localProfilePhotoUrl,
     uploadingProfilePhoto,
     profilePhotoUploadError,

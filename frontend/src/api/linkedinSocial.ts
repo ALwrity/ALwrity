@@ -245,6 +245,7 @@ export interface LinkedInProfileOptimizationMeta {
   profile_optimization_updated_at?: string | null;
   active_batch_index?: number;
   remaining_in_backlog?: number;
+  completed_ids_count?: number;
   message?: string | null;
 }
 
@@ -329,19 +330,22 @@ export interface LinkedInPublishPostResponse {
 const BASE = '/api/linkedin-social';
 
 /** Profile Phases 5–7 can run multiple LLM calls in one GET /profile request. */
-const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 300_000;
+const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 120_000; // 2 minutes
 
-// ── Profile foundation cache (sessionStorage, 30 min TTL) ────────────────────
+// ── Profile foundation cache (localStorage, 24 hour TTL) ──────────────────
+// Profile data rarely changes — users optimize once, may not return for weeks.
+// localStorage survives browser restarts. Force-refresh via the "↻ Refresh"
+// button or invalidateProfileCache(). Write is best-effort (storage-full safe).
 const PROFILE_CACHE_KEY = 'alwrity_linkedin_profile';
-const PROFILE_CACHE_TTL = 30 * 60 * 1000;
+const PROFILE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 function readProfileCache(): LinkedInProfileAcquireResponse | null {
   try {
-    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
     if (!raw) return null;
     const { data, cachedAt } = JSON.parse(raw);
     if (!cachedAt || Date.now() - cachedAt > PROFILE_CACHE_TTL) {
-      sessionStorage.removeItem(PROFILE_CACHE_KEY);
+      localStorage.removeItem(PROFILE_CACHE_KEY);
       return null;
     }
     return data;
@@ -352,8 +356,18 @@ function readProfileCache(): LinkedInProfileAcquireResponse | null {
 
 function writeProfileCache(data: LinkedInProfileAcquireResponse) {
   try {
-    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }));
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }));
   } catch { /* storage full */ }
+}
+
+/** Save profile data to localStorage cache from external callers (e.g., after optimization). */
+export function updateProfileCache(data: LinkedInProfileAcquireResponse) {
+  writeProfileCache(data);
+}
+
+/** Force-refresh the profile foundation cache on next fetch. */
+export function invalidateProfileCache() {
+  try { localStorage.removeItem(PROFILE_CACHE_KEY); } catch { /* noop */ }
 }
 
 /** In-flight promise cache so 4+ hook mounts share one request */
@@ -619,7 +633,12 @@ export async function getLinkedInProfile(
   return response.data;
 }
 
-/** Phases 1–5 only — foundation load on LinkedIn Writer mount (no Phase 6/7). */
+/** Phases 1–5 + 7 (cached) — foundation load on LinkedIn Writer mount.
+ *
+ * Always includes Phase 7 optimization data from the backend SQLite cache
+ * (no LLM trigger unless refresh_profile_optimization is also set).
+ * Falls back to Phases 1-5 only on cold-cache first visits.
+ */
 export async function getLinkedInProfileFoundation(
   refresh = false,
   refreshIntelligence = false
@@ -635,7 +654,12 @@ export async function getLinkedInProfileFoundation(
     if (cached) return cached;
   }
 
-  const data = await getLinkedInProfile({ refresh, refreshIntelligence });
+  const data = await getLinkedInProfile({
+    refresh,
+    refreshIntelligence,
+  });
+  // Note: does NOT request optimization (Phase 7). Existing recommendations
+  // are preserved in localStorage. Phase 7 is loaded on-demand via Refresh.
 
   // Cache the result only for standard foundation loads (not AI refreshes)
   if (!refreshIntelligence) {

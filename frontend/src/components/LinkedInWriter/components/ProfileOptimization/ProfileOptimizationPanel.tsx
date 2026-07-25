@@ -283,6 +283,7 @@ export const ProfileOptimizationPanel: React.FC<
     !showNoGaps &&
     showNextBatchCta &&
     Boolean(onLoadNextBatch);
+  const showEmptyPrompt = !showSkeleton && !showCards && !showNoGaps && !showNextBatchBanner;
 
   const showSectionScores =
     Boolean(sectionScores) && (showCards || showNextBatchBanner);
@@ -373,8 +374,29 @@ export const ProfileOptimizationPanel: React.FC<
                     <p className="profile-opt-panel__meta">
                       {updatedLabel}
                       {optimizationMeta?.source
-                        ? ` · Source: ${optimizationMeta.source}`
+                        ? ` · ${optimizationMeta.source}`
                         : ""}
+                      {optimizationMeta?.completed_ids_count != null &&
+                       optimizationMeta.completed_ids_count > 0
+                        ? ` · ${optimizationMeta.completed_ids_count} completed`
+                        : ""}
+                      <button
+                        type="button"
+                        onClick={onRefresh}
+                        disabled={isLoading}
+                        style={{
+                          marginLeft: 10,
+                          background: "none",
+                          border: "1px solid #cbd5e1",
+                          borderRadius: 4,
+                          padding: "1px 8px",
+                          fontSize: 11,
+                          color: isLoading ? "#94a3b8" : "#64748b",
+                          cursor: isLoading ? "default" : "pointer",
+                        }}
+                      >
+                        ↻ Refresh
+                      </button>
                     </p>
                   )}
                   {!updatedLabel && optimizationMeta?.source && (
@@ -778,8 +800,16 @@ export const ProfileOptimizationPanel: React.FC<
                         }}
                       >
                         <CircularProgress size={20} sx={{ color: "#0A66C2" }} />
-                        Generating profile suggestions…
+                        Analyzing your profile…
                       </div>
+                      <StepIndicator
+                        steps={[
+                          "Reading your LinkedIn profile",
+                          "Analyzing profile strengths & gaps",
+                          "Generating personalized recommendations",
+                          "Finalizing your optimization plan",
+                        ]}
+                      />
                       {Array.from({ length: SKELETON_COUNT }).map(
                         (_, index) => (
                           <div
@@ -799,6 +829,36 @@ export const ProfileOptimizationPanel: React.FC<
                     message={noGapsMessage}
                     onClose={onCollapse}
                   />
+                )}
+
+                {showEmptyPrompt && (
+                  <div style={{ textAlign: 'center', padding: '32px 16px' }}>
+                    <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', margin: '0 0 8px' }}>
+                      No recommendations yet
+                    </p>
+                    <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 16px', lineHeight: 1.5 }}>
+                      Click Refresh to analyze your profile and generate
+                      personalized optimization suggestions.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={onRefresh}
+                      disabled={isLoading}
+                      style={{
+                        padding: '8px 20px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: isLoading ? '#94a3b8' : '#0a66c2',
+                        color: '#fff',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: isLoading ? 'default' : 'pointer',
+                      }}
+                    >
+                      {isLoading ? 'Analyzing…' : 'Generate Recommendations'}
+                    </button>
+                  </div>
                 )}
 
                 {showNextBatchBanner && (
@@ -993,5 +1053,42 @@ export const ProfileOptimizationPanel: React.FC<
         </div>
       </div>
     </>
+  );
+};
+
+// ── Progress step indicator ──
+
+const StepIndicator: React.FC<{ steps: string[] }> = ({ steps }) => {
+  const [step, setStep] = React.useState(0);
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setStep((s) => Math.min(s + 1, steps.length - 1));
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [steps.length]);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+      {steps.map((label, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 12,
+            color: i <= step ? "#0A66C2" : "#d1d5db",
+            fontWeight: i <= step ? 600 : 400,
+            transition: "color 0.4s",
+          }}
+        >
+          <span style={{ width: 16, textAlign: "center" }}>
+            {i < step ? "✓" : i === step ? "●" : "○"}
+          </span>
+          {label}
+        </div>
+      ))}
+    </div>
   );
 };

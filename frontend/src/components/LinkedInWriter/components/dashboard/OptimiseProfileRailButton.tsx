@@ -70,7 +70,10 @@ export const OptimiseProfileRailButton: React.FC<
             className="linkedin-optimise-profile-rail-btn__icon"
             aria-hidden
           >
-            ✦
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.75"/>
+              <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
           </span>
           <span className="linkedin-optimise-profile-rail-btn__copy">
             <span

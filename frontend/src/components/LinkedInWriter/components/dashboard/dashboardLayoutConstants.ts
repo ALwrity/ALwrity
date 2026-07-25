@@ -11,7 +11,7 @@
  */
 
 /** Primary mobile studio boundary (CSS `max-width`). */
-export const MOBILE_STUDIO_MAX_WIDTH_PX = 960;
+export const MOBILE_STUDIO_MAX_WIDTH_PX = 600;
 
 /** Desktop dashboard min width — always `MOBILE_STUDIO_MAX_WIDTH_PX + 1` for matchMedia parity. */
 export const DESKTOP_DASHBOARD_MIN_WIDTH_PX = MOBILE_STUDIO_MAX_WIDTH_PX + 1;
