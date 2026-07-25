@@ -506,9 +506,11 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                 'quality_score': 0.8  # Default quality for comments
             } if grounding_enabled else None
             
+            # generate_grounded_comment_response returns 'content'; some callers inject 'response'.
+            response_text = content_result.get('response') or content_result.get('content') or ""
             return {
                 'success': True,
-                'response': content_result['response'],
+                'response': response_text,
                 'alternative_responses': content_result.get('alternative_responses', []),
                 'tone_analysis': content_result.get('tone_analysis'),
                 'generation_metadata': {

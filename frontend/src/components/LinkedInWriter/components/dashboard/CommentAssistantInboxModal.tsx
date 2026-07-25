@@ -54,7 +54,7 @@ export const CommentAssistantInboxModal: React.FC<
     retryPost,
     handleReact,
     handleSendReply,
-    handleDraftAi,
+    handleDraftAlwrity,
     handleLoadMore,
     handleShowThreadReplies,
   } = useCommentAssistantInbox(open, connected);
@@ -192,10 +192,18 @@ export const CommentAssistantInboxModal: React.FC<
           {statusMessage && (
             <div
               role="status"
+              aria-live="polite"
               style={{
+                position: "sticky",
+                top: 0,
+                zIndex: 2,
                 padding: "10px 12px",
                 background:
                   statusMessage.tone === "success" ? "#ecfdf5" : "#eff6ff",
+                border:
+                  statusMessage.tone === "success"
+                    ? "1px solid #a7f3d0"
+                    : "1px solid #bfdbfe",
                 borderRadius: 8,
                 color: statusMessage.tone === "success" ? "#047857" : "#1d4ed8",
                 fontSize: 12,
@@ -205,6 +213,7 @@ export const CommentAssistantInboxModal: React.FC<
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
               }}
             >
               {statusMessage.tone === "info" && (
@@ -220,6 +229,25 @@ export const CommentAssistantInboxModal: React.FC<
                     flexShrink: 0,
                   }}
                 />
+              )}
+              {statusMessage.tone === "success" && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    width: 16,
+                    height: 16,
+                    borderRadius: "50%",
+                    background: "#047857",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    flexShrink: 0,
+                  }}
+                >
+                  ✓
+                </span>
               )}
               {statusMessage.text}
             </div>
@@ -397,14 +425,12 @@ export const CommentAssistantInboxModal: React.FC<
                       payload,
                     )
                   }
-                  onDraftAi={(commentId) => {
-                    const comment = g.comments?.find((c) => c.id === commentId);
-                    if (!comment) return;
-                    void handleDraftAi(
+                  onDraftAlwrity={(commentId, options) => {
+                    void handleDraftAlwrity(
                       g.postId,
-                      g.postText || g.postSnippet,
+                      g.socialId,
                       commentId,
-                      comment.text,
+                      options,
                     );
                   }}
                   onRetry={g.error ? () => retryPost() : undefined}

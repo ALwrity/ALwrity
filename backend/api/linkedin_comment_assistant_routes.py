@@ -32,6 +32,9 @@ from services.linkedin_comment_assistant_cache_service import (
     LinkedInCommentAssistantCacheService,
     mask_user_id,
 )
+from services.linkedin_comment_assistant_draft_cache_service import (
+    LinkedInCommentAssistantDraftCacheService,
+)
 from services.linkedin_comment_assistant_inbox import get_comment_assistant_inbox
 from services.linkedin_comment_assistant_reactions import like_comment
 from services.linkedin_post_comments_service import (
@@ -320,8 +323,11 @@ async def post_inbox_comment_reply(
         )
         # Reply changes thread classification — invalidate so next load rebuilds.
         LinkedInCommentAssistantCacheService(db).clear(user_id)
+        # Drop cached ALwrity draft for this comment so a later draft regenerates.
+        LinkedInCommentAssistantDraftCacheService(db).clear_draft(user_id, comment_id)
         logger.info(
-            "[CommentAssistant] POST reply ok user={} comment_id={} cache_cleared=true",
+            "[CommentAssistant] POST reply ok user={} comment_id={} "
+            "inbox_cache_cleared=true draft_cache_cleared=true",
             mask_user_id(user_id),
             comment_id,
         )
