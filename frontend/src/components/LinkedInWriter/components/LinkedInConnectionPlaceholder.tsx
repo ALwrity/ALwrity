@@ -727,14 +727,18 @@ export const LinkedInConnectionPlaceholder: React.FC<{
     await connectWithOAuth();
   };
 
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+
   const handleDisconnect = async () => {
     if (onDisconnectProp) {
       await onDisconnectProp();
       return;
     }
-    if (!window.confirm("Disconnect LinkedIn? You can reconnect anytime.")) {
-      return;
-    }
+    setShowDisconnectConfirm(true);
+  };
+
+  const confirmDisconnect = async () => {
+    setShowDisconnectConfirm(false);
     setIsDisconnectingLocal(true);
     try {
       await disconnect();
@@ -773,18 +777,59 @@ export const LinkedInConnectionPlaceholder: React.FC<{
   }
 
   return (
-    <DisconnectedState
-      centered={centered}
-      splitConnectAction={splitConnectAction}
-      mobileProfileStrip={mobileProfileStrip}
-      relocateMobileProfileStrip={relocateMobileProfileStrip}
-      isConnecting={isConnecting}
-      connectError={connectError}
-      statusError={error}
-      onConnect={handleConnect}
-      onConnectWelcomeDismissed={onConnectWelcomeDismissed}
-      onConnectWelcomeOpenChange={onConnectWelcomeOpenChange}
-      userId={userId}
-    />
+    <>
+      <DisconnectedState
+        centered={centered}
+        splitConnectAction={splitConnectAction}
+        mobileProfileStrip={mobileProfileStrip}
+        relocateMobileProfileStrip={relocateMobileProfileStrip}
+        isConnecting={isConnecting}
+        connectError={connectError}
+        statusError={error}
+        onConnect={handleConnect}
+        onConnectWelcomeDismissed={onConnectWelcomeDismissed}
+        onConnectWelcomeOpenChange={onConnectWelcomeOpenChange}
+        userId={userId}
+      />
+
+      {showDisconnectConfirm && (
+        <DashboardActionModal
+          open={showDisconnectConfirm}
+          title="Disconnect LinkedIn?"
+          onClose={() => setShowDisconnectConfirm(false)}
+        >
+          <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px', lineHeight: 1.5 }}>
+            You can reconnect anytime. Your saved drafts, analytics history, and profile optimization will be preserved.
+          </p>
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>
+            Publishing, post analytics, and watchlist monitoring will pause until you reconnect.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setShowDisconnectConfirm(false)}
+              style={{
+                padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db',
+                background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDisconnect}
+              disabled={isDisconnecting}
+              style={{
+                padding: '8px 16px', borderRadius: 8, border: 'none',
+                background: isDisconnecting ? '#94a3b8' : '#dc2626',
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: isDisconnecting ? 'default' : 'pointer',
+              }}
+            >
+              {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          </div>
+        </DashboardActionModal>
+      )}
+    </>
   );
 };

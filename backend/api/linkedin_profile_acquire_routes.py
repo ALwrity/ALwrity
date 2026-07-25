@@ -1160,67 +1160,55 @@ async def get_linkedin_profile(
     should_load_profile_optimization = (
         refresh_profile_optimization or include_profile_optimization
     )
-    if ai_profile_intelligence is not None and should_load_recommendations:
-        intelligence_dict = ai_profile_intelligence.model_dump()
-        (
-            recommendations,
-            recommendations_meta,
-            recommendations_error,
-            recommendations_analysis_error,
-        ) = _load_topic_recommendations_for_response(
-            user_id,
-            intelligence_dict,
-            profile_validation,
-            repository,
-            force_regenerate=refresh_recommendations,
-        )
-        if recommendations_analysis_error:
-            analysis_error = recommendations_analysis_error
-        elif recommendations:
-            last_completed_phase = 6
-    elif ai_profile_intelligence is not None and not should_load_recommendations:
-        logger.info(
-            "[TopicRecommendation] GET /profile skipping recommendations — not requested "
-            "user_id={} include_recommendations={} refresh_recommendations={}",
-            user_id,
-            include_recommendations,
-            refresh_recommendations,
-        )
-    elif profile_validation.get("is_profile_complete") and intelligence_error is None:
-        logger.info(
-            "[TopicRecommendation] GET /profile skipping recommendations — no intelligence "
-            "user_id={}",
-            user_id,
+    if ai_profile_intelligence is not None and (
+        should_load_recommendations or should_load_profile_optimization
+    ):
+        from services.integrations.linkedin.profile_intelligence_concurrent import (
+            load_recommendations_and_optimization_concurrently,
         )
 
-    if ai_profile_intelligence is not None and should_load_profile_optimization:
-        intelligence_dict = ai_profile_intelligence.model_dump()
-        (
-            profile_optimization,
-            profile_optimization_meta,
-            profile_optimization_error,
-            optimization_analysis_error,
-        ) = _load_profile_optimization_for_response(
-            user_id,
-            profile_context,
-            profile_validation,
-            intelligence_dict,
-            repository,
-            force_regenerate=refresh_profile_optimization,
+        recs_result, opt_result = (
+            await load_recommendations_and_optimization_concurrently(
+                load_recs_fn=_load_topic_recommendations_for_response,
+                load_opt_fn=_load_profile_optimization_for_response,
+                user_id=user_id,
+                ai_profile_intelligence=ai_profile_intelligence,
+                profile_context=profile_context,
+                profile_validation=profile_validation,
+                repository=repository,
+                should_load_recs=should_load_recommendations,
+                should_load_opt=should_load_profile_optimization,
+                refresh_recs=refresh_recommendations,
+                refresh_opt=refresh_profile_optimization,
+            )
         )
-        if optimization_analysis_error:
-            analysis_error = optimization_analysis_error
-        elif profile_optimization is not None or (
-            profile_optimization_meta is not None
-            and profile_optimization_meta.source == "no_gaps"
-        ):
-            last_completed_phase = 7
-    elif should_load_profile_optimization:
-        logger.info(
-            "[ProfileOptimization] GET /profile skipping optimization — no intelligence "
-            "user_id={}",
-            user_id,
-        )
+
+        if recs_result is not None:
+            (
+                recommendations,
+                recommendations_meta,
+                recommendations_error,
+                recommendations_analysis_error,
+            ) = recs_result
+            if recommendations_analysis_error:
+                analysis_error = recommendations_analysis_error
+            elif recommendations:
+                last_completed_phase = 6
+
+        if opt_result is not None:
+            (
+                profile_optimization,
+                profile_optimization_meta,
+                profile_optimization_error,
+                optimization_analysis_error,
+            ) = opt_result
+            if optimization_analysis_error:
+                analysis_error = optimization_analysis_error
+            elif profile_optimization is not None or (
+                profile_optimization_meta is not None
+                and profile_optimization_meta.source == "no_gaps"
+            ):
+                last_completed_phase = 7
 
     logger.info(
         "[LinkedInAnalysis] pipeline complete user_id={} last_completed_phase={} "

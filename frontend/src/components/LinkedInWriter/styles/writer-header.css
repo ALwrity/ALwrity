@@ -513,7 +513,7 @@
 }
 
 /* Desktop / wide — search bar height + Analytics alignment */
-@media (min-width: 961px) {
+@media (min-width: 601px) {
   .linkedin-writer-header {
     padding-right: 36px;
   }

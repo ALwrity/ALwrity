@@ -80,12 +80,12 @@
 }
 
 .linkedin-dashboard-main-toolbar .linkedin-rail-icon-trigger--icon-leading {
-  width: min(100%, var(--li-toolbar-pill-width, 228px));
-  min-width: var(--li-toolbar-pill-width, 228px);
-  max-width: min(calc(100vw - 32px), 320px);
-  min-height: 38px;
+  width: auto;
+  min-width: 0;
+  max-width: min(calc(100vw - 32px), 240px);
+  min-height: 34px;
   height: auto;
-  padding: 6px 12px 6px 6px;
+  padding: 5px 14px 5px 8px;
   border-radius: 999px;
   justify-content: flex-start;
   gap: 8px;
@@ -95,10 +95,10 @@
 }
 
 .linkedin-dashboard-toolbar-pill {
-  width: min(100%, var(--li-toolbar-pill-width, 228px));
-  min-width: var(--li-toolbar-pill-width, 228px);
-  max-width: min(calc(100vw - 32px), 320px);
-  min-height: 38px;
+  width: auto;
+  min-width: 0;
+  max-width: min(calc(100vw - 32px), 240px);
+  min-height: 34px;
   box-sizing: border-box;
 }
 
@@ -106,9 +106,27 @@
   .linkedin-rail-icon-trigger--icon-leading
   .linkedin-rail-icon-trigger-icon {
   position: static;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   flex-shrink: 0;
+  color: #0a66c2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.linkedin-dashboard-main-toolbar
+  .linkedin-rail-icon-trigger--icon-leading
+  .linkedin-rail-icon-trigger-icon--emoji {
+  font-size: 18px;
+  color: inherit;
+}
+
+.linkedin-optimise-profile-rail-btn__icon {
+  color: #0a66c2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .linkedin-dashboard-main-toolbar
@@ -2050,7 +2068,7 @@ body.linkedin-quick-create-open {
   margin: -4px 0 0;
 }
 
-@media (min-width: 961px) {
+@media (min-width: 601px) {
   /* Lock dashboard to viewport height so the radial stack can sit vertically centered */
   body.linkedin-dashboard-view .linkedin-writer > div:nth-of-type(2) {
     flex: 1 1 0;
@@ -2333,7 +2351,7 @@ body.linkedin-quick-create-open {
   opacity: 1;
 }
 
-@media (min-width: 641px) and (max-width: 960px) {
+@media (min-width: 641px) and (max-width: 600px) {
   .linkedin-dashboard-topbar {
     padding-left: 6px;
   }
@@ -2994,7 +3012,7 @@ body.linkedin-quick-create-open {
   box-shadow: none;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px) {
   .linkedin-writer-header-studio-dock {
     gap: 8px;
     padding: 0 8px;
@@ -3077,7 +3095,7 @@ body.linkedin-quick-create-open {
   );
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px) {
   .linkedin-dashboard-mobile-studio-nudge--priority {
     display: none !important;
   }
@@ -3092,7 +3110,7 @@ body.linkedin-quick-create-open {
   box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
 }
 
-@media (min-width: 961px) {
+@media (min-width: 601px) {
   .linkedin-dashboard-studio-nudge--desktop
     .linkedin-dashboard-mobile-studio-nudge-label {
     font-size: 13px;
@@ -3687,7 +3705,7 @@ body.linkedin-quick-create-open {
   }
 }
 
-@media (min-width: 961px) {
+@media (min-width: 601px) {
   .profile-opt-panel__grid {
     display: grid;
     grid-template-columns: minmax(240px, 34%) minmax(0, 1fr);
@@ -3706,7 +3724,7 @@ body.linkedin-quick-create-open {
   }
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px) {
   .linkedin-optimise-profile-rail-btn--tab {
     flex: 1 0 80px;
     min-width: 80px;
@@ -4022,7 +4040,7 @@ body.linkedin-quick-create-open {
   }
 }
 
-@media (min-width: 961px) {
+@media (min-width: 601px) {
   .linkedin-dashboard-right-rail {
     position: relative !important;
     overflow: visible;
@@ -4995,7 +5013,7 @@ body.linkedin-quick-create-open {
   pointer-events: none;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px) {
   body.linkedin-dashboard-view {
     /* Minimal scroll pad below last row; Co-Pilot FAB is fixed bottom-right */
     --li-mobile-bottom-inset: 12px;
@@ -6290,7 +6308,7 @@ body.linkedin-quick-create-open {
   padding-right: 2px;
 }
 
-@media (max-width: 960px) {
+@media (max-width: 600px) {
   .profile-opt-batch-impact__meter-row {
     grid-template-columns: 36px minmax(0, 1fr) 32px;
   }
