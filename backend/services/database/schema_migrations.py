@@ -436,6 +436,53 @@ def ensure_linkedin_post_analytics_attachments_column(engine, user_id: str) -> N
         )
 
 
+_LINKEDIN_POST_ANALYTICS_OPTIONAL_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("engagements", "INTEGER NULL"),
+    ("clickthrough_rate", "FLOAT NULL"),
+    ("page_viewers", "INTEGER NULL"),
+    ("members_reached", "INTEGER NULL"),
+)
+
+
+def ensure_linkedin_post_analytics_extended_metrics_columns(
+    engine, user_id: str
+) -> None:
+    """Backfill optional Unipile analytics columns on linkedin_post_analytics."""
+    try:
+        with engine.begin() as conn:
+            table_check = conn.exec_driver_sql(
+                "SELECT name FROM sqlite_master WHERE type='table' "
+                "AND name='linkedin_post_analytics'"
+            ).fetchone()
+            if not table_check:
+                return
+
+            existing_cols = {
+                row[1]
+                for row in conn.exec_driver_sql(
+                    "PRAGMA table_info(linkedin_post_analytics)"
+                ).fetchall()
+            }
+
+            for col_name, col_type in _LINKEDIN_POST_ANALYTICS_OPTIONAL_COLUMNS:
+                if col_name in existing_cols:
+                    continue
+                conn.exec_driver_sql(
+                    f"ALTER TABLE linkedin_post_analytics ADD COLUMN {col_name} {col_type}"
+                )
+                logger.warning(
+                    "Auto-migrated linkedin_post_analytics column '{}' for user {}",
+                    col_name,
+                    user_id,
+                )
+    except Exception as e:
+        logger.error(
+            "Failed linkedin_post_analytics extended metrics migration for user {}: {}",
+            user_id,
+            e,
+        )
+
+
 def run_user_schema_migrations(engine, user_id: str) -> None:
     """Run all legacy schema backfills for a tenant database."""
     ensure_scheduler_task_columns(engine, user_id)
@@ -444,6 +491,7 @@ def run_user_schema_migrations(engine, user_id: str) -> None:
     ensure_calendar_events_user_id_column(engine, user_id)
     ensure_enhanced_calendar_user_id_type(engine, user_id)
     ensure_linkedin_post_analytics_attachments_column(engine, user_id)
+    ensure_linkedin_post_analytics_extended_metrics_columns(engine, user_id)
     ensure_daily_workflow_schema(engine, user_id)
     ensure_task_history_unique_index(engine, user_id)
 

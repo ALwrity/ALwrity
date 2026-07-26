@@ -62,6 +62,40 @@ def _calculate_engagement_rate(engagements: int, impressions: int) -> float:
     return round(engagements / impressions, 4)
 
 
+def _analytics_dict(unipile_item: dict[str, Any]) -> dict[str, Any]:
+    raw = unipile_item.get("analytics")
+    return raw if isinstance(raw, dict) else {}
+
+
+def _first_present(analytics: dict[str, Any], *keys: str) -> Any:
+    """Return the first key that exists in analytics (including explicit 0)."""
+    for key in keys:
+        if key in analytics and analytics[key] is not None:
+            return analytics[key]
+    return None
+
+
+def _optional_non_negative_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_non_negative_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
 def _normalize_author(unipile_item: dict[str, Any]) -> PostAuthor:
     """
     Extract and normalize author information from Unipile post item.
@@ -81,36 +115,94 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
     Extract and normalize engagement metrics from Unipile post item.
 
     Uses both top-level counters and nested analytics object.
+    Supports legacy analytics keys and Unipile ``*_counter`` renames.
+    Optional analytics fields stay ``None`` when the provider omits them.
     """
-    # Get analytics data if available
-    analytics = unipile_item.get("analytics", {})
+    analytics = _analytics_dict(unipile_item)
 
-    # Extract raw values with fallbacks
-    reactions = unipile_item.get("reaction_counter", 0) or analytics.get("reactions", 0)
-    comments = unipile_item.get("comment_counter", 0) or analytics.get("comments", 0)
-    reposts = unipile_item.get("repost_counter", 0) or analytics.get("reposts", 0)
-    impressions = unipile_item.get("impressions_counter", 0) or analytics.get("impressions", 0)
-    clicks = analytics.get("clicks", 0) or analytics.get("clicks_counter", 0)
-    followers_gained = (
-        analytics.get("followers_gained_from_this_post", 0)
-        or analytics.get("followers_gained_from_this_post_counter", 0)
+    reactions = unipile_item.get("reaction_counter", 0) or analytics.get("reactions", 0) or 0
+    comments = unipile_item.get("comment_counter", 0) or analytics.get("comments", 0) or 0
+    reposts = unipile_item.get("repost_counter", 0) or analytics.get("reposts", 0) or 0
+    impressions = (
+        unipile_item.get("impressions_counter", 0)
+        or analytics.get("impressions", 0)
+        or analytics.get("impressions_counter", 0)
+        or 0
     )
-    reach_raw = analytics.get("users_reached_counter")
-    reach = int(reach_raw) if reach_raw is not None else None
 
-    # Calculate engagement rate
-    total_engagements = reactions + comments + reposts + clicks
-    engagement_rate = _calculate_engagement_rate(total_engagements, impressions)
+    clicks_raw = _first_present(analytics, "clicks", "clicks_counter")
+    clicks = _optional_non_negative_int(clicks_raw) or 0
+
+    followers_raw = _first_present(
+        analytics,
+        "followers_gained_from_this_post",
+        "followers_gained_from_this_post_counter",
+    )
+    followers_gained = _optional_non_negative_int(followers_raw) or 0
+
+    engagements = _optional_non_negative_int(
+        _first_present(analytics, "engagements", "engagements_counter")
+    )
+    clickthrough_rate = _optional_non_negative_float(
+        _first_present(analytics, "clickthrough_rate", "clickthrough_rate_counter")
+    )
+    page_viewers = _optional_non_negative_int(
+        _first_present(
+            analytics,
+            "page_viewers_from_this_post",
+            "page_viewers_from_this_post_counter",
+        )
+    )
+    reach = _optional_non_negative_int(
+        _first_present(
+            analytics,
+            "members_reached",
+            "users_reached_counter",
+            "members_reached_counter",
+        )
+    )
+
+    reactions_i = max(0, int(reactions or 0))
+    comments_i = max(0, int(comments or 0))
+    reposts_i = max(0, int(reposts or 0))
+    impressions_i = max(0, int(impressions or 0))
+
+    # Prefer provider engagement_rate when present; otherwise derive from counters.
+    provider_rate = _optional_non_negative_float(
+        _first_present(analytics, "engagement_rate")
+    )
+    if provider_rate is not None:
+        engagement_rate = min(1.0, provider_rate if provider_rate <= 1 else provider_rate / 100.0)
+    else:
+        derived_engagements = engagements if engagements is not None else (
+            reactions_i + comments_i + reposts_i + clicks
+        )
+        engagement_rate = _calculate_engagement_rate(derived_engagements, impressions_i)
+
+    logger.debug(
+        "[PostsService] normalized engagement impressions={} clicks={} "
+        "followers_gained={} engagements={} page_viewers={} reach={} ctr={}",
+        impressions_i,
+        clicks,
+        followers_gained,
+        engagements,
+        page_viewers,
+        reach,
+        clickthrough_rate,
+    )
 
     return PostEngagementMetrics(
-        reactions=max(0, reactions),
-        comments=max(0, comments),
-        reposts=max(0, reposts),
-        impressions=max(0, impressions),
+        reactions=reactions_i,
+        comments=comments_i,
+        reposts=reposts_i,
+        impressions=impressions_i,
         engagement_rate=engagement_rate,
-        clicks=max(0, clicks),
-        followers_gained=max(0, followers_gained),
-        reach=max(0, reach) if reach is not None else None,
+        clicks=clicks,
+        followers_gained=followers_gained,
+        engagements=engagements,
+        clickthrough_rate=clickthrough_rate,
+        page_viewers=page_viewers,
+        reach=reach,
     )
 
 

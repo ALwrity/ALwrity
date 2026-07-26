@@ -10,6 +10,14 @@ export interface PostEngagementMetrics {
   engagement_rate: number;
   clicks: number;
   followers_gained: number;
+  /** Unipile analytics.engagements — null/undefined when omitted by provider. */
+  engagements?: number | null;
+  /** Unipile analytics.clickthrough_rate — null/undefined when omitted. */
+  clickthrough_rate?: number | null;
+  /** Unipile analytics.page_viewers_from_this_post. */
+  page_viewers?: number | null;
+  /** Unipile members_reached / users_reached_counter. */
+  reach?: number | null;
 }
 
 export interface PostAttachment {

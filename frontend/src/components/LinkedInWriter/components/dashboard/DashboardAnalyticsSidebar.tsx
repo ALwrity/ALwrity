@@ -99,13 +99,32 @@ export const DashboardAnalyticsSidebar: React.FC<
     let impressions = 0;
     let clicks = 0;
     let followers = 0;
+    let engagements = 0;
+    let engagementsKnown = false;
+    let reach = 0;
+    let reachKnown = false;
     for (const p of posts) {
       impressions += p.engagement.impressions;
       clicks += p.engagement.clicks;
       followers += p.engagement.followers_gained;
+      if (p.engagement.engagements != null) {
+        engagementsKnown = true;
+        engagements += p.engagement.engagements;
+      }
+      if (p.engagement.reach != null) {
+        reachKnown = true;
+        reach += p.engagement.reach;
+      }
     }
     const ctr = impressions > 0 ? clicks / impressions : 0;
-    return { impressions, clicks, followers, ctr };
+    return {
+      impressions,
+      clicks,
+      followers,
+      ctr,
+      engagements: engagementsKnown ? engagements : null,
+      reach: reachKnown ? reach : null,
+    };
   }, [posts]);
 
   const isLoading = panelState === "loading" && posts.length === 0;
@@ -289,7 +308,7 @@ export const DashboardAnalyticsSidebar: React.FC<
                       marginTop: 2,
                     }}
                   >
-                    {totals.followers > 0 ? `+${totals.followers}` : "—"}
+                    {`+${totals.followers}`}
                   </div>
                 </div>
                 <div className="linkedin-analytics-stat-chip">
@@ -307,6 +326,40 @@ export const DashboardAnalyticsSidebar: React.FC<
                     }}
                   >
                     {totals.impressions > 0 ? formatPct(totals.ctr) : "—"}
+                  </div>
+                </div>
+                <div className="linkedin-analytics-stat-chip">
+                  <div
+                    style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                  >
+                    Engagements
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#4f46e5",
+                      marginTop: 2,
+                    }}
+                  >
+                    {totals.engagements != null ? totals.engagements : "—"}
+                  </div>
+                </div>
+                <div className="linkedin-analytics-stat-chip">
+                  <div
+                    style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                  >
+                    Reached
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#0d9488",
+                      marginTop: 2,
+                    }}
+                  >
+                    {totals.reach != null ? totals.reach : "—"}
                   </div>
                 </div>
               </div>

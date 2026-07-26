@@ -6,11 +6,12 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from models.linkedin_post_analytics_model import LinkedInPostAnalytics
-from models.linkedin_posts_models import LinkedInPost, PostAuthor, PostEngagementMetrics
+from models.linkedin_posts_models import LinkedInPost, PostAuthor
 from services.integrations.linkedin.post_attachments import (
     attachments_from_json,
     attachments_to_json,
 )
+from services.linkedin_post_analytics_engagement import engagement_from_row
 
 
 def utc_iso(dt: Optional[datetime]) -> Optional[str]:
@@ -36,15 +37,7 @@ def row_to_linkedin_post(row: LinkedInPostAnalytics) -> LinkedInPost:
         text=row.text or "",
         title=row.title,
         created_at=row.created_at or datetime.utcnow(),
-        engagement=PostEngagementMetrics(
-            reactions=row.reactions or 0,
-            comments=row.comments or 0,
-            reposts=row.reposts or 0,
-            impressions=row.impressions or 0,
-            clicks=row.clicks or 0,
-            followers_gained=row.followers_gained or 0,
-            engagement_rate=row.engagement_rate or 0.0,
-        ),
+        engagement=engagement_from_row(row),
         author=PostAuthor(
             name=row.author_name or "Unknown",
             avatar_url=row.author_avatar_url,
@@ -56,3 +49,13 @@ def row_to_linkedin_post(row: LinkedInPostAnalytics) -> LinkedInPost:
         is_company_post=row.is_company_post or False,
         attachments=attachments_from_json(row.attachments_json),
     )
+
+
+# Re-export for callers that previously imported attachment helpers via mappers.
+__all__ = [
+    "utc_iso",
+    "as_naive_utc",
+    "row_to_linkedin_post",
+    "attachments_from_json",
+    "attachments_to_json",
+]

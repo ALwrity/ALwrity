@@ -55,10 +55,16 @@ def _engagement_rate(reactions: int, comments: int, reposts: int, clicks: int, i
 
 
 def _aggregate(posts: list[LinkedInPost]) -> dict[str, Any]:
-    """Sum widget metrics. Omit reach when Unipile did not provide it on any post."""
+    """Sum widget metrics. Omit optional fields when Unipile did not provide them."""
     impressions = reactions = comments = shares = clicks = followers = 0
+    engagements_total = 0
+    engagements_known = False
     reach_total = 0
     reach_known = False
+    page_viewers_total = 0
+    page_viewers_known = False
+    ctr_weighted_num = 0.0
+    ctr_weighted_den = 0
 
     for post in posts:
         eng = post.engagement
@@ -68,21 +74,39 @@ def _aggregate(posts: list[LinkedInPost]) -> dict[str, Any]:
         shares += eng.reposts or 0
         clicks += eng.clicks or 0
         followers += eng.followers_gained or 0
+        if eng.engagements is not None:
+            engagements_known = True
+            engagements_total += eng.engagements
         if eng.reach is not None:
             reach_known = True
             reach_total += eng.reach
+        if eng.page_viewers is not None:
+            page_viewers_known = True
+            page_viewers_total += eng.page_viewers
+        if eng.clickthrough_rate is not None and (eng.impressions or 0) > 0:
+            ctr_weighted_num += eng.clickthrough_rate * eng.impressions
+            ctr_weighted_den += eng.impressions
 
     analytics: dict[str, Any] = {
         "impressions": impressions,
         "reactions": reactions,
         "shares": shares,
         "followers_gained": followers,
+        "clicks": clicks,
         "engagementRate": _engagement_rate(
             reactions, comments, shares, clicks, impressions
         ),
     }
+    if engagements_known:
+        analytics["engagements"] = engagements_total
     if reach_known:
         analytics["reach"] = reach_total
+    if page_viewers_known:
+        analytics["page_viewers"] = page_viewers_total
+    if ctr_weighted_den > 0:
+        analytics["clickthroughRate"] = round(ctr_weighted_num / ctr_weighted_den, 4)
+    elif impressions > 0:
+        analytics["clickthroughRate"] = round(clicks / impressions, 4)
     return analytics
 
 

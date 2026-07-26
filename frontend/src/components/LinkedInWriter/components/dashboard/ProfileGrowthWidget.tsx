@@ -60,6 +60,25 @@ const METRIC_DEFS = [
     color: "#10b981",
     format: fmtNum,
   },
+  {
+    key: "engagements",
+    label: "Engagements",
+    color: "#4f46e5",
+    format: fmtNum,
+  },
+  { key: "clicks", label: "Clicks", color: "#7c3aed", format: fmtNum },
+  {
+    key: "clickthroughRate",
+    label: "CTR",
+    color: "#0284c7",
+    format: fmtPct,
+  },
+  {
+    key: "page_viewers",
+    label: "Page viewers",
+    color: "#db2777",
+    format: fmtNum,
+  },
 ] as const;
 
 type MetricKey = (typeof METRIC_DEFS)[number]["key"];
