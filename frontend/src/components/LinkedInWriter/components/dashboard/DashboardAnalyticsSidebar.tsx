@@ -211,16 +211,30 @@ export const DashboardAnalyticsSidebar: React.FC<
               <p style={{ fontSize: 10, color: "#dc2626", margin: "0 0 6px", lineHeight: 1.4 }}>
                 {errorMessage || "Could not load posts. Your LinkedIn account may need reconnection."}
               </p>
-              <button
-                type="button"
-                onClick={handleLoadPosts}
-                style={{
-                  padding: "4px 10px", borderRadius: 4, border: "1px solid #d1d5db",
-                  background: "#fff", color: "#0a66c2", fontSize: 10, fontWeight: 600, cursor: "pointer",
-                }}
-              >
-                🔁 Retry
-              </button>
+              {errorMessage?.toLowerCase().includes("not found") ||
+               errorMessage?.toLowerCase().includes("reconnect") ? (
+                <button
+                  type="button"
+                  onClick={() => void connectWithOAuth()}
+                  style={{
+                    padding: "4px 12px", borderRadius: 4, border: "none",
+                    background: "#0a66c2", color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  Connect LinkedIn
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleLoadPosts}
+                  style={{
+                    padding: "4px 10px", borderRadius: 4, border: "1px solid #d1d5db",
+                    background: "#fff", color: "#0a66c2", fontSize: 10, fontWeight: 600, cursor: "pointer",
+                  }}
+                >
+                  🔁 Retry
+                </button>
+              )}
             </div>
           ) : (
             <>
