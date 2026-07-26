@@ -51,6 +51,7 @@ export interface PostListResponse {
 export interface FetchPostsParams {
   cursor?: string;
   limit?: number;
+  refresh?: boolean;
 }
 
 // ── Engagement Trends ──────────────────────────────────────────────────

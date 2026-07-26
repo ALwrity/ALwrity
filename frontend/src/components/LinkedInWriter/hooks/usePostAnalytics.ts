@@ -155,7 +155,7 @@ export function usePostAnalytics() {
     clearCache();
     setData(null);
     setPanelState("idle");
-    await fetchPosts();
+    await fetchPosts({ limit: 8, refresh: true });
   }, [fetchPosts]);
 
   return {

@@ -6,6 +6,7 @@ Provides endpoints for fetching user's LinkedIn posts with engagement metrics.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -30,6 +31,19 @@ from services.integrations.linkedin.unipile_client import (
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 
 router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn Posts"])
+
+_ANALYTICS_SERVICE = None
+
+
+def _get_analytics_service():
+    """Lazy-init the post analytics service (DB-backed)."""
+    global _ANALYTICS_SERVICE
+    if _ANALYTICS_SERVICE is None:
+        from database import SessionLocal
+        from services.linkedin_post_analytics_service import PostAnalyticsService
+        db = SessionLocal()
+        _ANALYTICS_SERVICE = PostAnalyticsService(db)
+    return _ANALYTICS_SERVICE
 
 _oauth_service = LinkedInOAuthService()
 
@@ -165,13 +179,15 @@ async def _get_personal_profile_provider_id(account_id: str) -> Optional[str]:
     summary="Fetch user's LinkedIn posts",
     description=(
         "Fetch the authenticated user's LinkedIn posts with engagement metrics. "
-        "Supports pagination via cursor. Returns 20 posts by default."
+        "Supports pagination via cursor. Returns 20 posts by default. "
+        "Posts are cached in DB for 1 hour — use ?refresh=true to force a fresh Unipile fetch."
     ),
 )
 async def get_linkedin_posts(
     request: Request,
     cursor: Optional[str] = Query(None, description="Pagination cursor for next page"),
     limit: int = Query(20, ge=1, le=100, description="Number of posts to fetch (max 100)"),
+    refresh: bool = Query(False, description="Skip DB cache, fetch fresh from Unipile"),
     current_user: dict = Depends(get_current_user),
     posts_service: PostsService = Depends(get_posts_service),
 ) -> PostListResponse:
@@ -179,8 +195,37 @@ async def get_linkedin_posts(
     user_id = _user_id(current_user)
     logger.info(
         f"[PostsRoutes] Fetching posts for user={user_id} limit={limit} "
-        f"cursor={'set' if cursor else 'none'}"
+        f"cursor={'set' if cursor else 'none'} refresh={refresh}"
     )
+
+    # ── Cache read-through ──────────────────────────────────────────────
+    POST_CACHE_TTL_SECONDS = 3600  # 1 hour
+
+    if not refresh and not cursor:
+        try:
+            analytics_svc = _get_analytics_service()
+
+            last_synced = analytics_svc.get_last_synced_at(user_id)
+            stored_count = analytics_svc.count_stored(user_id)
+            cache_fresh = (
+                last_synced is not None
+                and stored_count > 0
+                and (datetime.now(timezone.utc) - last_synced.replace(tzinfo=timezone.utc)).total_seconds() < POST_CACHE_TTL_SECONDS
+            )
+
+            if cache_fresh:
+                logger.info(
+                    f"[PostsRoutes] Cache hit — returning {stored_count} posts from DB "
+                    f"synced {last_synced.isoformat()}"
+                )
+                return analytics_svc.get_stored_analytics(user_id)
+
+            logger.info(
+                f"[PostsRoutes] Cache miss or stale "
+                f"(stored={stored_count}, last_synced={last_synced}) — fetching from Unipile"
+            )
+        except Exception as cache_err:
+            logger.warning(f"[PostsRoutes] Cache check failed, falling through to Unipile: {cache_err}")
 
     try:
         account_id, identifier = await _resolve_personal_account_and_identifier(user_id)
@@ -195,6 +240,17 @@ async def get_linkedin_posts(
             cursor=cursor,
             limit=limit,
         )
+
+        # ── Persist to DB cache ──────────────────────────────────────
+        if result.posts and not cursor:
+            try:
+                analytics_svc = _get_analytics_service()
+                stored = analytics_svc.store_posts(user_id, result.posts)
+                logger.info(
+                    f"[PostsRoutes] Cached {stored} posts to DB for user={user_id}"
+                )
+            except Exception as persist_err:
+                logger.warning(f"[PostsRoutes] Failed to cache posts: {persist_err}")
 
         logger.info(
             f"[PostsRoutes] Successfully fetched {len(result.posts)} posts for user={user_id}"
