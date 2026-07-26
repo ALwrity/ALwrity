@@ -16,7 +16,7 @@ import PricingPage from './components/Pricing/PricingPage';
 import ContactPage from './components/Landing/ContactPage';
 import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
 
-// ─── Lazy loaded route components ───────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Lazy loaded route components ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Default exports
 const Wizard = React.lazy(() => import('./components/OnboardingWizard/Wizard'));
 const MainDashboard = React.lazy(() => import('./components/MainDashboard/MainDashboard'));
@@ -62,7 +62,7 @@ const GSCAuthCallback = React.lazy(() => import('./components/SEODashboard/compo
 const YouTubeCallbackPage = React.lazy(() => import('./components/YouTubeCreator/YouTubeCallbackPage'));
 const ErrorBoundaryTest = React.lazy(() => import('./components/shared/ErrorBoundaryTest'));
 
-// Named exports — need .then() wrapper to resolve default
+// Named exports ΓÇö need .then() wrapper to resolve default
 const StoryProjectList = React.lazy(() => import('./components/StoryWriter/StoryProjectList').then(m => ({ default: m.StoryProjectList })));
 
 // ImageStudio barrel (10 named exports)
@@ -102,7 +102,7 @@ const ProductAvatarStudio = React.lazy(() => import('./components/ProductMarketi
 // BacklinkOutreach barrel (1 export)
 const BacklinkOutreachDashboard = React.lazy(() => import('./components/BacklinkOutreach').then(m => ({ default: m.BacklinkOutreachDashboard })));
 
-// GifMaker — standalone, zero ALwrity dependencies
+// GifMaker ΓÇö standalone, zero ALwrity dependencies
 const GifMakerPage = React.lazy(() => import('./components/GifMaker').then(m => ({ default: m.GifMaker })));
 
 // Root route that chooses Landing (signed out) or InitialRouteHandler (signed in)
@@ -118,9 +118,19 @@ const App: React.FC = () => {
   // React Hooks MUST be at the top before any conditionals
   const [loading, setLoading] = useState(true);
   
-  // CopilotKit is disabled — not released yet.
-  // Force empty key so AuthenticatedCopilotWrapper passes through children.
-  const [copilotApiKey] = useState('');
+  // Get CopilotKit key from localStorage or .env
+  const [copilotApiKey, setCopilotApiKey] = useState(() => {
+    const savedKey = localStorage.getItem('copilotkit_api_key');
+    const envKey = process.env.REACT_APP_COPILOTKIT_API_KEY || '';
+    const key = (savedKey || envKey).trim();
+    
+    // Validate key format if present
+    if (key && !key.startsWith('ck_pub_')) {
+      console.warn('CopilotKit API key format invalid - must start with ck_pub_');
+    }
+    
+    return key;
+  });
 
   // Initialize app - loading state will be managed by InitialRouteHandler
   useEffect(() => {
@@ -142,6 +152,21 @@ const App: React.FC = () => {
       console.log('[GIF] Removing event listener for open-gif-maker');
       window.removeEventListener('open-gif-maker', handler);
     };
+  }, []);
+
+  // Listen for CopilotKit key updates
+  useEffect(() => {
+    const handleKeyUpdate = (event: CustomEvent) => {
+      const newKey = event.detail?.apiKey;
+      if (newKey) {
+        console.log('App: CopilotKit key updated, reloading...');
+        setCopilotApiKey(newKey);
+        setTimeout(() => window.location.reload(), 500);
+      }
+    };
+    
+    window.addEventListener('copilotkit-key-updated', handleKeyUpdate as EventListener);
+    return () => window.removeEventListener('copilotkit-key-updated', handleKeyUpdate as EventListener);
   }, []);
 
   // Token installer must be inside ClerkProvider; see TokenInstaller below
@@ -264,7 +289,7 @@ const App: React.FC = () => {
                     <Route path="/intent-research" element={<FeatureRoute feature="research"><IntentResearchTest /></FeatureRoute>} />
                     <Route path="/wix-test" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
                     <Route path="/wix-test-direct" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
-                    {/* Auth callbacks — always accessible (needed for OAuth flow) */}
+                    {/* Auth callbacks ΓÇö always accessible (needed for OAuth flow) */}
                     <Route path="/wix/callback" element={<WixCallbackPage />} />
                     <Route path="/wp/callback" element={<WordPressCallbackPage />} />
                     <Route path="/gsc/callback" element={<GSCAuthCallback />} />
@@ -275,7 +300,7 @@ const App: React.FC = () => {
               </Routes>
             </Suspense>
 
-            {/* GifMakerFloatingPanel — outside Suspense so it's never replaced by fallback */}
+            {/* GifMakerFloatingPanel ΓÇö outside Suspense so it's never replaced by fallback */}
             <GifMakerFloatingPanel
               open={showGifMaker}
               onClose={() => setShowGifMaker(false)}
