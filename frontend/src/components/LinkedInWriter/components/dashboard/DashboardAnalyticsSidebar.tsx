@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useMemo } from "react";
 import { usePostAnalytics } from "../../hooks/usePostAnalytics";
 import { useLinkedInSocialConnection } from "../../../../hooks/useLinkedInSocialConnection";
 import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
@@ -84,11 +84,13 @@ export const DashboardAnalyticsSidebar: React.FC<
   const { data, panelState, fetchPosts } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
 
-  useEffect(() => {
-    if (panelState === "idle" && connected) {
+  // Only fetch on explicit user action — not on every mount.
+  // Posts come from backend DB cache; refresh fetches fresh from Unipile.
+  const handleLoadPosts = useCallback(() => {
+    if (panelState !== "loading") {
       void fetchPosts({ limit: 8 });
     }
-  }, [panelState, fetchPosts, connected]);
+  }, [panelState, fetchPosts]);
 
   const totals = useMemo(() => {
     let impressions = 0;
@@ -184,16 +186,22 @@ export const DashboardAnalyticsSidebar: React.FC<
           <ProfileGrowthWidget onViewAnalytics={onViewAll} />
 
           {/* Post engagement mini chart */}
-          {isLoading && posts.length === 0 ? (
-            <div
-              style={{
-                fontSize: 10,
-                color: "#64748b",
-                padding: "4px 0",
-                textAlign: "center",
-              }}
-            >
+          {isLoading ? (
+            <div style={{ fontSize: 10, color: "#64748b", padding: "4px 0", textAlign: "center" }}>
               Loading posts…
+            </div>
+          ) : posts.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "12px 0" }}>
+              <button
+                type="button"
+                onClick={handleLoadPosts}
+                style={{
+                  padding: "5px 14px", borderRadius: 6, border: "1px solid #d1d5db",
+                  background: "#fff", color: "#0a66c2", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                📊 Load Posts
+              </button>
             </div>
           ) : (
             <>
@@ -201,13 +209,26 @@ export const DashboardAnalyticsSidebar: React.FC<
                 <div className="linkedin-analytics-panel-mini-chart">
                   <div
                     style={{
-                      fontSize: 10,
-                      fontWeight: 700,
-                      color: "#475569",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                       marginBottom: 4,
                     }}
                   >
-                    Post engagement
+                    <div style={{ fontSize: 10, fontWeight: 700, color: "#475569" }}>
+                      Post engagement
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleLoadPosts}
+                      disabled={isLoading}
+                      style={{
+                        background: "none", border: "none", color: isLoading ? "#94a3b8" : "#0a66c2",
+                        fontSize: 10, fontWeight: 600, cursor: isLoading ? "default" : "pointer", padding: 0,
+                      }}
+                    >
+                      {isLoading ? "Loading…" : "↻ Refresh"}
+                    </button>
                   </div>
                   <MiniBarChart posts={posts} />
                 </div>
