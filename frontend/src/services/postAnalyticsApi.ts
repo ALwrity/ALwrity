@@ -1,4 +1,4 @@
-import { aiApiClient } from '../api/client';
+import { apiClient } from '../api/client';
 
 const BASE = '/api/linkedin/posts';
 
@@ -115,14 +115,14 @@ export interface PostAnalyticsHistoryResponse {
 
 export const postAnalyticsApi = {
   async fetchPosts(params?: FetchPostsParams): Promise<PostListResponse> {
-    const { data } = await aiApiClient.get<PostListResponse>(BASE, { params });
+    const { data } = await apiClient.get<PostListResponse>(BASE, { params });
     return data;
   },
 
   /** Fetch cached post analytics from the workspace DB.
    *  Pass refresh=true to trigger a fresh sync from Unipile first. */
   async fetchStoredAnalytics(refresh = false): Promise<PostListResponse> {
-    const { data } = await aiApiClient.get<PostListResponse>('/api/linkedin/post-analytics', {
+    const { data } = await apiClient.get<PostListResponse>('/api/linkedin/post-analytics', {
       params: { refresh },
     });
     return data;
@@ -132,7 +132,7 @@ export const postAnalyticsApi = {
   async fetchEngagementHistory(
     period: string = 'since_joining',
   ): Promise<PostAnalyticsHistoryResponse> {
-    const { data } = await aiApiClient.get<PostAnalyticsHistoryResponse>(
+    const { data } = await apiClient.get<PostAnalyticsHistoryResponse>(
       '/api/linkedin/post-analytics/history',
       { params: { period } },
     );
