@@ -213,7 +213,7 @@ async def get_linkedin_posts(
                     f"[PostsRoutes] Cache hit — returning {stored_count} posts from DB "
                     f"synced {last_synced.isoformat()}"
                 )
-                return analytics_svc.get_stored_analytics(user_id)
+                return analytics_svc.get_stored_analytics(user_id, limit=limit)
 
             logger.info(
                 f"[PostsRoutes] Cache miss or stale "

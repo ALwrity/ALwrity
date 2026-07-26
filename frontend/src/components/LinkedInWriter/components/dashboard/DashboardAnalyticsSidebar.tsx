@@ -88,7 +88,7 @@ export const DashboardAnalyticsSidebar: React.FC<
   // Posts come from backend DB cache; refresh fetches fresh from Unipile.
   const handleLoadPosts = useCallback(() => {
     if (panelState !== "loading") {
-      void fetchPosts({ limit: 8 });
+      void fetchPosts({ limit: 8, refresh: true });
     }
   }, [panelState, fetchPosts]);
 
@@ -108,7 +108,7 @@ export const DashboardAnalyticsSidebar: React.FC<
     return { impressions, clicks, followers, ctr };
   }, [posts]);
 
-  const isLoading = panelState === "loading" && posts.length === 0;
+  const isLoading = panelState === "loading";
 
   return (
     <div

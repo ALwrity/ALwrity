@@ -12,6 +12,10 @@ import {
   type LinkedInPersonalAnalyticsResponse,
 } from "../../../../api/linkedinSocial";
 
+// ─── deduplication ─────────────────────────────────────────────────────────
+
+let _inFlightPromise: Promise<LinkedInPersonalAnalyticsResponse> | null = null;
+
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 function fmtNum(v: number | string | null | undefined): string {
@@ -81,15 +85,28 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const fetch = useCallback(async (days: LinkedInAnalyticsPresetDays) => {
+    if (_inFlightPromise) {
+      try {
+        const res = await _inFlightPromise;
+        setData(res);
+      } catch {
+        // the inflight promise already rejected — we'll try fresh below
+      } finally {
+        _inFlightPromise = null;
+      }
+      return;
+    }
     setLoading(true);
     setErrorMessage(null);
+    _inFlightPromise = getLinkedInPersonalAnalytics({ presetDays: days });
     try {
-      const res = await getLinkedInPersonalAnalytics({ presetDays: days });
+      const res = await _inFlightPromise;
       setData(res);
     } catch (err) {
       setData(null);
       setErrorMessage(getLinkedInSocialErrorMessage(err));
     } finally {
+      _inFlightPromise = null;
       setLoading(false);
     }
   }, []);

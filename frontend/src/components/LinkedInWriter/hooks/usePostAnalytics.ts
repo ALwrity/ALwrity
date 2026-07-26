@@ -102,6 +102,11 @@ export function usePostAnalytics() {
 
     try {
       const result = await postAnalyticsApi.fetchPosts(params);
+      console.log("[PostAnalytics] Fetched posts:", {
+        count: result.posts?.length,
+        total_count: result.total_count,
+        sample: result.posts?.[0]?.engagement,
+      });
       setData(result);
       setCache({ data: result, cursor: undefined, fetchedAt: Date.now() });
       setPanelState("loaded");

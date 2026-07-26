@@ -345,7 +345,6 @@ function readProfileCache(): LinkedInProfileAcquireResponse | null {
     if (!raw) return null;
     const { data, cachedAt } = JSON.parse(raw);
     if (!cachedAt || Date.now() - cachedAt > PROFILE_CACHE_TTL) {
-      localStorage.removeItem(PROFILE_CACHE_KEY);
       return null;
     }
     return data;
@@ -356,8 +355,30 @@ function readProfileCache(): LinkedInProfileAcquireResponse | null {
 
 function writeProfileCache(data: LinkedInProfileAcquireResponse) {
   try {
-    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }));
+    // Preserve Phase 7 data from the previous cache if the new data
+    // doesn't include it (e.g. getLinkedInProfileFoundation writes
+    // Phases 1-5 only — we must not overwrite previously-generated
+    // optimization recommendations that live in the same cache key).
+    const stored: LinkedInProfileAcquireResponse = { ...data };
+    if (!stored.profile_optimization?.length) {
+      const prior = readProfileCacheRaw();
+      if (prior?.profile_optimization?.length) {
+        stored.profile_optimization = prior.profile_optimization;
+        stored.profile_optimization_meta = prior.profile_optimization_meta;
+      }
+    }
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data: stored, cachedAt: Date.now() }));
   } catch { /* storage full */ }
+}
+
+function readProfileCacheRaw(): LinkedInProfileAcquireResponse | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw).data;
+  } catch {
+    return null;
+  }
 }
 
 /** Save profile data to localStorage cache from external callers (e.g., after optimization). */

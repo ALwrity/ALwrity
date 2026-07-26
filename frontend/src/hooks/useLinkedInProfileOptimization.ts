@@ -97,6 +97,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [transformedProfilePhotoUrl, setTransformedProfilePhotoUrl] = useState<string | null>(null);
   const [transformingProfilePhoto, setTransformingProfilePhoto] = useState(false);
   const [profilePhotoTransformError, setProfilePhotoTransformError] = useState<string | null>(null);
+  const [showTransformedPreview, setShowTransformedPreview] = useState(false);
 
   const lastScoreRef = useRef<number | null>(null);
   const [recheckDelta, setRecheckDelta] = useState<{
@@ -375,16 +376,51 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     }
   }, []);
 
-  const handleMakeProfilePhotoPresentable = useCallback(async () => {
-    if (!localProfilePhotoUrl) return;
+  const handleMakeProfilePhotoPresentable = useCallback(async (photoUrl?: string) => {
+    const url = photoUrl || localProfilePhotoUrl;
+    if (!url) return;
+
+    // External URLs (LinkedIn CDN) must be mirrored locally first —
+    // the backend cannot reach external CDNs.  We fetch the image in
+    // the browser, upload it, then transform the local copy.
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      setUploadingProfilePhoto(true);
+      setTransformingProfilePhoto(true);
+      setProfilePhotoTransformError(null);
+      try {
+        const fetchResp = await fetch(url);
+        if (!fetchResp.ok) throw new Error(`Failed to fetch photo (${fetchResp.status})`);
+        const blob = await fetchResp.blob();
+        const filename = url.split("/").pop()?.split("?")[0] || "avatar.jpg";
+        const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+        const uploadResult = await uploadProfilePhoto(file);
+        setLocalProfilePhotoUrl(uploadResult.photo_url);
+        setUploadingProfilePhoto(false);
+
+        const result = await makeProfilePhotoPresentable(uploadResult.photo_url);
+        setTransformedProfilePhotoUrl(result.photo_url);
+        setLocalProfilePhotoUrl(result.photo_url);
+        setShowTransformedPreview(true);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to transform photo";
+        setProfilePhotoTransformError(message);
+      } finally {
+        setUploadingProfilePhoto(false);
+        setTransformingProfilePhoto(false);
+      }
+      return;
+    }
+
+    // Local URL — already in workspace, transform directly
     setTransformingProfilePhoto(true);
     setProfilePhotoTransformError(null);
     try {
-      const result = await makeProfilePhotoPresentable(localProfilePhotoUrl);
+      const result = await makeProfilePhotoPresentable(url);
       setTransformedProfilePhotoUrl(result.photo_url);
       setLocalProfilePhotoUrl(result.photo_url);
+      setShowTransformedPreview(true);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to transform photo';
+      const message = err instanceof Error ? err.message : "Failed to transform photo";
       setProfilePhotoTransformError(message);
     } finally {
       setTransformingProfilePhoto(false);
@@ -408,6 +444,10 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       console.error('[ProfileOptimization] Download failed:', err);
     }
   }, [transformedProfilePhotoUrl, localProfilePhotoUrl]);
+
+  const dismissTransformedPreview = useCallback(() => {
+    setShowTransformedPreview(false);
+  }, []);
 
   return {
     optimizationPanelState: panelState,
@@ -446,5 +486,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     profilePhotoTransformError,
     handleMakeProfilePhotoPresentable,
     handleDownloadProfilePhoto,
+    showTransformedPreview,
+    dismissTransformedPreview,
   };
 };

@@ -38,14 +38,55 @@ def _get_profile_photos_dir(user_id: str) -> Path:
 
 
 def _resolve_profile_photo_path(photo_url: str, user_id: str) -> Path:
-    """Resolve a local profile photo URL to an absolute file path."""
+    """Resolve a profile photo URL to an absolute file path.
+
+    Handles two cases:
+    1. Local URL: ``/api/linkedin-social/profile-photo/...`` — a previously
+       uploaded file stored in the user's workspace.
+    2. Remote URL: ``https://...`` — a LinkedIn CDN / external image.
+       Downloaded and cached in the user's workspace on first access.
+    """
     parsed = urlparse(photo_url)
     path = parsed.path
+
+    # ── Remote URL → download to local workspace ──────────────────────
+    if parsed.scheme in ("http", "https"):
+        photos_dir = _get_profile_photos_dir(user_id)
+        safe_name = path.rsplit("/", 1)[-1].rsplit("?", 1)[0].strip() or "avatar.jpg"
+        local_path = photos_dir / safe_name
+        if not local_path.exists():
+            logger.info(
+                "[ProfilePhoto] Downloading external photo to {} "
+                "from {}",
+                local_path,
+                photo_url[:120],
+            )
+            try:
+                import httpx
+                resp = httpx.get(photo_url, follow_redirects=True, timeout=30)
+                resp.raise_for_status()
+                local_path.write_bytes(resp.content)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to download profile photo: {exc}",
+                ) from exc
+        return local_path
+
+    # ── Local URL → resolve to workspace path ─────────────────────────
     prefix = "/api/linkedin-social/profile-photo/"
     if not path.startswith(prefix):
         raise HTTPException(status_code=400, detail="Invalid profile photo URL")
-    filename = path[len(prefix):].split("?", 1)[0].strip()
+    # Path is /api/linkedin-social/profile-photo/{user_id}/{filename}
+    rest = path[len(prefix):].split("?", 1)[0].strip()
+    parts = rest.split("/", 1)
+    if len(parts) != 2:
+        raise HTTPException(status_code=400, detail="Invalid profile photo URL")
+    url_user_id, filename = parts
     safe_name = Path(filename).name
+    # user_id from the URL path must match the authed user
+    if url_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     photos_dir = _get_profile_photos_dir(user_id)
     file_path = (photos_dir / safe_name).resolve()
     if not str(file_path).startswith(str(photos_dir.resolve())):
@@ -82,7 +123,7 @@ async def upload_profile_photo(
         with open(file_path, "wb") as f:
             f.write(file_bytes)
 
-        photo_url = f"/api/linkedin-social/profile-photo/{filename}"
+        photo_url = f"/api/linkedin-social/profile-photo/{user_id}/{filename}"
         logger.info("[ProfilePhoto] Uploaded for user_id={}: {}", user_id, filename)
 
         return {"photo_url": photo_url, "filename": filename}
@@ -93,15 +134,13 @@ async def upload_profile_photo(
         raise HTTPException(status_code=500, detail=f"Photo upload failed: {str(exc)}")
 
 
-@router.get("/profile-photo/{filename:str}")
+@router.get("/profile-photo/{user_id}/{filename:str}")
 async def serve_profile_photo(
+    user_id: str,
     filename: str,
-    current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
 ):
-    """Serve an uploaded profile photo."""
-    user_id = _user_id(current_user)
+    """Serve an uploaded profile photo (public — filenames are UUID-based)."""
     photos_dir = _get_profile_photos_dir(user_id)
-    # Prevent path traversal
     safe_name = Path(filename).name
     file_path = (photos_dir / safe_name).resolve()
 
@@ -193,7 +232,7 @@ async def make_profile_photo_presentable(
         with open(transformed_path, "wb") as f:
             f.write(result.image_bytes)
 
-        transformed_url = f"/api/linkedin-social/profile-photo/{transformed_filename}"
+        transformed_url = f"/api/linkedin-social/profile-photo/{user_id}/{transformed_filename}"
         logger.info("[ProfilePhoto/MakePresentable] Saved transformed photo: {}", transformed_path)
 
         return {

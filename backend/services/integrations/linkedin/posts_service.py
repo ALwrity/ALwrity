@@ -218,6 +218,37 @@ class PostsService:
                     f"Unexpected items type from Unipile: {type(items)}"
                 )
 
+            # ── Engagement audit logging ──────────────────────────────
+            if items and isinstance(items[0], dict):
+                first = items[0]
+                raw_counters = {
+                    "reaction_counter": first.get("reaction_counter"),
+                    "comment_counter": first.get("comment_counter"),
+                    "repost_counter": first.get("repost_counter"),
+                    "impressions_counter": first.get("impressions_counter"),
+                }
+                raw_analytics = first.get("analytics", {})
+                if isinstance(raw_analytics, dict):
+                    raw_analytics = {
+                        k: raw_analytics[k] for k in
+                        ("reactions", "comments", "reposts", "impressions", "clicks")
+                        if k in raw_analytics
+                    }
+                logger.info(
+                    f"[PostsService] Raw Unipile post[0] counters={raw_counters} "
+                    f"analytics={raw_analytics}"
+                )
+                normalized = _normalize_engagement(first)
+                logger.info(
+                    f"[PostsService] Normalized engagement: "
+                    f"impressions={normalized.impressions} "
+                    f"reactions={normalized.reactions} "
+                    f"comments={normalized.comments} "
+                    f"reposts={normalized.reposts} "
+                    f"clicks={normalized.clicks} "
+                    f"followers_gained={normalized.followers_gained}"
+                )
+
             # Normalize each post
             normalized_posts: list[LinkedInPost] = []
             for item in items:

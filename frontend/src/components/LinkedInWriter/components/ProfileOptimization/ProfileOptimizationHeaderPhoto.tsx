@@ -8,6 +8,7 @@ interface ProfileOptimizationHeaderPhotoProps {
   transformingProfilePhoto?: boolean;
   profilePhotoUploadError?: string | null;
   onUploadProfilePhoto?: (file: File) => void;
+  onMakeProfilePhotoPresentable?: () => void;
 }
 
 /** Compact profile photo control for the Optimise Profile modal header. */
@@ -21,6 +22,7 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
   transformingProfilePhoto = false,
   profilePhotoUploadError,
   onUploadProfilePhoto,
+  onMakeProfilePhotoPresentable,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const photoSrc = localProfilePhotoUrl || profilePictureUrl;
@@ -33,7 +35,7 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
         aria-hidden
       >
         {photoSrc ? (
-          <img src={photoSrc} alt="" />
+          <img src={photoSrc} alt="" style={{ cursor: "pointer" }} />
         ) : (
           <svg
             width="20"
@@ -80,9 +82,20 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingProfilePhoto || transformingProfilePhoto}
           >
-            {uploadingProfilePhoto ? "Uploading…" : "Upload photo"}
+            {uploadingProfilePhoto ? "Uploading…" : "Upload"}
           </button>
         </>
+      )}
+      {photoSrc && onMakeProfilePhotoPresentable && (
+        <button
+          type="button"
+          className="linkedin-profile-optimization-dialog__photo-btn"
+          onClick={onMakeProfilePhotoPresentable}
+          disabled={uploadingProfilePhoto || transformingProfilePhoto}
+          style={{ marginTop: 4 }}
+        >
+          {transformingProfilePhoto ? "Enhancing…" : "✨ Make Presentable"}
+        </button>
       )}
     </div>
   );

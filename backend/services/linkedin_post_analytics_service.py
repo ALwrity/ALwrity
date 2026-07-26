@@ -48,12 +48,13 @@ class LinkedInPostAnalyticsService:
 
     # ── Query ──────────────────────────────────────────────────────────────
 
-    def get_stored_analytics(self, user_id: str) -> PostListResponse:
-        """Return all persisted analytics rows for *user_id* as a PostListResponse."""
+    def get_stored_analytics(self, user_id: str, limit: int = 100) -> PostListResponse:
+        """Return persisted analytics rows for *user_id* as a PostListResponse."""
         rows: list[LinkedInPostAnalytics] = (
             self.db.query(LinkedInPostAnalytics)
             .filter(LinkedInPostAnalytics.user_id == user_id)
             .order_by(LinkedInPostAnalytics.created_at.desc())
+            .limit(limit)
             .all()
         )
         posts = [row_to_linkedin_post(r) for r in rows]

@@ -37,16 +37,9 @@ export const CopilotKitHealthProvider: React.FC<CopilotKitHealthProviderProps> =
 }) => {
   // Persist health status across page reloads to prevent manual form from disappearing
   const getInitialHealthStatus = (): boolean => {
-    if (typeof window === 'undefined') return initialHealthStatus;
-    try {
-      const saved = localStorage.getItem('copilotkit_health_status');
-      if (saved !== null) {
-        return saved === 'true';
-      }
-    } catch (e) {
-      console.warn('[CopilotKitHealthContext] Failed to read persisted health status:', e);
-    }
-    return initialHealthStatus;
+    // CopilotKit is disabled — always treat as healthy to prevent the
+    // "unavailable" banner from appearing (no CopilotKit APIs are in use).
+    return true;
   };
 
   const [state, setState] = useState<CopilotKitHealthState>({
@@ -59,47 +52,12 @@ export const CopilotKitHealthProvider: React.FC<CopilotKitHealthProviderProps> =
   });
 
   const markHealthy = useCallback(() => {
-    setState((prev) => {
-      const newState = {
-        ...prev,
-        isHealthy: true,
-        isAvailable: true,
-        errorMessage: null,
-        retryCount: 0,
-        lastChecked: new Date(),
-      };
-      // Persist health status to localStorage
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('copilotkit_health_status', 'true');
-        }
-      } catch (e) {
-        console.warn('[CopilotKitHealthContext] Failed to persist health status:', e);
-      }
-      return newState;
-    });
+    // CopilotKit is disabled — no-op.
   }, []);
 
-  const markUnhealthy = useCallback((errorMessage?: string) => {
-    setState((prev) => {
-      const newState = {
-        ...prev,
-        isHealthy: false,
-        isAvailable: false,
-        errorMessage: errorMessage || 'CopilotKit is unavailable',
-        lastChecked: new Date(),
-        retryCount: prev.retryCount + 1,
-      };
-      // Persist health status to localStorage
-      try {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('copilotkit_health_status', 'false');
-        }
-      } catch (e) {
-        console.warn('[CopilotKitHealthContext] Failed to persist health status:', e);
-      }
-      return newState;
-    });
+  const markUnhealthy = useCallback((_errorMessage?: string) => {
+    // CopilotKit is disabled — never mark unhealthy to prevent the
+    // "unavailable" banner from appearing on transient SDK errors.
   }, []);
 
   // Listen for CopilotKit error events from App.tsx

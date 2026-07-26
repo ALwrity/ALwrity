@@ -27,6 +27,7 @@ interface ProfileOptimizationModalHeaderProps {
   transformingProfilePhoto?: boolean;
   profilePhotoUploadError?: string | null;
   onUploadProfilePhoto?: (file: File) => void;
+  onMakeProfilePhotoPresentable?: () => void;
 }
 
 interface ProfileOptimizationModalFooterProps {
@@ -57,6 +58,7 @@ export const ProfileOptimizationModalHeader: React.FC<
   transformingProfilePhoto,
   profilePhotoUploadError,
   onUploadProfilePhoto,
+  onMakeProfilePhotoPresentable,
 }) => (
   <header className="linkedin-profile-optimization-dialog__header">
     <div className="linkedin-profile-optimization-dialog__header-row">
@@ -91,6 +93,7 @@ export const ProfileOptimizationModalHeader: React.FC<
           transformingProfilePhoto={transformingProfilePhoto}
           profilePhotoUploadError={profilePhotoUploadError}
           onUploadProfilePhoto={onUploadProfilePhoto}
+          onMakeProfilePhotoPresentable={onMakeProfilePhotoPresentable}
         />
       </div>
 

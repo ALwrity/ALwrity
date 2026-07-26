@@ -13,6 +13,7 @@ import {
   ProfileOptimizationModalFooter,
   ProfileOptimizationModalHeader,
 } from "../ProfileOptimization/ProfileOptimizationModalChrome";
+import { TransformedPhotoPreview } from "../ProfileOptimization/TransformedPhotoPreview";
 import { findProfileOptimizationQuickWin } from "../ProfileOptimization/profileOptimizationQuickWin";
 import { ProfileCompletionForm } from "./ProfileCompletionForm";
 import { ProfileCompletionQuestionsModal } from "./ProfileCompletionQuestionsModal";
@@ -154,6 +155,8 @@ export const LinkedInProfileSetupPanel: React.FC<
     profilePhotoTransformError,
     handleMakeProfilePhotoPresentable,
     handleDownloadProfilePhoto,
+    showTransformedPreview,
+    dismissTransformedPreview,
   } = useLinkedInProfileOptimization(isProfileComplete);
 
   const handleRecheckProfile = useCallback(async () => {
@@ -508,6 +511,9 @@ export const LinkedInProfileSetupPanel: React.FC<
                 transformingProfilePhoto={transformingProfilePhoto}
                 profilePhotoUploadError={profilePhotoUploadError}
                 onUploadProfilePhoto={handleUploadProfilePhoto}
+                onMakeProfilePhotoPresentable={() =>
+                  handleMakeProfilePhotoPresentable(avatarUrl ?? undefined)
+                }
               />
               <div className="linkedin-profile-optimization-dialog__body linkedin-profile-optimization-dialog__body--modal-layout">
                 <ProfileOptimizationPanel
@@ -651,7 +657,15 @@ export const LinkedInProfileSetupPanel: React.FC<
             }}
             isRetrying={isOptimizationLoading}
           />
-        )}
+      )}
+
+      {/* Transformed profile photo preview modal */}
+      <TransformedPhotoPreview
+        photoUrl={transformedProfilePhotoUrl ?? ""}
+        visible={showTransformedPreview}
+        onDownload={handleDownloadProfilePhoto}
+        onDismiss={dismissTransformedPreview}
+      />
 
       {!centered &&
         optimizationUserError &&
