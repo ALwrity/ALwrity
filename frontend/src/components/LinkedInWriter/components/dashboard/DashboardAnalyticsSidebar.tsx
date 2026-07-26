@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { usePostAnalytics } from "../../hooks/usePostAnalytics";
 import { useLinkedInSocialConnection } from "../../../../hooks/useLinkedInSocialConnection";
 import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
@@ -83,15 +83,24 @@ export const DashboardAnalyticsSidebar: React.FC<
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
   const { data, panelState, refreshPosts, errorMessage } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
+  const [profileGrowthReloadToken, setProfileGrowthReloadToken] = useState(0);
 
   // Only fetch on explicit user action — not on every mount.
   // Always force Unipile refresh so retrieve-post enrichment can fill
   // creator analytics missing from list-posts cache.
-  const handleLoadPosts = useCallback(() => {
-    if (panelState !== "loading") {
-      void refreshPosts();
-    }
+  const handleLoadPosts = useCallback(async () => {
+    if (panelState === "loading") return;
+    await refreshPosts();
+    setProfileGrowthReloadToken((n) => n + 1);
   }, [panelState, refreshPosts]);
+
+  // When posts are already loaded (e.g. from Post Analytics modal), refresh
+  // Profile Growth so engagements / page viewers match the synced DB.
+  useEffect(() => {
+    if (panelState === "loaded" && posts.length > 0) {
+      setProfileGrowthReloadToken((n) => n + 1);
+    }
+  }, [panelState, posts.length]);
 
   const isError = panelState === "error";
   const isLoaded = panelState === "loaded";
@@ -101,20 +110,26 @@ export const DashboardAnalyticsSidebar: React.FC<
     let clicks = 0;
     let followers = 0;
     let engagements = 0;
-    let engagementsKnown = false;
     let reach = 0;
     let reachKnown = false;
+    let pageViewers = 0;
+    let pageViewersKnown = false;
     for (const p of posts) {
-      impressions += p.engagement.impressions;
-      clicks += p.engagement.clicks;
-      followers += p.engagement.followers_gained;
-      if (p.engagement.engagements != null) {
-        engagementsKnown = true;
-        engagements += p.engagement.engagements;
-      }
-      if (p.engagement.reach != null) {
+      const eng = p.engagement;
+      impressions += eng.impressions;
+      clicks += eng.clicks;
+      followers += eng.followers_gained;
+      engagements +=
+        eng.engagements != null
+          ? eng.engagements
+          : eng.reactions + eng.comments + eng.reposts + eng.clicks;
+      if (eng.reach != null) {
         reachKnown = true;
-        reach += p.engagement.reach;
+        reach += eng.reach;
+      }
+      if (eng.page_viewers != null) {
+        pageViewersKnown = true;
+        pageViewers += eng.page_viewers;
       }
     }
     const ctr = impressions > 0 ? clicks / impressions : 0;
@@ -123,8 +138,9 @@ export const DashboardAnalyticsSidebar: React.FC<
       clicks,
       followers,
       ctr,
-      engagements: engagementsKnown ? engagements : null,
+      engagements,
       reach: reachKnown ? reach : null,
+      pageViewers: pageViewersKnown ? pageViewers : null,
     };
   }, [posts]);
 
@@ -206,7 +222,11 @@ export const DashboardAnalyticsSidebar: React.FC<
           style={{ maxHeight: 480, overflowY: "auto" }}
         >
           {/* F1 — Profile Growth Snapshot */}
-          <ProfileGrowthWidget onViewAnalytics={onViewAll} />
+          <ProfileGrowthWidget
+            onViewAnalytics={onViewAll}
+            reloadToken={profileGrowthReloadToken}
+            pageViewersFallback={totals.pageViewers}
+          />
 
           {/* Post engagement mini chart */}
           {isLoading ? (
@@ -343,7 +363,24 @@ export const DashboardAnalyticsSidebar: React.FC<
                       marginTop: 2,
                     }}
                   >
-                    {totals.engagements != null ? totals.engagements : "—"}
+                    {totals.engagements}
+                  </div>
+                </div>
+                <div className="linkedin-analytics-stat-chip">
+                  <div
+                    style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                  >
+                    Page viewers
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 800,
+                      color: "#db2777",
+                      marginTop: 2,
+                    }}
+                  >
+                    {totals.pageViewers != null ? totals.pageViewers : "—"}
                   </div>
                 </div>
                 <div className="linkedin-analytics-stat-chip">

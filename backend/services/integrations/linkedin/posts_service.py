@@ -146,9 +146,20 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
     )
     followers_gained = _optional_non_negative_int(followers_raw) or 0
 
+    reactions_i = max(0, int(reactions or 0))
+    comments_i = max(0, int(comments or 0))
+    reposts_i = max(0, int(reposts or 0))
+    impressions_i = max(0, int(impressions or 0))
+
     engagements = _optional_non_negative_int(
         _first_present(analytics, "engagements", "engagements_counter")
     )
+    # LinkedIn "engagements" = reactions + comments + reposts (+ clicks).
+    # When Unipile omits engagements(_counter), use the same real counters we
+    # already trust for engagement_rate — not invented mock data.
+    if engagements is None:
+        engagements = reactions_i + comments_i + reposts_i + clicks
+
     clickthrough_rate = _optional_non_negative_float(
         _first_present(analytics, "clickthrough_rate", "clickthrough_rate_counter")
     )
@@ -157,6 +168,8 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
             analytics,
             "page_viewers_from_this_post",
             "page_viewers_from_this_post_counter",
+            "profile_viewers_from_this_post",
+            "profile_viewers_from_this_post_counter",
         )
     )
     reach = _optional_non_negative_int(
@@ -168,11 +181,6 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
         )
     )
 
-    reactions_i = max(0, int(reactions or 0))
-    comments_i = max(0, int(comments or 0))
-    reposts_i = max(0, int(reposts or 0))
-    impressions_i = max(0, int(impressions or 0))
-
     # Prefer provider engagement_rate when present; otherwise derive from counters.
     provider_rate = _optional_non_negative_float(
         _first_present(analytics, "engagement_rate")
@@ -180,14 +188,12 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
     if provider_rate is not None:
         engagement_rate = min(1.0, provider_rate if provider_rate <= 1 else provider_rate / 100.0)
     else:
-        derived_engagements = engagements if engagements is not None else (
-            reactions_i + comments_i + reposts_i + clicks
-        )
-        engagement_rate = _calculate_engagement_rate(derived_engagements, impressions_i)
+        engagement_rate = _calculate_engagement_rate(engagements, impressions_i)
 
     logger.debug(
         "[PostsService] normalized engagement impressions={} clicks={} "
-        "followers_gained={} engagements={} page_viewers={} reach={} ctr={}",
+        "followers_gained={} engagements={} page_viewers={} reach={} ctr={} "
+        "analytics_keys={}",
         impressions_i,
         clicks,
         followers_gained,
@@ -195,6 +201,7 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
         page_viewers,
         reach,
         clickthrough_rate,
+        sorted(analytics.keys()) if analytics else [],
     )
 
     return PostEngagementMetrics(

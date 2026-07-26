@@ -54,15 +54,42 @@ def _engagement_rate(reactions: int, comments: int, reposts: int, clicks: int, i
     return round((reactions + comments + reposts + clicks) / impressions, 4)
 
 
+def _post_engagements_count(eng: Any) -> int:
+    """
+    Real LinkedIn engagements for a post.
+
+    Prefer Unipile ``engagements`` when stored; otherwise sum reaction/comment/
+    repost/click counters (same definition LinkedIn uses).
+    """
+    if getattr(eng, "engagements", None) is not None:
+        return max(0, int(eng.engagements or 0))
+    return max(
+        0,
+        (eng.reactions or 0)
+        + (eng.comments or 0)
+        + (eng.reposts or 0)
+        + (eng.clicks or 0),
+    )
+
+
+def _sum_page_viewers(posts: list[LinkedInPost]) -> Optional[int]:
+    """Sum Unipile page viewers across posts; None when provider omitted on all."""
+    total = 0
+    known = False
+    for post in posts:
+        value = post.engagement.page_viewers
+        if value is not None:
+            known = True
+            total += max(0, int(value))
+    return total if known else None
+
+
 def _aggregate(posts: list[LinkedInPost]) -> dict[str, Any]:
-    """Sum widget metrics. Omit optional fields when Unipile did not provide them."""
+    """Sum widget metrics for Profile Growth. Always include engagements."""
     impressions = reactions = comments = shares = clicks = followers = 0
     engagements_total = 0
-    engagements_known = False
     reach_total = 0
     reach_known = False
-    page_viewers_total = 0
-    page_viewers_known = False
     ctr_weighted_num = 0.0
     ctr_weighted_den = 0
 
@@ -74,18 +101,15 @@ def _aggregate(posts: list[LinkedInPost]) -> dict[str, Any]:
         shares += eng.reposts or 0
         clicks += eng.clicks or 0
         followers += eng.followers_gained or 0
-        if eng.engagements is not None:
-            engagements_known = True
-            engagements_total += eng.engagements
+        engagements_total += _post_engagements_count(eng)
         if eng.reach is not None:
             reach_known = True
             reach_total += eng.reach
-        if eng.page_viewers is not None:
-            page_viewers_known = True
-            page_viewers_total += eng.page_viewers
         if eng.clickthrough_rate is not None and (eng.impressions or 0) > 0:
             ctr_weighted_num += eng.clickthrough_rate * eng.impressions
             ctr_weighted_den += eng.impressions
+
+    page_viewers_total = _sum_page_viewers(posts)
 
     analytics: dict[str, Any] = {
         "impressions": impressions,
@@ -93,20 +117,30 @@ def _aggregate(posts: list[LinkedInPost]) -> dict[str, Any]:
         "shares": shares,
         "followers_gained": followers,
         "clicks": clicks,
+        "engagements": engagements_total,
         "engagementRate": _engagement_rate(
             reactions, comments, shares, clicks, impressions
         ),
     }
-    if engagements_known:
-        analytics["engagements"] = engagements_total
     if reach_known:
         analytics["reach"] = reach_total
-    if page_viewers_known:
+    if page_viewers_total is not None:
         analytics["page_viewers"] = page_viewers_total
     if ctr_weighted_den > 0:
         analytics["clickthroughRate"] = round(ctr_weighted_num / ctr_weighted_den, 4)
     elif impressions > 0:
         analytics["clickthroughRate"] = round(clicks / impressions, 4)
+
+    logger.info(
+        "[UnipilePersonalAnalytics] aggregate posts={} impressions={} "
+        "engagements={} page_viewers={} reach={} followers={}",
+        len(posts),
+        impressions,
+        engagements_total,
+        analytics.get("page_viewers"),
+        analytics.get("reach"),
+        followers,
+    )
     return analytics
 
 
@@ -137,16 +171,16 @@ def _creator_analytics_incomplete(posts: list[LinkedInPost]) -> bool:
     """
     True when cached posts lack Unipile creator analytics.
 
-    Used to trigger a Unipile refresh after list-only syncs that stored
-    impressions but left nested analytics empty.
+    Engagements are derived from reaction/comment/repost/click counters when
+    Unipile omits them, so incompleteness focuses on provider-only fields
+    (followers, reach, page viewers, clicks, CTR).
     """
     if not posts:
         return True
     for post in posts[:30]:
         eng = post.engagement
         if (
-            eng.engagements is not None
-            or eng.page_viewers is not None
+            eng.page_viewers is not None
             or eng.reach is not None
             or (eng.followers_gained or 0) > 0
             or (eng.clicks or 0) > 0
@@ -265,19 +299,37 @@ async def build_personal_analytics_payload(
         analytics: dict[str, Any] = {}
     elif not in_range:
         personal_error = "No posts published in this date range."
+        # Still surface page viewers from all synced posts so Profile Growth
+        # matches the Post engagement chip when the window filter is empty.
         analytics = {}
+        page_viewers_all = _sum_page_viewers(posts)
+        if page_viewers_all is not None:
+            analytics["page_viewers"] = page_viewers_all
     else:
         analytics = _aggregate(in_range)
+        # If date-window posts lack page_viewers but other synced posts have
+        # them (Post engagement chip), include that real total for Profile Growth.
+        if analytics.get("page_viewers") is None:
+            page_viewers_all = _sum_page_viewers(posts)
+            if page_viewers_all is not None:
+                analytics["page_viewers"] = page_viewers_all
+                logger.info(
+                    "[UnipilePersonalAnalytics] page_viewers filled from all "
+                    "stored posts={} total={}",
+                    len(posts),
+                    page_viewers_all,
+                )
 
     logger.info(
         "[UnipilePersonalAnalytics] build done user_id={} stored={} in_range={} "
-        "impressions={} followers_gained={} engagements={} reach={}",
+        "impressions={} followers_gained={} engagements={} page_viewers={} reach={}",
         user_id,
         len(posts),
         len(in_range),
         analytics.get("impressions"),
         analytics.get("followers_gained"),
         analytics.get("engagements"),
+        analytics.get("page_viewers"),
         analytics.get("reach"),
     )
 

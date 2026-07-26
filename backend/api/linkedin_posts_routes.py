@@ -34,10 +34,17 @@ router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn Posts"])
 
 
 def _get_analytics_service(user_id: str):
-    """Get PostAnalyticsService backed by the user's workspace SQLite DB."""
-    from database.sessions import get_session_for_user
+    """
+    Get PostAnalyticsService backed by the user's workspace SQLite DB.
+
+    Caller must close ``service.db`` when finished (see route handlers).
+    """
+    from services.database.sessions import get_session_for_user
     from services.linkedin_post_analytics_service import LinkedInPostAnalyticsService
+
     db = get_session_for_user(user_id)
+    if db is None:
+        raise RuntimeError(f"Could not open workspace DB for user_id={user_id}")
     return LinkedInPostAnalyticsService(db)
 
 _oauth_service = LinkedInOAuthService()
@@ -197,6 +204,7 @@ async def get_linkedin_posts(
     POST_CACHE_TTL_SECONDS = 3600  # 1 hour
 
     if not refresh and not cursor:
+        analytics_svc = None
         try:
             analytics_svc = _get_analytics_service(user_id)
 
@@ -221,6 +229,12 @@ async def get_linkedin_posts(
             )
         except Exception as cache_err:
             logger.warning(f"[PostsRoutes] Cache check failed, falling through to Unipile: {cache_err}")
+        finally:
+            if analytics_svc is not None:
+                try:
+                    analytics_svc.db.close()
+                except Exception:
+                    pass
 
     try:
         account_id, identifier = await _resolve_personal_account_and_identifier(user_id)
@@ -237,15 +251,31 @@ async def get_linkedin_posts(
         )
 
         # ── Persist to DB cache ──────────────────────────────────────
+        # After a non-cursor fetch, return the full stored set so dashboard
+        # Profile Growth and Post Analytics sum the same real metrics
+        # (e.g. page viewers), not a partial Unipile page.
         if result.posts and not cursor:
+            analytics_svc = None
             try:
                 analytics_svc = _get_analytics_service(user_id)
                 stored = analytics_svc.store_posts(user_id, result.posts)
                 logger.info(
                     f"[PostsRoutes] Cached {stored} posts to DB for user={user_id}"
                 )
+                full = analytics_svc.get_stored_analytics(user_id)
+                logger.info(
+                    f"[PostsRoutes] Returning {full.total_count or len(full.posts)} "
+                    f"cached posts after Unipile sync for user={user_id}"
+                )
+                return full
             except Exception as persist_err:
                 logger.warning(f"[PostsRoutes] Failed to cache posts: {persist_err}")
+            finally:
+                if analytics_svc is not None:
+                    try:
+                        analytics_svc.db.close()
+                    except Exception:
+                        pass
 
         logger.info(
             f"[PostsRoutes] Successfully fetched {len(result.posts)} posts for user={user_id}"

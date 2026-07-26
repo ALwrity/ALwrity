@@ -4,7 +4,7 @@
  * Surfaces profile-level aggregates from GET /analytics/personal
  * (Unipile post metrics summed for posts published in the window).
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getLinkedInPersonalAnalytics,
   getLinkedInSocialErrorMessage,
@@ -87,10 +87,19 @@ type MetricKey = (typeof METRIC_DEFS)[number]["key"];
 
 interface ProfileGrowthWidgetProps {
   onViewAnalytics?: () => void;
+  /** Bump after post-analytics sync so Profile Growth reloads from DB. */
+  reloadToken?: number;
+  /**
+   * Real page-viewer total from the same posts as Post engagement.
+   * Used when personal analytics omits page_viewers so both UI areas match.
+   */
+  pageViewersFallback?: number | null;
 }
 
 export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({
   onViewAnalytics,
+  reloadToken = 0,
+  pageViewersFallback = null,
 }) => {
   const [preset, setPreset] = useState<LinkedInAnalyticsPresetDays>(28);
   const [data, setData] = useState<LinkedInPersonalAnalyticsResponse | null>(
@@ -115,9 +124,21 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({
 
   useEffect(() => {
     void fetch(preset);
-  }, [fetch, preset]);
+  }, [fetch, preset, reloadToken]);
 
-  const analytics = data?.personal?.analytics ?? {};
+  const analytics = useMemo(() => {
+    const base = { ...(data?.personal?.analytics ?? {}) };
+    const apiPageViewers = base.page_viewers;
+    const apiMissing =
+      apiPageViewers === null ||
+      apiPageViewers === undefined ||
+      apiPageViewers === "";
+    if (apiMissing && pageViewersFallback != null) {
+      base.page_viewers = pageViewersFallback;
+    }
+    return base;
+  }, [data, pageViewersFallback]);
+
   const emptyReason = data?.personal?.error ?? null;
   const hasMetrics = Object.keys(analytics).length > 0;
 

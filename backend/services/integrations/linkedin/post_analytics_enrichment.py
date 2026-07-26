@@ -1,9 +1,9 @@
 """
 Enrich list-posts items with creator analytics from Unipile retrieve-post.
 
-List ``GET /users/{id}/posts`` often returns top-level counters only.
-``GET /posts/{post_id}`` is more likely to include the nested ``analytics`` object
-(followers gained, page viewers, engagements, CTR, members reached).
+List ``GET /users/{id}/posts`` often returns partial ``analytics`` (e.g. followers
++ reach) while omitting engagements / page viewers. We re-fetch via
+``GET /posts/{post_id}`` using ``social_id`` first (numeric ``id`` often 404s).
 """
 
 from __future__ import annotations
@@ -15,25 +15,24 @@ from loguru import logger
 
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 
-# Cap concurrent retrieve-post calls to avoid Unipile/LinkedIn rate limits.
 _ENRICH_CONCURRENCY = 4
-# Cap how many list items we enrich per fetch (newest first).
 _ENRICH_MAX_POSTS = 30
 
-_CREATOR_ANALYTICS_KEYS = (
-    "followers_gained_from_this_post",
-    "followers_gained_from_this_post_counter",
-    "engagements",
-    "engagements_counter",
+_ENGAGEMENTS_KEYS = ("engagements", "engagements_counter")
+_PAGE_VIEWERS_KEYS = (
     "page_viewers_from_this_post",
     "page_viewers_from_this_post_counter",
+    "profile_viewers_from_this_post",
+    "profile_viewers_from_this_post_counter",
+)
+_FOLLOWERS_KEYS = (
+    "followers_gained_from_this_post",
+    "followers_gained_from_this_post_counter",
+)
+_REACH_KEYS = (
     "members_reached",
     "users_reached_counter",
     "members_reached_counter",
-    "clicks",
-    "clicks_counter",
-    "clickthrough_rate",
-    "clickthrough_rate_counter",
 )
 
 
@@ -41,24 +40,53 @@ class SupportsGetPost(Protocol):
     async def get_post(self, account_id: str, post_id: str) -> dict[str, Any]: ...
 
 
-def item_has_creator_analytics(item: dict[str, Any]) -> bool:
-    """True when the list item already carries creator analytics fields."""
+def _analytics_has_any(analytics: dict[str, Any], keys: tuple[str, ...]) -> bool:
+    return any(key in analytics and analytics[key] is not None for key in keys)
+
+
+def item_needs_analytics_enrichment(item: dict[str, Any]) -> bool:
+    """
+    True when retrieve-post may still add missing creator fields.
+
+    Partial list analytics (followers/reach only) must still be enriched so
+    engagements and page viewers are not skipped forever.
+    """
     analytics = item.get("analytics")
     if not isinstance(analytics, dict) or not analytics:
-        return False
-    return any(
-        key in analytics and analytics[key] is not None
-        for key in _CREATOR_ANALYTICS_KEYS
-    )
+        return True
+    has_engagements = _analytics_has_any(analytics, _ENGAGEMENTS_KEYS)
+    has_page_viewers = _analytics_has_any(analytics, _PAGE_VIEWERS_KEYS)
+    return not (has_engagements and has_page_viewers)
+
+
+# Backward-compatible alias used by tests / callers
+def item_has_creator_analytics(item: dict[str, Any]) -> bool:
+    return not item_needs_analytics_enrichment(item)
+
+
+def resolve_retrieve_post_ids(item: dict[str, Any]) -> list[str]:
+    """
+    Candidate Unipile post ids for retrieve-post, preferred order.
+
+    ``social_id`` (urn:li:activity:...) is more reliable than bare numeric ``id``,
+    which frequently returns 404 from Unipile.
+    """
+    candidates: list[str] = []
+    for key in ("social_id", "id"):
+        value = item.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if not text or text in candidates:
+            continue
+        candidates.append(text)
+    return candidates
 
 
 def resolve_retrieve_post_id(item: dict[str, Any]) -> Optional[str]:
     """Pick the best Unipile post id for retrieve-post."""
-    for key in ("id", "social_id"):
-        value = item.get(key)
-        if value is not None and str(value).strip():
-            return str(value).strip()
-    return None
+    ids = resolve_retrieve_post_ids(item)
+    return ids[0] if ids else None
 
 
 def merge_post_analytics(
@@ -76,9 +104,17 @@ def merge_post_analytics(
     merged = dict(list_item)
     existing = merged.get("analytics")
     base = dict(existing) if isinstance(existing, dict) else {}
-    # Detail analytics win for overlapping keys (richer creator payload).
     merged["analytics"] = {**base, **detail_analytics}
     return merged
+
+
+def _count_analytics_presence(analytics: dict[str, Any]) -> tuple[int, int, int, int]:
+    return (
+        1 if _analytics_has_any(analytics, _FOLLOWERS_KEYS) else 0,
+        1 if _analytics_has_any(analytics, _PAGE_VIEWERS_KEYS) else 0,
+        1 if _analytics_has_any(analytics, _ENGAGEMENTS_KEYS) else 0,
+        1 if _analytics_has_any(analytics, _REACH_KEYS) else 0,
+    )
 
 
 async def enrich_posts_with_retrieve_analytics(
@@ -90,34 +126,34 @@ async def enrich_posts_with_retrieve_analytics(
     concurrency: int = _ENRICH_CONCURRENCY,
 ) -> list[Any]:
     """
-    For list items missing creator analytics, call retrieve-post and merge.
+    For list items missing engagements/page viewers, call retrieve-post and merge.
 
     Failures on individual posts are logged and skipped — list data still returns.
     """
     if not items:
         return items
 
-    targets: list[tuple[int, str]] = []
+    targets: list[tuple[int, list[str]]] = []
     for index, item in enumerate(items):
         if len(targets) >= max_posts:
             break
         if not isinstance(item, dict):
             continue
-        if item_has_creator_analytics(item):
+        if not item_needs_analytics_enrichment(item):
             continue
-        post_id = resolve_retrieve_post_id(item)
-        if not post_id:
+        post_ids = resolve_retrieve_post_ids(item)
+        if not post_ids:
             logger.warning(
                 "[PostAnalyticsEnrichment] skip item index={} — no post id",
                 index,
             )
             continue
-        targets.append((index, post_id))
+        targets.append((index, post_ids))
 
     if not targets:
         logger.info(
             "[PostAnalyticsEnrichment] no enrichment needed "
-            "(list already has creator analytics or empty)"
+            "(list already has engagements + page viewers, or empty)"
         )
         return items
 
@@ -139,13 +175,13 @@ async def enrich_posts_with_retrieve_analytics(
     with_engagements = 0
     with_reach = 0
 
-    async def _enrich_one(index: int, post_id: str) -> None:
-        nonlocal ok, failed, with_followers, with_page_viewers, with_engagements, with_reach
-        async with semaphore:
+    async def _fetch_detail(post_ids: list[str]) -> Optional[dict[str, Any]]:
+        last_error: Optional[Exception] = None
+        for post_id in post_ids:
             try:
-                detail = await client.get_post(account_id, post_id)
+                return await client.get_post(account_id, post_id)
             except UnipileAPIError as exc:
-                failed += 1
+                last_error = exc
                 logger.warning(
                     "[PostAnalyticsEnrichment] get_post failed post_id={} "
                     "status={} type={}: {}",
@@ -154,14 +190,26 @@ async def enrich_posts_with_retrieve_analytics(
                     exc.error_type,
                     exc,
                 )
-                return
+                if exc.status_code != 404:
+                    break
             except Exception as exc:
-                failed += 1
+                last_error = exc
                 logger.warning(
                     "[PostAnalyticsEnrichment] get_post unexpected error post_id={}: {}",
                     post_id,
                     exc,
                 )
+                break
+        if last_error is not None:
+            return None
+        return None
+
+    async def _enrich_one(index: int, post_ids: list[str]) -> None:
+        nonlocal ok, failed, with_followers, with_page_viewers, with_engagements, with_reach
+        async with semaphore:
+            detail = await _fetch_detail(post_ids)
+            if detail is None:
+                failed += 1
                 return
 
             current = enriched_items[index]
@@ -172,30 +220,20 @@ async def enrich_posts_with_retrieve_analytics(
             ok += 1
             analytics = merged.get("analytics")
             if isinstance(analytics, dict):
-                if (
-                    analytics.get("followers_gained_from_this_post") is not None
-                    or analytics.get("followers_gained_from_this_post_counter") is not None
-                ):
-                    with_followers += 1
-                if (
-                    analytics.get("page_viewers_from_this_post") is not None
-                    or analytics.get("page_viewers_from_this_post_counter") is not None
-                ):
-                    with_page_viewers += 1
-                if (
-                    analytics.get("engagements") is not None
-                    or analytics.get("engagements_counter") is not None
-                ):
-                    with_engagements += 1
-                if (
-                    analytics.get("members_reached") is not None
-                    or analytics.get("users_reached_counter") is not None
-                    or analytics.get("members_reached_counter") is not None
-                ):
-                    with_reach += 1
+                f, p, e, r = _count_analytics_presence(analytics)
+                with_followers += f
+                with_page_viewers += p
+                with_engagements += e
+                with_reach += r
+                logger.info(
+                    "[PostAnalyticsEnrichment] merged post index={} "
+                    "analytics_keys={}",
+                    index,
+                    sorted(analytics.keys()),
+                )
 
     await asyncio.gather(
-        *(_enrich_one(index, post_id) for index, post_id in targets)
+        *(_enrich_one(index, post_ids) for index, post_ids in targets)
     )
 
     logger.info(
