@@ -32,18 +32,13 @@ from services.integrations.linkedin_oauth import LinkedInOAuthService
 
 router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn Posts"])
 
-_ANALYTICS_SERVICE = None
 
-
-def _get_analytics_service():
-    """Lazy-init the post analytics service (DB-backed)."""
-    global _ANALYTICS_SERVICE
-    if _ANALYTICS_SERVICE is None:
-        from database import SessionLocal
-        from services.linkedin_post_analytics_service import PostAnalyticsService
-        db = SessionLocal()
-        _ANALYTICS_SERVICE = PostAnalyticsService(db)
-    return _ANALYTICS_SERVICE
+def _get_analytics_service(user_id: str):
+    """Get PostAnalyticsService backed by the user's workspace SQLite DB."""
+    from database.sessions import get_session_for_user
+    from services.linkedin_post_analytics_service import LinkedInPostAnalyticsService
+    db = get_session_for_user(user_id)
+    return LinkedInPostAnalyticsService(db)
 
 _oauth_service = LinkedInOAuthService()
 
@@ -203,7 +198,7 @@ async def get_linkedin_posts(
 
     if not refresh and not cursor:
         try:
-            analytics_svc = _get_analytics_service()
+            analytics_svc = _get_analytics_service(user_id)
 
             last_synced = analytics_svc.get_last_synced_at(user_id)
             stored_count = analytics_svc.count_stored(user_id)
@@ -244,7 +239,7 @@ async def get_linkedin_posts(
         # ── Persist to DB cache ──────────────────────────────────────
         if result.posts and not cursor:
             try:
-                analytics_svc = _get_analytics_service()
+                analytics_svc = _get_analytics_service(user_id)
                 stored = analytics_svc.store_posts(user_id, result.posts)
                 logger.info(
                     f"[PostsRoutes] Cached {stored} posts to DB for user={user_id}"
