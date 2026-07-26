@@ -29,6 +29,8 @@ import { apiClient } from '../../api/client';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { usePriority2Alerts } from '../../hooks/usePriority2Alerts';
 import Priority2AlertBanner from './Priority2AlertBanner';
+import { UsagePeriodSelector } from './UsagePeriodSelector';
+import { userBadgeSectionHeaderOnlyLabelSx } from './userBadgeMenuStyles';
 
 interface UsageStats {
   total_calls: number;
@@ -84,11 +86,14 @@ interface DashboardData {
 interface UsageDashboardProps {
   compact?: boolean;
   showFullDashboard?: boolean;
+  /** Renders Usage Statistics header row with period picker aligned right (UserBadge menu). */
+  menuSection?: boolean;
 }
 
 const UsageDashboard: React.FC<UsageDashboardProps> = ({ 
   compact = true, 
-  showFullDashboard = false 
+  showFullDashboard = false,
+  menuSection = false,
 }) => {
   const { subscription } = useSubscription();
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -314,9 +319,17 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
       return periodStr;
     };
 
+    const periodControl = (
+      <UsagePeriodSelector
+        selectedPeriod={selectedPeriod}
+        availablePeriods={availablePeriods}
+        onChange={handlePeriodChange}
+        menuHeader={menuSection}
+      />
+    );
+
     return (
       <Box sx={{ width: '100%' }}>
-        {/* Priority 2 Alert Banner (Usage limits) */}
         {priority2Alerts.length > 0 && (
           <Box sx={{ mb: 1 }}>
             <Priority2AlertBanner 
@@ -325,11 +338,53 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
             />
           </Box>
         )}
+
+        {menuSection && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+              mb: 0.75,
+              minWidth: 0,
+            }}
+          >
+            <Typography variant="caption" sx={{ ...userBadgeSectionHeaderOnlyLabelSx, flexShrink: 0 }}>
+              Usage Statistics
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexShrink: 0 }}>
+              {periodControl}
+              <Tooltip title="Usage options">
+                <IconButton
+                  size="small"
+                  onClick={handleMenuOpen}
+                  sx={{
+                    p: 0.35,
+                    color: '#6b7280',
+                    '&:hover': { bgcolor: '#f3f4f6' },
+                  }}
+                >
+                  <MoreVert sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          </Box>
+        )}
         
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: menuSection ? 2 : 1,
+            flexWrap: 'wrap',
+            width: menuSection ? '100%' : undefined,
+            justifyContent: menuSection ? 'space-between' : 'flex-start',
+          }}
+        >
         
-        {/* Month Selector for Compact View */}
-        {availablePeriods.length > 1 && (
+        {/* Month Selector for Compact View (inline unless menuSection) */}
+        {!menuSection && availablePeriods.length > 1 && (
           <FormControl variant="standard" size="small" sx={{ minWidth: 100, mr: 1 }}>
             <Select
               value={selectedPeriod}
@@ -420,7 +475,8 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
           </IconButton>
         </Tooltip>
 
-        {/* More Options */}
+        {/* More Options — inline unless menuSection (shown in header row) */}
+        {!menuSection && (
         <Tooltip title="Usage options">
           <IconButton
             size="small"
@@ -434,6 +490,7 @@ const UsageDashboard: React.FC<UsageDashboardProps> = ({
             <MoreVert sx={{ fontSize: 16 }} />
           </IconButton>
         </Tooltip>
+        )}
         </Box>
 
         {/* Per-Provider Usage Breakdown */}

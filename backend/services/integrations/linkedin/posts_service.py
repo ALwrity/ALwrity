@@ -22,7 +22,13 @@ from models.linkedin_posts_models import (
     PostListResponse,
 )
 from services.integrations.linkedin.post_attachments import normalize_post_attachments
+from services.integrations.linkedin.post_analytics_enrichment import (
+    enrich_posts_with_retrieve_analytics,
+)
 from services.integrations.linkedin.unipile_client import UnipileClient, UnipileAPIError
+from services.integrations.linkedin.unipile_retrieve_post_client import (
+    UnipileRetrievePostClient,
+)
 
 
 def _parse_datetime(date_str: Optional[str]) -> datetime:
@@ -62,6 +68,40 @@ def _calculate_engagement_rate(engagements: int, impressions: int) -> float:
     return round(engagements / impressions, 4)
 
 
+def _analytics_dict(unipile_item: dict[str, Any]) -> dict[str, Any]:
+    raw = unipile_item.get("analytics")
+    return raw if isinstance(raw, dict) else {}
+
+
+def _first_present(analytics: dict[str, Any], *keys: str) -> Any:
+    """Return the first key that exists in analytics (including explicit 0)."""
+    for key in keys:
+        if key in analytics and analytics[key] is not None:
+            return analytics[key]
+    return None
+
+
+def _optional_non_negative_int(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def _optional_non_negative_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError):
+        return None
+    if parsed < 0:
+        return None
+    return parsed
+
+
 def _normalize_author(unipile_item: dict[str, Any]) -> PostAuthor:
     """
     Extract and normalize author information from Unipile post item.
@@ -81,36 +121,101 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
     Extract and normalize engagement metrics from Unipile post item.
 
     Uses both top-level counters and nested analytics object.
+    Supports legacy analytics keys and Unipile ``*_counter`` renames.
+    Optional analytics fields stay ``None`` when the provider omits them.
     """
-    # Get analytics data if available
-    analytics = unipile_item.get("analytics", {})
+    analytics = _analytics_dict(unipile_item)
 
-    # Extract raw values with fallbacks
-    reactions = unipile_item.get("reaction_counter", 0) or analytics.get("reactions", 0)
-    comments = unipile_item.get("comment_counter", 0) or analytics.get("comments", 0)
-    reposts = unipile_item.get("repost_counter", 0) or analytics.get("reposts", 0)
-    impressions = unipile_item.get("impressions_counter", 0) or analytics.get("impressions", 0)
-    clicks = analytics.get("clicks", 0) or analytics.get("clicks_counter", 0)
-    followers_gained = (
-        analytics.get("followers_gained_from_this_post", 0)
-        or analytics.get("followers_gained_from_this_post_counter", 0)
+    reactions = unipile_item.get("reaction_counter", 0) or analytics.get("reactions", 0) or 0
+    comments = unipile_item.get("comment_counter", 0) or analytics.get("comments", 0) or 0
+    reposts = unipile_item.get("repost_counter", 0) or analytics.get("reposts", 0) or 0
+    impressions = (
+        unipile_item.get("impressions_counter", 0)
+        or analytics.get("impressions", 0)
+        or analytics.get("impressions_counter", 0)
+        or 0
     )
-    reach_raw = analytics.get("users_reached_counter")
-    reach = int(reach_raw) if reach_raw is not None else None
 
-    # Calculate engagement rate
-    total_engagements = reactions + comments + reposts + clicks
-    engagement_rate = _calculate_engagement_rate(total_engagements, impressions)
+    clicks_raw = _first_present(analytics, "clicks", "clicks_counter")
+    clicks = _optional_non_negative_int(clicks_raw) or 0
+
+    followers_raw = _first_present(
+        analytics,
+        "followers_gained_from_this_post",
+        "followers_gained_from_this_post_counter",
+    )
+    followers_gained = _optional_non_negative_int(followers_raw) or 0
+
+    reactions_i = max(0, int(reactions or 0))
+    comments_i = max(0, int(comments or 0))
+    reposts_i = max(0, int(reposts or 0))
+    impressions_i = max(0, int(impressions or 0))
+
+    engagements = _optional_non_negative_int(
+        _first_present(analytics, "engagements", "engagements_counter")
+    )
+    # LinkedIn "engagements" = reactions + comments + reposts (+ clicks).
+    # When Unipile omits engagements(_counter), use the same real counters we
+    # already trust for engagement_rate — not invented mock data.
+    if engagements is None:
+        engagements = reactions_i + comments_i + reposts_i + clicks
+
+    clickthrough_rate = _optional_non_negative_float(
+        _first_present(analytics, "clickthrough_rate", "clickthrough_rate_counter")
+    )
+    page_viewers = _optional_non_negative_int(
+        _first_present(
+            analytics,
+            "page_viewers_from_this_post",
+            "page_viewers_from_this_post_counter",
+            "profile_viewers_from_this_post",
+            "profile_viewers_from_this_post_counter",
+        )
+    )
+    reach = _optional_non_negative_int(
+        _first_present(
+            analytics,
+            "members_reached",
+            "users_reached_counter",
+            "members_reached_counter",
+        )
+    )
+
+    # Prefer provider engagement_rate when present; otherwise derive from counters.
+    provider_rate = _optional_non_negative_float(
+        _first_present(analytics, "engagement_rate")
+    )
+    if provider_rate is not None:
+        engagement_rate = min(1.0, provider_rate if provider_rate <= 1 else provider_rate / 100.0)
+    else:
+        engagement_rate = _calculate_engagement_rate(engagements, impressions_i)
+
+    logger.debug(
+        "[PostsService] normalized engagement impressions={} clicks={} "
+        "followers_gained={} engagements={} page_viewers={} reach={} ctr={} "
+        "analytics_keys={}",
+        impressions_i,
+        clicks,
+        followers_gained,
+        engagements,
+        page_viewers,
+        reach,
+        clickthrough_rate,
+        sorted(analytics.keys()) if analytics else [],
+    )
 
     return PostEngagementMetrics(
-        reactions=max(0, reactions),
-        comments=max(0, comments),
-        reposts=max(0, reposts),
-        impressions=max(0, impressions),
+        reactions=reactions_i,
+        comments=comments_i,
+        reposts=reposts_i,
+        impressions=impressions_i,
         engagement_rate=engagement_rate,
-        clicks=max(0, clicks),
-        followers_gained=max(0, followers_gained),
-        reach=max(0, reach) if reach is not None else None,
+        clicks=clicks,
+        followers_gained=followers_gained,
+        engagements=engagements,
+        clickthrough_rate=clickthrough_rate,
+        page_viewers=page_viewers,
+        reach=reach,
     )
 
 
@@ -164,9 +269,10 @@ class PostsService:
         Initialize the posts service.
 
         Args:
-            unipile_client: Unipile client instance. If None, creates new instance.
+            unipile_client: Unipile client instance. If None, uses retrieve-post
+                capable client so creator analytics can be enriched.
         """
-        self._client = unipile_client or UnipileClient()
+        self._client = unipile_client or UnipileRetrievePostClient()
 
     async def fetch_user_posts(
         self,
@@ -174,15 +280,21 @@ class PostsService:
         identifier: str,
         cursor: Optional[str] = None,
         limit: int = 20,
+        *,
+        enrich_analytics: bool = True,
     ) -> PostListResponse:
         """
         Fetch and normalize LinkedIn posts for a user.
+
+        When ``enrich_analytics`` is True (default), posts missing nested creator
+        ``analytics`` are enriched via Unipile retrieve-post.
 
         Args:
             account_id: Unipile personal account ID
             identifier: LinkedIn provider internal id (ACo/ADo...)
             cursor: Optional pagination cursor
             limit: Number of posts to fetch (default 20, max 100)
+            enrich_analytics: Merge retrieve-post analytics when list omits them
 
         Returns:
             PostListResponse with normalized posts and pagination info
@@ -192,7 +304,7 @@ class PostsService:
         """
         logger.info(
             f"[PostsService] Fetching posts for identifier={identifier} "
-            f"account_id={account_id} limit={limit}"
+            f"account_id={account_id} limit={limit} enrich_analytics={enrich_analytics}"
         )
 
         try:
@@ -248,6 +360,12 @@ class PostsService:
                     f"clicks={normalized.clicks} "
                     f"followers_gained={normalized.followers_gained}"
                 )
+            if enrich_analytics and hasattr(self._client, "get_post"):
+                items = await enrich_posts_with_retrieve_analytics(
+                    self._client,
+                    account_id,
+                    items,
+                )
 
             # Normalize each post
             normalized_posts: list[LinkedInPost] = []
@@ -275,9 +393,21 @@ class PostsService:
                 if page_count:
                     total_count = page_count * limit
 
+            with_creator = sum(
+                1
+                for p in normalized_posts
+                if (
+                    p.engagement.engagements is not None
+                    or p.engagement.page_viewers is not None
+                    or p.engagement.reach is not None
+                    or p.engagement.followers_gained > 0
+                    or p.engagement.clicks > 0
+                    or p.engagement.clickthrough_rate is not None
+                )
+            )
             logger.info(
                 f"[PostsService] Successfully normalized {len(normalized_posts)} posts "
-                f"for identifier={identifier}"
+                f"for identifier={identifier} with_creator_analytics={with_creator}"
             )
 
             return PostListResponse(

@@ -7,7 +7,8 @@ Personal Profile Growth uses Unipile post metrics; other aggregates stay 501.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
+from dataclasses import replace
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -93,12 +94,27 @@ async def get_personal_analytics(
             raise InvalidAnalyticsDateRange(
                 "presetDays must be one of 7, 14, 28, 90, or 365."
             )
+        # Unipile post metrics are available same-day. Use lag=0 and extend
+        # end_exclusive through tomorrow so today's posts (page viewers,
+        # engagements) match Post Analytics instead of being cut off.
         date_range = parse_range_request(
             today=date.today(),
             preset_days=preset_days,
             start_date=start_date,
             end_date=end_date,
+            data_lag_days=0,
         )
+        today = date.today()
+        include_through = today + timedelta(days=1)
+        if date_range.end_exclusive < include_through:
+            date_range = replace(
+                date_range,
+                end_exclusive=include_through,
+                label=(
+                    f"{date_range.start.strftime('%b %d')} – "
+                    f"{today.strftime('%b %d, %Y')}"
+                ),
+            )
         payload = await build_personal_analytics_payload(
             user_id,
             date_range,

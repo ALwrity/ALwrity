@@ -30,10 +30,28 @@ class PostEngagementMetrics(BaseModel):
         default=0,
         description="Number of followers gained from this post"
     )
+    engagements: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Unipile analytics.engagements; null when provider omitted it",
+    )
+    clickthrough_rate: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        description="Unipile analytics.clickthrough_rate; null when omitted",
+    )
+    page_viewers: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Unipile analytics.page_viewers_from_this_post; null when omitted",
+    )
     reach: Optional[int] = Field(
         default=None,
         ge=0,
-        description="Users reached (Unipile analytics); null when not available from cache",
+        description=(
+            "Members/users reached (Unipile members_reached / users_reached_counter); "
+            "null when not available"
+        ),
     )
 
 

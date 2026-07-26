@@ -68,7 +68,7 @@
 }
 
 .linkedin-writer-header-brand-subline {
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
@@ -235,8 +235,8 @@
 
 .linkedin-search-bar--nav {
   width: 100%;
-  max-width: 280px;
-  min-width: 140px;
+  max-width: 252px;
+  min-width: 126px;
   flex: 1 1 auto;
   padding: 4px 11px;
 }
@@ -548,9 +548,10 @@
 
   .linkedin-writer-header-search-slot {
     position: absolute;
-    /* Align bar left edge with Analytics panel (340px rail + 10px inset, minus header padding) */
-    right: calc(340px - 10px - 36px - 340px * 0.6);
-    width: calc(340px * 0.6);
+    /* Left edge aligns with Analytics panel (after tour icon + gap), not the tour slot */
+    --li-rail-tour-offset: 40px; /* 32px tour + 8px analytics-row gap */
+    right: calc(340px - 10px - 36px - 340px * 0.54 - var(--li-rail-tour-offset));
+    width: calc(340px * 0.54);
     flex: none;
   }
 
@@ -619,8 +620,8 @@
   }
 
   .linkedin-search-bar--nav {
-    max-width: 210px;
-    min-width: 130px;
+    max-width: 189px;
+    min-width: 117px;
   }
 }
 

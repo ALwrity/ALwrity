@@ -160,7 +160,9 @@ export function usePostAnalytics() {
     clearCache();
     setData(null);
     setPanelState("idle");
-    await fetchPosts({ limit: 8, refresh: true });
+    // Match Post Analytics / personal-analytics fetch size so page viewers
+    // and other creator metrics sum the same post set on dashboard + modal.
+    await fetchPosts({ limit: 50, refresh: true });
   }, [fetchPosts]);
 
   return {
