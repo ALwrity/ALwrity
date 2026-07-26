@@ -118,19 +118,9 @@ const App: React.FC = () => {
   // React Hooks MUST be at the top before any conditionals
   const [loading, setLoading] = useState(true);
   
-  // Get CopilotKit key from localStorage or .env
-  const [copilotApiKey, setCopilotApiKey] = useState(() => {
-    const savedKey = localStorage.getItem('copilotkit_api_key');
-    const envKey = process.env.REACT_APP_COPILOTKIT_API_KEY || '';
-    const key = (savedKey || envKey).trim();
-    
-    // Validate key format if present
-    if (key && !key.startsWith('ck_pub_')) {
-      console.warn('CopilotKit API key format invalid - must start with ck_pub_');
-    }
-    
-    return key;
-  });
+  // CopilotKit is disabled — not released yet.
+  // Force empty key so AuthenticatedCopilotWrapper passes through children.
+  const [copilotApiKey] = useState('');
 
   // Initialize app - loading state will be managed by InitialRouteHandler
   useEffect(() => {
@@ -152,21 +142,6 @@ const App: React.FC = () => {
       console.log('[GIF] Removing event listener for open-gif-maker');
       window.removeEventListener('open-gif-maker', handler);
     };
-  }, []);
-
-  // Listen for CopilotKit key updates
-  useEffect(() => {
-    const handleKeyUpdate = (event: CustomEvent) => {
-      const newKey = event.detail?.apiKey;
-      if (newKey) {
-        console.log('App: CopilotKit key updated, reloading...');
-        setCopilotApiKey(newKey);
-        setTimeout(() => window.location.reload(), 500);
-      }
-    };
-    
-    window.addEventListener('copilotkit-key-updated', handleKeyUpdate as EventListener);
-    return () => window.removeEventListener('copilotkit-key-updated', handleKeyUpdate as EventListener);
   }, []);
 
   // Token installer must be inside ClerkProvider; see TokenInstaller below
