@@ -106,8 +106,12 @@ export function usePostAnalytics() {
       setCache({ data: result, cursor: undefined, fetchedAt: Date.now() });
       setPanelState("loaded");
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message = status === 404
+        ? "LinkedIn account not found. Try reconnecting your account."
+        : extractErrorMessage(err);
       console.error("[PostAnalytics] Failed to fetch posts:", err);
-      setErrorMessage(extractErrorMessage(err));
+      setErrorMessage(message);
       setPanelState("error");
     } finally {
       inFlightRef.current = false;
@@ -135,8 +139,12 @@ export function usePostAnalytics() {
       setCache({ data: merged, cursor: nextCursor, fetchedAt: Date.now() });
       setPanelState("loaded");
     } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      const message = status === 404
+        ? "LinkedIn account not found. Try reconnecting."
+        : extractErrorMessage(err);
       console.error("[PostAnalytics] Failed to load more posts:", err);
-      setErrorMessage(extractErrorMessage(err));
+      setErrorMessage(message);
       setPanelState("error");
     } finally {
       inFlightRef.current = false;

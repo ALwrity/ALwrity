@@ -81,7 +81,7 @@ export const DashboardAnalyticsSidebar: React.FC<
   DashboardAnalyticsSidebarProps
 > = ({ onViewAll }) => {
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
-  const { data, panelState, fetchPosts } = usePostAnalytics();
+  const { data, panelState, fetchPosts, errorMessage } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
 
   // Only fetch on explicit user action — not on every mount.
@@ -91,6 +91,9 @@ export const DashboardAnalyticsSidebar: React.FC<
       void fetchPosts({ limit: 8 });
     }
   }, [panelState, fetchPosts]);
+
+  const isError = panelState === "error";
+  const isLoaded = panelState === "loaded";
 
   const totals = useMemo(() => {
     let impressions = 0;
@@ -201,6 +204,22 @@ export const DashboardAnalyticsSidebar: React.FC<
                 }}
               >
                 📊 Load Posts
+              </button>
+            </div>
+          ) : isError ? (
+            <div style={{ textAlign: "center", padding: "8px 0" }}>
+              <p style={{ fontSize: 10, color: "#dc2626", margin: "0 0 6px", lineHeight: 1.4 }}>
+                {errorMessage || "Could not load posts. Your LinkedIn account may need reconnection."}
+              </p>
+              <button
+                type="button"
+                onClick={handleLoadPosts}
+                style={{
+                  padding: "4px 10px", borderRadius: 4, border: "1px solid #d1d5db",
+                  background: "#fff", color: "#0a66c2", fontSize: 10, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                🔁 Retry
               </button>
             </div>
           ) : (
