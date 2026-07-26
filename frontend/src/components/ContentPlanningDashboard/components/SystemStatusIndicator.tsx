@@ -79,9 +79,14 @@ interface DetailedStatsData {
 
 interface SystemStatusIndicatorProps {
   className?: string;
+  /** Light compact row for UserBadge dropdown; default is dark dashboard pill. */
+  variant?: 'dashboard' | 'menu';
 }
 
-const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className }) => {
+const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({
+  className,
+  variant = 'dashboard',
+}) => {
   const [statusData, setStatusData] = useState<SystemStatusData | null>(null);
   const [detailedStats, setDetailedStats] = useState<DetailedStatsData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -260,8 +265,10 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
     <Typography>Loading system status...</Typography>
   );
 
-  const handleDashboardClick = () => {
-    console.log('Dashboard clicked, setting dashboardOpen to true');
+  const isMenuVariant = variant === 'menu';
+
+  const handleDashboardClick = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     setDashboardOpen(true);
   };
 
@@ -269,10 +276,47 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
     return (
       <Box className={className} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <CircularProgress size={16} />
-        <Typography variant="caption">System Status</Typography>
+        <Typography variant="caption" sx={{ color: isMenuVariant ? '#6b7280' : 'inherit' }}>
+          Checking system status…
+        </Typography>
       </Box>
     );
   }
+
+  const controlButtonSx = isMenuVariant
+    ? {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1.25,
+        py: 0.75,
+        width: '100%',
+        minHeight: 36,
+        borderRadius: 1.5,
+        justifyContent: 'flex-start',
+        background: '#ffffff',
+        borderColor: '#e5e7eb',
+        color: '#1a1a2e',
+        boxShadow: 'none',
+        textTransform: 'none' as const,
+        '&:hover': {
+          background: '#f8fafc',
+          borderColor: '#cbd5e1',
+        },
+      }
+    : {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1,
+        px: 1,
+        py: 0.5,
+        minHeight: 34,
+        borderRadius: 2,
+        background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.1))',
+        borderColor: 'rgba(255,255,255,0.35)',
+        color: 'white',
+        boxShadow: '0 10px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.2)',
+      };
 
   return (
     <>
@@ -280,21 +324,9 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
         <Button
           variant="outlined"
           onClick={handleDashboardClick}
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 1,
-            py: 0.5,
-            minHeight: 34,
-            borderRadius: 2,
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.18), rgba(255,255,255,0.1))',
-            borderColor: 'rgba(255,255,255,0.35)',
-            color: 'white',
-            boxShadow: '0 10px 28px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.2)'
-          }}
+          sx={controlButtonSx}
         >
-          {statusData ? getStatusIcon(statusData.status) : <UnknownIcon sx={{ color: 'grey.200' }} />}
+          {statusData ? getStatusIcon(statusData.status) : <UnknownIcon sx={{ color: isMenuVariant ? 'grey.500' : 'grey.200' }} />}
           <Chip
             label={`System • ${(statusData?.status || 'unknown').toUpperCase()}`}
             size="small"
@@ -303,10 +335,14 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
           />
           <Box
             component="div"
-            onClick={(e) => { e.stopPropagation(); fetchStatus(); fetchDetailedStats(); }}
-            sx={{ 
-              ml: 0.5, 
-              color: 'rgba(255,255,255,0.9)',
+            onClick={(e) => {
+              e.stopPropagation();
+              void fetchStatus();
+              void fetchDetailedStats();
+            }}
+            sx={{
+              ml: isMenuVariant ? 'auto' : 0.5,
+              color: isMenuVariant ? '#0a66c2' : 'rgba(255,255,255,0.9)',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
@@ -315,8 +351,8 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
               height: 24,
               borderRadius: '50%',
               '&:hover': {
-                backgroundColor: 'rgba(255,255,255,0.1)',
-              }
+                backgroundColor: isMenuVariant ? 'rgba(10, 102, 194, 0.08)' : 'rgba(255,255,255,0.1)',
+              },
             }}
           >
             <RefreshIcon sx={{ fontSize: 16 }} />
@@ -325,20 +361,18 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
       </Tooltip>
 
       {/* Enhanced Monitoring Dashboard */}
-      <Dialog 
-        open={dashboardOpen} 
-        onClose={() => {
-          console.log('Dialog closing, setting dashboardOpen to false');
-          setDashboardOpen(false);
-        }}
+      <Dialog
+        open={dashboardOpen}
+        onClose={() => setDashboardOpen(false)}
         maxWidth="lg"
         fullWidth
         sx={{
+          zIndex: 1400,
           '& .MuiDialog-paper': {
             borderRadius: 3,
             background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)',
-            maxHeight: '90vh'
-          }
+            maxHeight: '90vh',
+          },
         }}
       >
         <DialogTitle sx={{ 
@@ -367,10 +401,6 @@ const SystemStatusIndicator: React.FC<SystemStatusIndicatorProps> = ({ className
         </DialogTitle>
 
         <DialogContent sx={{ p: 3, overflow: 'auto' }}>
-          <Typography variant="body1" sx={{ mb: 2 }}>
-            Dashboard is open! Status: {dashboardOpen ? 'Open' : 'Closed'}
-          </Typography>
-          
           <AnimatePresence>
             <motion.div
               initial={{ opacity: 0, y: 20 }}

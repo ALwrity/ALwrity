@@ -1,0 +1,49 @@
+/* UserBadge popover — scrollbar must stay INSIDE the bordered, rounded box. */
+.user-badge-menu-paper.MuiPaper-root {
+  overflow: hidden !important;
+  padding: 0 !important;
+  max-height: 85vh !important;
+  box-sizing: border-box !important;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Clips anything that would paint past the rounded border (incl. scrollbar). */
+.user-badge-menu-clip {
+  max-height: min(85vh, 720px);
+  overflow: hidden;
+  width: 100%;
+  border-radius: inherit;
+  box-sizing: border-box;
+}
+
+/*
+ * Scrollport: negative margin pulls the OS scrollbar into the clip region;
+ * padding-right reserves an inner track so the thumb does not sit on the border.
+ */
+.user-badge-menu-scroll {
+  max-height: min(85vh, 720px);
+  overflow-x: hidden;
+  overflow-y: scroll;
+  box-sizing: content-box;
+  width: 100%;
+  padding-right: 12px;
+  margin-right: -12px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.user-badge-menu-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.user-badge-menu-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.user-badge-menu-scroll::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 999px;
+  border: 2px solid #ffffff;
+}
