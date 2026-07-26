@@ -22,7 +22,13 @@ from models.linkedin_posts_models import (
     PostListResponse,
 )
 from services.integrations.linkedin.post_attachments import normalize_post_attachments
+from services.integrations.linkedin.post_analytics_enrichment import (
+    enrich_posts_with_retrieve_analytics,
+)
 from services.integrations.linkedin.unipile_client import UnipileClient, UnipileAPIError
+from services.integrations.linkedin.unipile_retrieve_post_client import (
+    UnipileRetrievePostClient,
+)
 
 
 def _parse_datetime(date_str: Optional[str]) -> datetime:
@@ -256,9 +262,10 @@ class PostsService:
         Initialize the posts service.
 
         Args:
-            unipile_client: Unipile client instance. If None, creates new instance.
+            unipile_client: Unipile client instance. If None, uses retrieve-post
+                capable client so creator analytics can be enriched.
         """
-        self._client = unipile_client or UnipileClient()
+        self._client = unipile_client or UnipileRetrievePostClient()
 
     async def fetch_user_posts(
         self,
@@ -266,15 +273,21 @@ class PostsService:
         identifier: str,
         cursor: Optional[str] = None,
         limit: int = 20,
+        *,
+        enrich_analytics: bool = True,
     ) -> PostListResponse:
         """
         Fetch and normalize LinkedIn posts for a user.
+
+        When ``enrich_analytics`` is True (default), posts missing nested creator
+        ``analytics`` are enriched via Unipile retrieve-post.
 
         Args:
             account_id: Unipile personal account ID
             identifier: LinkedIn provider internal id (ACo/ADo...)
             cursor: Optional pagination cursor
             limit: Number of posts to fetch (default 20, max 100)
+            enrich_analytics: Merge retrieve-post analytics when list omits them
 
         Returns:
             PostListResponse with normalized posts and pagination info
@@ -284,7 +297,7 @@ class PostsService:
         """
         logger.info(
             f"[PostsService] Fetching posts for identifier={identifier} "
-            f"account_id={account_id} limit={limit}"
+            f"account_id={account_id} limit={limit} enrich_analytics={enrich_analytics}"
         )
 
         try:
@@ -308,6 +321,13 @@ class PostsService:
             if not isinstance(items, list):
                 raise PostsServiceError(
                     f"Unexpected items type from Unipile: {type(items)}"
+                )
+
+            if enrich_analytics and hasattr(self._client, "get_post"):
+                items = await enrich_posts_with_retrieve_analytics(
+                    self._client,
+                    account_id,
+                    items,
                 )
 
             # Normalize each post
@@ -336,9 +356,21 @@ class PostsService:
                 if page_count:
                     total_count = page_count * limit
 
+            with_creator = sum(
+                1
+                for p in normalized_posts
+                if (
+                    p.engagement.engagements is not None
+                    or p.engagement.page_viewers is not None
+                    or p.engagement.reach is not None
+                    or p.engagement.followers_gained > 0
+                    or p.engagement.clicks > 0
+                    or p.engagement.clickthrough_rate is not None
+                )
+            )
             logger.info(
                 f"[PostsService] Successfully normalized {len(normalized_posts)} posts "
-                f"for identifier={identifier}"
+                f"for identifier={identifier} with_creator_analytics={with_creator}"
             )
 
             return PostListResponse(

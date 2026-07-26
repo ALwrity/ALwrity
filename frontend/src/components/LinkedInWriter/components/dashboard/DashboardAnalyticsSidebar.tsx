@@ -81,16 +81,17 @@ export const DashboardAnalyticsSidebar: React.FC<
   DashboardAnalyticsSidebarProps
 > = ({ onViewAll }) => {
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
-  const { data, panelState, fetchPosts, errorMessage } = usePostAnalytics();
+  const { data, panelState, refreshPosts, errorMessage } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
 
   // Only fetch on explicit user action — not on every mount.
-  // Posts come from backend DB cache; refresh fetches fresh from Unipile.
+  // Always force Unipile refresh so retrieve-post enrichment can fill
+  // creator analytics missing from list-posts cache.
   const handleLoadPosts = useCallback(() => {
     if (panelState !== "loading") {
-      void fetchPosts({ limit: 8 });
+      void refreshPosts();
     }
-  }, [panelState, fetchPosts]);
+  }, [panelState, refreshPosts]);
 
   const isError = panelState === "error";
   const isLoaded = panelState === "loaded";

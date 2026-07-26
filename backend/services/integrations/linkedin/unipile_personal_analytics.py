@@ -8,7 +8,7 @@ inside the selected date window — Unipile has no profile-aggregate endpoint.
 
 from __future__ import annotations
 
-from datetime import date, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 from loguru import logger
@@ -130,6 +130,64 @@ async def _resolve_account_and_identifier(
     return account_id, identifier
 
 
+_CREATOR_ANALYTICS_RETRY_MINUTES = 5
+
+
+def _creator_analytics_incomplete(posts: list[LinkedInPost]) -> bool:
+    """
+    True when cached posts lack Unipile creator analytics.
+
+    Used to trigger a Unipile refresh after list-only syncs that stored
+    impressions but left nested analytics empty.
+    """
+    if not posts:
+        return True
+    for post in posts[:30]:
+        eng = post.engagement
+        if (
+            eng.engagements is not None
+            or eng.page_viewers is not None
+            or eng.reach is not None
+            or (eng.followers_gained or 0) > 0
+            or (eng.clicks or 0) > 0
+            or eng.clickthrough_rate is not None
+        ):
+            return False
+    return True
+
+
+def _should_refresh_posts(
+    analytics_service: LinkedInPostAnalyticsService,
+    user_id: str,
+    cached_posts: list[LinkedInPost],
+) -> bool:
+    """Refresh when empty, or when creator analytics are missing and last sync is stale."""
+    stored_count = analytics_service.count_stored(user_id)
+    if stored_count == 0:
+        return True
+    if not _creator_analytics_incomplete(cached_posts):
+        return False
+
+    last_synced = analytics_service.get_last_synced_at(user_id)
+    if last_synced is None:
+        return True
+
+    synced = last_synced
+    if synced.tzinfo is not None:
+        synced = synced.astimezone(timezone.utc).replace(tzinfo=None)
+    age_minutes = (datetime.utcnow() - synced).total_seconds() / 60.0
+    if age_minutes < _CREATOR_ANALYTICS_RETRY_MINUTES:
+        logger.info(
+            "[UnipilePersonalAnalytics] skip enrich retry user_id={} "
+            "age_minutes={:.1f} (wait {}m)",
+            user_id,
+            age_minutes,
+            _CREATOR_ANALYTICS_RETRY_MINUTES,
+        )
+        return False
+    return True
+
+
 async def build_personal_analytics_payload(
     user_id: str,
     date_range: AnalyticsDateRange,
@@ -142,7 +200,8 @@ async def build_personal_analytics_payload(
     Build LinkedInPersonalAnalyticsResponse-compatible payload.
 
     Uses cached post analytics when present; refreshes from Unipile via the same
-    PostsService.fetch_user_posts + store_posts path as post-analytics when empty.
+    PostsService.fetch_user_posts + store_posts path when empty or when creator
+    analytics were never stored (list-posts omit nested analytics).
     """
     oauth = oauth_service or LinkedInOAuthService()
     analytics_service = LinkedInPostAnalyticsService(db)
@@ -158,10 +217,19 @@ async def build_personal_analytics_payload(
     account_id = creds.unipile_account_id or creds.primary_account_id or ""
 
     posts: list[LinkedInPost] = []
-    if analytics_service.count_stored(user_id) == 0:
+    stored_count = analytics_service.count_stored(user_id)
+    cached_posts = (
+        analytics_service.get_stored_analytics(user_id).posts if stored_count > 0 else []
+    )
+    needs_refresh = _should_refresh_posts(analytics_service, user_id, cached_posts)
+
+    if needs_refresh:
         logger.info(
-            "[UnipilePersonalAnalytics] cache empty; refreshing via PostsService user_id={}",
+            "[UnipilePersonalAnalytics] refreshing via PostsService user_id={} "
+            "stored={} creator_incomplete={}",
             user_id,
+            stored_count,
+            _creator_analytics_incomplete(cached_posts) if cached_posts else True,
         )
         resolved_account, identifier = await _resolve_account_and_identifier(user_id, oauth)
         account_id = resolved_account
@@ -170,6 +238,7 @@ async def build_personal_analytics_payload(
                 account_id=account_id,
                 identifier=identifier,
                 limit=_FETCH_LIMIT,
+                enrich_analytics=True,
             )
         except PostsServiceError as exc:
             logger.warning(
@@ -181,7 +250,7 @@ async def build_personal_analytics_payload(
         analytics_service.store_posts(user_id, result.posts)
         posts = result.posts
     else:
-        posts = analytics_service.get_stored_analytics(user_id).posts
+        posts = cached_posts
 
     in_range = _posts_in_range(posts, date_range)
     avatar_url = None
@@ -202,11 +271,14 @@ async def build_personal_analytics_payload(
 
     logger.info(
         "[UnipilePersonalAnalytics] build done user_id={} stored={} in_range={} "
-        "impressions={}",
+        "impressions={} followers_gained={} engagements={} reach={}",
         user_id,
         len(posts),
         len(in_range),
         analytics.get("impressions"),
+        analytics.get("followers_gained"),
+        analytics.get("engagements"),
+        analytics.get("reach"),
     )
 
     return {
