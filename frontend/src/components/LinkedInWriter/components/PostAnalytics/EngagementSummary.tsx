@@ -28,6 +28,10 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
           avgEngagementRate: 0,
           totalClicks: 0,
           totalFollowersGained: 0,
+          totalEngagements: null as number | null,
+          totalPageViewers: null as number | null,
+          totalReach: null as number | null,
+          avgCtr: null as number | null,
           bestPost: null as LinkedInPost | null,
           bestCtaPost: null as LinkedInPost | null,
         };
@@ -40,6 +44,12 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
       let totalEngagementRate = 0;
       let totalClicks = 0;
       let totalFollowersGained = 0;
+      let totalEngagements = 0;
+      let engagementsKnown = false;
+      let totalPageViewers = 0;
+      let pageViewersKnown = false;
+      let totalReach = 0;
+      let reachKnown = false;
       let bestPost: LinkedInPost | null = null;
       let bestScore = 0;
       let bestCtaPost: LinkedInPost | null = null;
@@ -54,6 +64,18 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
         totalEngagementRate += e.engagement_rate;
         totalClicks += e.clicks ?? 0;
         totalFollowersGained += e.followers_gained ?? 0;
+        if (e.engagements != null) {
+          engagementsKnown = true;
+          totalEngagements += e.engagements;
+        }
+        if (e.page_viewers != null) {
+          pageViewersKnown = true;
+          totalPageViewers += e.page_viewers;
+        }
+        if (e.reach != null) {
+          reachKnown = true;
+          totalReach += e.reach;
+        }
 
         // Best post = highest engagement rate (or highest reactions as tie-breaker)
         const score = e.engagement_rate * 1000 + e.reactions;
@@ -78,6 +100,11 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
         avgEngagementRate: totalEngagementRate / posts.length,
         totalClicks,
         totalFollowersGained,
+        totalEngagements: engagementsKnown ? totalEngagements : null,
+        totalPageViewers: pageViewersKnown ? totalPageViewers : null,
+        totalReach: reachKnown ? totalReach : null,
+        avgCtr:
+          totalImpressions > 0 ? totalClicks / totalImpressions : null,
         bestPost,
         bestCtaPost: bestClicks > 0 ? bestCtaPost : null,
       };
@@ -124,26 +151,50 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
         color: "#0891b2",
         bg: "#cffafe",
       },
-      ...(stats.totalClicks > 0
-        ? [
-            {
-              label: "Total Clicks",
-              value: formatNumber(stats.totalClicks),
-              color: "#7c3aed",
-              bg: "#f5f3ff",
-            },
-          ]
-        : []),
-      ...(stats.totalFollowersGained > 0
-        ? [
-            {
-              label: "Followers Gained",
-              value: `+${formatNumber(stats.totalFollowersGained)}`,
-              color: "#10b981",
-              bg: "#f0fdf4",
-            },
-          ]
-        : []),
+      {
+        label: "Engagements",
+        value:
+          stats.totalEngagements != null
+            ? formatNumber(stats.totalEngagements)
+            : "—",
+        color: "#4f46e5",
+        bg: "#eef2ff",
+      },
+      {
+        label: "Clicks",
+        value: formatNumber(stats.totalClicks),
+        color: "#7c3aed",
+        bg: "#f5f3ff",
+      },
+      {
+        label: "Avg. CTR",
+        value:
+          stats.avgCtr != null ? `${(stats.avgCtr * 100).toFixed(1)}%` : "—",
+        color: "#0284c7",
+        bg: "#e0f2fe",
+      },
+      {
+        label: "Page viewers",
+        value:
+          stats.totalPageViewers != null
+            ? formatNumber(stats.totalPageViewers)
+            : "—",
+        color: "#db2777",
+        bg: "#fdf2f8",
+      },
+      {
+        label: "Followers Gained",
+        value: `+${formatNumber(stats.totalFollowersGained)}`,
+        color: "#10b981",
+        bg: "#f0fdf4",
+      },
+      {
+        label: "Reached",
+        value:
+          stats.totalReach != null ? formatNumber(stats.totalReach) : "—",
+        color: "#0d9488",
+        bg: "#f0fdfa",
+      },
     ];
 
     return (

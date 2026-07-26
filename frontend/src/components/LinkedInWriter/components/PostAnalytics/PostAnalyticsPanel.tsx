@@ -38,7 +38,7 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
 
   useEffect(() => {
     if (open && panelState === "idle" && connected) {
-      void fetchPosts();
+      void fetchPosts({ limit: 50 });
     }
   }, [open, panelState, fetchPosts, connected]);
 

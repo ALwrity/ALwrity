@@ -35,6 +35,11 @@ from services.linkedin_post_analytics_mappers import (
     row_to_linkedin_post,
     utc_iso,
 )
+from services.linkedin_post_analytics_engagement import (
+    apply_engagement_to_row,
+    engagement_kwargs_for_insert,
+    engagement_metrics_unchanged,
+)
 from services.integrations.linkedin.post_attachments import attachments_to_json
 
 TOP_TREND_POSTS_LIMIT = 5
@@ -428,16 +433,7 @@ class LinkedInPostAnalyticsService:
         return exists is not None
 
     def _metrics_unchanged(self, row: LinkedInPostAnalytics, post: LinkedInPost) -> bool:
-        eng = post.engagement
-        return (
-            row.reactions == eng.reactions
-            and row.comments == eng.comments
-            and row.reposts == eng.reposts
-            and row.impressions == eng.impressions
-            and row.clicks == eng.clicks
-            and row.followers_gained == eng.followers_gained
-            and abs((row.engagement_rate or 0.0) - (eng.engagement_rate or 0.0)) < 1e-9
-        )
+        return engagement_metrics_unchanged(row, post.engagement)
 
     def _snapshot_if_changed(
         self, row: LinkedInPostAnalytics, post: LinkedInPost, now: datetime
@@ -461,13 +457,7 @@ class LinkedInPostAnalyticsService:
         row.text = post.text
         row.title = post.title
         row.created_at = post.created_at
-        row.reactions = post.engagement.reactions
-        row.comments = post.engagement.comments
-        row.reposts = post.engagement.reposts
-        row.impressions = post.engagement.impressions
-        row.clicks = post.engagement.clicks
-        row.followers_gained = post.engagement.followers_gained
-        row.engagement_rate = post.engagement.engagement_rate
+        apply_engagement_to_row(row, post.engagement)
         row.author_name = post.author.name
         row.author_headline = post.author.headline
         row.author_public_identifier = post.author.public_identifier
@@ -489,13 +479,7 @@ class LinkedInPostAnalyticsService:
             text=post.text,
             title=post.title,
             created_at=post.created_at,
-            reactions=post.engagement.reactions,
-            comments=post.engagement.comments,
-            reposts=post.engagement.reposts,
-            impressions=post.engagement.impressions,
-            clicks=post.engagement.clicks,
-            followers_gained=post.engagement.followers_gained,
-            engagement_rate=post.engagement.engagement_rate,
+            **engagement_kwargs_for_insert(post.engagement),
             author_name=post.author.name,
             author_headline=post.author.headline,
             author_public_identifier=post.author.public_identifier,

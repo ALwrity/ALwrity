@@ -4,7 +4,7 @@
  * Surfaces profile-level aggregates from GET /analytics/personal
  * (Unipile post metrics summed for posts published in the window).
  */
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getLinkedInPersonalAnalytics,
   getLinkedInSocialErrorMessage,
@@ -60,6 +60,25 @@ const METRIC_DEFS = [
     color: "#10b981",
     format: fmtNum,
   },
+  {
+    key: "engagements",
+    label: "Engagements",
+    color: "#4f46e5",
+    format: fmtNum,
+  },
+  { key: "clicks", label: "Clicks", color: "#7c3aed", format: fmtNum },
+  {
+    key: "clickthroughRate",
+    label: "CTR",
+    color: "#0284c7",
+    format: fmtPct,
+  },
+  {
+    key: "page_viewers",
+    label: "Page viewers",
+    color: "#db2777",
+    format: fmtNum,
+  },
 ] as const;
 
 type MetricKey = (typeof METRIC_DEFS)[number]["key"];
@@ -68,10 +87,19 @@ type MetricKey = (typeof METRIC_DEFS)[number]["key"];
 
 interface ProfileGrowthWidgetProps {
   onViewAnalytics?: () => void;
+  /** Bump after post-analytics sync so Profile Growth reloads from DB. */
+  reloadToken?: number;
+  /**
+   * Real page-viewer total from the same posts as Post engagement.
+   * Used when personal analytics omits page_viewers so both UI areas match.
+   */
+  pageViewersFallback?: number | null;
 }
 
 export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({
   onViewAnalytics,
+  reloadToken = 0,
+  pageViewersFallback = null,
 }) => {
   const [preset, setPreset] = useState<LinkedInAnalyticsPresetDays>(28);
   const [data, setData] = useState<LinkedInPersonalAnalyticsResponse | null>(
@@ -96,9 +124,21 @@ export const ProfileGrowthWidget: React.FC<ProfileGrowthWidgetProps> = ({
 
   useEffect(() => {
     void fetch(preset);
-  }, [fetch, preset]);
+  }, [fetch, preset, reloadToken]);
 
-  const analytics = data?.personal?.analytics ?? {};
+  const analytics = useMemo(() => {
+    const base = { ...(data?.personal?.analytics ?? {}) };
+    const apiPageViewers = base.page_viewers;
+    const apiMissing =
+      apiPageViewers === null ||
+      apiPageViewers === undefined ||
+      apiPageViewers === "";
+    if (apiMissing && pageViewersFallback != null) {
+      base.page_viewers = pageViewersFallback;
+    }
+    return base;
+  }, [data, pageViewersFallback]);
+
   const emptyReason = data?.personal?.error ?? null;
   const hasMetrics = Object.keys(analytics).length > 0;
 

@@ -27,6 +27,11 @@ class LinkedInPostAnalytics(Base):
     clicks = Column(Integer, default=0)
     followers_gained = Column(Integer, default=0)
     engagement_rate = Column(Float, default=0.0)
+    # Optional Unipile analytics.* fields (null when provider omitted them)
+    engagements = Column(Integer, nullable=True)
+    clickthrough_rate = Column(Float, nullable=True)
+    page_viewers = Column(Integer, nullable=True)
+    members_reached = Column(Integer, nullable=True)
 
     author_name = Column(String(255), nullable=True)
     author_headline = Column(String(500), nullable=True)
