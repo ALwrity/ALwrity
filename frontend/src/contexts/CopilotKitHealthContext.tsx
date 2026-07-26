@@ -152,92 +152,9 @@ export const CopilotKitHealthProvider: React.FC<CopilotKitHealthProviderProps> =
   }, [markUnhealthy]);
 
   const checkHealth = useCallback(async () => {
-    setState((prev) => ({ ...prev, isChecking: true }));
-
-    try {
-      // Get CopilotKit API key from the same sources as App.tsx
-      // Check localStorage first, then fall back to environment variable
-      const savedKey = typeof window !== 'undefined' 
-        ? localStorage.getItem('copilotkit_api_key') 
-        : null;
-      const apiKey = savedKey || process.env.REACT_APP_COPILOTKIT_API_KEY || '';
-      
-      // If no API key is available, mark as unhealthy and skip the check
-      if (!apiKey || !apiKey.trim()) {
-        markUnhealthy('CopilotKit API key not configured');
-        return;
-      }
-
-      // Validate key format (must start with ck_pub_)
-      if (!apiKey.startsWith('ck_pub_')) {
-        markUnhealthy('CopilotKit API key format invalid (must start with ck_pub_)');
-        return;
-      }
-
-      // Try to check CopilotKit status endpoint
-      // This is a lightweight check that doesn't require full CopilotKit initialization
-      // Use AbortController for timeout (more compatible than AbortSignal.timeout)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-      
-      try {
-        const response = await fetch('https://api.cloud.copilotkit.ai/ciu', {
-          method: 'GET',
-          headers: {
-            'x-copilotcloud-public-api-key': apiKey.trim(),
-          },
-          signal: controller.signal,
-        });
-        
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          markHealthy();
-        } else {
-          // Provide more specific error messages based on status code
-          if (response.status === 401) {
-            markUnhealthy('CopilotKit API key is invalid or unauthorized');
-          } else if (response.status === 429) {
-            markUnhealthy('CopilotKit rate limit exceeded');
-          } else if (response.status >= 500) {
-            markUnhealthy(`CopilotKit server error: ${response.status}`);
-          } else {
-            markUnhealthy(`CopilotKit status check failed: ${response.status}`);
-          }
-        }
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId);
-        throw fetchError;
-      }
-    } catch (error: any) {
-      // Handle various error types
-      let errorMsg = 'CopilotKit health check failed';
-      let isCorsError = false;
-      
-      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
-        errorMsg = 'CopilotKit health check timed out';
-      } else if (error.message?.includes('CORS') || error.message?.includes('cors')) {
-        errorMsg = 'CopilotKit CORS error - service may be unavailable';
-        isCorsError = true;
-      } else if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-        // Failed to fetch often indicates CORS or network issues
-        errorMsg = 'CopilotKit network error - service may be down or blocked';
-        isCorsError = true; // Treat as potentially unavailable
-      } else if (error.message?.includes('certificate') || error.message?.includes('SSL')) {
-        errorMsg = 'CopilotKit SSL certificate error';
-      } else if (error.message?.includes('network') || error.message?.includes('Network')) {
-        errorMsg = 'CopilotKit network error - service may be down';
-      } else {
-        errorMsg = error.message || 'Unknown error checking CopilotKit health';
-      }
-
-      console.warn('[CopilotKitHealthContext] Health check failed:', errorMsg, error);
-      markUnhealthy(errorMsg);
-    } finally {
-      setState((prev) => ({ ...prev, isChecking: false }));
-    }
-  }, [markHealthy, markUnhealthy]);
-
+    // CopilotKit is disabled - "Coming Soon" feature, not released.
+    // Skip health checks entirely to avoid network errors to api.cloud.copilotkit.ai.
+  }, []);
   const resetHealth = useCallback(() => {
     setState({
       isHealthy: initialHealthStatus,
