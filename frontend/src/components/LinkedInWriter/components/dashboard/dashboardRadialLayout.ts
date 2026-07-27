@@ -59,7 +59,7 @@ const RING_HEIGHT_FIT_SLACK = 12;
 const OUTER_BULGE_FACTOR = 0.14;
 const PLAN_CONNECT_SLOT_HEIGHT = 38;
 const RING_EDGE_PAD = 4;
-/** Distance below Plan wedge outer bulge to the connect control anchor. */
+/** Distance outward from Plan wedge outer bulge to the connect control anchor. */
 const PLAN_ANCHOR_BELOW_EXTENT = 12;
 /** Extra lift applied in hero (px) — pulls button above the layout bottom padding. */
 export const PLAN_CONNECT_UI_LIFT_PX = 18;

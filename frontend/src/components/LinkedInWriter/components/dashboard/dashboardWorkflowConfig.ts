@@ -50,8 +50,8 @@ export const WORKFLOW_ARC_SPAN_DEG = 360;
 export const WORKFLOW_WEDGE_SLICE_DEG =
   WORKFLOW_ARC_SPAN_DEG / WORKFLOW_WEDGE_COUNT;
 
-/** First wedge (Plan) centered at bottom; remaining cards follow clockwise. */
-export const WORKFLOW_FIRST_WEDGE_CENTER_DEG = 270;
+/** First wedge (Plan) centered at top; remaining cards follow clockwise. */
+export const WORKFLOW_FIRST_WEDGE_CENTER_DEG = 90;
 
 const CARD_DEFS: Omit<DashboardWorkflowCard, "startAngle" | "endAngle">[] = [
   {
