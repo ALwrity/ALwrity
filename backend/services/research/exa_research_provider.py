@@ -112,8 +112,6 @@ class ExaResearchProvider:
                 text=text_params,
                 summary={"query": summary_query},
                 highlights=highlights_params or None,
-                type=config.exa_search_type or "auto",
-                num_results=num_results,
                 **search_kwargs,
             )
         except Exception as e:
@@ -122,8 +120,6 @@ class ExaResearchProvider:
                 logger.info("[ExaResearch] Retrying with simplified parameters")
                 results = self.exa.search_and_contents(
                     query,
-                    type=config.exa_search_type or "auto",
-                    num_results=num_results,
                     **search_kwargs,
                 )
             except Exception as retry_error:

@@ -8,7 +8,7 @@ proper error handling, monitoring, and documentation.
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, FileResponse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import time
 import json
 from loguru import logger
