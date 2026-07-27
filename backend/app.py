@@ -4,17 +4,6 @@ import os
 # Print env vars immediately - BEFORE any imports
 print(f"[app.py] EARLY - PORT={os.getenv('PORT')}, HOST={os.getenv('HOST')}", flush=True)
 
-import typing
-import builtins
-import builtins
-
-# Make common typing constructs available globally
-builtins.Optional = typing.Optional
-builtins.List = typing.List
-builtins.Dict = typing.Dict
-builtins.Any = typing.Any
-builtins.Union = typing.Union
-
 # Load environment variables FIRST before any other imports
 from pathlib import Path
 from dotenv import load_dotenv
@@ -275,19 +264,11 @@ default_allowed_origins = [
     "http://localhost:3000",  # React dev server
     "http://localhost:8000",  # Backend dev server
     "http://localhost:3001",  # Alternative React port
-    "https://alwrity-ai.vercel.app",  # Vercel frontend
-    "https://alwrity-5vac2n9su-ajsis-projects.vercel.app",  # Current Vercel deployment
-    "https://alwrity.vercel.app",  # Vercel app
 ]
 
-# Optional dynamic origins from environment (comma-separated)
-env_origins = os.getenv("ALWRITY_ALLOWED_ORIGINS", "").split(",") if os.getenv("ALWRITY_ALLOWED_ORIGINS") else []
-env_origins = [o.strip() for o in env_origins if o.strip()]
-
-# Convenience: NGROK_URL env var (single origin)
-ngrok_origin = os.getenv("NGROK_URL")
-if ngrok_origin:
-    env_origins.append(ngrok_origin.strip())
+# Production frontend URL(s) from environment
+prod_origins = os.getenv("ALWRITY_FRONTEND_URLS", "").split(",") if os.getenv("ALWRITY_FRONTEND_URLS") else []
+default_allowed_origins.extend(o.strip() for o in prod_origins if o.strip())
 
 # Optional dynamic origins from environment (comma-separated)
 env_origins = os.getenv("ALWRITY_ALLOWED_ORIGINS", "").split(",") if os.getenv("ALWRITY_ALLOWED_ORIGINS") else []

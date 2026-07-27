@@ -6,7 +6,7 @@ This module provides API endpoints for the extracted component logic services.
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 from loguru import logger
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 import hashlib
 

@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.db
+*.sqlite*
+.venv/
+venv/
+test_venv/
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+
+# Environment (use env_file in docker-compose)
+.env
+.env.*
+backend/.env
+frontend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs & data
+logs/
+*.log
+data/
+workspace/
+
+# Tests
+.pytest_cache/
+.pytest_coverage/
+htmlcov/
+.coverage
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+.opencode/
+.planning/
+docs/
+docs-site/
+*.md
+LICENSE
+nul

@@ -279,10 +279,10 @@ class DatabaseTaskManager:
         query = """
         DELETE FROM blog_writer_tasks 
         WHERE status IN ('completed', 'failed', 'cancelled') 
-        AND created_at < NOW() - INTERVAL '%s days'
-        """ % days
+        AND created_at < NOW() - INTERVAL '1 day' * $1
+        """
         
-        result = await self.db.execute(query)
+        result = await self.db.execute(query, days)
         deleted_count = int(result.split()[-1]) if result else 0
         
         if deleted_count > 0:
@@ -349,12 +349,12 @@ class DatabaseTaskManager:
             COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count,
             COUNT(CASE WHEN status = 'running' THEN 1 END) as running_count
         FROM blog_writer_tasks
-        WHERE created_at >= NOW() - INTERVAL '%s days'
+        WHERE created_at >= NOW() - INTERVAL '1 day' * $1
         GROUP BY task_type, status
         ORDER BY task_type, status
-        """ % days
+        """
         
-        rows = await self.db.fetch(query)
+        rows = await self.db.fetch(query, days)
         
         analytics = {
             "summary": {

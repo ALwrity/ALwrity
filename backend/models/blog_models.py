@@ -302,6 +302,7 @@ class BlogPublishResponse(BaseModel):
     platform: str
     url: Optional[str] = None
     post_id: Optional[str] = None
+    error: Optional[str] = None
 
 
 class HallucinationCheckRequest(BaseModel):

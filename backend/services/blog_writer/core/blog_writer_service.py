@@ -353,7 +353,12 @@ class BlogWriterService:
         unified publish flow (pre-publish checklist + schedule + history) is
         built and this becomes the single entry point for all publishing.
         """
-        return BlogPublishResponse(success=True, platform=request.platform, url="https://example.com/post")
+        return BlogPublishResponse(
+            success=False,
+            platform=request.platform,
+            url=None,
+            error="Publishing is not yet available through this endpoint. Please use platform-specific endpoints: /api/wix/publish or /api/wordpress/publish."
+        )
 
     async def generate_medium_blog_with_progress(self, req: MediumBlogGenerateRequest, task_id: str, user_id: str, db: Session = None) -> MediumBlogGenerateResult:
         """Use Gemini structured JSON to generate a medium-length blog in one call.

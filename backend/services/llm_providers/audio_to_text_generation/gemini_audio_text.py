@@ -65,6 +65,7 @@ Dependencies:
 import os
 import sys
 from pathlib import Path
+from typing import List, Optional
 import google.genai as genai
 from google.genai import types
 from dotenv import load_dotenv
