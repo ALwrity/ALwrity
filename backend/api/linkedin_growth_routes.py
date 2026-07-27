@@ -45,15 +45,10 @@ router = APIRouter(
 
 
 def _extract_user_id(current_user: Optional[dict]) -> str:
-    if current_user:
-        uid = (
-            current_user.get("clerk_user_id")
-            or current_user.get("id")
-            or current_user.get("sub")
-        )
-        if uid:
-            return str(uid)
-    raise HTTPException(status_code=401, detail="User not authenticated")
+    uid = current_user.get("id") if current_user else None
+    if not uid:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+    return str(uid)
 
 
 @router.post(
