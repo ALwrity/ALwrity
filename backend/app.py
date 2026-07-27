@@ -830,6 +830,7 @@ async def startup_event():
                         count = task_manager.recover_stale_tasks(uid)
                         recovered += count
                     except Exception:
+                        logger.warning(f"[STARTUP] Failed to recover stale YouTube tasks for user {uid}")
                         pass
                 if recovered > 0:
                     logger.info(f"[STARTUP] Recovered {recovered} stale YouTube tasks across {len(user_ids)} users")
@@ -922,7 +923,8 @@ async def shutdown_event():
             from services.research.exa_monitors import get_exa_monitor_client
             client = get_exa_monitor_client()
             await client.close()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[SHUTDOWN] Exa monitor client close failed: {e}")
             pass
 
         logger.info("ALwrity backend shutdown successfully")

@@ -8,6 +8,7 @@ threshold is exceeded, with auto-recovery after cooldown period.
 
 import time
 import asyncio
+import functools
 from typing import Callable, Any, Optional, Dict
 from enum import Enum
 from dataclasses import dataclass
@@ -202,6 +203,7 @@ def circuit_breaker(name: str, config: Optional[CircuitBreakerConfig] = None):
         config: Circuit breaker configuration
     """
     def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
         async def wrapper(*args, **kwargs):
             breaker = circuit_breaker_manager.get_breaker(name, config)
             return await breaker.call(func, *args, **kwargs)

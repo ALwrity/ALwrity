@@ -381,7 +381,7 @@ class GroundingContextEngine:
             try:
                 domain = chunk.url.split('/')[2] if '://' in chunk.url else chunk.url.split('/')[0]
                 unique_domains.add(domain)
-            except:
+            except (ValueError, IndexError):
                 continue
         
         diversity_score = min(len(unique_domains) / 5.0, 1.0)  # Normalize to 0-1

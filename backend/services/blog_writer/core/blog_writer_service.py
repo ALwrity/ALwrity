@@ -4,11 +4,8 @@ Blog Writer Service - Main orchestrator for AI Blog Writer.
 Coordinates research, outline generation, content creation, and optimization.
 """
 
-from typing import Dict, Any, List
-import time
-import uuid
+from typing import Dict, Any, List, Optional
 from loguru import logger
-from sqlalchemy.orm import Session
 
 from models.blog_models import (
     BlogResearchRequest,
@@ -138,7 +135,7 @@ class BlogWriterService:
         return self.outline_service.rebalance_word_counts(outline, target_words)
     
     # Content Generation Methods
-    async def generate_section(self, request: BlogSectionRequest, user_id: str = None) -> BlogSectionResponse:
+    async def generate_section(self, request: BlogSectionRequest, user_id: Optional[str] = None) -> BlogSectionResponse:
         """Generate section content from outline."""
         research_ctx = request.research
         competitive_advantage = request.competitive_advantage
@@ -173,8 +170,12 @@ class BlogWriterService:
     
     async def optimize_section(self, request: BlogOptimizeRequest) -> BlogOptimizeResponse:
         """Optimize section content for readability and SEO."""
-        # TODO: Move to optimization module
-        return BlogOptimizeResponse(success=True, optimized=request.content, diff_preview=None)
+        return BlogOptimizeResponse(
+            success=False,
+            optimized=request.content,
+            diff_preview=None,
+            error="Section optimization is not yet available. Content returned unchanged."
+        )
     
     # SEO and Analysis Methods (TODO: Extract to optimization module)
     async def hallucination_check(self, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -214,7 +215,7 @@ class BlogWriterService:
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    async def seo_analyze(self, request: BlogSEOAnalyzeRequest, user_id: str = None) -> BlogSEOAnalyzeResponse:
+    async def seo_analyze(self, request: BlogSEOAnalyzeRequest, user_id: Optional[str] = None) -> BlogSEOAnalyzeResponse:
         """Analyze content for SEO optimization using comprehensive blog-specific analyzer."""
         try:
             from services.blog_writer.seo.blog_content_seo_analyzer import BlogContentSEOAnalyzer
@@ -280,7 +281,7 @@ class BlogWriterService:
                 recommendations=[f"SEO analysis failed: {str(e)}"]
             )
 
-    async def seo_metadata(self, request: BlogSEOMetadataRequest, user_id: str = None) -> BlogSEOMetadataResponse:
+    async def seo_metadata(self, request: BlogSEOMetadataRequest, user_id: Optional[str] = None) -> BlogSEOMetadataResponse:
         """Generate comprehensive SEO metadata for content."""
         try:
             from services.blog_writer.seo.blog_seo_metadata_generator import BlogSEOMetadataGenerator
