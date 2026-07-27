@@ -18,6 +18,114 @@
     drop-shadow(0 0 8px var(--linkedin-dashboard-focus-shadow)) !important;
 }
 
+/* Plan wedge — purple bookmark START HERE badge (desktop radial hero, wide screen only) */
+@media (min-width: 601px) {
+  .workflow-wedge-bookmark-badge {
+    --bookmark-accent: var(--bookmark-ribbon-color, #b9faf8);
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 37px;
+    height: 46px;
+    transform: translateX(-50%);
+    display: grid;
+    place-items: center;
+    pointer-events: none;
+    user-select: none;
+    z-index: 2;
+    filter: drop-shadow(
+      0 3px 10px color-mix(in srgb, var(--bookmark-accent) 55%, transparent)
+    );
+    animation: workflowBookmarkBadgeFloat 2.8s ease-in-out infinite;
+  }
+
+  .workflow-wedge-bookmark-badge__svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  .workflow-wedge-bookmark-badge__path {
+    stroke: rgba(255, 255, 255, 0.85);
+    stroke-width: 1.2;
+    stroke-linejoin: round;
+    paint-order: stroke fill;
+  }
+
+  .workflow-wedge-bookmark-badge__text {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    text-align: center;
+    line-height: 1;
+    padding-bottom: 6px;
+  }
+
+  .workflow-wedge-bookmark-badge__line {
+    display: block;
+    font-size: 7px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0f4c47;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.65);
+  }
+
+  .workflow-wedge-bookmark-badge__line--bold {
+    font-size: 8px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+  }
+
+  @keyframes workflowBookmarkBadgeFloat {
+    0%,
+    100% {
+      transform: translateX(-50%) translateY(0);
+    }
+    50% {
+      transform: translateX(-50%) translateY(-2px);
+    }
+  }
+}
+
+@media (min-width: 601px) and (prefers-reduced-motion: reduce) {
+  .workflow-wedge-bookmark-badge {
+    animation: none;
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes workflowWedgeRecommendedPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 2px 8px rgba(99, 102, 241, 0.2))
+      drop-shadow(0 4px 6px rgba(0, 0, 0, 0.05));
+    stroke-opacity: 1;
+  }
+  50% {
+    filter: drop-shadow(0 4px 14px rgba(99, 102, 241, 0.45))
+      drop-shadow(0 6px 10px rgba(0, 0, 0, 0.08));
+    stroke-opacity: 0.92;
+  }
+}
+
+.workflow-wedge--recommended .workflow-wedge-base {
+  animation: workflowWedgeRecommendedPulse 2.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-wedge--recommended .workflow-wedge-base {
+    animation: none !important;
+  }
+}
+
 .linkedin-dashboard-tool-tile:focus-visible,
 .linkedin-dashboard-tool-pill:focus-visible {
   outline: 3px solid var(--linkedin-dashboard-focus-ring);
