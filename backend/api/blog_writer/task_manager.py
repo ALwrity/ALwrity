@@ -184,6 +184,7 @@ class TaskManager:
                 await self.update_progress(task_id, f"❌ Research failed: {result.error_message or 'Unknown error'}")
                 self.task_storage[task_id]["status"] = "failed"
                 self.task_storage[task_id]["error"] = result.error_message or "Research failed"
+                self.task_storage[task_id]["error_data"] = {"error_message": result.error_message or "Research failed", "error_type": "ResearchServiceError"}
             else:
                 await self.update_progress(task_id, f"✅ Research completed successfully! Found {len(result.sources)} sources and {len(result.search_queries or [])} search queries.")
                 # Update status to completed
@@ -205,6 +206,7 @@ class TaskManager:
             # Update status to failed
             self.task_storage[task_id]["status"] = "failed"
             self.task_storage[task_id]["error"] = str(e)
+            self.task_storage[task_id]["error_data"] = {"error_message": str(e), "error_type": type(e).__name__}
         
         # Ensure we always send a final completion message
         finally:
@@ -215,6 +217,7 @@ class TaskManager:
                     await self.update_progress(task_id, "⚠️ Research operation completed with unknown status")
                     self.task_storage[task_id]["status"] = "failed"
                     self.task_storage[task_id]["error"] = "Research completed with unknown status"
+                    self.task_storage[task_id]["error_data"] = {"error_message": "Research completed with unknown status", "error_type": "UnknownCompletionState"}
     
     async def _run_outline_generation_task(self, task_id: str, request: BlogOutlineRequest, user_id: str):
         """Background task to run outline generation and update status with progress messages."""
@@ -249,6 +252,7 @@ class TaskManager:
             # Update status to failed
             self.task_storage[task_id]["status"] = "failed"
             self.task_storage[task_id]["error"] = str(e)
+            self.task_storage[task_id]["error_data"] = {"error_message": str(e), "error_type": type(e).__name__}
 
     async def _run_medium_generation_task(self, task_id: str, request: MediumBlogGenerateRequest, user_id: str):
         """Background task to generate a medium blog using a single structured JSON call."""

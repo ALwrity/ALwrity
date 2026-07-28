@@ -283,3 +283,10 @@ class PartialSuccessException(BlogWriterException):
         )
         self.partial_results = partial_results
         self.failed_operations = failed_operations
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Include partial results and failed operations in serialization."""
+        base = super().to_dict()
+        base["partial_results"] = self.partial_results
+        base["failed_operations"] = self.failed_operations
+        return base

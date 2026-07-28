@@ -595,7 +595,7 @@ async def startup_event():
         # Check Wix API key configuration
         wix_api_key = os.getenv('WIX_API_KEY')
         if wix_api_key:
-            logger.warning(f"âœ… WIX_API_KEY loaded ({len(wix_api_key)} chars, starts with '{wix_api_key[:10]}...')")
+            logger.warning(f"WIX_API_KEY loaded ({len(wix_api_key)} chars)")
         else:
             logger.warning("âš ï¸ WIX_API_KEY not found in environment - Wix publishing may fail")
         

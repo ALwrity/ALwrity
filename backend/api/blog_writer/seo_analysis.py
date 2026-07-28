@@ -148,7 +148,7 @@ async def analyze_blog_seo(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"SEO analysis endpoint error: {e}")
+        logger.error(f"SEO analysis endpoint error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -292,7 +292,7 @@ async def analyze_blog_seo_with_progress(
                 yield analysis_results
                 
             except Exception as e:
-                logger.error(f"Progress generator error: {e}")
+                logger.error(f"Progress generator error: {e}", exc_info=True)
                 yield SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="error",
@@ -307,7 +307,7 @@ async def analyze_blog_seo_with_progress(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"SEO analysis with progress endpoint error: {e}")
+        logger.error(f"SEO analysis with progress endpoint error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
@@ -353,7 +353,7 @@ async def get_analysis_result(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Get analysis result error: {e}")
+        logger.error(f"Get analysis result error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
