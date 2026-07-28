@@ -4,6 +4,7 @@
   color: #1a1a2e;
   min-height: 80px;
   max-height: 80px;
+  overflow: visible;
   padding: 0 36px 0 12px;
   border-bottom: 1px solid rgba(10, 102, 194, 0.12);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
@@ -161,35 +162,6 @@
 
 .linkedin-writer-header-strength-ticker {
   flex-shrink: 0;
-}
-
-.linkedin-writer-header-persona-hint {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  background: #1e293b;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-  z-index: 2;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.18);
-}
-
-.linkedin-writer-header-persona-hint-dismiss {
-  border: none;
-  background: transparent;
-  color: #cbd5e1;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 2px;
 }
 
 .linkedin-writer-header-persona-strength {
@@ -535,6 +507,7 @@
     justify-self: auto;
     z-index: 110;
     pointer-events: auto;
+    overflow: visible;
   }
 
   .linkedin-writer-header-right {
@@ -912,15 +885,6 @@
 
   .linkedin-writer-header-persona-tab-wrap .linkedin-writer-header-studio-tab {
     flex: 1;
-  }
-
-  .linkedin-writer-header-persona-tab-wrap
-    .linkedin-writer-header-persona-hint {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: calc(100% + 6px);
-    z-index: 2;
   }
 
   .linkedin-writer-header-studio-dock .linkedin-growth-dropdown--tab,

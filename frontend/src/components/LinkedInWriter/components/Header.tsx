@@ -19,7 +19,6 @@ import { DashboardActionModal } from "./dashboard/DashboardActionModal";
 import { STUDIO_TAB_ACTION_MODAL_CLASS } from "./dashboard/dashboardLayoutConstants";
 
 const NAV_TITLE_CLASS = "linkedin-writer-header-title";
-const PERSONA_VOICE_HINT_KEY = "linkedin_persona_voice_hint_seen";
 
 interface HeaderProps {
   userPreferences: LinkedInPreferences;
@@ -52,18 +51,10 @@ export const Header: React.FC<HeaderProps> = ({
   const [personaPanelPos, setPersonaPanelPos] = useState<{
     top: number;
     left: number;
-    maxHeight: number;
   } | null>(null);
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
   const linkedInSearch = useLinkedInSearch({ connected });
   const isMobileHeaderNav = useMobileHeaderNav();
-  const [showPersonaVoiceHint, setShowPersonaVoiceHint] = useState(() => {
-    try {
-      return !localStorage.getItem(PERSONA_VOICE_HINT_KEY);
-    } catch {
-      return false;
-    }
-  });
   const {
     profileStrengthPercent,
     profileStrengthLoading,
@@ -137,8 +128,7 @@ export const Header: React.FC<HeaderProps> = ({
         window.innerWidth - panelWidth - 16,
       );
       const top = rect.bottom + 8;
-      const maxHeight = Math.max(240, window.innerHeight - top - 16);
-      setPersonaPanelPos({ top, left, maxHeight });
+      setPersonaPanelPos({ top, left });
     };
 
     updatePosition();
@@ -167,14 +157,6 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   const togglePreferencesPanel = () => {
-    if (showPersonaVoiceHint) {
-      try {
-        localStorage.setItem(PERSONA_VOICE_HINT_KEY, "1");
-      } catch {
-        // ignore storage errors
-      }
-      setShowPersonaVoiceHint(false);
-    }
     onPreferencesModalChange(!showPreferencesModal);
   };
 
@@ -192,7 +174,6 @@ export const Header: React.FC<HeaderProps> = ({
     onOptimiseProfile: handleOpenOptimiseProfile,
     onPreferenceChange: handlePreferenceChange,
     onPersonaUpdate: handlePersonaUpdate,
-    onClose: () => onPreferencesModalChange(false),
   };
 
   const personaPreferencesPanel =
@@ -210,8 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
           left: personaPanelPos.left,
           width: 400,
           maxWidth: "min(400px, calc(100vw - 32px))",
-          maxHeight: personaPanelPos.maxHeight,
-          overflowY: "auto",
+          overflow: "visible",
           background: "white",
           borderRadius: "12px",
           boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
@@ -219,6 +199,8 @@ export const Header: React.FC<HeaderProps> = ({
           padding: "20px",
           zIndex: 10050,
           animation: "slideIn 0.2s ease-out",
+          display: "flex",
+          flexDirection: "column",
         }}
       >
         <div
@@ -263,7 +245,17 @@ export const Header: React.FC<HeaderProps> = ({
       onClose={() => onPreferencesModalChange(false)}
       maxWidth="100%"
       maxHeight="min(85dvh, 640px)"
-      modalClassName={STUDIO_TAB_ACTION_MODAL_CLASS}
+      modalClassName={`${STUDIO_TAB_ACTION_MODAL_CLASS} linkedin-content-persona-mobile-modal`}
+      scrollBody={false}
+      footer={
+        <button
+          type="button"
+          className="content-persona-mobile-done-btn"
+          onClick={() => onPreferencesModalChange(false)}
+        >
+          Done
+        </button>
+      }
     >
       <ContentPersonaPreferencesBody
         {...personaPreferencesBodyProps}
