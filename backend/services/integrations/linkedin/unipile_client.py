@@ -13,6 +13,7 @@ This client provides functionality for LinkedIn Growth Engine:
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -93,6 +94,36 @@ def _raise_for_error(response: httpx.Response) -> None:
         status_code=response.status_code,
         error_type=error_type,
     )
+
+
+class _CircuitGuard:
+    """Circuit breaker for Unipile HTTP calls — prevents cascading failures."""
+
+    def __init__(self, threshold: int = 5, cooldown_s: float = 60.0):
+        self._failure_count = 0
+        self._circuit_open_until: float = 0.0
+        self._threshold = threshold
+        self._cooldown_s = cooldown_s
+
+    def check(self) -> None:
+        if self._failure_count < self._threshold:
+            return
+        if time.monotonic() < self._circuit_open_until:
+            raise UnipileAPIError(
+                503,
+                "Unipile is temporarily unavailable — circuit breaker open. "
+                "Please retry in a few minutes.",
+                error_type="circuit_open",
+            )
+        self._failure_count = 0  # half-open probe
+
+    def record_failure(self) -> None:
+        self._failure_count += 1
+        if self._failure_count >= self._threshold:
+            self._circuit_open_until = time.monotonic() + self._cooldown_s
+
+    def record_success(self) -> None:
+        self._failure_count = 0
 
 
 def _normalize_account_list(data: Any) -> list[dict[str, Any]]:
@@ -229,6 +260,30 @@ class UnipileClient:
         self._dsn = dsn or os.getenv("UNIPILE_DSN", DEFAULT_UNIPILE_DSN)
         self._base_url = f"https://{self._dsn}"
         self._timeout = timeout
+        self._guard = _CircuitGuard()
+
+    async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Make an HTTP request through the circuit breaker + retry transport."""
+        self._guard.check()
+        try:
+            async with self._make_client() as client:
+                response = await client.request(method, url, **kwargs)
+                _raise_for_error(response)
+                self._guard.record_success()
+                return response
+        except Exception:
+            self._guard.record_failure()
+            raise
+
+    def _make_client(self) -> "httpx.AsyncClient":
+        """Create an httpx client with retry transport."""
+        import httpx
+
+        transport = httpx.AsyncHTTPTransport(retries=3)
+        return httpx.AsyncClient(
+            timeout=httpx.Timeout(self._timeout, connect=10.0),
+            transport=transport,
+        )
 
     def _get_full_url(self, path: str) -> str:
         """Build full URL from API path."""
@@ -294,7 +349,7 @@ class UnipileClient:
             f"providers={providers}, expires_at={expires_at.isoformat()}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 json=payload,
@@ -340,10 +395,8 @@ class UnipileClient:
 
         logger.debug(f"[UnipileClient] Fetching account {account_id}")
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, headers=_auth_headers(self._api_key))
-            _raise_for_error(response)
-            return response.json()
+        response = await self._request("GET", url, headers=_auth_headers(self._api_key))
+        return response.json()
 
     async def get_own_profile(self, account_id: str) -> dict[str, Any]:
         """
@@ -374,7 +427,7 @@ class UnipileClient:
             f"[UnipileClient] Fetching own profile account_id={account_id}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(
                 url, params=params, headers=_auth_headers(self._api_key)
             )
@@ -434,12 +487,10 @@ class UnipileClient:
             f"notify={notify!r}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(
-                url, params=params, headers=_auth_headers(self._api_key)
-            )
-            _raise_for_error(response)
-            data = response.json()
+        response = await self._request(
+            "GET", url, params=params, headers=_auth_headers(self._api_key)
+        )
+        data = response.json()
 
         if isinstance(data, dict):
             logger.info(
@@ -472,7 +523,7 @@ class UnipileClient:
 
         logger.debug(f"[UnipileClient] Listing accounts, provider={provider}")
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(
                 url, params=params, headers=_auth_headers(self._api_key)
             )
@@ -502,31 +553,33 @@ class UnipileClient:
             account_id: Unipile account ID to delete
 
         Returns:
-            True if deletion was successful, False otherwise
+            True if deletion was successful
+
+        Raises:
+            UnipileAPIError: On network/API failures that prevent deletion.
+                            404 (not found) is treated as success (already deleted).
         """
         if not self._api_key:
-            logger.warning("Cannot delete account: Unipile API key not configured")
-            return False
+            raise ValueError("Cannot delete account: Unipile API key not configured")
 
         url = self._get_full_url(f"/api/v1/accounts/{account_id}")
 
         logger.info(f"[UnipileClient] Deleting account {account_id}")
 
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.delete(url, headers=_auth_headers(self._api_key))
-                if response.status_code < 400:
-                    logger.info(f"[UnipileClient] Account {account_id} deleted successfully")
-                    return True
-                else:
-                    logger.warning(
-                        f"[UnipileClient] Failed to delete account {account_id}: "
-                        f"HTTP {response.status_code}"
-                    )
-                    return False
-        except Exception as e:
-            logger.error(f"[UnipileClient] Error deleting account {account_id}: {e}")
-            return False
+            response = await self._request(
+                "DELETE", url, headers=_auth_headers(self._api_key)
+            )
+            logger.info(f"[UnipileClient] Account {account_id} deleted successfully")
+            return True
+        except UnipileAPIError as exc:
+            if exc.status_code == 404:
+                logger.info(
+                    f"[UnipileClient] Account {account_id} not found on Unipile "
+                    f"(already deleted locally) — treating as success"
+                )
+                return True
+            raise
 
     async def create_post(
         self,
@@ -580,7 +633,7 @@ class UnipileClient:
             f"attachments={attachment_count}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 files=form_fields,
@@ -644,7 +697,7 @@ class UnipileClient:
             f"expires_at={expires_at.isoformat()}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 json=payload,
@@ -716,14 +769,10 @@ class UnipileClient:
             f"cursor={'set' if cursor else 'none'}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(
-                url,
-                params=params,
-                headers=_auth_headers(self._api_key),
-            )
-            _raise_for_error(response)
-            data = response.json()
+        response = await self._request(
+            "GET", url, params=params, headers=_auth_headers(self._api_key)
+        )
+        data = response.json()
 
         item_count = 0
         next_cursor = None
@@ -789,7 +838,7 @@ class UnipileClient:
             "set" if cursor else "none",
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 params=params,
@@ -873,7 +922,7 @@ class UnipileClient:
             service,
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(
                 url,
                 params=params,
@@ -929,7 +978,7 @@ class UnipileClient:
         )
 
         url = self._get_full_url("/api/v1/linkedin")
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 json=request_body,
@@ -975,7 +1024,7 @@ class UnipileClient:
             identifier,
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(url, params=params, headers=_auth_headers(self._api_key))
             _raise_for_error(response)
             data = response.json()

@@ -12,6 +12,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from loguru import logger
 
+from utils.error_logging import log_route_exception
 from middleware.auth_middleware import get_current_user
 from models.linkedin_posts_models import (
     PostListResponse,
@@ -325,7 +326,12 @@ async def get_linkedin_posts(
         ) from exc
 
     except Exception as exc:
-        logger.exception(f"[PostsRoutes] Unexpected error fetching posts: {exc}")
+        log_route_exception(
+            route="get_linkedin_posts",
+            user_id=user_id,
+            exc=exc,
+            extra=f"limit={limit} refresh={refresh} cursor={'set' if cursor else 'none'}",
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={

@@ -37,6 +37,7 @@ export type ProfileOptimizationPanelState =
  */
 export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [panelState, setPanelState] = useState<ProfileOptimizationPanelState>('idle');
+  const inFlightRef = useRef(false);
   const [recommendations, setRecommendations] = useState<LinkedInProfileOptimizationItem[] | null>(
     null
   );
@@ -57,7 +58,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   // Load Phase 5 intelligence only (fast, cache-first). Recommendations
   // (Phase 7) are triggered separately by user click.
   const loadIntelligence = useCallback(async () => {
-    if (!isProfileComplete) return;
+    if (!isProfileComplete || inFlightRef.current) return;
+    inFlightRef.current = true;
     console.info(`${LOG_PREFIX} loading profile intelligence (Phases 1-5)`);
     setPanelState('loading');
     try {
@@ -88,6 +90,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     } catch (err) {
       console.warn(`${LOG_PREFIX} intelligence load failed`, err);
       setPanelState('error');
+    } finally {
+      inFlightRef.current = false;
     }
   }, [isProfileComplete]);
 
@@ -136,6 +140,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       console.warn(`${LOG_PREFIX} load blocked — profile incomplete`);
       return;
     }
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
 
     console.info(`${LOG_PREFIX} loading profile optimization`, { forceRegenerate });
     setPanelState('loading');
@@ -223,6 +229,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setOptimizationUserError(message);
       setOptimizationError(null);
       setPanelState('error');
+    } finally {
+      inFlightRef.current = false;
     }
   }, [isProfileComplete]);
 
@@ -303,6 +311,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       console.warn(`${LOG_PREFIX} recheck blocked — profile incomplete`);
       return null;
     }
+    if (inFlightRef.current) return null;
+    inFlightRef.current = true;
     console.info(`${LOG_PREFIX} user requested live profile re-check`);
     const previousScore = lastScoreRef.current;
     setPanelState('loading');
@@ -354,6 +364,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setOptimizationError(null);
       setPanelState('error');
       return null;
+    } finally {
+      inFlightRef.current = false;
     }
   }, [isProfileComplete]);
 

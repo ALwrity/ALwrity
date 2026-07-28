@@ -37,7 +37,7 @@ def _get_profile_photos_dir(user_id: str) -> Path:
     return photos_dir
 
 
-def _resolve_profile_photo_path(photo_url: str, user_id: str) -> Path:
+async def _resolve_profile_photo_path(photo_url: str, user_id: str) -> Path:
     """Resolve a profile photo URL to an absolute file path.
 
     Handles two cases:
@@ -63,9 +63,10 @@ def _resolve_profile_photo_path(photo_url: str, user_id: str) -> Path:
             )
             try:
                 import httpx
-                resp = httpx.get(photo_url, follow_redirects=True, timeout=30)
-                resp.raise_for_status()
-                local_path.write_bytes(resp.content)
+                async with httpx.AsyncClient(timeout=30) as client:
+                    resp = await client.get(photo_url, follow_redirects=True)
+                    resp.raise_for_status()
+                    local_path.write_bytes(resp.content)
             except Exception as exc:
                 raise HTTPException(
                     status_code=400,
@@ -115,7 +116,7 @@ async def upload_profile_photo(
 
     try:
         file_ext = Path(file.filename).suffix if file.filename else ".png"
-        unique_id = str(uuid.uuid4())[:8]
+        unique_id = str(uuid.uuid4()).replace("-", "")[:12]
         filename = f"profile_photo_{unique_id}{file_ext}"
         photos_dir = _get_profile_photos_dir(user_id)
         file_path = photos_dir / filename
@@ -139,7 +140,13 @@ async def serve_profile_photo(
     user_id: str,
     filename: str,
 ):
-    """Serve an uploaded profile photo (public — filenames are UUID-based)."""
+    """Serve an uploaded profile photo.
+
+    This endpoint is intentionally public (no auth middleware) because
+    browser <img> tags cannot attach Authorization headers. Security is
+    provided by the unguessable URL: user_id (28‑char) + full UUID
+    filename (36 chars) = ~128 bits of entropy.
+    """
     photos_dir = _get_profile_photos_dir(user_id)
     safe_name = Path(filename).name
     file_path = (photos_dir / safe_name).resolve()
@@ -194,7 +201,7 @@ async def make_profile_photo_presentable(
 
     try:
         # Resolve the uploaded photo to bytes
-        photo_path = _resolve_profile_photo_path(photo_url, user_id)
+        photo_path = await _resolve_profile_photo_path(photo_url, user_id)
         photo_bytes = photo_path.read_bytes()
         logger.info("[ProfilePhoto/MakePresentable] Loaded {} bytes from {}", len(photo_bytes), photo_path)
 
@@ -224,7 +231,7 @@ async def make_profile_photo_presentable(
         logger.info("[ProfilePhoto/MakePresentable] edit_image done: provider={}, model={}", result.provider, result.model)
 
         # Save the transformed photo
-        unique_id = str(uuid.uuid4())[:8]
+        unique_id = str(uuid.uuid4()).replace("-", "")[:12]
         transformed_filename = f"profile_photo_transformed_{unique_id}.png"
         photos_dir = _get_profile_photos_dir(user_id)
         transformed_path = photos_dir / transformed_filename
