@@ -5,7 +5,7 @@ import {
 } from "../../services/linkedInWriterApi";
 import {
   mapPostType,
-  mapTone,
+  mapToneFromPrefs,
   mapIndustry,
   mapSearchEngine,
   readPrefs,
@@ -180,7 +180,7 @@ const RegisterLinkedInActionsEnhanced: React.FC = () => {
         topic: args?.topic || prefs.topic || "AI transformation in business",
         industry: mapIndustry(args?.industry || prefs.industry),
         post_type: mapPostType(args?.post_type || prefs.post_type),
-        tone: mapTone(args?.tone || prefs.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone),
         target_audience:
           args?.target_audience ||
           prefs.target_audience ||
