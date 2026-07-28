@@ -61,14 +61,32 @@ export function growthImpactStyle(impact: LinkedInGrowthImpact): CSSProperties {
   };
 }
 
+const TIMEZONE_SUFFIX_PATTERN = /[zZ]$|[+-]\d{2}:\d{2}$/;
+
+/** Parse backend ISO timestamps stored as UTC without an explicit offset. */
+export function parseStoredUtcTimestamp(isoTimestamp: string): Date | null {
+  const trimmed = isoTimestamp.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const normalized = TIMEZONE_SUFFIX_PATTERN.test(trimmed)
+    ? trimmed
+    : `${trimmed}Z`;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
 export function formatRelativeUpdatedAt(
   isoTimestamp?: string | null,
 ): string | null {
   if (!isoTimestamp) {
     return null;
   }
-  const updated = new Date(isoTimestamp);
-  if (Number.isNaN(updated.getTime())) {
+  const updated = parseStoredUtcTimestamp(isoTimestamp);
+  if (!updated) {
     console.warn(
       "[TopicRecommendations] invalid recommendations_updated_at:",
       isoTimestamp,
@@ -76,6 +94,9 @@ export function formatRelativeUpdatedAt(
     return null;
   }
   const diffMs = Date.now() - updated.getTime();
+  if (diffMs < 0) {
+    return "Updated just now";
+  }
   const diffMinutes = Math.floor(diffMs / 60000);
   if (diffMinutes < 1) {
     return "Updated just now";
@@ -90,3 +111,10 @@ export function formatRelativeUpdatedAt(
   const diffDays = Math.floor(diffHours / 24);
   return `Updated ${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
 }
+
+export const TOPIC_RECOMMENDATION_REFRESH_STEPS = [
+  "Reading your LinkedIn profile",
+  "Analyzing your expertise & audience",
+  "Generating personalized topic ideas",
+  "Finalizing your recommendations",
+] as const;
