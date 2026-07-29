@@ -148,6 +148,10 @@ class PostListResponse(BaseModel):
         default=None,
         description="Total number of posts (if available)"
     )
+    last_synced_at: Optional[datetime] = Field(
+        default=None,
+        description="When the posts were last synced from Unipile (ISO 8601)"
+    )
 
 
 class FetchPostsRequest(BaseModel):
