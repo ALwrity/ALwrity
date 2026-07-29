@@ -12,6 +12,7 @@ import os
 from typing import Any, Optional
 
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from services.integrations.linkedin.protocol import LinkedInSocialProvider
 from services.integrations.linkedin.types import (
@@ -33,7 +34,10 @@ from services.integrations.linkedin.unipile_client import (
     avatar_url_from_user_profile,
     profile_identifier_from_owner,
 )
-from services.integrations.linkedin.zernio_client import avatar_url_from_item
+from services.integrations.linkedin.unipile_post_comments_client import (
+    UnipilePostCommentsClient,
+)
+from services.integrations.linkedin.account_item_utils import avatar_url_from_item
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 
 
@@ -594,21 +598,22 @@ class UnipileProvider:
         return await self._resolve_avatar_url(account.account_id)
 
     async def create_post(
-        self, user_id: str, request: CreatePostRequest
+        self, user_id: str, request: CreatePostRequest, *, db: Optional[Session] = None
     ) -> CreatePostResult:
         """
-        Publish a text-only post to the user's connected LinkedIn personal profile.
+        Publish a post to the user's connected LinkedIn personal profile.
 
-        v1: personal profile only; no first comment, media, or organization posting.
+        Supports optional single-image attachments via request.media_urls (v1).
         """
+        media_count = len(request.media_urls or [])
         logger.info(
             f"[UnipileProvider] create_post user_id={user_id} "
-            f"content_len={len(request.content or '')}"
+            f"content_len={len(request.content or '')} media_count={media_count}"
         )
 
         creds = self._oauth.resolve_credentials(user_id)
         if creds.provider_mode != "unipile" or not creds.unipile_account_id:
-            raise LinkedInNotConnectedError("Unipile LinkedIn account not connected")
+            raise LinkedInNotConnectedError("LinkedIn account not connected")
 
         account_id = creds.unipile_account_id
         if request.account_id and request.account_id != account_id:
@@ -621,15 +626,26 @@ class UnipileProvider:
                 "Organization posting is not supported yet. Switch to personal profile."
             )
 
+        if media_count > 1:
+            raise ValueError("Maximum 1 image allowed per post")
+
         text = (request.content or "").strip()
         if not text:
             raise ValueError("Post content cannot be empty")
 
-        publish_request = CreatePostRequest(account_id=account_id, content=text)
-        await run_publish_preflight(user_id, publish_request)
+        publish_request = CreatePostRequest(
+            account_id=account_id,
+            content=text,
+            media_urls=list(request.media_urls or []),
+        )
+        await run_publish_preflight(user_id, publish_request, db=db)
 
         try:
-            raw = await self._client.create_post(account_id, text)
+            raw = await self._client.create_post(
+                account_id,
+                text,
+                attachment_paths=publish_request.media_urls or None,
+            )
         except UnipileAPIError as exc:
             logger.error(
                 f"[UnipileProvider] create_post Unipile error user_id={user_id} "
@@ -644,7 +660,7 @@ class UnipileProvider:
 
         logger.info(
             f"[UnipileProvider] create_post success user_id={user_id} "
-            f"post_id={post_id} post_urn={post_urn}"
+            f"post_id={post_id} post_urn={post_urn} media_count={media_count}"
         )
 
         return CreatePostResult(
@@ -689,16 +705,41 @@ class UnipileProvider:
     async def list_comments(
         self, user_id: str, account_id: str, post_urn: str
     ) -> list[CommentInfo]:
-        """
-        List comments on a LinkedIn post.
+        """List comments on a LinkedIn post via Unipile (post_urn = social_id)."""
+        client = UnipilePostCommentsClient()
+        data = await client.list_post_comments(account_id, post_urn)
+        items = data.get("items") if isinstance(data, dict) else []
+        if not isinstance(items, list):
+            return []
 
-        Phase 1: Not implemented. Raises NotImplementedError.
-        Phase 4: Will implement comment listing.
-        """
-        logger.warning(
-            f"[UnipileProvider] list_comments called but not implemented (Phase 1)"
-        )
-        raise NotImplementedError(_COMMENTS_NOT_IMPLEMENTED)
+        comments: list[CommentInfo] = []
+        for raw in items:
+            if not isinstance(raw, dict):
+                continue
+            comment_id = raw.get("id") or raw.get("provider_id")
+            if not comment_id:
+                continue
+            author = raw.get("author")
+            author_name: Optional[str] = None
+            if isinstance(author, str):
+                author_name = author
+            elif isinstance(author, dict):
+                author_name = (
+                    author.get("public_identifier")
+                    or author.get("provider_id")
+                )
+            comments.append(
+                CommentInfo(
+                    comment_id=str(comment_id),
+                    text=raw.get("text"),
+                    author=author_name,
+                    created_at=raw.get("date") or (
+                        str(raw.get("created_at")) if raw.get("created_at") is not None else None
+                    ),
+                    raw=raw,
+                )
+            )
+        return comments
 
     async def reply_to_comment(
         self,
@@ -708,16 +749,27 @@ class UnipileProvider:
         comment_id: str,
         text: str,
     ) -> ReplyResult:
-        """
-        Reply to a LinkedIn comment.
-
-        Phase 1: Not implemented. Raises NotImplementedError.
-        Phase 4: Will implement comment replies.
-        """
-        logger.warning(
-            f"[UnipileProvider] reply_to_comment called but not implemented (Phase 1)"
-        )
-        raise NotImplementedError(_COMMENTS_NOT_IMPLEMENTED)
+        """Reply to a LinkedIn comment via Unipile (post_urn = social_id)."""
+        client = UnipilePostCommentsClient()
+        try:
+            data = await client.send_post_comment(
+                account_id,
+                post_urn,
+                text,
+                comment_id=comment_id,
+            )
+            new_id = data.get("comment_id") if isinstance(data, dict) else None
+            return ReplyResult(
+                success=True,
+                comment_id=str(new_id) if new_id else None,
+                raw=data if isinstance(data, dict) else {},
+            )
+        except UnipileAPIError as exc:
+            return ReplyResult(
+                success=False,
+                error=str(exc),
+                raw={"status_code": exc.status_code, "error_type": exc.error_type},
+            )
 
     # Phase 1 helper methods for connection management
 

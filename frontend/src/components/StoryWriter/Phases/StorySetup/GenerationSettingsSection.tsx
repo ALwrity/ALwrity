@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { SectionProps } from './types';
-import { textFieldStyles, accordionStyles } from './styles';
+import { textFieldStyles, accordionStyles, selectMenuProps } from './styles';
 import { IMAGE_PROVIDERS, AUDIO_PROVIDERS, COMMON_IMAGE_SIZES } from './constants';
 
 export const GenerationSettingsSection: React.FC<SectionProps> = ({ state }) => {
@@ -65,6 +65,7 @@ export const GenerationSettingsSection: React.FC<SectionProps> = ({ state }) => 
                 onChange={(e) => state.setImageProvider(e.target.value || null)}
                 helperText="Select the image generation provider. Leave as 'Auto' to use the default."
                 sx={textFieldStyles}
+                SelectProps={selectMenuProps}
                 disabled={imageDisabled}
               >
                 {IMAGE_PROVIDERS.map((provider) => (
@@ -87,6 +88,7 @@ export const GenerationSettingsSection: React.FC<SectionProps> = ({ state }) => 
                 }}
                 helperText="Select a common image size or set custom dimensions below."
                 sx={textFieldStyles}
+                SelectProps={selectMenuProps}
                 disabled={imageDisabled}
               >
                 {COMMON_IMAGE_SIZES.map((size) => (
@@ -202,6 +204,7 @@ export const GenerationSettingsSection: React.FC<SectionProps> = ({ state }) => 
                 onChange={(e) => state.setAudioProvider(e.target.value)}
                 helperText="Text-to-speech provider for narration"
                 sx={textFieldStyles}
+                SelectProps={selectMenuProps}
                 disabled={audioDisabled}
               >
                 {AUDIO_PROVIDERS.map((provider) => (

@@ -5,7 +5,7 @@ This module defines the data models for LinkedIn content generation endpoints.
 Enhanced to support grounding capabilities with source integration and quality metrics.
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import AliasChoices, BaseModel, Field, validator
 from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
 from enum import Enum
@@ -60,7 +60,7 @@ class LinkedInPostRequest(BaseModel):
     topic: str = Field(..., description="Main topic for the post", min_length=3, max_length=200)
     industry: str = Field(..., description="Target industry context", min_length=2, max_length=100)
     post_type: LinkedInPostType = Field(default=LinkedInPostType.PROFESSIONAL, description="Type of LinkedIn post")
-    tone: LinkedInTone = Field(default=LinkedInTone.PROFESSIONAL, description="Tone of the post")
+    tone: str = Field(default=LinkedInTone.PROFESSIONAL.value, description="Tone of the post (preset or custom label)")
     target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
     key_points: Optional[List[str]] = Field(None, description="Key points to include", max_items=10)
     include_hashtags: bool = Field(default=True, description="Whether to include hashtags")
@@ -97,7 +97,7 @@ class LinkedInArticleRequest(BaseModel):
     """Request model for LinkedIn article generation."""
     topic: str = Field(..., description="Main topic for the article", min_length=3, max_length=200)
     industry: str = Field(..., description="Target industry context", min_length=2, max_length=100)
-    tone: LinkedInTone = Field(default=LinkedInTone.PROFESSIONAL, description="Tone of the article")
+    tone: str = Field(default=LinkedInTone.PROFESSIONAL.value, description="Tone of the article (preset or custom label)")
     target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
     key_sections: Optional[List[str]] = Field(None, description="Key sections to include", max_items=10)
     include_images: bool = Field(default=True, description="Whether to generate image suggestions")
@@ -134,7 +134,7 @@ class LinkedInCarouselRequest(BaseModel):
     """Request model for LinkedIn carousel generation."""
     topic: str = Field(..., description="Main topic for the carousel", min_length=3, max_length=200)
     industry: str = Field(..., description="Target industry context", min_length=2, max_length=100)
-    tone: LinkedInTone = Field(default=LinkedInTone.PROFESSIONAL, description="Tone of the carousel")
+    tone: str = Field(default=LinkedInTone.PROFESSIONAL.value, description="Tone of the carousel (preset or custom label)")
     target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
     number_of_slides: int = Field(default=5, description="Number of slides", ge=3, le=10)
     include_cover_slide: bool = Field(default=True, description="Whether to include a cover slide")
@@ -170,7 +170,7 @@ class LinkedInVideoScriptRequest(BaseModel):
     """Request model for LinkedIn video script generation."""
     topic: str = Field(..., description="Main topic for the video script", min_length=3, max_length=200)
     industry: str = Field(..., description="Target industry context", min_length=2, max_length=100)
-    tone: LinkedInTone = Field(default=LinkedInTone.PROFESSIONAL, description="Tone of the video script")
+    tone: str = Field(default=LinkedInTone.PROFESSIONAL.value, description="Tone of the video script (preset or custom label)")
     target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
     video_duration: int = Field(default=60, description="Target video duration in seconds", ge=30, le=300)
     include_captions: bool = Field(default=True, description="Whether to include captions")
@@ -201,17 +201,45 @@ class LinkedInVideoScriptRequest(BaseModel):
 
 
 class LinkedInCommentResponseRequest(BaseModel):
-    """Request model for LinkedIn comment response generation."""
-    original_comment: str = Field(..., description="Original comment to respond to", min_length=10, max_length=1000)
-    post_context: str = Field(..., description="Context of the post being commented on", min_length=10, max_length=500)
-    industry: str = Field(..., description="Industry context", min_length=2, max_length=100)
-    tone: LinkedInTone = Field(default=LinkedInTone.FRIENDLY, description="Tone of the response")
+    """Request model for LinkedIn comment response generation.
+
+    Backward-compatible aliases: ``comment`` maps to ``original_comment`` and
+    ``original_post`` maps to ``post_context``. ``industry`` defaults to
+    ``General`` so Comment Assistant can call this endpoint without requiring it.
+    """
+    original_comment: str = Field(
+        ...,
+        validation_alias=AliasChoices("original_comment", "comment"),
+        description="Original comment to respond to",
+        min_length=10,
+        max_length=1000,
+    )
+    post_context: str = Field(
+        ...,
+        validation_alias=AliasChoices("post_context", "original_post"),
+        description="Context of the post being commented on",
+        min_length=10,
+        max_length=500,
+    )
+    industry: str = Field(
+        default="General",
+        description="Industry context",
+        min_length=2,
+        max_length=100,
+    )
+    tone: str = Field(default=LinkedInTone.FRIENDLY.value, description="Tone of the response (preset or custom label)")
     response_length: str = Field(default="medium", description="Length of response: short, medium, long")
     include_questions: bool = Field(default=True, description="Whether to include engaging questions")
     research_enabled: bool = Field(default=False, description="Whether to include research-backed content")
     search_engine: SearchEngine = Field(default=SearchEngine.EXA, description="Search engine for research")
     grounding_level: GroundingLevel = Field(default=GroundingLevel.BASIC, description="Level of content grounding")
-    
+
+    @validator("original_comment", "post_context", "industry", pre=True)
+    def _strip_strings(cls, v):  # noqa: N805
+        if isinstance(v, str):
+            return v.strip()
+        return v
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -303,6 +331,19 @@ class LinkedInPostOutput(BaseModel):
                 "hashtags": ["#AI", "#DigitalTransformation", "#TechTrends"],
                 "call_to_action": "What's your take on AI adoption in your industry? Share below!",
                 "cited_source_indices": [1, 2]
+            }
+        }
+
+
+# Structured output schema for LLM article title generation (separate call)
+class LinkedInArticleTitleOutput(BaseModel):
+    """Structured JSON schema for dedicated LinkedIn article title generation."""
+    title: str = Field(..., description="Compelling, specific LinkedIn article headline (40-60 characters)", min_length=40, max_length=60)
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "AI in Enterprise: Key Trends Reshaping 2026"
             }
         }
 
@@ -587,7 +628,7 @@ class LinkedInOutlineRequest(BaseModel):
     """Request model for LinkedIn article outline generation."""
     topic: str = Field(..., description="Main topic for the article", min_length=3, max_length=200)
     industry: str = Field(..., description="Target industry context", min_length=2, max_length=100)
-    tone: LinkedInTone = Field(default=LinkedInTone.PROFESSIONAL, description="Tone of the article")
+    tone: str = Field(default=LinkedInTone.PROFESSIONAL.value, description="Tone of the article (preset or custom label)")
     target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
     word_count: int = Field(default=1500, description="Target word count", ge=500, le=5000)
     research_enabled: bool = Field(default=True, description="Whether to include research-backed content")

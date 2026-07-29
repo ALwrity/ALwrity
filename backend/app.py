@@ -4,17 +4,6 @@ import os
 # Print env vars immediately - BEFORE any imports
 print(f"[app.py] EARLY - PORT={os.getenv('PORT')}, HOST={os.getenv('HOST')}", flush=True)
 
-import typing
-import builtins
-import builtins
-
-# Make common typing constructs available globally
-builtins.Optional = typing.Optional
-builtins.List = typing.List
-builtins.Dict = typing.Dict
-builtins.Any = typing.Any
-builtins.Union = typing.Union
-
 # Load environment variables FIRST before any other imports
 from pathlib import Path
 from dotenv import load_dotenv
@@ -287,19 +276,11 @@ default_allowed_origins = [
     "http://localhost:3000",  # React dev server
     "http://localhost:8000",  # Backend dev server
     "http://localhost:3001",  # Alternative React port
-    "https://alwrity-ai.vercel.app",  # Vercel frontend
-    "https://alwrity-5vac2n9su-ajsis-projects.vercel.app",  # Current Vercel deployment
-    "https://alwrity.vercel.app",  # Vercel app
 ]
 
-# Optional dynamic origins from environment (comma-separated)
-env_origins = os.getenv("ALWRITY_ALLOWED_ORIGINS", "").split(",") if os.getenv("ALWRITY_ALLOWED_ORIGINS") else []
-env_origins = [o.strip() for o in env_origins if o.strip()]
-
-# Convenience: NGROK_URL env var (single origin)
-ngrok_origin = os.getenv("NGROK_URL")
-if ngrok_origin:
-    env_origins.append(ngrok_origin.strip())
+# Production frontend URL(s) from environment
+prod_origins = os.getenv("ALWRITY_FRONTEND_URLS", "").split(",") if os.getenv("ALWRITY_FRONTEND_URLS") else []
+default_allowed_origins.extend(o.strip() for o in prod_origins if o.strip())
 
 # Optional dynamic origins from environment (comma-separated)
 env_origins = os.getenv("ALWRITY_ALLOWED_ORIGINS", "").split(",") if os.getenv("ALWRITY_ALLOWED_ORIGINS") else []
@@ -552,6 +533,10 @@ router_group_status["assets_serving"] = {
     "reason": "Required for podcast media assets",
 }
 
+# Include standalone GIF Maker router (zero ALwrity dependencies)
+from routers.gif_maker import router as gif_maker_router
+app.include_router(gif_maker_router)
+
 # SEO Dashboard endpoints (skip in feature-only modes)
 if _is_full_mode():
     @app.get("/api/seo-dashboard/data")
@@ -792,6 +777,14 @@ if _is_full_mode():
         "mounted": True,
         "reason": "Full mode",
     }
+elif _is_feature_enabled("linkedin"):
+    # LinkedIn-only mode: today workflow routes still needed
+    from api.today_workflow import router as today_workflow_router
+    app.include_router(today_workflow_router)
+    router_group_status["advanced_workflows"] = {
+        "mounted": True,
+        "reason": "LinkedIn feature enabled",
+    }
 else:
     router_group_status["advanced_workflows"] = {
         "mounted": False,
@@ -868,6 +861,7 @@ async def startup_event():
                         count = task_manager.recover_stale_tasks(uid)
                         recovered += count
                     except Exception:
+                        logger.warning(f"[STARTUP] Failed to recover stale YouTube tasks for user {uid}")
                         pass
                 if recovered > 0:
                     logger.info(f"[STARTUP] Recovered {recovered} stale YouTube tasks across {len(user_ids)} users")
@@ -889,7 +883,7 @@ async def startup_event():
         except Exception as poller_err:
             logger.warning(f"[STARTUP] Watchdog monitor poller not started: {poller_err}")
 
-        if _is_feature_enabled("linkedin") and os.getenv("LINKEDIN_PROVIDER", "zernio").strip().lower() == "unipile":
+        if _is_feature_enabled("linkedin") and os.getenv("LINKEDIN_PROVIDER", "unipile").strip().lower() == "unipile":
             try:
                 from services.integrations.linkedin.unipile_health import log_unipile_startup_health
 
@@ -914,7 +908,7 @@ async def startup_event():
 def _assert_router_mounted(router_name: str) -> None:
     """Assert that a critical router is mounted. Fails startup if not found."""
     from fastapi import routing
-    mounted_routes = [route.path for route in app.routes]
+    mounted_routes = [getattr(route, 'path', None) for route in app.routes if hasattr(route, 'path')]
     
     # Check for router-specific paths
     router_path_indicators = {
@@ -940,10 +934,11 @@ def _assert_router_mounted(router_name: str) -> None:
 async def shutdown_event():
     """Cleanup on shutdown."""
     try:
-        # Stop task scheduler
-        from services.scheduler import get_scheduler
-        await get_scheduler().stop()
-        
+        # Stop task scheduler (full mode only — skipped at startup in feature-limited mode)
+        if _is_full_mode():
+            from services.scheduler import get_scheduler
+            await get_scheduler().stop()
+
         # Close database connections
         close_database()
 
@@ -959,7 +954,8 @@ async def shutdown_event():
             from services.research.exa_monitors import get_exa_monitor_client
             client = get_exa_monitor_client()
             await client.close()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[SHUTDOWN] Exa monitor client close failed: {e}")
             pass
 
         logger.info("ALwrity backend shutdown successfully")

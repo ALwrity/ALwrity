@@ -299,6 +299,7 @@ class LinkedInPublishPostRequest(BaseModel):
 
     content: str
     account_id: Optional[str] = None
+    image_ids: Optional[List[str]] = None
 
 
 class LinkedInPublishPostResponse(BaseModel):
@@ -307,6 +308,8 @@ class LinkedInPublishPostResponse(BaseModel):
     success: bool
     post_id: Optional[str] = None
     post_urn: Optional[str] = None
+    share_url: Optional[str] = None
     provider: str
     message: str
     debug_id: str
+    has_media: bool = False

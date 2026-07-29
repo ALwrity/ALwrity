@@ -5,11 +5,41 @@ import sys
 import sqlite3
 import tempfile
 import types
+import importlib.machinery
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterator
 
 import pytest
+
+
+def pytest_collection_modifyitems(config, items):
+    """Pass — placeholder hook (kept for backwards compatibility)."""
+
+
+# Some test files in the suite reference ``Union`` etc. without an
+# explicit ``from typing import Union`` — this is a defensive shim that
+# adds the names to the *builtins* module so module-level evaluation of
+# such annotations does not blow up at collection time. We deliberately
+# keep the shim narrow (just the names we have observed missing) to
+# avoid masking real bugs.
+import builtins as _builtins
+import typing as _typing
+
+for _typing_name in (
+    "Union",
+    "Optional",
+    "List",
+    "Dict",
+    "Tuple",
+    "Set",
+    "FrozenSet",
+    "Any",
+    "Callable",
+    "Type",
+):
+    if not hasattr(_builtins, _typing_name):
+        setattr(_builtins, _typing_name, getattr(_typing, _typing_name))
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -19,6 +49,257 @@ if "dotenv" not in sys.modules:
     _dotenv = types.ModuleType("dotenv")
     _dotenv.load_dotenv = lambda *args, **kwargs: None
     sys.modules["dotenv"] = _dotenv
+
+
+class _Tensor:
+    """Stub ``torch.Tensor`` for ``numpy`` issubclass checks."""
+    pass
+
+
+if "torch" not in sys.modules:
+    _torch = types.ModuleType("torch")
+    _torch.Tensor = _Tensor
+    _torch._NoGrad = _Tensor
+
+    def _torch_decorator(*args, **kwargs):
+        def _wrap(obj):
+            return obj
+
+        return _wrap
+
+    class _TorchNamespace:
+        def __getattr__(self, name):
+            return _torch_decorator
+
+    _torch.__getattr__ = lambda name: _TorchNamespace()
+    sys.modules["torch"] = _torch
+
+
+class _StubLogger:
+    """Lightweight loguru drop-in used when loguru isn't installed."""
+
+    def __getattr__(self, name):
+        target = _StubLogger()
+        return target
+
+    def __call__(self, *args, **kwargs):
+        return None
+
+    def bind(self, **kwargs):
+        return _StubLogger()
+
+    def opt(self, *args, **kwargs):
+        return _StubLogger()
+
+    def add(self, *args, **kwargs):
+        return 1
+
+    def remove(self, *args, **kwargs):
+        return None
+
+    def configure(self, *args, **kwargs):
+        return None
+
+    def info(self, *args, **kwargs):
+        return None
+
+    def warning(self, *args, **kwargs):
+        return None
+
+    def error(self, *args, **kwargs):
+        return None
+
+    def debug(self, *args, **kwargs):
+        return None
+
+    def exception(self, *args, **kwargs):
+        return None
+
+    def success(self, *args, **kwargs):
+        return None
+
+    def critical(self, *args, **kwargs):
+        return None
+
+    def trace(self, *args, **kwargs):
+        return None
+
+    def log(self, *args, **kwargs):
+        return None
+
+
+if "loguru" not in sys.modules:
+    _loguru = types.ModuleType("loguru")
+    _loguru.logger = _StubLogger()
+    sys.modules["loguru"] = _loguru
+
+
+if "googleapiclient" not in sys.modules:
+    _gap = types.ModuleType("googleapiclient")
+    _gap.discovery = types.ModuleType("googleapiclient.discovery")
+    _gap.errors = types.ModuleType("googleapiclient.errors")
+
+    def _build(*args, **kwargs):
+        return types.SimpleNamespace(
+            users=lambda *a, **k: types.SimpleNamespace(
+                get=lambda *a, **k: types.SimpleNamespace(execute=lambda: {})
+            )
+        )
+
+    _gap.errors.HttpError = type("HttpError", (Exception,), {})
+    _gap.errors.UnknownApiServiceOrVersion = type("UnknownApiServiceOrVersion", (Exception,), {})
+    _gap.discovery.build = _build
+    sys.modules["googleapiclient"] = _gap
+    sys.modules["googleapiclient.discovery"] = _gap.discovery
+    sys.modules["googleapiclient.errors"] = _gap.errors
+
+
+if "google_auth_oauthlib" not in sys.modules:
+    _gaol = types.ModuleType("google_auth_oauthlib")
+    _flow = types.ModuleType("google_auth_oauthlib.flow")
+    _flow.Flow = type("Flow", (), {})
+    _flow.InstalledAppFlow = type("InstalledAppFlow", (), {})
+
+    class _Client:
+        def __init__(self, *args, **kwargs):
+            pass
+
+    _flow.Flow = _Client
+    _gaol.flow = _flow
+    sys.modules["google_auth_oauthlib"] = _gaol
+    sys.modules["google_auth_oauthlib.flow"] = _flow
+
+
+def _ensure_nltk_stub():
+    if "nltk" in sys.modules:
+        return
+    stub = types.ModuleType("nltk")
+    stub.__path__ = []  # mark as package
+    stub.__spec__ = importlib.machinery.ModuleSpec("nltk", None, is_package=True)
+    stub.__getattr__ = lambda name: types.SimpleNamespace(
+        words=lambda *a, **k: set(),
+    ) if name == "stopwords" else (lambda *a, **k: [])
+
+    def _noop(*args, **kwargs):
+        return None
+
+    def _noop_list(*args, **kwargs):
+        return []
+
+    stub.download = _noop
+
+    sub_tokenize = types.ModuleType("nltk.tokenize")
+    sub_tokenize.word_tokenize = _noop_list
+    sub_tokenize.sent_tokenize = _noop_list
+    sys.modules["nltk.tokenize"] = sub_tokenize
+    stub.tokenize = sub_tokenize
+
+    sub_tag = types.ModuleType("nltk.tag")
+    sub_tag.pos_tag = _noop_list
+    sys.modules["nltk.tag"] = sub_tag
+    stub.tag = sub_tag
+
+    sub_corpus = types.ModuleType("nltk.corpus")
+    sub_corpus.stopwords = types.SimpleNamespace(words=lambda *a, **k: set())
+    sys.modules["nltk.corpus"] = sub_corpus
+    stub.corpus = sub_corpus
+
+    sub_data = types.ModuleType("nltk.data")
+    sys.modules["nltk.data"] = sub_data
+    stub.data = sub_data
+
+    sys.modules["nltk"] = stub
+
+
+_ensure_nltk_stub()
+
+
+def _ensure_pkg_stub(name: str):
+    """Stub a top-level package as a no-op package if it's missing.
+
+    Provides the minimum surface (``__path__`` + ``__spec__`` + permissive
+    ``__getattr__``) so ``from X import Y`` and ``X.submodule.attr`` patterns
+    both resolve without crashing. Useful for heavy ML libs that aren't
+    installed in the test env.
+    """
+    if name in sys.modules:
+        return
+    stub = types.ModuleType(name)
+    stub.__path__ = []
+    stub.__spec__ = importlib.machinery.ModuleSpec(name, None, is_package=True)
+
+    def _getattr(attr):
+        sub = types.ModuleType(f"{name}.{attr}")
+        sub.__path__ = []
+        sub.__spec__ = importlib.machinery.ModuleSpec(f"{name}.{attr}", None, is_package=True)
+        for verb in ("info", "warning", "error", "debug", "load", "download"):
+            setattr(sub, verb, lambda *a, **k: None)
+        sub.__getattr__ = lambda inner: types.SimpleNamespace(
+            load=lambda *a, **k: None,
+            words=lambda *a, **k: [],
+            get=lambda *a, **k: type("R", (), {"execute": lambda self: {}, "get": lambda self, **kw: {}})(),
+        )
+        sys.modules[f"{name}.{attr}"] = sub
+        return sub
+
+    stub.__getattr__ = _getattr
+    sys.modules[name] = stub
+
+
+for _pkg in ("spacy", "torch", "tensorflow", "transformers", "openai", "exao", "stripe", "exa_py", "exa", "google_auth_httplib2", "textstat", "advertools", "bs4"):
+    _ensure_pkg_stub(_pkg)
+
+
+def _ensure_submodule_stub(parent: str, child: str):
+    full = f"{parent}.{child}"
+    if full in sys.modules:
+        return
+    sub = types.ModuleType(full)
+    sub.__path__ = []
+    sub.__spec__ = importlib.machinery.ModuleSpec(full, None, is_package=True)
+
+    def _ga(inner):
+        return types.SimpleNamespace()
+
+    sub.__getattr__ = _ga
+    sys.modules[full] = sub
+    if parent in sys.modules:
+        setattr(sys.modules[parent], child, sub)
+
+
+_ensure_submodule_stub("google", "genai")
+_ensure_submodule_stub("openai", "resources")
+_ensure_submodule_stub("openai", "types")
+
+
+def _ensure_google_genai_types_schema():
+    """Provide a stub ``google.genai.types.Schema`` so GeminiProvider imports.
+
+    The real package is heavy and not part of the test environment.
+    """
+    if "google.genai.types" in sys.modules:
+        mod = sys.modules["google.genai.types"]
+    else:
+        mod = types.ModuleType("google.genai.types")
+        sys.modules["google.genai.types"] = mod
+        if "google.genai" in sys.modules:
+            setattr(sys.modules["google.genai"], "types", mod)
+
+    class _Schema:
+        def __init__(self, **kwargs):
+            self.__dict__.update(kwargs)
+
+    mod.Schema = _Schema
+    mod.Type = types.SimpleNamespace(OBJECT="object", STRING="string", NUMBER="number")
+    return mod
+
+
+_ensure_google_genai_types_schema()
+# Backstop: ensure google namespace is available without hiding real subpkgs.
+try:
+    import google  # noqa: F401
+except ImportError:
+    _ensure_pkg_stub("google")
 
 if "services" not in sys.modules:
     _services = types.ModuleType("services")
@@ -35,12 +316,39 @@ if "services.llm_providers.main_image_generation" not in sys.modules:
     async def _enhance_image_prompt(prompt, user_id=None):
         return prompt
 
+    async def generate_image(*args, **kwargs):
+        return {"url": "", "image_url": ""}
+
     async def generate_image_variation(*args, **kwargs):
         return {"url": "", "variations": []}
 
+    async def edit_image(*args, **kwargs):
+        return {"url": ""}
+
+    _llm_img.generate_image = generate_image
+    _llm_img.generate_image_edit = edit_image
     _llm_img.generate_image_variation = generate_image_variation
+    _llm_img.edit_image = edit_image
     _llm_img._enhance_image_prompt = _enhance_image_prompt
+    _llm_img.enhance_image_prompt = _enhance_image_prompt
+
+    async def _stub_any(*args, **kwargs):
+        return {"url": ""}
+
+    def _getattr(name):
+        return _stub_any
+
+    _llm_img.__getattr__ = _getattr
     sys.modules["services.llm_providers.main_image_generation"] = _llm_img
+
+if "services.llm_providers.main_image_editing" not in sys.modules:
+    _llm_edit = types.ModuleType("services.llm_providers.main_image_editing")
+
+    async def edit_image_edit(*args, **kwargs):
+        return {"url": ""}
+
+    _llm_edit.edit_image = edit_image_edit
+    sys.modules["services.llm_providers.main_image_editing"] = _llm_edit
 
 # =========================================================================
 # Schema helpers (subset of real services' tables — enough for the
@@ -168,9 +476,6 @@ def _init_linkedin_oauth_tokens(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,
             provider_mode TEXT NOT NULL,
-            zernio_api_key TEXT,
-            zernio_account_id TEXT,
-            zernio_org_account_id TEXT,
             linkedin_access_token TEXT,
             linkedin_refresh_token TEXT,
             expires_at TIMESTAMP,
@@ -179,7 +484,6 @@ def _init_linkedin_oauth_tokens(conn: sqlite3.Connection) -> None:
             is_active BOOLEAN DEFAULT TRUE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            zernio_profile_id TEXT,
             unipile_account_id TEXT,
             unipile_org_account_id TEXT
         )
@@ -328,7 +632,3 @@ class _PatchedUserDB:
         if _ACTIVE_DB_PATH.get("path") == self.db_path:
             _ACTIVE_DB_PATH["path"] = ""
         return result
-
-
-_llm_img.enhance_image_prompt = _enhance_image_prompt
-sys.modules["services.llm_providers.main_image_generation"] = _llm_img

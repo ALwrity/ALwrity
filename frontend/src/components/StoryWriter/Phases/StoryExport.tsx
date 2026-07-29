@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -14,19 +14,51 @@ import {
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
 import DownloadIcon from '@mui/icons-material/Download';
 import SaveIcon from '@mui/icons-material/Save';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import FolderZipIcon from '@mui/icons-material/FolderZip';
+import ImageIcon from '@mui/icons-material/Image';
+import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import { useStoryWriterState } from '../../../hooks/useStoryWriterState';
 import { storyWriterApi } from '../../../services/storyWriterApi';
-import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { fetchMediaBlobUrl, downloadMediaBlob } from '../../../utils/fetchMediaBlobUrl';
+import { renderMarkdown } from '../../../utils/markdown';
+import GlobalStyles from '@mui/material/GlobalStyles';
 import { triggerSubscriptionError } from '../../../api/client';
 import SmartDisplayIcon from '@mui/icons-material/SmartDisplay';
 import SceneVideoApproval from '../components/SceneVideoApproval';
 import { PrimaryButton } from '../../PodcastMaker/ui/PrimaryButton';
+import { StoryVideoProgressModal } from './StorySetup/StoryVideoProgressModal';
 
 interface StoryExportProps {
   state: ReturnType<typeof useStoryWriterState>;
   onSaveProject?: () => void;
   isSavingProject?: boolean;
 }
+
+const splitStoryContent = (content: string, numSections: number): string[] => {
+  if (!content || numSections <= 1) {
+    return [content || ''];
+  }
+  const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+  if (paragraphs.length === 0) {
+    return [content];
+  }
+  if (paragraphs.length <= numSections) {
+    const sections = [...paragraphs];
+    while (sections.length < numSections) {
+      sections.push('');
+    }
+    return sections;
+  }
+  const sections: string[] = [];
+  const paragraphsPerSection = Math.ceil(paragraphs.length / numSections);
+  for (let i = 0; i < numSections; i++) {
+    const start = i * paragraphsPerSection;
+    const end = Math.min(start + paragraphsPerSection, paragraphs.length);
+    sections.push(paragraphs.slice(start, end).join('\n\n'));
+  }
+  return sections;
+};
 
 const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavingProject }) => {
   const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
@@ -37,8 +69,47 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
   const [hdVideoProgress, setHdVideoProgress] = useState(0);
   const [hdVideoMessage, setHdVideoMessage] = useState<string>('');
   const [hdVideoPrompts, setHdVideoPrompts] = useState<Map<number, string>>(new Map()); // Store prompts by scene number
+  const [isExportingPackage, setIsExportingPackage] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [sceneImageBlobUrls, setSceneImageBlobUrls] = useState<Map<number, string | null>>(new Map());
+  const [sceneAudioBlobUrls, setSceneAudioBlobUrls] = useState<Map<number, string | null>>(new Map());
   const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // Load blob URLs for generated scene images and audio so they can be
+  // previewed and downloaded in the export phase (authenticated assets).
+  useEffect(() => {
+    const loadMedia = async () => {
+      const imageMap = new Map<number, string | null>();
+      const audioMap = new Map<number, string | null>();
+
+      if (state.outlineScenes) {
+        for (const scene of state.outlineScenes) {
+          const sceneNumber = scene.scene_number || state.outlineScenes.indexOf(scene) + 1;
+          const imageUrl = state.sceneImages?.get(sceneNumber);
+          const audioUrl = state.sceneAudio?.get(sceneNumber);
+          if (imageUrl) {
+            imageMap.set(sceneNumber, await fetchMediaBlobUrl(imageUrl));
+          }
+          if (audioUrl) {
+            audioMap.set(sceneNumber, await fetchMediaBlobUrl(audioUrl));
+          }
+        }
+      }
+
+      setSceneImageBlobUrls(imageMap);
+      setSceneAudioBlobUrls(audioMap);
+    };
+
+    loadMedia();
+  }, [state.outlineScenes, state.sceneImages, state.sceneAudio]);
   const [error, setError] = useState<string | null>(null);
+
+  // Split story content into sections matching scene count for inline image display
+  const storySections = useMemo(() => {
+    const hasScenes = state.outlineScenes && state.outlineScenes.length > 0;
+    if (!hasScenes || !state.storyContent) return null;
+    return splitStoryContent(state.storyContent, state.outlineScenes!.length);
+  }, [state.storyContent, state.outlineScenes]);
 
   // Scene-by-scene approval state
   const [approvalModal, setApprovalModal] = useState<{
@@ -70,6 +141,88 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+  };
+
+  const buildExportPayload = () => {
+    const sceneImages: Record<string, string> = {};
+    const sceneAudio: Record<string, string> = {};
+    state.sceneImages?.forEach((url, sceneNumber) => {
+      sceneImages[String(sceneNumber)] = url;
+    });
+    state.sceneAudio?.forEach((url, sceneNumber) => {
+      sceneAudio[String(sceneNumber)] = url;
+    });
+
+    return {
+      story_title: state.projectTitle || state.premise?.slice(0, 80) || 'My Story',
+      story_setup: {
+        genre: state.storyMode,
+        writing_style: state.writingStyle,
+        story_tone: state.storyTone,
+        narrative_pov: state.narrativePOV,
+        audience_age_group: state.audienceAgeGroup,
+        content_rating: state.contentRating,
+        ending_preference: state.endingPreference,
+        story_length: state.storyLength,
+        story_setting: state.storySetting,
+        character_input: state.characters,
+        plot_elements: state.plotElements,
+      },
+      outline: state.outlineScenes || state.outline,
+      story_content: state.storyContent!,
+      scene_media: { scene_images: sceneImages, scene_audio: sceneAudio },
+      story_video: state.storyVideo || null,
+    };
+  };
+
+  const handleDownloadPackage = async () => {
+    if (!state.storyContent) return;
+    setIsExportingPackage(true);
+    setError(null);
+    try {
+      const response = await storyWriterApi.exportStoryPackage(buildExportPayload());
+      const blob = new Blob([response.data], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `story-package-${Date.now()}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      state.setError(null);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || err.message || 'Failed to export story package';
+      setError(message);
+      state.setError(message);
+    } finally {
+      setIsExportingPackage(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!state.storyContent) return;
+    setIsExportingPdf(true);
+    setError(null);
+    try {
+      const response = await storyWriterApi.exportStoryPdf(buildExportPayload());
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `story-${Date.now()}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      state.setError(null);
+    } catch (err: any) {
+      const message = err.response?.data?.detail || err.message || 'Failed to export PDF';
+      setError(message);
+      state.setError(message);
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -197,17 +350,7 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
 
   const handleDownloadVideo = async () => {
     if (state.storyVideo) {
-      const blobUrl = await fetchMediaBlobUrl(state.storyVideo);
-      if (!blobUrl) {
-        return;
-      }
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `story-video-${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      await downloadMediaBlob(state.storyVideo, `story-video-${Date.now()}.mp4`);
     }
   };
 
@@ -456,17 +599,103 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
       sx={{ 
         p: 4, 
         mt: 2,
-        backgroundColor: '#F7F3E9', // Warm cream/parchment color
-        color: '#2C2416', // Dark brown text for readability
+        backgroundColor: '#F7F3E9',
+        color: '#2C2416',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08)',
       }}
     >
-      <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 600, color: '#1A1611' }}>
-        Export Story
-      </Typography>
-      <Typography variant="body2" sx={{ mb: 4, color: '#5D4037' }}>
-        Your story is complete! You can copy it to clipboard or download it as a text file.
-      </Typography>
+      <GlobalStyles
+        styles={{
+          '.rendered-content p': { marginBottom: '0.75rem', lineHeight: 1.8 },
+          '.rendered-content h1, .rendered-content h2, .rendered-content h3': {
+            color: '#2C2416', marginTop: '1rem', marginBottom: '0.5rem', fontWeight: 600,
+          },
+          '.rendered-content h1': { fontSize: '1.5rem' },
+          '.rendered-content h2': { fontSize: '1.3rem', borderBottom: '1px solid rgba(120,90,60,0.2)', paddingBottom: '0.25rem' },
+          '.rendered-content h3': { fontSize: '1.15rem' },
+          '.rendered-content strong': { fontWeight: 700 },
+          '.rendered-content em': { fontStyle: 'italic' },
+          '.rendered-content ul, .rendered-content ol': { paddingLeft: '1.5rem', marginBottom: '0.75rem' },
+          '.rendered-content li': { marginBottom: '0.25rem' },
+          '.rendered-content blockquote': {
+            borderLeft: '3px solid #8D6E63', paddingLeft: '1rem', color: '#5D4037',
+            fontStyle: 'italic', margin: '0.75rem 0',
+          },
+          '.rendered-content code': {
+            background: 'rgba(141,110,99,0.12)', padding: '2px 6px', borderRadius: 4,
+            fontFamily: 'monospace', fontSize: '0.9em',
+          },
+          '.rendered-content hr': { border: 'none', borderTop: '1px solid rgba(120,90,60,0.2)', margin: '1rem 0' },
+          '.rendered-content a': { color: '#5D4037', textDecoration: 'underline' },
+          '.rendered-content img': { maxWidth: '100%', height: 'auto', borderRadius: '4px', margin: '0.5rem 0' },
+        }}
+      />
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', md: 'center' },
+          gap: 2,
+          mb: 2,
+        }}
+      >
+        <Box>
+          <Typography variant="h5" gutterBottom sx={{ mb: 0.5, fontWeight: 600, color: '#1A1611' }}>
+            Export Story
+          </Typography>
+          <Typography variant="body2" sx={{ color: '#5D4037' }}>
+            Your story is complete! Copy, download, or package it for sharing.
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', justifyContent: { xs: 'flex-start', md: 'flex-end' } }}>
+          {onSaveProject && (
+            <PrimaryButton
+              onClick={onSaveProject}
+              startIcon={<SaveIcon />}
+              loading={Boolean(isSavingProject)}
+              ariaLabel="Save story project"
+              tooltip={
+                state.projectId
+                  ? 'Save changes to My Projects'
+                  : 'Save this story to My Projects'
+              }
+              sx={{ minWidth: 160 }}
+            >
+              {state.projectId ? 'Save to My Projects' : 'Save Story'}
+            </PrimaryButton>
+          )}
+          <Button variant="outlined" onClick={handleCopyToClipboard} size="small">
+            Copy Text
+          </Button>
+          <Button variant="outlined" onClick={handleDownload} startIcon={<DownloadIcon />} size="small">
+            Text File
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<FolderZipIcon />}
+            onClick={handleDownloadPackage}
+            disabled={isExportingPackage}
+            size="small"
+          >
+            {isExportingPackage ? 'Packaging...' : 'Package'}
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<PictureAsPdfIcon />}
+            onClick={handleExportPdf}
+            disabled={isExportingPdf}
+            size="small"
+            sx={{
+              background: 'linear-gradient(90deg, #5D4037, #3E2723)',
+              color: '#FAF9F6',
+              '&:hover': { background: 'linear-gradient(90deg, #3E2723, #2C2416)' },
+            }}
+          >
+            {isExportingPdf ? 'Exporting...' : 'PDF'}
+          </Button>
+        </Box>
+      </Box>
 
       {error && (
         <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError(null)}>
@@ -515,25 +744,17 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
               <Typography variant="h6" gutterBottom sx={{ color: '#1A1611' }}>
                 Premise
               </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={3}
-                value={state.premise}
-                InputProps={{ readOnly: true }}
+              <Box
+                className="rendered-content"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#FFFFFF',
-                    color: '#1A1611',
-                    '& fieldset': {
-                      borderColor: '#8D6E63',
-                      borderWidth: '1.5px',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#1A1611',
-                  },
+                  p: 2,
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 1,
+                  border: '1.5px solid #8D6E63',
+                  color: '#1A1611',
+                  lineHeight: 1.7,
                 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(state.premise || '') }}
               />
             </Box>
           )}
@@ -544,25 +765,17 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
               <Typography variant="h6" gutterBottom sx={{ color: '#1A1611' }}>
                 Outline
               </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={6}
-                value={state.outline}
-                InputProps={{ readOnly: true }}
+              <Box
+                className="rendered-content"
                 sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: '#FFFFFF',
-                    color: '#1A1611',
-                    '& fieldset': {
-                      borderColor: '#8D6E63',
-                      borderWidth: '1.5px',
-                    },
-                  },
-                  '& .MuiInputBase-input': {
-                    color: '#1A1611',
-                  },
+                  p: 2,
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 1,
+                  border: '1.5px solid #8D6E63',
+                  color: '#1A1611',
+                  lineHeight: 1.7,
                 }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(state.outline || '') }}
               />
             </Box>
           )}
@@ -572,27 +785,204 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
             <Typography variant="h6" gutterBottom sx={{ color: '#1A1611' }}>
               Complete Story
             </Typography>
-            <TextField
-              fullWidth
-              multiline
-              rows={20}
-              value={state.storyContent}
-              InputProps={{ readOnly: true }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  backgroundColor: '#FFFFFF',
-                  color: '#1A1611',
-                  '& fieldset': {
-                    borderColor: '#8D6E63',
-                    borderWidth: '1.5px',
-                  },
-                },
-                '& .MuiInputBase-input': {
-                  color: '#1A1611',
-                },
-              }}
-            />
+            {storySections && state.outlineScenes && state.outlineScenes.length > 0 ? (
+              <Box>
+                {state.outlineScenes.map((scene, idx) => {
+                  const sectionText = storySections[idx];
+                  if (!sectionText) return null;
+                  const sceneNum = scene.scene_number || idx + 1;
+                  const imageUrl = sceneImageBlobUrls.get(sceneNum);
+                  const sceneTitle = scene.title || `Scene ${sceneNum}`;
+                  return (
+                    <Box
+                      key={sceneNum}
+                      sx={{
+                        mb: 3,
+                        p: 2.5,
+                        backgroundColor: '#FAFAF5',
+                        borderRadius: 2,
+                        border: '1.5px solid #E8DDD0',
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle1"
+                        sx={{
+                          fontWeight: 700,
+                          color: '#5D4037',
+                          mb: 1.5,
+                          fontSize: '1rem',
+                        }}
+                      >
+                        {sceneTitle}
+                      </Typography>
+                      {imageUrl && (
+                        <Box
+                          sx={{
+                            mb: 1.5,
+                            borderRadius: 1,
+                            overflow: 'hidden',
+                            maxWidth: 480,
+                          }}
+                        >
+                          <Box
+                            component="img"
+                            src={imageUrl}
+                            alt={`${sceneTitle} illustration`}
+                            sx={{
+                              width: '100%',
+                              height: 'auto',
+                              display: 'block',
+                              borderRadius: 1,
+                            }}
+                          />
+                        </Box>
+                      )}
+                      <Box
+                        className="rendered-content"
+                        sx={{
+                          color: '#3E2723',
+                          lineHeight: 1.7,
+                          fontSize: '0.95rem',
+                        }}
+                        dangerouslySetInnerHTML={{ __html: renderMarkdown(sectionText) }}
+                      />
+                    </Box>
+                  );
+                })}
+              </Box>
+            ) : state.storyContent ? (
+              <Box
+                className="rendered-content"
+                sx={{
+                  p: 2.5,
+                  backgroundColor: '#FAFAF5',
+                  borderRadius: 2,
+                  border: '1.5px solid #E8DDD0',
+                  color: '#3E2723',
+                  lineHeight: 1.7,
+                  fontSize: '0.95rem',
+                  minHeight: '400px',
+                }}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(state.storyContent || '') }}
+              />
+            ) : null}
           </Box>
+
+          {/* Generated Media — Images & Audio */}
+          {(state.sceneImages?.size || 0) > 0 || (state.sceneAudio?.size || 0) > 0 ? (
+            <Box sx={{ mb: 4 }}>
+              <Typography variant="h6" gutterBottom sx={{ color: '#1A1611' }}>
+                Generated Media
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#5D4037', mb: 2 }}>
+                Scene images and audio narration generated during the writing phase.
+              </Typography>
+
+              {/* Images */}
+              {(state.sceneImages?.size || 0) > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" sx={{ color: '#5D4037', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <ImageIcon fontSize="small" /> Scene Images
+                  </Typography>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+                    {Array.from(sceneImageBlobUrls.entries()).map(([sceneNumber, blobUrl]) => {
+                      return (
+                        <Box
+                          key={`img-${sceneNumber}`}
+                          sx={{
+                            border: '1px solid rgba(141,110,99,0.25)',
+                            borderRadius: 2,
+                            overflow: 'hidden',
+                            backgroundColor: '#FFFFFF',
+                          }}
+                        >
+                          {blobUrl ? (
+                            <img
+                              src={blobUrl}
+                              alt={`Scene ${sceneNumber}`}
+                              style={{ width: '100%', height: '160px', objectFit: 'cover' }}
+                            />
+                          ) : (
+                            <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#F7F3E9' }}>
+                              <Typography variant="caption" sx={{ color: '#8D6E63' }}>
+                                Image unavailable
+                              </Typography>
+                            </Box>
+                          )}
+                          <Box sx={{ p: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: '#2C2416' }}>
+                              Scene {sceneNumber}
+                            </Typography>
+                            {blobUrl && (
+                              <Button
+                                size="small"
+                                variant="text"
+                                href={blobUrl}
+                                download={`scene-${sceneNumber}-image.png`}
+                                sx={{ color: '#5D4037', minWidth: 'auto' }}
+                              >
+                                Download
+                              </Button>
+                            )}
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Audio */}
+              {(state.sceneAudio?.size || 0) > 0 && (
+                <Box>
+                  <Typography variant="subtitle2" sx={{ color: '#5D4037', mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <VolumeUpIcon fontSize="small" /> Scene Audio
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                    {Array.from(sceneAudioBlobUrls.entries()).map(([sceneNumber, blobUrl]) => {
+                      return (
+                        <Box
+                          key={`audio-${sceneNumber}`}
+                          sx={{
+                            p: 1.5,
+                            border: '1px solid rgba(141,110,99,0.25)',
+                            borderRadius: 2,
+                            backgroundColor: '#FFFFFF',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 600, color: '#2C2416', minWidth: 80 }}>
+                            Scene {sceneNumber}
+                          </Typography>
+                          {blobUrl ? (
+                            <>
+                              <audio controls src={blobUrl} style={{ flex: 1, minWidth: 200 }} />
+                              <Button
+                                size="small"
+                                variant="text"
+                                href={blobUrl}
+                                download={`scene-${sceneNumber}-audio.mp3`}
+                                sx={{ color: '#5D4037', minWidth: 'auto' }}
+                              >
+                                Download
+                              </Button>
+                            </>
+                          ) : (
+                            <Typography variant="caption" sx={{ color: '#8D6E63' }}>
+                              Audio unavailable
+                            </Typography>
+                          )}
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          ) : null}
 
           {/* Video Generation */}
           {state.isOutlineStructured && state.outlineScenes && (
@@ -607,14 +997,11 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
                 {(!state.sceneAudio || state.sceneAudio.size === 0) && ' Generate audio first.'}
               </Alert>
               
-              {isGeneratingVideo && (
-                <Box sx={{ mb: 2 }}>
-                  <LinearProgress variant="determinate" value={videoProgress} sx={{ mb: 1 }} />
-                  <Typography variant="body2" sx={{ color: '#5D4037' }}>
-                    {videoMessage || 'Generating video...'} {videoProgress}%
-                  </Typography>
-                </Box>
-              )}
+              <StoryVideoProgressModal
+                open={isGeneratingVideo}
+                progress={videoProgress}
+                message={videoMessage || 'Generating video...'}
+              />
 
               {state.storyVideo && (
                 <Box sx={{ mb: 2 }}>
@@ -774,32 +1161,6 @@ const StoryExport: React.FC<StoryExportProps> = ({ state, onSaveProject, isSavin
             )
           )}
 
-          <Divider sx={{ my: 3 }} />
-
-          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {onSaveProject && (
-              <PrimaryButton
-                onClick={onSaveProject}
-                startIcon={<SaveIcon />}
-                loading={Boolean(isSavingProject)}
-                ariaLabel="Save story project"
-                tooltip={
-                  state.projectId
-                    ? 'Save changes to My Projects'
-                    : 'Save this story to My Projects'
-                }
-                sx={{ minWidth: 180 }}
-              >
-                {state.projectId ? 'Save to My Projects' : 'Save Story to My Projects'}
-              </PrimaryButton>
-            )}
-            <Button variant="outlined" onClick={handleCopyToClipboard}>
-              Copy to Clipboard
-            </Button>
-            <Button variant="contained" onClick={handleDownload}>
-              Download as Text File
-            </Button>
-          </Box>
         </>
       )}
     </Paper>

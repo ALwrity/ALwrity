@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
 
@@ -48,10 +48,10 @@ async def test_unipile_client_create_post_uses_posts_endpoint() -> None:
     mock_client.post.assert_awaited_once()
     url = mock_client.post.await_args.args[0]
     assert url.endswith("/api/v1/posts")
-    assert mock_client.post.await_args.kwargs["files"] == {
-        "account_id": (None, "acct-1"),
-        "text": (None, "Hello LinkedIn"),
-    }
+    assert mock_client.post.await_args.kwargs["files"] == [
+        ("account_id", (None, "acct-1")),
+        ("text", (None, "Hello LinkedIn")),
+    ]
     assert "json" not in mock_client.post.await_args.kwargs
 
 
@@ -99,7 +99,86 @@ async def test_unipile_provider_create_post_publishes_text_only() -> None:
 
     assert result.success is True
     assert result.post_urn == "urn:li:activity:123"
-    provider._client.create_post.assert_awaited_once_with("acct-1", "Hello LinkedIn")
+    provider._client.create_post.assert_awaited_once_with(
+        "acct-1",
+        "Hello LinkedIn",
+        attachment_paths=None,
+    )
+
+
+@pytest.mark.anyio
+async def test_unipile_client_create_post_includes_attachment(tmp_path) -> None:
+    image_path = tmp_path / "photo.png"
+    image_path.write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+        b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+        b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+        b"\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    response = Mock(status_code=201, text="created")
+    response.json.return_value = {
+        "id": "123",
+        "social_id": "urn:li:activity:123",
+    }
+    mock_client = _mock_async_http_client(response)
+
+    with patch(
+        "services.integrations.linkedin.unipile_client.httpx.AsyncClient",
+        return_value=mock_client,
+    ):
+        client = UnipileClient(api_key="test-key", dsn="api.example.com")
+        await client.create_post("acct-1", "Hello LinkedIn", attachment_paths=[str(image_path)])
+
+    files = mock_client.post.await_args.kwargs["files"]
+    assert files[0] == ("account_id", (None, "acct-1"))
+    assert files[1] == ("text", (None, "Hello LinkedIn"))
+    assert files[2][0] == "attachments"
+    assert files[2][1][0] == "photo.png"
+
+
+@pytest.mark.anyio
+async def test_unipile_provider_create_post_publishes_with_media(tmp_path) -> None:
+    image_path = tmp_path / "photo.png"
+    image_path.write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+        b"\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89"
+        b"\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01"
+        b"\r\n-\xdb\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    creds = SimpleNamespace(provider_mode="unipile", unipile_account_id="acct-1")
+    provider = UnipileProvider(
+        oauth_service=SimpleNamespace(resolve_credentials=lambda user_id: creds)
+    )
+    provider._client.create_post = AsyncMock(
+        return_value={
+            "id": "123",
+            "social_id": "urn:li:activity:123",
+            "share_url": "https://www.linkedin.com/posts/example",
+        }
+    )
+
+    with patch(
+        "services.integrations.linkedin.unipile_provider.run_publish_preflight",
+        new_callable=AsyncMock,
+    ):
+        result = await provider.create_post(
+            "user_1",
+            CreatePostRequest(
+                account_id="acct-1",
+                content="Hello LinkedIn",
+                media_urls=[str(image_path)],
+            ),
+            db=MagicMock(),
+        )
+
+    assert result.success is True
+    provider._client.create_post.assert_awaited_once_with(
+        "acct-1",
+        "Hello LinkedIn",
+        attachment_paths=[str(image_path)],
+    )
 
 
 @pytest.mark.anyio

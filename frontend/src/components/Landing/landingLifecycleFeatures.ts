@@ -50,7 +50,7 @@ export const LANDING_LIFECYCLE_FEATURES: readonly LandingLifecycleFeature[] = [
     description:
       'Monitor comments, DMs and reactions. Research communities and reply with AI assistance from within ALwrity to grow audience authentically.',
     badge: 'Community',
-    href: '/linkedin-writer',
+    href: '/linkedin-studio',
   },
   {
     iconKey: 'remarket',

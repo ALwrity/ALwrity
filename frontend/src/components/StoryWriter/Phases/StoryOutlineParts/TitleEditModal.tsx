@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from '@mui/material';
+import { modalPaperSx } from './modalStyles';
 
 interface TitleEditModalProps {
   open: boolean;
@@ -18,16 +19,11 @@ const TitleEditModal: React.FC<TitleEditModalProps> = ({ open, sceneNumber, valu
       maxWidth="sm"
       fullWidth
       PaperProps={{
-        sx: {
-          backgroundColor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-          border: '1px solid rgba(0,0,0,0.06)',
-        },
+        sx: modalPaperSx,
       }}
     >
       <DialogTitle>Edit Scene Title (Scene {sceneNumber})</DialogTitle>
-      <DialogContent dividers sx={{ color: '#2C2416' }}>
+      <DialogContent dividers>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
             label="Title"

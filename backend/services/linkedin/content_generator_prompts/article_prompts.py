@@ -61,7 +61,7 @@ class ArticlePromptBuilder:
         - Practical takeaways and next steps
         - Strong conclusion with a call-to-action
 
-        {self._build_outline_block(request)}
+        {ArticlePromptBuilder._build_outline_block(request)}
 
         CONTENT QUALITY REQUIREMENTS:
         - Include statistics and trends from the research sources provided
@@ -87,7 +87,7 @@ class ArticlePromptBuilder:
 
         KEY SECTIONS TO COVER: {', '.join(request.key_sections) if request.key_sections else 'Industry overview, current challenges, emerging trends, practical solutions, future outlook'}
 
-        {self._build_outline_override_block(request)}
+        {ArticlePromptBuilder._build_outline_override_block(request)}
 
         CITATION FORMAT:
         - When you reference a specific data point, statistic, or claim from the research sources above, add [Source N] immediately after the claim, where N is the source number from the RESEARCH CONTEXT.

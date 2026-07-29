@@ -52,7 +52,7 @@ const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
     <Box
       component="footer"
       sx={{
-        py: 6,
+        py: { xs: 2, md: 6 },
         background: isLight
           ? '#F8FAFC'
           : `linear-gradient(180deg, ${alpha('#0a0a0a', 0.95)} 0%, #000 100%)`,
@@ -66,7 +66,7 @@ const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
           direction={{ xs: 'column', md: 'row' }}
           justifyContent="space-between"
           alignItems={{ xs: 'flex-start', md: 'center' }}
-          spacing={3}
+          spacing={{ xs: 1.5, md: 3 }}
         >
           <BrandMark
             showSubtitle
@@ -75,7 +75,12 @@ const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
             variant={isLight ? 'dark' : 'light'}
           />
 
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: 2, sm: 3 }} flexWrap="wrap">
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={{ xs: 2, sm: 3 }}
+            flexWrap="wrap"
+            sx={{ display: { xs: 'none', md: 'flex' } }}
+          >
             {FOOTER_LINKS.map(({ label, to }) => (
               <Link key={to} component={RouterLink} to={to} sx={linkSx}>
                 {label}
@@ -86,7 +91,7 @@ const LandingFooter: React.FC<LandingFooterProps> = ({ surface = 'dark' }) => {
 
         <Divider
           sx={{
-            my: 3,
+            my: { xs: 1.25, md: 3 },
             borderColor: isLight ? '#E5E7EB' : alpha('#fff', 0.08),
           }}
         />

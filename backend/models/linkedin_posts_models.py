@@ -30,6 +30,44 @@ class PostEngagementMetrics(BaseModel):
         default=0,
         description="Number of followers gained from this post"
     )
+    engagements: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Unipile analytics.engagements; null when provider omitted it",
+    )
+    clickthrough_rate: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        description="Unipile analytics.clickthrough_rate; null when omitted",
+    )
+    page_viewers: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Unipile analytics.page_viewers_from_this_post; null when omitted",
+    )
+    reach: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description=(
+            "Members/users reached (Unipile members_reached / users_reached_counter); "
+            "null when not available"
+        ),
+    )
+
+
+class PostAttachment(BaseModel):
+    """Media attachment on a LinkedIn post (Unipile attachments[] shape)."""
+
+    type: str = Field(default="img", description="Attachment type: img, video, file, etc.")
+    url: Optional[str] = Field(default=None, description="Media URL from Unipile")
+    unavailable: bool = Field(
+        default=False,
+        description="True when Unipile marks the attachment as no longer fetchable",
+    )
+    title: Optional[str] = Field(
+        default=None,
+        description="Optional label for documents/files",
+    )
 
 
 class PostAuthor(BaseModel):
@@ -85,6 +123,10 @@ class LinkedInPost(BaseModel):
         default=None,
         description="Type of reaction by current user (LIKE, etc.)"
     )
+    attachments: list[PostAttachment] = Field(
+        default_factory=list,
+        description="Post media attachments (images, video, documents)",
+    )
 
 
 class PostListResponse(BaseModel):
@@ -105,6 +147,10 @@ class PostListResponse(BaseModel):
     total_count: Optional[int] = Field(
         default=None,
         description="Total number of posts (if available)"
+    )
+    last_synced_at: Optional[datetime] = Field(
+        default=None,
+        description="When the posts were last synced from Unipile (ISO 8601)"
     )
 
 
@@ -162,14 +208,30 @@ class MetricDelta(BaseModel):
 class PostDelta(BaseModel):
     """Per-post delta between two snapshot epochs."""
     post_id: str
+    social_id: Optional[str] = Field(
+        default=None,
+        description="Unipile social_id required for list/reply comments API",
+    )
     text: str
     author_name: str
     share_url: Optional[str] = None
     reactions_delta: int = 0
     comments_delta: int = 0
     impressions_delta: int = 0
+    followers_delta: int = 0
+    clicks_delta: int = 0
+    reposts_delta: int = 0
     engagement_rate_now: float = 0.0
     engagement_rate_before: float = 0.0
+    impressions_now: int = 0
+    reactions_now: int = 0
+    growth_contribution_pct: Optional[float] = Field(
+        default=None,
+        description=(
+            "Share of total positive engagement growth contributed by this post "
+            "across the comparison period (reactions + comments + impressions + followers)"
+        ),
+    )
 
 
 class EngagementSummary(BaseModel):
@@ -178,13 +240,35 @@ class EngagementSummary(BaseModel):
     reactions: MetricDelta
     comments: MetricDelta
     impressions: MetricDelta
+    followers: Optional[MetricDelta] = None
+    clicks: Optional[MetricDelta] = None
+    reposts: Optional[MetricDelta] = None
     avg_engagement_rate_before: float
     avg_engagement_rate_now: float
 
 
 class PostAnalyticsHistoryResponse(BaseModel):
     """Response model for GET /post-analytics/history."""
-    period: dict  # {"from": datetime, "to": datetime}
+    period: dict  # {"from": iso, "to": iso}
     summary: EngagementSummary
     top_gainers: list[PostDelta]
     top_decliners: list[PostDelta]
+    top_posts: list[PostDelta] = Field(default_factory=list)
+    rising_posts: list[PostDelta] = Field(default_factory=list)
+    falling_posts: list[PostDelta] = Field(default_factory=list)
+    period_key: str = Field(
+        default="since_joining",
+        description="Requested comparison window: 1d|7d|15d|30d|since_joining",
+    )
+    baseline_reason: Optional[str] = Field(
+        default=None,
+        description="Why this baseline was chosen, or why history is insufficient",
+    )
+    recommended_sync_cooldown_seconds: int = Field(
+        default=300,
+        description="Suggested client wait between Sync clicks (seconds)",
+    )
+    last_synced_at: Optional[datetime] = Field(
+        default=None,
+        description="When post analytics were last fetched from LinkedIn",
+    )

@@ -3,8 +3,46 @@
  * Separate from linkedInWriterApi.ts (content generation).
  */
 
-import { apiClient, aiApiClient, ConnectionError, NetworkError, RequestTimeoutError } from './client';
+import { apiClient, aiApiClient, getAuthTokenGetter, ConnectionError, NetworkError, RequestTimeoutError } from './client';
 import { getApiBaseUrl } from '../utils/apiUrl';
+
+// ── Auth token cache for avatar proxy URLs (synchronous access for <img> tags) ──
+let cachedSocialAuthToken: string | null = null;
+
+const socialTokenGetter = getAuthTokenGetter();
+if (socialTokenGetter) {
+  socialTokenGetter()
+    .then((token) => {
+      if (token) {
+        cachedSocialAuthToken = token;
+      }
+    })
+    .catch(() => { /* token will be captured from first API call */ });
+}
+
+/** Check whether a URL points to a LinkedIn CDN that needs proxying. */
+export function isLinkedInCdnUrl(url?: string | null): url is string {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return false;
+    const host = parsed.hostname.toLowerCase();
+    return host === 'media.licdn.com' || host.endsWith('.licdn.com');
+  } catch {
+    return false;
+  }
+}
+
+/** Build a proxy URL for LinkedIn CDN images, authenticated for <img> tag use. */
+export function buildAvatarProxyUrl(cdnUrl: string | null | undefined): string | null {
+  if (!cdnUrl || !isLinkedInCdnUrl(cdnUrl)) return null;
+
+  const token = cachedSocialAuthToken;
+  if (!token) return null;
+
+  const baseUrl = getApiBaseUrl();
+  return `${baseUrl}/api/linkedin-social/avatar-proxy?url=${encodeURIComponent(cdnUrl)}&token=${encodeURIComponent(token)}`;
+}
 
 export interface LinkedInConnectionStatus {
   connected: boolean;
@@ -207,6 +245,7 @@ export interface LinkedInProfileOptimizationMeta {
   profile_optimization_updated_at?: string | null;
   active_batch_index?: number;
   remaining_in_backlog?: number;
+  completed_ids_count?: number;
   message?: string | null;
 }
 
@@ -273,33 +312,39 @@ export interface LinkedInProfileCompleteResponse {
 export interface LinkedInPublishPostRequest {
   content: string;
   account_id?: string;
+  /** AI-generated stored image IDs (Phase 3 backend). */
+  image_ids?: string[];
 }
 
 export interface LinkedInPublishPostResponse {
   success: boolean;
   post_id?: string | null;
   post_urn?: string | null;
+  share_url?: string | null;
   provider: string;
   message: string;
   debug_id: string;
+  has_media?: boolean;
 }
 
 const BASE = '/api/linkedin-social';
 
 /** Profile Phases 5–7 can run multiple LLM calls in one GET /profile request. */
-const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 300_000;
+const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 120_000; // 2 minutes
 
-// ── Profile foundation cache (sessionStorage, 30 min TTL) ────────────────────
+// ── Profile foundation cache (localStorage, 24 hour TTL) ──────────────────
+// Profile data rarely changes — users optimize once, may not return for weeks.
+// localStorage survives browser restarts. Force-refresh via the "↻ Refresh"
+// button or invalidateProfileCache(). Write is best-effort (storage-full safe).
 const PROFILE_CACHE_KEY = 'alwrity_linkedin_profile';
-const PROFILE_CACHE_TTL = 30 * 60 * 1000;
+const PROFILE_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
 function readProfileCache(): LinkedInProfileAcquireResponse | null {
   try {
-    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
     if (!raw) return null;
     const { data, cachedAt } = JSON.parse(raw);
     if (!cachedAt || Date.now() - cachedAt > PROFILE_CACHE_TTL) {
-      sessionStorage.removeItem(PROFILE_CACHE_KEY);
       return null;
     }
     return data;
@@ -310,26 +355,66 @@ function readProfileCache(): LinkedInProfileAcquireResponse | null {
 
 function writeProfileCache(data: LinkedInProfileAcquireResponse) {
   try {
-    sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }));
+    // Preserve Phase 7 data from the previous cache if the new data
+    // doesn't include it (e.g. getLinkedInProfileFoundation writes
+    // Phases 1-5 only — we must not overwrite previously-generated
+    // optimization recommendations that live in the same cache key).
+    const stored: LinkedInProfileAcquireResponse = { ...data };
+    if (!stored.profile_optimization?.length) {
+      const prior = readProfileCacheRaw();
+      if (prior?.profile_optimization?.length) {
+        stored.profile_optimization = prior.profile_optimization;
+        stored.profile_optimization_meta = prior.profile_optimization_meta;
+      }
+    }
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ data: stored, cachedAt: Date.now() }));
   } catch { /* storage full */ }
+}
+
+function readProfileCacheRaw(): LinkedInProfileAcquireResponse | null {
+  try {
+    const raw = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw).data;
+  } catch {
+    return null;
+  }
+}
+
+/** Save profile data to localStorage cache from external callers (e.g., after optimization). */
+export function updateProfileCache(data: LinkedInProfileAcquireResponse) {
+  writeProfileCache(data);
+}
+
+/** Force-refresh the profile foundation cache on next fetch. */
+export function invalidateProfileCache() {
+  try { localStorage.removeItem(PROFILE_CACHE_KEY); } catch { /* noop */ }
 }
 
 /** In-flight promise cache so 4+ hook mounts share one request */
 let statusPromiseCache: Promise<LinkedInConnectionStatus> | null = null;
 let statusCacheExpiry = 0;
-const STATUS_CACHE_TTL = 3000;
+const STATUS_CACHE_TTL = 30_000; // 30 seconds — shared across all hook mounts
 
 export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
   if (statusPromiseCache && Date.now() < statusCacheExpiry) {
     return statusPromiseCache;
   }
-  const promise = apiClient.get(`${BASE}/connection/status`).then((r) => r.data);
+  const promise = apiClient
+    .get(`${BASE}/connection/status`)
+    .then((r) => r.data)
+    .catch((err) => {
+      statusPromiseCache = null;
+      throw err;
+    });
   statusPromiseCache = promise;
   statusCacheExpiry = Date.now() + STATUS_CACHE_TTL;
   promise.finally(() => {
     if (Date.now() >= statusCacheExpiry) {
       statusPromiseCache = null;
     }
+  }).catch(() => {
+    /* Suppress unhandled rejection — the caller handles the real error */
   });
   return promise;
 }
@@ -366,13 +451,17 @@ export async function disconnectLinkedIn(): Promise<LinkedInDisconnectResponse> 
   return response.data;
 }
 
-/** Publish the LinkedIn Writer draft as a text-only post to the personal profile. */
+/** Publish the LinkedIn Writer draft as a post to the personal profile (text or text + image). */
 export async function publishLinkedInPost(
   payload: LinkedInPublishPostRequest
 ): Promise<LinkedInPublishPostResponse> {
-  const response = await apiClient.post(`${BASE}/posts/publish`, payload);
+  const response = await apiClient.post(`${BASE}/posts/publish`, payload, {
+    timeout: 180_000,
+  });
   return response.data;
 }
+
+export { publishLinkedInPostWithFile, getLinkedInPublishErrorMessage } from './linkedinPublishApi';
 
 export function getLinkedInSocialErrorMessage(err: unknown): string {
   if (err instanceof RequestTimeoutError) {
@@ -405,8 +494,15 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
 
     if (status === 402) {
       return (
-        'LinkedIn connection requires billing on your Zernio account. ' +
-        'Add a payment method in Zernio, then try connecting again.'
+        'LinkedIn connection requires an active billing plan. ' +
+        'Update billing, then try connecting again.'
+      );
+    }
+
+    if (status === 501) {
+      return (
+        (typeof detail === 'string' && detail.trim()) ||
+        'This LinkedIn analytics feature is not available yet.'
       );
     }
 
@@ -424,7 +520,7 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
     }
 
     if (typeof detail === 'string' && detail.trim()) {
-      if (detail.includes('ZERNIO_API_KEY')) {
+      if (detail.includes('UNIPILE_API_KEY') || detail.includes('LINKEDIN_PROVIDER')) {
         return 'LinkedIn is not configured on this server. Contact your administrator.';
       }
       const lowerDetail = detail.toLowerCase();
@@ -452,9 +548,26 @@ export function getLinkedInSocialErrorMessage(err: unknown): string {
 /** @deprecated Use getLinkedInSocialErrorMessage */
 export const getLinkedInConnectErrorMessage = getLinkedInSocialErrorMessage;
 
+/** In-flight promise cache so 4+ hook mounts share one request */
+let accountsPromiseCache: Promise<LinkedInAccountsResponse> | null = null;
+let accountsCacheExpiry = 0;
+const ACCOUNTS_CACHE_TTL = 3000;
+
 export async function listLinkedInAccounts(): Promise<LinkedInAccountsResponse> {
-  const response = await apiClient.get(`${BASE}/accounts`);
-  return response.data;
+  if (accountsPromiseCache && Date.now() < accountsCacheExpiry) {
+    return accountsPromiseCache;
+  }
+  const promise = apiClient.get(`${BASE}/accounts`).then((r) => r.data);
+  accountsPromiseCache = promise;
+  accountsCacheExpiry = Date.now() + ACCOUNTS_CACHE_TTL;
+  promise.finally(() => {
+    if (Date.now() >= accountsCacheExpiry) {
+      accountsPromiseCache = null;
+    }
+  }).catch(() => {
+    /* Suppress unhandled rejection — the caller handles the real error */
+  });
+  return promise;
 }
 
 export async function listLinkedInOrganizations(
@@ -541,7 +654,12 @@ export async function getLinkedInProfile(
   return response.data;
 }
 
-/** Phases 1–5 only — foundation load on LinkedIn Writer mount (no Phase 6/7). */
+/** Phases 1–5 + 7 (cached) — foundation load on LinkedIn Writer mount.
+ *
+ * Always includes Phase 7 optimization data from the backend SQLite cache
+ * (no LLM trigger unless refresh_profile_optimization is also set).
+ * Falls back to Phases 1-5 only on cold-cache first visits.
+ */
 export async function getLinkedInProfileFoundation(
   refresh = false,
   refreshIntelligence = false
@@ -557,7 +675,12 @@ export async function getLinkedInProfileFoundation(
     if (cached) return cached;
   }
 
-  const data = await getLinkedInProfile({ refresh, refreshIntelligence });
+  const data = await getLinkedInProfile({
+    refresh,
+    refreshIntelligence,
+  });
+  // Note: does NOT request optimization (Phase 7). Existing recommendations
+  // are preserved in localStorage. Phase 7 is loaded on-demand via Refresh.
 
   // Cache the result only for standard foundation loads (not AI refreshes)
   if (!refreshIntelligence) {
@@ -652,6 +775,35 @@ export async function loadNextProfileOptimizationBatch(): Promise<LinkedInProfil
     });
     throw err;
   }
+}
+
+/** Upload a profile photo for the Optimize Profile modal. */
+export async function uploadProfilePhoto(file: File): Promise<{ photo_url: string; filename: string }> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiClient.post(`${BASE}/profile-photo/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+/** Transform an uploaded profile photo into a professional headshot via AI image editing. */
+export async function makeProfilePhotoPresentable(photoUrl: string): Promise<{ photo_url: string; filename: string }> {
+  const formData = new FormData();
+  formData.append('photo_url', photoUrl);
+  const response = await apiClient.post(`${BASE}/profile-photo/make-presentable`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+  return response.data;
+}
+
+/** Download a profile photo as a file attachment. */
+export async function downloadProfilePhoto(photoUrl: string): Promise<Blob> {
+  const filename = photoUrl.split('/').pop() || 'profile_photo.jpg';
+  const response = await apiClient.get(`${BASE}/profile-photo/download/${filename}`, {
+    responseType: 'blob',
+  });
+  return response.data;
 }
 
 const _PHASE_LABELS: Record<number, string> = {

@@ -1,43 +1,71 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import { LI_Z_KNOWLEDGE_CENTER } from "../../utils/linkedInStudioZIndex";
 import {
   KNOWLEDGE_CENTER_FEATURES,
   type KnowledgeCenterFeature,
-} from './knowledgeCenterFeatures';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
+} from "./knowledgeCenterFeatures";
+import { FRAME_COLOR } from "./dashboardWorkflowConfig";
+import { DashboardRailIconButton } from "./DashboardRailIconButton";
+import { StudioModalCloseButton } from "./StudioModalCloseButton";
 
 export type KnowledgeCenterAction =
-  | 'featureMap'
-  | 'contentCoach'
-  | 'persona'
-  | 'bestPractices'
-  | 'quickStart'
-  | 'multimodal'
-  | 'askAlwrity'
+  | "featureMap"
+  | "contentCoach"
+  | "persona"
+  | "bestPractices"
+  | "quickStart"
+  | "multimodal"
+  | "askAlwrity"
   // legacy — kept for backward compatibility
-  | 'factCheck'
-  | 'googleGround'
-  | 'assistive'
-  | 'copilot';
+  | "factCheck"
+  | "googleGround"
+  | "assistive"
+  | "copilot";
 
 interface KnowledgeCenterDockProps {
   onFeatureAction: (action: KnowledgeCenterAction) => void;
   onExpandedChange?: (expanded: boolean) => void;
-  variant?: 'main' | 'rail';
+  variant?: "main" | "rail";
 }
 
 export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
   onFeatureAction,
   onExpandedChange,
-  variant = 'main',
+  variant = "main",
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [gridPos, setGridPos] = useState<{ bottom: number; right: number; width: number } | null>(
-    null
-  );
+  const [gridPos, setGridPos] = useState<{
+    bottom: number;
+    right: number;
+    width: number;
+  } | null>(null);
   const anchorRef = useRef<HTMLDivElement>(null);
-  const isRail = variant === 'rail';
+  const isRail = variant === "rail";
+  /** Always render inline in the rail — structural sidebar, not floating overlay */
+  const useInlinePanel = !isRail;
+
+  useEffect(() => {
+    if (!expanded) return;
+    const onDocumentClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (anchorRef.current?.contains(target)) return;
+      if (
+        (event.target as Element).closest?.(".linkedin-knowledge-center-portal")
+      )
+        return;
+      setExpanded(false);
+    };
+    document.addEventListener("mousedown", onDocumentClick);
+    return () => document.removeEventListener("mousedown", onDocumentClick);
+  }, [expanded]);
 
   useEffect(() => {
     onExpandedChange?.(expanded);
@@ -50,45 +78,43 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     const width = Math.min(720, window.innerWidth - 32);
     const right = Math.max(16, window.innerWidth - rect.right);
     setGridPos({
-      bottom: window.innerHeight - rect.top + 8,
+      bottom: window.innerHeight - rect.top,
       right,
       width,
     });
   }, []);
 
   useLayoutEffect(() => {
-    if (!isRail || !expanded) {
+    if (!isRail || useInlinePanel || !expanded) {
       setGridPos(null);
       return;
     }
     updateGridPosition();
-    window.addEventListener('resize', updateGridPosition);
-    window.addEventListener('scroll', updateGridPosition, true);
+    window.addEventListener("resize", updateGridPosition);
+    window.addEventListener("scroll", updateGridPosition, true);
     return () => {
-      window.removeEventListener('resize', updateGridPosition);
-      window.removeEventListener('scroll', updateGridPosition, true);
+      window.removeEventListener("resize", updateGridPosition);
+      window.removeEventListener("scroll", updateGridPosition, true);
     };
-  }, [isRail, expanded, updateGridPosition]);
+  }, [isRail, useInlinePanel, expanded, updateGridPosition]);
 
   const handleFeatureClick = (feature: KnowledgeCenterFeature) => {
     onFeatureAction(feature.action);
     setExpanded(false);
   };
 
+  const closePanel = () => setExpanded(false);
+
   const gridContent = (
     <div
       className="linkedin-knowledge-center-grid"
       style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(86px, 1fr))',
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(86px, 1fr))",
         gap: 8,
         padding: 10,
-        background: '#ffffff',
-        border: `2px solid ${FRAME_COLOR}`,
-        borderRadius: 14,
-        boxShadow: '0 12px 40px rgba(10, 102, 194, 0.18)',
-        width: '100%',
-        boxSizing: 'border-box',
+        width: "100%",
+        boxSizing: "border-box",
       }}
     >
       {KNOWLEDGE_CENTER_FEATURES.map((feature) => {
@@ -101,29 +127,29 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
             onMouseEnter={() => setHoveredId(feature.id)}
             onMouseLeave={() => setHoveredId(null)}
             style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               gap: 4,
-              padding: '8px 6px',
-              background: '#ffffff',
+              padding: "8px 6px",
+              background: "#ffffff",
               border: `2px solid ${FRAME_COLOR}`,
               borderRadius: 10,
-              cursor: 'pointer',
-              textAlign: 'center',
+              cursor: "pointer",
+              textAlign: "center",
               minWidth: 0,
-              transform: isHovered ? 'translateY(-2px) scale(1.02)' : 'none',
+              transform: isHovered ? "translateY(-2px) scale(1.02)" : "none",
               boxShadow: isHovered
                 ? `0 6px 18px ${feature.accent}33`
-                : '0 2px 6px rgba(0,0,0,0.04)',
-              transition: 'transform 160ms ease, box-shadow 160ms ease',
+                : "0 2px 6px rgba(0,0,0,0.04)",
+              transition: "transform 160ms ease, box-shadow 160ms ease",
             }}
           >
             {feature.image ? (
               <img
                 src={feature.image}
                 alt={feature.title}
-                style={{ width: 38, height: 28, objectFit: 'contain' }}
+                style={{ width: 38, height: 28, objectFit: "contain" }}
               />
             ) : (
               <span style={{ fontSize: 22 }} aria-hidden>
@@ -143,12 +169,12 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
             <span
               style={{
                 fontSize: 9,
-                color: '#64748b',
+                color: "#64748b",
                 lineHeight: 1.3,
-                display: '-webkit-box',
+                display: "-webkit-box",
                 WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
               }}
             >
               {feature.description}
@@ -159,65 +185,69 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
     </div>
   );
 
+  const knowledgeCenterPanel = (
+    <div className="linkedin-knowledge-center-panel">
+      <div className="linkedin-knowledge-center-panel-header">
+        <h3 className="linkedin-knowledge-center-panel-title">
+          Knowledge Center
+        </h3>
+        <StudioModalCloseButton
+          onClick={closePanel}
+          ariaLabel="Close Knowledge Center"
+        />
+      </div>
+      {gridContent}
+    </div>
+  );
+
   const triggerButton = (
-    <button
-      type="button"
+    <DashboardRailIconButton
+      label="Knowledge Center"
+      icon="knowledge"
       onClick={() => setExpanded((open) => !open)}
-      aria-expanded={expanded}
-      style={{
-        padding: isRail ? '8px 10px' : '8px 14px',
-        width: isRail ? '100%' : undefined,
-        background: '#ffffff',
-        border: `2px solid ${FRAME_COLOR}`,
-        borderRadius: expanded && !isRail ? '12px 12px 0 0' : 10,
-        boxShadow: '0 4px 16px rgba(10, 102, 194, 0.12)',
-        fontSize: isRail ? 10 : 11,
-        fontWeight: 700,
-        color: '#0a66c2',
-        cursor: 'pointer',
-        textTransform: 'uppercase',
-        letterSpacing: '0.04em',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      Knowledge center
-    </button>
+      open={expanded}
+      ariaExpanded={expanded}
+    />
   );
 
   const portaledGrid =
     isRail &&
+    !useInlinePanel &&
     expanded &&
     gridPos &&
-    typeof document !== 'undefined' &&
+    typeof document !== "undefined" &&
     createPortal(
       <div
         className="linkedin-knowledge-center-portal"
         style={{
-          position: 'fixed',
+          position: "fixed",
           bottom: gridPos.bottom,
           right: gridPos.right,
           width: gridPos.width,
-          zIndex: 12000,
-          pointerEvents: 'auto',
+          zIndex: LI_Z_KNOWLEDGE_CENTER,
+          pointerEvents: "auto",
+          paddingBottom: 8,
+          boxSizing: "border-box",
         }}
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
       >
-        {gridContent}
+        {knowledgeCenterPanel}
       </div>,
-      document.body
+      document.body,
     );
 
   if (isRail) {
     return (
       <>
         {portaledGrid}
-        <div
-          ref={anchorRef}
-          className="linkedin-knowledge-center-rail"
-          onMouseEnter={() => setExpanded(true)}
-          onMouseLeave={() => setExpanded(false)}
-        >
+        <div ref={anchorRef} className="linkedin-knowledge-center-rail">
+          {useInlinePanel && expanded && (
+            <div
+              className="linkedin-knowledge-center-inline"
+              style={{ marginBottom: 8 }}
+            >
+              {knowledgeCenterPanel}
+            </div>
+          )}
           {triggerButton}
         </div>
       </>
@@ -226,12 +256,10 @@ export const KnowledgeCenterDock: React.FC<KnowledgeCenterDockProps> = ({
 
   return (
     <div className="linkedin-knowledge-center-dock">
-      <div
-        className="linkedin-knowledge-center-dock-inner"
-        onMouseEnter={() => setExpanded(true)}
-        onMouseLeave={() => setExpanded(false)}
-      >
-        {expanded && <div style={{ marginBottom: 8 }}>{gridContent}</div>}
+      <div ref={anchorRef} className="linkedin-knowledge-center-dock-inner">
+        {expanded && (
+          <div style={{ marginBottom: 8 }}>{knowledgeCenterPanel}</div>
+        )}
         {triggerButton}
       </div>
     </div>

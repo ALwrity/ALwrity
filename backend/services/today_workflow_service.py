@@ -130,7 +130,7 @@ def _resolve_calendar_pillar(content_type: str, platform: str) -> str:
 
 
 _PLATFORM_ACTION_URL = {
-    "linkedin": "/linkedin-writer",
+    "linkedin": "/linkedin-studio",
     "facebook": "/facebook-writer",
     "twitter": "/twitter-writer",
     "instagram": "/instagram-writer",
@@ -140,7 +140,7 @@ _PLATFORM_ACTION_URL = {
 
 _CONTENT_ACTION_URL = {
     "blog_post": "/blog-writer",
-    "linkedin_post": "/linkedin-writer",
+    "linkedin_post": "/linkedin-studio",
     "facebook_post": "/facebook-writer",
     "seo_page": "/seo-dashboard",
     "video": "/video-writer",
@@ -591,24 +591,29 @@ def build_grounding_context(db: Session, user_id: str, date: str) -> Dict[str, A
     }
 
 
-import asyncio
-from services.intelligence.agents.agent_orchestrator import AgentOrchestrationService
-from services.task_memory_service import TaskMemoryService
+_orchestration_service = None
+_orchestration_service_checked = False
 
-# Initialize orchestration service (singleton) with resilient fallback.
-# If the constructor fails (e.g., missing AI provider config, import error in
-# a transitive dependency), we leave the module usable by setting the singleton
-# to None. The agent committee will be skipped, and only the LLM fallback path
-# will produce tasks. This prevents a transient init failure from taking down
-# the entire scheduler import chain.
-try:
-    orchestration_service = AgentOrchestrationService()
-except Exception as _orch_init_err:
-    logger.error(
-        f"AgentOrchestrationService init failed at module load; "
-        f"agent committee will be disabled: {_orch_init_err}"
-    )
-    orchestration_service = None
+
+def _get_orchestration_service():
+    """Lazy-load agent orchestrator so lean LinkedIn-only startup avoids SIF/SEO deps."""
+    global _orchestration_service, _orchestration_service_checked
+    if _orchestration_service_checked:
+        return _orchestration_service
+
+    _orchestration_service_checked = True
+    try:
+        from services.intelligence.agents.agent_orchestrator import AgentOrchestrationService
+
+        _orchestration_service = AgentOrchestrationService()
+    except Exception as _orch_init_err:
+        logger.error(
+            f"AgentOrchestrationService init failed at module load; "
+            f"agent committee will be disabled: {_orch_init_err}"
+        )
+        _orchestration_service = None
+    return _orchestration_service
+
 
 async def generate_agent_enhanced_plan(
     db: Session,
@@ -617,11 +622,15 @@ async def generate_agent_enhanced_plan(
     grounding: Optional[Dict[str, Any]] = None,
     strict_contextuality: bool = False,
 ) -> Dict[str, Any]:
+    import asyncio
+    from services.task_memory_service import TaskMemoryService
+
     activity = AgentActivityService(db, user_id)
     grounding = grounding or build_grounding_context(db, user_id, date)
     memory_service = TaskMemoryService(user_id, db)
 
     # 1. Get Orchestrator
+    orchestration_service = _get_orchestration_service()
     if orchestration_service is None:
         logger.warning(
             f"OrchestrationService unavailable for user {user_id}; "
@@ -902,7 +911,7 @@ async def generate_agent_enhanced_plan(
         "- If competitors are listed, include a task to analyze one of them.\n"
         "- Prefer actionable tasks that can be completed today.\n"
         "- Use these common actionUrl routes when relevant: "
-        "/content-planning-dashboard, /blog-writer, /linkedin-writer, /facebook-writer, /seo-dashboard, /scheduler-dashboard.\n"
+        "/content-planning-dashboard, /blog-writer, /linkedin-studio, /facebook-writer, /seo-dashboard, /scheduler-dashboard.\n"
         "- Keep descriptions concise.\n\n"
         f"Grounding context (Alerts):\n{json.dumps(grounding.get('recent_agent_alerts', []), indent=2)}\n\n"
         f"Calendar events scheduled for today (must inform the 'generate' pillar):\n"

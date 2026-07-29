@@ -106,3 +106,37 @@ export async function fetchLinkedInImageBlobUrl(imageId: string): Promise<string
   });
   return URL.createObjectURL(response.data);
 }
+
+export interface LinkedInImageUploadResult {
+  success: boolean;
+  imageId?: string;
+  imageUrl?: string;
+  error?: string;
+}
+
+/** Upload a local image for LinkedIn Studio editor / publish flows. */
+export async function uploadLinkedInImage(file: File): Promise<LinkedInImageUploadResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await aiApiClient.post('/api/linkedin/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
+  const data = response.data;
+  if (!data?.success) {
+    return {
+      success: false,
+      error: data?.error || 'Image upload failed',
+    };
+  }
+
+  const imageId = normalizeImageId(data.image_id);
+  const imageUrl = data.image_url || (imageId ? resolveLinkedInImageUrl(imageId) : undefined);
+
+  return {
+    success: true,
+    imageId,
+    imageUrl,
+  };
+}

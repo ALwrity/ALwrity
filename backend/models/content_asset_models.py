@@ -64,6 +64,9 @@ class AssetSource(enum.Enum):
     # Voice Cloner
     VOICE_CLONER = "voice_cloner"
 
+    # GIF Maker
+    GIF_MAKER = "gif_maker"
+
 
 class ContentAsset(Base):
     """

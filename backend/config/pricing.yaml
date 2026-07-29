@@ -1,0 +1,362 @@
+model_pricing:
+- provider: gemini
+  model: gemini-2.5-pro
+  input_per_1m_tokens: 1.25
+  output_per_1m_tokens: 10.0
+  notes: Gemini 2.5 Pro - State-of-the-art multipurpose model for coding and complex reasoning
+- provider: gemini
+  model: gemini-2.5-pro-large
+  input_per_1m_tokens: 2.5
+  output_per_1m_tokens: 15.0
+  notes: Gemini 2.5 Pro - Large context model for prompts > 200k tokens
+- provider: gemini
+  model: gemini-2.5-flash
+  input_per_1m_tokens: 0.3
+  output_per_1m_tokens: 2.5
+  notes: Gemini 2.5 Flash - Hybrid reasoning model with 1M token context window
+- provider: gemini
+  model: gemini-2.5-flash-audio
+  input_per_1m_tokens: 1.0
+  output_per_1m_tokens: 2.5
+  notes: Gemini 2.5 Flash - Audio input model
+- provider: gemini
+  model: gemini-2.5-flash-lite
+  input_per_1m_tokens: 0.1
+  output_per_1m_tokens: 0.4
+  notes: Gemini 2.5 Flash-Lite - Smallest and most cost-effective model for at-scale usage
+- provider: gemini
+  model: gemini-2.5-flash-lite-audio
+  input_per_1m_tokens: 0.3
+  output_per_1m_tokens: 0.4
+  notes: Gemini 2.5 Flash-Lite - Audio input model
+- provider: gemini
+  model: gemini-1.5-flash
+  input_per_1m_tokens: 0.075
+  output_per_1m_tokens: 0.3
+  notes: Gemini 1.5 Flash - Fast multimodal model with 1M token context window
+- provider: gemini
+  model: gemini-1.5-flash-large
+  input_per_1m_tokens: 0.15
+  output_per_1m_tokens: 0.6
+  notes: Gemini 1.5 Flash - Large context model for prompts > 128k tokens
+- provider: gemini
+  model: gemini-1.5-flash-8b
+  input_per_1m_tokens: 0.0375
+  output_per_1m_tokens: 0.15
+  notes: Gemini 1.5 Flash-8B - Smallest model for lower intelligence use cases
+- provider: gemini
+  model: gemini-1.5-flash-8b-large
+  input_per_1m_tokens: 0.075
+  output_per_1m_tokens: 0.3
+  notes: Gemini 1.5 Flash-8B - Large context model for prompts > 128k tokens
+- provider: gemini
+  model: gemini-1.5-pro
+  input_per_1m_tokens: 1.25
+  output_per_1m_tokens: 5.0
+  notes: Gemini 1.5 Pro - Highest intelligence model with 2M token context window
+- provider: gemini
+  model: gemini-1.5-pro-large
+  input_per_1m_tokens: 2.5
+  output_per_1m_tokens: 10.0
+  notes: Gemini 1.5 Pro - Large context model for prompts > 128k tokens
+- provider: gemini
+  model: gemini-embedding
+  input_per_1m_tokens: 0.15
+  output_per_1m_tokens: 0.0
+  notes: Gemini Embedding - Newest embeddings model with higher rate limits
+- provider: gemini
+  model: gemini-grounding-search
+  per_request: 0.035
+  input_per_1m_tokens: 0.0
+  output_per_1m_tokens: 0.0
+  notes: Grounding with Google Search - 1,500 RPD free, then $35/1K requests
+- provider: openai
+  model: gpt-4o
+  input_per_1m_tokens: 2.5
+  output_per_1m_tokens: 10.0
+  notes: GPT-4o - Latest OpenAI model
+- provider: openai
+  model: gpt-4o-mini
+  input_per_1m_tokens: 0.15
+  output_per_1m_tokens: 0.6
+  notes: GPT-4o Mini - Cost-effective model
+- provider: anthropic
+  model: claude-3.5-sonnet
+  input_per_1m_tokens: 3.0
+  output_per_1m_tokens: 15.0
+  notes: Claude 3.5 Sonnet - Anthropic's flagship model
+- provider: mistral
+  model: openai/gpt-oss-120b:groq
+  input_per_1m_tokens: ${HUGGINGFACE_INPUT_TOKEN_COST:-1.00}
+  output_per_1m_tokens: ${HUGGINGFACE_OUTPUT_TOKEN_COST:-3.00}
+  notes: GPT-OSS-120B via HuggingFace/Groq
+- provider: mistral
+  model: gpt-oss-120b
+  input_per_1m_tokens: ${HUGGINGFACE_INPUT_TOKEN_COST:-1.00}
+  output_per_1m_tokens: ${HUGGINGFACE_OUTPUT_TOKEN_COST:-3.00}
+  notes: GPT-OSS-120B via HuggingFace/Groq
+- provider: mistral
+  model: default
+  input_per_1m_tokens: ${HUGGINGFACE_INPUT_TOKEN_COST:-1.00}
+  output_per_1m_tokens: ${HUGGINGFACE_OUTPUT_TOKEN_COST:-3.00}
+  notes: HuggingFace default model pricing
+- provider: tavily
+  model: tavily-search
+  per_request: 0.001
+  notes: Tavily AI Search API
+- provider: serper
+  model: serper-search
+  per_request: 0.001
+  notes: Serper Google Search API
+- provider: metaphor
+  model: metaphor-search
+  per_request: 0.003
+  notes: Metaphor/Exa AI Search API
+- provider: firecrawl
+  model: firecrawl-extract
+  per_page: 0.002
+  notes: Firecrawl Web Extraction API
+- provider: exa
+  model: exa-search
+  per_request: 0.005
+  notes: Exa Neural Search API
+- provider: stability
+  model: stable-diffusion
+  per_image: 0.04
+  notes: Stability AI Image Generation
+- provider: stability
+  model: qwen-image
+  per_request: 0.03
+  per_image: 0.03
+  notes: WaveSpeed Qwen Image (OSS) - Fast generation, cost-effective
+- provider: stability
+  model: ideogram-v3-turbo
+  per_request: 0.05
+  per_image: 0.05
+  notes: WaveSpeed Ideogram V3 Turbo (OSS) - Photorealistic, text rendering
+- provider: image_edit
+  model: qwen-edit
+  per_request: 0.02
+  notes: WaveSpeed Qwen Image Edit (OSS) - Budget editing, bilingual
+- provider: image_edit
+  model: qwen-edit-plus
+  per_request: 0.02
+  notes: WaveSpeed Qwen Image Edit Plus (OSS) - Multi-image editing
+- provider: image_edit
+  model: flux-kontext-pro
+  per_request: 0.04
+  notes: WaveSpeed FLUX Kontext Pro (OSS) - Professional editing, typography
+- provider: video
+  model: tencent/HunyuanVideo
+  per_request: 0.1
+  notes: HuggingFace AI Video Generation (HunyuanVideo)
+- provider: video
+  model: default
+  per_request: 0.25
+  notes: 'AI Video Generation default pricing (OSS: WAN 2.5)'
+- provider: video
+  model: kling-v2.5-turbo-std-5s
+  per_request: 0.21
+  notes: WaveSpeed Kling v2.5 Turbo Std Image-to-Video (5 seconds)
+- provider: video
+  model: kling-v2.5-turbo-std-10s
+  per_request: 0.42
+  notes: WaveSpeed Kling v2.5 Turbo Std Image-to-Video (10 seconds)
+- provider: video
+  model: wavespeed-ai/infinitetalk
+  per_request: 0.3
+  notes: WaveSpeed InfiniteTalk (image + audio to talking avatar video)
+- provider: video
+  model: wan-2.5
+  per_request: 0.25
+  notes: WaveSpeed WAN 2.5 (OSS) - Text-to-Video, Image-to-Video, cost-effective
+- provider: video
+  model: alibaba/wan-2.5
+  per_request: 0.25
+  notes: WaveSpeed WAN 2.5 (OSS) - Alternative path, same model
+- provider: video
+  model: seedance-1.5-pro
+  per_request: 0.4
+  notes: WaveSpeed Seedance 1.5 Pro (OSS) - Longer duration videos (10-30 sec)
+- provider: audio
+  model: minimax/speech-02-hd
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  per_request: 0.0
+  notes: AI Audio Generation (Text-to-Speech) - Minimax Speech 02 HD via WaveSpeed
+- provider: audio
+  model: minimax/voice-clone
+  per_request: 0.5
+  input_per_1m_tokens: 0.0
+  output_per_1m_tokens: 0.0
+  notes: MiniMax Voice Clone via WaveSpeed (per run pricing)
+- provider: audio
+  model: wavespeed-ai/qwen3-tts/voice-clone
+  per_request: 0.005
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  notes: Qwen3-TTS Voice Clone via WaveSpeed (cost depends on text length)
+- provider: audio
+  model: wavespeed-ai/cosyvoice-tts/voice-clone
+  per_request: 0.005
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  notes: CosyVoice-TTS Voice Clone via WaveSpeed (cost depends on text length)
+- provider: audio
+  model: default
+  input_per_1m_tokens: 50.0
+  output_per_1m_tokens: 0.0
+  per_request: 0.0
+  notes: AI Audio Generation default pricing
+- provider: audio
+  model: alwrity-ai/qwen3-tts/voice-clone
+  per_request: 0.1
+  input_per_1m_tokens: 10.0
+  output_per_1m_tokens: 0.0
+  notes: Alwrity Qwen3 Voice Clone (Efficient)
+- provider: audio
+  model: alwrity-ai/cosyvoice/voice-clone
+  per_request: 0.15
+  input_per_1m_tokens: 10.0
+  output_per_1m_tokens: 0.0
+  notes: Alwrity CosyVoice Clone (High Fidelity)
+- provider: wavespeed
+  model: openai/gpt-oss-120b
+  input_per_1m_tokens: 0.6
+  output_per_1m_tokens: 0.6
+  notes: WaveSpeed GPT-OSS 120B (Cerebras) - Fast text generation
+- provider: wavespeed
+  model: openai/gpt-oss-120b:cerebras
+  input_per_1m_tokens: 0.6
+  output_per_1m_tokens: 0.6
+  notes: WaveSpeed GPT-OSS 120B (Cerebras) - Fast text generation
+- provider: wavespeed
+  model: openai/gpt-oss-20b
+  input_per_1m_tokens: 0.2
+  output_per_1m_tokens: 0.2
+  notes: WaveSpeed GPT-OSS 20B (Cerebras) - Cost-effective text generation
+plans:
+- name: Free
+  tier: free
+  price_monthly: 0
+  price_yearly: 0
+  monthly_cost_cap: 2.0
+  limits:
+    ai_text_generation_calls_limit: 50
+    gemini_calls_limit: 50
+    openai_calls_limit: 0
+    anthropic_calls_limit: 0
+    mistral_calls_limit: 0
+    tavily_calls_limit: 10
+    serper_calls_limit: 10
+    metaphor_calls_limit: 0
+    firecrawl_calls_limit: 0
+    stability_calls_limit: 10
+    exa_calls_limit: 10
+    video_calls_limit: 2
+    image_edit_calls_limit: 5
+    audio_calls_limit: 10
+    wavespeed_calls_limit: 0
+    gemini_tokens_limit: 50000
+    openai_tokens_limit: 0
+    anthropic_tokens_limit: 0
+    mistral_tokens_limit: 0
+  features:
+  - basic_content_generation
+  - limited_research
+  description: Perfect for trying out ALwrity
+- name: Basic
+  tier: basic
+  price_monthly: 29
+  price_yearly: 290
+  monthly_cost_cap: 25.0
+  limits:
+    ai_text_generation_calls_limit: 500
+    gemini_calls_limit: 1000
+    openai_calls_limit: 500
+    anthropic_calls_limit: 200
+    mistral_calls_limit: 500
+    tavily_calls_limit: 200
+    serper_calls_limit: 200
+    metaphor_calls_limit: 100
+    firecrawl_calls_limit: 100
+    stability_calls_limit: 25
+    exa_calls_limit: 100
+    video_calls_limit: 10
+    image_edit_calls_limit: 25
+    audio_calls_limit: 100
+    wavespeed_calls_limit: 200
+    gemini_tokens_limit: 100000
+    openai_tokens_limit: 100000
+    anthropic_tokens_limit: 100000
+    mistral_tokens_limit: 100000
+  features:
+  - full_content_generation
+  - advanced_research
+  - basic_analytics
+  - all_tools_access
+  - oss_models_priority
+  description: Perfect for individuals and small teams. Access all ALwrity features with generous limits powered by OSS AI
+    models.
+- name: Pro
+  tier: pro
+  price_monthly: 79
+  price_yearly: 790
+  monthly_cost_cap: 100.0
+  limits:
+    ai_text_generation_calls_limit: 3000
+    gemini_calls_limit: 5000
+    openai_calls_limit: 2500
+    anthropic_calls_limit: 1000
+    mistral_calls_limit: 2500
+    tavily_calls_limit: 1000
+    serper_calls_limit: 1000
+    metaphor_calls_limit: 500
+    firecrawl_calls_limit: 500
+    stability_calls_limit: 100
+    exa_calls_limit: 500
+    video_calls_limit: 30
+    image_edit_calls_limit: 100
+    audio_calls_limit: 100
+    wavespeed_calls_limit: 500
+    gemini_tokens_limit: 5000000
+    openai_tokens_limit: 2500000
+    anthropic_tokens_limit: 1000000
+    mistral_tokens_limit: 2500000
+  features:
+  - unlimited_content_generation
+  - premium_research
+  - advanced_analytics
+  - priority_support
+  description: Perfect for growing businesses
+- name: Enterprise
+  tier: enterprise
+  price_monthly: 199
+  price_yearly: 1990
+  monthly_cost_cap: 500.0
+  limits:
+    ai_text_generation_calls_limit: 0
+    gemini_calls_limit: 0
+    openai_calls_limit: 0
+    anthropic_calls_limit: 0
+    mistral_calls_limit: 0
+    tavily_calls_limit: 0
+    serper_calls_limit: 0
+    metaphor_calls_limit: 0
+    firecrawl_calls_limit: 0
+    stability_calls_limit: 0
+    exa_calls_limit: 0
+    video_calls_limit: 0
+    image_edit_calls_limit: 0
+    audio_calls_limit: 0
+    wavespeed_calls_limit: 0
+    gemini_tokens_limit: 0
+    openai_tokens_limit: 0
+    anthropic_tokens_limit: 0
+    mistral_tokens_limit: 0
+  features:
+  - unlimited_everything
+  - white_label
+  - dedicated_support
+  - custom_integrations
+  description: For large organizations with high-volume needs

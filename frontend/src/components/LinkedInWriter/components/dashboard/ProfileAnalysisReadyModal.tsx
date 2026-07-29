@@ -1,8 +1,10 @@
-import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
-import { OptimiseProfileControl } from './OptimiseProfileControl';
-import { getProfileStrengthLabel as getProfileStrengthLabelImpl } from '../../utils/profileStrengthUtils';
+import React, { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { LI_Z_TOUR } from "../../utils/linkedInStudioZIndex";
+import { FRAME_COLOR } from "./dashboardWorkflowConfig";
+import { OptimiseProfileControl } from "./OptimiseProfileControl";
+import { getProfileStrengthLabel as getProfileStrengthLabelImpl } from "../../utils/profileStrengthUtils";
+import { StudioModalCloseButton } from "./StudioModalCloseButton";
 
 interface ProfileAnalysisReadyModalProps {
   open: boolean;
@@ -16,11 +18,13 @@ interface ProfileAnalysisReadyModalProps {
   isProfileComplete?: boolean;
 }
 
-export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps> = ({
+export const ProfileAnalysisReadyModal: React.FC<
+  ProfileAnalysisReadyModalProps
+> = ({
   open,
   profileStrengthPercent,
   strengthLabel,
-  strengthTooltip = '',
+  strengthTooltip = "",
   actionPoints,
   onOptimiseProfile,
   onDismiss,
@@ -28,12 +32,12 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
   isProfileComplete = true,
 }) => {
   // Global 2: Accessibility - Focus management
-  const primaryButtonRef = useRef<HTMLButtonElement>(null);
+  const primaryButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open && primaryButtonRef.current) {
-      // Move focus to primary action button when modal opens
-      primaryButtonRef.current.focus();
+      const btn = primaryButtonRef.current.querySelector("button");
+      btn?.focus();
     }
   }, [open]);
 
@@ -45,13 +49,13 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
       aria-modal="true"
       aria-labelledby="profile-analysis-ready-title"
       style={{
-        position: 'fixed',
+        position: "fixed",
         inset: 0,
-        zIndex: 13000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.5)',
+        zIndex: LI_Z_TOUR,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(15, 23, 42, 0.5)",
         padding: 20,
       }}
       onClick={onDismiss}
@@ -59,93 +63,107 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: 'min(520px, 100%)',
+          width: "min(520px, 100%)",
           maxWidth: 480,
-          maxHeight: 'calc(100vh - 40px)',
-          overflowY: 'auto',
-          background: '#ffffff',
+          maxHeight: "calc(100vh - 40px)",
+          overflowY: "auto",
+          background: "#ffffff",
           borderRadius: 16,
           border: `2px solid ${FRAME_COLOR}`,
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.18)',
-          overflow: 'hidden',
+          boxShadow: "0 24px 64px rgba(0, 0, 0, 0.18)",
+          overflow: "hidden",
         }}
       >
         <div
           style={{
-            padding: '18px 22px',
+            padding: "18px 22px",
             background: FRAME_COLOR,
             borderBottom: `1px solid ${FRAME_COLOR}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             gap: 8,
           }}
         >
           <h2
             id="profile-analysis-ready-title"
-            style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0a66c2' }}
+            style={{
+              margin: 0,
+              fontSize: 18,
+              fontWeight: 700,
+              color: "#0a66c2",
+            }}
           >
             Profile analysis ready
           </h2>
-          <button
-            ref={primaryButtonRef}
-            type="button"
-            onClick={onDismiss}
-            aria-label="Close"
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: '#475569',
-              fontSize: 20,
-              lineHeight: 1,
-              cursor: 'pointer',
-              padding: 2,
-            }}
-          >
-            ✕
-          </button>
+          <StudioModalCloseButton onClick={onDismiss} ariaLabel="Close" />
         </div>
 
-        <div style={{ padding: '22px 24px' }}>
-          <p style={{ margin: '0 0 14px', fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+        <div style={{ padding: "22px 24px" }}>
+          <p
+            style={{
+              margin: "0 0 14px",
+              fontSize: 13,
+              color: "#64748b",
+              lineHeight: 1.5,
+            }}
+          >
             {isProfileComplete
-              ? 'Your score reflects LinkedIn best-practice checks — headline depth, summary, skills, photo, and more.'
-              : 'Finish required profile fields to unlock your full optimization score.'}
+              ? "Your score reflects LinkedIn best-practice checks — headline depth, summary, skills, photo, and more."
+              : "Finish required profile fields to unlock your full optimization score."}
           </p>
 
           <div
             style={{
-              display: 'flex',
-              alignItems: 'baseline',
+              display: "flex",
+              alignItems: "baseline",
               gap: 8,
               marginBottom: strengthTooltip ? 8 : 16,
-              flexWrap: 'wrap',
+              flexWrap: "wrap",
             }}
             title={strengthTooltip}
           >
-            <span style={{ fontSize: 14, color: '#64748b', fontWeight: 600 }}>Profile strength</span>
-            <span style={{ fontSize: 28, fontWeight: 800, color: '#059669' }}>
+            <span style={{ fontSize: 14, color: "#64748b", fontWeight: 600 }}>
+              Profile strength
+            </span>
+            <span style={{ fontSize: 28, fontWeight: 800, color: "#059669" }}>
               {profileStrengthPercent}%
             </span>
-            <span style={{ fontSize: 13, color: '#475569' }}>{strengthLabel}</span>
+            <span style={{ fontSize: 13, color: "#475569" }}>
+              {strengthLabel}
+            </span>
           </div>
 
           {strengthTooltip && (
-            <p style={{ margin: '0 0 16px', fontSize: 12, color: '#94a3b8', lineHeight: 1.45 }}>
+            <p
+              style={{
+                margin: "0 0 16px",
+                fontSize: 12,
+                color: "#94a3b8",
+                lineHeight: 1.45,
+              }}
+            >
               {strengthTooltip}
             </p>
           )}
 
           {actionPoints.length > 0 && (
             <>
-              <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+              <p
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#1e293b",
+                }}
+              >
                 Action these first
               </p>
               <ul
                 style={{
-                  margin: '0 0 20px',
+                  margin: "0 0 20px",
                   paddingLeft: 20,
-                  color: '#475569',
+                  color: "#475569",
                   fontSize: 13,
                   lineHeight: 1.55,
                 }}
@@ -159,27 +177,36 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
             </>
           )}
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <OptimiseProfileControl
-              onOptimiseProfile={onOptimiseProfile}
-              profileStrengthPercent={profileStrengthPercent}
-              strengthLabel={strengthLabel}
-              strengthTooltip={strengthTooltip}
-              isDisabled={isOptimiseDisabled}
-              variant="capsule"
-            />
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              alignItems: "center",
+            }}
+          >
+            <div ref={primaryButtonRef}>
+              <OptimiseProfileControl
+                onOptimiseProfile={onOptimiseProfile}
+                profileStrengthPercent={profileStrengthPercent}
+                strengthLabel={strengthLabel}
+                strengthTooltip={strengthTooltip}
+                isDisabled={isOptimiseDisabled}
+                variant="capsule"
+              />
+            </div>
             <button
               type="button"
               onClick={onDismiss}
               style={{
-                padding: '12px 18px',
+                padding: "12px 18px",
                 borderRadius: 10,
-                border: '1px solid #e2e8f0',
-                background: '#fff',
-                color: '#64748b',
+                border: "1px solid #e2e8f0",
+                background: "#fff",
+                color: "#64748b",
                 fontWeight: 600,
                 fontSize: 14,
-                cursor: 'pointer',
+                cursor: "pointer",
               }}
             >
               Later
@@ -190,7 +217,9 @@ export const ProfileAnalysisReadyModal: React.FC<ProfileAnalysisReadyModalProps>
     </div>
   );
 
-  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : modalContent;
+  return typeof document !== "undefined"
+    ? createPortal(modalContent, document.body)
+    : modalContent;
 };
 
 export function getProfileStrengthLabel(percent: number): string {
@@ -201,31 +230,35 @@ export function buildProfileActionPoints(
   missingFields: string[] = [],
   optionalMissing: string[] = [],
   fallbackTips: string[] = [],
-  optimizationGapsCount?: number | null
+  optimizationGapsCount?: number | null,
 ): string[] {
   const formatField = (field: string) =>
-    field.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+    field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 
-  const fromRequired = missingFields.slice(0, 3).map((f) => `Add your ${formatField(f)}`);
-  const fromOptional = optionalMissing.slice(0, 2).map((f) => `Enhance ${formatField(f)}`);
+  const fromRequired = missingFields
+    .slice(0, 3)
+    .map((f) => `Add your ${formatField(f)}`);
+  const fromOptional = optionalMissing
+    .slice(0, 2)
+    .map((f) => `Enhance ${formatField(f)}`);
   const combined = [...fromRequired, ...fromOptional];
 
   if (combined.length > 0) return combined.slice(0, 4);
   if (fallbackTips.length > 0) return fallbackTips.slice(0, 4);
 
   if ((optimizationGapsCount ?? 0) > 0) {
-    const gapLabel = optimizationGapsCount === 1 ? 'area' : 'areas';
+    const gapLabel = optimizationGapsCount === 1 ? "area" : "areas";
     return [
       `${optimizationGapsCount} improvement ${gapLabel} found from LinkedIn best practices`,
-      'Open Optimise Profile for step-by-step suggestions',
-      'Strengthen your headline for clearer positioning',
-      'Expand your About section with outcomes and keywords',
+      "Open Optimise Profile for step-by-step suggestions",
+      "Strengthen your headline for clearer positioning",
+      "Expand your About section with outcomes and keywords",
     ].slice(0, 4);
   }
 
   return [
-    'Strengthen your headline for clearer positioning',
-    'Expand your About section with outcomes and keywords',
-    'Add skills that match your target audience',
+    "Strengthen your headline for clearer positioning",
+    "Expand your About section with outcomes and keywords",
+    "Add skills that match your target audience",
   ];
 }

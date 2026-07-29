@@ -26,7 +26,7 @@ from services.story_writer.audio_generation_service import StoryAudioGenerationS
 from utils.asset_tracker import save_asset_to_library
 
 from ..utils.auth import require_authenticated_user
-from ..utils.media_utils import resolve_media_file, resolve_story_media_path
+from ..utils.media_utils import resolve_story_media_path
 
 
 router = APIRouter()
@@ -185,8 +185,8 @@ async def serve_scene_image(
     Query parameter is useful for HTML elements like <img> that cannot send custom headers.
     """
     try:
-        require_authenticated_user(current_user)
-        image_path = resolve_media_file(image_service.output_dir, image_filename)
+        user_id = require_authenticated_user(current_user)
+        image_path = resolve_story_media_path(image_filename, "image", user_id)
         return FileResponse(path=str(image_path), media_type="image/png", filename=image_filename)
 
     except HTTPException:
@@ -348,8 +348,8 @@ async def serve_scene_audio(
 ):
     """Serve a generated story scene audio file."""
     try:
-        require_authenticated_user(current_user)
-        audio_path = resolve_media_file(audio_service.output_dir, audio_filename)
+        user_id = require_authenticated_user(current_user)
+        audio_path = resolve_story_media_path(audio_filename, "audio", user_id)
         return FileResponse(path=str(audio_path), media_type="audio/mpeg", filename=audio_filename)
 
     except HTTPException:

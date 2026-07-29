@@ -1,20 +1,20 @@
-import React from 'react';
+import React from "react";
 
 const actionButtonStyle: React.CSSProperties = {
-  padding: '8px 14px',
+  padding: "8px 14px",
   borderRadius: 8,
-  border: '1px solid #cbd5e1',
-  backgroundColor: '#fff',
-  color: '#0A66C2',
+  border: "1px solid #cbd5e1",
+  backgroundColor: "#fff",
+  color: "#0A66C2",
   fontSize: 13,
   fontWeight: 600,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const secondaryButtonStyle: React.CSSProperties = {
   ...actionButtonStyle,
-  color: '#475569',
+  color: "#475569",
 };
 
 interface TopicRecommendationsSummaryBarProps {
@@ -25,7 +25,9 @@ interface TopicRecommendationsSummaryBarProps {
   onRefresh?: () => void;
 }
 
-export const TopicRecommendationsSummaryBar: React.FC<TopicRecommendationsSummaryBarProps> = ({
+export const TopicRecommendationsSummaryBar: React.FC<
+  TopicRecommendationsSummaryBarProps
+> = ({
   recommendationCount,
   updatedLabel,
   isRefreshing = false,
@@ -33,46 +35,46 @@ export const TopicRecommendationsSummaryBar: React.FC<TopicRecommendationsSummar
   onRefresh,
 }) => {
   const ideaLabel =
-    recommendationCount === 1 ? '1 idea' : `${recommendationCount} ideas`;
+    recommendationCount === 1 ? "1 idea" : `${recommendationCount} ideas`;
   const subtitleParts = [ideaLabel];
   if (updatedLabel) {
     subtitleParts.push(updatedLabel);
   }
   if (isRefreshing) {
-    subtitleParts.push('Updating…');
+    subtitleParts.push("Updating…");
   }
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'flex-start',
-        justifyContent: 'space-between',
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
         gap: 12,
       }}
     >
-      <div style={{ flex: '1 1 220px', minWidth: 0 }}>
+      <div style={{ flex: "1 1 220px", minWidth: 0 }}>
         <h3
           style={{
             margin: 0,
             fontSize: 18,
             fontWeight: 700,
-            color: '#1e293b',
+            color: "#1e293b",
           }}
         >
           What to write next
         </h3>
-        <p style={{ margin: '6px 0 0', fontSize: 14, color: '#64748b' }}>
-          {subtitleParts.join(' · ')}
+        <p style={{ margin: "6px 0 0", fontSize: 14, color: "#64748b" }}>
+          {subtitleParts.join(" · ")}
         </p>
       </div>
 
       <div
         style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
           gap: 8,
         }}
       >
@@ -92,11 +94,11 @@ export const TopicRecommendationsSummaryBar: React.FC<TopicRecommendationsSummar
             disabled={isRefreshing}
             style={{
               ...secondaryButtonStyle,
-              cursor: isRefreshing ? 'default' : 'pointer',
+              cursor: isRefreshing ? "default" : "pointer",
               opacity: isRefreshing ? 0.7 : 1,
             }}
           >
-            {isRefreshing ? 'Refreshing…' : 'Get new ideas'}
+            {isRefreshing ? "Refreshing…" : "Get new ideas"}
           </button>
         )}
       </div>

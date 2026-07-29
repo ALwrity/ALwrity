@@ -136,8 +136,7 @@ COPILOT_API_KEY=your_copilot_api_key_here
 # Initialize the database
 python -c "from services.database import initialize_database; initialize_database()"
 
-# Or run the initialization script
-python scripts/init_alpha_subscription_tiers.py
+# (Plan limits and model pricing are seeded automatically via PricingService)
 ```
 
 #### 2.4 Start Backend Server

@@ -8,7 +8,7 @@ proper error handling, monitoring, and documentation.
 
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, FileResponse
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import time
 import json
 from loguru import logger
@@ -704,6 +704,10 @@ async def generate_comment_response(
     
     try:
         logger.info("Received LinkedIn comment response generation request")
+        logger.warning(
+            "[LinkedInWriter] /generate-comment-response is deprecated for new Comment Assistant "
+            "drafts; use POST /api/linkedin/comment-assistant/draft-reply instead."
+        )
         
         # Validate request
         original_comment = getattr(request, 'original_comment', getattr(request, 'comment', ''))

@@ -591,7 +591,7 @@ Generate a platform-optimized persona adaptation that maintains brand consistenc
     def get_persona_for_platform(self, user_id: str, platform: str) -> Optional[Dict[str, Any]]:
         """Get the best persona for a specific platform."""
         try:
-            session = get_db_session()
+            session = get_db_session(user_id)
             
             # Get the most recent active persona
             persona = session.query(WritingPersona).filter(

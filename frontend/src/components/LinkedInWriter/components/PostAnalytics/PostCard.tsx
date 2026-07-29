@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
+import { PostCardMedia } from './PostCardMedia';
 import { cardBase, colors } from './styles';
 
 const PREVIEW_CHAR_LIMIT = 280;
@@ -17,6 +18,27 @@ function formatMetric(value: number): string {
     return `${(value / 1_000).toFixed(1)}K`;
   }
   return String(value);
+}
+
+function formatOptionalMetric(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return formatMetric(value);
+}
+
+/** Prefer Unipile CTR when present; else derive from clicks/impressions (real data only). */
+function formatCtr(
+  clickthroughRate: number | null | undefined,
+  clicks: number,
+  impressions: number,
+): string {
+  if (clickthroughRate != null && !Number.isNaN(clickthroughRate)) {
+    const pct = clickthroughRate > 1 ? clickthroughRate : clickthroughRate * 100;
+    return `${pct.toFixed(1)}%`;
+  }
+  if (impressions > 0) {
+    return `${((clicks / impressions) * 100).toFixed(1)}%`;
+  }
+  return '—';
 }
 
 export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateSimilar }) => {
@@ -160,6 +182,8 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateS
         </button>
       )}
 
+      <PostCardMedia attachments={post.attachments} postId={post.id} />
+
       <div
         style={{
           display: 'flex',
@@ -173,12 +197,29 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateS
         <MetricPill label="Reposts" value={formatMetric(post.engagement.reposts)} />
         <MetricPill label="Impressions" value={formatMetric(post.engagement.impressions)} />
         <MetricPill label="Eng. rate" value={`${engagementRatePct}%`} highlight />
-        {post.engagement.clicks > 0 && (
-          <MetricPill label="Clicks" value={formatMetric(post.engagement.clicks)} accent />
-        )}
-        {post.engagement.followers_gained > 0 && (
-          <MetricPill label="Followers" value={`+${formatMetric(post.engagement.followers_gained)}`} accent />
-        )}
+        <MetricPill
+          label="Engagements"
+          value={formatOptionalMetric(post.engagement.engagements)}
+        />
+        <MetricPill label="Clicks" value={formatMetric(post.engagement.clicks)} accent />
+        <MetricPill
+          label="CTR"
+          value={formatCtr(post.engagement.clickthrough_rate, post.engagement.clicks, post.engagement.impressions)}
+          accent
+        />
+        <MetricPill
+          label="Page viewers"
+          value={formatOptionalMetric(post.engagement.page_viewers)}
+        />
+        <MetricPill
+          label="Followers"
+          value={`+${formatMetric(post.engagement.followers_gained)}`}
+          accent
+        />
+        <MetricPill
+          label="Reached"
+          value={formatOptionalMetric(post.engagement.reach)}
+        />
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 8 }}>

@@ -2,10 +2,16 @@ import { useCallback, useRef, useState } from 'react';
 
 import {
   completeProfileOptimizationRecommendation,
+  downloadProfilePhoto,
+  getLinkedInProfileFoundation,
   getLinkedInSocialErrorMessage,
   loadNextProfileOptimizationBatch,
   logProfileAnalysisError,
+  makeProfilePhotoPresentable,
   runLinkedInProfileOptimization,
+  updateProfileCache,
+  uploadProfilePhoto,
+  type LinkedInAIProfileIntelligence,
   type LinkedInProfileAnalysisError,
   type LinkedInProfileOptimizationBatchActionResponse,
   type LinkedInProfileOptimizationItem,
@@ -31,6 +37,7 @@ export type ProfileOptimizationPanelState =
  */
 export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [panelState, setPanelState] = useState<ProfileOptimizationPanelState>('idle');
+  const inFlightRef = useRef(false);
   const [recommendations, setRecommendations] = useState<LinkedInProfileOptimizationItem[] | null>(
     null
   );
@@ -43,6 +50,58 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const [markingRecommendationId, setMarkingRecommendationId] = useState<string | null>(null);
   const [isLoadingNextBatch, setIsLoadingNextBatch] = useState(false);
   const [showNextBatchCta, setShowNextBatchCta] = useState(false);
+
+  // Phase 5 intelligence — loaded immediately on panel open (fast, from 2h cache)
+  const [profileIntelligence, setProfileIntelligence] =
+    useState<LinkedInAIProfileIntelligence | null>(null);
+
+  // Load Phase 5 intelligence only (fast, cache-first). Recommendations
+  // (Phase 7) are triggered separately by user click.
+  const loadIntelligence = useCallback(async () => {
+    if (!isProfileComplete || inFlightRef.current) return;
+    inFlightRef.current = true;
+    console.info(`${LOG_PREFIX} loading profile intelligence (Phases 1-5)`);
+    setPanelState('loading');
+    try {
+      const data = await getLinkedInProfileFoundation();
+      setProfileIntelligence(data.ai_profile_intelligence ?? null);
+
+      // Restore recommendations from localStorage cache if the foundation
+      // call doesn't include Phase 7 data (which it doesn't). This makes
+      // previously-generated recommendations visible after page refresh.
+      if (data.profile_optimization != null) {
+        setRecommendations(data.profile_optimization);
+        setOptimizationMeta(data.profile_optimization_meta ?? null);
+      } else if (data.profile_optimization == null) {
+        // Foundation call never includes Phase 7 — try cached data from
+        // a prior optimization session (saved by loadOptimization).
+        try {
+          const raw = localStorage.getItem('alwrity_linkedin_profile');
+          if (raw) {
+            const cached = JSON.parse(raw);
+            if (cached?.data?.profile_optimization?.length) {
+              setRecommendations(cached.data.profile_optimization);
+              setOptimizationMeta(cached.data.profile_optimization_meta ?? null);
+            }
+          }
+        } catch { /* ignore parse errors */ }
+      }
+      setPanelState('complete');
+    } catch (err) {
+      console.warn(`${LOG_PREFIX} intelligence load failed`, err);
+      setPanelState('error');
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [isProfileComplete]);
+
+  const [localProfilePhotoUrl, setLocalProfilePhotoUrl] = useState<string | null>(null);
+  const [uploadingProfilePhoto, setUploadingProfilePhoto] = useState(false);
+  const [profilePhotoUploadError, setProfilePhotoUploadError] = useState<string | null>(null);
+  const [transformedProfilePhotoUrl, setTransformedProfilePhotoUrl] = useState<string | null>(null);
+  const [transformingProfilePhoto, setTransformingProfilePhoto] = useState(false);
+  const [profilePhotoTransformError, setProfilePhotoTransformError] = useState<string | null>(null);
+  const [showTransformedPreview, setShowTransformedPreview] = useState(false);
 
   const lastScoreRef = useRef<number | null>(null);
   const [recheckDelta, setRecheckDelta] = useState<{
@@ -81,6 +140,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       console.warn(`${LOG_PREFIX} load blocked — profile incomplete`);
       return;
     }
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
 
     console.info(`${LOG_PREFIX} loading profile optimization`, { forceRegenerate });
     setPanelState('loading');
@@ -149,6 +210,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setShowNextBatchCta(false);
       setPanelState('complete');
       setIsOptimizationExpanded(true);
+      // Persist to localStorage so recommendations survive page refreshes
+      try { updateProfileCache(data); } catch { /* best-effort */ }
       if (data.profile_validation?.optimization_score != null) {
         lastScoreRef.current = data.profile_validation.optimization_score;
       }
@@ -166,6 +229,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setOptimizationUserError(message);
       setOptimizationError(null);
       setPanelState('error');
+    } finally {
+      inFlightRef.current = false;
     }
   }, [isProfileComplete]);
 
@@ -181,7 +246,12 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       } catch (err) {
         const message = getLinkedInSocialErrorMessage(err);
         console.error(`${LOG_PREFIX} mark item failed`, { recommendationId, message, err });
-        setOptimizationUserError(message);
+        // Show toast instead of panel-level error — item stays visible for retry
+        try {
+          window.dispatchEvent(new CustomEvent('linkedinwriter:toast', {
+            detail: { message: message || 'Failed to save. Tap again to retry.', severity: 'error' },
+          }));
+        } catch { /* best-effort toast */ }
       } finally {
         setMarkingRecommendationId(null);
       }
@@ -207,8 +277,8 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   }, [applyBatchActionResponse]);
 
   const openOptimizationPanel = useCallback(async () => {
-    await loadOptimization(false);
-  }, [loadOptimization]);
+    await loadIntelligence();
+  }, [loadIntelligence]);
 
   const closeOptimizationPanel = useCallback(() => {
     console.info(`${LOG_PREFIX} user collapsed profile optimization panel to idle`);
@@ -239,8 +309,10 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
   const recheckProfile = useCallback(async () => {
     if (!isProfileComplete) {
       console.warn(`${LOG_PREFIX} recheck blocked — profile incomplete`);
-      return;
+      return null;
     }
+    if (inFlightRef.current) return null;
+    inFlightRef.current = true;
     console.info(`${LOG_PREFIX} user requested live profile re-check`);
     const previousScore = lastScoreRef.current;
     setPanelState('loading');
@@ -250,7 +322,10 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     setIsOptimizationExpanded(true);
 
     try {
-      const data = await runLinkedInProfileOptimization({ refreshProfile: true });
+      const data = await runLinkedInProfileOptimization({
+        refreshProfile: true,
+        refreshIntelligence: true,
+      });
       const items = data.profile_optimization ?? null;
       const meta = data.profile_optimization_meta ?? null;
 
@@ -280,6 +355,7 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
         newScore,
         delta: newScore != null && previousScore != null ? newScore - previousScore : null,
       });
+      return data;
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Failed to re-check your LinkedIn profile';
@@ -287,11 +363,102 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
       setOptimizationUserError(message);
       setOptimizationError(null);
       setPanelState('error');
+      return null;
+    } finally {
+      inFlightRef.current = false;
     }
   }, [isProfileComplete]);
 
   const dismissRecheckDelta = useCallback(() => {
     setRecheckDelta(null);
+  }, []);
+
+  const handleUploadProfilePhoto = useCallback(async (file: File) => {
+    setUploadingProfilePhoto(true);
+    setProfilePhotoUploadError(null);
+    setTransformedProfilePhotoUrl(null);
+    try {
+      const result = await uploadProfilePhoto(file);
+      setLocalProfilePhotoUrl(result.photo_url);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to upload photo';
+      setProfilePhotoUploadError(message);
+    } finally {
+      setUploadingProfilePhoto(false);
+    }
+  }, []);
+
+  const handleMakeProfilePhotoPresentable = useCallback(async (photoUrl?: string) => {
+    const url = photoUrl || localProfilePhotoUrl;
+    if (!url) return;
+
+    // External URLs (LinkedIn CDN) must be mirrored locally first —
+    // the backend cannot reach external CDNs.  We fetch the image in
+    // the browser, upload it, then transform the local copy.
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      setUploadingProfilePhoto(true);
+      setTransformingProfilePhoto(true);
+      setProfilePhotoTransformError(null);
+      try {
+        const fetchResp = await fetch(url);
+        if (!fetchResp.ok) throw new Error(`Failed to fetch photo (${fetchResp.status})`);
+        const blob = await fetchResp.blob();
+        const filename = url.split("/").pop()?.split("?")[0] || "avatar.jpg";
+        const file = new File([blob], filename, { type: blob.type || "image/jpeg" });
+        const uploadResult = await uploadProfilePhoto(file);
+        setLocalProfilePhotoUrl(uploadResult.photo_url);
+        setUploadingProfilePhoto(false);
+
+        const result = await makeProfilePhotoPresentable(uploadResult.photo_url);
+        setTransformedProfilePhotoUrl(result.photo_url);
+        setLocalProfilePhotoUrl(result.photo_url);
+        setShowTransformedPreview(true);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to transform photo";
+        setProfilePhotoTransformError(message);
+      } finally {
+        setUploadingProfilePhoto(false);
+        setTransformingProfilePhoto(false);
+      }
+      return;
+    }
+
+    // Local URL — already in workspace, transform directly
+    setTransformingProfilePhoto(true);
+    setProfilePhotoTransformError(null);
+    try {
+      const result = await makeProfilePhotoPresentable(url);
+      setTransformedProfilePhotoUrl(result.photo_url);
+      setLocalProfilePhotoUrl(result.photo_url);
+      setShowTransformedPreview(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to transform photo";
+      setProfilePhotoTransformError(message);
+    } finally {
+      setTransformingProfilePhoto(false);
+    }
+  }, [localProfilePhotoUrl]);
+
+  const handleDownloadProfilePhoto = useCallback(async () => {
+    const photoUrl = transformedProfilePhotoUrl || localProfilePhotoUrl;
+    if (!photoUrl) return;
+    try {
+      const blob = await downloadProfilePhoto(photoUrl);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'linkedin_profile_photo.png';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('[ProfileOptimization] Download failed:', err);
+    }
+  }, [transformedProfilePhotoUrl, localProfilePhotoUrl]);
+
+  const dismissTransformedPreview = useCallback(() => {
+    setShowTransformedPreview(false);
   }, []);
 
   return {
@@ -320,5 +487,18 @@ export function useLinkedInProfileOptimization(isProfileComplete: boolean) {
     isRechecking: panelState === 'loading',
     markOptimizationItemComplete,
     loadNextOptimizationBatch,
+    profileIntelligence,
+    loadOptimization,
+    localProfilePhotoUrl,
+    uploadingProfilePhoto,
+    profilePhotoUploadError,
+    handleUploadProfilePhoto,
+    transformedProfilePhotoUrl,
+    transformingProfilePhoto,
+    profilePhotoTransformError,
+    handleMakeProfilePhotoPresentable,
+    handleDownloadProfilePhoto,
+    showTransformedPreview,
+    dismissTransformedPreview,
   };
 };

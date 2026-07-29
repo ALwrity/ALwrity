@@ -1,0 +1,76 @@
+/**
+ * Blog Writer Radial Workflow Hero — layout styles.
+ * Scoped to the BlogWriter dashboard folder; imported only from
+ * `BlogWorkflowHeroSection.tsx` so it never leaks into other studios.
+ */
+
+.blog-workflow-hero-section {
+  width: 100%;
+  padding: 56px 20px 64px;
+  background: linear-gradient(180deg, #fbfbff 0%, #ffffff 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.blog-workflow-hero-heading {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 28px;
+}
+
+.blog-workflow-hero-heading h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0 0 8px;
+  background: linear-gradient(135deg, #1976d2 0%, #9c27b0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.blog-workflow-hero-heading p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.blog-workflow-hero-canvas {
+  position: relative;
+  width: 100%;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.blog-workflow-hero-hub {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.blog-workflow-hero-hub > * {
+  pointer-events: auto;
+}
+
+.blog-workflow-wedge {
+  outline: none;
+}
+
+.blog-workflow-wedge-base {
+  outline: none;
+}
+
+@media (max-width: 960px) {
+  .blog-workflow-hero-section {
+    padding: 40px 16px 48px;
+  }
+
+  .blog-workflow-hero-heading h2 {
+    font-size: 1.6rem;
+  }
+}

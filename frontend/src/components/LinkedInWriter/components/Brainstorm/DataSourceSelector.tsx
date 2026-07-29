@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 export interface BrainstormOptions {
   usePersona: boolean;
@@ -10,6 +10,8 @@ interface DataSourceSelectorProps {
   options: BrainstormOptions;
   onChange: (updated: Partial<BrainstormOptions>) => void;
   connected: boolean;
+  /** Pill chips for Plan wedge modal; default compact chips elsewhere. */
+  variant?: "default" | "pill";
 }
 
 interface CheckboxDef {
@@ -23,71 +25,108 @@ interface CheckboxDef {
 
 const CHECKBOXES: CheckboxDef[] = [
   {
-    key: 'usePersona',
-    label: 'Persona',
-    icon: '🎨',
-    tooltip: 'Match your writing persona (tone, style, audience)',
+    key: "usePersona",
+    label: "Persona",
+    icon: "🎨",
+    tooltip: "Match your writing persona (tone, style, audience)",
     requiresConnected: false,
-    disabledTooltip: '',
+    disabledTooltip: "",
   },
   {
-    key: 'includeTrending',
-    label: 'Trending',
-    icon: '📈',
-    tooltip: 'Surface trending topics from your industry',
+    key: "includeTrending",
+    label: "Trending",
+    icon: "📈",
+    tooltip: "Surface trending topics from your industry",
     requiresConnected: true,
-    disabledTooltip: 'Connect LinkedIn to use trending topics',
+    disabledTooltip: "Connect LinkedIn to use trending topics",
   },
   {
-    key: 'remarketContent',
-    label: 'Remarket',
-    icon: '🔄',
-    tooltip: 'Repurpose your existing content & saved ideas',
+    key: "remarketContent",
+    label: "Remarket",
+    icon: "🔄",
+    tooltip: "Repurpose your existing content & saved ideas",
     requiresConnected: false,
-    disabledTooltip: '',
+    disabledTooltip: "",
   },
 ];
 
-const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ options, onChange, connected }) => {
+const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({
+  options,
+  onChange,
+  connected,
+  variant = "default",
+}) => {
+  const isPill = variant === "pill";
+
   return (
-    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+    <div
+      className={isPill ? "plan-wedge-source-chips" : undefined}
+      style={isPill ? undefined : { display: "flex", gap: 5, flexWrap: "wrap" }}
+    >
       {CHECKBOXES.map((cb) => {
         const disabled = cb.requiresConnected && !connected;
         const checked = options[cb.key];
+
+        if (isPill) {
+          return (
+            <button
+              key={cb.key}
+              type="button"
+              title={disabled ? cb.disabledTooltip : cb.tooltip}
+              disabled={disabled}
+              onClick={() => onChange({ [cb.key]: !checked })}
+              className={`plan-wedge-source-chip${checked ? " plan-wedge-source-chip--active" : ""}${disabled ? " plan-wedge-source-chip--disabled" : ""}`}
+            >
+              <span className="plan-wedge-source-chip__icon" aria-hidden>
+                {cb.icon}
+              </span>
+              <span>{cb.label}</span>
+            </button>
+          );
+        }
 
         return (
           <div
             key={cb.key}
             title={disabled ? cb.disabledTooltip : cb.tooltip}
-            onClick={() => { if (disabled) return; onChange({ [cb.key]: !checked }); }}
+            onClick={() => {
+              if (disabled) return;
+              onChange({ [cb.key]: !checked });
+            }}
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "inline-flex",
+              alignItems: "center",
               gap: 5,
-              padding: '3px 9px 3px 7px',
+              padding: "3px 9px 3px 7px",
               borderRadius: 6,
-              background: checked ? '#0a66c2' : '#f3f4f6',
-              border: checked ? '1px solid #0a66c2' : '1px solid #e5e7eb',
+              background: checked ? "#0a66c2" : "#f3f4f6",
+              border: checked ? "1px solid #0a66c2" : "1px solid #e5e7eb",
               opacity: disabled ? 0.4 : 1,
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              transition: 'all 0.12s ease',
-              userSelect: 'none',
+              cursor: disabled ? "not-allowed" : "pointer",
+              transition: "all 0.12s ease",
+              userSelect: "none",
               fontSize: 11.5,
               fontWeight: 600,
-              color: checked ? '#fff' : '#6b7280',
-              boxShadow: checked ? '0 1px 3px rgba(10,102,194,0.2)' : 'none',
+              color: checked ? "#fff" : "#6b7280",
+              boxShadow: checked ? "0 1px 3px rgba(10,102,194,0.2)" : "none",
             }}
             onMouseEnter={(e) => {
               if (disabled) return;
-              if (checked) { e.currentTarget.style.background = '#004182'; return; }
-              e.currentTarget.style.background = '#e5e7eb';
-              e.currentTarget.style.borderColor = '#d1d5db';
+              if (checked) {
+                e.currentTarget.style.background = "#004182";
+                return;
+              }
+              e.currentTarget.style.background = "#e5e7eb";
+              e.currentTarget.style.borderColor = "#d1d5db";
             }}
             onMouseLeave={(e) => {
               if (disabled) return;
-              if (checked) { e.currentTarget.style.background = '#0a66c2'; return; }
-              e.currentTarget.style.background = '#f3f4f6';
-              e.currentTarget.style.borderColor = '#e5e7eb';
+              if (checked) {
+                e.currentTarget.style.background = "#0a66c2";
+                return;
+              }
+              e.currentTarget.style.background = "#f3f4f6";
+              e.currentTarget.style.borderColor = "#e5e7eb";
             }}
           >
             <span style={{ fontSize: 12, lineHeight: 1 }}>{cb.icon}</span>

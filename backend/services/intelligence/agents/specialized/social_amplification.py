@@ -153,12 +153,12 @@ class SocialAmplificationAgent(BaseALwrityAgent):
             pass
 
         platform_urls = {
-            "linkedin": "/linkedin-writer",
+            "linkedin": "/linkedin-studio",
             "facebook": "/facebook-writer",
-            "twitter": "/linkedin-writer",  # no dedicated twitter writer, use linkedin as fallback
-            "instagram": "/linkedin-writer",
-            "tiktok": "/linkedin-writer",
-            "youtube": "/linkedin-writer",
+            "twitter": "/linkedin-studio",  # no dedicated twitter writer, use linkedin as fallback
+            "instagram": "/linkedin-studio",
+            "tiktok": "/linkedin-studio",
+            "youtube": "/linkedin-studio",
         }
 
         target_platforms = [p for p in selected_platforms if p.lower() in platform_urls]
@@ -173,7 +173,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
                 source_agent="SocialAmplificationAgent",
                 reasoning="Social distribution drives referral traffic and builds audience engagement.",
                 action_type="navigate",
-                action_url="/linkedin-writer",
+                action_url="/linkedin-studio",
             ))
             return proposals
 

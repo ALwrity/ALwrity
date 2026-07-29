@@ -1,52 +1,65 @@
-import React from 'react';
-import { DashboardAnalyticsSidebar, DASHBOARD_RIGHT_RAIL_WIDTH } from './DashboardAnalyticsSidebar';
-import { DashboardCopilotFab } from './DashboardCopilotFab';
-import { KnowledgeCenterDock, type KnowledgeCenterAction } from './KnowledgeCenterDock';
-import { FRAME_COLOR } from './dashboardWorkflowConfig';
+import React from "react";
+import {
+  DashboardAnalyticsSidebar,
+  DASHBOARD_RIGHT_RAIL_WIDTH,
+} from "./DashboardAnalyticsSidebar";
+import {
+  KnowledgeCenterDock,
+  type KnowledgeCenterAction,
+} from "./KnowledgeCenterDock";
+import { LibraryRailButton } from "./LibraryRailButton";
+import { StudioTourTrigger } from "./StudioTourTrigger";
 
 interface DashboardRightRailProps {
   onViewAllAnalytics?: () => void;
-  onOpenCopilot?: () => void;
   onKnowledgeCenterAction?: (action: KnowledgeCenterAction) => void;
 }
 
-/** Right rail: Analytics panel, Co-Pilot, and Knowledge Center as separate stacked blocks. */
+/** Right rail: Analytics panel and Knowledge Center as separate stacked blocks. */
 export const DashboardRightRail: React.FC<DashboardRightRailProps> = ({
   onViewAllAnalytics,
-  onOpenCopilot,
   onKnowledgeCenterAction,
 }) => {
   return (
     <aside
-      className="linkedin-dashboard-right-rail"
+      className="linkedin-dashboard-right-rail linkedin-dashboard-data-section"
       aria-label="Dashboard tools"
       style={{
         width: DASHBOARD_RIGHT_RAIL_WIDTH,
         flexShrink: 0,
-        alignSelf: 'stretch',
-        borderLeft: `2px solid ${FRAME_COLOR}`,
-        background: '#fafbfc',
-        padding: '10px 10px 12px',
-        display: 'flex',
-        flexDirection: 'column',
+        alignSelf: "stretch",
+        background: "transparent",
+        padding: "10px 10px 12px",
+        display: "flex",
+        flexDirection: "column",
         gap: 10,
         minHeight: 0,
-        overflow: 'visible',
+        overflow: "visible",
       }}
     >
-      <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
+      <h2 className="linkedin-dashboard-data-section-title">
+        Analytics &amp; Knowledge
+      </h2>
 
-      {onOpenCopilot && (
-        <div className="linkedin-dashboard-rail-copilot">
-          <DashboardCopilotFab onOpenCopilot={onOpenCopilot} variant="rail" layout="stacked" />
+      <div className="linkedin-dashboard-analytics-row">
+        <div className="linkedin-dashboard-rail-tour-slot">
+          <StudioTourTrigger variant="analyticsPanel" />
         </div>
-      )}
+        <div className="linkedin-dashboard-analytics-slot">
+          <DashboardAnalyticsSidebar onViewAll={onViewAllAnalytics} />
+        </div>
+      </div>
 
-      {onKnowledgeCenterAction && (
-        <div className="linkedin-dashboard-rail-knowledge">
-          <KnowledgeCenterDock variant="rail" onFeatureAction={onKnowledgeCenterAction} />
-        </div>
-      )}
+      <div className="linkedin-dashboard-rail-actions">
+        <LibraryRailButton />
+
+        {onKnowledgeCenterAction && (
+          <KnowledgeCenterDock
+            variant="rail"
+            onFeatureAction={onKnowledgeCenterAction}
+          />
+        )}
+      </div>
     </aside>
   );
 };

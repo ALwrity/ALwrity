@@ -34,6 +34,7 @@ class APIProvider(enum.Enum):
     OPENAI = "openai"
     ANTHROPIC = "anthropic"
     MISTRAL = "mistral"
+    HUGGINGFACE = "huggingface"
     WAVESPEED = "wavespeed"
     TAVILY = "tavily"
     SERPER = "serper"

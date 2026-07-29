@@ -246,43 +246,51 @@ The user has provided the following story idea or information:
 
 Based on this story idea, generate exactly 1 well-thought-out story setup option. The setup should be CREATIVE, PERSONALIZED, and perfectly tailored to the user's specific story idea.
 
-**CRITICAL - Creative Freedom:**
-- You have COMPLETE FREEDOM to craft personalized values that best fit the user's story idea
-- Do NOT limit yourself to predefined options - create custom, creative values that perfectly match the story concept
-- For example, if the user wants "a story about how stars are made for a 5-year-old", you might create:
-  - Writing Style: "Educational Playful" or "Simple Scientific" (not just "Casual" or "Poetic")
-  - Story Tone: "Wonder-filled" or "Curious Discovery" (not just "Whimsical" or "Uplifting")
-  - Narrative POV: "Second Person (You)" or "Omniscient Narrator as Guide" (not just standard options)
-- The goal is to create the PERFECT setup for THIS specific story, not to fit into generic categories
+**CRITICAL - Pick from pre-defined values for these 6 dropdown fields:**
+The six fields below are presented to the user as dropdown menus with fixed options.
+The user clicks a dropdown and selects one of the listed values. To ensure the chosen
+value actually shows up in that dropdown, you MUST return EXACTLY one of the listed
+strings (case-sensitive, including any parentheticals). Do NOT invent synonyms,
+hyphenated variants, or multi-word refinements for these six — they will not match
+the dropdown and the value will appear lost to the user.
+
+1. writing_style — pick EXACTLY one of: {', '.join(suggested_writing_styles)}
+2. story_tone — pick EXACTLY one of: {', '.join(suggested_story_tones)}
+3. narrative_pov — pick EXACTLY one of: {', '.join(suggested_narrative_povs)}
+4. audience_age_group — pick EXACTLY one of: {', '.join(suggested_audience_age_groups)}
+5. content_rating — pick EXACTLY one of: {', '.join(suggested_content_ratings)}
+6. ending_preference — pick EXACTLY one of: {', '.join(suggested_ending_preferences)}
+7. story_length — pick EXACTLY one of: "Short (>1000 words)", "Medium (>5000 words)", "Long (>10000 words)" (include the parenthetical verbatim)
+
+Choose the value from each list that best serves the story idea. The list entries are
+the only acceptable values for these six fields.
+
+The TEXTUAL fields below still allow full creative freedom — make these vivid,
+specific, and tailored to the story:
+- persona: a unique and creative author persona that fits the story idea perfectly
+- story_setting: a compelling world/setting that brings the idea to life
+- character_input: interesting and engaging characters
+- plot_elements: key plot elements that drive the narrative
 
 The setup should:
 1. Have a unique and creative persona that fits the story idea perfectly
 2. Define a compelling story setting that brings the idea to life
 3. Describe interesting and engaging characters
 4. Include key plot elements that drive the narrative
-5. Create CUSTOM, PERSONALIZED values for writing style, story tone, narrative POV, audience age group, content rating, and ending preference that best serve the story idea
-6. Select an appropriate story length: "Short (>1000 words)" for brief stories, "Medium (>5000 words)" for standard-length stories, or "Long (>10000 words)" for extended, detailed stories
+5. Pick canonical values from the six dropdown lists above that best serve the story idea
+6. Select an appropriate story length from the three allowed values above
 7. Generate a brief story premise (1-2 sentences, approximately 20-40 words) that summarizes the story concept
 8. Provide a brief reasoning (2-3 sentences) explaining why this setup works well for the story idea
 
 **IMPORTANT - Premise Requirements:**
 - The premise MUST be age-appropriate for the selected audience_age_group
 - For Children (5-12): Use simple, everyday words. Avoid complex vocabulary like "nebular", "ionized", "cosmic", "stellar", "melancholic", "bittersweet"
-- The premise MUST match the selected writing_style (e.g., if custom style is "Educational Playful", use playful educational language)
-- The premise MUST match the selected story_tone (e.g., if custom tone is "Wonder-filled", create a sense of wonder)
+- The premise MUST match the selected writing_style (e.g., if you chose "Poetic", use lyrical imagery)
+- The premise MUST match the selected story_tone (e.g., if you chose "Whimsical", create a sense of whimsy)
 - Keep the premise to 1-2 sentences maximum
 - Focus on who, where, and what the main challenge/adventure is
 
-**Suggested Options (for reference only - feel free to create better custom values):**
-- Writing Styles (suggestions): {', '.join(suggested_writing_styles)}
-- Story Tones (suggestions): {', '.join(suggested_story_tones)}
-- Narrative POVs (suggestions): {', '.join(suggested_narrative_povs)}
-- Audience Age Groups (suggestions): {', '.join(suggested_audience_age_groups)}
-- Content Ratings (suggestions): {', '.join(suggested_content_ratings)}
-- Ending Preferences (suggestions): {', '.join(suggested_ending_preferences)}
-- Story Lengths: "Short (>1000 words)", "Medium (>5000 words)", "Long (>10000 words)"
-
-**Remember:** These are ONLY suggestions. If a custom value better serves the story idea, CREATE IT!
+**Final reminder:** Output ONLY exact dropdown values for the 7 numbered fields above. Mismatched values (different casing, missing parentheticals, paraphrased synonyms) will not display for the user and waste the generation.
 
 Return exactly 1 option as a JSON array with a single object in "options". The object must include a "premise" field with the story premise.
 """
@@ -355,6 +363,8 @@ Return exactly 1 option as a JSON array with a single object in "options". The o
         user_id: str,
         fiction_variant: str | None = None,
         narrative_energy: str | None = None,
+        fiction_variant_description: str | None = None,
+        narrative_energy_description: str | None = None,
     ) -> List[Dict[str, Any]]:
         mode_label = None
         if story_mode == "marketing":
@@ -363,6 +373,7 @@ Return exactly 1 option as a JSON array with a single object in "options". The o
             mode_label = "Fiction story"
 
         template_label = None
+        template_guidance = ""
         if story_template == "product_story":
             template_label = "Product Story"
         elif story_template == "brand_manifesto":
@@ -373,12 +384,16 @@ Return exactly 1 option as a JSON array with a single object in "options". The o
             template_label = "Customer Story"
         elif story_template == "short_fiction":
             template_label = "Short Fiction"
+            template_guidance = "Focus on a single, tightly-focused narrative arc that delivers impact within a compressed format. Every word must earn its place."
         elif story_template == "long_fiction":
             template_label = "Long Fiction"
+            template_guidance = "Consider broader narrative scope with room for subplots, character arcs that evolve across time, and immersive worldbuilding."
         elif story_template == "anime_fiction":
             template_label = "Anime Fiction"
+            template_guidance = "Draw from anime and manga storytelling conventions: expressive character dynamics, stylized action, emotional sincerity, and distinct visual storytelling."
         elif story_template == "experimental_fiction":
             template_label = "Experimental Fiction"
+            template_guidance = "Embrace unconventional narrative structures, unusual points of view, and formal playfulness. The form itself is part of the story."
 
         brand_name = None
         writing_tone = None
@@ -394,29 +409,48 @@ Return exactly 1 option as a JSON array with a single object in "options". The o
 
         fiction_focus_line = ""
         if fiction_variant:
-            fiction_focus_line = f'Treat the story as "{fiction_variant}" and lean into that creative focus.'
+            variant_parts = [f'Treat the story as "{fiction_variant}".']
+            if fiction_variant_description:
+                variant_parts.append(f"Creative direction: {fiction_variant_description}")
+            fiction_focus_line = " ".join(variant_parts)
 
         energy_line = ""
         if narrative_energy:
-            energy_line = f'Target narrative energy: {narrative_energy}.'
+            energy_parts = [f"Target narrative energy: {narrative_energy}."]
+            if narrative_energy_description:
+                energy_parts.append(f"Pacing and tone: {narrative_energy_description}")
+            energy_line = " ".join(energy_parts)
+
+        brand_section = ""
+        if story_mode == "marketing" and brand_name:
+            brand_section = f"""
+The story MUST be aligned with the following brand and audience context:
+- Brand name or site: {brand_name or "Not specified"}
+- Headline/overall writing tone: {writing_tone or "Not specified"}
+- Audience description: {audience_description or "Not specified"}
+
+The enhanced ideas should reinforce the brand voice, resonate with the target audience, and serve the brand's marketing or storytelling goals."""
+        elif brand_context:
+            brand_section = f"""
+When relevant, keep the idea loosely aligned with this brand and audience context:
+- Brand name or site: {brand_name or "Not specified"}
+- Headline/overall writing tone: {writing_tone or "Not specified"}
+- Audience description: {audience_description or "Not specified"}"""
 
         enhance_prompt = f"""You are a creative writing coach helping a user refine and expand a story idea.
 
 {"This is a " + mode_label + "." if mode_label else ""}
 {("The user selected the template: " + template_label + ".") if template_label else ""}
+{template_guidance}
 {fiction_focus_line}
 {energy_line}
-
-When relevant, keep the idea aligned with this brand and audience context:
-- Brand name or site: {brand_name or "Not specified"}
-- Headline/overall writing tone: {writing_tone or "Not specified"}
-- Audience description: {audience_description or "Not specified"}
+{brand_section}
 
 The user has written the following story idea or concept:
 
 {story_idea}
 
-Your task is to propose exactly 3 alternative enhanced story idea options.
+Your task is to propose exactly 3 alternative enhanced story idea options. Each option should take a DISTINCT creative direction — do not offer three variations of the same approach. Make each option meaningfully different in its focus, tone, or narrative strategy.
 
 Each option must:
 - Preserve the user's core premise and intent.
@@ -427,9 +461,9 @@ Each option must:
 - Stay at the "idea" level, not a full outline or beat-by-beat breakdown.
 
 For each option, return three fields:
-- "idea": 2-4 sentences describing the improved story idea, suitable for a single textarea input.
-- "whats_missing": 2-4 sentences explaining what important details are missing or underspecified in the current brief. Focus on gaps such as: protagonist details, antagonist or opposing force, stakes, setting and time period, audience/age group, subgenre or type of fiction (for example, anime vs grounded sci-fi), language or tone preferences, and any format constraints.
-- "why_choose": 1-3 sentences explaining how this option interprets the original idea and why it might be a strong direction for the story.
+- "idea": 2-4 sentences describing the improved story idea, suitable for pasting into a story idea input field. Make it vivid and specific.
+- "whats_missing": 2-4 sentences identifying specific gaps in the original idea. Cover areas such as: protagonist motivation, antagonist or opposing force, concrete stakes, setting and time period, target audience or age group, subgenre conventions, language or tone preferences, and format constraints. Be precise and actionable.
+- "why_choose": 1-3 sentences explaining how this option interprets the original idea differently from the other options and why it might be a strong direction.
 
 Do not write a full story outline.
 Do not output numbered lists or markdown formatting.

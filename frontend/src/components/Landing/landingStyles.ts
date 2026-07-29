@@ -15,6 +15,14 @@ export const landingSectionSubtitleSx = {
 /** Vertical rhythm between header → subtitle → content blocks */
 export const landingSectionStackSpacing = { xs: 2, md: 2.75 } as const;
 
+/** Desktop-only: supporting copy at promoted scale (aligned with lifecycle subtitle). */
+export const landingDesktopPromotedCopySx = {
+  fontWeight: { md: 600 },
+  fontSize: { md: '1.5rem' },
+  lineHeight: { md: 1.45 },
+  letterSpacing: { md: '-0.01em' },
+} as const;
+
 /** Extra gap between section title block and following strip/cards */
 export const landingSectionHeaderGap = { xs: 2.5, md: 3.5 } as const;
 

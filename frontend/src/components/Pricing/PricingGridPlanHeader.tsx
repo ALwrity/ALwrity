@@ -29,7 +29,8 @@ const TIER_HEADER_STYLE: Record<PlanTier, { bg: string; accent: string; borderTo
 const FEATURES_CELL_SX = {
   verticalAlign: 'top' as const,
   bgcolor: '#F8FAFC',
-  minWidth: { xs: 220, md: 300 },
+  minWidth: { xs: 175, md: 300 },
+  width: { xs: 175, md: 300 },
   px: 2,
 };
 
@@ -37,31 +38,37 @@ interface PlanInfoCellProps {
   plan: SubscriptionPlan;
   yearlyBilling: boolean;
   selectedPlanId: number | null;
+  isMobile?: boolean;
 }
 
-const PlanInfoCell: React.FC<PlanInfoCellProps> = ({ plan, yearlyBilling, selectedPlanId }) => {
+const PlanInfoCell: React.FC<PlanInfoCellProps> = ({ plan, yearlyBilling, selectedPlanId, isMobile }) => {
   const theme = useTheme();
   const priceDisplay = getPlanPriceDisplay(plan, yearlyBilling);
   const isSelected = selectedPlanId === plan.id;
   const tier = plan.tier as PlanTier;
   const tierStyle = TIER_HEADER_STYLE[tier] ?? TIER_HEADER_STYLE.free;
+  const isEnterpriseMobile = Boolean(isMobile && tier === 'enterprise');
+  const headerRowGap = isEnterpriseMobile ? 0.2 : 0.75;
 
   return (
     <TableCell
       sx={{
-        verticalAlign: 'top',
+        verticalAlign: isMobile ? 'middle' : 'top',
         textAlign: 'center',
         px: { xs: 1, md: 1.5 },
-        py: { xs: 1.25, md: 1.5 },
+        py: isMobile ? 0.7 : { xs: 1.25, md: 1.5 },
         bgcolor: tierStyle.bg,
         borderBottom: '1px solid #E5E7EB',
         borderTop: tierStyle.borderTop,
-        minWidth: { xs: 128, md: 152 },
-        position: 'relative',
+        minWidth: { xs: 120, md: 152 },
+        width: isMobile ? '100%' : { xs: 120, md: 152 },
+        position: 'sticky',
+        top: 0,
+        zIndex: 3,
         ...(isSelected && { boxShadow: 'inset 0 0 0 2px rgba(99, 102, 241, 0.35)' }),
       }}
     >
-      {plan.tier === 'pro' && (
+      {plan.tier === 'pro' && !isMobile && (
         <Chip
           label="Popular"
           size="small"
@@ -79,25 +86,35 @@ const PlanInfoCell: React.FC<PlanInfoCellProps> = ({ plan, yearlyBilling, select
         />
       )}
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.75 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? 0.4 : 0.75 }}>
         <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 0.75,
+            gap: headerRowGap,
             width: '100%',
-            pt: plan.tier === 'pro' ? 0.5 : 0,
+            pt: plan.tier === 'pro' && !isMobile ? 0.5 : 0,
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', '& .MuiSvgIcon-root': { fontSize: 22 } }}>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              '& .MuiSvgIcon-root': { fontSize: isEnterpriseMobile ? 20 : 22 },
+            }}
+          >
             {getPlanIcon(plan.tier, theme)}
           </Box>
           <Typography
             variant="subtitle1"
             component="p"
             fontWeight={700}
-            sx={{ color: '#1a1a2e', fontSize: { xs: '0.95rem', md: '1.05rem' }, lineHeight: 1.2 }}
+            sx={{
+              color: '#1a1a2e',
+              fontSize: isEnterpriseMobile ? '0.88rem' : { xs: '0.95rem', md: '1.05rem' },
+              lineHeight: 1.2,
+            }}
           >
             {plan.name}
           </Typography>
@@ -115,17 +132,18 @@ const PlanInfoCell: React.FC<PlanInfoCellProps> = ({ plan, yearlyBilling, select
               size="small"
               aria-label={`About ${plan.name} plan`}
               sx={{
-                p: 0.25,
+                p: isEnterpriseMobile ? 0 : 0.25,
+                ml: isEnterpriseMobile ? -0.25 : 0,
                 color: '#94a3b8',
                 '&:hover': { color: tierStyle.accent, bgcolor: 'rgba(255,255,255,0.6)' },
               }}
             >
-              <InfoOutlinedIcon sx={{ fontSize: 17 }} />
+              <InfoOutlinedIcon sx={{ fontSize: isEnterpriseMobile ? 15 : 17 }} />
             </IconButton>
           </Tooltip>
         </Box>
 
-        <Box sx={{ width: '100%', minHeight: { xs: 72, md: 80 } }} aria-live="polite">
+        <Box sx={{ width: '100%', minHeight: { xs: 40, md: 80 } }} aria-live="polite">
           <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 0.25 }}>
             <Typography
               component="span"
@@ -144,9 +162,9 @@ const PlanInfoCell: React.FC<PlanInfoCellProps> = ({ plan, yearlyBilling, select
               sx={{
                 display: 'block',
                 color: '#64748b',
-                mt: 0.35,
-                lineHeight: 1.35,
-                fontSize: '0.72rem',
+                mt: isMobile ? 0.2 : 0.35,
+                lineHeight: 1.3,
+                fontSize: isMobile ? '0.68rem' : '0.72rem',
                 px: 0.5,
               }}
             >
@@ -161,6 +179,22 @@ const PlanInfoCell: React.FC<PlanInfoCellProps> = ({ plan, yearlyBilling, select
               Save ${priceDisplay.savingsAmount.toFixed(0)} vs monthly
             </Typography>
           )}
+          {plan.tier === 'pro' && isMobile && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+              <Chip
+                label="Popular"
+                size="small"
+                sx={{
+                  height: 18,
+                  mt: 0.35,
+                  fontSize: '0.6rem',
+                  fontWeight: 700,
+                  bgcolor: '#6366f1',
+                  color: '#FFFFFF',
+                }}
+              />
+            </Box>
+          )}
         </Box>
       </Box>
     </TableCell>
@@ -173,6 +207,7 @@ interface PlanCtaCellProps {
   subscribing: boolean;
   isSelfServe: boolean;
   onPlanCtaClick: (planId: number) => void;
+  isMobile?: boolean;
 }
 
 const PlanCtaCell: React.FC<PlanCtaCellProps> = ({
@@ -181,9 +216,11 @@ const PlanCtaCell: React.FC<PlanCtaCellProps> = ({
   subscribing,
   isSelfServe,
   onPlanCtaClick,
+  isMobile: isMobileProp,
 }) => {
   const isSelected = selectedPlanId === plan.id;
-  const isMobile = useMediaQuery('(max-width:600px)');
+  const isMobileQuery = useMediaQuery('(max-width:600px)');
+  const isMobile = isMobileProp ?? isMobileQuery;
   const planColor = getPlanColor(plan.tier);
   const tier = plan.tier as PlanTier;
   const tierStyle = TIER_HEADER_STYLE[tier] ?? TIER_HEADER_STYLE.free;
@@ -197,7 +234,11 @@ const PlanCtaCell: React.FC<PlanCtaCellProps> = ({
         py: 1.25,
         bgcolor: tierStyle.bg,
         borderBottom: '2px solid #E5E7EB',
-        minWidth: { xs: 128, md: 152 },
+        minWidth: { xs: 120, md: 152 },
+        width: isMobile ? '100%' : { xs: 120, md: 152 },
+        position: 'sticky',
+        top: 0,
+        zIndex: 3,
       }}
     >
       <Button
@@ -244,6 +285,8 @@ interface PlanGridHeaderRowProps {
   subscribing: boolean;
   isSelfServeForTier: (tier: string) => boolean;
   onPlanCtaClick: (planId: number) => void;
+  visibleTiers: PlanTier[];
+  isMobile?: boolean;
 }
 
 export const PlanGridHeaderRows: React.FC<PlanGridHeaderRowProps> = ({
@@ -254,8 +297,10 @@ export const PlanGridHeaderRows: React.FC<PlanGridHeaderRowProps> = ({
   subscribing,
   isSelfServeForTier,
   onPlanCtaClick,
+  visibleTiers,
+  isMobile,
 }) => {
-  const tiers: PlanTier[] = ['free', 'basic', 'pro', 'enterprise'];
+  const tiers = visibleTiers;
 
   return (
     <>
@@ -264,16 +309,31 @@ export const PlanGridHeaderRows: React.FC<PlanGridHeaderRowProps> = ({
         <TableCell
           sx={{
             ...FEATURES_CELL_SX,
-            py: 1.25,
+            py: isMobile ? 0.65 : 1.25,
+            px: isMobile ? 0.75 : 2,
+            verticalAlign: isMobile ? 'middle' : 'top',
             borderBottom: '1px solid #E5E7EB',
             borderTop: '3px solid transparent',
+            position: isMobile ? 'sticky' : 'static',
+            left: 0,
+            top: 0,
+            zIndex: 4,
           }}
         >
-          <PricingBillingToggle
-            yearlyBilling={yearlyBilling}
-            onChange={onYearlyBillingChange}
-            compact
-          />
+          {isMobile ? (
+            <PricingBillingToggle
+              yearlyBilling={yearlyBilling}
+              onChange={onYearlyBillingChange}
+              compact
+              labelsOnly
+            />
+          ) : (
+            <PricingBillingToggle
+              yearlyBilling={yearlyBilling}
+              onChange={onYearlyBillingChange}
+              compact
+            />
+          )}
         </TableCell>
         {tiers.map((tier) => {
           const plan = tierPlans[tier];
@@ -291,6 +351,7 @@ export const PlanGridHeaderRows: React.FC<PlanGridHeaderRowProps> = ({
               plan={plan}
               yearlyBilling={yearlyBilling}
               selectedPlanId={selectedPlanId}
+              isMobile={isMobile}
             />
           );
         })}
@@ -304,6 +365,10 @@ export const PlanGridHeaderRows: React.FC<PlanGridHeaderRowProps> = ({
             verticalAlign: 'middle',
             py: 1.25,
             borderBottom: '2px solid #E5E7EB',
+            position: isMobile ? 'sticky' : 'static',
+            left: 0,
+            top: 0,
+            zIndex: 4,
           }}
         >
           <Typography
@@ -332,6 +397,7 @@ export const PlanGridHeaderRows: React.FC<PlanGridHeaderRowProps> = ({
               subscribing={subscribing}
               isSelfServe={isSelfServeForTier(plan.tier)}
               onPlanCtaClick={onPlanCtaClick}
+              isMobile={isMobile}
             />
           );
         })}

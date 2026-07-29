@@ -545,7 +545,7 @@ def llm_text_gen(
             # Provide more helpful error message based on available providers
             if not available_providers:
                 raise HTTPException(
-                    status_code=429,
+                    status_code=503,
                     detail={
                         "error": "No LLM providers configured",
                         "message": "No LLM API keys found. Please configure at least one provider (GPT_PROVIDER, GOOGLE_API_KEY, HF_TOKEN, or WAVESPEED_API_KEY).",
@@ -560,7 +560,7 @@ def llm_text_gen(
                 )
             
             raise HTTPException(
-                status_code=429,
+                status_code=503,
                 detail={
                     "error": "All LLM providers failed",
                     "message": "All configured LLM providers failed to generate a response. Please check API keys and try again.",
@@ -577,7 +577,7 @@ def llm_text_gen(
             )
 
     except HTTPException:
-        # Re-raise HTTPExceptions (e.g., 429 subscription limit) - preserve error details
+        # Re-raise HTTPExceptions (e.g., 429 subscription limit from preflight) - preserve error details
         raise
     except Exception as e:
         logger.error(f"[llm_text_gen] Error during text generation: {str(e)}")

@@ -381,7 +381,15 @@ class ConsolidatedGrowthService:
 
     def _parse_trending(self, raw: dict, now: datetime) -> TrendingTopicsResponse:
         try:
-            items = [TrendingTopicItem(**t) for t in raw.get("trending_topics", [])]
+            items = [
+                TrendingTopicItem(**t)
+                for t in raw.get("trending_topics", [])
+                if isinstance(t, dict)
+                and t.get("topic")
+                and t.get("why_now")
+                and t.get("suggested_hook")
+                and t.get("confidence") in ("high", "medium", "low")
+            ]
             return TrendingTopicsResponse(
                 industry=raw.get("trending_industry", ""),
                 trending_topics=items,
@@ -390,7 +398,12 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse trending: {}", e)
-            return TrendingTopicsResponse(generated_at=now)
+            return TrendingTopicsResponse(
+                industry="",
+                trending_topics=[],
+                data_source_summary="",
+                generated_at=now,
+            )
 
     def _parse_network(self, raw: dict, now: datetime) -> NetworkSuggestionsResponse:
         try:
@@ -402,7 +415,11 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse network: {}", e)
-            return NetworkSuggestionsResponse(generated_at=now)
+            return NetworkSuggestionsResponse(
+                suggestions=[],
+                data_source_summary="",
+                generated_at=now,
+            )
 
     def _parse_engagement(self, raw: dict, now: datetime) -> EngagementOpportunitiesResponse:
         try:
@@ -414,7 +431,11 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse engagement: {}", e)
-            return EngagementOpportunitiesResponse(generated_at=now)
+            return EngagementOpportunitiesResponse(
+                opportunities=[],
+                data_source_summary="",
+                generated_at=now,
+            )
 
     def _parse_viral(self, raw: dict, now: datetime) -> ViralAnalysisResponse:
         try:
@@ -428,7 +449,13 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse viral: {}", e)
-            return ViralAnalysisResponse(generated_at=now)
+            return ViralAnalysisResponse(
+                industry="",
+                patterns=[],
+                top_recommendation="",
+                data_source_summary="",
+                generated_at=now,
+            )
 
     def _parse_strategy(self, raw: dict, now: datetime) -> WeeklyStrategyResponse:
         try:
@@ -444,7 +471,15 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse strategy: {}", e)
-            return WeeklyStrategyResponse(generated_at=now)
+            return WeeklyStrategyResponse(
+                theme="",
+                week_of="",
+                daily_posts=[],
+                key_topics=[],
+                focus_area="",
+                data_source_summary="",
+                generated_at=now,
+            )
 
     def _parse_content_gaps(self, raw: dict, now: datetime) -> ContentGapsResponse:
         try:
@@ -456,7 +491,11 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse content gaps: {}", e)
-            return ContentGapsResponse(generated_at=now)
+            return ContentGapsResponse(
+                gaps=[],
+                data_source_summary="",
+                generated_at=now,
+            )
 
     def _parse_brand(self, raw: dict, now: datetime) -> BrandScorecardResponse:
         try:
@@ -470,4 +509,10 @@ class ConsolidatedGrowthService:
             )
         except Exception as e:
             logger.warning("[ConsolidatedGrowth] Failed to parse brand: {}", e)
-            return BrandScorecardResponse(generated_at=now)
+            return BrandScorecardResponse(
+                overall_score=0,
+                dimensions=[],
+                top_recommendation="",
+                data_source_summary="",
+                generated_at=now,
+            )

@@ -4,6 +4,7 @@ import { OperationButton } from '../../../shared/OperationButton';
 import AutoFixHighIcon from '@mui/icons-material/AutoFixHigh';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { storyWriterApi } from '../../../../services/storyWriterApi';
+import { modalPaperSx } from './modalStyles';
 
 interface ImageEditModalProps {
   open: boolean;
@@ -97,23 +98,16 @@ const ImageEditModal: React.FC<ImageEditModalProps> = ({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: {
-          backgroundColor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-          border: '1px solid rgba(0,0,0,0.06)',
-        },
+        sx: modalPaperSx,
       }}
     >
       <DialogTitle>Edit Scene Illustration Prompt (Scene {sceneNumber})</DialogTitle>
-      <DialogContent dividers sx={{ color: '#2C2416' }}>
+      <DialogContent dividers>
         <Box
           sx={{
             display: 'flex',
             flexDirection: 'column',
             gap: 2,
-            '& .MuiFormLabel-root': { color: '#6b5846' },
-            '& .MuiInputBase-root': { color: '#2C2416' },
           }}
         >
           <TextField

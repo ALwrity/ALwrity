@@ -11,6 +11,7 @@ from fastapi import APIRouter
 
 from .routes import (
     cache_routes,
+    export,
     media_generation,
     scene_animation,
     story_content,
@@ -30,6 +31,7 @@ router.include_router(story_tasks.router)
 router.include_router(media_generation.router)
 router.include_router(scene_animation.router)
 router.include_router(video_generation.router)
+router.include_router(export.router)
 router.include_router(cache_routes.router)
 
 

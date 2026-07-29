@@ -1,24 +1,13 @@
-# Ensure typing constructs and models are available globally for FastAPI type annotation evaluation
-import typing
-import builtins
-
-# Make common typing constructs available globally
-builtins.Optional = typing.Optional
-builtins.List = typing.List
-builtins.Dict = typing.Dict
-builtins.Any = typing.Any
-builtins.Union = typing.Union
-
 # Import onboarding models VERY early to ensure they're available before any services
+import typing
 from models.onboarding import APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis
-
 
 from fastapi import FastAPI, HTTPException, Depends, Request, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import os
 from loguru import logger
 from dotenv import load_dotenv
@@ -157,8 +146,11 @@ default_allowed_origins = [
     "http://localhost:3000",  # React dev server
     "http://localhost:8000",  # Backend dev server
     "http://localhost:3001",  # Alternative React port
-    "https://alwrity-ai.vercel.app",  # Vercel frontend
 ]
+
+# Production frontend URL(s) from environment
+prod_origins = os.getenv("ALWRITY_FRONTEND_URLS", "").split(",") if os.getenv("ALWRITY_FRONTEND_URLS") else []
+default_allowed_origins.extend(o.strip() for o in prod_origins if o.strip())
 
 # Optional dynamic origins from environment (comma-separated)
 env_origins = os.getenv("ALWRITY_ALLOWED_ORIGINS", "").split(",") if os.getenv("ALWRITY_ALLOWED_ORIGINS") else []
@@ -175,8 +167,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
 
 # Initialize modular utilities
@@ -603,7 +595,7 @@ async def startup_event():
         # Check Wix API key configuration
         wix_api_key = os.getenv('WIX_API_KEY')
         if wix_api_key:
-            logger.warning(f"âœ… WIX_API_KEY loaded ({len(wix_api_key)} chars, starts with '{wix_api_key[:10]}...')")
+            logger.warning(f"WIX_API_KEY loaded ({len(wix_api_key)} chars)")
         else:
             logger.warning("âš ï¸ WIX_API_KEY not found in environment - Wix publishing may fail")
         

@@ -46,7 +46,7 @@ class ContentGenerator:
         self.carousel_generator = CarouselGenerator(citation_manager, quality_analyzer)
         self.video_script_generator = VideoScriptGenerator(citation_manager, quality_analyzer)
     
-    def _get_cached_persona_data(self, user_id: int, platform: str) -> Optional[Dict[str, Any]]:
+    def _get_cached_persona_data(self, user_id: str, platform: str) -> Optional[Dict[str, Any]]:
         """
         Get persona data with caching for LinkedIn platform.
         
@@ -89,7 +89,7 @@ class ContentGenerator:
             logger.warning(f"Could not load persona data for {platform} content generation: {e}")
             return None
     
-    def _clear_persona_cache(self, user_id: int = None):
+    def _clear_persona_cache(self, user_id: str = None):
         """
         Clear persona cache for a specific user or all users.
         
@@ -152,58 +152,7 @@ class ContentGenerator:
         context_parts.append("\nInstructions: Use the research above to include specific data points, statistics, and factual claims in your content. Cite sources where appropriate.")
         return "\n".join(context_parts)
     
-    async def _synthesize_research(self, research_sources: List, topic: str, user_id: str = None) -> str:
-        """Distill research sources into structured bullet points using LLM.
-        
-        Produces a concise synthesis focused on key statistics, trends, and
-        actionable findings relevant to the topic.
-        """
-        if not research_sources:
-            return ""
-        
-        today = datetime.now().strftime("%B %d, %Y")
-        sources_text = []
-        for i, s in enumerate(research_sources[:15], 1):
-            title = getattr(s, 'title', f'Source {i}')
-            highlights = getattr(s, 'highlights', None)
-            summary = getattr(s, 'summary', None)
-            content = getattr(s, 'content', '')
-            
-            snippet = f"Source {i}: {title}\n"
-            if highlights:
-                snippet += "\n".join(f"  - {h}" for h in highlights[:3])
-            elif summary:
-                snippet += f"  Summary: {summary[:500]}"
-            elif content:
-                snippet += f"  Excerpt: {content[:500]}"
-            sources_text.append(snippet)
-        
-        synthesis_prompt = f"""You are a research analyst. Below are {len(research_sources)} research sources about "{topic}".
-
-Extract and organize the most important information into these categories:
-- KEY STATISTICS: Specific numbers, percentages, dates, and data points
-- KEY TRENDS: Emerging patterns, shifts, and发展方向
-- EXPERT INSIGHTS: Quotes, opinions, and expert perspectives
-- ACTIONABLE FINDINGS: Practical takeaways that can be applied
-
-Research sources:
-{chr(10).join(sources_text)}
-
-Today's date: {today}
-
-Return ONLY the synthesized findings in clear bullet points under each category heading. Be concise and factual. If a category has no relevant data, skip it."""
-        
-        try:
-            synthesis = llm_text_gen(
-                prompt=synthesis_prompt,
-                user_id=user_id,
-                flow_type="research_synthesis",
-                temperature=0.2
-            )
-            return f"\n\nRESEARCH SYNTHESIS:\n{synthesis}"
-        except Exception as e:
-            logger.warning(f"Research synthesis failed, using raw context: {e}")
-            return ""
+    
     
     async def generate_post(
         self,
@@ -498,8 +447,9 @@ Return ONLY the synthesized findings in clear bullet points under each category 
         """Generate post content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             # Build the prompt using persona if available
-            uid = int(getattr(request, "user_id", 0) or 0)
-            persona_data = self._get_cached_persona_data(uid, 'linkedin')
+            persona_data = None
+            if user_id:
+                persona_data = self._get_cached_persona_data(user_id, 'linkedin')
             if getattr(request, 'persona_override', None):
                 try:
                     override = request.persona_override
@@ -589,8 +539,9 @@ Return ONLY the synthesized findings in clear bullet points under each category 
         """Generate article content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             # Build the prompt using persona if available
-            uid = int(getattr(request, "user_id", 0) or 0)
-            persona_data = self._get_cached_persona_data(uid, 'linkedin')
+            persona_data = None
+            if user_id:
+                persona_data = self._get_cached_persona_data(user_id, 'linkedin')
             if getattr(request, 'persona_override', None):
                 try:
                     override = request.persona_override
@@ -609,17 +560,10 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                     pass
             prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data)
             
-            # Step A: Inject raw research context (highlights/summary prioritized)
+            # Inject research context (highlights/summary prioritized)
             research_context = self._build_research_context(research_sources)
             if research_context:
                 prompt += research_context
-            
-            # Step B: Synthesize research into structured bullet points
-            research_synthesis = await self._synthesize_research(
-                research_sources, request.topic, user_id
-            )
-            if research_synthesis:
-                prompt += research_synthesis
             
             # Generate content using provider-agnostic gateway with structured JSON schema
             raw_response = llm_text_gen(

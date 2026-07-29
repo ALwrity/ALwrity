@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Paper, Stepper, Step, StepLabel, StepButton, Typography, IconButton, Tooltip } from '@mui/material';
+import { Box, Stepper, Step, StepLabel, StepButton, Typography, IconButton, Tooltip } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { StoryPhase } from '../../hooks/useStoryWriterPhaseNavigation';
 
@@ -8,6 +8,7 @@ interface PhaseNavigationProps {
   currentPhase: string;
   onPhaseClick: (phaseId: string) => void;
   onReset?: () => void;
+  colorMode?: 'light' | 'dark';
 }
 
 export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
@@ -15,8 +16,10 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
   currentPhase,
   onPhaseClick,
   onReset,
+  colorMode = 'dark',
 }) => {
   const activeStep = phases.findIndex((p) => p.id === currentPhase);
+  const isLight = colorMode === 'light';
 
   const handleReset = () => {
     if (window.confirm('Are you sure you want to restart? This will clear all your story data and start from the beginning.')) {
@@ -30,49 +33,50 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
     <Box sx={{ position: 'relative' }}>
       {onReset && (
         <Box sx={{ position: 'absolute', top: -8, right: -8, zIndex: 10 }}>
-        <Tooltip title="Restart Story (Clear all data and start from beginning)">
-          <IconButton
-            onClick={handleReset}
-            sx={{
-                color: 'rgba(255, 255, 255, 0.9)',
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-              },
-            }}
-            size="small"
-          >
+          <Tooltip title="Restart Story (Clear all data and start from beginning)">
+            <IconButton
+              onClick={handleReset}
+              sx={{
+                color: isLight ? '#8D6E63' : 'rgba(255, 255, 255, 0.9)',
+                backgroundColor: isLight ? 'rgba(93, 64, 55, 0.08)' : 'rgba(255, 255, 255, 0.1)',
+                '&:hover': {
+                  backgroundColor: isLight ? 'rgba(93, 64, 55, 0.15)' : 'rgba(255, 255, 255, 0.2)',
+                  color: isLight ? '#5D4037' : 'white',
+                },
+              }}
+              size="small"
+            >
               <RefreshIcon fontSize="small" />
-          </IconButton>
-        </Tooltip>
+            </IconButton>
+          </Tooltip>
         </Box>
       )}
-      <Stepper 
-        activeStep={activeStep} 
+      <Stepper
+        activeStep={activeStep}
         alternativeLabel
         sx={{
           backgroundColor: 'transparent',
           '& .MuiStepLabel-label': {
-            color: 'rgba(255, 255, 255, 0.9)',
+            color: isLight ? '#8D6E63' : 'rgba(255, 255, 255, 0.9)',
             '&.Mui-active': {
-              color: 'white',
+              color: isLight ? '#5D4037' : 'white',
+              fontWeight: 600,
             },
             '&.Mui-completed': {
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: isLight ? '#6D8A6D' : 'rgba(255, 255, 255, 0.7)',
             },
             '&.Mui-disabled': {
-              color: 'rgba(255, 255, 255, 0.4)',
+              color: isLight ? '#C4B8A8' : 'rgba(255, 255, 255, 0.4)',
             },
           },
           '& .MuiStepLabel-iconContainer': {
             '& .MuiSvgIcon-root': {
-              color: 'rgba(255, 255, 255, 0.3)',
+              color: isLight ? '#C4B8A8' : 'rgba(255, 255, 255, 0.3)',
               '&.Mui-active': {
-                color: 'rgba(255, 255, 255, 0.6)',
+                color: isLight ? '#8D6E63' : 'rgba(255, 255, 255, 0.6)',
               },
               '&.Mui-completed': {
-                color: 'rgba(255, 255, 255, 0.5)',
+                color: isLight ? '#6D8A6D' : 'rgba(255, 255, 255, 0.5)',
               },
             },
           },
@@ -101,24 +105,24 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: phase.current
-                        ? 'rgba(255, 255, 255, 0.9)'
+                        ? isLight ? '#5D4037' : 'rgba(255, 255, 255, 0.9)'
                         : phase.completed
-                        ? 'rgba(76, 175, 80, 0.9)'
+                        ? isLight ? '#6D8A6D' : 'rgba(76, 175, 80, 0.9)'
                         : phase.disabled
-                        ? 'rgba(255, 255, 255, 0.2)'
-                        : 'rgba(255, 255, 255, 0.3)',
-                      color: phase.current 
-                        ? '#667eea'
-                        : phase.completed 
-                        ? 'white' 
-                        : 'rgba(255, 255, 255, 0.7)',
+                        ? isLight ? '#E8E5D3' : 'rgba(255, 255, 255, 0.2)'
+                        : isLight ? '#E8E5D3' : 'rgba(255, 255, 255, 0.3)',
+                      color: phase.current
+                        ? isLight ? '#FAF9F6' : '#667eea'
+                        : phase.completed
+                        ? 'white'
+                        : isLight ? '#8D6E63' : 'rgba(255, 255, 255, 0.7)',
                       fontSize: '1rem',
                       fontWeight: phase.current ? 600 : 400,
                       transition: 'all 0.2s ease',
                       '&:hover': !phase.disabled ? {
                         backgroundColor: phase.current
-                          ? 'rgba(255, 255, 255, 1)'
-                          : 'rgba(255, 255, 255, 0.4)',
+                          ? isLight ? '#3E2723' : 'rgba(255, 255, 255, 1)'
+                          : isLight ? '#D4C9B5' : 'rgba(255, 255, 255, 0.4)',
                         transform: 'scale(1.05)',
                       } : {},
                     }}
@@ -132,11 +136,11 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
                   sx={{
                     fontWeight: phase.current ? 600 : 400,
                     fontSize: '0.75rem',
-                    color: phase.disabled 
-                      ? 'rgba(255, 255, 255, 0.4)' 
-                      : phase.current 
-                      ? 'white' 
-                      : 'rgba(255, 255, 255, 0.8)',
+                    color: phase.disabled
+                      ? isLight ? '#C4B8A8' : 'rgba(255, 255, 255, 0.4)'
+                      : phase.current
+                      ? isLight ? '#2C2416' : 'white'
+                      : isLight ? '#5D4037' : 'rgba(255, 255, 255, 0.8)',
                     mt: 0.5,
                   }}
                 >

@@ -6,20 +6,21 @@
  * F3  BrandScorecardModal      — full BrandScorecard component in a modal
  * F4  WeeklyPlanModal          — Mon-Fri content plan with Create Now + Schedule CTAs
  * F5  ViralCopywriterModal     — top viral patterns with "Write in This Style" CTA
+ * F6  EngagementTrendsModal    — see EngagementTrendsModal.tsx
  */
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { DashboardActionModal } from './DashboardActionModal';
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { DashboardActionModal } from "./DashboardActionModal";
 import {
   linkedInGrowthApi,
   type ConsolidatedGrowthResponse,
   type DailyPostIdea,
   type ViralPattern,
   type BrandDimension,
-} from '../../../../services/linkedInGrowthApi';
-import { contentPlanningApi } from '../../../../services/contentPlanningApi';
-import { BrandScorecard } from '../GrowthEngine/BrandScorecard';
-import { ViralAnalysisCard } from '../GrowthEngine/ViralAnalysisCard';
-import { postAnalyticsApi, type PostAnalyticsHistoryResponse, type PostDelta } from '../../../../services/postAnalyticsApi';
+} from "../../../../services/linkedInGrowthApi";
+import { contentPlanningApi } from "../../../../services/contentPlanningApi";
+import { BrandScorecard } from "../GrowthEngine/BrandScorecard";
+import { ViralAnalysisCard } from "../GrowthEngine/ViralAnalysisCard";
+import { PostTodayCandidateList, type PostCandidate } from "./PostTodayCandidateList";
 import {
   colors,
   rowBase,
@@ -27,13 +28,14 @@ import {
   scoreBg,
   barColor,
   CONFIDENCE_COLORS,
-} from '../GrowthEngine/styles';
+} from "../GrowthEngine/styles";
+import { openGrowthEngineModal } from "../../utils/linkedInDashboardEvents";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-const CACHE_KEY = 'alwrity_growth_engine';
+const CACHE_KEY = "alwrity_growth_engine";
 
 interface CachePayload {
   data: ConsolidatedGrowthResponse;
@@ -59,7 +61,10 @@ function readCache(): CachePayload | null {
 
 function writeCache(data: ConsolidatedGrowthResponse) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, cachedAt: Date.now() }));
+    sessionStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ data, cachedAt: Date.now() }),
+    );
   } catch {
     // storage full — silent
   }
@@ -68,24 +73,18 @@ function writeCache(data: ConsolidatedGrowthResponse) {
 function formatAge(cachedAt: number): string {
   const ms = Date.now() - cachedAt;
   const min = Math.floor(ms / 60000);
-  if (min < 1) return 'just now';
+  if (min < 1) return "just now";
   if (min < 60) return `${min} min ago`;
   const hr = Math.floor(min / 60);
   if (hr < 24) return `${hr}h ago`;
   return `${Math.floor(hr / 24)}d ago`;
 }
 
-function openInCreate(topic: string, keyPoints: string, type: string = 'post') {
+function openInCreate(topic: string, keyPoints: string, type: string = "post") {
   window.dispatchEvent(
-    new CustomEvent('linkedinwriter:openQuickCreate', {
+    new CustomEvent("linkedinwriter:openQuickCreate", {
       detail: { type, topic, key_points: keyPoints },
-    })
-  );
-}
-
-function switchToGrowthEngine() {
-  window.dispatchEvent(
-    new CustomEvent('linkedinwriter:switchTab', { detail: { tab: 'analytics' } })
+    }),
   );
 }
 
@@ -94,20 +93,22 @@ const Spinner = () => (
     <style>{`@keyframes aw-spin { to { transform: rotate(360deg); } }`}</style>
     <span
       style={{
-        display: 'inline-block',
+        display: "inline-block",
         width: 16,
         height: 16,
-        border: '2px solid #d1d5db',
+        border: "2px solid #d1d5db",
         borderTopColor: colors.primary,
-        borderRadius: '50%',
-        animation: 'aw-spin 0.7s linear infinite',
+        borderRadius: "50%",
+        animation: "aw-spin 0.7s linear infinite",
         flexShrink: 0,
       }}
     />
   </>
 );
 
-const ConfidencePill: React.FC<{ level: 'high' | 'medium' | 'low' }> = ({ level }) => {
+const ConfidencePill: React.FC<{ level: "high" | "medium" | "low" }> = ({
+  level,
+}) => {
   const cc = CONFIDENCE_COLORS[level] ?? CONFIDENCE_COLORS.medium;
   return (
     <span
@@ -116,7 +117,7 @@ const ConfidencePill: React.FC<{ level: 'high' | 'medium' | 'low' }> = ({ level 
         fontWeight: 700,
         background: cc.bg,
         color: cc.text,
-        padding: '1px 6px',
+        padding: "1px 6px",
         borderRadius: 4,
       }}
     >
@@ -129,7 +130,7 @@ function useGrowthInsights(open: boolean) {
   const [data, setData] = useState<ConsolidatedGrowthResponse | null>(null);
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -141,13 +142,13 @@ function useGrowthInsights(open: boolean) {
       setData(null);
       setCachedAt(null);
     }
-    setError('');
+    setError("");
     setLoading(false);
   }, [open]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       const result = await linkedInGrowthApi.analyzeAll();
       writeCache(result);
@@ -157,7 +158,12 @@ function useGrowthInsights(open: boolean) {
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } };
       const msg = axiosErr.response?.data?.detail;
-      setError(msg ?? (err instanceof Error ? err.message : 'Could not load insights. Please try again.'));
+      setError(
+        msg ??
+          (err instanceof Error
+            ? err.message
+            : "Could not load insights. Please try again."),
+      );
       return null;
     } finally {
       setLoading(false);
@@ -168,14 +174,14 @@ function useGrowthInsights(open: boolean) {
 }
 
 const primaryLoadBtn: React.CSSProperties = {
-  padding: '10px 24px',
+  padding: "10px 24px",
   background: colors.primary,
-  color: '#fff',
-  border: 'none',
+  color: "#fff",
+  border: "none",
   borderRadius: 8,
   fontSize: 14,
   fontWeight: 700,
-  cursor: 'pointer',
+  cursor: "pointer",
 };
 
 const CacheEmptyPrompt: React.FC<{
@@ -186,26 +192,46 @@ const CacheEmptyPrompt: React.FC<{
   onLoad: () => void;
   disabled?: boolean;
 }> = ({ icon, title, description, buttonLabel, onLoad, disabled }) => (
-  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+  <div style={{ textAlign: "center", padding: "24px 0" }}>
     <div style={{ fontSize: 36, marginBottom: 12 }}>{icon}</div>
-    <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>{title}</div>
-    <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}>{description}</div>
-    <button type="button" onClick={onLoad} disabled={disabled} style={{
-      ...primaryLoadBtn,
-      opacity: disabled ? 0.6 : 1,
-      cursor: disabled ? 'not-allowed' : 'pointer',
-    }}>{buttonLabel}</button>
+    <div
+      style={{
+        fontWeight: 600,
+        fontSize: 14,
+        color: colors.textDark,
+        marginBottom: 6,
+      }}
+    >
+      {title}
+    </div>
+    <div
+      style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 20 }}
+    >
+      {description}
+    </div>
+    <button
+      type="button"
+      onClick={onLoad}
+      disabled={disabled}
+      style={{
+        ...primaryLoadBtn,
+        opacity: disabled ? 0.6 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
+      }}
+    >
+      {buttonLabel}
+    </button>
   </div>
 );
 
 const LoadingRow: React.FC<{ message: string }> = ({ message }) => (
   <div
     style={{
-      display: 'flex',
-      alignItems: 'center',
+      display: "flex",
+      alignItems: "center",
       gap: 12,
-      padding: '24px 0',
-      justifyContent: 'center',
+      padding: "24px 0",
+      justifyContent: "center",
       color: colors.textSecondary,
       fontSize: 13,
     }}
@@ -217,10 +243,10 @@ const LoadingRow: React.FC<{ message: string }> = ({ message }) => (
 const ErrorBanner: React.FC<{ message: string }> = ({ message }) => (
   <div
     style={{
-      padding: '10px 14px',
-      background: '#fef2f2',
+      padding: "10px 14px",
+      background: "#fef2f2",
       borderRadius: 8,
-      color: '#dc2626',
+      color: "#dc2626",
       fontSize: 13,
       marginBottom: 14,
     }}
@@ -229,33 +255,35 @@ const ErrorBanner: React.FC<{ message: string }> = ({ message }) => (
   </div>
 );
 
-const RefreshBar: React.FC<{ cachedAt: number; onRefresh: () => void; label?: string }> = ({
-  cachedAt,
-  onRefresh,
-  label = 'Last refreshed',
-}) => (
+const RefreshBar: React.FC<{
+  cachedAt: number;
+  onRefresh: () => void;
+  label?: string;
+}> = ({ cachedAt, onRefresh, label = "Last refreshed" }) => (
   <div
     style={{
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
       marginBottom: 14,
       fontSize: 11,
       color: colors.textTertiary,
     }}
   >
-    <span>{label} {formatAge(cachedAt)}</span>
+    <span>
+      {label} {formatAge(cachedAt)}
+    </span>
     <button
       type="button"
       onClick={onRefresh}
       style={{
-        background: 'none',
+        background: "none",
         border: `1px solid ${colors.border}`,
         borderRadius: 5,
-        padding: '2px 8px',
+        padding: "2px 8px",
         fontSize: 11,
         color: colors.textSecondary,
-        cursor: 'pointer',
+        cursor: "pointer",
         fontWeight: 600,
       }}
     >
@@ -273,7 +301,10 @@ interface GrowthSnapshotModalProps {
   onClose: () => void;
 }
 
-export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, onClose }) => {
+export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({
+  open,
+  onClose,
+}) => {
   const { data, cachedAt, loading, error, loadAll } = useGrowthInsights(open);
   const handleLoadAll = () => void loadAll();
 
@@ -282,7 +313,13 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
   const brandScore = data?.brand_scorecard?.overall_score ?? null;
   const brandRank =
     brandScore !== null
-      ? brandScore >= 85 ? 'Exceptional' : brandScore >= 65 ? 'Strong' : brandScore >= 40 ? 'Developing' : 'Beginner'
+      ? brandScore >= 85
+        ? "Exceptional"
+        : brandScore >= 65
+          ? "Strong"
+          : brandScore >= 40
+            ? "Developing"
+            : "Beginner"
       : null;
 
   return (
@@ -294,8 +331,16 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
       maxHeight="min(92vh, 680px)"
     >
       <div>
-        <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-          Your latest AI growth insights at a glance — trending topic, content gap, and brand health.
+        <p
+          style={{
+            margin: "0 0 16px",
+            fontSize: 13,
+            color: colors.textSecondary,
+            lineHeight: 1.5,
+          }}
+        >
+          Your latest AI growth insights at a glance — trending topic, content
+          gap, and brand health.
         </p>
 
         {/* ── No cache state ── */}
@@ -309,7 +354,9 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
           />
         )}
 
-        {loading && <LoadingRow message="Running AI analysis across 7 dimensions…" />}
+        {loading && (
+          <LoadingRow message="Running AI analysis across 7 dimensions…" />
+        )}
 
         {error && <ErrorBanner message={error} />}
 
@@ -317,7 +364,9 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
         {data && !loading && (
           <>
             {/* Cache age */}
-            {cachedAt && <RefreshBar cachedAt={cachedAt} onRefresh={handleLoadAll} />}
+            {cachedAt && (
+              <RefreshBar cachedAt={cachedAt} onRefresh={handleLoadAll} />
+            )}
 
             {/* Section 1 — Trending Topic */}
             <SnapshotSection
@@ -338,17 +387,22 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                     {topTrend.emoji} {topTrend.topic}
                   </div>
                   <div
-                    style={{ fontSize: 12, color: colors.textMedium, lineHeight: 1.5, marginBottom: 8 }}
+                    style={{
+                      fontSize: 12,
+                      color: colors.textMedium,
+                      lineHeight: 1.5,
+                      marginBottom: 8,
+                    }}
                   >
                     {topTrend.why_now}
                   </div>
                   <div
                     style={{
                       fontSize: 11,
-                      fontStyle: 'italic',
+                      fontStyle: "italic",
                       color: colors.textSecondary,
                       background: colors.badgeBg,
-                      padding: '6px 10px',
+                      padding: "6px 10px",
                       borderRadius: 6,
                       marginBottom: 8,
                       lineHeight: 1.5,
@@ -356,21 +410,23 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                   >
                     💡 Hook idea: "{topTrend.suggested_hook}"
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
                     <button
                       onClick={() => {
                         openInCreate(topTrend.topic, topTrend.suggested_hook);
                         onClose();
                       }}
                       style={{
-                        padding: '6px 14px',
+                        padding: "6px 14px",
                         background: colors.primary,
-                        color: '#fff',
-                        border: 'none',
+                        color: "#fff",
+                        border: "none",
                         borderRadius: 6,
                         fontSize: 12,
                         fontWeight: 600,
-                        cursor: 'pointer',
+                        cursor: "pointer",
                       }}
                     >
                       ✍️ Create Post
@@ -402,17 +458,22 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                     {topGap.gap_topic}
                   </div>
                   <div
-                    style={{ fontSize: 12, color: colors.textMedium, lineHeight: 1.5, marginBottom: 4 }}
+                    style={{
+                      fontSize: 12,
+                      color: colors.textMedium,
+                      lineHeight: 1.5,
+                      marginBottom: 4,
+                    }}
                   >
                     {topGap.why_it_matters}
                   </div>
                   <div
                     style={{
                       fontSize: 11,
-                      fontStyle: 'italic',
+                      fontStyle: "italic",
                       color: colors.textSecondary,
                       background: colors.badgeBg,
-                      padding: '6px 10px',
+                      padding: "6px 10px",
                       borderRadius: 6,
                       marginBottom: 8,
                       lineHeight: 1.5,
@@ -420,21 +481,23 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                   >
                     💡 Post angle: {topGap.suggested_angle}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
                     <button
                       onClick={() => {
                         openInCreate(topGap.gap_topic, topGap.suggested_angle);
                         onClose();
                       }}
                       style={{
-                        padding: '6px 14px',
-                        background: '#8b5cf6',
-                        color: '#fff',
-                        border: 'none',
+                        padding: "6px 14px",
+                        background: "#8b5cf6",
+                        color: "#fff",
+                        border: "none",
                         borderRadius: 6,
                         fontSize: 12,
                         fontWeight: 600,
-                        cursor: 'pointer',
+                        cursor: "pointer",
                       }}
                     >
                       ✍️ Fill This Gap
@@ -454,17 +517,17 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
               accent="#0ea5e9"
             >
               {brandScore !== null ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                   <div
                     style={{
                       width: 64,
                       height: 64,
-                      borderRadius: '50%',
+                      borderRadius: "50%",
                       background: scoreBg(brandScore),
                       color: scoreColor(brandScore),
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                       fontWeight: 800,
                       fontSize: 22,
                       flexShrink: 0,
@@ -484,23 +547,29 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
                     >
                       {brandRank} Brand
                     </div>
-                    <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 8 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: colors.textSecondary,
+                        marginBottom: 8,
+                      }}
+                    >
                       {data.brand_scorecard?.top_recommendation}
                     </div>
                     <button
                       onClick={() => {
-                        switchToGrowthEngine();
+                        openGrowthEngineModal();
                         onClose();
                       }}
                       style={{
-                        padding: '5px 12px',
-                        background: 'none',
+                        padding: "5px 12px",
+                        background: "none",
                         border: `1.5px solid ${colors.primary}`,
                         borderRadius: 6,
                         fontSize: 12,
                         fontWeight: 600,
                         color: colors.primary,
-                        cursor: 'pointer',
+                        cursor: "pointer",
                       }}
                     >
                       See Full Breakdown →
@@ -516,22 +585,22 @@ export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({ open, 
             <div
               style={{
                 marginTop: 16,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
               }}
             >
               <button
                 onClick={() => {
-                  switchToGrowthEngine();
+                  openGrowthEngineModal();
                   onClose();
                 }}
                 style={{
                   fontSize: 12,
                   color: colors.primary,
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
+                  background: "none",
+                  border: "none",
+                  cursor: "pointer",
                   fontWeight: 600,
                   padding: 0,
                 }}
@@ -556,7 +625,12 @@ interface SnapshotSectionProps {
   children: React.ReactNode;
 }
 
-const SnapshotSection: React.FC<SnapshotSectionProps> = ({ icon, label, accent, children }) => (
+const SnapshotSection: React.FC<SnapshotSectionProps> = ({
+  icon,
+  label,
+  accent,
+  children,
+}) => (
   <div
     style={{
       ...rowBase,
@@ -566,14 +640,14 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({ icon, label, accent, 
   >
     <div
       style={{
-        display: 'flex',
-        alignItems: 'center',
+        display: "flex",
+        alignItems: "center",
         gap: 6,
         marginBottom: 10,
         fontSize: 11,
         fontWeight: 700,
         color: colors.textTertiary,
-        textTransform: 'uppercase',
+        textTransform: "uppercase",
         letterSpacing: 0.6,
       }}
     >
@@ -584,16 +658,19 @@ const SnapshotSection: React.FC<SnapshotSectionProps> = ({ icon, label, accent, 
   </div>
 );
 
-const NoDataRow: React.FC<{ label: string; onRefresh: () => void }> = ({ label, onRefresh }) => (
+const NoDataRow: React.FC<{ label: string; onRefresh: () => void }> = ({
+  label,
+  onRefresh,
+}) => (
   <div style={{ fontSize: 12, color: colors.textTertiary }}>
-    No {label} in current analysis.{' '}
+    No {label} in current analysis.{" "}
     <button
       onClick={onRefresh}
       style={{
-        background: 'none',
-        border: 'none',
+        background: "none",
+        border: "none",
         color: colors.primary,
-        cursor: 'pointer',
+        cursor: "pointer",
         fontSize: 12,
         fontWeight: 600,
         padding: 0,
@@ -607,15 +684,8 @@ const NoDataRow: React.FC<{ label: string; onRefresh: () => void }> = ({ label, 
 // ---------------------------------------------------------------------------
 // F2 — Post Today Modal
 // ---------------------------------------------------------------------------
-
-interface PostCandidate {
-  topic: string;
-  hook: string;
-  sourceLabel: string;
-  sourceIcon: string;
-  confidence: 'high' | 'medium' | 'low';
-  score: number;
-}
+// PostCandidate type imported from PostTodayCandidateList.tsx
+// ---------------------------------------------------------------------------
 
 const CARD_PRIORITY: Record<string, number> = {
   trending: 0.5,
@@ -635,8 +705,8 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
       candidates.push({
         topic: item.topic,
         hook: item.suggested_hook,
-        sourceLabel: 'Trending Now',
-        sourceIcon: '🔥',
+        sourceLabel: "Trending Now",
+        sourceIcon: "🔥",
         confidence: item.confidence,
         score: (SCORE_MAP[item.confidence] ?? 1) + CARD_PRIORITY.trending,
       });
@@ -649,7 +719,7 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
         topic: post.headline,
         hook: post.hook,
         sourceLabel: `Weekly Plan · ${post.day}`,
-        sourceIcon: '📅',
+        sourceIcon: "📅",
         confidence: post.confidence,
         score: (SCORE_MAP[post.confidence] ?? 1) + CARD_PRIORITY.strategy,
       });
@@ -661,8 +731,8 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
       candidates.push({
         topic: item.title,
         hook: item.suggested_comment,
-        sourceLabel: 'Engagement Opportunity',
-        sourceIcon: '💬',
+        sourceLabel: "Engagement Opportunity",
+        sourceIcon: "💬",
         confidence: item.confidence,
         score: (SCORE_MAP[item.confidence] ?? 1) + CARD_PRIORITY.engagement,
       });
@@ -674,8 +744,8 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
       candidates.push({
         topic: gap.gap_topic,
         hook: gap.suggested_angle,
-        sourceLabel: 'Content Gap',
-        sourceIcon: '🔍',
+        sourceLabel: "Content Gap",
+        sourceIcon: "🔍",
         confidence: gap.confidence,
         score: (SCORE_MAP[gap.confidence] ?? 1) + CARD_PRIORITY.gaps,
       });
@@ -687,8 +757,8 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
       candidates.push({
         topic: p.example_headline,
         hook: p.description,
-        sourceLabel: 'Viral Pattern',
-        sourceIcon: '📈',
+        sourceLabel: "Viral Pattern",
+        sourceIcon: "📈",
         confidence: p.confidence,
         score: (SCORE_MAP[p.confidence] ?? 1) + CARD_PRIORITY.viral,
       });
@@ -698,10 +768,10 @@ function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   if (c.network_suggestions?.suggestions) {
     for (const s of c.network_suggestions.suggestions) {
       candidates.push({
-        topic: `${s.name} — ${s.title}${s.company ? ` @ ${s.company}` : ''}`,
+        topic: `${s.name} — ${s.title}${s.company ? ` @ ${s.company}` : ""}`,
         hook: s.why_connect,
-        sourceLabel: 'Network Suggestion',
-        sourceIcon: '🤝',
+        sourceLabel: "Network Suggestion",
+        sourceIcon: "🤝",
         confidence: s.confidence,
         score: (SCORE_MAP[s.confidence] ?? 1) + CARD_PRIORITY.network,
       });
@@ -717,11 +787,13 @@ interface PostTodayModalProps {
   onClose: () => void;
 }
 
-export const PostTodayModal: React.FC<PostTodayModalProps> = ({ open, onClose }) => {
+export const PostTodayModal: React.FC<PostTodayModalProps> = ({
+  open,
+  onClose,
+}) => {
   const { data, cachedAt, loading, error, loadAll } = useGrowthInsights(open);
   const candidates = useMemo(() => (data ? rankCandidates(data) : []), [data]);
   const handleLoadAll = () => void loadAll();
-  const top3 = candidates.slice(0, 3);
 
   return (
     <DashboardActionModal
@@ -732,9 +804,16 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({ open, onClose })
       maxHeight="min(92vh, 700px)"
     >
       <div>
-        <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-          AI-ranked post opportunities across all your growth signals — trending topics, content gaps,
-          weekly strategy, and engagement wins.
+        <p
+          style={{
+            margin: "0 0 16px",
+            fontSize: 13,
+            color: colors.textSecondary,
+            lineHeight: 1.5,
+          }}
+        >
+          AI-ranked post opportunities across all your growth signals — trending
+          topics, content gaps, weekly strategy, and engagement wins.
         </p>
 
         {/* No cache */}
@@ -742,58 +821,48 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({ open, onClose })
           <>
             <CacheEmptyPrompt
               icon="🎯"
-              title={error ? 'Failed to load insights' : 'No insights loaded yet'}
-              description={error ? 'Try again or close and reopen the modal.' : 'Load your growth analysis to get AI-ranked post recommendations.'}
-              buttonLabel={error ? '🔁 Retry' : '🚀 Load Insights'}
+              title={
+                error ? "Failed to load insights" : "No insights loaded yet"
+              }
+              description={
+                error
+                  ? "Try again or close and reopen the modal."
+                  : "Load your growth analysis to get AI-ranked post recommendations."
+              }
+              buttonLabel={error ? "🔁 Retry" : "🚀 Load Insights"}
               onLoad={handleLoadAll}
             />
             {error && <ErrorBanner message={error} />}
           </>
         )}
 
-        {loading && <LoadingRow message={data ? 'Refreshing insights…' : 'Running AI analysis across all growth signals…'} />}
+        {loading && (
+          <LoadingRow
+            message={
+              data
+                ? "Refreshing insights…"
+                : "Running AI analysis across all growth signals…"
+            }
+          />
+        )}
 
-        {/* Ranked candidates */}
-        {!loading && top3.length > 0 && (
+        {/* Ranked candidates with tabs */}
+        {!loading && candidates.length > 0 && (
           <>
             {cachedAt && (
-              <RefreshBar cachedAt={cachedAt} onRefresh={handleLoadAll} label="Based on analysis from" />
-            )}
-
-            {top3.map((candidate, idx) => (
-              <PostCandidateCard
-                key={idx}
-                candidate={candidate}
-                rank={idx + 1}
-                onUse={() => {
-                  openInCreate(candidate.topic, candidate.hook);
-                  onClose();
-                }}
+              <RefreshBar
+                cachedAt={cachedAt}
+                onRefresh={handleLoadAll}
+                label="Based on analysis from"
               />
-            ))}
-
-            {candidates.length > 3 && (
-              <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 8, textAlign: 'center' }}>
-                + {candidates.length - 3} more opportunities in the{' '}
-                <button
-                  onClick={() => {
-                    switchToGrowthEngine();
-                    onClose();
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: colors.primary,
-                    cursor: 'pointer',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    padding: 0,
-                  }}
-                >
-                  Growth Engine →
-                </button>
-              </div>
             )}
+            <PostTodayCandidateList
+              candidates={candidates}
+              onUseCandidate={(topic, hook) => {
+                openInCreate(topic, hook);
+                onClose();
+              }}
+            />
           </>
         )}
       </div>
@@ -810,13 +879,20 @@ interface PostCandidateCardProps {
   onUse: () => void;
 }
 
-const RANK_STYLES: Record<number, { border: string; badge: string; badgeText: string }> = {
-  1: { border: '#0a66c2', badge: '#dbeafe', badgeText: '#1d4ed8' },
-  2: { border: '#8b5cf6', badge: '#ede9fe', badgeText: '#6d28d9' },
-  3: { border: '#e2e8f0', badge: '#f1f5f9', badgeText: '#64748b' },
+const RANK_STYLES: Record<
+  number,
+  { border: string; badge: string; badgeText: string }
+> = {
+  1: { border: "#0a66c2", badge: "#dbeafe", badgeText: "#1d4ed8" },
+  2: { border: "#8b5cf6", badge: "#ede9fe", badgeText: "#6d28d9" },
+  3: { border: "#e2e8f0", badge: "#f1f5f9", badgeText: "#64748b" },
 };
 
-const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, onUse }) => {
+const PostCandidateCard: React.FC<PostCandidateCardProps> = ({
+  candidate,
+  rank,
+  onUse,
+}) => {
   const rs = RANK_STYLES[rank] ?? RANK_STYLES[3];
 
   return (
@@ -829,21 +905,29 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
     >
       <div
         style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
           marginBottom: 8,
           gap: 8,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
           <span
             style={{
               fontSize: 10,
               fontWeight: 800,
               background: rs.badge,
               color: rs.badgeText,
-              padding: '2px 7px',
+              padding: "2px 7px",
               borderRadius: 4,
               flexShrink: 0,
             }}
@@ -855,9 +939,9 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
               fontWeight: 700,
               fontSize: 13,
               color: colors.textDark,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {candidate.topic}
@@ -871,11 +955,11 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
           fontSize: 11,
           color: colors.textSecondary,
           background: colors.badgeBg,
-          padding: '6px 10px',
+          padding: "6px 10px",
           borderRadius: 6,
           marginBottom: 10,
           lineHeight: 1.5,
-          fontStyle: 'italic',
+          fontStyle: "italic",
         }}
       >
         💡 "{candidate.hook}"
@@ -883,9 +967,9 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
 
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           gap: 8,
         }}
       >
@@ -893,8 +977,8 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
           style={{
             fontSize: 11,
             color: colors.textTertiary,
-            display: 'flex',
-            alignItems: 'center',
+            display: "flex",
+            alignItems: "center",
             gap: 4,
           }}
         >
@@ -904,18 +988,18 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
         <button
           onClick={onUse}
           style={{
-            padding: '6px 14px',
-            background: rank === 1 ? colors.primary : 'none',
-            color: rank === 1 ? '#fff' : colors.primary,
+            padding: "6px 14px",
+            background: rank === 1 ? colors.primary : "none",
+            color: rank === 1 ? "#fff" : colors.primary,
             border: `1.5px solid ${colors.primary}`,
             borderRadius: 6,
             fontSize: 12,
             fontWeight: 700,
-            cursor: 'pointer',
-            whiteSpace: 'nowrap',
+            cursor: "pointer",
+            whiteSpace: "nowrap",
           }}
         >
-          {rank === 1 ? '✍️ Create This Post' : 'Create Post'}
+          {rank === 1 ? "✍️ Create This Post" : "Create Post"}
         </button>
       </div>
     </div>
@@ -931,7 +1015,10 @@ interface BrandScorecardModalProps {
   onClose: () => void;
 }
 
-export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({ open, onClose }) => {
+export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({
+  open,
+  onClose,
+}) => {
   const { data, loading, error, loadAll } = useGrowthInsights(open);
   const handleLoad = () => void loadAll();
   const sc = data?.brand_scorecard;
@@ -976,8 +1063,13 @@ export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({ open, 
 // ---------------------------------------------------------------------------
 
 const DAY_EMOJIS: Record<string, string> = {
-  Monday: '🟦', Tuesday: '🟩', Wednesday: '🟧', Thursday: '🟪', Friday: '🟥',
-  Saturday: '⬜', Sunday: '⬜',
+  Monday: "🟦",
+  Tuesday: "🟩",
+  Wednesday: "🟧",
+  Thursday: "🟪",
+  Friday: "🟥",
+  Saturday: "⬜",
+  Sunday: "⬜",
 };
 
 interface WeeklyPlanModalProps {
@@ -985,16 +1077,19 @@ interface WeeklyPlanModalProps {
   onClose: () => void;
 }
 
-export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose }) => {
+export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
+  open,
+  onClose,
+}) => {
   const { data, loading, error, loadAll } = useGrowthInsights(open);
   const [scheduling, setScheduling] = useState<number | null>(null);
   const [scheduled, setScheduled] = useState<number[]>([]);
-  const [scheduleError, setScheduleError] = useState('');
+  const [scheduleError, setScheduleError] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setScheduled([]);
-    setScheduleError('');
+    setScheduleError("");
   }, [open]);
 
   const handleLoad = () => void loadAll();
@@ -1004,7 +1099,13 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
 
   const getNextWeekday = (dayName: string): string => {
     const days: Record<string, number> = {
-      Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 0,
+      Monday: 1,
+      Tuesday: 2,
+      Wednesday: 3,
+      Thursday: 4,
+      Friday: 5,
+      Saturday: 6,
+      Sunday: 0,
     };
     const today = new Date();
     const targetDay = days[dayName] ?? 1;
@@ -1013,44 +1114,50 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
     if (daysAhead <= 0) daysAhead += 7;
     const target = new Date(today);
     target.setDate(today.getDate() + daysAhead);
-    return target.toISOString().split('T')[0];
+    return target.toISOString().split("T")[0];
   };
 
   const handleScheduleAll = async () => {
     if (!posts.length) return;
-    setScheduleError('');
+    setScheduleError("");
     const results = await Promise.allSettled(
       posts.map((post, i) =>
-        contentPlanningApi.createEventSafe({
-          title: post.headline,
-          description: `Hook: ${post.hook}\n\n${post.why_this_works}`,
-          date: getNextWeekday(post.day),
-          platform: 'linkedin',
-          content_type: post.content_type,
-          status: 'draft',
-        }).then(() => i)
-      )
+        contentPlanningApi
+          .createEventSafe({
+            title: post.headline,
+            description: `Hook: ${post.hook}\n\n${post.why_this_works}`,
+            date: getNextWeekday(post.day),
+            platform: "linkedin",
+            content_type: post.content_type,
+            status: "draft",
+          })
+          .then(() => i),
+      ),
     );
     const succeeded = results
-      .filter((r): r is PromiseFulfilledResult<number> => r.status === 'fulfilled')
+      .filter(
+        (r): r is PromiseFulfilledResult<number> => r.status === "fulfilled",
+      )
       .map((r) => r.value);
     setScheduled(succeeded);
     if (succeeded.length < posts.length) {
-      setScheduleError(`Scheduled ${succeeded.length}/${posts.length} posts. Some may have failed.`);
+      setScheduleError(
+        `Scheduled ${succeeded.length}/${posts.length} posts. Some may have failed.`,
+      );
     }
   };
 
   const handleScheduleOne = async (post: DailyPostIdea, idx: number) => {
     setScheduling(idx);
-    setScheduleError('');
+    setScheduleError("");
     try {
       await contentPlanningApi.createEventSafe({
         title: post.headline,
         description: `Hook: ${post.hook}\n\n${post.why_this_works}`,
         date: getNextWeekday(post.day),
-        platform: 'linkedin',
+        platform: "linkedin",
         content_type: post.content_type,
-        status: 'draft',
+        status: "draft",
       });
       setScheduled((prev) => [...prev, idx]);
     } catch {
@@ -1069,8 +1176,16 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
       maxHeight="min(92vh, 740px)"
     >
       <div>
-        <p style={{ margin: '0 0 14px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-          AI-generated 5-day content plan. Create posts or add to your calendar with one click.
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: colors.textSecondary,
+            lineHeight: 1.5,
+          }}
+        >
+          AI-generated 5-day content plan. Create posts or add to your calendar
+          with one click.
         </p>
 
         {!data && !loading && (
@@ -1091,23 +1206,37 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
             {/* Plan header */}
             <div
               style={{
-                background: '#eff6ff',
-                border: '1px solid #bfdbfe',
+                background: "#eff6ff",
+                border: "1px solid #bfdbfe",
                 borderRadius: 10,
-                padding: '12px 16px',
+                padding: "12px 16px",
                 marginBottom: 14,
               }}
             >
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#1e40af', marginBottom: 2 }}>
+              <div
+                style={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: "#1e40af",
+                  marginBottom: 2,
+                }}
+              >
                 Week of {ws.week_of} · {ws.theme}
               </div>
-              <div style={{ fontSize: 12, color: '#3b82f6' }}>
-                Focus: {ws.focus_area} · Topics: {ws.key_topics.join(', ')}
+              <div style={{ fontSize: 12, color: "#3b82f6" }}>
+                Focus: {ws.focus_area} · Topics: {ws.key_topics.join(", ")}
               </div>
             </div>
 
             {/* Day cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                marginBottom: 14,
+              }}
+            >
               {posts.map((post, idx) => {
                 const isScheduled = scheduled.includes(idx);
                 const isSchedulingThis = scheduling === idx;
@@ -1116,34 +1245,48 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
                     key={idx}
                     style={{
                       ...rowBase,
-                      borderLeft: `3px solid ${isScheduled ? '#22c55e' : colors.border}`,
+                      borderLeft: `3px solid ${isScheduled ? "#22c55e" : colors.border}`,
                     }}
                   >
                     <div
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
                         marginBottom: 6,
                         gap: 8,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <span style={{ fontSize: 16 }}>{DAY_EMOJIS[post.day] ?? '📌'}</span>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 7,
+                        }}
+                      >
+                        <span style={{ fontSize: 16 }}>
+                          {DAY_EMOJIS[post.day] ?? "📌"}
+                        </span>
                         <div>
                           <span
                             style={{
                               fontSize: 10,
                               fontWeight: 800,
                               color: colors.textTertiary,
-                              textTransform: 'uppercase',
+                              textTransform: "uppercase",
                               letterSpacing: 0.6,
-                              display: 'block',
+                              display: "block",
                             }}
                           >
                             {post.day}
                           </span>
-                          <span style={{ fontWeight: 700, fontSize: 13, color: colors.textDark }}>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: colors.textDark,
+                            }}
+                          >
                             {post.headline}
                           </span>
                         </div>
@@ -1154,9 +1297,9 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
                           color: colors.textSecondary,
                           background: colors.badgeBg,
                           border: `1px solid ${colors.border}`,
-                          padding: '2px 7px',
+                          padding: "2px 7px",
                           borderRadius: 4,
-                          whiteSpace: 'nowrap',
+                          whiteSpace: "nowrap",
                           flexShrink: 0,
                         }}
                       >
@@ -1167,10 +1310,10 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
                     <div
                       style={{
                         fontSize: 11,
-                        fontStyle: 'italic',
+                        fontStyle: "italic",
                         color: colors.textSecondary,
                         background: colors.badgeBg,
-                        padding: '5px 9px',
+                        padding: "5px 9px",
                         borderRadius: 5,
                         marginBottom: 8,
                         lineHeight: 1.5,
@@ -1179,21 +1322,32 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
                       💡 "{post.hook}"
                     </div>
 
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                      }}
+                    >
                       <button
                         onClick={() => {
-                          openInCreate(post.headline, post.hook, post.content_type);
+                          openInCreate(
+                            post.headline,
+                            post.hook,
+                            post.content_type,
+                          );
                           onClose();
                         }}
                         style={{
-                          padding: '5px 12px',
+                          padding: "5px 12px",
                           background: colors.primary,
-                          color: '#fff',
-                          border: 'none',
+                          color: "#fff",
+                          border: "none",
                           borderRadius: 6,
                           fontSize: 11,
                           fontWeight: 600,
-                          cursor: 'pointer',
+                          cursor: "pointer",
                         }}
                       >
                         ✍️ Create Now
@@ -1202,20 +1356,28 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
                         disabled={isScheduled || isSchedulingThis}
                         onClick={() => void handleScheduleOne(post, idx)}
                         style={{
-                          padding: '5px 12px',
-                          background: isScheduled ? '#dcfce7' : 'none',
-                          color: isScheduled ? '#166534' : colors.textSecondary,
-                          border: `1px solid ${isScheduled ? '#86efac' : colors.border}`,
+                          padding: "5px 12px",
+                          background: isScheduled ? "#dcfce7" : "none",
+                          color: isScheduled ? "#166534" : colors.textSecondary,
+                          border: `1px solid ${isScheduled ? "#86efac" : colors.border}`,
                           borderRadius: 6,
                           fontSize: 11,
                           fontWeight: 600,
-                          cursor: isScheduled ? 'default' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
+                          cursor: isScheduled ? "default" : "pointer",
+                          display: "flex",
+                          alignItems: "center",
                           gap: 4,
                         }}
                       >
-                        {isSchedulingThis ? <><Spinner /> Adding…</> : isScheduled ? '✓ Scheduled' : '📅 Add to Calendar'}
+                        {isSchedulingThis ? (
+                          <>
+                            <Spinner /> Adding…
+                          </>
+                        ) : isScheduled ? (
+                          "✓ Scheduled"
+                        ) : (
+                          "📅 Add to Calendar"
+                        )}
                       </button>
                     </div>
                   </div>
@@ -1224,7 +1386,16 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
             </div>
 
             {scheduleError && (
-              <div style={{ padding: '8px 12px', background: '#fef9c3', borderRadius: 7, color: '#854d0e', fontSize: 12, marginBottom: 10 }}>
+              <div
+                style={{
+                  padding: "8px 12px",
+                  background: "#fef9c3",
+                  borderRadius: 7,
+                  color: "#854d0e",
+                  fontSize: 12,
+                  marginBottom: 10,
+                }}
+              >
                 {scheduleError}
               </div>
             )}
@@ -1235,15 +1406,15 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
                 onClick={() => void handleScheduleAll()}
                 disabled={loading}
                 style={{
-                  width: '100%',
-                  padding: '10px',
-                  background: '#059669',
-                  color: '#fff',
-                  border: 'none',
+                  width: "100%",
+                  padding: "10px",
+                  background: "#059669",
+                  color: "#fff",
+                  border: "none",
                   borderRadius: 8,
                   fontSize: 13,
                   fontWeight: 700,
-                  cursor: 'pointer',
+                  cursor: "pointer",
                 }}
               >
                 📅 Schedule All {posts.length} Posts to Calendar
@@ -1253,11 +1424,11 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
             {scheduled.length === posts.length && posts.length > 0 && (
               <div
                 style={{
-                  textAlign: 'center',
-                  padding: '12px',
-                  background: '#dcfce7',
+                  textAlign: "center",
+                  padding: "12px",
+                  background: "#dcfce7",
                   borderRadius: 8,
-                  color: '#166534',
+                  color: "#166534",
                   fontWeight: 700,
                   fontSize: 13,
                 }}
@@ -1273,347 +1444,6 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({ open, onClose 
 };
 
 // ---------------------------------------------------------------------------
-// F6 — Engagement Trends Modal
-// ---------------------------------------------------------------------------
-
-interface EngagementTrendsModalProps {
-  open: boolean;
-  onClose: () => void;
-  connected?: boolean;
-}
-
-export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({ open, onClose, connected }) => {
-  const [data, setData] = useState<PostAnalyticsHistoryResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const mountedRef = useRef(true);
-
-  const fetchData = useCallback(async (refreshFirst = false) => {
-    setLoading(true);
-    setError('');
-    try {
-      if (refreshFirst) {
-        await postAnalyticsApi.fetchStoredAnalytics(true);
-      }
-      const result = await postAnalyticsApi.fetchEngagementHistory();
-      if (mountedRef.current) setData(result);
-    } catch (err: unknown) {
-      const axiosErr = err as { response?: { data?: { detail?: string } } };
-      if (mountedRef.current) {
-        setError(axiosErr.response?.data?.detail ?? (err instanceof Error ? err.message : 'Could not load engagement trends.'));
-      }
-    } finally {
-      if (mountedRef.current) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    if (!open) return;
-    setLoading(true);
-    setError('');
-    postAnalyticsApi.fetchEngagementHistory()
-      .then((result) => { if (mountedRef.current) setData(result); })
-      .catch((err) => {
-        const axiosErr = err as { response?: { data?: { detail?: string } } };
-        if (mountedRef.current) {
-          setError(axiosErr.response?.data?.detail ?? (err instanceof Error ? err.message : 'Could not load engagement trends.'));
-        }
-      })
-      .finally(() => { if (mountedRef.current) setLoading(false); });
-    return () => { mountedRef.current = false; };
-  }, [open]);
-
-  const handleLoad = () => void fetchData(false);
-  const handleSync = () => void fetchData(true);
-
-  const fmtPeriod = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const min = Math.floor(diffMs / 60000);
-    if (min < 1) return 'just now';
-    if (min < 60) return `${min} min ago`;
-    if (min < 1440) return `${Math.floor(min / 60)}h ago`;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  };
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Engagement Trends"
-      onClose={onClose}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
-    >
-      <div>
-        <p style={{ margin: '0 0 16px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-          See how your post engagement has changed between the last two syncs — track growth,
-          spot declines, and measure what works.
-        </p>
-
-        {/* Not connected */}
-        {!connected && !data && !loading && (
-          <CacheEmptyPrompt
-            icon="🔗"
-            title="LinkedIn not connected"
-            description="Connect your LinkedIn account first to view engagement trends."
-            buttonLabel="⟳ Sync Posts Now"
-            onLoad={handleSync}
-            disabled
-          />
-        )}
-
-        {/* Empty state */}
-        {connected && !data && !loading && !error && (
-          <CacheEmptyPrompt
-            icon="📈"
-            title="No trends yet"
-            description="Sync your LinkedIn posts at least twice to see engagement trends."
-            buttonLabel="⟳ Sync Posts Now"
-            onLoad={handleSync}
-            disabled={loading}
-          />
-        )}
-
-        {/* Error state */}
-        {connected && !data && !loading && error && (
-          <div style={{ textAlign: 'center', padding: '24px 0' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>⚠️</div>
-            <div style={{ fontWeight: 600, fontSize: 14, color: colors.textDark, marginBottom: 6 }}>Could not load trends</div>
-            <div style={{ fontSize: 13, color: '#dc2626', marginBottom: 20 }}>{error}</div>
-            <button type="button" onClick={handleLoad} disabled={loading} style={{
-              ...primaryLoadBtn,
-              opacity: loading ? 0.6 : 1,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}>🔁 Retry</button>
-          </div>
-        )}
-
-        {loading && <LoadingRow message="Computing engagement trends…" />}
-
-        {/* Data loaded */}
-        {data && !loading && (
-          <>
-            {/* Period indicator */}
-            <div
-              style={{
-                fontSize: 11,
-                color: colors.textTertiary,
-                marginBottom: 14,
-                textAlign: 'center',
-              }}
-            >
-              {fmtPeriod(data.period.from)} → {fmtPeriod(data.period.to)}
-            </div>
-
-            {/* Summary delta cards — only if there are comparable posts */}
-            {data.summary.total_posts > 0 && (
-              <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                <SummaryDeltaCard
-                  icon="❤️" label="Reactions"
-                  before={data.summary.reactions.before}
-                  now={data.summary.reactions.now}
-                  delta={data.summary.reactions.delta}
-                  pct={data.summary.reactions.pct_change}
-                />
-                <SummaryDeltaCard
-                  icon="💬" label="Comments"
-                  before={data.summary.comments.before}
-                  now={data.summary.comments.now}
-                  delta={data.summary.comments.delta}
-                  pct={data.summary.comments.pct_change}
-                />
-                <SummaryDeltaCard
-                  icon="👁️" label="Impressions"
-                  before={data.summary.impressions.before}
-                  now={data.summary.impressions.now}
-                  delta={data.summary.impressions.delta}
-                  pct={data.summary.impressions.pct_change}
-                />
-                <SummaryDeltaCard
-                  icon="📊" label="Avg ER"
-                  before={Math.round(data.summary.avg_engagement_rate_before * 100)}
-                  now={Math.round(data.summary.avg_engagement_rate_now * 100)}
-                  delta={Math.round((data.summary.avg_engagement_rate_now - data.summary.avg_engagement_rate_before) * 100)}
-                  pct={0}
-                  isRate
-                />
-              </div>
-            )}
-
-            {/* Top gainers */}
-            {data.top_gainers.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#16a34a',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.6,
-                    marginBottom: 6,
-                  }}
-                >
-                  📈 Top Gainers
-                </div>
-                {data.top_gainers.map((post) => (
-                  <PostDeltaRow key={post.post_id} post={post} gain />
-                ))}
-              </div>
-            )}
-
-            {/* Top decliners */}
-            {data.top_decliners.length > 0 && (
-              <div style={{ marginBottom: 14 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: '#dc2626',
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.6,
-                    marginBottom: 6,
-                  }}
-                >
-                  📉 Top Decliners
-                </div>
-                {data.top_decliners.map((post) => (
-                  <PostDeltaRow key={post.post_id} post={post} gain={false} />
-                ))}
-              </div>
-            )}
-
-            {data.top_gainers.length === 0 && data.top_decliners.length === 0 && (
-              <div
-                style={{
-                  textAlign: 'center',
-                  padding: '20px 0',
-                  fontSize: 13,
-                  color: colors.textTertiary,
-                }}
-              >
-                No posts with data in both snapshot periods to compare.
-              </div>
-            )}
-
-            {/* Refresh */}
-            <button
-              onClick={handleSync}
-              disabled={loading}
-              style={{
-                width: '100%',
-                padding: '8px',
-                background: 'none',
-                border: `1px solid ${colors.border}`,
-                borderRadius: 6,
-                fontSize: 12,
-                color: colors.textSecondary,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                fontWeight: 600,
-                marginTop: 8,
-                opacity: loading ? 0.6 : 1,
-              }}
-            >
-              ⟳ Sync Latest & Recompute
-            </button>
-          </>
-        )}
-      </div>
-    </DashboardActionModal>
-  );
-};
-
-// ── Sub-components ──────────────────────────────────────────────────────
-
-const SummaryDeltaCard: React.FC<{
-  icon: string;
-  label: string;
-  before: number;
-  now: number;
-  delta: number;
-  pct: number;
-  isRate?: boolean;
-}> = ({ icon, label, before, now, delta, pct, isRate }) => {
-  const up = delta >= 0;
-  return (
-    <div
-      style={{
-        flex: '1 1 calc(50% - 4px)',
-        minWidth: 120,
-        padding: '10px 12px',
-        background: colors.rowBg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: 8,
-      }}
-    >
-      <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 4, fontWeight: 600 }}>
-        {icon} {label}
-      </div>
-      <div style={{ fontSize: 18, fontWeight: 800, color: up ? '#16a34a' : '#dc2626', marginBottom: 2 }}>
-        {isRate ? `${now}%` : now.toLocaleString()}
-      </div>
-      <div style={{ fontSize: 11, color: colors.textSecondary }}>
-        <span style={{ color: up ? '#16a34a' : '#dc2626', fontWeight: 700 }}>
-          {up ? '+' : ''}{isRate ? `${delta}pp` : delta.toLocaleString()}
-        </span>
-        {!isRate && pct !== 0 && (
-          <span> ({up ? '+' : ''}{pct}%)</span>
-        )}
-        <span style={{ color: colors.textTertiary }}> from {isRate ? `${before}%` : before.toLocaleString()}</span>
-      </div>
-    </div>
-  );
-};
-
-const PostDeltaRow: React.FC<{ post: PostDelta; gain: boolean }> = ({ post, gain }) => (
-  <div
-    style={{
-      ...rowBase,
-      marginBottom: 8,
-      borderLeft: `3px solid ${gain ? '#16a34a' : '#dc2626'}`,
-    }}
-  >
-    <div style={{ fontSize: 13, fontWeight: 600, color: colors.textDark, marginBottom: 6 }}>
-      {post.text ? `${post.text.slice(0, 100)}…` : '(no text)'}
-    </div>
-    <div style={{ fontSize: 11, color: colors.textTertiary, marginBottom: 6 }}>
-      {post.author_name}{post.share_url ? ` · ` : ''}
-      {post.share_url && (
-        <a href={post.share_url} target="_blank" rel="noopener noreferrer"
-          style={{ color: colors.primary, textDecoration: 'none', fontWeight: 600 }}>
-          View on LinkedIn →
-        </a>
-      )}
-    </div>
-    <div style={{ display: 'flex', gap: 12 }}>
-      <DeltaChip icon="❤️" delta={post.reactions_delta} />
-      <DeltaChip icon="💬" delta={post.comments_delta} />
-      <DeltaChip icon="👁️" delta={post.impressions_delta} />
-    </div>
-    <div
-      style={{
-        fontSize: 11,
-        color: gain ? '#16a34a' : '#dc2626',
-        fontWeight: 700,
-        marginTop: 4,
-      }}
-    >
-      ER: {(post.engagement_rate_before * 100).toFixed(1)}% → {(post.engagement_rate_now * 100).toFixed(1)}%
-    </div>
-  </div>
-);
-
-const DeltaChip: React.FC<{ icon: string; delta: number }> = ({ icon, delta }) => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-    <span>{icon}</span>
-    <span style={{ fontSize: 12, fontWeight: 700, color: delta >= 0 ? '#16a34a' : '#dc2626' }}>
-      {delta >= 0 ? '+' : ''}{delta}
-    </span>
-  </div>
-);
-
-// ---------------------------------------------------------------------------
 // F5 — Viral Pattern Copywriter Modal
 // ---------------------------------------------------------------------------
 
@@ -1622,12 +1452,15 @@ interface ViralCopywriterModalProps {
   onClose: () => void;
 }
 
-export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open, onClose }) => {
+export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({
+  open,
+  onClose,
+}) => {
   const { data, loading, error, loadAll } = useGrowthInsights(open);
   const handleLoad = () => void loadAll();
   const va = data?.viral_analysis;
   const patterns: ViralPattern[] = va?.patterns ?? [];
-  const industry = va?.industry ?? 'your industry';
+  const industry = va?.industry ?? "your industry";
 
   return (
     <DashboardActionModal
@@ -1638,9 +1471,16 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open
       maxHeight="min(92vh, 740px)"
     >
       <div>
-        <p style={{ margin: '0 0 14px', fontSize: 13, color: colors.textSecondary, lineHeight: 1.5 }}>
-          AI-identified content patterns that drive viral engagement in your industry. Pick a pattern
-          and create a post in that exact style.
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: colors.textSecondary,
+            lineHeight: 1.5,
+          }}
+        >
+          AI-identified content patterns that drive viral engagement in your
+          industry. Pick a pattern and create a post in that exact style.
         </p>
 
         {!data && !loading && (
@@ -1653,7 +1493,9 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open
           />
         )}
 
-        {loading && <LoadingRow message={`Analysing viral patterns in ${industry}…`} />}
+        {loading && (
+          <LoadingRow message={`Analysing viral patterns in ${industry}…`} />
+        )}
         {error && <ErrorBanner message={error} />}
 
         {va && !loading && (
@@ -1674,22 +1516,24 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open
                     fontSize: 11,
                     fontWeight: 700,
                     color: colors.textTertiary,
-                    textTransform: 'uppercase',
+                    textTransform: "uppercase",
                     letterSpacing: 0.6,
                     marginBottom: 8,
                   }}
                 >
                   Write in a Viral Style
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
+                >
                   {patterns.map((pattern, idx) => (
                     <div
                       key={idx}
                       style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        padding: '10px 14px',
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        padding: "10px 14px",
                         background: colors.rowBg,
                         border: `1px solid ${colors.border}`,
                         borderRadius: 8,
@@ -1697,11 +1541,21 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: 12, color: colors.textDark, marginBottom: 2 }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 12,
+                            color: colors.textDark,
+                            marginBottom: 2,
+                          }}
+                        >
                           📌 {pattern.pattern_name}
                         </div>
-                        <div style={{ fontSize: 11, color: colors.textTertiary }}>
-                          {pattern.engagement_multiplier} engagement · {pattern.confidence} confidence
+                        <div
+                          style={{ fontSize: 11, color: colors.textTertiary }}
+                        >
+                          {pattern.engagement_multiplier} engagement ·{" "}
+                          {pattern.confidence} confidence
                         </div>
                       </div>
                       <button
@@ -1712,20 +1566,20 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open
                             `Description: ${pattern.description}`,
                             `Example format: ${pattern.example_headline}`,
                             `Engagement goal: ${pattern.engagement_multiplier}`,
-                          ].join('\n');
+                          ].join("\n");
                           openInCreate(topic, keyPoints);
                           onClose();
                         }}
                         style={{
-                          padding: '6px 14px',
-                          background: '#dc2626',
-                          color: '#fff',
-                          border: 'none',
+                          padding: "6px 14px",
+                          background: "#dc2626",
+                          color: "#fff",
+                          border: "none",
                           borderRadius: 6,
                           fontSize: 11,
                           fontWeight: 700,
-                          cursor: 'pointer',
-                          whiteSpace: 'nowrap',
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
                           flexShrink: 0,
                         }}
                       >
@@ -1742,4 +1596,3 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({ open
     </DashboardActionModal>
   );
 };
-

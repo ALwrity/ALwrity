@@ -1,6 +1,6 @@
 """LinkedIn Post Analytics Model — DB persistence for fetched post metrics."""
 
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, Index, UniqueConstraint, JSON
 from datetime import datetime
 
 from models.subscription_models import Base
@@ -27,6 +27,11 @@ class LinkedInPostAnalytics(Base):
     clicks = Column(Integer, default=0)
     followers_gained = Column(Integer, default=0)
     engagement_rate = Column(Float, default=0.0)
+    # Optional Unipile analytics.* fields (null when provider omitted them)
+    engagements = Column(Integer, nullable=True)
+    clickthrough_rate = Column(Float, nullable=True)
+    page_viewers = Column(Integer, nullable=True)
+    members_reached = Column(Integer, nullable=True)
 
     author_name = Column(String(255), nullable=True)
     author_headline = Column(String(500), nullable=True)
@@ -34,6 +39,7 @@ class LinkedInPostAnalytics(Base):
     author_avatar_url = Column(String(1000), nullable=True)
 
     share_url = Column(String(1000), nullable=True)
+    attachments_json = Column(JSON, nullable=True, comment="Post media attachments from Unipile")
     is_repost = Column(Boolean, default=False)
     is_company_post = Column(Boolean, default=False)
 

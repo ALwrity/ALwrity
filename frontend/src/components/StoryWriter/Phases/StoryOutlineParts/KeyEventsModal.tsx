@@ -1,5 +1,7 @@
 import React from 'react';
 import { Box, Dialog, DialogActions, DialogContent, DialogTitle, Button, Typography } from '@mui/material';
+import { renderMarkdown } from '../../../../utils/markdown';
+import { modalPaperSx } from './modalStyles';
 
 interface KeyEventsModalProps {
   open: boolean;
@@ -16,21 +18,19 @@ const KeyEventsModal: React.FC<KeyEventsModalProps> = ({ open, sceneNumber, even
       maxWidth="sm"
       fullWidth
       PaperProps={{
-        sx: {
-          backgroundColor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-          border: '1px solid rgba(0,0,0,0.06)',
-        },
+        sx: modalPaperSx,
       }}
     >
       <DialogTitle>Key Events (Scene {sceneNumber})</DialogTitle>
-      <DialogContent dividers sx={{ color: '#2C2416' }}>
+      <DialogContent dividers>
         {events && events.length > 0 ? (
           <Box component="ul" sx={{ pl: 2, mb: 0 }}>
             {events.map((e, idx) => (
               <li key={idx}>
-                <Typography variant="body2">{e}</Typography>
+                <Box
+                  className="rendered-content"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(e) }}
+                />
               </li>
             ))}
           </Box>

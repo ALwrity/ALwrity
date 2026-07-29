@@ -21,7 +21,7 @@ from .types import (
 
 @runtime_checkable
 class LinkedInSocialProvider(Protocol):
-    """Abstract contract for LinkedIn platform operations (Zernio or native API)."""
+    """Abstract contract for LinkedIn platform operations (Unipile or native API)."""
 
     @property
     def provider_name(self) -> str:
@@ -66,7 +66,7 @@ class LinkedInSocialProvider(Protocol):
         ...
 
     async def create_post(
-        self, user_id: str, request: CreatePostRequest
+        self, user_id: str, request: CreatePostRequest, *, db: Any = None
     ) -> CreatePostResult:
         ...
 

@@ -15,7 +15,7 @@ from services.integrations.linkedin.unipile_health import (
 
 @pytest.mark.anyio
 async def test_check_unipile_health_skips_when_provider_not_unipile() -> None:
-    with patch.dict(os.environ, {"LINKEDIN_PROVIDER": "zernio"}, clear=False):
+    with patch.dict(os.environ, {"LINKEDIN_PROVIDER": "native"}, clear=False):
         result = await check_unipile_health(probe_api=True)
 
     assert result["status"] == "skipped"

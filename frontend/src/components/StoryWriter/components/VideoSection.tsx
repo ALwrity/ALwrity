@@ -3,7 +3,6 @@ import {
   Box,
   Typography,
   Button,
-  LinearProgress,
   CircularProgress,
   Chip,
   Alert,
@@ -14,8 +13,9 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useStoryWriterState } from '../../../hooks/useStoryWriterState';
 import { storyWriterApi } from '../../../services/storyWriterApi';
 import { triggerSubscriptionError } from '../../../api/client';
-import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { fetchMediaBlobUrl, downloadMediaBlob } from '../../../utils/fetchMediaBlobUrl';
 import { HdVideoSection } from './HdVideoSection';
+import { StoryVideoProgressModal } from '../Phases/StorySetup/StoryVideoProgressModal';
 
 interface VideoSectionProps {
   state: ReturnType<typeof useStoryWriterState>;
@@ -192,18 +192,7 @@ export const VideoSection: React.FC<VideoSectionProps> = ({ state, error, onErro
 
   const handleDownloadVideo = async () => {
     if (state.storyVideo) {
-      const blobUrl = await fetchMediaBlobUrl(state.storyVideo);
-      if (!blobUrl) {
-        // File not found - skip download
-        return;
-      }
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = `story-video-${Date.now()}.mp4`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
+      await downloadMediaBlob(state.storyVideo, `story-video-${Date.now()}.mp4`);
     }
   };
 
@@ -256,17 +245,11 @@ export const VideoSection: React.FC<VideoSectionProps> = ({ state, error, onErro
         </Box>
       </Box>
 
-      {isGeneratingVideo && (
-        <Box sx={{ mt: 1 }}>
-          <LinearProgress
-            variant={videoProgress > 0 ? 'determinate' : 'indeterminate'}
-            value={videoProgress}
-          />
-          <Typography variant="caption" sx={{ mt: 0.5, color: '#5D4037', display: 'block' }}>
-            {videoMessage || 'Generating video... This may take a few minutes.'}
-          </Typography>
-        </Box>
-      )}
+      <StoryVideoProgressModal
+        open={isGeneratingVideo}
+        progress={videoProgress}
+        message={videoMessage || 'Generating video... This may take a few minutes.'}
+      />
 
       {hasVideo && state.storyVideo && (
         <Box sx={{ mt: 2 }}>

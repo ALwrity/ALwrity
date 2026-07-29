@@ -93,11 +93,12 @@ interface FeatureIconBadgeProps {
 
 export const FeatureIconBadge: React.FC<FeatureIconBadgeProps> = ({ rowId, size = 20 }) => {
   const Icon = getFeatureIcon(rowId);
+  const badgeSize = size + 16;
   return (
     <Box
       sx={{
-        width: 36,
-        height: 36,
+        width: `${badgeSize}px`,
+        height: `${badgeSize}px`,
         borderRadius: 1.5,
         bgcolor: '#F0F4FF',
         border: '1px solid #E0E7FF',

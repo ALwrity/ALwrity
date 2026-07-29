@@ -47,6 +47,14 @@ class ClerkAuthMiddleware:
             self.allow_unverified_dev = not self.is_production
         else:
             self.allow_unverified_dev = allow_unverified_raw.lower() == 'true'
+
+        # Hard guard: never allow unverified JWTs in production, regardless of env var
+        if self.is_production and self.allow_unverified_dev:
+            logger.warning(
+                "ALLOW_UNVERIFIED_JWT_DEV=true is ignored in production environment. "
+                "Unverified JWT fallback has been forcibly disabled."
+            )
+            self.allow_unverified_dev = False
         
         # Cache for PyJWKClient to avoid repeated JWKS fetches
         self._jwks_client_cache = {}

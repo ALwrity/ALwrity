@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-10000}:10000"
+    env_file:
+      - backend/.env
+    environment:
+      - ENVIRONMENT=production
+      - APP_ENV=production
+      - PORT=10000
+      - ALWRITY_FRONTEND_URLS=${ALWRITY_FRONTEND_URLS:-}
+      - ALWRITY_ALLOWED_ORIGINS=${ALWRITY_ALLOWED_ORIGINS:-}
+    volumes:
+      - ./backend/logs:/app/backend/logs
+      - ./backend/data:/app/backend/data
+      - ./backend/workspace:/app/backend/workspace
+    restart: unless-stopped
+
+  app-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["dev"]
+    ports:
+      - "${PORT:-10000}:10000"
+    env_file:
+      - backend/.env
+    environment:
+      - ENVIRONMENT=development
+      - APP_ENV=development
+    volumes:
+      - ./backend:/app/backend
+      - ./frontend/build:/app/frontend/build
+    command: python backend/start_alwrity_backend.py --reload
+    restart: unless-stopped

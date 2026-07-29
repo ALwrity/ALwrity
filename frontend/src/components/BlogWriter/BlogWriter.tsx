@@ -1,5 +1,6 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import type { GifHandoffSession } from '../GifMaker/types';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -286,12 +287,24 @@ const BlogWriter: React.FC = () => {
   } = useBlogAsset();
   // Load blog asset passed via React Router state (from Asset Library)
   const location = useLocation();
-  const locationState = location.state as { restoreBlogAssetId?: number; calendarTopic?: string; calendarDescription?: string; calendarEventId?: string; workflowTaskId?: string } | null;
+  const locationState = location.state as { restoreBlogAssetId?: number; calendarTopic?: string; calendarDescription?: string; calendarEventId?: string; workflowTaskId?: string; gifHandoff?: GifHandoffSession } | null;
 
   // Persist last active asset_id across refreshes
   const saveLastAssetId = useCallback((id: number) => {
     try { localStorage.setItem('blog_last_asset_id', id.toString()); } catch { /* noop */ }
   }, []);
+
+  // Restore a saved blog asset into the editor — same mechanism used by the
+  // Asset Library handoff above. Reused by the radial workflow hero's
+  // "Continue draft" (Create wedge) and "Refresh this post" (Remarket wedge).
+  const handleRestoreAssetId = useCallback((id: number) => {
+    loadAsset(id).then(loaded => {
+      if (!loaded) return;
+      saveLastAssetId(id);
+      restoreFromAsset(loaded);
+      debug.log('[BlogWriter] Restored blog asset from workflow hero', { asset_id: id, phase: loaded.phase });
+    });
+  }, [loadAsset, saveLastAssetId, restoreFromAsset]);
 
   React.useEffect(() => {
     const assetIdFromState = locationState?.restoreBlogAssetId;
@@ -320,6 +333,17 @@ const BlogWriter: React.FC = () => {
           });
         }
       }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // GIF Maker handoff: pre-fill topic and navigate to research phase
+  React.useEffect(() => {
+    const handoff = locationState?.gifHandoff;
+    if (handoff) {
+      setResearchKeywords(handoff.topic);
+      navigateToPhase('research');
+      window.history.replaceState({}, document.title);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -808,6 +832,8 @@ const BlogWriter: React.FC = () => {
         startResearchRef={startResearchRef}
         restoreAttempted={restoreAttempted}
         onBrainstormResult={handleBrainstormResult}
+        initialKeywords={researchKeywords}
+        onRestoreAsset={handleRestoreAssetId}
       />
 
       {research && (
@@ -815,6 +841,7 @@ const BlogWriter: React.FC = () => {
       <PhaseContent
         currentPhase={currentPhase}
         research={research}
+        initialKeywords={researchKeywords}
         outline={outline}
         outlineConfirmed={outlineConfirmed}
         titleOptions={titleOptions}

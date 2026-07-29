@@ -39,86 +39,124 @@ const EnterpriseCTA: React.FC = () => {
   } as const;
 
   return (
-    <Box sx={{ py: { xs: 2, md: 2.75 }, bgcolor: '#0a0a0a' }}>
+    <Box sx={{ py: { xs: 2, md: 2.75 }, bgcolor: '#0a0a0a', mt: { xs: 0, md: 0 } }}>
       <Container maxWidth="lg" sx={{ px: { xs: 2, md: 3 } }}>
         <motion.div variants={stagger} initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }}>
-          <Box
-            sx={{
-              ...glassPanelSx,
-              p: { xs: 2.5, md: 3.5 },
-              width: '100%',
-            }}
-          >
-            <Grid container spacing={{ xs: 2.5, md: 3 }} alignItems="center">
-              <Grid item xs={12} md={5}>
-                <motion.div variants={fadeInUp}>
-                  <Box
+            <Box
+              sx={{
+                ...glassPanelSx,
+                p: { xs: 0, md: 3.5 },
+                width: '100%',
+                overflow: 'hidden',
+              }}
+            >
+              <Box sx={{ position: 'relative', minHeight: { xs: 340, md: 'auto' } }}>
+                <Grid container spacing={{ xs: 0, md: 3 }} alignItems="center">
+                  <Grid
+                    item
+                    xs={12}
+                    md={5}
                     sx={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      minHeight: { xs: 220, md: 280 },
-                      width: '100%',
+                      position: { xs: 'absolute', md: 'relative' },
+                      inset: { xs: 0, md: 'auto' },
+                      zIndex: { xs: 0, md: 1 },
+                      height: { xs: '100%', md: 'auto' },
                     }}
                   >
-                    <OptimizedImage
-                      src="/alwrity_landing_copilot.png"
-                      alt="ALwrity Copilot Interface"
-                      priority={false}
-                      fallback={
-                        <Box
+                    <motion.div variants={fadeInUp}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          minHeight: { xs: 340, md: 280 },
+                          width: '100%',
+                          height: { xs: '100%', md: 'auto' },
+                        }}
+                      >
+                        <OptimizedImage
+                          src="/alwrity_landing_copilot.png"
+                          alt="ALwrity Copilot Interface"
+                          priority={false}
+                          fallback={
+                            <Box
+                              sx={{
+                                width: '100%',
+                                height: '100%',
+                                minHeight: { xs: 340, md: 280 },
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 2,
+                                borderRadius: { xs: 0, md: 3 },
+                                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                boxShadow: { xs: 'none', md: '0 16px 36px rgba(0,0,0,0.35)' },
+                              }}
+                            >
+                              <Box
+                                sx={{
+                                  width: 64,
+                                  height: 64,
+                                  borderRadius: 3,
+                                  background: 'rgba(255, 255, 255, 0.2)',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'white',
+                                }}
+                              >
+                                <RocketLaunch sx={{ fontSize: 40 }} />
+                              </Box>
+                              <Typography variant="subtitle1" fontWeight={600} color="white">
+                                ALwrity AI Copilot
+                              </Typography>
+                            </Box>
+                          }
                           sx={{
                             width: '100%',
-                            height: '100%',
-                            minHeight: { xs: 220, md: 280 },
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 2,
-                            borderRadius: 3,
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                            boxShadow: '0 16px 36px rgba(0,0,0,0.35)',
+                            height: { xs: '100%', md: 'auto' },
+                            maxWidth: '100%',
+                            minHeight: { xs: 340, md: 'auto' },
+                            objectFit: { xs: 'cover', md: 'contain' },
+                            borderRadius: { xs: 0, md: 3 },
+                            boxShadow: { xs: 'none', md: '0 16px 36px rgba(0,0,0,0.35)' },
+                            transition: 'transform 0.3s ease',
+                            display: 'block',
+                            '&:hover': { transform: { xs: 'none', md: 'scale(1.02)' } },
                           }}
-                        >
-                          <Box
-                            sx={{
-                              width: 64,
-                              height: 64,
-                              borderRadius: 3,
-                              background: 'rgba(255, 255, 255, 0.2)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: 'white',
-                            }}
-                          >
-                            <RocketLaunch sx={{ fontSize: 40 }} />
-                          </Box>
-                          <Typography variant="subtitle1" fontWeight={600} color="white">
-                            ALwrity AI Copilot
-                          </Typography>
-                        </Box>
-                      }
-                      sx={{
-                        width: '100%',
-                        height: 'auto',
-                        maxWidth: '100%',
-                        objectFit: 'contain',
-                        borderRadius: 3,
-                        boxShadow: '0 16px 36px rgba(0,0,0,0.35)',
-                        transition: 'transform 0.3s ease',
-                        display: 'block',
-                        '&:hover': { transform: 'scale(1.02)' },
-                      }}
-                    />
-                  </Box>
-                </motion.div>
-              </Grid>
+                        />
+                      </Box>
+                    </motion.div>
+                  </Grid>
 
-              <Grid item xs={12} md={7}>
-                <motion.div variants={fadeInUp}>
-                  <Stack spacing={2} alignItems={{ xs: 'center', md: 'flex-start' }} textAlign={{ xs: 'center', md: 'left' }}>
+                  <Grid
+                    item
+                    xs={12}
+                    md={7}
+                    sx={{
+                      position: 'relative',
+                      zIndex: { xs: 2, md: 1 },
+                      minHeight: { xs: 340, md: 'auto' },
+                      display: 'flex',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <motion.div variants={fadeInUp} style={{ width: '100%' }}>
+                      <Stack
+                        spacing={2}
+                        alignItems={{ xs: 'center', md: 'flex-start' }}
+                        textAlign={{ xs: 'center', md: 'left' }}
+                        sx={{
+                          width: '100%',
+                          p: { xs: 3, md: 0 },
+                          background: {
+                            xs: `linear-gradient(180deg, ${alpha('#000', 0.35)} 0%, ${alpha('#000', 0.72)} 100%)`,
+                            md: 'transparent',
+                          },
+                          backdropFilter: { xs: 'blur(6px)', md: 'none' },
+                        }}
+                      >
                     <Typography variant="h3" component="h2" sx={{ ...landingSectionTitleSx, color: 'white' }}>
                       Ready to Transform Your Content Creation?
                     </Typography>
@@ -169,11 +207,12 @@ const EnterpriseCTA: React.FC = () => {
                         </Typography>
                       </Stack>
                     </Stack>
-                  </Stack>
-                </motion.div>
-              </Grid>
-            </Grid>
-          </Box>
+                    </Stack>
+                    </motion.div>
+                  </Grid>
+                </Grid>
+              </Box>
+            </Box>
         </motion.div>
       </Container>
     </Box>

@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { LinkedIn as LinkedInIcon } from '@mui/icons-material';
-import { CircularProgress } from '@mui/material';
-import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
-import { LinkedInProfileSetupPanel } from './ProfileCompletion/LinkedInProfileSetupPanel';
-import { linkedInPlaceholderCardStyles } from './linkedInPlaceholderStyles';
-import { DashboardActionModal } from './dashboard/DashboardActionModal';
-import { DashboardSimpleErrorModal } from './dashboard/DashboardSimpleErrorModal';
+import React, { useState, useEffect } from "react";
+import { LinkedIn as LinkedInIcon } from "@mui/icons-material";
+import { CircularProgress } from "@mui/material";
+import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
+import { LinkedInProfileSetupPanel } from "./ProfileCompletion/LinkedInProfileSetupPanel";
+import { LinkedInProfileHubStrip } from "./LinkedInProfileHubStrip";
+import { useDesktopViewport } from "../hooks/useDesktopViewport";
+import { linkedInPlaceholderCardStyles } from "./linkedInPlaceholderStyles";
+import { DashboardActionModal } from "./dashboard/DashboardActionModal";
+import { DashboardSimpleErrorModal } from "./dashboard/DashboardSimpleErrorModal";
 
-export type LinkedInSocialConnectionState = ReturnType<typeof useLinkedInSocialConnection>;
+export type LinkedInSocialConnectionState = ReturnType<
+  typeof useLinkedInSocialConnection
+>;
 
 export interface LinkedInPlanConnectActionProps {
   social: LinkedInSocialConnectionState;
@@ -15,22 +19,147 @@ export interface LinkedInPlanConnectActionProps {
   onDisconnect: () => Promise<void>;
 }
 
-export const CONNECT_WELCOME_DISMISSED_KEY = 'linkedin_connect_welcome_dismissed';
-
 const CONNECT_BUTTON_STYLE: React.CSSProperties = {
-  background: 'linear-gradient(135deg, #0A66C2 0%, #004182 100%)',
-  border: 'none',
+  background: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
+  border: "none",
   borderRadius: 12,
-  padding: '12px 40px',
-  color: 'white',
+  padding: "12px 40px",
+  color: "white",
   fontSize: 15,
   fontWeight: 700,
-  cursor: 'pointer',
-  whiteSpace: 'nowrap',
+  cursor: "pointer",
+  whiteSpace: "nowrap",
   minWidth: 220,
-  boxShadow: '0 4px 15px rgba(10, 102, 194, 0.35)',
-  transition: 'all 0.2s ease',
+  boxShadow: "0 4px 15px rgba(10, 102, 194, 0.35)",
+  transition: "all 0.2s ease",
 };
+
+const CONNECT_WELCOME_TITLE = "Let's Supercharge Your LinkedIn! 🔥";
+const CONNECT_WELCOME_LEAD =
+  "Your AI co-pilot for LinkedIn — you stay in control of every post.";
+const CONNECT_WELCOME_BENEFITS: ReadonlyArray<{ icon: string; label: string }> =
+  [
+    { icon: "🚀", label: "Publish instantly" },
+    { icon: "🔍", label: "In-depth profile insights" },
+    { icon: "🎯", label: "Smarter Analytics" },
+  ];
+const CONNECT_WELCOME_REASSURANCE =
+  "Explore planning and creation tools first — connect when you're ready to publish.";
+const CONNECT_WELCOME_SIGN_IN_HINT =
+  "Sign in via LinkedIn and choose your personal profile";
+const CONNECT_WELCOME_CTA = "Connect LinkedIn⚡";
+const CONNECT_WELCOME_DISMISS_LABEL = "Explore first";
+const CONNECT_WELCOME_DISMISSED_KEY = "linkedin_connect_welcome_dismissed";
+const MAX_CONNECT_WELCOME_LOGIN_COUNT = 3;
+const CONNECT_WELCOME_LOGIN_COUNT_KEY = "linkedin_connect_welcome_login_count";
+const CONNECT_WELCOME_SESSION_COUNTED_KEY =
+  "linkedin_connect_welcome_session_counted";
+
+function getConnectWelcomeDismissedKey(
+  userId: string | null | undefined,
+): string | null {
+  if (!userId) return null;
+  return `${CONNECT_WELCOME_DISMISSED_KEY}_${userId}`;
+}
+
+function getConnectWelcomeLoginCountKey(
+  userId: string | null | undefined,
+): string | null {
+  if (!userId) return null;
+  return `${CONNECT_WELCOME_LOGIN_COUNT_KEY}_${userId}`;
+}
+
+function getConnectWelcomeSessionCountedKey(
+  userId: string | null | undefined,
+): string | null {
+  if (!userId) return null;
+  return `${CONNECT_WELCOME_SESSION_COUNTED_KEY}_${userId}`;
+}
+
+function readConnectWelcomeLoginCount(
+  userId: string | null | undefined,
+): number {
+  const key = getConnectWelcomeLoginCountKey(userId);
+  if (!key) return 0;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return 0;
+    const parsed = parseInt(raw, 10);
+    return Number.isNaN(parsed) ? 0 : parsed;
+  } catch {
+    return 0;
+  }
+}
+
+function incrementConnectWelcomeLoginCount(
+  userId: string | null | undefined,
+): number {
+  if (!userId) return readConnectWelcomeLoginCount(userId);
+
+  const countedKey = getConnectWelcomeSessionCountedKey(userId);
+  const countKey = getConnectWelcomeLoginCountKey(userId);
+  if (!countedKey || !countKey) return readConnectWelcomeLoginCount(userId);
+
+  try {
+    if (sessionStorage.getItem(countedKey) === "1") {
+      return readConnectWelcomeLoginCount(userId);
+    }
+  } catch {
+    // ignore sessionStorage errors
+  }
+
+  const current = readConnectWelcomeLoginCount(userId);
+  const next = current + 1;
+  try {
+    localStorage.setItem(countKey, String(next));
+    sessionStorage.setItem(countedKey, "1");
+  } catch {
+    // ignore storage errors
+  }
+  return next;
+}
+
+function isWithinConnectWelcomeLoginWindow(
+  userId: string | null | undefined,
+): boolean {
+  return readConnectWelcomeLoginCount(userId) < MAX_CONNECT_WELCOME_LOGIN_COUNT;
+}
+
+const ConnectWelcomeBenefitsList: React.FC = () => (
+  <ul
+    className="linkedin-connect-welcome-benefits"
+    style={{
+      margin: "0 0 14px",
+      padding: 0,
+      listStyle: "none",
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    }}
+  >
+    {CONNECT_WELCOME_BENEFITS.map(({ icon, label }) => (
+      <li
+        key={label}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          color: "#334155",
+          fontSize: 14,
+          lineHeight: 1.4,
+        }}
+      >
+        <span
+          aria-hidden
+          style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}
+        >
+          {icon}
+        </span>
+        <span>{label}</span>
+      </li>
+    ))}
+  </ul>
+);
 
 function useDismissibleError(activeError: string | null) {
   const [dismissedError, setDismissedError] = useState<string | null>(null);
@@ -56,25 +185,94 @@ const DisconnectedState: React.FC<{
   onConnect: () => void;
   centered?: boolean;
   splitConnectAction?: boolean;
-}> = ({ isConnecting, connectError, statusError, onConnect, centered = false, splitConnectAction = false }) => {
-  const buttonLabel = isConnecting ? 'Connecting...' : 'Connect LinkedIn';
+  mobileProfileStrip?: boolean;
+  relocateMobileProfileStrip?: boolean;
+  onConnectWelcomeDismissed?: () => void;
+  onConnectWelcomeOpenChange?: (open: boolean) => void;
+  userId?: string | null;
+}> = ({
+  isConnecting,
+  connectError,
+  statusError,
+  onConnect,
+  centered = false,
+  splitConnectAction = false,
+  mobileProfileStrip = false,
+  relocateMobileProfileStrip = false,
+  onConnectWelcomeDismissed,
+  onConnectWelcomeOpenChange,
+  userId,
+}) => {
+  const connectCtaLabel = isConnecting ? "Connecting..." : CONNECT_WELCOME_CTA;
   const displayStatusError = connectError ? null : statusError;
-  const activeError = connectError || displayStatusError;
+  // On the dashboard, keep the welcome popup visible — don't overlay a status-check error modal.
+  const activeError = connectError || (centered ? null : displayStatusError);
   const { showErrorModal, dismissError } = useDismissibleError(activeError);
-  const [showConnectWelcomeModal, setShowConnectWelcomeModal] = useState(false);
+  const initialWelcomeDismissed = (() => {
+    const storageKey = getConnectWelcomeDismissedKey(userId);
+    if (!storageKey) return false;
+    try {
+      return localStorage.getItem(storageKey) !== null;
+    } catch {
+      return false;
+    }
+  })();
+  const initialLoginCount = readConnectWelcomeLoginCount(userId);
+  const [showConnectWelcomeModal, setShowConnectWelcomeModal] = useState(
+    centered &&
+      !initialWelcomeDismissed &&
+      isWithinConnectWelcomeLoginWindow(userId),
+  );
+  const [welcomeDismissed, setWelcomeDismissed] = useState(
+    initialWelcomeDismissed,
+  );
+  const [loginCount, setLoginCount] = useState(initialLoginCount);
 
+  // Track a new login/session once per browser session per user.
   useEffect(() => {
-    if (!centered || activeError) return;
-    if (sessionStorage.getItem(CONNECT_WELCOME_DISMISSED_KEY)) return;
-    setShowConnectWelcomeModal(true);
-  }, [centered, activeError]);
+    setLoginCount(incrementConnectWelcomeLoginCount(userId));
+  }, [userId]);
 
-  const dismissConnectWelcome = () => {
-    sessionStorage.setItem(CONNECT_WELCOME_DISMISSED_KEY, '1');
-    setShowConnectWelcomeModal(false);
+  const persistDismissal = () => {
+    const storageKey = getConnectWelcomeDismissedKey(userId);
+    if (storageKey) {
+      try {
+        localStorage.setItem(storageKey, "true");
+      } catch {
+        /* ignore */
+      }
+    }
   };
 
-  const errorTitle = connectError ? 'LinkedIn connection error' : 'LinkedIn error';
+  const handleWelcomeConnect = () => {
+    setWelcomeDismissed(true);
+    setShowConnectWelcomeModal(false);
+    persistDismissal();
+    onConnectWelcomeDismissed?.();
+    onConnect();
+  };
+
+  useEffect(() => {
+    if (!centered || welcomeDismissed) return;
+    if (loginCount < MAX_CONNECT_WELCOME_LOGIN_COUNT) {
+      setShowConnectWelcomeModal(true);
+    }
+  }, [centered, welcomeDismissed, loginCount]);
+
+  useEffect(() => {
+    onConnectWelcomeOpenChange?.(centered && showConnectWelcomeModal);
+  }, [centered, showConnectWelcomeModal, onConnectWelcomeOpenChange]);
+
+  const dismissConnectWelcome = () => {
+    setWelcomeDismissed(true);
+    setShowConnectWelcomeModal(false);
+    persistDismissal();
+    onConnectWelcomeDismissed?.();
+  };
+
+  const errorTitle = connectError
+    ? "LinkedIn connection error"
+    : "LinkedIn error";
 
   if (centered) {
     return (
@@ -82,7 +280,7 @@ const DisconnectedState: React.FC<{
         <DashboardSimpleErrorModal
           open={showErrorModal}
           title={errorTitle}
-          message={activeError ?? ''}
+          message={activeError ?? ""}
           onClose={dismissError}
           onRetry={connectError || displayStatusError ? onConnect : undefined}
           isRetrying={isConnecting}
@@ -90,93 +288,144 @@ const DisconnectedState: React.FC<{
 
         <DashboardActionModal
           open={showConnectWelcomeModal}
-          title="Connect LinkedIn to get started"
+          title={CONNECT_WELCOME_TITLE}
           onClose={dismissConnectWelcome}
-          maxWidth={480}
+          closeLabel={CONNECT_WELCOME_DISMISS_LABEL}
+          maxWidth={500}
+          titleSize="lg"
+          elevated
+          modalClassName="linkedin-connect-welcome-modal"
         >
-          <p style={{ margin: '0 0 10px', color: '#334155', fontSize: 14, lineHeight: 1.5 }}>
-            Connect your LinkedIn account to enable publishing, profile analysis, and post analytics.
+          <p
+            style={{
+              margin: "0 0 10px",
+              color: "#1e293b",
+              fontSize: 15,
+              lineHeight: 1.55,
+              fontWeight: 500,
+            }}
+          >
+            {CONNECT_WELCOME_LEAD}
           </p>
-          <p style={{ margin: '0 0 10px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-            You can still explore planning and creation tools below without connecting.
+          <ConnectWelcomeBenefitsList />
+          <p
+            style={{
+              margin: "0 0 18px",
+              color: "#64748b",
+              fontSize: 14,
+              lineHeight: 1.5,
+            }}
+          >
+            {CONNECT_WELCOME_REASSURANCE}
           </p>
-          <p style={{ margin: '0 0 14px', color: '#64748b', fontSize: 13, lineHeight: 1.45 }}>
-            Sign in via LinkedIn popup and choose your <strong>personal profile</strong>.
+          <p
+            style={{
+              margin: "0 0 18px",
+              color: "#334155",
+              fontSize: 14,
+              lineHeight: 1.5,
+              fontWeight: 500,
+            }}
+          >
+            {CONNECT_WELCOME_SIGN_IN_HINT}
           </p>
           <button
             type="button"
-            onClick={() => {
-              dismissConnectWelcome();
-              void onConnect();
-            }}
+            onClick={handleWelcomeConnect}
             disabled={isConnecting}
+            aria-label={connectCtaLabel}
             style={{
               ...CONNECT_BUTTON_STYLE,
-              width: '100%',
-              minWidth: 'unset',
-              cursor: isConnecting ? 'default' : 'pointer',
+              width: "100%",
+              minWidth: "unset",
+              cursor: isConnecting ? "default" : "pointer",
               opacity: isConnecting ? 0.7 : 1,
             }}
           >
-            {buttonLabel}
+            {connectCtaLabel}
           </button>
         </DashboardActionModal>
 
         <div
           className="linkedin-profile-hub-cluster"
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            marginBottom: 0,
-            transform: 'translateY(0)',
-          }}
+          data-tour={mobileProfileStrip ? "li-profile-hub" : undefined}
+          style={
+            mobileProfileStrip
+              ? { width: "100%", margin: 0 }
+              : relocateMobileProfileStrip
+                ? {
+                    width: 0,
+                    height: 0,
+                    overflow: "hidden",
+                    margin: 0,
+                    padding: 0,
+                  }
+                : {
+                    width: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    marginBottom: 0,
+                    transform: "translateY(0)",
+                  }
+          }
         >
-          <div style={{ position: 'relative' }}>
-            <div
-              style={{
-                width: 120,
-                height: 120,
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 20px rgba(10, 102, 194, 0.15)',
-                border: '4px solid #fff',
-              }}
-            >
-              <LinkedInIcon sx={{ color: '#0A66C2', fontSize: 56 }} />
-            </div>
-          </div>
+          {mobileProfileStrip ? (
+            <LinkedInProfileHubStrip
+              connected={false}
+              isConnecting={isConnecting}
+              onConnect={onConnect}
+            />
+          ) : relocateMobileProfileStrip ? null : (
+            <>
+              <div style={{ position: "relative" }}>
+                <div
+                  className="linkedin-profile-hub-placeholder-avatar"
+                  style={{
+                    width: 120,
+                    height: 120,
+                    borderRadius: "50%",
+                    background:
+                      "linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: "0 4px 20px rgba(10, 102, 194, 0.15)",
+                    border: "4px solid #fff",
+                  }}
+                >
+                  <LinkedInIcon sx={{ color: "#0A66C2", fontSize: 56 }} />
+                </div>
+              </div>
 
-          {!splitConnectAction && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 12,
-                flexWrap: 'nowrap',
-                justifyContent: 'center',
-                zIndex: 6,
-              }}
-            >
-              <button
-                type="button"
-                onClick={onConnect}
-                disabled={isConnecting}
-                style={{
-                  ...CONNECT_BUTTON_STYLE,
-                  cursor: isConnecting ? 'default' : 'pointer',
-                  opacity: isConnecting ? 0.7 : 1,
-                }}
-              >
-                {buttonLabel}
-              </button>
-            </div>
+              {!splitConnectAction && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    flexWrap: "nowrap",
+                    justifyContent: "center",
+                    zIndex: 6,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={onConnect}
+                    disabled={isConnecting}
+                    style={{
+                      ...CONNECT_BUTTON_STYLE,
+                      cursor: isConnecting ? "default" : "pointer",
+                      opacity: isConnecting ? 0.7 : 1,
+                    }}
+                  >
+                    {connectCtaLabel}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </>
@@ -188,7 +437,7 @@ const DisconnectedState: React.FC<{
       <DashboardSimpleErrorModal
         open={showErrorModal}
         title={errorTitle}
-        message={activeError ?? ''}
+        message={activeError ?? ""}
         onClose={dismissError}
         onRetry={activeError ? onConnect : undefined}
         isRetrying={isConnecting}
@@ -198,63 +447,65 @@ const DisconnectedState: React.FC<{
         <div
           style={{
             ...linkedInPlaceholderCardStyles.inner,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
             gap: 12,
           }}
         >
           <div
             style={{
-              position: 'absolute',
-              top: '-50%',
-              left: '-50%',
-              width: '200%',
-              height: '200%',
+              position: "absolute",
+              top: "-50%",
+              left: "-50%",
+              width: "200%",
+              height: "200%",
               background:
-                'radial-gradient(circle, rgba(10, 102, 194, 0.08) 0%, transparent 70%)',
+                "radial-gradient(circle, rgba(10, 102, 194, 0.08) 0%, transparent 70%)",
               zIndex: 0,
             }}
           />
           <div
             style={{
               zIndex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
               gap: 12,
-              width: '100%',
+              width: "100%",
             }}
           >
-            <LinkedInIcon sx={{ color: '#0A66C2', fontSize: 40 }} />
+            <LinkedInIcon sx={{ color: "#0A66C2", fontSize: 40 }} />
             {!displayStatusError && (
               <>
                 <p
                   style={{
                     margin: 0,
-                    color: '#475569',
+                    color: "#1e293b",
                     fontSize: 14,
-                    textAlign: 'center',
+                    textAlign: "center",
                     maxWidth: 520,
                     lineHeight: 1.55,
+                    fontWeight: 500,
                   }}
                 >
-                  Connect your LinkedIn account to enable publishing and analytics.
+                  {CONNECT_WELCOME_LEAD}
                 </p>
+                <div style={{ width: "100%", maxWidth: 360 }}>
+                  <ConnectWelcomeBenefitsList />
+                </div>
                 <p
                   style={{
                     margin: 0,
-                    color: '#64748b',
+                    color: "#64748b",
                     fontSize: 13,
-                    textAlign: 'center',
+                    textAlign: "center",
                     maxWidth: 520,
                     lineHeight: 1.55,
                   }}
                 >
-                  You&apos;ll sign in on LinkedIn in a popup. When asked, choose your{' '}
-                  <strong>personal profile</strong> — that lets you post as yourself and on
-                  company pages you manage.
+                  {CONNECT_WELCOME_REASSURANCE}
                 </p>
               </>
             )}
@@ -264,11 +515,11 @@ const DisconnectedState: React.FC<{
               disabled={isConnecting}
               style={{
                 ...CONNECT_BUTTON_STYLE,
-                cursor: isConnecting ? 'default' : 'pointer',
+                cursor: isConnecting ? "default" : "pointer",
                 opacity: isConnecting ? 0.7 : 1,
               }}
             >
-              {buttonLabel}
+              {connectCtaLabel}
             </button>
           </div>
         </div>
@@ -277,35 +528,48 @@ const DisconnectedState: React.FC<{
   );
 };
 
-const ConnectionLoadingState: React.FC<{ centered?: boolean }> = ({ centered = false }) => (
+const ConnectionLoadingState: React.FC<{ centered?: boolean }> = ({
+  centered = false,
+}) => (
   <div
     style={{
-      width: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
+      width: "100%",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
       gap: 12,
       marginBottom: centered ? 24 : 20,
       minHeight: centered ? 200 : undefined,
     }}
   >
-    <CircularProgress size={28} sx={{ color: '#0A66C2' }} />
-    <p style={{ margin: 0, color: '#64748b', fontSize: 14 }}>Loading LinkedIn...</p>
+    <CircularProgress size={28} sx={{ color: "#0A66C2" }} />
+    <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>
+      Loading LinkedIn...
+    </p>
   </div>
 );
 
-const ConnectTourAnchor: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div data-tour="li-connect-action" style={{ display: 'inline-flex' }}>
+const ConnectTourAnchor: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => (
+  <div
+    className="linkedin-plan-connect-anchor"
+    data-tour="li-connect-action"
+    style={{
+      display: "inline-flex",
+      width: "100%",
+      maxWidth: 360,
+      justifyContent: "center",
+    }}
+  >
     {children}
   </div>
 );
 
-export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps> = ({
-  social,
-  isDisconnecting = false,
-  onDisconnect,
-}) => {
+export const LinkedInPlanConnectAction: React.FC<
+  LinkedInPlanConnectActionProps
+> = ({ social, isDisconnecting = false, onDisconnect }) => {
   const {
     connected,
     isLoading,
@@ -327,12 +591,13 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
       <ConnectTourAnchor>
         <button
           type="button"
+          className="linkedin-plan-connect-btn"
           disabled
           aria-busy="true"
           style={{
             ...CONNECT_BUTTON_STYLE,
             opacity: 0.82,
-            cursor: 'default',
+            cursor: "default",
           }}
         >
           Checking connection...
@@ -347,34 +612,38 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
         <DashboardSimpleErrorModal
           open={showErrorModal}
           title="Disconnect failed"
-          message={disconnectError ?? ''}
+          message={disconnectError ?? ""}
           onClose={dismissError}
         />
         <ConnectTourAnchor>
           <button
             type="button"
+            className="linkedin-plan-connect-btn linkedin-plan-connect-btn--disconnect"
             onClick={() => void onDisconnect()}
             disabled={isDisconnecting}
-            title={isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
-            aria-label={isDisconnecting ? 'Disconnecting LinkedIn' : 'Disconnect LinkedIn'}
+            title={isDisconnecting ? "Disconnecting..." : "Disconnect LinkedIn"}
+            aria-label={
+              isDisconnecting ? "Disconnecting LinkedIn" : "Disconnect LinkedIn"
+            }
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
               gap: 8,
-              padding: '10px 24px',
+              padding: "10px 24px",
               borderRadius: 10,
-              border: '2px solid #fecaca',
-              backgroundColor: '#fff',
-              color: '#b91c1c',
+              border: "2px solid #fecaca",
+              backgroundColor: "#fff",
+              color: "#b91c1c",
               fontSize: 14,
               fontWeight: 700,
-              cursor: isDisconnecting ? 'default' : 'pointer',
+              cursor: isDisconnecting ? "default" : "pointer",
               opacity: isDisconnecting ? 0.7 : 1,
-              boxShadow: '0 4px 14px rgba(185, 28, 28, 0.12)',
-              whiteSpace: 'nowrap',
+              boxShadow: "0 4px 14px rgba(185, 28, 28, 0.12)",
+              whiteSpace: "nowrap",
             }}
           >
-            {isDisconnecting ? 'Disconnecting...' : 'Disconnect LinkedIn'}
+            {isDisconnecting ? "Disconnecting..." : "Disconnect LinkedIn"}
           </button>
         </ConnectTourAnchor>
       </>
@@ -385,8 +654,8 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
     <>
       <DashboardSimpleErrorModal
         open={showErrorModal}
-        title={connectError ? 'LinkedIn connection error' : 'LinkedIn error'}
-        message={modalError ?? ''}
+        title={connectError ? "LinkedIn connection error" : "LinkedIn error"}
+        message={modalError ?? ""}
         onClose={dismissError}
         onRetry={modalError ? handleConnect : undefined}
         isRetrying={isConnecting}
@@ -394,16 +663,17 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
       <ConnectTourAnchor>
         <button
           type="button"
+          className="linkedin-plan-connect-btn"
           onClick={handleConnect}
           disabled={isConnecting}
           style={{
             ...CONNECT_BUTTON_STYLE,
-            cursor: isConnecting ? 'default' : 'pointer',
+            cursor: isConnecting ? "default" : "pointer",
             opacity: isConnecting ? 0.7 : 1,
-            boxShadow: '0 6px 20px rgba(10, 102, 194, 0.35)',
+            boxShadow: "0 6px 20px rgba(10, 102, 194, 0.35)",
           }}
         >
-          {isConnecting ? 'Connecting...' : 'Connect LinkedIn'}
+          {isConnecting ? "Connecting..." : CONNECT_WELCOME_CTA}
         </button>
       </ConnectTourAnchor>
     </>
@@ -413,17 +683,30 @@ export const LinkedInPlanConnectAction: React.FC<LinkedInPlanConnectActionProps>
 export const LinkedInConnectionPlaceholder: React.FC<{
   centered?: boolean;
   splitConnectAction?: boolean;
+  relocateMobileProfileStrip?: boolean;
   socialConnection?: LinkedInSocialConnectionState;
   isDisconnecting?: boolean;
   onDisconnect?: () => Promise<void>;
+  onConnectWelcomeDismissed?: () => void;
+  onConnectWelcomeOpenChange?: (open: boolean) => void;
+  userId?: string | null;
+  blockDashboardErrorModal?: boolean;
 }> = ({
   centered = false,
   splitConnectAction = false,
+  relocateMobileProfileStrip = false,
   socialConnection,
   isDisconnecting: isDisconnectingProp = false,
   onDisconnect: onDisconnectProp,
+  onConnectWelcomeDismissed,
+  onConnectWelcomeOpenChange,
+  userId,
+  blockDashboardErrorModal = false,
 }) => {
   const internalSocial = useLinkedInSocialConnection();
+  const desktopViewport = useDesktopViewport();
+  const mobileProfileStrip =
+    centered && !desktopViewport && !relocateMobileProfileStrip;
   const {
     connected,
     isLoading,
@@ -444,18 +727,21 @@ export const LinkedInConnectionPlaceholder: React.FC<{
     await connectWithOAuth();
   };
 
+  const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
+
   const handleDisconnect = async () => {
     if (onDisconnectProp) {
       await onDisconnectProp();
       return;
     }
-    if (!window.confirm('Disconnect LinkedIn? You can reconnect anytime.')) {
-      return;
-    }
+    setShowDisconnectConfirm(true);
+  };
+
+  const confirmDisconnect = async () => {
+    setShowDisconnectConfirm(false);
     setIsDisconnectingLocal(true);
     try {
       await disconnect();
-      sessionStorage.removeItem(CONNECT_WELCOME_DISMISSED_KEY);
     } finally {
       setIsDisconnectingLocal(false);
     }
@@ -469,26 +755,81 @@ export const LinkedInConnectionPlaceholder: React.FC<{
 
   if (connected) {
     return (
-      <LinkedInProfileSetupPanel
-        centered={centered}
-        displayName={displayName}
-        avatarUrl={avatarUrl}
-        onDisconnect={showDisconnect ? handleDisconnect : undefined}
-        isDisconnecting={isDisconnecting}
-        disconnectError={disconnectError}
-        hideDisconnectButton={centered && splitConnectAction}
-      />
+      <div
+        data-tour={relocateMobileProfileStrip ? undefined : "li-profile-hub"}
+        style={{ width: "100%", display: "flex", justifyContent: "center" }}
+      >
+        <LinkedInProfileSetupPanel
+          centered={centered}
+          mobileProfileStrip={mobileProfileStrip}
+          displayName={displayName}
+          avatarUrl={avatarUrl}
+          onDisconnect={showDisconnect ? handleDisconnect : undefined}
+          isDisconnecting={isDisconnecting}
+          disconnectError={disconnectError}
+          hideDisconnectButton={
+            centered && splitConnectAction && !mobileProfileStrip
+          }
+          blockDashboardErrorModal={blockDashboardErrorModal}
+        />
+      </div>
     );
   }
 
   return (
-    <DisconnectedState
-      centered={centered}
-      splitConnectAction={splitConnectAction}
-      isConnecting={isConnecting}
-      connectError={connectError}
-      statusError={error}
-      onConnect={handleConnect}
-    />
+    <>
+      <DisconnectedState
+        centered={centered}
+        splitConnectAction={splitConnectAction}
+        mobileProfileStrip={mobileProfileStrip}
+        relocateMobileProfileStrip={relocateMobileProfileStrip}
+        isConnecting={isConnecting}
+        connectError={connectError}
+        statusError={error}
+        onConnect={handleConnect}
+        onConnectWelcomeDismissed={onConnectWelcomeDismissed}
+        onConnectWelcomeOpenChange={onConnectWelcomeOpenChange}
+        userId={userId}
+      />
+
+      {showDisconnectConfirm && (
+        <DashboardActionModal
+          open={showDisconnectConfirm}
+          title="Disconnect LinkedIn?"
+          onClose={() => setShowDisconnectConfirm(false)}
+        >
+          <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px', lineHeight: 1.5 }}>
+            You can reconnect anytime. Your saved drafts, analytics history, and profile optimization will be preserved.
+          </p>
+          <p style={{ fontSize: 12, color: '#94a3b8', margin: '0 0 16px' }}>
+            Publishing, post analytics, and watchlist monitoring will pause until you reconnect.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              type="button"
+              onClick={() => setShowDisconnectConfirm(false)}
+              style={{
+                padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db',
+                background: '#fff', color: '#374151', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={confirmDisconnect}
+              disabled={isDisconnecting}
+              style={{
+                padding: '8px 16px', borderRadius: 8, border: 'none',
+                background: isDisconnecting ? '#94a3b8' : '#dc2626',
+                color: '#fff', fontSize: 13, fontWeight: 700, cursor: isDisconnecting ? 'default' : 'pointer',
+              }}
+            >
+              {isDisconnecting ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+          </div>
+        </DashboardActionModal>
+      )}
+    </>
   );
 };

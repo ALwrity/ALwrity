@@ -69,13 +69,44 @@ const DiffPreviewModal: React.FC<DiffPreviewModalProps> = ({
       </div>
       <div style={{ padding: 16 }}>
         <div
-          style={{ fontFamily: 'inherit', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}
+          className="liw-diff-preview"
+          style={{
+            fontFamily: 'inherit',
+            fontSize: 15,
+            lineHeight: 1.7,
+            whiteSpace: 'pre-wrap',
+            color: '#0f172a',
+            background: '#f8fafc',
+            border: '1px solid #e2e8f0',
+            borderRadius: 8,
+            padding: 16,
+          }}
           dangerouslySetInnerHTML={{ __html: livePreviewHtml || diffMarkup(pendingEdit.src, pendingEdit.target) }}
         />
         <style>{`
-          .liw-add { background: rgba(46, 204, 113, 0.18); font-style: normal; }
-          .liw-del { color: #c0392b; text-decoration: line-through; opacity: 0.8; }
-          .liw-more { color: #999; }
+          .liw-diff-preview {
+            color: #0f172a !important;
+          }
+          .liw-diff-preview .liw-add {
+            background: #bbf7d0;
+            color: #14532d;
+            font-style: normal;
+            font-weight: 600;
+            border-radius: 2px;
+            padding: 0 2px;
+          }
+          .liw-diff-preview .liw-del {
+            background: #fecaca;
+            color: #7f1d1d;
+            text-decoration: line-through;
+            opacity: 1;
+            border-radius: 2px;
+            padding: 0 2px;
+          }
+          .liw-diff-preview .liw-more {
+            color: #475569;
+            font-weight: 500;
+          }
         `}</style>
       </div>
     </div>

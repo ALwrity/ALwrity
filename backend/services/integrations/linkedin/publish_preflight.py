@@ -1,7 +1,7 @@
 """
 Pre-publish validation orchestrator (H4 + H5).
 
-Runs duplicate detection and media validation before Zernio/native publish.
+Runs duplicate detection and media validation before LinkedIn publish.
 """
 
 from __future__ import annotations

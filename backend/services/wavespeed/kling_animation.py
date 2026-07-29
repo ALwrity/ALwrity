@@ -51,59 +51,40 @@ def _build_fallback_prompt(scene_data: Dict[str, Any], story_context: Dict[str, 
     description = (scene_data.get("description") or "").strip()
     image_prompt = (scene_data.get("image_prompt") or "").strip()
     tone = (story_context.get("story_tone") or "story").strip()
-    setting = (story_context.get("story_setting") or "the scene").strip()
     anime_bible = story_context.get("anime_bible") or {}
 
-    anime_style_parts = []
+    bible_desc_parts = []
     if isinstance(anime_bible, dict):
         visual_style = anime_bible.get("visual_style") or {}
         world = anime_bible.get("world") or {}
         main_cast = anime_bible.get("main_cast") or []
 
-        style_preset = visual_style.get("style_preset")
-        camera_style = visual_style.get("camera_style")
-        color_mood = visual_style.get("color_mood")
-        lighting = visual_style.get("lighting")
-        line_style = visual_style.get("line_style")
-        extra_tags = visual_style.get("extra_tags") or []
-
-        if style_preset:
-            anime_style_parts.append(f"Follow {style_preset} anime visual style.")
-        if camera_style:
-            anime_style_parts.append(f"Use camera style: {camera_style}.")
-        if color_mood:
-            anime_style_parts.append(f"Color mood: {color_mood}.")
-        if lighting:
-            anime_style_parts.append(f"Lighting: {lighting}.")
-        if line_style:
-            anime_style_parts.append(f"Line art: {line_style}.")
-        if extra_tags:
-            anime_style_parts.append("Style tags: " + ", ".join(str(tag) for tag in extra_tags[:6]))
-
-        if world:
-            setting_desc = world.get("setting")
-            if setting_desc:
-                anime_style_parts.append(f"World context: {setting_desc}.")
-
+        if visual_style.get("style_preset"):
+            bible_desc_parts.append(f"{visual_style['style_preset']} anime")
+        if visual_style.get("color_mood"):
+            bible_desc_parts.append(f"{visual_style['color_mood']} color")
+        if visual_style.get("lighting"):
+            bible_desc_parts.append(f"{visual_style['lighting']} lighting")
+        if visual_style.get("camera_style"):
+            bible_desc_parts.append(visual_style["camera_style"])
+        if world and world.get("setting"):
+            bible_desc_parts.append(f"in {world['setting']}")
         if main_cast:
             names = [c.get("name") for c in main_cast if isinstance(c, dict) and c.get("name")]
             if names:
-                joined = ", ".join(names[:4])
-                anime_style_parts.append(f"Keep character designs consistent for: {joined}.")
+                bible_desc_parts.append(f"featuring {', '.join(names[:3])}")
 
-    anime_style_text = " ".join(anime_style_parts).strip()
+    bible_desc = ", ".join(bible_desc_parts) if bible_desc_parts else ""
+    scene_desc = (description or image_prompt)[:180].strip()
 
-    parts = [
-        f"{title} cinematic motion shot.",
-        description[:220] if description else "",
-        f"Camera glides with subtle parallax over {setting}.",
-        f"Maintain a {tone} mood with natural lighting accents.",
-        f"Honor the original illustration details: {image_prompt[:200]}." if image_prompt else "",
-        "5-second sequence, gentle push-in, flowing cloth and atmospheric particles.",
-        anime_style_text,
-    ]
-    fallback_prompt = " ".join(filter(None, parts))
-    return fallback_prompt.strip()
+    prompt = f"Cinematic motion shot of {title}"
+    if scene_desc:
+        prompt += f": {scene_desc.rstrip('.')}"
+    if bible_desc:
+        prompt += f", {bible_desc}"
+    prompt += f", gentle camera motion, {tone} atmosphere, 5-second loop"
+
+    return prompt
 
 
 def _load_llm_json_response(response_text: Any) -> Dict[str, Any]:
@@ -237,15 +218,14 @@ def generate_animation_prompt(
 
             if detail_lines:
                 anime_bible_block = (
-                    "\nANIME STORY BIBLE VISUAL GUIDANCE:\n"
+                    "\nVisual reference from story bible:\n"
                     + "\n".join(detail_lines)
-                    + "\nAlways respect these constraints in the motion description."
                 )
         except Exception:
             anime_bible_block = ""
 
     prompt = f"""
-Create a concise animation prompt (2-3 sentences) for a 5-second cinematic clip.
+Describe a 5-second cinematic motion shot (2-3 sentences) for this scene.
 
 Scene Title: {title}
 Description: {description}
@@ -254,11 +234,11 @@ Story Tone: {tone}
 Setting: {setting}
 {anime_bible_block}
 
-Focus on:
-- Motion of characters/objects
-- Camera movement (pan, zoom, dolly, orbit)
-- Atmosphere, lighting, and emotion
-- Timing cues appropriate for a {tone or "story"} scene
+Describe:
+- What moves and how (character/object motion)
+- Camera motion (pan, zoom, dolly, orbit)
+- Atmosphere, lighting, and emotional tone
+- Match the {tone or "story"} mood
 
 Respond with JSON: {{"animation_prompt": "<prompt>"}}
 """

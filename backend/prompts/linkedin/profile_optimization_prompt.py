@@ -9,7 +9,10 @@ from __future__ import annotations
 import json
 from typing import Any, Optional
 
-PROFILE_OPTIMIZATION_LLM_BATCH_SIZE = 5
+from services.integrations.linkedin.profile_optimization_types import (
+    PROFILE_OPTIMIZATION_LLM_BATCH_SIZE,
+)
+
 PROFILE_OPTIMIZATION_BACKLOG_MIN = 10
 PROFILE_OPTIMIZATION_BACKLOG_MAX = 15
 

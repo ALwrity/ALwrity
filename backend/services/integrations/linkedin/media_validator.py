@@ -1,7 +1,7 @@
 """
 LinkedIn media pre-publish validation (H5).
 
-Validates images, videos, and documents against LinkedIn/Zernio specs
+Validates images, videos, and documents against LinkedIn specs
 before calling the publish API.
 """
 

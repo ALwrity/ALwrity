@@ -1,28 +1,33 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { showToastNotification } from '../../../utils/toastNotifications';
+import { useState, useCallback, useRef, useEffect } from "react";
+import { showToastNotification } from "../../../utils/toastNotifications";
 import {
   buildPromptFromSelection,
   generateLinkedInImage,
   fetchLinkedInImageBlobUrl,
   resolveLinkedInImageUrl,
-} from '../../../services/linkedInImageService';
+} from "../../../services/linkedInImageService";
 import type {
   LinkedInImageGenerationSettings,
   GeneratedLinkedInImagePreview,
-} from '../components/LinkedInSelectionImageModal';
+} from "../components/LinkedInSelectionImageModal";
 
 interface UseLinkedInSelectionImageOptions {
   topic?: string;
   industry?: string;
+  onInsertImage?: (imageUrl: string) => void;
+  /** Called after a successful generation (publish flow attaches without draft insert). */
+  onImageGenerated?: (preview: GeneratedLinkedInImagePreview) => void;
 }
 
 export function useLinkedInSelectionImage({
   topic,
   industry,
+  onInsertImage,
+  onImageGenerated,
 }: UseLinkedInSelectionImageOptions) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
-  const [initialPrompt, setInitialPrompt] = useState('');
+  const [selectedText, setSelectedText] = useState("");
+  const [initialPrompt, setInitialPrompt] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPreview, setGeneratedPreview] =
     useState<GeneratedLinkedInImagePreview | null>(null);
@@ -44,13 +49,26 @@ export function useLinkedInSelectionImage({
       setGeneratedPreview(null);
       setModalOpen(true);
     },
-    [topic, industry]
+    [topic, industry],
+  );
+
+  const openForDraft = useCallback(
+    (seedText: string, prompt?: string) => {
+      const trimmed = seedText.trim();
+      setSelectedText(trimmed);
+      setInitialPrompt(
+        prompt || buildPromptFromSelection(trimmed, topic, industry),
+      );
+      setGeneratedPreview(null);
+      setModalOpen(true);
+    },
+    [topic, industry],
   );
 
   const closeModal = useCallback(() => {
     setModalOpen(false);
-    setSelectedText('');
-    setInitialPrompt('');
+    setSelectedText("");
+    setInitialPrompt("");
   }, []);
 
   const closePreview = useCallback(() => {
@@ -77,12 +95,16 @@ export function useLinkedInSelectionImage({
         });
 
         if (!result.success || !result.imageId) {
-          showToastNotification(result.error || 'Image generation failed', 'error');
+          showToastNotification(
+            result.error || "Image generation failed",
+            "error",
+          );
           return;
         }
 
-        const imageUrl = result.imageUrl || resolveLinkedInImageUrl(result.imageId);
-        console.log('[LinkedInSelectionImage] Generated image URL:', imageUrl);
+        const imageUrl =
+          result.imageUrl || resolveLinkedInImageUrl(result.imageId);
+        console.log("[LinkedInSelectionImage] Generated image URL:", imageUrl);
 
         const blobUrl = await fetchLinkedInImageBlobUrl(result.imageId);
         if (blobUrlRef.current) {
@@ -96,16 +118,33 @@ export function useLinkedInSelectionImage({
           imageId: result.imageId,
         });
 
-        showToastNotification(`Image generated: ${imageUrl}`, 'success');
+        const preview = {
+          blobUrl,
+          imageUrl,
+          imageId: result.imageId,
+        };
+
+        if (onInsertImage) {
+          onInsertImage(imageUrl);
+        }
+
+        onImageGenerated?.(preview);
+
+        showToastNotification(
+          onInsertImage
+            ? "Image added to your post"
+            : "Image generated successfully",
+          "success",
+        );
       } catch (error) {
         const message =
-          error instanceof Error ? error.message : 'Image generation failed';
-        showToastNotification(message, 'error');
+          error instanceof Error ? error.message : "Image generation failed";
+        showToastNotification(message, "error");
       } finally {
         setIsGenerating(false);
       }
     },
-    [selectedText, topic, industry]
+    [selectedText, topic, industry, onInsertImage, onImageGenerated],
   );
 
   return {
@@ -114,6 +153,7 @@ export function useLinkedInSelectionImage({
     isGenerating,
     generatedPreview,
     openForSelection,
+    openForDraft,
     closeModal,
     closePreview,
     handleGenerate,

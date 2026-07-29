@@ -7,20 +7,23 @@ This client provides functionality for LinkedIn Growth Engine:
 - List connected accounts
 - Delete/disconnect account
 - LinkedIn Classic search and search parameter lookup
+- LinkedIn raw data (PYMK) and company profile lookup
 """
 
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Optional
 from urllib.parse import quote
 
 import httpx
 from loguru import logger
 
-from services.integrations.linkedin.zernio_client import avatar_url_from_item
+from services.integrations.linkedin.account_item_utils import avatar_url_from_item
 
 
 DEFAULT_UNIPILE_DSN = "api30.unipile.com:16037"
@@ -91,6 +94,36 @@ def _raise_for_error(response: httpx.Response) -> None:
         status_code=response.status_code,
         error_type=error_type,
     )
+
+
+class _CircuitGuard:
+    """Circuit breaker for Unipile HTTP calls — prevents cascading failures."""
+
+    def __init__(self, threshold: int = 5, cooldown_s: float = 60.0):
+        self._failure_count = 0
+        self._circuit_open_until: float = 0.0
+        self._threshold = threshold
+        self._cooldown_s = cooldown_s
+
+    def check(self) -> None:
+        if self._failure_count < self._threshold:
+            return
+        if time.monotonic() < self._circuit_open_until:
+            raise UnipileAPIError(
+                503,
+                "Unipile is temporarily unavailable — circuit breaker open. "
+                "Please retry in a few minutes.",
+                error_type="circuit_open",
+            )
+        self._failure_count = 0  # half-open probe
+
+    def record_failure(self) -> None:
+        self._failure_count += 1
+        if self._failure_count >= self._threshold:
+            self._circuit_open_until = time.monotonic() + self._cooldown_s
+
+    def record_success(self) -> None:
+        self._failure_count = 0
 
 
 def _normalize_account_list(data: Any) -> list[dict[str, Any]]:
@@ -192,6 +225,17 @@ class HostedAuthLinkResult:
     expires_at: datetime
 
 
+def _mime_for_attachment(path: str) -> str:
+    ext = Path(path).suffix.lower()
+    return {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+    }.get(ext, "application/octet-stream")
+
+
 class UnipileClient:
     """Async HTTP client for Unipile LinkedIn endpoints."""
 
@@ -216,6 +260,30 @@ class UnipileClient:
         self._dsn = dsn or os.getenv("UNIPILE_DSN", DEFAULT_UNIPILE_DSN)
         self._base_url = f"https://{self._dsn}"
         self._timeout = timeout
+        self._guard = _CircuitGuard()
+
+    async def _request(self, method: str, url: str, **kwargs) -> httpx.Response:
+        """Make an HTTP request through the circuit breaker + retry transport."""
+        self._guard.check()
+        try:
+            async with self._make_client() as client:
+                response = await client.request(method, url, **kwargs)
+                _raise_for_error(response)
+                self._guard.record_success()
+                return response
+        except Exception:
+            self._guard.record_failure()
+            raise
+
+    def _make_client(self) -> "httpx.AsyncClient":
+        """Create an httpx client with retry transport."""
+        import httpx
+
+        transport = httpx.AsyncHTTPTransport(retries=3)
+        return httpx.AsyncClient(
+            timeout=httpx.Timeout(self._timeout, connect=10.0),
+            transport=transport,
+        )
 
     def _get_full_url(self, path: str) -> str:
         """Build full URL from API path."""
@@ -281,7 +349,7 @@ class UnipileClient:
             f"providers={providers}, expires_at={expires_at.isoformat()}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 json=payload,
@@ -327,10 +395,8 @@ class UnipileClient:
 
         logger.debug(f"[UnipileClient] Fetching account {account_id}")
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(url, headers=_auth_headers(self._api_key))
-            _raise_for_error(response)
-            return response.json()
+        response = await self._request("GET", url, headers=_auth_headers(self._api_key))
+        return response.json()
 
     async def get_own_profile(self, account_id: str) -> dict[str, Any]:
         """
@@ -361,7 +427,7 @@ class UnipileClient:
             f"[UnipileClient] Fetching own profile account_id={account_id}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(
                 url, params=params, headers=_auth_headers(self._api_key)
             )
@@ -421,12 +487,10 @@ class UnipileClient:
             f"notify={notify!r}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(
-                url, params=params, headers=_auth_headers(self._api_key)
-            )
-            _raise_for_error(response)
-            data = response.json()
+        response = await self._request(
+            "GET", url, params=params, headers=_auth_headers(self._api_key)
+        )
+        data = response.json()
 
         if isinstance(data, dict):
             logger.info(
@@ -459,7 +523,7 @@ class UnipileClient:
 
         logger.debug(f"[UnipileClient] Listing accounts, provider={provider}")
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(
                 url, params=params, headers=_auth_headers(self._api_key)
             )
@@ -489,39 +553,47 @@ class UnipileClient:
             account_id: Unipile account ID to delete
 
         Returns:
-            True if deletion was successful, False otherwise
+            True if deletion was successful
+
+        Raises:
+            UnipileAPIError: On network/API failures that prevent deletion.
+                            404 (not found) is treated as success (already deleted).
         """
         if not self._api_key:
-            logger.warning("Cannot delete account: Unipile API key not configured")
-            return False
+            raise ValueError("Cannot delete account: Unipile API key not configured")
 
         url = self._get_full_url(f"/api/v1/accounts/{account_id}")
 
         logger.info(f"[UnipileClient] Deleting account {account_id}")
 
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.delete(url, headers=_auth_headers(self._api_key))
-                if response.status_code < 400:
-                    logger.info(f"[UnipileClient] Account {account_id} deleted successfully")
-                    return True
-                else:
-                    logger.warning(
-                        f"[UnipileClient] Failed to delete account {account_id}: "
-                        f"HTTP {response.status_code}"
-                    )
-                    return False
-        except Exception as e:
-            logger.error(f"[UnipileClient] Error deleting account {account_id}: {e}")
-            return False
+            response = await self._request(
+                "DELETE", url, headers=_auth_headers(self._api_key)
+            )
+            logger.info(f"[UnipileClient] Account {account_id} deleted successfully")
+            return True
+        except UnipileAPIError as exc:
+            if exc.status_code == 404:
+                logger.info(
+                    f"[UnipileClient] Account {account_id} not found on Unipile "
+                    f"(already deleted locally) — treating as success"
+                )
+                return True
+            raise
 
-    async def create_post(self, account_id: str, text: str) -> dict[str, Any]:
+    async def create_post(
+        self,
+        account_id: str,
+        text: str,
+        attachment_paths: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
         """
-        Publish a text-only LinkedIn post via Unipile.
+        Publish a LinkedIn post via Unipile.
 
         Args:
             account_id: Unipile account ID for the connected LinkedIn profile
             text: Post body text
+            attachment_paths: Optional local image file paths to attach
 
         Returns:
             Raw Unipile post response (includes id, social_id, share_url)
@@ -534,18 +606,34 @@ class UnipileClient:
             raise ValueError("Unipile API key is required")
 
         url = self._get_full_url("/api/v1/posts")
-        # Unipile POST /api/v1/posts requires multipart/form-data (not JSON).
-        # Send only account_id + text — omit attachments / video_thumbnail entirely.
-        form_fields = {
-            "account_id": (None, account_id),
-            "text": (None, text),
-        }
+        form_fields: list[tuple[str, tuple]] = [
+            ("account_id", (None, account_id)),
+            ("text", (None, text)),
+        ]
+
+        attachment_count = 0
+        for attachment_path in attachment_paths or []:
+            file_path = Path(attachment_path)
+            if not file_path.exists():
+                raise ValueError(f"Attachment file not found: {attachment_path}")
+            form_fields.append(
+                (
+                    "attachments",
+                    (
+                        file_path.name,
+                        file_path.read_bytes(),
+                        _mime_for_attachment(str(file_path)),
+                    ),
+                )
+            )
+            attachment_count += 1
 
         logger.info(
-            f"[UnipileClient] create_post account_id={account_id} text_len={len(text)}"
+            f"[UnipileClient] create_post account_id={account_id} text_len={len(text)} "
+            f"attachments={attachment_count}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 files=form_fields,
@@ -609,7 +697,7 @@ class UnipileClient:
             f"expires_at={expires_at.isoformat()}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 json=payload,
@@ -681,14 +769,10 @@ class UnipileClient:
             f"cursor={'set' if cursor else 'none'}"
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.get(
-                url,
-                params=params,
-                headers=_auth_headers(self._api_key),
-            )
-            _raise_for_error(response)
-            data = response.json()
+        response = await self._request(
+            "GET", url, params=params, headers=_auth_headers(self._api_key)
+        )
+        data = response.json()
 
         item_count = 0
         next_cursor = None
@@ -754,7 +838,7 @@ class UnipileClient:
             "set" if cursor else "none",
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.post(
                 url,
                 params=params,
@@ -838,7 +922,7 @@ class UnipileClient:
             service,
         )
 
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
+        async with self._make_client() as client:
             response = await client.get(
                 url,
                 params=params,
@@ -861,3 +945,97 @@ class UnipileClient:
             item_count,
         )
         return data
+
+    async def linkedin_raw_data(self, request_body: dict[str, Any]) -> dict[str, Any]:
+        """
+        Call Unipile magic route ``POST /api/v1/linkedin`` for LinkedIn raw data.
+
+        Used for PYMK and other advanced LinkedIn endpoints not exposed as
+        first-class Unipile APIs.
+
+        Args:
+            request_body: Unipile linkedin raw data payload (account_id, request_url, etc.)
+
+        Returns:
+            Raw Unipile response dict (typically ``LinkedinRawData``)
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        account_id = request_body.get("account_id", "unknown")
+        request_url = request_body.get("request_url", "")
+        method = request_body.get("method", "GET")
+
+        logger.info(
+            "[UnipileClient] linkedin_raw_data account_id={} method={} url={}",
+            account_id,
+            method,
+            request_url[:120] if isinstance(request_url, str) else request_url,
+        )
+
+        url = self._get_full_url("/api/v1/linkedin")
+        async with self._make_client() as client:
+            response = await client.post(
+                url,
+                json=request_body,
+                headers=_auth_headers(self._api_key),
+            )
+            _raise_for_error(response)
+            data = response.json()
+
+        obj_type = data.get("object") if isinstance(data, dict) else None
+        data_len = len(data.get("data", "")) if isinstance(data, dict) else 0
+        logger.info(
+            "[UnipileClient] linkedin_raw_data success account_id={} object={} data_len={}",
+            account_id,
+            obj_type,
+            data_len,
+        )
+        return data if isinstance(data, dict) else {"raw": data}
+
+    async def get_company_profile(
+        self,
+        account_id: str,
+        identifier: str,
+    ) -> dict[str, Any]:
+        """
+        Fetch a LinkedIn company profile by public slug, name, or company id.
+
+        Uses ``GET /api/v1/linkedin/company/{identifier}``.
+
+        Raises:
+            UnipileAPIError: If the API request fails
+            ValueError: If API key is not configured
+        """
+        if not self._api_key:
+            raise ValueError("Unipile API key is required")
+
+        encoded = quote(identifier.strip(), safe="")
+        url = self._get_full_url(f"/api/v1/linkedin/company/{encoded}")
+        params = {"account_id": account_id}
+
+        logger.debug(
+            "[UnipileClient] Fetching company profile account_id={} identifier={}",
+            account_id,
+            identifier,
+        )
+
+        async with self._make_client() as client:
+            response = await client.get(url, params=params, headers=_auth_headers(self._api_key))
+            _raise_for_error(response)
+            data = response.json()
+
+        if isinstance(data, dict):
+            logger.info(
+                "[UnipileClient] Company profile fetched account_id={} identifier={} "
+                "name={!r} industry={}",
+                account_id,
+                identifier,
+                data.get("name"),
+                data.get("industry"),
+            )
+        return data if isinstance(data, dict) else {"raw": data}

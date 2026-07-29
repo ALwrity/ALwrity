@@ -15,6 +15,7 @@ The main component that handles the complete image generation workflow.
 **Location**: `ImageGenerationSuggestions.tsx`
 
 **Features**:
+
 - Content-aware image prompt generation
 - Three distinct visual styles (Professional, Creative, Industry-Specific)
 - Real-time progress tracking
@@ -29,6 +30,7 @@ A demonstration component showcasing the ImageGenerationSuggestions functionalit
 **Location**: `ImageGenerationDemo.tsx`
 
 **Features**:
+
 - Sample LinkedIn content display
 - Interactive workflow demonstration
 - Step-by-step explanation
@@ -53,7 +55,7 @@ yarn add @heroicons/react
 ### Import
 
 ```typescript
-import { ImageGenerationSuggestions, ImageGenerationDemo } from './components';
+import { ImageGenerationSuggestions, ImageGenerationDemo } from "./components";
 ```
 
 ## 📖 Usage
@@ -113,7 +115,7 @@ const LinkedInContentEditor: React.FC = () => {
   return (
     <div className="linkedin-editor">
       {/* Your existing content editor */}
-      
+
       {/* Image generation suggestions */}
       {content.content && (
         <ImageGenerationSuggestions
@@ -124,7 +126,7 @@ const LinkedInContentEditor: React.FC = () => {
           onImageGenerated={handleImageGenerated}
         />
       )}
-      
+
       {/* Display generated image */}
       {generatedImage && (
         <div className="generated-image-display">
@@ -157,7 +159,7 @@ const DemoPage: React.FC = () => {
 
 ```typescript
 interface ImageGenerationSuggestionsProps {
-  contentType: 'post' | 'article' | 'carousel' | 'video_script';
+  contentType: "post" | "article" | "carousel" | "video_script";
   topic: string;
   industry: string;
   content: string;
@@ -199,18 +201,21 @@ The component manages several states to provide a smooth user experience:
 The component generates three distinct image styles:
 
 ### 1. Professional Style
+
 - Corporate aesthetics and clean lines
 - Professional color scheme (blues, grays, whites)
 - Business-appropriate imagery
 - Clean typography and layout
 
 ### 2. Creative Style
+
 - Engaging and eye-catching visuals
 - Vibrant colors while maintaining professionalism
 - Social media engagement optimization
 - Modern design elements
 
 ### 3. Industry-Specific Style
+
 - Tailored to specific business sectors
 - Industry-relevant imagery and colors
 - Professional appeal for target audience
@@ -221,18 +226,22 @@ The component generates three distinct image styles:
 The component integrates seamlessly with CopilotKit through two main actions:
 
 ### 1. generate_image_prompts
+
 Generates three AI-optimized image prompts based on content analysis.
 
 **Parameters**:
+
 - `content_type`: Type of LinkedIn content
 - `topic`: Content topic
 - `industry`: Industry context
 - `content`: Actual content text
 
 ### 2. generate_linkedin_image
+
 Creates LinkedIn-optimized images from selected prompts.
 
 **Parameters**:
+
 - `prompt`: Selected image prompt
 - `content_context`: Full content context object
 - `aspect_ratio`: Image aspect ratio (default: "1:1")
@@ -288,7 +297,7 @@ describe('ImageGenerationSuggestions', () => {
         content="Test content"
       />
     );
-    
+
     expect(screen.getByText(/Enhance Your Post with AI-Generated Images/)).toBeInTheDocument();
   });
 

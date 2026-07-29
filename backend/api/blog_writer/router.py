@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from loguru import logger
-from datetime import datetime
+from datetime import datetime, timedelta
 from middleware.auth_middleware import get_current_user
 from sqlalchemy.orm import Session
 from services.database import get_db as get_db_dependency
@@ -99,8 +99,8 @@ async def apply_seo_recommendations(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to apply SEO recommendations: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to apply SEO recommendations: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 class BlogSectionToolRequest(BaseModel):
@@ -161,8 +161,8 @@ async def section_originality_tools(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to run originality tools: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to run originality tools: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/section/tools/internal-links")
@@ -197,8 +197,8 @@ async def section_internal_link_tools(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to run internal link tools: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to run internal link tools: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/section/tools/fact-check")
@@ -236,8 +236,8 @@ async def section_fact_check_tools(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to run fact check tools: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to run fact check tools: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/section/tools/optimize")
@@ -310,8 +310,8 @@ async def section_optimize_tools(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to run optimize tools: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to run optimize tools: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 
@@ -342,8 +342,8 @@ async def start_research(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to start research: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start research: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/research/status/{task_id}")
@@ -403,8 +403,8 @@ async def get_research_status(task_id: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get research status for {task_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get research status for {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # Outline Endpoints
@@ -425,8 +425,8 @@ async def start_outline_generation(
         task_id = task_manager.start_outline_task(request, user_id)
         return {"task_id": task_id, "status": "started"}
     except Exception as e:
-        logger.error(f"Failed to start outline generation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start outline generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/outline/status/{task_id}")
@@ -441,8 +441,8 @@ async def get_outline_status(task_id: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get outline status for {task_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get outline status for {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/outline/refine", response_model=BlogOutlineResponse)
@@ -451,8 +451,8 @@ async def refine_outline(request: BlogOutlineRefineRequest) -> BlogOutlineRespon
     try:
         return await service.refine_outline(request)
     except Exception as e:
-        logger.error(f"Failed to refine outline: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to refine outline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/outline/enhance-section")
@@ -464,8 +464,8 @@ async def enhance_section(section_data: Dict[str, Any], focus: str = "general im
         enhanced_section = await service.enhance_section_with_ai(section, focus)
         return enhanced_section.dict()
     except Exception as e:
-        logger.error(f"Failed to enhance section: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to enhance section: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/outline/optimize")
@@ -477,8 +477,8 @@ async def optimize_outline(outline_data: Dict[str, Any], focus: str = "general o
         optimized_outline = await service.optimize_outline_with_ai(outline, focus)
         return {"outline": [section.dict() for section in optimized_outline]}
     except Exception as e:
-        logger.error(f"Failed to optimize outline: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to optimize outline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/outline/rebalance")
@@ -490,8 +490,8 @@ async def rebalance_outline(outline_data: Dict[str, Any], target_words: int = 15
         rebalanced_outline = service.rebalance_word_counts(outline, target_words)
         return {"outline": [section.dict() for section in rebalanced_outline]}
     except Exception as e:
-        logger.error(f"Failed to rebalance outline: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to rebalance outline: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # Content Generation Endpoints
@@ -533,8 +533,8 @@ async def generate_section(
         
         return response
     except Exception as e:
-        logger.error(f"Failed to generate section: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to generate section: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/content/start")
@@ -572,8 +572,8 @@ async def start_content_generation(
         task_id = task_manager.start_content_generation_task(req, user_id)
         return {"task_id": task_id, "status": "started"}
     except Exception as e:
-        logger.error(f"Failed to start content generation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start content generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/content/status/{task_id}")
@@ -667,8 +667,8 @@ async def content_generation_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get content generation status for {task_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get content generation status for {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/section/{section_id}/continuity")
@@ -684,8 +684,8 @@ async def get_section_continuity(section_id: str) -> Dict[str, Any]:
         metrics = continuity.get(section_id)
         return {"section_id": section_id, "continuity_metrics": metrics}
     except Exception as e:
-        logger.error(f"Failed to get section continuity for {section_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get section continuity for {section_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/flow-analysis/basic")
@@ -697,8 +697,8 @@ async def analyze_flow_basic(request: Dict[str, Any], current_user: Dict[str, An
         result = await service.analyze_flow_basic(request)
         return result
     except Exception as e:
-        logger.error(f"Failed to perform basic flow analysis: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to perform basic flow analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/flow-analysis/advanced")
@@ -710,8 +710,8 @@ async def analyze_flow_advanced(request: Dict[str, Any], current_user: Dict[str,
         result = await service.analyze_flow_advanced(request)
         return result
     except Exception as e:
-        logger.error(f"Failed to perform advanced flow analysis: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to perform advanced flow analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/section/optimize", response_model=BlogOptimizeResponse)
@@ -750,8 +750,8 @@ async def optimize_section(
         
         return response
     except Exception as e:
-        logger.error(f"Failed to optimize section: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to optimize section: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # Quality Assurance Endpoints
@@ -761,8 +761,8 @@ async def hallucination_check(request: HallucinationCheckRequest) -> Hallucinati
     try:
         return await service.hallucination_check(request)
     except Exception as e:
-        logger.error(f"Failed to perform hallucination check: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to perform hallucination check: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # SEO Endpoints
@@ -785,8 +785,8 @@ async def seo_analyze(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to perform SEO analysis: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to perform SEO analysis: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/seo/metadata", response_model=BlogSEOMetadataResponse)
@@ -808,8 +808,8 @@ async def seo_metadata(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to generate SEO metadata: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to generate SEO metadata: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # Publishing Endpoints
@@ -822,8 +822,8 @@ async def publish(request: BlogPublishRequest) -> BlogPublishResponse:
     try:
         return await service.publish(request)
     except Exception as e:
-        logger.error(f"Failed to publish blog: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to publish blog: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # Cache Management Endpoints
@@ -833,8 +833,8 @@ async def get_cache_stats() -> Dict[str, Any]:
     try:
         return cache_manager.get_research_cache_stats()
     except Exception as e:
-        logger.error(f"Failed to get cache stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get cache stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/cache/clear")
@@ -843,8 +843,8 @@ async def clear_cache() -> Dict[str, Any]:
     try:
         return cache_manager.clear_research_cache()
     except Exception as e:
-        logger.error(f"Failed to clear cache: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to clear cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/cache/outline/stats")
@@ -853,8 +853,8 @@ async def get_outline_cache_stats():
     try:
         return cache_manager.get_outline_cache_stats()
     except Exception as e:
-        logger.error(f"Failed to get outline cache stats: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get outline cache stats: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.delete("/cache/outline/clear")
@@ -863,8 +863,8 @@ async def clear_outline_cache():
     try:
         return cache_manager.clear_outline_cache()
     except Exception as e:
-        logger.error(f"Failed to clear outline cache: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to clear outline cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/cache/outline/invalidate")
@@ -873,8 +873,8 @@ async def invalidate_outline_cache(request: Dict[str, List[str]]):
     try:
         return cache_manager.invalidate_outline_cache_for_keywords(request["keywords"])
     except Exception as e:
-        logger.error(f"Failed to invalidate outline cache: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to invalidate outline cache: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/cache/outline/entries")
@@ -883,8 +883,8 @@ async def get_outline_cache_entries(limit: int = 20):
     try:
         return cache_manager.get_recent_outline_cache_entries(limit)
     except Exception as e:
-        logger.error(f"Failed to get outline cache entries: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get outline cache entries: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ---------------------------
@@ -914,8 +914,8 @@ async def start_medium_generation(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to start medium generation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start medium generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/generate/medium/status/{task_id}")
@@ -1010,8 +1010,8 @@ async def medium_generation_status(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get medium generation status for {task_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get medium generation status for {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.post("/rewrite/start")
 async def start_blog_rewrite(request: Dict[str, Any]) -> Dict[str, Any]:
@@ -1020,8 +1020,8 @@ async def start_blog_rewrite(request: Dict[str, Any]) -> Dict[str, Any]:
         task_id = service.start_blog_rewrite(request)
         return {"task_id": task_id, "status": "started"}
     except Exception as e:
-        logger.error(f"Failed to start blog rewrite: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to start blog rewrite: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/rewrite/status/{task_id}")
 async def rewrite_status(task_id: str):
@@ -1034,8 +1034,8 @@ async def rewrite_status(task_id: str):
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get rewrite status for {task_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get rewrite status for {task_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/titles/generate-seo")
@@ -1118,8 +1118,8 @@ async def generate_seo_titles(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to generate SEO titles: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to generate SEO titles: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/introductions/generate")
@@ -1205,8 +1205,8 @@ async def generate_introductions(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to generate introductions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to generate introductions: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ---------------------------
@@ -1281,8 +1281,8 @@ async def save_complete_blog_asset(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to save complete blog asset: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to save complete blog asset: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/publish-history")
@@ -1332,8 +1332,128 @@ async def get_publish_history(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get publish history: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get publish history: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/analytics/summary")
+async def get_blog_analytics_summary(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Lightweight analytics summary powering the Blog Writer radial workflow hero.
+
+    Pure read aggregation over the current user's existing ContentAsset rows
+    (source_module=blog_writer) — no new tables, no schema changes. Feeds the
+    Plan / Create / Publish / Analysis / Engagement / Remarket wedge badges.
+    """
+    try:
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        user_id = str(current_user.get("id", ""))
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid user ID in authentication token")
+
+        svc = ContentAssetService(db)
+        assets, _ = svc.get_user_assets(
+            user_id=user_id,
+            source_module=AssetSource.BLOG_WRITER,
+            asset_type=AssetType.TEXT,
+            sort_by="created_at",
+            sort_order="desc",
+            limit=500,
+        )
+
+        now = datetime.utcnow()
+        seven_days_ago = now - timedelta(days=7)
+        thirty_days_ago = now - timedelta(days=30)
+        ninety_days_ago = now - timedelta(days=90)
+
+        research_sessions_7d = 0
+        drafts_in_progress = 0
+        published_30d = 0
+        platform_breakdown: Dict[str, int] = {}
+        seo_scores: List[float] = []
+        pending_recommendations = 0
+        refresh_candidates: List[Dict[str, Any]] = []
+        most_recent_draft: Optional[Dict[str, Any]] = None
+
+        # `assets` is already sorted created_at desc, so the first draft-phase
+        # asset encountered is the most recently touched one.
+        for asset in assets:
+            meta = asset.asset_metadata or {}
+            phase = meta.get("phase")
+            tags = asset.tags or []
+            created_at = asset.created_at
+
+            if created_at and created_at >= seven_days_ago:
+                research_sessions_7d += 1
+
+            if phase in ("outline", "content"):
+                drafts_in_progress += 1
+                if most_recent_draft is None:
+                    most_recent_draft = {
+                        "asset_id": asset.id,
+                        "title": asset.title,
+                        "phase": phase,
+                    }
+
+            is_published = "published" in tags or phase == "publish"
+            if is_published and created_at and created_at >= thirty_days_ago:
+                published_30d += 1
+                publish_data = meta.get("publish_data") or {}
+                platform = (publish_data.get("platform") if isinstance(publish_data, dict) else None) or "unknown"
+                platform_breakdown[platform] = platform_breakdown.get(platform, 0) + 1
+
+            seo_data = meta.get("seo_data")
+            seo_score = None
+            if isinstance(seo_data, dict):
+                seo_score = seo_data.get("seo_score")
+                recs = seo_data.get("recommendations") or []
+                if isinstance(recs, list):
+                    pending_recommendations += len(recs)
+            if isinstance(seo_score, (int, float)):
+                seo_scores.append(float(seo_score))
+
+            if is_published:
+                is_stale = bool(created_at and created_at <= ninety_days_ago)
+                is_low_score = isinstance(seo_score, (int, float)) and seo_score < 70
+                if is_stale or is_low_score:
+                    refresh_candidates.append({
+                        "asset_id": asset.id,
+                        "title": asset.title,
+                        "seo_score": seo_score,
+                        "published_at": created_at.isoformat() if created_at else None,
+                    })
+
+        # Lowest-scoring / stalest candidates first (None scores sort last).
+        refresh_candidates.sort(
+            key=lambda c: (c["seo_score"] is None, c["seo_score"] if c["seo_score"] is not None else 0)
+        )
+        refresh_candidates = refresh_candidates[:5]
+
+        avg_seo_score = round(sum(seo_scores) / len(seo_scores), 1) if seo_scores else None
+
+        return {
+            "success": True,
+            "research_sessions_7d": research_sessions_7d,
+            "drafts_in_progress": drafts_in_progress,
+            "published_30d": published_30d,
+            "platform_breakdown": platform_breakdown,
+            "avg_seo_score": avg_seo_score,
+            "analyzed_count": len(seo_scores),
+            "pending_seo_recommendations": pending_recommendations,
+            "refresh_candidates": refresh_candidates,
+            "most_recent_draft": most_recent_draft,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get blog analytics summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 # ---------------------------------------
@@ -1435,8 +1555,8 @@ async def create_blog_asset(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to create blog asset: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to create blog asset: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.put("/asset/{asset_id}", response_model=Dict[str, Any])
@@ -1509,8 +1629,8 @@ async def update_blog_asset(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to update blog asset {asset_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to update blog asset {asset_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/asset/{asset_id}", response_model=Dict[str, Any])
@@ -1536,8 +1656,8 @@ async def get_blog_asset(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get blog asset {asset_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to get blog asset {asset_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 def _asset_to_response(asset: Any, full: bool = False) -> Dict[str, Any]:

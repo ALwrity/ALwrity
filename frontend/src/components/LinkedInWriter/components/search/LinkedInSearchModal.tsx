@@ -1,15 +1,17 @@
-import React, { useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { LI_Z_KNOWLEDGE_CENTER } from "../../utils/linkedInStudioZIndex";
 
-import { LinkedInSearchFilterBar } from './LinkedInSearchFilterBar';
-import { LinkedInSearchResultsList } from './LinkedInSearchResultsList';
-import { LINKEDIN_SEARCH_PRIMARY } from './linkedinSearchConstants';
+import { LinkedInSearchFilterBar } from "./LinkedInSearchFilterBar";
+import { LinkedInSearchResultsList } from "./LinkedInSearchResultsList";
+import { LINKEDIN_SEARCH_PRIMARY } from "./linkedinSearchConstants";
 import type {
   LinkedInSearchCategory,
   LinkedInSearchErrorType,
   LinkedInSearchPaging,
   LinkedInSearchResultItem,
-} from './linkedinSearchTypes';
+} from "./linkedinSearchTypes";
+import { StudioModalCloseButton } from "../dashboard/StudioModalCloseButton";
 
 interface LinkedInSearchModalProps {
   open: boolean;
@@ -69,11 +71,11 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
     if (!open) return;
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === "Escape") onClose();
     };
 
-    document.addEventListener('keydown', handleEscape);
-    return () => document.removeEventListener('keydown', handleEscape);
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
   }, [open, onClose]);
 
   useEffect(() => {
@@ -90,13 +92,13 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
       aria-modal="true"
       aria-labelledby="linkedin-search-modal-title"
       style={{
-        position: 'fixed',
+        position: "fixed",
         inset: 0,
-        zIndex: 12000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.45)',
+        zIndex: LI_Z_KNOWLEDGE_CENTER,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(15, 23, 42, 0.45)",
         padding: 24,
       }}
       onClick={onClose}
@@ -106,32 +108,40 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
         tabIndex={-1}
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: '100%',
+          width: "100%",
           maxWidth: 960,
-          maxHeight: 'min(92vh, 800px)',
-          display: 'flex',
-          flexDirection: 'column',
-          background: '#ffffff',
+          maxHeight: "min(92vh, 800px)",
+          display: "flex",
+          flexDirection: "column",
+          background: "#ffffff",
           borderRadius: 16,
-          border: '2px solid #BCE0FD',
-          boxShadow: '0 24px 64px rgba(0, 0, 0, 0.18)',
-          overflow: 'hidden',
-          outline: 'none',
+          border: "2px solid #BCE0FD",
+          boxShadow: "0 24px 64px rgba(0, 0, 0, 0.18)",
+          overflow: "hidden",
+          outline: "none",
         }}
       >
         <div
           style={{
-            padding: '14px 20px',
-            borderBottom: '1px solid rgba(10, 102, 194, 0.12)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            padding: "14px 20px",
+            borderBottom: "1px solid rgba(10, 102, 194, 0.12)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             gap: 12,
             flexShrink: 0,
-            background: '#f8fbff',
+            background: "#f8fbff",
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              minWidth: 0,
+              flex: 1,
+            }}
+          >
             <SearchIconSmall />
             <h2
               id="linkedin-search-modal-title"
@@ -139,32 +149,16 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
                 margin: 0,
                 fontSize: 16,
                 fontWeight: 600,
-                color: '#1a1a2e',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
+                color: "#1a1a2e",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
-              {query || 'Search LinkedIn'}
+              {query || "Search LinkedIn"}
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close search"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              fontSize: 22,
-              lineHeight: 1,
-              cursor: 'pointer',
-              color: '#475569',
-              padding: 4,
-              flexShrink: 0,
-            }}
-          >
-            ✕
-          </button>
+          <StudioModalCloseButton onClick={onClose} ariaLabel="Close search" />
         </div>
 
         <LinkedInSearchFilterBar
@@ -173,7 +167,15 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
           disabled={loading}
         />
 
-        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
           <LinkedInSearchResultsList
             query={query}
             category={category}
@@ -191,6 +193,6 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 };

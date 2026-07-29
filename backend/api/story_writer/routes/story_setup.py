@@ -15,6 +15,7 @@ from models.story_models import (
     StoryScene,
     StoryStartRequest,
     StoryPremiseResponse,
+    TaskStatus,
     StoryIdeaEnhanceRequest,
     StoryIdeaEnhanceResponse,
     StoryIdeaEnhanceSuggestion,
@@ -25,6 +26,7 @@ from services.database import get_session_for_user
 from models.content_asset_models import ContentAsset, AssetType, AssetSource
 
 from ..utils.auth import require_authenticated_user
+from ..task_manager import task_manager
 
 
 router = APIRouter()
@@ -84,6 +86,8 @@ async def enhance_story_idea(
             user_id=user_id,
             fiction_variant=request.fiction_variant,
             narrative_energy=request.narrative_energy,
+            fiction_variant_description=request.fiction_variant_description,
+            narrative_energy_description=request.narrative_energy_description,
         )
 
         return StoryIdeaEnhanceResponse(
@@ -318,6 +322,52 @@ async def generate_outline(
         raise
     except Exception as exc:
         logger.error(f"[StoryWriter] Failed to generate outline: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.post("/generate-outline/start")
+async def start_outline_generation(
+    request: StoryStartRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Start an outline generation operation and return a task ID for polling."""
+    try:
+        user_id = require_authenticated_user(current_user)
+
+        if not request.premise or not request.premise.strip():
+            raise HTTPException(status_code=400, detail="Premise is required")
+
+        logger.info(f"[StoryWriter] Starting async outline generation for user {user_id}")
+
+        task_id = task_manager.start_outline_generation_task(request.dict(), user_id)
+        return {"task_id": task_id, "status": "started"}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"[StoryWriter] Failed to start outline generation: {exc}")
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/generate-outline/status/{task_id}", response_model=TaskStatus)
+async def get_outline_status(
+    task_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> TaskStatus:
+    """Get the status of an outline generation operation."""
+    try:
+        require_authenticated_user(current_user)
+
+        task_status = task_manager.get_task_status(task_id)
+        if not task_status:
+            raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+        return TaskStatus(**task_status)
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"[StoryWriter] Failed to get outline status: {exc}")
         raise HTTPException(status_code=500, detail=str(exc))
 
 

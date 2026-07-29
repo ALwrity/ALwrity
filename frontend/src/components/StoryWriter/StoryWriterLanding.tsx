@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Box, Button, Grid, Paper, Typography } from '@mui/material';
 import GlobalStyles from '@mui/material/GlobalStyles';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import FolderOpenIcon from '@mui/icons-material/FolderOpen';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import ImageIcon from '@mui/icons-material/Image';
 import VolumeUpIcon from '@mui/icons-material/VolumeUp';
 import VideoLibraryIcon from '@mui/icons-material/VideoLibrary';
+import { useNavigate } from 'react-router-dom';
 import { OptimizedVideo } from '../ImageStudio/dashboard/utils/OptimizedVideo';
 import { motion, AnimatePresence } from 'framer-motion';
 import { leftPageVariants, rightPageVariants } from './Phases/StoryOutlineParts/pageVariants';
@@ -61,6 +63,7 @@ export const StoryWriterLanding: React.FC<StoryWriterLandingProps> = ({ onStart,
   type FictionTemplate = 'short_fiction' | 'long_fiction' | 'anime_fiction' | 'experimental_fiction';
   type TemplateDetailKey = NonFictionTemplate | FictionTemplate | null;
 
+  const navigate = useNavigate();
   const [detailTemplate, setDetailTemplate] = useState<TemplateDetailKey>(null);
 
   const isDetailView = detailTemplate !== null;
@@ -1020,7 +1023,24 @@ export const StoryWriterLanding: React.FC<StoryWriterLandingProps> = ({ onStart,
         >
           Let’s ALwrity Your Story Journey
         </Button>
-          <Typography variant="body2" sx={{ color: '#5D4037' }}>
+        <Box sx={{ mt: 1.5 }}>
+          <Button
+            variant="text"
+            size="small"
+            startIcon={<FolderOpenIcon />}
+            onClick={() => navigate('/story-projects')}
+            sx={{
+              textTransform: 'none',
+              color: '#8D6E63',
+              fontWeight: 500,
+              fontSize: '0.85rem',
+              '&:hover': { color: '#5D4037', backgroundColor: 'transparent' },
+            }}
+          >
+            Browse My Saved Projects
+          </Button>
+        </Box>
+        <Typography variant="body2" sx={{ color: '#5D4037', mt: 1 }}>
           Tap once to open the book. Inputs appear after AI drafts your campaign-ready foundation.
         </Typography>
       </Box>

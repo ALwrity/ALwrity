@@ -1,5 +1,5 @@
 import React, { useState, useEffect, Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Box, CircularProgress, Typography } from '@mui/material';
 import { ClerkProvider, useAuth } from '@clerk/clerk-react';
 import ProtectedRoute from './components/shared/ProtectedRoute';
@@ -14,8 +14,9 @@ import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
 import PricingPage from './components/Pricing/PricingPage';
 import ContactPage from './components/Landing/ContactPage';
+import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
 
-// ─── Lazy loaded route components ───────────────────────────────────────────
+// ΓöÇΓöÇΓöÇ Lazy loaded route components ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Default exports
 const Wizard = React.lazy(() => import('./components/OnboardingWizard/Wizard'));
 const MainDashboard = React.lazy(() => import('./components/MainDashboard/MainDashboard'));
@@ -37,6 +38,16 @@ const WizardWithNavigate = () => {
   const navigate = useNavigate();
   return <Wizard onComplete={() => navigate('/dashboard')} />;
 };
+
+const LinkedInWriterLegacyRedirect = () => {
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{ pathname: '/linkedin-studio', search: location.search, hash: location.hash }}
+      replace
+    />
+  );
+};
 const WordPressCallbackPage = React.lazy(() => import('./components/WordPressCallbackPage/WordPressCallbackPage'));
 const BingCallbackPage = React.lazy(() => import('./components/BingCallbackPage/BingCallbackPage'));
 const BingAnalyticsStorage = React.lazy(() => import('./components/BingAnalyticsStorage/BingAnalyticsStorage'));
@@ -51,7 +62,7 @@ const GSCAuthCallback = React.lazy(() => import('./components/SEODashboard/compo
 const YouTubeCallbackPage = React.lazy(() => import('./components/YouTubeCreator/YouTubeCallbackPage'));
 const ErrorBoundaryTest = React.lazy(() => import('./components/shared/ErrorBoundaryTest'));
 
-// Named exports — need .then() wrapper to resolve default
+// Named exports ΓÇö need .then() wrapper to resolve default
 const StoryProjectList = React.lazy(() => import('./components/StoryWriter/StoryProjectList').then(m => ({ default: m.StoryProjectList })));
 
 // ImageStudio barrel (10 named exports)
@@ -91,6 +102,9 @@ const ProductAvatarStudio = React.lazy(() => import('./components/ProductMarketi
 // BacklinkOutreach barrel (1 export)
 const BacklinkOutreachDashboard = React.lazy(() => import('./components/BacklinkOutreach').then(m => ({ default: m.BacklinkOutreachDashboard })));
 
+// GifMaker ΓÇö standalone, zero ALwrity dependencies
+const GifMakerPage = React.lazy(() => import('./components/GifMaker').then(m => ({ default: m.GifMaker })));
+
 // Root route that chooses Landing (signed out) or InitialRouteHandler (signed in)
 const RootRoute: React.FC = () => {
   const { isSignedIn } = useAuth();
@@ -121,6 +135,23 @@ const App: React.FC = () => {
   // Initialize app - loading state will be managed by InitialRouteHandler
   useEffect(() => {
     setLoading(false);
+  }, []);
+
+  // GIF Maker floating overlay state
+  const [showGifMaker, setShowGifMaker] = useState(false);
+
+  // Listen for global open-gif-maker event
+  useEffect(() => {
+    console.log('[GIF] Mounting event listener for open-gif-maker');
+    const handler = () => {
+      console.log('[GIF] open-gif-maker event received');
+      setShowGifMaker(true);
+    };
+    window.addEventListener('open-gif-maker', handler);
+    return () => {
+      console.log('[GIF] Removing event listener for open-gif-maker');
+      window.removeEventListener('open-gif-maker', handler);
+    };
   }, []);
 
   // Listen for CopilotKit key updates
@@ -206,10 +237,11 @@ const App: React.FC = () => {
                     <Route path="/backlink-outreach" element={<ProtectedRoute><FeatureRoute feature="backlinking"><BacklinkOutreachDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/content-planning" element={<ProtectedRoute><FeatureRoute feature="content-planning"><ContentPlanningDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/facebook-writer" element={<ProtectedRoute><FeatureRoute feature="facebook"><FacebookWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/linkedin-writer" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/linkedin-studio" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/linkedin-writer" element={<LinkedInWriterLegacyRedirect />} />
                     <Route path="/blog-writer" element={<ProtectedRoute><FeatureRoute feature="blog_writer"><BlogWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
-                    <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/story-projects" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryProjectList /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/youtube-creator" element={<ProtectedRoute><FeatureRoute feature="youtube"><YouTubeCreator /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/podcast-maker" element={<ProtectedRoute><FeatureRoute feature="podcast"><PodcastDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/image-studio" element={<ProtectedRoute><FeatureRoute feature="image"><ImageStudioDashboard /></FeatureRoute></ProtectedRoute>} />
@@ -257,15 +289,22 @@ const App: React.FC = () => {
                     <Route path="/intent-research" element={<FeatureRoute feature="research"><IntentResearchTest /></FeatureRoute>} />
                     <Route path="/wix-test" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
                     <Route path="/wix-test-direct" element={<FeatureRoute feature="wix"><WixTestPage /></FeatureRoute>} />
-                    {/* Auth callbacks — always accessible (needed for OAuth flow) */}
+                    {/* Auth callbacks ΓÇö always accessible (needed for OAuth flow) */}
                     <Route path="/wix/callback" element={<WixCallbackPage />} />
                     <Route path="/wp/callback" element={<WordPressCallbackPage />} />
                     <Route path="/gsc/callback" element={<GSCAuthCallback />} />
                     <Route path="/bing/callback" element={<BingCallbackPage />} />
                     <Route path="/youtube/callback" element={<YouTubeCallbackPage />} />
                     <Route path="/bing-analytics-storage" element={<ProtectedRoute><FeatureRoute feature="bing"><BingAnalyticsStorage /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/gif-maker" element={<ProtectedRoute><GifMakerPage apiBaseUrl={process.env.REACT_APP_API_URL || ''} maxFrames={30} /></ProtectedRoute>} />
               </Routes>
             </Suspense>
+
+            {/* GifMakerFloatingPanel ΓÇö outside Suspense so it's never replaced by fallback */}
+            <GifMakerFloatingPanel
+              open={showGifMaker}
+              onClose={() => setShowGifMaker(false)}
+            />
           </ConditionalCopilotKit>
         </AuthenticatedCopilotWrapper>
       </Router>

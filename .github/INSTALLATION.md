@@ -74,7 +74,6 @@ cp env_template.txt .env
 
 # Initialize database
 python scripts/create_subscription_tables.py
-python scripts/cleanup_alpha_plans.py
 
 # Return to root
 cd ..
@@ -182,7 +181,6 @@ cd frontend
 ```bash
 cd backend
 python scripts/create_subscription_tables.py
-python scripts/cleanup_alpha_plans.py
 ```
 
 ### **Issue 6: "Port Already in Use"**

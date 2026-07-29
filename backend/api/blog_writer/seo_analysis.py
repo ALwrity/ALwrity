@@ -7,7 +7,7 @@ and CopilotKit integration for real-time progress updates.
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from loguru import logger
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -148,8 +148,8 @@ async def analyze_blog_seo(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"SEO analysis endpoint error: {e}")
-        raise HTTPException(status_code=500, detail=f"SEO analysis failed: {str(e)}")
+        logger.error(f"SEO analysis endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.post("/analyze-with-progress")
@@ -292,7 +292,7 @@ async def analyze_blog_seo_with_progress(
                 yield analysis_results
                 
             except Exception as e:
-                logger.error(f"Progress generator error: {e}")
+                logger.error(f"Progress generator error: {e}", exc_info=True)
                 yield SEOAnalysisProgress(
                     analysis_id=analysis_id,
                     stage="error",
@@ -307,8 +307,8 @@ async def analyze_blog_seo_with_progress(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"SEO analysis with progress endpoint error: {e}")
-        raise HTTPException(status_code=500, detail=f"SEO analysis failed: {str(e)}")
+        logger.error(f"SEO analysis with progress endpoint error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/analysis/{analysis_id}")
@@ -353,8 +353,8 @@ async def get_analysis_result(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Get analysis result error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve analysis result: {str(e)}")
+        logger.error(f"Get analysis result error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 @router.get("/health")

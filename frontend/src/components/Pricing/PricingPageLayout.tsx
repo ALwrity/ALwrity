@@ -51,7 +51,7 @@ const PricingPageLayout: React.FC<PricingPageLayoutProps> = ({ children }) => {
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: '#FFFFFF', color: '#1a1a2e' }}>
       <LandingNav surface="light" />
-      <Box component="main" sx={{ pt: { xs: 10, md: 12 }, pb: { xs: 4, md: 6 } }}>
+      <Box component="main" sx={{ pt: { xs: 8.4, md: 12 }, pb: { xs: 4, md: 6 } }}>
         {children}
       </Box>
       <LandingFooter surface="light" />

@@ -1,5 +1,10 @@
 import React from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Paper, TextField, Typography } from '@mui/material';
+import { renderMarkdown } from '../../../../utils/markdown';
+import { modalPaperSx } from './modalStyles';
+
+import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
 
 interface EditSectionModalProps {
   open: boolean;
@@ -14,6 +19,10 @@ interface EditSectionModalProps {
   onPickSuggestion: (index: number) => void;
   onClose: () => void;
   onSave: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
 }
 
 const EditSectionModal: React.FC<EditSectionModalProps> = ({
@@ -29,6 +38,10 @@ const EditSectionModal: React.FC<EditSectionModalProps> = ({
   onPickSuggestion,
   onClose,
   onSave,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
 }) => {
   return (
     <Dialog
@@ -37,12 +50,7 @@ const EditSectionModal: React.FC<EditSectionModalProps> = ({
       maxWidth="md"
       fullWidth
       PaperProps={{
-        sx: {
-          backgroundColor: '#fff',
-          borderRadius: 2,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-          border: '1px solid rgba(0,0,0,0.06)',
-        },
+        sx: modalPaperSx,
       }}
     >
       <DialogTitle>Edit Section (Scene {sceneNumber})</DialogTitle>
@@ -77,9 +85,10 @@ const EditSectionModal: React.FC<EditSectionModalProps> = ({
                   <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
                     Suggestion {i + 1}
                   </Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                    {s}
-                  </Typography>
+                  <Box
+                    className="rendered-content"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(s) }}
+                  />
                   <Box sx={{ mt: 1, display: 'flex', justifyContent: 'flex-end' }}>
                     <Button size="small" variant="text" onClick={() => onPickSuggestion(i)}>
                       Use this
@@ -91,11 +100,25 @@ const EditSectionModal: React.FC<EditSectionModalProps> = ({
           )}
         </Box>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
-        <Button variant="contained" onClick={onSave}>
-          Save & Update
-        </Button>
+      <DialogActions sx={{ justifyContent: 'space-between' }}>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          {onUndo && (
+            <Button size="small" onClick={onUndo} disabled={!canUndo} startIcon={<UndoIcon />} title="Undo (Ctrl+Z)">
+              Undo
+            </Button>
+          )}
+          {onRedo && (
+            <Button size="small" onClick={onRedo} disabled={!canRedo} startIcon={<RedoIcon />} title="Redo (Ctrl+Shift+Z)">
+              Redo
+            </Button>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button variant="contained" onClick={onSave}>
+            Save & Update
+          </Button>
+        </Box>
       </DialogActions>
     </Dialog>
   );

@@ -8,7 +8,7 @@ from fastapi import HTTPException, status
 from loguru import logger
 from sqlalchemy.orm import Session
 
-from services.database import get_db
+from services.database import get_session_for_user
 from services.user_workspace_manager import UserWorkspaceManager
 
 
@@ -61,11 +61,14 @@ def _get_workspace_path(user_id: str, db: Optional[Session] = None) -> Optional[
         return None
 
     session = db
-    db_gen = None
+    own_session = False
     try:
         if session is None:
-            db_gen = get_db()
-            session = next(db_gen)
+            session = get_session_for_user(user_id)
+            if session is None:
+                logger.warning(f"[StoryWriter] Could not open database session for {user_id}")
+                return None
+            own_session = True
 
         workspace_manager = UserWorkspaceManager(session)
         workspace = workspace_manager.get_user_workspace(user_id)
@@ -74,14 +77,9 @@ def _get_workspace_path(user_id: str, db: Optional[Session] = None) -> Optional[
     except Exception as exc:
         logger.warning(f"[StoryWriter] Failed to resolve workspace for {user_id}: {exc}")
     finally:
-        if db is None and session is not None:
+        if own_session and session is not None:
             try:
                 session.close()
-            except Exception:
-                pass
-        if db_gen is not None:
-            try:
-                db_gen.close()
             except Exception:
                 pass
 

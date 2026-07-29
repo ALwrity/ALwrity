@@ -82,7 +82,7 @@ def _summaries_usage_status(summaries: list) -> str:
         try:
             st = s.usage_status.value
         except Exception:
-            st = str(s.usage_status)
+            st = 'active'
         if st == 'limit_reached':
             return 'limit_reached'
         if st == 'warning' and status != 'limit_reached':
@@ -138,7 +138,7 @@ def get_all_historical_usage(user_id: str, db: Session, pricing_service) -> Dict
         try:
             status_val = s.usage_status.value
         except Exception:
-            status_val = str(s.usage_status)
+            status_val = 'active'
         historical_breakdown.append({
             'billing_period': s.billing_period,
             'total_calls': s.total_calls or 0,
@@ -190,7 +190,7 @@ def get_current_period_usage(user_id: str, db: Session, pricing_service) -> Dict
     try:
         status_val = summary.usage_status.value
     except Exception:
-        status_val = str(summary.usage_status)
+        status_val = 'active'
 
     return {
         'billing_period': current_period,
@@ -232,7 +232,7 @@ def get_usage_for_period(user_id: str, billing_period: str, db: Session, pricing
     try:
         status_val = summary.usage_status.value
     except Exception:
-        status_val = str(summary.usage_status)
+        status_val = 'active'
 
     return {
         'billing_period': billing_period,

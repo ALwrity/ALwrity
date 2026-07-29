@@ -1,4 +1,4 @@
-import { aiApiClient, pollingApiClient } from "../api/client";
+import { aiApiClient, longRunningApiClient, pollingApiClient } from "../api/client";
 
 /**
  * Story Writer API Service
@@ -60,6 +60,8 @@ export interface StoryIdeaEnhanceRequest {
   } | null;
   fiction_variant?: string | null;
   narrative_energy?: string | null;
+  fiction_variant_description?: string | null;
+  narrative_energy_description?: string | null;
 }
 
 export interface StoryIdeaEnhanceSuggestion {
@@ -221,12 +223,15 @@ export interface StoryContinueResponse {
 
 export interface TaskStatus {
   task_id: string;
-  status: "pending" | "processing" | "completed" | "failed";
+  status: 'pending' | 'running' | 'completed' | 'failed';
   progress?: number;
   message?: string;
+  progress_messages: Array<{ timestamp: string; message: string }>;
   result?: any;
   error?: string;
-  created_at?: string;
+  error_status?: number;
+  error_data?: any;
+  created_at: string;
   updated_at?: string;
 }
 
@@ -472,7 +477,7 @@ class StoryWriterApi {
    * Generate a story premise
    */
   async generatePremise(request: StoryGenerationRequest): Promise<StoryPremiseResponse> {
-    const response = await aiApiClient.post<StoryPremiseResponse>(
+    const response = await longRunningApiClient.post<StoryPremiseResponse>(
       "/api/story/generate-premise",
       request
     );
@@ -492,9 +497,38 @@ class StoryWriterApi {
       premise: premise,
       outline: [], // Empty outline for outline generation
     };
-    const response = await aiApiClient.post<StoryOutlineResponse>(
+    const response = await longRunningApiClient.post<StoryOutlineResponse>(
       `/api/story/generate-outline`,
       outlineRequest
+    );
+    return response.data;
+  }
+
+  /**
+   * Start an outline generation operation asynchronously (returns task_id for polling)
+   */
+  async startOutlineGeneration(
+    premise: string,
+    request: StoryGenerationRequest
+  ): Promise<{ task_id: string; status: string }> {
+    const outlineRequest: StoryStartRequest = {
+      ...request,
+      premise: premise,
+      outline: [],
+    };
+    const response = await aiApiClient.post<{ task_id: string; status: string }>(
+      `/api/story/generate-outline/start`,
+      outlineRequest
+    );
+    return response.data;
+  }
+
+  /**
+   * Poll the status of an outline generation task
+   */
+  async pollOutlineTaskStatus(taskId: string): Promise<TaskStatus> {
+    const response = await pollingApiClient.get<TaskStatus>(
+      `/api/story/generate-outline/status/${taskId}`
     );
     return response.data;
   }
@@ -513,7 +547,7 @@ class StoryWriterApi {
       premise,
       outline,
     };
-    const response = await aiApiClient.post<StoryContentResponse>(
+    const response = await longRunningApiClient.post<StoryContentResponse>(
       `/api/story/generate-start`,
       requestBody
     );
@@ -524,7 +558,7 @@ class StoryWriterApi {
    * Continue writing a story
    */
   async continueStory(request: StoryContinueRequest): Promise<StoryContinueResponse> {
-    const response = await aiApiClient.post<StoryContinueResponse>(
+    const response = await longRunningApiClient.post<StoryContinueResponse>(
       "/api/story/continue",
       request
     );
@@ -593,7 +627,7 @@ class StoryWriterApi {
    * Generate images for story scenes
    */
   async generateSceneImages(request: StoryImageGenerationRequest): Promise<StoryImageGenerationResponse> {
-    const response = await aiApiClient.post<StoryImageGenerationResponse>(
+    const response = await longRunningApiClient.post<StoryImageGenerationResponse>(
       "/api/story/generate-images",
       request
     );
@@ -604,7 +638,7 @@ class StoryWriterApi {
    * Animate a single scene image into a short video preview
    */
   async animateScene(request: AnimateSceneRequest): Promise<AnimateSceneResponse> {
-    const response = await aiApiClient.post<AnimateSceneResponse>(
+    const response = await longRunningApiClient.post<AnimateSceneResponse>(
       "/api/story/animate-scene-preview",
       request
     );
@@ -1032,6 +1066,47 @@ class StoryWriterApi {
     const cleanBaseURL = baseURL.endsWith('/') ? baseURL.slice(0, -1) : baseURL;
     const cleanVideoUrl = videoUrl.startsWith('/') ? videoUrl : `/${videoUrl}`;
     return `${cleanBaseURL}${cleanVideoUrl}`;
+  }
+
+  /**
+   * Export the full story package as a ZIP archive containing the story text,
+   * scene images, audio narration, and generated video (if available).
+   */
+  async exportStoryPackage(payload: {
+    story_title: string;
+    story_setup?: Record<string, any>;
+    outline?: any;
+    story_content: string;
+    scene_media: {
+      scene_images: Record<string, string>;
+      scene_audio: Record<string, string>;
+    };
+    story_video?: string | null;
+  }) {
+    return aiApiClient.post('/api/story/export-package', payload, {
+      responseType: 'blob',
+      timeout: 120000,
+    });
+  }
+
+  /**
+   * Export the story as a PDF containing metadata, full story text, and scene images.
+   */
+  async exportStoryPdf(payload: {
+    story_title: string;
+    story_setup?: Record<string, any>;
+    outline?: any;
+    story_content: string;
+    scene_media: {
+      scene_images: Record<string, string>;
+      scene_audio: Record<string, string>;
+    };
+    story_video?: string | null;
+  }) {
+    return aiApiClient.post('/api/story/export-pdf', payload, {
+      responseType: 'blob',
+      timeout: 120000,
+    });
   }
 }
 

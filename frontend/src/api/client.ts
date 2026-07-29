@@ -71,14 +71,7 @@ const isLinkedInConnection401 = (error: any): boolean => {
       )
     ) ||
     detail.includes('missing_credentials') ||
-    detail.includes('missing credentials') ||
-    (
-      detail.includes('unipile') &&
-      (
-        detail.includes('not connected') ||
-        detail.includes('invalid credentials')
-      )
-    )
+    detail.includes('missing credentials')
   );
 };
 

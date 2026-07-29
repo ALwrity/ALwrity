@@ -496,7 +496,7 @@ SEO ANALYSIS RESULTS:
         content_preview = self._extract_content_highlights(blog_content)
         
         prompt = f"""
-Generate comprehensive, personalized SEO metadata for this blog post.
+Generate comprehensive, personalized SEO metadata for this blog post. 
 
 === BLOG CONTENT CONTEXT ===
 TITLE: {blog_title}
@@ -563,6 +563,7 @@ INDUSTRY: {industry}
 - Use language appropriate for {target_audience} audience
 - Optimize for {search_intent} search intent
 - Make descriptions compelling and action-oriented
+- Metadata should reflect current context (you are generating for {datetime.now().year}), but avoid stating the year unless the content itself is year-specific
 
 Generate metadata that is personalized, compelling, and SEO-optimized.
 """

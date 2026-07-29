@@ -1,6 +1,8 @@
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 from loguru import logger
+from pydantic import BaseModel, Field
 
 from models.content_asset_models import AssetSource
 from models.linkedin_brainstorm_saved_ideas_db_models import BrainstormSavedIdeaDB
@@ -180,99 +182,82 @@ async def gather_personalization_data(
 
 def format_personalized_prompt(data: dict, count: int, seed: str = "") -> str:
     """Build the LLM prompt from gathered data."""
-    parts: list[str] = []
+    parts: list[str] = [f"TODAY'S DATE: {_PERSONALIZED_TODAY}"]
 
     if seed:
-        parts.append(f"Generate LinkedIn content angle ideas based on the seed topic AND the user's personal data below.")
-        parts.append(f"\n## Seed Topic\n{seed}")
-    else:
-        parts.append("Generate personalized LinkedIn content angle ideas based on the following user data.")
+        parts.append(f"SEED TOPIC: {seed}")
 
     if data.get("connected") and data.get("profile"):
         p = data["profile"]
-        parts.append(f"\n## User Profile\nName: {p.get('name', 'N/A')}\nHeadline: {p.get('headline', 'N/A')}\nIndustry: {p.get('industry', 'N/A')}\nTitle: {p.get('title', 'N/A')}")
+        parts.append(f"User profile: {p.get('name', 'N/A')} | {p.get('headline', 'N/A')} | {p.get('industry', 'N/A')}")
 
     if data.get("profile_intelligence"):
         pi = data["profile_intelligence"]
-        parts.append(f"\n## Communication Style\n{pi.get('communication_style', 'N/A')}")
-        parts.append(f"\n## Brand Positioning\n{pi.get('brand_positioning', 'N/A')}")
-        opps = pi.get("writing_opportunities", [])
-        if opps:
-            parts.append(f"\n## Writing Opportunities\n" + "\n".join(f"- {o}" for o in opps))
+        parts.append(f"Style: {pi.get('communication_style', 'N/A')}")
+        parts.append(f"Brand: {pi.get('brand_positioning', 'N/A')}")
 
     if data.get("growth_insights"):
         gi = data["growth_insights"]
-        topics = gi.get("trending", [])
-        if topics:
-            parts.append(f"\n## Trending Topics\n" + "\n".join(f"- {t['topic']}: {t.get('why_now', '')}" for t in topics))
-        patterns = gi.get("viral_patterns", [])
-        if patterns:
-            parts.append(f"\n## Viral Content Patterns\n" + "\n".join(f"- {p['name']}: {p.get('description', '')}" for p in patterns))
-        gaps = gi.get("content_gaps", [])
-        if gaps:
-            parts.append(f"\n## Content Gaps\n" + "\n".join(f"- {g['topic']}: angle → {g.get('angle', '')}" for g in gaps))
+        for t in gi.get("trending", []):
+            parts.append(f"Trending: {t['topic']} — {t.get('why_now', '')}")
+        for p in gi.get("viral_patterns", []):
+            parts.append(f"Viral pattern: {p['name']} — {p.get('description', '')}")
+        for g in gi.get("content_gaps", []):
+            parts.append(f"Content gap: {g['topic']} — angle: {g.get('angle', '')}")
 
     if data.get("watchdog"):
-        parts.append(f"\n## Industry Watchdog (recent updates)\n" + "\n".join(f"- [{w['category']}] {w['title']}: {w.get('summary', '')}" for w in data["watchdog"]))
+        for w in data["watchdog"]:
+            parts.append(f"[{w['category']}] {w['title']}: {w.get('summary', '')}")
 
     if data.get("asset_library"):
-        parts.append(f"\n## Recently Generated Content\n" + "\n".join(f"- {a['title'] or '(untitled)'} ({a.get('content_type', a['type'])})" for a in data["asset_library"]))
-        titles = [a['title'] for a in data["asset_library"] if a.get('title')]
-        if titles:
-            parts.append(f"\n## Your Writing Style\nTitles from your recent content — generate new titles that sound like they came from the same author:\n" + "\n".join(f"- \"{t}\"" for t in titles[:8]))
+        for a in data["asset_library"]:
+            parts.append(f"Past content: {a['title'] or '(untitled)'} ({a.get('content_type', a['type'])})")
 
     if data.get("saved_ideas"):
-        parts.append(f"\n## Saved Brainstorm Ideas\n" + "\n".join(f"- {s['prompt']}" for s in data["saved_ideas"]))
+        for s in data["saved_ideas"]:
+            parts.append(f"Saved idea: {s['prompt']}")
 
-    has_style_ref = bool(data.get("asset_library") and any(a.get("title") for a in data["asset_library"]))
-    voice_guidance = (
-        "Match the tone, depth, and structure of the user's existing content shown above. "
-        "Each title should feel like a natural next post from this author — not a generic viral template."
-    ) if has_style_ref else (
-        "Each title must feel like an actual LinkedIn post someone would click — specific, "
-        "opinionated, or tactical. Avoid generic phrases like 'the importance of', "
-        "'how to master', or 'why you should'."
-    )
-
-    source_hint = ", ".join(data.get("sources", [])) or "no sources"
+    source_hint = ", ".join(data.get("sources", [])) or "general knowledge"
     parts.append(f"""
-TASK:
-Propose {count} specific, actionable LinkedIn content angle ideas tailored to this user.
-{voice_guidance}
+Generate exactly {count} LinkedIn content angles in JSON.
 
-Each idea should include:
-- title: A concise headline for the content angle
-- rationale: 1–2 sentences explaining why this angle fits this specific user (their style, brand, past content, or industry position)
-- suggested_hook: A sample opening sentence that could grab attention
-- data_source: Which data source inspired this idea — one of "{source_hint}"
+Each angle must be a JSON object with these fields:
+- title: short, specific headline (5-15 words, no markdown, no emojis)
+- rationale: 1-2 sentences why this fits this specific user
+- suggested_hook: sample opening sentence that grabs attention
+- data_source: which source inspired this — one of: {source_hint}
 
-Return valid JSON with an array named "ideas".""")
+Rules:
+- Every title should sound like it could have been written by the user, not a generic template.
+- Avoid: the importance of, how to master, why you should, unlocking.
+- Use TODAY'S DATE to make angles timely.""")
     return "\n".join(parts)
 
+
+_PERSONALIZED_TODAY = date.today().strftime("%B %d, %Y")
 
 PERSONALIZED_SYSTEM_PROMPT = (
     "You are a LinkedIn content strategist who studies the user's existing writing style "
     "and generates new ideas that extend their voice — not generic viral templates. "
     "Every title should sound like it could have been written by the user. "
     "Avoid empty platitudes ('the importance of', 'how to master', 'why you should'). "
-    "Instead use specific details, opinions, or frameworks the user would genuinely share."
+    "Instead use specific details, opinions, or frameworks the user would genuinely share. "
+    f"Today's date is {_PERSONALIZED_TODAY}. Ensure all ideas feel current as of this date."
 )
+
+class PersonalizedIdeaOutputItem(BaseModel):
+    title: str = Field(..., description="A concise headline for the content angle")
+    rationale: str = Field(..., description="1-2 sentences explaining why this angle fits this specific user")
+    suggested_hook: str = Field("", description="A sample opening sentence that could grab attention")
+    data_source: str = Field(..., description="Which data source inspired this idea")
+
 
 PERSONALIZED_JSON_STRUCT = {
     "type": "object",
     "properties": {
         "ideas": {
             "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string"},
-                    "rationale": {"type": "string"},
-                    "suggested_hook": {"type": "string"},
-                    "data_source": {"type": "string"},
-                },
-                "required": ["title", "rationale", "data_source"],
-            },
+            "items": PersonalizedIdeaOutputItem.model_json_schema(),
         }
     },
 }

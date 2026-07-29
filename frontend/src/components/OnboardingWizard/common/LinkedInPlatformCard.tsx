@@ -1,6 +1,6 @@
 /**
 
- * LinkedIn Platform Card — Growth Engine social connection (Zernio OAuth).
+ * LinkedIn Platform Card — Growth Engine social connection (Unipile OAuth).
 
  */
 

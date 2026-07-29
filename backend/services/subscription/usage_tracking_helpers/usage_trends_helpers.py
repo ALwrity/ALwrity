@@ -120,17 +120,17 @@ def self_heal_summaries_from_logs(db: Any, user_id: str, periods: List[str], sum
                     tokens_attr = f"{provider_name}_tokens"
 
                     if hasattr(summary, calls_attr):
-                        current_val = getattr(summary, calls_attr, 0)
+                        current_val = getattr(summary, calls_attr, 0) or 0
                         if current_val < data["calls"]:
                             setattr(summary, calls_attr, data["calls"])
 
                     if hasattr(summary, cost_attr):
-                        current_val = getattr(summary, cost_attr, 0.0)
+                        current_val = getattr(summary, cost_attr, 0.0) or 0.0
                         if (float(data["cost"]) - current_val) > 0.000001:
                             setattr(summary, cost_attr, data["cost"])
 
                     if hasattr(summary, tokens_attr):
-                        current_val = getattr(summary, tokens_attr, 0)
+                        current_val = getattr(summary, tokens_attr, 0) or 0
                         if current_val < data["tokens"]:
                             setattr(summary, tokens_attr, data["tokens"])
 
@@ -161,6 +161,8 @@ def build_usage_trends_response(periods: List[str], summary_dict: Dict[str, Any]
     }
 
     for provider in APIProvider:
+        if provider == APIProvider.HUGGINGFACE:
+            continue
         provider_name = provider.value
         trends["provider_trends"][provider_name] = {"calls": [], "cost": [], "tokens": []}
 
@@ -172,6 +174,8 @@ def build_usage_trends_response(periods: List[str], summary_dict: Dict[str, Any]
             trends["total_tokens"].append(summary.total_tokens or 0)
 
             for provider in APIProvider:
+                if provider == APIProvider.HUGGINGFACE:
+                    continue
                 provider_name = provider.value
                 trends["provider_trends"][provider_name]["calls"].append(
                     getattr(summary, f"{provider_name}_calls", 0) or 0
@@ -187,6 +191,8 @@ def build_usage_trends_response(periods: List[str], summary_dict: Dict[str, Any]
             trends["total_cost"].append(0.0)
             trends["total_tokens"].append(0)
             for provider in APIProvider:
+                if provider == APIProvider.HUGGINGFACE:
+                    continue
                 provider_name = provider.value
                 trends["provider_trends"][provider_name]["calls"].append(0)
                 trends["provider_trends"][provider_name]["cost"].append(0.0)

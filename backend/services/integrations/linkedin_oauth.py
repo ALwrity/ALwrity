@@ -1,7 +1,7 @@
 """
 LinkedIn OAuth / credential service for Growth Engine.
 
-Supports Zernio per-user profiles + OAuth connect and native LinkedIn OAuth tokens,
+Supports Unipile hosted auth and native LinkedIn OAuth tokens,
 with Fernet encryption and per-user SQLite.
 """
 
@@ -9,37 +9,26 @@ from __future__ import annotations
 
 import base64
 import hashlib
-import json
 import os
 import secrets
 import sqlite3
+import time
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Mapping, Optional, Tuple
-from urllib.parse import quote, unquote, urlencode, urlparse
+from typing import Any, Dict, List, Optional, Tuple
+from urllib.parse import quote, urlencode, urlparse
 
 import requests
 from loguru import logger
 
 from services.integrations.oauth_provider_base import OAuthProviderBase, resolve_encryption_key
+from services.integrations.linkedin.oauth_schema_migrations import (
+    ensure_linkedin_oauth_token_columns,
+    existing_token_encryption_columns,
+    normalize_unipile_provider_mode,
+)
 from services.integrations.linkedin.types import (
     LinkedInCredentials,
     LinkedInNotConnectedError,
-)
-from services.integrations.linkedin.zernio_client import (
-    account_id_from_item,
-    account_name_from_item,
-    account_type_from_item,
-    create_profile_sync,
-    get_connect_url_sync,
-    parse_select_linkedin_account_response,
-    select_linkedin_organization_sync,
-    zernio_base_url,
-    _parse_account_items,
-)
-from services.integrations.linkedin.account_resolution import (
-    fetch_linkedin_account_items,
-    partition_zernio_account_items,
-    summarize_zernio_account_items,
 )
 
 _PLACEHOLDER_BACKEND_URL_TOKENS = ("your-backend-ngrok", "example.com", "placeholder")
@@ -67,20 +56,17 @@ def _is_localhost_origin(origin: str) -> bool:
 
 
 class LinkedInOAuthService(OAuthProviderBase):
-    """Manages LinkedIn Growth Engine credentials (Zernio, Unipile, or native OAuth).
+    """Manages LinkedIn Growth Engine credentials (Unipile or native OAuth).
 
     Inherits Fernet token encryption and per-user DB path resolution from
-    OAuthProviderBase (commits e383d08c / 1ca38b01 / 386f7813). Overrides
-    only the migration method: LinkedIn stores a Zernio API key alongside
-    the LinkedIn access/refresh tokens, so the standard 2-column
-    migration doesn't fit and we use a 3-column variant here.
+    OAuthProviderBase.
     """
 
     _TOKEN_SELECT_COLUMNS = """
-        id, user_id, provider_mode, zernio_api_key, zernio_account_id,
-        zernio_org_account_id, linkedin_access_token, linkedin_refresh_token,
+        id, user_id, provider_mode,
+        linkedin_access_token, linkedin_refresh_token,
         expires_at, account_name, profile_urn, is_active, created_at, updated_at,
-        zernio_profile_id, unipile_account_id, unipile_org_account_id
+        unipile_account_id, unipile_org_account_id
     """
 
     def __init__(self, db_path: Optional[str] = None):
@@ -105,9 +91,6 @@ class LinkedInOAuthService(OAuthProviderBase):
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id TEXT NOT NULL,
                     provider_mode TEXT NOT NULL,
-                    zernio_api_key TEXT,
-                    zernio_account_id TEXT,
-                    zernio_org_account_id TEXT,
                     linkedin_access_token TEXT,
                     linkedin_refresh_token TEXT,
                     expires_at TIMESTAMP,
@@ -116,26 +99,19 @@ class LinkedInOAuthService(OAuthProviderBase):
                     is_active BOOLEAN DEFAULT TRUE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    zernio_profile_id TEXT,
                     unipile_account_id TEXT,
                     unipile_org_account_id TEXT
                 )
                 """
             )
-            cursor.execute("PRAGMA table_info(linkedin_oauth_tokens)")
-            existing_cols = {row[1] for row in cursor.fetchall()}
-            if "zernio_profile_id" not in existing_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN zernio_profile_id TEXT"
-                )
-            # Add Unipile columns (Phase 2 migration)
-            if "unipile_account_id" not in existing_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_account_id TEXT"
-                )
-            if "unipile_org_account_id" not in existing_cols:
-                cursor.execute(
-                    "ALTER TABLE linkedin_oauth_tokens ADD COLUMN unipile_org_account_id TEXT"
+            # Legacy tenant DBs may predate Unipile columns; backfill idempotently.
+            # Leave any leftover zernio_* columns in place (unused; DROP is unsafe/unneeded).
+            ensure_linkedin_oauth_token_columns(cursor, user_id=user_id)
+            normalized = normalize_unipile_provider_mode(cursor)
+            if normalized:
+                logger.info(
+                    f"[LinkedInOAuthSchema] Normalized provider_mode to unipile "
+                    f"user_id={user_id} rows={normalized}"
                 )
             cursor.execute(
                 """
@@ -219,35 +195,33 @@ class LinkedInOAuthService(OAuthProviderBase):
     ) -> None:
         """Override of OAuthProviderBase._migrate_plaintext_tokens_if_needed.
 
-        LinkedIn stores three encrypted columns per row (Zernio API key,
-        LinkedIn access token, LinkedIn refresh token), while the base
-        class's migration handles two columns. We keep the 2-column
-        behaviour for access/refresh by calling the base, then do an
-        additional pass for the Zernio API key.
-
-        The per-user gate is honoured via self._migration_done; the base
-        class would skip this user on subsequent calls, so we manage the
-        gate ourselves to keep both passes in lockstep.
+        Migrate any plaintext access/refresh token values once per user.
+        Only touches columns that exist after schema ensure (Unipile-era).
         """
         if user_id in self._migration_done:
             return
         cursor = conn.cursor()
+        token_cols = existing_token_encryption_columns(cursor)
+        if not token_cols:
+            self._migration_done.add(user_id)
+            return
+
+        select_cols = ", ".join(["id", *token_cols])
         cursor.execute(
-            """
-            SELECT id, zernio_api_key, linkedin_access_token, linkedin_refresh_token
+            f"""
+            SELECT {select_cols}
             FROM linkedin_oauth_tokens WHERE user_id = ?
             """,
             (user_id,),
         )
         migrated = 0
-        for token_id, zernio_key, access, refresh in cursor.fetchall():
+        for row in cursor.fetchall():
+            token_id = row[0]
+            values = dict(zip(token_cols, row[1:]))
             updates: Dict[str, Optional[str]] = {}
-            if zernio_key and not self._is_likely_encrypted_blob(zernio_key):
-                updates["zernio_api_key"] = self._encrypt_token(zernio_key)
-            if access and not self._is_likely_encrypted_blob(access):
-                updates["linkedin_access_token"] = self._encrypt_token(access)
-            if refresh and not self._is_likely_encrypted_blob(refresh):
-                updates["linkedin_refresh_token"] = self._encrypt_token(refresh)
+            for col, value in values.items():
+                if value and not self._is_likely_encrypted_blob(value):
+                    updates[col] = self._encrypt_token(value)
             if not updates:
                 continue
             set_clause = ", ".join(f"{k} = ?" for k in updates)
@@ -268,27 +242,9 @@ class LinkedInOAuthService(OAuthProviderBase):
         self._migration_done.add(user_id)
 
     def _row_to_credentials(self, row: tuple) -> LinkedInCredentials:
-        (
-            _id,
-            _user_id,
-            provider_mode,
-            zernio_api_key,
-            zernio_account_id,
-            zernio_org_account_id,
-            linkedin_access_token,
-            linkedin_refresh_token,
-            _expires_at,
-            account_name,
-            profile_urn,
-            _is_active,
-            _created_at,
-            _updated_at,
-            *rest,
-        ) = row
-        # Handle optional columns that may not exist in older rows
-        zernio_profile_id = rest[0] if len(rest) > 0 else None
-        unipile_account_id = rest[1] if len(rest) > 1 else None
-        unipile_org_account_id = rest[2] if len(rest) > 2 else None
+        # Map SELECT columns by name for resilience against column reordering
+        col_names = [c.strip() for c in self._TOKEN_SELECT_COLUMNS.split(",")]
+        row_dict = dict(zip(col_names, row))
 
         def _maybe_decrypt(value: Optional[str]) -> Optional[str]:
             if not value:
@@ -297,19 +253,19 @@ class LinkedInOAuthService(OAuthProviderBase):
                 return self._decrypt_token(value)
             return value
 
+        mode = str(row_dict.get("provider_mode") or "").strip().lower()
+        if mode not in ("native", "unipile"):
+            mode = "unipile"
+
         return LinkedInCredentials.from_db_row(
             {
-                "provider_mode": provider_mode,
-                "zernio_api_key": _maybe_decrypt(zernio_api_key),
-                "zernio_profile_id": zernio_profile_id,
-                "zernio_account_id": zernio_account_id,
-                "zernio_org_account_id": zernio_org_account_id,
-                "unipile_account_id": unipile_account_id,
-                "unipile_org_account_id": unipile_org_account_id,
-                "linkedin_access_token": _maybe_decrypt(linkedin_access_token),
-                "linkedin_refresh_token": _maybe_decrypt(linkedin_refresh_token),
-                "account_name": account_name,
-                "profile_urn": profile_urn,
+                "provider_mode": mode,
+                "unipile_account_id": row_dict.get("unipile_account_id"),
+                "unipile_org_account_id": row_dict.get("unipile_org_account_id"),
+                "linkedin_access_token": _maybe_decrypt(row_dict.get("linkedin_access_token")),
+                "linkedin_refresh_token": _maybe_decrypt(row_dict.get("linkedin_refresh_token")),
+                "account_name": row_dict.get("account_name"),
+                "profile_urn": row_dict.get("profile_urn"),
             }
         )
 
@@ -332,53 +288,6 @@ class LinkedInOAuthService(OAuthProviderBase):
                 (user_id,),
             )
             return cursor.fetchone()
-
-    def store_zernio_credentials(
-        self,
-        user_id: str,
-        zernio_api_key: str,
-        zernio_account_id: str,
-        zernio_org_account_id: Optional[str] = None,
-        account_name: Optional[str] = None,
-        profile_urn: Optional[str] = None,
-        zernio_profile_id: Optional[str] = None,
-    ) -> bool:
-        try:
-            self._init_db(user_id)
-            enc_key = self._encrypt_token(zernio_api_key)
-            resolved_profile_id = zernio_profile_id or self._get_stored_zernio_profile_id(
-                user_id
-            )
-            db_path = self._get_db_path(user_id)
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                cursor.execute(
-                    "UPDATE linkedin_oauth_tokens SET is_active = 0 WHERE user_id = ?",
-                    (user_id,),
-                )
-                cursor.execute(
-                    """
-                    INSERT INTO linkedin_oauth_tokens (
-                        user_id, provider_mode, zernio_api_key, zernio_account_id,
-                        zernio_org_account_id, account_name, profile_urn, is_active,
-                        zernio_profile_id
-                    ) VALUES (?, 'zernio', ?, ?, ?, ?, ?, 1, ?)
-                    """,
-                    (
-                        user_id,
-                        enc_key,
-                        zernio_account_id,
-                        zernio_org_account_id,
-                        account_name,
-                        profile_urn,
-                        resolved_profile_id,
-                    ),
-                )
-                conn.commit()
-            return True
-        except Exception as e:
-            logger.error(f"Failed to store Zernio credentials for user {user_id}: {e}")
-            return False
 
     def store_native_tokens(
         self,
@@ -498,37 +407,20 @@ class LinkedInOAuthService(OAuthProviderBase):
 
     def _token_row_metadata(self, row: tuple) -> Dict[str, Any]:
         """Build monitoring-safe token metadata (no decrypted secrets)."""
-        (
-            token_id,
-            _user_id,
-            provider_mode,
-            _zernio_api_key,
-            zernio_account_id,
-            zernio_org_account_id,
-            _linkedin_access_token,
-            linkedin_refresh_token,
-            expires_at,
-            account_name,
-            profile_urn,
-            is_active,
-            created_at,
-            _updated_at,
-            zernio_profile_id,
-            *_rest,  # unipile_account_id, unipile_org_account_id (optional)
-        ) = row
-        not_expired, expires_dt = self._parse_expires_at(expires_at)
-        has_refresh = bool(linkedin_refresh_token)
+        col_names = [c.strip() for c in self._TOKEN_SELECT_COLUMNS.split(",")]
+        row_dict = dict(zip(col_names, row))
+        not_expired, expires_dt = self._parse_expires_at(row_dict.get("expires_at"))
+        has_refresh = bool(row_dict.get("linkedin_refresh_token"))
         return {
-            "id": token_id,
-            "provider_mode": provider_mode,
-            "zernio_account_id": zernio_account_id,
-            "zernio_org_account_id": zernio_org_account_id,
-            "zernio_profile_id": zernio_profile_id,
-            "expires_at": expires_at,
-            "account_name": account_name,
-            "profile_urn": profile_urn,
-            "is_active": bool(is_active),
-            "created_at": created_at,
+            "id": row_dict.get("id"),
+            "provider_mode": row_dict.get("provider_mode"),
+            "unipile_account_id": row_dict.get("unipile_account_id"),
+            "unipile_org_account_id": row_dict.get("unipile_org_account_id"),
+            "expires_at": row_dict.get("expires_at"),
+            "account_name": row_dict.get("account_name"),
+            "profile_urn": row_dict.get("profile_urn"),
+            "is_active": bool(row_dict.get("is_active")),
+            "created_at": row_dict.get("created_at"),
             "has_refresh_token": has_refresh,
             "not_expired": not_expired,
             "expires_at_dt": expires_dt.isoformat() if expires_dt else None,
@@ -608,8 +500,6 @@ class LinkedInOAuthService(OAuthProviderBase):
                 "No per-user LinkedIn credentials found in database"
             )
         creds = self._row_to_credentials(row)
-        if creds.provider_mode == "zernio" and creds.zernio_api_key:
-            return creds
         if creds.provider_mode == "native" and creds.linkedin_access_token:
             return creds
         if creds.provider_mode == "unipile" and creds.unipile_account_id:
@@ -621,33 +511,11 @@ class LinkedInOAuthService(OAuthProviderBase):
         if not row:
             raise LinkedInNotConnectedError("No LinkedIn credentials available for user")
         creds = self._row_to_credentials(row)
-        if creds.provider_mode == "zernio" and creds.zernio_api_key:
-            return creds
         if creds.provider_mode == "native" and creds.linkedin_access_token:
             return creds
         if creds.provider_mode == "unipile" and creds.unipile_account_id:
             return creds
         raise LinkedInNotConnectedError("LinkedIn credentials row is incomplete")
-
-    def test_zernio_credentials(self, creds: LinkedInCredentials) -> bool:
-        """Sync health check for Zernio API key (returns True if key is valid)."""
-        if not creds.zernio_api_key:
-            return False
-        base_url = creds.zernio_api_url.rstrip("/")
-        try:
-            response = requests.get(
-                f"{base_url}/accounts",
-                params={"platform": "linkedin"},
-                headers={
-                    "Authorization": f"Bearer {creds.zernio_api_key}",
-                    "Accept": "application/json",
-                },
-                timeout=30,
-            )
-            return response.status_code < 400
-        except Exception as e:
-            logger.error(f"Zernio credential health check failed: {e}")
-            return False
 
     def refresh_access_token(
         self, user_id: str, refresh_token: str
@@ -713,7 +581,6 @@ class LinkedInOAuthService(OAuthProviderBase):
 
         When monitoring=True, uses DB-only credentials (no env fallback).
         For native mode, refreshes expired/expiring tokens when possible.
-        For Zernio mode, validates API key via health check when monitoring.
         """
         creds = (
             self._resolve_db_credentials(user_id)
@@ -721,9 +588,7 @@ class LinkedInOAuthService(OAuthProviderBase):
             else self.resolve_credentials(user_id)
         )
 
-        if creds.provider_mode == "zernio":
-            if monitoring and not self.test_zernio_credentials(creds):
-                raise LinkedInNotConnectedError("Zernio API key is invalid or expired")
+        if creds.provider_mode == "unipile":
             return creds
 
         row = self._get_active_token_row(user_id)
@@ -752,7 +617,57 @@ class LinkedInOAuthService(OAuthProviderBase):
         )
 
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
-        provider = os.getenv("LINKEDIN_PROVIDER", "zernio")
+        provider = os.getenv("LINKEDIN_PROVIDER", "unipile")
+
+        # Retry ONLY transient errors (DB lock, decrypt glitch).
+        # Genuine credential errors (LinkedInNotConnectedError) return immediately.
+        for attempt in (1, 2):
+            try:
+                return self._get_connection_status_impl(user_id, provider)
+            except LinkedInNotConnectedError:
+                return self._disconnected_status(
+                    provider,
+                    has_db_token=self._has_active_token(user_id),
+                )
+            except Exception as e:
+                if not self._is_transient_error(e):
+                    raise  # Non-transient — let it propagate
+                if attempt == 2:
+                    logger.warning(
+                        f"[LinkedInOAuth] get_connection_status failed after retry for "
+                        f"user {user_id}: {e}"
+                    )
+                    return self._disconnected_status(
+                        provider,
+                        has_db_token=self._has_active_token(user_id),
+                    )
+                time.sleep(0.15)
+
+    @staticmethod
+    def _is_transient_error(exc: Exception) -> bool:
+        """Return True for errors that may resolve on retry (DB lock, timeout)."""
+        if isinstance(exc, sqlite3.OperationalError):
+            return "locked" in str(exc).lower()
+        return False
+
+    def _has_active_token(self, user_id: str) -> bool:
+        """Check if a token row exists without decrypting (lightweight)."""
+        try:
+            return self._get_active_token_row(user_id) is not None
+        except Exception:
+            return False
+
+    def _disconnected_status(self, provider: str, has_db_token: bool = False) -> Dict[str, Any]:
+        return {
+            "connected": False,
+            "provider": provider,
+            "has_per_user_token": has_db_token,
+            "has_env_fallback": False,
+            "accounts": [],
+            "account_name": None,
+        }
+
+    def _get_connection_status_impl(self, user_id: str, provider: str) -> Dict[str, Any]:
         row = self._get_active_token_row(user_id)
         has_db_token = row is not None
 
@@ -764,43 +679,23 @@ class LinkedInOAuthService(OAuthProviderBase):
             creds = None
 
         accounts: List[Dict[str, Any]] = []
-        if connected and creds:
-            # Handle Zernio accounts
-            if creds.provider_mode == "zernio":
-                if creds.zernio_account_id:
-                    accounts.append(
-                        {
-                            "account_id": creds.zernio_account_id,
-                            "account_type": "personal",
-                            "source": creds.source,
-                        }
-                    )
-                if creds.zernio_org_account_id:
-                    accounts.append(
-                        {
-                            "account_id": creds.zernio_org_account_id,
-                            "account_type": "organization",
-                            "source": creds.source,
-                        }
-                    )
-            # Handle Unipile accounts (Phase 2)
-            elif creds.provider_mode == "unipile":
-                if creds.unipile_account_id:
-                    accounts.append(
-                        {
-                            "account_id": creds.unipile_account_id,
-                            "account_type": "personal",
-                            "source": creds.source,
-                        }
-                    )
-                if creds.unipile_org_account_id:
-                    accounts.append(
-                        {
-                            "account_id": creds.unipile_org_account_id,
-                            "account_type": "organization",
-                            "source": creds.source,
-                        }
-                    )
+        if connected and creds and creds.provider_mode == "unipile":
+            if creds.unipile_account_id:
+                accounts.append(
+                    {
+                        "account_id": creds.unipile_account_id,
+                        "account_type": "personal",
+                        "source": creds.source,
+                    }
+                )
+            if creds.unipile_org_account_id:
+                accounts.append(
+                    {
+                        "account_id": creds.unipile_org_account_id,
+                        "account_type": "organization",
+                        "source": creds.source,
+                    }
+                )
 
         account_name = creds.account_name if creds else None
         if account_name and str(account_name).strip().startswith("user_"):
@@ -840,7 +735,7 @@ class LinkedInOAuthService(OAuthProviderBase):
         logger.info(f"[LinkedInConnect] disconnect_user start user_id={user_id}")
 
         # Check if Unipile and attempt to delete remote account
-        provider = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
+        provider = os.getenv("LINKEDIN_PROVIDER", "unipile").lower()
         unipile_account_deleted = False
 
         if provider == "unipile":
@@ -863,187 +758,20 @@ class LinkedInOAuthService(OAuthProviderBase):
         revoked = self.revoke_token(user_id)
         status = self.get_connection_status(user_id)
 
-        log_msg = (
+        logger.warning(
             f"[LinkedInConnect] disconnect_user done user_id={user_id} "
-            f"revoked={revoked} provider={provider}"
+            f"revoked={revoked} provider={provider} "
+            f"unipile_account_deleted={unipile_account_deleted}"
         )
-        if provider == "unipile":
-            log_msg += f" unipile_account_deleted={unipile_account_deleted}"
-        else:
-            log_msg += " zernio_accounts_preserved=true"
-        logger.warning(log_msg)
 
         return {
             "success": revoked,
             "revoked": revoked,
             "provider": provider,
-            "unipile_account_deleted" if provider == "unipile" else "zernio_account_deleted": unipile_account_deleted if provider == "unipile" else False,
+            "unipile_account_deleted": unipile_account_deleted,
             "connected": status.get("connected", False),
             "has_env_fallback": False,
         }
-
-    def _get_stored_zernio_profile_id(self, user_id: str) -> Optional[str]:
-        self._init_db(user_id)
-        db_path = self._get_db_path(user_id)
-        if not os.path.exists(db_path):
-            return None
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT zernio_profile_id FROM linkedin_oauth_tokens
-                WHERE user_id = ? AND zernio_profile_id IS NOT NULL AND zernio_profile_id != ''
-                ORDER BY created_at DESC
-                LIMIT 1
-                """,
-                (user_id,),
-            )
-            row = cursor.fetchone()
-            return str(row[0]) if row and row[0] else None
-
-    def _persist_zernio_profile_id(self, user_id: str, profile_id: str) -> None:
-        self._init_db(user_id)
-        db_path = self._get_db_path(user_id)
-        with sqlite3.connect(db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                UPDATE linkedin_oauth_tokens
-                SET zernio_profile_id = ?, updated_at = datetime('now')
-                WHERE user_id = ? AND is_active = 1
-                """,
-                (profile_id, user_id),
-            )
-            if cursor.rowcount == 0:
-                cursor.execute(
-                    """
-                    INSERT INTO linkedin_oauth_tokens (
-                        user_id, provider_mode, zernio_profile_id, is_active
-                    ) VALUES (?, 'zernio', ?, 0)
-                    """,
-                    (user_id, profile_id),
-                )
-            conn.commit()
-
-    def ensure_zernio_profile(
-        self, user_id: str, *, display_name: Optional[str] = None
-    ) -> str:
-        """Ensure the user has a Zernio profile (Quickstart Step 1)."""
-        existing = self._get_stored_zernio_profile_id(user_id)
-        if existing:
-            return existing
-
-        api_key = os.getenv("ZERNIO_API_KEY")
-        if not api_key:
-            raise ValueError("ZERNIO_API_KEY is not configured")
-
-        profile_label = display_name or f"ALwrity - {user_id}"
-        result = create_profile_sync(
-            api_key,
-            zernio_base_url(),
-            profile_label,
-            description="ALwrity LinkedIn social profile",
-        )
-        profile_id = result["profileId"]
-        self._persist_zernio_profile_id(user_id, profile_id)
-        logger.info(f"Created Zernio profile {profile_id} for user {user_id}")
-        return profile_id
-
-    def sync_zernio_accounts(self, user_id: str) -> List[Dict[str, Any]]:
-        """Sync LinkedIn accounts from Zernio for the user's profile (Quickstart Step 3)."""
-        api_key = os.getenv("ZERNIO_API_KEY")
-        if not api_key:
-            raise ValueError("ZERNIO_API_KEY is not configured")
-
-        profile_id = self._get_stored_zernio_profile_id(user_id)
-        if not profile_id:
-            raise ValueError("No Zernio profile found for user; run ensure_zernio_profile first")
-
-        items, list_source = fetch_linkedin_account_items(
-            api_key, zernio_base_url(), profile_id
-        )
-        if not items:
-            raise ValueError("No LinkedIn accounts found for this Zernio profile")
-
-        logger.warning(
-            f"[LinkedInConnect] sync start user_id={user_id} profile_id={profile_id} "
-            f"list_source={list_source} raw_count={len(items)} "
-            f"items={summarize_zernio_account_items(items)}"
-        )
-
-        personal_item, org_item = partition_zernio_account_items(items)
-        partition_method = "partition"
-        if org_item is None and len(items) >= 2:
-            logger.warning(
-                f"[LinkedInConnect] sync partition missing org user_id={user_id} "
-                f"account_types={[account_type_from_item(i) for i in items]}"
-            )
-
-        primary_item = personal_item
-        if primary_item is None:
-            primary_item = items[0]
-            partition_method = "fallback_first_item"
-        elif org_item is primary_item and len(items) > 1:
-            primary_item = next((i for i in items if i is not org_item), primary_item)
-            partition_method = "fallback_non_org_primary"
-
-        logger.warning(
-            f"[LinkedInConnect] sync partition user_id={user_id} method={partition_method} "
-            f"personal_id={account_id_from_item(personal_item) if personal_item else None} "
-            f"org_id={account_id_from_item(org_item) if org_item else None}"
-        )
-
-        if not primary_item:
-            primary_item = items[0]
-        primary_id = account_id_from_item(primary_item)
-        if not primary_id:
-            raise ValueError("Zernio account list missing account id")
-
-        org_id = None
-        if org_item and org_item is not primary_item:
-            org_id = account_id_from_item(org_item) or None
-
-        account_name = account_name_from_item(primary_item)
-        stored = self.store_zernio_credentials(
-            user_id=user_id,
-            zernio_api_key=api_key,
-            zernio_account_id=primary_id,
-            zernio_org_account_id=org_id,
-            account_name=account_name,
-            zernio_profile_id=profile_id,
-        )
-        if not stored:
-            raise RuntimeError("Failed to store synced Zernio credentials")
-
-        logger.warning(
-            f"[LinkedInConnect] sync stored user_id={user_id} profile_id={profile_id} "
-            f"personal_id={primary_id} org_id={org_id}"
-        )
-
-        synced: List[Dict[str, Any]] = []
-        for item in items:
-            aid = account_id_from_item(item)
-            if not aid:
-                continue
-            synced.append(
-                {
-                    "account_id": aid,
-                    "account_type": account_type_from_item(item),
-                    "username": account_name_from_item(item),
-                }
-            )
-        return synced
-
-    def try_sync_zernio_accounts(self, user_id: str) -> bool:
-        """Best-effort sync from Zernio; returns True when sync succeeded."""
-        try:
-            self.sync_zernio_accounts(user_id)
-            return True
-        except Exception as e:
-            logger.warning(
-                f"[LinkedInConnect] Zernio account sync skipped user_id={user_id}: {e}"
-            )
-            return False
 
     def validate_callback_base(self, callback_base: Optional[str]) -> Optional[str]:
         """
@@ -1197,7 +925,7 @@ class LinkedInOAuthService(OAuthProviderBase):
         Matches accounts by hosted-auth ``name`` (ALwrity user id) or account detail
         fields. Returns False if no match is found — user must complete OAuth flow.
         """
-        if os.getenv("LINKEDIN_PROVIDER", "zernio").lower() != "unipile":
+        if os.getenv("LINKEDIN_PROVIDER", "unipile").lower() != "unipile":
             return False
 
         try:
@@ -1333,41 +1061,10 @@ class LinkedInOAuthService(OAuthProviderBase):
         *,
         callback_base: Optional[str] = None,
     ) -> Dict[str, str]:
-        """Return OAuth authorization URL for Zernio, Unipile, or native LinkedIn based on LINKEDIN_PROVIDER."""
-        provider = os.getenv("LINKEDIN_PROVIDER", "zernio").lower()
+        """Return OAuth authorization URL for Unipile or native LinkedIn based on LINKEDIN_PROVIDER."""
+        provider = os.getenv("LINKEDIN_PROVIDER", "unipile").lower()
         oauth_state = self._build_oauth_state(user_id, state)
         backend_base = callback_base or self._resolve_public_backend_url()
-
-        if provider == "zernio":
-            api_key = os.getenv("ZERNIO_API_KEY")
-            if not api_key:
-                logger.error(f"[LinkedInConnect] ZERNIO_API_KEY missing user_id={user_id}")
-                raise ValueError("ZERNIO_API_KEY is not configured")
-
-            profile_id = self.ensure_zernio_profile(user_id)
-            logger.info(
-                f"[LinkedInConnect] generating Zernio auth URL user_id={user_id} "
-                f"profile_id={profile_id}"
-            )
-
-            redirect_uri = self._get_redirect_uri(callback_base)
-            redirect_with_state = (
-                f"{redirect_uri}?alwrity_state={quote(oauth_state, safe='')}"
-            )
-            base_url = zernio_base_url()
-            connect_data = get_connect_url_sync(
-                api_key,
-                base_url,
-                profile_id,
-                redirect_with_state,
-            )
-            if not self.store_oauth_state(user_id, oauth_state):
-                raise RuntimeError("Failed to persist OAuth state")
-            return {
-                "auth_url": connect_data["authUrl"],
-                "state": oauth_state,
-                "provider": "zernio",
-            }
 
         if provider == "unipile":
             api_key = os.getenv("UNIPILE_API_KEY")
@@ -1398,7 +1095,7 @@ class LinkedInOAuthService(OAuthProviderBase):
                 )
             except Exception as e:
                 logger.error(f"[LinkedInConnect] Failed to create Unipile auth link: {e}")
-                raise ValueError(f"Failed to generate Unipile auth URL: {e}")
+                raise ValueError(f"Failed to generate LinkedIn auth URL: {e}")
 
             logger.info(f"[LinkedInConnect] Unipile auth URL generated for user={user_id}")
             return {
@@ -1444,124 +1141,6 @@ class LinkedInOAuthService(OAuthProviderBase):
             "state": oauth_state,
             "provider": "native",
         }
-
-    def _log_zernio_callback_params(
-        self, user_id: str, query_params: Mapping[str, str]
-    ) -> None:
-        """Log callback query keys/values once (secrets redacted) for OAuth debugging."""
-        redacted_keys = {"temptoken", "temp_token", "code", "access_token"}
-        safe: Dict[str, str] = {}
-        for key, value in query_params.items():
-            if key.lower() in redacted_keys:
-                safe[key] = "<redacted>" if value else value
-            else:
-                safe[key] = value
-        logger.info(
-            f"[LinkedInConnect] Zernio callback query params user_id={user_id} params={safe}"
-        )
-
-    @staticmethod
-    def _parse_headless_user_profile(query_params: Mapping[str, str]) -> dict[str, Any]:
-        raw = query_params.get("userProfile") or query_params.get("user_profile") or ""
-        if not raw:
-            logger.warning("[LinkedInConnect] headless callback missing userProfile")
-            return {}
-        try:
-            return json.loads(unquote(raw))
-        except (json.JSONDecodeError, TypeError) as exc:
-            logger.warning(f"[LinkedInConnect] headless userProfile parse failed: {exc}")
-            return {}
-
-    def _validate_zernio_callback_state(
-        self, user_id: str, query_params: Mapping[str, str]
-    ) -> bool:
-        alwrity_state = query_params.get("alwrity_state")
-        if not alwrity_state:
-            return True
-        state_user = self._extract_user_id_from_state(alwrity_state)
-        if state_user and state_user != user_id:
-            logger.error(
-                f"[LinkedInConnect] OAuth state user mismatch user_id={user_id} "
-                f"state_user={state_user}"
-            )
-            return False
-        if not self._oauth_state_is_valid(user_id, alwrity_state):
-            logger.error(f"[LinkedInConnect] invalid or expired OAuth state user_id={user_id}")
-            return False
-        self.consume_oauth_state(user_id, alwrity_state)
-        return True
-
-    def finalize_headless_personal_connect(
-        self, user_id: str, query_params: Mapping[str, str]
-    ) -> bool:
-        """Complete headless LinkedIn OAuth by selecting personal account server-side."""
-        self._log_zernio_callback_params(user_id, query_params)
-
-        if not self._validate_zernio_callback_state(user_id, query_params):
-            return False
-
-        temp_token = query_params.get("tempToken") or query_params.get("temp_token")
-        if not temp_token:
-            logger.error(f"[LinkedInConnect] headless callback missing tempToken user_id={user_id}")
-            return False
-
-        api_key = os.getenv("ZERNIO_API_KEY")
-        if not api_key:
-            logger.error(f"[LinkedInConnect] ZERNIO_API_KEY missing during callback user_id={user_id}")
-            return False
-
-        profile_id = (
-            query_params.get("profileId")
-            or query_params.get("profile_id")
-            or self._get_stored_zernio_profile_id(user_id)
-        )
-        if not profile_id:
-            logger.error(f"[LinkedInConnect] headless callback missing profileId user_id={user_id}")
-            return False
-
-        user_profile = self._parse_headless_user_profile(query_params)
-        try:
-            result = select_linkedin_organization_sync(
-                api_key,
-                zernio_base_url(),
-                profile_id,
-                temp_token,
-                user_profile,
-                account_type="personal",
-            )
-        except Exception as exc:
-            logger.error(
-                f"[LinkedInConnect] headless select-organization failed user_id={user_id}: {exc}"
-            )
-            return False
-
-        parsed = parse_select_linkedin_account_response(result)
-        account_id = parsed.get("account_id")
-        if not account_id:
-            logger.error(
-                f"[LinkedInConnect] headless select-organization missing accountId "
-                f"user_id={user_id}"
-            )
-            return False
-
-        account_name = parsed.get("display_name")
-        stored = self.store_zernio_credentials(
-            user_id=user_id,
-            zernio_api_key=api_key,
-            zernio_account_id=account_id,
-            zernio_org_account_id=None,
-            account_name=account_name,
-            zernio_profile_id=profile_id,
-        )
-        if not stored:
-            logger.error(f"[LinkedInConnect] headless credential store failed user_id={user_id}")
-            return False
-
-        logger.warning(
-            f"[LinkedInConnect] headless personal connected user_id={user_id} "
-            f"account_id={account_id} account_type={parsed.get('account_type')}"
-        )
-        return True
 
     def _oauth_state_is_valid(self, user_id: str, state: str) -> bool:
         try:
@@ -1647,47 +1226,6 @@ class LinkedInOAuthService(OAuthProviderBase):
             return None
         self.consume_oauth_state(user_id, state)
         return user_id
-
-    def handle_zernio_connect_callback(
-        self, user_id: str, query_params: Mapping[str, str]
-    ) -> bool:
-        """Persist Zernio credentials after connect redirect (headless or standard)."""
-        temp_token = query_params.get("tempToken") or query_params.get("temp_token")
-        if temp_token:
-            return self.finalize_headless_personal_connect(user_id, query_params)
-
-        self._log_zernio_callback_params(user_id, query_params)
-
-        connected = query_params.get("connected")
-        account_id = query_params.get("accountId") or query_params.get("account_id")
-        if not account_id and connected != "linkedin":
-            return False
-
-        api_key = os.getenv("ZERNIO_API_KEY")
-        if not api_key:
-            logger.error(f"[LinkedInConnect] ZERNIO_API_KEY missing during callback user_id={user_id}")
-            return False
-
-        if not self._validate_zernio_callback_state(user_id, query_params):
-            return False
-
-        try:
-            self.sync_zernio_accounts(user_id)
-            logger.info(f"[LinkedInConnect] Zernio account sync succeeded user_id={user_id}")
-            return True
-        except Exception as e:
-            logger.error(f"[LinkedInConnect] Zernio account sync failed user_id={user_id}: {e}")
-            if not account_id:
-                return False
-            username = query_params.get("username")
-            profile_id = self._get_stored_zernio_profile_id(user_id)
-            return self.store_zernio_credentials(
-                user_id=user_id,
-                zernio_api_key=api_key,
-                zernio_account_id=account_id,
-                account_name=username,
-                zernio_profile_id=profile_id,
-            )
 
     def handle_native_oauth_callback(
         self, user_id: str, code: str, state: str

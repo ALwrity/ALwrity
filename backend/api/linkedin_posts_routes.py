@@ -6,11 +6,13 @@ Provides endpoints for fetching user's LinkedIn posts with engagement metrics.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from loguru import logger
 
+from utils.error_logging import log_route_exception
 from middleware.auth_middleware import get_current_user
 from models.linkedin_posts_models import (
     PostListResponse,
@@ -30,6 +32,21 @@ from services.integrations.linkedin.unipile_client import (
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 
 router = APIRouter(prefix="/api/linkedin", tags=["LinkedIn Posts"])
+
+
+def _get_analytics_service(user_id: str):
+    """
+    Get PostAnalyticsService backed by the user's workspace SQLite DB.
+
+    Caller must close ``service.db`` when finished (see route handlers).
+    """
+    from services.database.sessions import get_session_for_user
+    from services.linkedin_post_analytics_service import LinkedInPostAnalyticsService
+
+    db = get_session_for_user(user_id)
+    if db is None:
+        raise RuntimeError(f"Could not open workspace DB for user_id={user_id}")
+    return LinkedInPostAnalyticsService(db)
 
 _oauth_service = LinkedInOAuthService()
 
@@ -165,13 +182,15 @@ async def _get_personal_profile_provider_id(account_id: str) -> Optional[str]:
     summary="Fetch user's LinkedIn posts",
     description=(
         "Fetch the authenticated user's LinkedIn posts with engagement metrics. "
-        "Supports pagination via cursor. Returns 20 posts by default."
+        "Supports pagination via cursor. Returns 20 posts by default. "
+        "Posts are cached in DB for 1 hour — use ?refresh=true to force a fresh Unipile fetch."
     ),
 )
 async def get_linkedin_posts(
     request: Request,
     cursor: Optional[str] = Query(None, description="Pagination cursor for next page"),
     limit: int = Query(20, ge=1, le=100, description="Number of posts to fetch (max 100)"),
+    refresh: bool = Query(False, description="Skip DB cache, fetch fresh from Unipile"),
     current_user: dict = Depends(get_current_user),
     posts_service: PostsService = Depends(get_posts_service),
 ) -> PostListResponse:
@@ -179,8 +198,44 @@ async def get_linkedin_posts(
     user_id = _user_id(current_user)
     logger.info(
         f"[PostsRoutes] Fetching posts for user={user_id} limit={limit} "
-        f"cursor={'set' if cursor else 'none'}"
+        f"cursor={'set' if cursor else 'none'} refresh={refresh}"
     )
+
+    # ── Cache read-through ──────────────────────────────────────────────
+    POST_CACHE_TTL_SECONDS = 3600  # 1 hour
+
+    if not refresh and not cursor:
+        analytics_svc = None
+        try:
+            analytics_svc = _get_analytics_service(user_id)
+
+            last_synced = analytics_svc.get_last_synced_at(user_id)
+            stored_count = analytics_svc.count_stored(user_id)
+            cache_fresh = (
+                last_synced is not None
+                and stored_count > 0
+                and (datetime.now(timezone.utc) - last_synced.replace(tzinfo=timezone.utc)).total_seconds() < POST_CACHE_TTL_SECONDS
+            )
+
+            if cache_fresh:
+                logger.info(
+                    f"[PostsRoutes] Cache hit — returning {stored_count} posts from DB "
+                    f"synced {last_synced.isoformat()}"
+                )
+                return analytics_svc.get_stored_analytics(user_id, limit=limit)
+
+            logger.info(
+                f"[PostsRoutes] Cache miss or stale "
+                f"(stored={stored_count}, last_synced={last_synced}) — fetching from Unipile"
+            )
+        except Exception as cache_err:
+            logger.warning(f"[PostsRoutes] Cache check failed, falling through to Unipile: {cache_err}")
+        finally:
+            if analytics_svc is not None:
+                try:
+                    analytics_svc.db.close()
+                except Exception:
+                    pass
 
     try:
         account_id, identifier = await _resolve_personal_account_and_identifier(user_id)
@@ -195,6 +250,33 @@ async def get_linkedin_posts(
             cursor=cursor,
             limit=limit,
         )
+
+        # ── Persist to DB cache ──────────────────────────────────────
+        # After a non-cursor fetch, return the full stored set so dashboard
+        # Profile Growth and Post Analytics sum the same real metrics
+        # (e.g. page viewers), not a partial Unipile page.
+        if result.posts and not cursor:
+            analytics_svc = None
+            try:
+                analytics_svc = _get_analytics_service(user_id)
+                stored = analytics_svc.store_posts(user_id, result.posts)
+                logger.info(
+                    f"[PostsRoutes] Cached {stored} posts to DB for user={user_id}"
+                )
+                full = analytics_svc.get_stored_analytics(user_id)
+                logger.info(
+                    f"[PostsRoutes] Returning {full.total_count or len(full.posts)} "
+                    f"cached posts after Unipile sync for user={user_id}"
+                )
+                return full
+            except Exception as persist_err:
+                logger.warning(f"[PostsRoutes] Failed to cache posts: {persist_err}")
+            finally:
+                if analytics_svc is not None:
+                    try:
+                        analytics_svc.db.close()
+                    except Exception:
+                        pass
 
         logger.info(
             f"[PostsRoutes] Successfully fetched {len(result.posts)} posts for user={user_id}"
@@ -244,7 +326,12 @@ async def get_linkedin_posts(
         ) from exc
 
     except Exception as exc:
-        logger.exception(f"[PostsRoutes] Unexpected error fetching posts: {exc}")
+        log_route_exception(
+            route="get_linkedin_posts",
+            user_id=user_id,
+            exc=exc,
+            extra=f"limit={limit} refresh={refresh} cursor={'set' if cursor else 'none'}",
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={

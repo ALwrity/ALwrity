@@ -85,10 +85,7 @@ export const AuthenticatedCopilotWrapper: React.FC<AuthenticatedCopilotWrapperPr
     );
   }
 
-  return (
-    <CopilotKitHealthProvider initialHealthStatus={false}>
-      <CopilotKitDegradedBanner />
-      {children}
-    </CopilotKitHealthProvider>
-  );
+  // CopilotKit is disabled ΓÇö no API key configured. Don't wrap in any
+  // CopilotKit providers (avoids health checks hitting api.cloud.copilotkit.ai).
+  return <>{children}</>;
 };

@@ -47,9 +47,13 @@ interface AlertGroup {
 
 interface AlertsBadgeProps {
   colorMode?: 'light' | 'dark';
+  /** When true, uses LinkedIn brand blue for the notification icon. */
+  linkedInTheme?: boolean;
 }
 
-const AlertsBadge: React.FC<AlertsBadgeProps> = ({ colorMode = 'light' }) => {
+const LINKEDIN_BLUE = '#0a66c2';
+
+const AlertsBadge: React.FC<AlertsBadgeProps> = ({ colorMode = 'light', linkedInTheme = false }) => {
   const { userId } = useAuth();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -345,21 +349,30 @@ const AlertsBadge: React.FC<AlertsBadgeProps> = ({ colorMode = 'light' }) => {
 
   if (!userId) return null;
 
+  const iconColor = linkedInTheme
+    ? LINKEDIN_BLUE
+    : unreadCount > 0
+      ? '#ff9800'
+      : colorMode === 'dark'
+        ? 'white'
+        : 'inherit';
+
   return (
     <>
       <Tooltip title={unreadCount > 0 ? `${unreadCount} unread alert${unreadCount > 1 ? 's' : ''}` : 'No alerts'}>
         <IconButton
           onClick={handleOpen}
           sx={{
-            color: colorMode === 'dark' ? 'white' : 'inherit',
+            color: linkedInTheme ? LINKEDIN_BLUE : colorMode === 'dark' ? 'white' : 'inherit',
             position: 'relative',
+            '&:hover': linkedInTheme ? { bgcolor: 'rgba(10, 102, 194, 0.08)' } : undefined,
           }}
         >
           <Badge badgeContent={unreadCount} color="error" max={99}>
             {unreadCount > 0 ? (
-              <NotificationsActiveIcon sx={{ color: '#ff9800' }} />
+              <NotificationsActiveIcon sx={{ color: iconColor }} />
             ) : (
-              <NotificationsIcon />
+              <NotificationsIcon sx={{ color: iconColor }} />
             )}
           </Badge>
         </IconButton>

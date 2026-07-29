@@ -52,7 +52,8 @@ export const toolCategories: ToolCategories = {
         status: 'beta',
         path: '/story-writer',
         features: ['Structured Outline', 'Image Generation', 'Audio Narration', 'Story Video'],
-        isHighlighted: true
+        isHighlighted: true,
+        featureKey: 'story_writer'
       },
       {
         name: 'Podcast Maker',

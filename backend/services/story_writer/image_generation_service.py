@@ -68,10 +68,10 @@ class StoryImageGenerationService:
         anime_bible: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Lightweight image prompt refinement using the anime story bible.
+        Enrich image prompt with 3-4 essential visual anchors from the anime bible.
 
-        Takes the existing scene image_prompt and enriches it with visual_style,
-        world, and cast hints from the bible. This is deterministic and avoids
+        Keeps only high-signal items that image models interpret cleanly:
+        style preset, world setting, and character consistency. Deterministic — no
         extra LLM calls.
         """
         if not image_prompt or not isinstance(image_prompt, str):
@@ -86,36 +86,39 @@ class StoryImageGenerationService:
 
         parts: List[str] = []
 
+        # 1. Style preset — the single most impactful visual anchor
         style_preset = visual_style.get("style_preset")
         if style_preset:
             parts.append(f"{style_preset} anime illustration style")
 
-        camera_style = visual_style.get("camera_style")
-        if camera_style:
-            parts.append(f"framing and camera style: {camera_style}")
+        # 2. World setting — contextual backdrop for the scene
+        if isinstance(world, dict):
+            setting = world.get("setting")
+            if setting:
+                parts.append(f"world setting: {setting}")
 
-        color_mood = visual_style.get("color_mood")
-        if color_mood:
-            parts.append(f"color mood: {color_mood}")
+        # 3. Character visibility — which cast members appear, with look details for in-scene characters
+        scene_chars = scene.get("character_descriptions") or []
+        if isinstance(scene_chars, list) and isinstance(main_cast, list):
+            for desc in scene_chars:
+                desc_lower = desc.lower()
+                for member in main_cast:
+                    if not isinstance(member, dict):
+                        continue
+                    name = member.get("name", "")
+                    if name and name.lower() in desc_lower:
+                        details = []
+                        look = member.get("look")
+                        if look:
+                            details.append(f"look: {look}")
+                        outfit = member.get("outfit_palette")
+                        if outfit:
+                            details.append(f"outfit: {outfit}")
+                        if details:
+                            parts.append(f"{name} ({', '.join(details)})")
+                        break
 
-        lighting = visual_style.get("lighting")
-        if lighting:
-            parts.append(f"lighting: {lighting}")
-
-        line_style = visual_style.get("line_style")
-        if line_style:
-            parts.append(f"line style: {line_style}")
-
-        extra_tags = visual_style.get("extra_tags") or []
-        if isinstance(extra_tags, (list, tuple)):
-            extra_text = ", ".join(str(tag) for tag in extra_tags[:6] if tag)
-            if extra_text:
-                parts.append(extra_text)
-
-        setting = world.get("setting") if isinstance(world, dict) else None
-        if setting:
-            parts.append(f"world setting: {setting}")
-
+        # 4. Character design consistency anchor
         if isinstance(main_cast, list):
             names = [
                 c.get("name")

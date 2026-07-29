@@ -8,6 +8,7 @@ export interface Tool {
   features: string[];
   isPinned?: boolean;
   isHighlighted?: boolean;
+  featureKey?: string;
 }
 
 export interface SubCategory {
@@ -236,4 +237,4 @@ export interface SEOAnalysisErrorProps {
   error: string | null;
   showError: boolean;
   onCloseError: () => void;
-} 
+}
