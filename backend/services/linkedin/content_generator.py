@@ -13,7 +13,7 @@ from loguru import logger
 from models.linkedin_models import (
     LinkedInPostRequest, LinkedInArticleRequest, LinkedInPostResponse, LinkedInArticleResponse,
     PostContent, ArticleContent, GroundingLevel, ResearchSource, LinkedInPostOutput, Citation,
-    HashtagSuggestion, LinkedInArticleOutput, LinkedInArticleTitleOutput, LinkedInCarouselOutput, LinkedInVideoScriptOutput
+    HashtagSuggestion, LinkedInArticleOutput, LinkedInCarouselOutput, LinkedInVideoScriptOutput
 )
 from services.linkedin.quality_handler import QualityHandler
 from services.linkedin.content_generator_prompts import (
@@ -46,7 +46,7 @@ class ContentGenerator:
         self.carousel_generator = CarouselGenerator(citation_manager, quality_analyzer)
         self.video_script_generator = VideoScriptGenerator(citation_manager, quality_analyzer)
     
-    def _get_cached_persona_data(self, user_id: int, platform: str) -> Optional[Dict[str, Any]]:
+    def _get_cached_persona_data(self, user_id: str, platform: str) -> Optional[Dict[str, Any]]:
         """
         Get persona data with caching for LinkedIn platform.
         
@@ -88,41 +88,7 @@ class ContentGenerator:
         except Exception as e:
             logger.warning(f"Could not load persona data for {platform} content generation: {e}")
             return None
-
-    def _generate_article_title(self, request, research_sources: List, user_id: str = None) -> str:
-        """Generate article title via llm_text_gen with structured JSON schema.
-
-        Uses a dedicated LLM call with LinkedInArticleTitleOutput schema to ensure
-        the title is 40-60 characters, compelling, and specific.
-        """
-        try:
-            title_prompt = f"""You are an expert content strategist. Generate a compelling LinkedIn article headline.
-            TOPIC: {request.topic}
-            INDUSTRY: {request.industry}
-            TONE: {request.tone}
-            TARGET AUDIENCE: {request.target_audience or 'Industry professionals, executives, and thought leaders'}
-
-            RULES:
-            - 40-60 characters maximum
-            - Compelling and specific, not generic or clickbait
-            - Must communicate the core value or insight of the article
-            - Do NOT include [Source N] citations in the title
-            - Do NOT use quotes or special characters
-            - Single sentence that makes the reader want to click
-            """
-            raw = llm_text_gen(
-                prompt=title_prompt,
-                json_struct=LinkedInArticleTitleOutput.model_json_schema(),
-                user_id=user_id,
-                flow_type="linkedin_article_title",
-                temperature=0.7
-            )
-            parsed = raw if isinstance(raw, dict) else json.loads(str(raw).strip())
-            return parsed.get('title', '').strip()
-        except Exception as e:
-            logger.warning(f"Article title generation failed, falling back to topic: {e}")
-            return ""
-
+    
     def _clear_persona_cache(self, user_id: str = None):
         """
         Clear persona cache for a specific user or all users.
@@ -186,58 +152,7 @@ class ContentGenerator:
         context_parts.append("\nInstructions: Use the research above to include specific data points, statistics, and factual claims in your content. Cite sources where appropriate.")
         return "\n".join(context_parts)
     
-    async def _synthesize_research(self, research_sources: List, topic: str, user_id: str = None) -> str:
-        """Distill research sources into structured bullet points using LLM.
-        
-        Produces a concise synthesis focused on key statistics, trends, and
-        actionable findings relevant to the topic.
-        """
-        if not research_sources:
-            return ""
-        
-        today = datetime.now().strftime("%B %d, %Y")
-        sources_text = []
-        for i, s in enumerate(research_sources[:15], 1):
-            title = getattr(s, 'title', f'Source {i}')
-            highlights = getattr(s, 'highlights', None)
-            summary = getattr(s, 'summary', None)
-            content = getattr(s, 'content', '')
-            
-            snippet = f"Source {i}: {title}\n"
-            if highlights:
-                snippet += "\n".join(f"  - {h}" for h in highlights[:3])
-            elif summary:
-                snippet += f"  Summary: {summary[:500]}"
-            elif content:
-                snippet += f"  Excerpt: {content[:500]}"
-            sources_text.append(snippet)
-        
-        synthesis_prompt = f"""You are a research analyst. Below are {len(research_sources)} research sources about "{topic}".
-
-Extract and organize the most important information into these categories:
-- KEY STATISTICS: Specific numbers, percentages, dates, and data points
-- KEY TRENDS: Emerging patterns, shifts, and发展方向
-- EXPERT INSIGHTS: Quotes, opinions, and expert perspectives
-- ACTIONABLE FINDINGS: Practical takeaways that can be applied
-
-Research sources:
-{chr(10).join(sources_text)}
-
-Today's date: {today}
-
-Return ONLY the synthesized findings in clear bullet points under each category heading. Be concise and factual. If a category has no relevant data, skip it."""
-        
-        try:
-            synthesis = llm_text_gen(
-                prompt=synthesis_prompt,
-                user_id=user_id,
-                flow_type="research_synthesis",
-                temperature=0.2
-            )
-            return f"\n\nRESEARCH SYNTHESIS:\n{synthesis}"
-        except Exception as e:
-            logger.warning(f"Research synthesis failed, using raw context: {e}")
-            return ""
+    
     
     async def generate_post(
         self,
@@ -506,11 +421,9 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                 'quality_score': 0.8  # Default quality for comments
             } if grounding_enabled else None
             
-            # generate_grounded_comment_response returns 'content'; some callers inject 'response'.
-            response_text = content_result.get('response') or content_result.get('content') or ""
             return {
                 'success': True,
-                'response': response_text,
+                'response': content_result['response'],
                 'alternative_responses': content_result.get('alternative_responses', []),
                 'tone_analysis': content_result.get('tone_analysis'),
                 'generation_metadata': {
@@ -534,8 +447,9 @@ Return ONLY the synthesized findings in clear bullet points under each category 
         """Generate post content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
             # Build the prompt using persona if available
-            uid = int(getattr(request, "user_id", 0) or 0)
-            persona_data = self._get_cached_persona_data(uid, 'linkedin')
+            persona_data = None
+            if user_id:
+                persona_data = self._get_cached_persona_data(user_id, 'linkedin')
             if getattr(request, 'persona_override', None):
                 try:
                     override = request.persona_override
@@ -624,11 +538,6 @@ Return ONLY the synthesized findings in clear bullet points under each category 
     async def generate_grounded_article_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
         """Generate article content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
-            # Generate title first via dedicated structured call
-            article_title = self._generate_article_title(request, research_sources, user_id)
-            if not article_title:
-                article_title = getattr(request, 'topic', 'LinkedIn Article').strip()
-            
             # Build the prompt using persona if available
             persona_data = None
             if user_id:
@@ -649,7 +558,7 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                         persona_data = override
                 except Exception:
                     pass
-            prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data, article_title=article_title)
+            prompt = ArticlePromptBuilder.build_article_prompt(request, persona=persona_data)
             
             # Inject research context (highlights/summary prioritized)
             research_context = self._build_research_context(research_sources)
@@ -680,7 +589,7 @@ Return ONLY the synthesized findings in clear bullet points under each category 
                 parsed = json.loads(cleaned)
             
             content_text = parsed.get('content', '').strip()
-            title = article_title or parsed.get('title', request.topic or "LinkedIn Article")
+            title = parsed.get('title', request.topic or "LinkedIn Article")
             sections = parsed.get('sections', [])
             seo_metadata = parsed.get('seo_metadata')
             reading_time = parsed.get('reading_time')
