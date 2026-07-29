@@ -13,7 +13,6 @@ import {
   GrowthSnapshotModal,
   PostTodayModal,
   BrandScorecardModal,
-  WeeklyPlanModal,
   ViralCopywriterModal,
   EngagementTrendsModal,
 } from "./analysisWedgeModalExports";
@@ -34,7 +33,6 @@ import {
 import { DraftLibraryModal, PublishNowModal } from "./PublishWedgeModals";
 import { PeopleYouMayKnowModal } from "../PeopleYouMayKnow/PeopleYouMayKnowModal";
 
-type PlanSub = "weekly_plan" | null;
 type AnalysisSub = "snapshot" | "brand_score" | "viral" | "trends" | null;
 type EngagementSub =
   "booster" | "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
@@ -86,7 +84,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   onClose,
 }) => {
   const navigate = useNavigate();
-  const [planSub, setPlanSub] = useState<PlanSub>(null);
   const [analysisSub, setAnalysisSub] = useState<AnalysisSub>(null);
   const [engagementSub, setEngagementSub] = useState<EngagementSub>(null);
   const [remarkSub, setRemarkSub] = useState<RemarkSub>(null);
@@ -99,10 +96,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     window.dispatchEvent(new CustomEvent(evt, detail ? { detail } : undefined));
   };
 
-  const openWatchdog = () => {
-    onClose();
-    dispatch("linkedinwriter:openWatchdog");
-  };
   const openTopicIdeas = () => {
     onClose();
     if (connected) {
@@ -147,21 +140,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   return (
     <>
       {/* ── Plan ── */}
-      <PlanWedgeModal
-        open={activeModal === "plan"}
-        onClose={onClose}
-        onOpenWatchdog={openWatchdog}
-        onOpenWeeklyPlan={() => {
-          onClose();
-          setPlanSub("weekly_plan");
-        }}
-      />
-
-      {/* ── Plan sub-modals ── */}
-      <WeeklyPlanModal
-        open={planSub === "weekly_plan"}
-        onClose={() => setPlanSub(null)}
-      />
+      <PlanWedgeModal open={activeModal === "plan"} onClose={onClose} />
 
       {/* ── Create ── */}
       <DashboardActionModal

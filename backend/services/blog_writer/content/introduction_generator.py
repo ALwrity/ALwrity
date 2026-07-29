@@ -5,6 +5,7 @@ Generates 3 different introduction options for the user to choose from.
 """
 
 from typing import Dict, Any, List
+from datetime import datetime
 from loguru import logger
 
 from models.blog_models import BlogResearchResponse, BlogOutlineSection
@@ -112,6 +113,7 @@ REQUIREMENTS FOR EACH INTRODUCTION:
 - Maintain a professional yet engaging tone
 - Avoid generic phrases - be specific and benefit-driven
 - Where possible, incorporate specific insights from the competitive landscape and search intent above
+- Write introductions that feel current (you are writing in {datetime.now().year}), but avoid stating the year unless it's essential to the story
 
 Return ONLY a JSON array of exactly 3 introductions:
 [

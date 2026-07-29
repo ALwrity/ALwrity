@@ -354,6 +354,125 @@
   cursor: default;
 }
 
+.plan-wedge-coming-soon-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  align-items: stretch;
+}
+
+.plan-wedge-coming-soon-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  text-align: left;
+}
+
+.plan-wedge-coming-soon-card__icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.plan-wedge-coming-soon-card__icon--watchdog {
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.plan-wedge-coming-soon-card__icon--weekly {
+  background: rgba(10, 102, 194, 0.1);
+}
+
+.plan-wedge-coming-soon-card__icon--calendar {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.plan-wedge-coming-soon-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 26px;
+}
+
+.plan-wedge-coming-soon-card__copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.plan-wedge-coming-soon-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+  line-height: 1.2;
+}
+
+.plan-wedge-coming-soon-card__badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.14);
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.plan-wedge-coming-soon-card__desc {
+  margin: 0;
+  font-size: 10.5px;
+  color: #6b7280;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: calc(10.5px * 1.35 * 2);
+}
+
+.plan-wedge-coming-soon-card__notify {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  background: #fff;
+  color: #7c3aed;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  white-space: nowrap;
+  width: 100%;
+  text-align: center;
+  margin-top: auto;
+}
+
+.plan-wedge-coming-soon-card__notify:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: #8b5cf6;
+}
+
+.plan-wedge-coming-soon-card__notify--done {
+  opacity: 0.65;
+  cursor: default;
+}
+
 @media (max-width: 560px) {
   .plan-wedge-tools-grid {
     grid-template-columns: 1fr;
@@ -367,6 +486,10 @@
   .plan-wedge-brainstorm__generate {
     width: 100%;
     text-align: center;
+  }
+
+  .plan-wedge-coming-soon-grid {
+    grid-template-columns: 1fr;
   }
 
   .plan-wedge-calendar {

@@ -8,7 +8,7 @@ and specific error code handling for different types of API failures.
 import asyncio
 import random
 import time
-from typing import Callable, Any, Optional, Dict, List
+from typing import Callable, Any, Optional, Dict, List, Awaitable
 from dataclasses import dataclass
 from loguru import logger
 
@@ -78,7 +78,7 @@ def calculate_delay(attempt: int, config: RetryConfig) -> float:
 
 
 async def retry_with_backoff(
-    func: Callable,
+    func: Callable[..., Awaitable[Any]],
     config: Optional[RetryConfig] = None,
     operation_name: str = "operation",
     context: Optional[Dict[str, Any]] = None

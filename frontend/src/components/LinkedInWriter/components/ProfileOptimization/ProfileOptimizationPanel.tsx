@@ -8,6 +8,7 @@ import type {
 } from "../../../../api/linkedinSocial";
 import { linkedInPlaceholderCardStyles } from "../linkedInPlaceholderStyles";
 import { formatRelativeUpdatedAt } from "../TopicRecommendations/topicRecommendationLabels";
+import { AnalysisStepIndicator } from "../shared/AnalysisStepIndicator";
 import { BrandIdentityCard } from "./BrandIdentityCard";
 import { ProfileOptimizationCard } from "./ProfileOptimizationCard";
 import { ProfileOptimizationSummaryBar } from "./ProfileOptimizationSummaryBar";
@@ -801,7 +802,7 @@ export const ProfileOptimizationPanel: React.FC<
                         <CircularProgress size={20} sx={{ color: "#0A66C2" }} />
                         Analyzing your profile…
                       </div>
-                      <StepIndicator
+                      <AnalysisStepIndicator
                         steps={[
                           "Reading your LinkedIn profile",
                           "Analyzing profile strengths & gaps",
@@ -1052,42 +1053,5 @@ export const ProfileOptimizationPanel: React.FC<
         </div>
       </div>
     </>
-  );
-};
-
-// ── Progress step indicator ──
-
-const StepIndicator: React.FC<{ steps: string[] }> = ({ steps }) => {
-  const [step, setStep] = React.useState(0);
-
-  React.useEffect(() => {
-    const interval = setInterval(() => {
-      setStep((s) => Math.min(s + 1, steps.length - 1));
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [steps.length]);
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
-      {steps.map((label, i) => (
-        <div
-          key={i}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 12,
-            color: i <= step ? "#0A66C2" : "#d1d5db",
-            fontWeight: i <= step ? 600 : 400,
-            transition: "color 0.4s",
-          }}
-        >
-          <span style={{ width: 16, textAlign: "center" }}>
-            {i < step ? "✓" : i === step ? "●" : "○"}
-          </span>
-          {label}
-        </div>
-      ))}
-    </div>
   );
 };

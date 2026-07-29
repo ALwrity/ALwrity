@@ -3,12 +3,14 @@ import {
   CONNECT_GATED_WORKFLOW_IDS,
   DASHBOARD_WORKFLOW_CARDS,
   FRAME_COLOR,
+  PLAN_PINNED_HINT_KEY,
   WEDGE_PANEL_GAP_DEG,
   resolveDashboardWorkflowIcon,
   type DashboardWorkflowCardId,
 } from "./dashboardWorkflowConfig";
 import type { RadialLayout } from "./dashboardRadialLayout";
 import { PlanWedgeStatusBadge } from "./PlanWedgeStatusBadge";
+import { PlanStartHereBadge } from "./PlanStartHereBadge";
 import { ConnectLockBadge } from "./ConnectLockIcon";
 
 interface DashboardRadialWorkflowProps {
@@ -31,7 +33,6 @@ const LABEL_POLISH: Partial<Record<DashboardWorkflowCardId, LabelPolish>> = {
 };
 
 const RECOMMENDED_CARD_ID: DashboardWorkflowCardId = "plan";
-const PLAN_PINNED_HINT_KEY = "linkedin_dashboard_plan_hint_dismissed";
 const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
 const OUTER_BULGE_FACTOR = 0.14;
 const HOVER_POP_PX = 10;
@@ -226,6 +227,7 @@ export const DashboardRadialWorkflow: React.FC<
         key={card.id}
         className={[
           "workflow-wedge",
+          isRecommended && "workflow-wedge--recommended",
           isConnectLocked && "workflow-wedge--connect-locked",
         ]
           .filter(Boolean)
@@ -292,7 +294,9 @@ export const DashboardRadialWorkflow: React.FC<
               ? "saturate(0.68) brightness(1.02)"
               : isActive
                 ? `drop-shadow(0 18px 34px ${accentFill(card.accent, 0.65)}) drop-shadow(0 8px 12px rgba(0,0,0,0.1))`
-                : "drop-shadow(0 2px 8px rgba(66,133,244,0.25)) drop-shadow(0 4px 6px rgba(0,0,0,0.05))",
+                : isRecommended
+                  ? undefined
+                  : "drop-shadow(0 2px 8px rgba(66,133,244,0.25)) drop-shadow(0 4px 6px rgba(0,0,0,0.05))",
           }}
         />
         {isConnectLocked && (
@@ -323,12 +327,24 @@ export const DashboardRadialWorkflow: React.FC<
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              justifyContent: "center",
+              justifyContent: isRecommended ? "flex-start" : "center",
               textAlign: "center",
-              padding: "4px 6px",
+              padding: isRecommended ? "29px 6px 4px" : "4px 6px",
               boxSizing: "border-box",
             }}
           >
+            {isRecommended && <PlanStartHereBadge />}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                flex: isRecommended ? "1 1 auto" : undefined,
+                minHeight: 0,
+                width: "100%",
+              }}
+            >
             <div
               style={{
                 width: iconFontSize,
@@ -380,19 +396,7 @@ export const DashboardRadialWorkflow: React.FC<
             >
               {card.description}
             </div>
-            {isRecommended && (
-              <div
-                style={{
-                  marginTop: 4,
-                  fontSize: Math.max(8, descFontSize - 1),
-                  fontWeight: 700,
-                  color: card.accent,
-                  lineHeight: 1.2,
-                }}
-              >
-                Recommended first step
-              </div>
-            )}
+            </div>
             {card.id === "plan" && <PlanWedgeStatusBadge />}
           </div>
         </foreignObject>

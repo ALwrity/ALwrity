@@ -39,27 +39,29 @@ export const MobileStudioQuickActionsDock: React.FC<
         onClear={onClearDraft}
       />
       <OptimiseProfileRailChip variant="tab" />
-      <button
-        type="button"
-        className={`linkedin-writer-header-studio-tab linkedin-writer-header-studio-tab--persona${
-          showPreferencesModal
-            ? " linkedin-writer-header-studio-tab--active"
-            : ""
-        }`}
-        title="Content Persona — Set your writing voice"
-        aria-expanded={showPreferencesModal}
-        aria-haspopup="dialog"
-        role="tab"
-        onClick={onTogglePreferences}
-      >
-        <span className="linkedin-writer-header-studio-tab-label linkedin-writer-header-studio-tab-label--stacked">
-          <span>Content</span>
-          <span>Persona</span>
-        </span>
-        <span className="linkedin-writer-header-studio-tab-icon" aria-hidden>
-          ⚙️
-        </span>
-      </button>
+      <div className="linkedin-writer-header-persona-tab-wrap">
+        <button
+          type="button"
+          className={`linkedin-writer-header-studio-tab linkedin-writer-header-studio-tab--persona${
+            showPreferencesModal
+              ? " linkedin-writer-header-studio-tab--active"
+              : ""
+          }`}
+          title="Content Persona — Set your writing voice"
+          aria-expanded={showPreferencesModal}
+          aria-haspopup="dialog"
+          role="tab"
+          onClick={onTogglePreferences}
+        >
+          <span className="linkedin-writer-header-studio-tab-label linkedin-writer-header-studio-tab-label--stacked">
+            <span>Content</span>
+            <span>Persona</span>
+          </span>
+          <span className="linkedin-writer-header-studio-tab-icon" aria-hidden>
+            ⚙️
+          </span>
+        </button>
+      </div>
     </div>
   );
 };

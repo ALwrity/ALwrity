@@ -89,6 +89,26 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
   const completedCount = phases.filter(p => p.completed).length;
   const completionPct = totalPhases > 0 ? Math.round((completedCount / totalPhases) * 100) : 0;
 
+  const PHASE_NUMBERS: Record<string, number> = {
+    research: 1,
+    outline: 2,
+    content: 3,
+    seo: 4,
+    publish: 5,
+  };
+
+  const getPhaseLabel = (phaseId: string): string => {
+    const num = PHASE_NUMBERS[phaseId];
+    const prefix = num ? `${num}. ` : '';
+    if (phaseId === 'research' && hasResearch) return `${prefix}Re-Research`;
+    if (phaseId === 'research') return `${prefix}Research`;
+    if (phaseId === 'outline') return `${prefix}Create`;
+    if (phaseId === 'content') return `${prefix}Content`;
+    if (phaseId === 'seo') return `${prefix}SEO`;
+    if (phaseId === 'publish') return `${prefix}Publish`;
+    return `${prefix}${phaseId.charAt(0).toUpperCase() + phaseId.slice(1)}`;
+  };
+
   const getActionForPhase = (phaseId: string): { label: string; handler: (() => void) | null } => {
     if (!actionHandlers) {
       return { label: '', handler: null };
@@ -338,7 +358,7 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
                 title={
                   <Box>
                     <Box sx={{ fontWeight: 700, mb: 0.5, fontSize: '0.875rem' }}>
-                      {phase.id === 'research' && hasResearch ? 'Re-Research' : phase.id === 'research' && !hasResearch && researchKeywords ? 'Click To Research' : phase.id === 'research' && !hasResearch ? 'Start Now' : phase.id === 'outline' && hasOutline ? 'Re-Generate' : phase.id === 'outline' && !hasOutline ? 'Create Now' : phase.id === 'content' && hasContent ? 'Re-Content' : phase.id === 'seo' ? (hasSEOAnalysis ? 'Re-Analyze SEO' : 'SEO Analysis') : phase.name}
+                      {getPhaseLabel(phase.id)}
                     </Box>
                     <Box sx={{ fontSize: '0.75rem', opacity: 0.9 }}>
                       {isDisabled
@@ -366,7 +386,7 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
                     <Box component="span" sx={{ fontSize: '12px', flexShrink: 0 }}>✓</Box>
                   )}
                   <Box component="span" sx={{ flexShrink: 0 }}>
-                    {phase.id === 'research' && hasResearch ? 'Re-Research' : phase.id === 'research' && !hasResearch && researchKeywords ? 'Click To Research' : phase.id === 'research' && !hasResearch ? 'Start Now' : phase.id === 'outline' && hasOutline ? 'Re-Generate' : phase.id === 'outline' && !hasOutline ? 'Create Now' : phase.id === 'content' && hasContent ? 'Re-Content' : phase.id === 'seo' ? (hasSEOAnalysis ? 'Re-Analyze SEO' : 'SEO Analysis') : phase.name}
+                    {getPhaseLabel(phase.id)}
                   </Box>
                 </Box>
               </Tooltip>
@@ -406,31 +426,47 @@ export const PhaseNavigation: React.FC<PhaseNavigationProps> = ({
               alignItems: 'center',
               gap: 0.5,
               ml: 0.5,
-              position: 'relative',
               cursor: 'pointer',
             }}>
-              <CircularProgress
-                variant="determinate"
-                value={completionPct}
-                size={26}
-                thickness={3}
-                sx={{
-                  color: completionPct === 100 ? '#10b981' : '#2563eb',
-                }}
-              />
+              <Box sx={{
+                position: 'relative',
+                display: 'flex',
+                alignItems: 'center',
+              }}>
+                <CircularProgress
+                  variant="determinate"
+                  value={completionPct}
+                  size={26}
+                  thickness={3}
+                  sx={{
+                    color: completionPct === 100 ? '#10b981' : '#2563eb',
+                  }}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontSize: '0.65rem',
+                    fontWeight: 700,
+                    color: '#64748b',
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                  }}
+                >
+                  {completionPct > 0 ? completionPct : '—'}
+                </Typography>
+              </Box>
               <Typography
                 variant="caption"
                 sx={{
-                  fontSize: '0.65rem',
-                  fontWeight: 700,
-                  color: '#64748b',
-                  position: 'absolute',
-                  top: '50%',
-                  left: '50%',
-                  transform: 'translate(-50%, -50%)',
+                  fontSize: '0.7rem',
+                  fontWeight: 500,
+                  color: '#94a3b8',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                {completionPct}
+                📋 {completedCount}/{totalPhases}
               </Typography>
             </Box>
           </Tooltip>

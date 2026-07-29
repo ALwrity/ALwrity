@@ -5,6 +5,7 @@ Generates 5 premium SEO-optimized titles using research data and outline context
 """
 
 from typing import Dict, Any, List
+from datetime import datetime
 from loguru import logger
 
 from models.blog_models import BlogResearchResponse, BlogOutlineSection
@@ -77,6 +78,7 @@ SEO REQUIREMENTS:
 - Avoid generic phrasing - be specific and benefit-focused
 - Target the search intent: {search_intent}
 - Ensure titles are compelling and click-worthy
+- No year in titles (you are writing in {datetime.now().year}, no need to state it)
 
 Return ONLY a JSON array of exactly 5 titles:
 [

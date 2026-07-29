@@ -58,6 +58,7 @@ export const BlogWriterLandingSection: React.FC<BlogWriterLandingSectionProps> =
           navigateToPhase={navigateToPhase}
           hasResearch={!!research}
           onRestoreAsset={onRestoreAsset}
+          currentPhase={currentPhase}
         />
       );
     }
@@ -71,6 +72,7 @@ export const BlogWriterLandingSection: React.FC<BlogWriterLandingSectionProps> =
           navigateToPhase={navigateToPhase}
           hasResearch={!!research}
           onRestoreAsset={onRestoreAsset}
+          currentPhase={currentPhase}
         />
       );
     }

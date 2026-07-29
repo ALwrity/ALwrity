@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any
 from enum import Enum
 
 
@@ -240,6 +240,7 @@ class BlogOptimizeResponse(BaseModel):
     success: bool = True
     optimized: str
     diff_preview: Optional[str] = None
+    error: Optional[str] = None
 
 
 class BlogSEOAnalyzeRequest(BaseModel):
