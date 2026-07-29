@@ -6,7 +6,7 @@ import {
 } from "../../services/linkedInWriterApi";
 import {
   mapPostType,
-  mapTone,
+  mapToneFromPrefs,
   mapIndustry,
   mapSearchEngine,
   readPrefs,
@@ -308,7 +308,7 @@ const RegisterLinkedInActions: React.FC = () => {
         topic: args?.topic || prefs.topic || "AI transformation in business",
         industry: mapIndustry(args?.industry || prefs.industry),
         post_type: mapPostType(args?.post_type || prefs.post_type),
-        tone: mapTone(args?.tone || prefs.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone),
         target_audience:
           args?.target_audience ||
           prefs.target_audience ||
@@ -572,7 +572,7 @@ const RegisterLinkedInActions: React.FC = () => {
         topic:
           args?.topic || prefs.topic || "Digital transformation strategies",
         industry: mapIndustry(args?.industry || prefs.industry),
-        tone: mapTone(args?.tone || prefs.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone),
         target_audience:
           args?.target_audience ||
           prefs.target_audience ||
@@ -798,7 +798,7 @@ const RegisterLinkedInActions: React.FC = () => {
         topic: args?.topic || prefs.topic || "Professional development tips",
         industry: mapIndustry(args?.industry || prefs.industry),
         number_of_slides: args?.number_of_slides || prefs.number_of_slides || 8,
-        tone: mapTone(args?.tone || prefs.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone),
         target_audience:
           args?.target_audience ||
           prefs.target_audience ||
@@ -968,7 +968,7 @@ const RegisterLinkedInActions: React.FC = () => {
         topic: args?.topic || prefs.topic || "Professional networking tips",
         industry: mapIndustry(args?.industry || prefs.industry),
         video_length: args?.video_length || prefs.video_length || 60,
-        tone: mapTone(args?.tone || prefs.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone),
         target_audience:
           args?.target_audience ||
           prefs.target_audience ||
@@ -1282,7 +1282,7 @@ const RegisterLinkedInActions: React.FC = () => {
           args?.comment || prefs.comment || "Sample comment to respond to",
         response_type:
           args?.response_type || prefs.response_type || "professional",
-        tone: mapTone(args?.tone || prefs.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone),
         include_question:
           args?.include_question ?? prefs.include_question ?? false,
         brand_voice: args?.brand_voice || prefs.brand_voice,

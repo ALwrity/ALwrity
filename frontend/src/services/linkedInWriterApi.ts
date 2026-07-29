@@ -56,7 +56,7 @@ export interface LinkedInPostRequest {
   topic: string;
   industry: string;
   post_type?: LinkedInPostType;
-  tone?: LinkedInTone;
+  tone?: LinkedInTone | string;
   target_audience?: string;
   key_points?: string[];
   include_hashtags?: boolean;
@@ -78,7 +78,7 @@ export interface LinkedInOutlineSection {
 export interface LinkedInArticleRequest {
   topic: string;
   industry: string;
-  tone?: LinkedInTone;
+  tone?: LinkedInTone | string;
   target_audience?: string;
   key_sections?: string[];
   include_images?: boolean;
@@ -94,7 +94,7 @@ export interface LinkedInArticleRequest {
 export interface LinkedInOutlineRequest {
   topic: string;
   industry: string;
-  tone?: LinkedInTone;
+  tone?: LinkedInTone | string;
   target_audience?: string;
   word_count?: number;
   research_enabled?: boolean;
@@ -121,7 +121,7 @@ export interface LinkedInCarouselRequest {
   topic: string;
   industry: string;
   number_of_slides?: number;
-  tone?: LinkedInTone;
+  tone?: LinkedInTone | string;
   target_audience?: string;
   key_takeaways?: string[];
   include_cover_slide?: boolean;
@@ -133,7 +133,7 @@ export interface LinkedInVideoScriptRequest {
   topic: string;
   industry: string;
   video_length?: number;
-  tone?: LinkedInTone;
+  tone?: LinkedInTone | string;
   target_audience?: string;
   key_messages?: string[];
   include_hook?: boolean;
@@ -144,7 +144,7 @@ export interface LinkedInCommentResponseRequest {
   original_post: string;
   comment: string;
   response_type?: 'professional' | 'appreciative' | 'clarifying' | 'disagreement' | 'value_add';
-  tone?: LinkedInTone;
+  tone?: LinkedInTone | string;
   include_question?: boolean;
   brand_voice?: string;
 }

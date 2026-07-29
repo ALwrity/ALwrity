@@ -163,9 +163,17 @@ export function mapPostType(postType: string | undefined): LinkedInPostType {
   return LinkedInPostType.PROFESSIONAL;
 }
 
-export function mapTone(tone: string | undefined): LinkedInTone {
+export function mapTone(
+  tone: string | undefined,
+  customTone?: string,
+): LinkedInTone | string {
   const t = normalizeEnum(tone);
   if (!t) return LinkedInTone.PROFESSIONAL;
+
+  if (t === "custom") {
+    const custom = (customTone || "").trim();
+    return custom || LinkedInTone.PROFESSIONAL;
+  }
 
   const exact = VALID_TONES.find((v) => v.toLowerCase() === t);
   if (exact) return exact as LinkedInTone;
@@ -182,6 +190,18 @@ export function mapTone(tone: string | undefined): LinkedInTone {
     return LinkedInTone.FRIENDLY;
 
   return LinkedInTone.PROFESSIONAL;
+}
+
+/** Resolve tone for API calls using stored LinkedIn Writer preferences. */
+export function mapToneFromPrefs(
+  prefs: Record<string, unknown>,
+  overrideTone?: string,
+): LinkedInTone | string {
+  const tone =
+    typeof overrideTone === "string" ? overrideTone : (prefs.tone as string | undefined);
+  const customTone =
+    typeof prefs.custom_tone === "string" ? prefs.custom_tone : undefined;
+  return mapTone(tone, customTone);
 }
 
 export function mapIndustry(industry: string | undefined): string {
