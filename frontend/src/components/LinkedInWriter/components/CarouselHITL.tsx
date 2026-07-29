@@ -13,6 +13,8 @@ import {
   VALID_TONES,
   VALID_INDUSTRIES,
 } from "../utils/linkedInWriterUtils";
+import { CustomToneSelect } from "./CustomToneSelect";
+import { isCustomToneSelection } from "../utils/storageUtils";
 
 interface CarouselHITLProps {
   args: any;
@@ -35,10 +37,17 @@ const CarouselHITL: React.FC<CarouselHITLProps> = ({ args, respond }) => {
     visual_style: args.visual_style ?? prefs.visual_style ?? "professional",
   });
 
+  const [customTone, setCustomTone] = React.useState(
+    args?.custom_tone ?? prefs.custom_tone ?? "",
+  );
   const [isLoading, setIsLoading] = React.useState(false);
 
   const run = async () => {
     try {
+      if (isCustomToneSelection(form.tone) && !customTone.trim()) {
+        logAssistant("Please enter a custom tone or select a preset tone.");
+        return;
+      }
       setIsLoading(true);
 
       // Emit loading start event
@@ -64,7 +73,7 @@ const CarouselHITL: React.FC<CarouselHITLProps> = ({ args, respond }) => {
       const request: LinkedInCarouselRequest = {
         topic: form.topic,
         target_audience: form.target_audience,
-        tone: mapTone(form.tone),
+        tone: mapTone(form.tone, customTone),
         industry: mapIndustry(form.industry),
         number_of_slides: form.number_of_slides,
         key_takeaways: form.key_takeaways,
@@ -78,6 +87,7 @@ const CarouselHITL: React.FC<CarouselHITLProps> = ({ args, respond }) => {
       // Write preferences
       writePrefs({
         tone: form.tone,
+        custom_tone: customTone,
         industry: form.industry,
         target_audience: form.target_audience,
         number_of_slides: form.number_of_slides,
@@ -172,18 +182,19 @@ const CarouselHITL: React.FC<CarouselHITLProps> = ({ args, respond }) => {
       </div>
 
       <div className="form-group">
-        <label htmlFor="tone">Tone</label>
-        <select
+        <CustomToneSelect
           id="tone"
-          value={form.tone}
-          onChange={(e) => setForm({ ...form, tone: e.target.value })}
-        >
-          {VALID_TONES.map((tone) => (
-            <option key={tone} value={tone}>
-              {tone.charAt(0).toUpperCase() + tone.slice(1)}
-            </option>
-          ))}
-        </select>
+          tone={form.tone}
+          customTone={customTone}
+          presets={VALID_TONES}
+          onChange={({ tone, custom_tone }) => {
+            setForm({ ...form, tone });
+            setCustomTone(custom_tone ?? "");
+          }}
+          formatOption={(tone) =>
+            tone.charAt(0).toUpperCase() + tone.slice(1)
+          }
+        />
       </div>
 
       <div className="form-group">

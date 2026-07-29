@@ -208,7 +208,7 @@ export function useLinkedInWriter() {
         topic: params?.topic || prefs.topic || "AI transformation in business",
         industry: mapIndustry(params?.industry || prefs.industry),
         post_type: mapPostType(params?.post_type || prefs.post_type),
-        tone: mapToneFromPrefs(prefs, params?.tone),
+        tone: mapToneFromPrefs(prefs, params?.tone, params?.custom_tone),
         target_audience:
           params?.target_audience ||
           prefs.target_audience ||
@@ -371,7 +371,7 @@ export function useLinkedInWriter() {
           topic:
             params?.topic || prefs.topic || "Digital transformation strategies",
           industry: mapIndustry(params?.industry || prefs.industry),
-          tone: mapToneFromPrefs(prefs, params?.tone),
+          tone: mapToneFromPrefs(prefs, params?.tone, params?.custom_tone),
           target_audience:
             params?.target_audience ||
             prefs.target_audience ||
@@ -518,7 +518,7 @@ export function useLinkedInWriter() {
         industry: mapIndustry(params?.industry || prefs.industry),
         number_of_slides:
           params?.number_of_slides || prefs.number_of_slides || 8,
-        tone: mapToneFromPrefs(prefs, params?.tone),
+        tone: mapToneFromPrefs(prefs, params?.tone, params?.custom_tone),
         target_audience:
           params?.target_audience ||
           prefs.target_audience ||
@@ -646,7 +646,7 @@ export function useLinkedInWriter() {
         topic: params?.topic || prefs.topic || "Professional networking tips",
         industry: mapIndustry(params?.industry || prefs.industry),
         video_length: params?.video_length || prefs.video_length || 60,
-        tone: mapToneFromPrefs(prefs, params?.tone),
+        tone: mapToneFromPrefs(prefs, params?.tone, params?.custom_tone),
         target_audience:
           params?.target_audience ||
           prefs.target_audience ||
@@ -1122,7 +1122,7 @@ export function useLinkedInWriter() {
         topic:
           params?.topic || prefs.topic || "Digital transformation strategies",
         industry: mapIndustry(params?.industry || prefs.industry),
-        tone: mapToneFromPrefs(prefs, params?.tone),
+        tone: mapToneFromPrefs(prefs, params?.tone, params?.custom_tone),
         target_audience:
           params?.target_audience ||
           prefs.target_audience ||

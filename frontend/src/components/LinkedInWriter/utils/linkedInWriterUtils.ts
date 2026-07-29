@@ -196,11 +196,16 @@ export function mapTone(
 export function mapToneFromPrefs(
   prefs: Record<string, unknown>,
   overrideTone?: string,
+  overrideCustomTone?: string,
 ): LinkedInTone | string {
   const tone =
     typeof overrideTone === "string" ? overrideTone : (prefs.tone as string | undefined);
   const customTone =
-    typeof prefs.custom_tone === "string" ? prefs.custom_tone : undefined;
+    overrideCustomTone !== undefined
+      ? overrideCustomTone
+      : typeof prefs.custom_tone === "string"
+        ? prefs.custom_tone
+        : undefined;
   return mapTone(tone, customTone);
 }
 

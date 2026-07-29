@@ -22,6 +22,8 @@ import {
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   joinHashtagSuggestions,
 } from "../utils/linkedInPostAssembly";
+import { CustomToneSelect } from "./CustomToneSelect";
+import { isCustomToneSelection } from "../utils/storageUtils";
 
 interface PostHITLProps {
   args: any;
@@ -48,11 +50,18 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
     max_length:
       args?.max_length || prefs.max_length || DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   });
+  const [customTone, setCustomTone] = React.useState(
+    args?.custom_tone || prefs.custom_tone || "",
+  );
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   const run = async () => {
     try {
+      if (isCustomToneSelection(form.tone) && !customTone.trim()) {
+        setError("Please enter a custom tone or select a preset tone.");
+        return;
+      }
       setLoading(true);
       setError(null);
 
@@ -69,7 +78,7 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
       const payload: LinkedInPostRequest = {
         ...form,
         post_type: mapPostType(form.post_type),
-        tone: mapTone(form.tone),
+        tone: mapTone(form.tone, customTone),
         industry: mapIndustry(form.industry),
         search_engine: mapSearchEngine(form.search_engine),
       };
@@ -79,7 +88,8 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
         topic: payload.topic,
         industry: payload.industry,
         post_type: payload.post_type,
-        tone: payload.tone,
+        tone: form.tone,
+        custom_tone: customTone,
         target_audience: payload.target_audience,
         key_points: payload.key_points,
         include_hashtags: payload.include_hashtags,
@@ -273,35 +283,40 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
           </select>
         </div>
 
-        <div>
-          <label
-            style={{
-              display: "block",
-              marginBottom: 4,
-              fontWeight: 500,
-              color: "#333",
-            }}
-          >
-            Tone
-          </label>
-          <select
-            value={form.tone}
-            onChange={(e) => set("tone", e.target.value)}
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              fontSize: 14,
-            }}
-          >
-            {VALID_TONES.map((tone) => (
-              <option key={tone} value={tone}>
-                {tone.charAt(0).toUpperCase() + tone.slice(1)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <CustomToneSelect
+          tone={form.tone}
+          customTone={customTone}
+          presets={VALID_TONES}
+          onChange={({ tone, custom_tone }) => {
+            set("tone", tone);
+            setCustomTone(custom_tone ?? "");
+          }}
+          formatOption={(tone) =>
+            tone.charAt(0).toUpperCase() + tone.slice(1)
+          }
+          labelStyle={{
+            display: "block",
+            marginBottom: 4,
+            fontWeight: 500,
+            color: "#333",
+          }}
+          selectStyle={{
+            width: "100%",
+            padding: "8px 12px",
+            border: "1px solid #ddd",
+            borderRadius: 4,
+            fontSize: 14,
+          }}
+          inputStyle={{
+            width: "100%",
+            marginTop: 8,
+            padding: "8px 12px",
+            border: "1px solid #ddd",
+            borderRadius: 4,
+            fontSize: 14,
+            boxSizing: "border-box",
+          }}
+        />
 
         <div>
           <label

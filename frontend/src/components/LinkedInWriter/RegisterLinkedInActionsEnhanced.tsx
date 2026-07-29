@@ -180,7 +180,7 @@ const RegisterLinkedInActionsEnhanced: React.FC = () => {
         topic: args?.topic || prefs.topic || "AI transformation in business",
         industry: mapIndustry(args?.industry || prefs.industry),
         post_type: mapPostType(args?.post_type || prefs.post_type),
-        tone: mapToneFromPrefs(prefs, args?.tone),
+        tone: mapToneFromPrefs(prefs, args?.tone, args?.custom_tone),
         target_audience:
           args?.target_audience ||
           prefs.target_audience ||

@@ -118,7 +118,7 @@ export const ContentPersonaPreferencesBody: React.FC<
                   custom_tone: e.target.value,
                 })
               }
-              placeholder="Describe your desired tone (e.g., Bold and witty)"
+              placeholder="Enter custom tone (e.g., Energetic & direct)"
             />
           )}
         </div>
