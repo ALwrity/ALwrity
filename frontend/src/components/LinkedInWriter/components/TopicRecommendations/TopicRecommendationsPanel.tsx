@@ -1,4 +1,5 @@
 import React from "react";
+import { CircularProgress } from "@mui/material";
 
 import type {
   LinkedInTopicRecommendation,
@@ -7,9 +8,13 @@ import type {
 } from "../../../../api/linkedinSocial";
 import { linkedInPlaceholderCardStyles } from "../linkedInPlaceholderStyles";
 import { TopicRecommendationCard } from "./TopicRecommendationCard";
-import { formatRelativeUpdatedAt } from "./topicRecommendationLabels";
+import {
+  formatRelativeUpdatedAt,
+  TOPIC_RECOMMENDATION_REFRESH_STEPS,
+} from "./topicRecommendationLabels";
 import { TopicRecommendationsSummaryBar } from "./TopicRecommendationsSummaryBar";
 import { AnalysisErrorAlert } from "./TopicSuggestionIntro";
+import { AnalysisStepIndicator } from "../shared/AnalysisStepIndicator";
 
 interface TopicRecommendationsPanelProps {
   recommendations: LinkedInTopicRecommendation[] | null;
@@ -62,6 +67,18 @@ const panelBackgroundGlowStyle: React.CSSProperties = {
   zIndex: 0,
 };
 
+const refreshButtonStyle: React.CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 8,
+  border: "1px solid #cbd5e1",
+  backgroundColor: "#fff",
+  color: "#0A66C2",
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
+};
+
 export const TopicRecommendationsPanel: React.FC<
   TopicRecommendationsPanelProps
 > = ({
@@ -82,15 +99,15 @@ export const TopicRecommendationsPanel: React.FC<
     recommendationsMeta?.recommendations_updated_at,
   );
   const recommendationCount = recommendations?.length ?? 0;
-  const showSkeleton = isRefreshing && !recommendations?.length;
+  const showRefreshProgress = isRefreshing;
   const displayError = analysisError?.user_message ?? recommendationsError;
-  const showError = Boolean(displayError) && !showSkeleton;
+  const showError = Boolean(displayError) && !showRefreshProgress;
   const showEmpty =
-    !showSkeleton &&
+    !showRefreshProgress &&
     !showError &&
     (!recommendations || recommendations.length === 0);
   const showRecommendationCards =
-    !showSkeleton &&
+    !showRefreshProgress &&
     !showError &&
     recommendations &&
     recommendations.length > 0;
@@ -198,13 +215,45 @@ export const TopicRecommendationsPanel: React.FC<
             </div>
           )}
 
-          {isModal && updatedLabel && (
+          {isModal && onRefresh && (
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                marginBottom: 12,
+              }}
+            >
+              <p style={{ margin: 0, fontSize: 12, color: "#94a3b8" }}>
+                {isRefreshing
+                  ? "Generating fresh topic ideas…"
+                  : updatedLabel || "Personalized ideas for your profile"}
+              </p>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={isRefreshing}
+                aria-label="Refresh topic ideas"
+                style={{
+                  ...refreshButtonStyle,
+                  cursor: isRefreshing ? "default" : "pointer",
+                  opacity: isRefreshing ? 0.7 : 1,
+                }}
+              >
+                {isRefreshing ? "Refreshing…" : "Refresh"}
+              </button>
+            </div>
+          )}
+
+          {isModal && !onRefresh && updatedLabel && (
             <p style={{ margin: "0 0 12px", fontSize: 12, color: "#94a3b8" }}>
               {updatedLabel}
             </p>
           )}
 
-          {showSkeleton && (
+          {showRefreshProgress && (
             <>
               <style>{`
                 @keyframes linkedinTopicRecShimmer {
@@ -215,6 +264,24 @@ export const TopicRecommendationsPanel: React.FC<
               <div
                 style={{ display: "flex", flexDirection: "column", gap: 12 }}
               >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    color: "#64748b",
+                    fontSize: 14,
+                    marginBottom: 4,
+                  }}
+                >
+                  <CircularProgress size={20} sx={{ color: "#0A66C2" }} />
+                  {isModal
+                    ? "Generating fresh topic ideas…"
+                    : "Updating topic ideas…"}
+                </div>
+                <AnalysisStepIndicator
+                  steps={[...TOPIC_RECOMMENDATION_REFRESH_STEPS]}
+                />
                 {Array.from({ length: SKELETON_COUNT }, (_, index) => (
                   <div key={index} style={SKELETON_CARD_STYLE} aria-hidden />
                 ))}
