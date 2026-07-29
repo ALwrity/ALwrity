@@ -3,6 +3,7 @@ import {
   CONNECT_GATED_WORKFLOW_IDS,
   DASHBOARD_WORKFLOW_CARDS,
   FRAME_COLOR,
+  PLAN_PINNED_HINT_KEY,
   WEDGE_PANEL_GAP_DEG,
   resolveDashboardWorkflowIcon,
   type DashboardWorkflowCardId,
@@ -32,7 +33,6 @@ const LABEL_POLISH: Partial<Record<DashboardWorkflowCardId, LabelPolish>> = {
 };
 
 const RECOMMENDED_CARD_ID: DashboardWorkflowCardId = "plan";
-const PLAN_PINNED_HINT_KEY = "linkedin_dashboard_plan_hint_dismissed";
 const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
 const OUTER_BULGE_FACTOR = 0.14;
 const HOVER_POP_PX = 10;
@@ -333,9 +333,7 @@ export const DashboardRadialWorkflow: React.FC<
               boxSizing: "border-box",
             }}
           >
-            {isRecommended && (
-              <PlanStartHereBadge accent={card.accent} />
-            )}
+            {isRecommended && <PlanStartHereBadge />}
             <div
               style={{
                 display: "flex",

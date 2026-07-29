@@ -9,6 +9,7 @@ import {
   resolvePersonaTone,
 } from "../utils/storageUtils";
 import { OptimiseProfileControl } from "./dashboard/OptimiseProfileControl";
+import "./persona/content-persona-preferences.css";
 
 interface ContentPersonaPreferencesBodyProps {
   userPreferences: LinkedInPreferences;
@@ -22,7 +23,6 @@ interface ContentPersonaPreferencesBodyProps {
   onPreferenceChange: (key: keyof LinkedInPreferences, value: unknown) => void;
   onPreferencesChange: (prefs: Partial<LinkedInPreferences>) => void;
   onPersonaUpdate: (personaData: unknown) => void;
-  onClose: () => void;
   /** Hide profile strength row on mobile — Optimise lives in header tabs. */
   showProfileStrength?: boolean;
 }
@@ -41,7 +41,6 @@ export const ContentPersonaPreferencesBody: React.FC<
   onPreferenceChange,
   onPreferencesChange,
   onPersonaUpdate,
-  onClose,
   showProfileStrength = true,
 }) => {
   const personaTone = resolvePersonaTone(userPreferences);
@@ -74,88 +73,20 @@ export const ContentPersonaPreferencesBody: React.FC<
           />
         </div>
       )}
-      <div style={{ fontSize: "12px", color: "#666", marginBottom: "16px" }}>
+
+      <div className="content-persona-summary">
         <strong>Current Settings:</strong> {personaTone} tone •{" "}
         {userPreferences.industry || "Not set"} industry • {chatHistory.length}{" "}
         messages
       </div>
-      <div
-        style={{
-          border: "1px solid #e2e8f0",
-          borderRadius: "8px",
-          padding: "16px",
-          marginBottom: "16px",
-          background: "#f8f9fa",
-        }}
-      >
-        <div style={{ marginBottom: "12px" }}>
-          <h5
-            style={{
-              margin: 0,
-              color: "#2d3748",
-              fontSize: "14px",
-              fontWeight: "600",
-            }}
-          >
-            Writing Persona
-          </h5>
-          <p
-            style={{
-              margin: "6px 0 0",
-              fontSize: "11px",
-              color: "#64748b",
-              lineHeight: 1.45,
-            }}
-          >
-            Persona is applied when available. Click the persona chip below to
-            edit your writing style.
-          </p>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "12px",
-            padding: "12px",
-            background: "white",
-            borderRadius: "6px",
-            border: "1px solid #e2e8f0",
-          }}
-        >
-          <PersonaChip platform="linkedin" onPersonaUpdate={onPersonaUpdate} />
-        </div>
-        <div
-          style={{
-            marginTop: "8px",
-            fontSize: "11px",
-            color: "#666",
-            fontStyle: "italic",
-          }}
-        >
-          Click persona to edit writing style, tone, and preferences
-        </div>
-      </div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "12px",
-          marginBottom: "16px",
-        }}
-      >
-        <div style={{ gridColumn: showCustomToneInput ? "1 / -1" : undefined }}>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>Tone</div>
+
+      <div className="content-persona-prefs-grid">
+        <div className={showCustomToneInput ? "content-persona-prefs-grid--wide" : undefined}>
+          <div className="content-persona-field-label">Tone</div>
           <select
+            className="content-persona-field-input"
             value={toneDropdownValue}
             onChange={(e) => handleToneSelect(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              background: "#f8f9fa",
-              fontSize: "12px",
-            }}
           >
             {LINKEDIN_PRESET_TONES.map((tone) => (
               <option key={tone} value={tone}>
@@ -168,6 +99,7 @@ export const ContentPersonaPreferencesBody: React.FC<
           </select>
           {showCustomToneInput && (
             <input
+              className="content-persona-field-input content-persona-field-input--custom-tone"
               value={userPreferences.custom_tone || ""}
               onChange={(e) =>
                 onPreferencesChange({
@@ -176,71 +108,40 @@ export const ContentPersonaPreferencesBody: React.FC<
                 })
               }
               placeholder="Describe your desired tone (e.g., Bold and witty)"
-              style={{
-                width: "100%",
-                marginTop: 8,
-                padding: "6px 8px",
-                border: "1px solid #ddd",
-                borderRadius: 4,
-                background: "#fff",
-                fontSize: "12px",
-              }}
             />
           )}
         </div>
+
         <div>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-            Industry
-          </div>
+          <div className="content-persona-field-label">Industry</div>
           <input
+            className="content-persona-field-input"
             value={userPreferences.industry}
             onChange={(e) => onPreferenceChange("industry", e.target.value)}
             placeholder="e.g., Technology"
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              background: "#f8f9fa",
-              fontSize: "12px",
-            }}
           />
         </div>
+
         <div>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-            Target Audience
-          </div>
+          <div className="content-persona-field-label">Target Audience</div>
           <input
+            className="content-persona-field-input"
             value={userPreferences.target_audience}
             onChange={(e) =>
               onPreferenceChange("target_audience", e.target.value)
             }
             placeholder="e.g., Product Managers"
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              background: "#f8f9fa",
-              fontSize: "12px",
-            }}
           />
         </div>
+
         <div>
-          <div style={{ fontSize: 12, color: "#666", marginBottom: 4 }}>
-            Writing Style
-          </div>
+          <div className="content-persona-field-label">Writing Style</div>
           <select
+            className="content-persona-field-input"
             value={userPreferences.writing_style}
-            onChange={(e) => onPreferenceChange("writing_style", e.target.value)}
-            style={{
-              width: "100%",
-              padding: "6px 8px",
-              border: "1px solid #ddd",
-              borderRadius: 4,
-              background: "#f8f9fa",
-              fontSize: "12px",
-            }}
+            onChange={(e) =>
+              onPreferenceChange("writing_style", e.target.value)
+            }
           >
             <option>Clear and Concise</option>
             <option>Storytelling</option>
@@ -249,152 +150,67 @@ export const ContentPersonaPreferencesBody: React.FC<
           </select>
         </div>
       </div>
-      <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: "12px",
-          }}
-        >
+
+      <div className="content-persona-checkboxes">
+        <label className="content-persona-checkbox-label">
           <input
             type="checkbox"
             checked={userPreferences.hashtag_preferences}
             onChange={(e) =>
               onPreferenceChange("hashtag_preferences", e.target.checked)
             }
-            style={{ margin: 0 }}
           />
           Include Hashtags
         </label>
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontSize: "12px",
-          }}
-        >
+        <label className="content-persona-checkbox-label">
           <input
             type="checkbox"
             checked={userPreferences.cta_preferences}
             onChange={(e) =>
               onPreferenceChange("cta_preferences", e.target.checked)
             }
-            style={{ margin: 0 }}
           />
           Include Call-to-Action
         </label>
       </div>
-      <div
-        style={{
-          borderTop: "1px solid #e9ecef",
-          paddingTop: "12px",
-          fontSize: "11px",
-        }}
-      >
-        <div style={{ marginBottom: "8px", fontWeight: 600, color: "#333" }}>
-          Current Context:
-        </div>
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+
+      <div className="content-persona-context">
+        <div className="content-persona-context__title">Current Context:</div>
+        <div className="content-persona-context__chips">
           {personaTone && (
-            <span
-              style={{
-                background: "#e3f2fd",
-                color: "#1976d2",
-                padding: "2px 6px",
-                borderRadius: 8,
-                fontSize: "10px",
-              }}
-            >
+            <span className="content-persona-context__chip content-persona-context__chip--tone">
               {personaTone}
             </span>
           )}
           {userPreferences.industry && (
-            <span
-              style={{
-                background: "#f3e5f5",
-                color: "#7b1fa2",
-                padding: "2px 6px",
-                borderRadius: 8,
-                fontSize: "10px",
-              }}
-            >
+            <span className="content-persona-context__chip content-persona-context__chip--industry">
               {userPreferences.industry}
             </span>
           )}
           {userPreferences.target_audience && (
-            <span
-              style={{
-                background: "#e8f5e8",
-                color: "#388e3c",
-                padding: "2px 6px",
-                borderRadius: 8,
-                fontSize: "10px",
-              }}
-            >
+            <span className="content-persona-context__chip content-persona-context__chip--audience">
               {userPreferences.target_audience}
             </span>
           )}
-          <span
-            style={{
-              background: "#fff3e0",
-              color: "#f57c00",
-              padding: "2px 6px",
-              borderRadius: 8,
-              fontSize: "10px",
-            }}
-          >
+          <span className="content-persona-context__chip content-persona-context__chip--messages">
             {chatHistory.length} messages
           </span>
         </div>
       </div>
-      <div
-        style={{
-          borderTop: "1px solid #e9ecef",
-          paddingTop: "12px",
-          marginTop: "12px",
-        }}
-      >
-        <div
-          style={{
-            marginBottom: "8px",
-            fontWeight: 600,
-            color: "#333",
-            fontSize: "12px",
-          }}
-        >
-          Quick Actions
+
+      <div className="content-persona-writing-box">
+        <div className="content-persona-writing-box__header">
+          <h5 className="content-persona-writing-box__title">Writing Persona</h5>
+          <p className="content-persona-writing-box__desc">
+            Persona is applied when available. Click the persona chip below to
+            edit your writing style.
+          </p>
         </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              window.dispatchEvent(
-                new CustomEvent("linkedinwriter:openBrainstorm"),
-              );
-            }}
-            style={{
-              flex: 1,
-              width: "100%",
-              padding: "8px 12px",
-              background: "#f8f9fa",
-              color: "#333",
-              border: "1px solid #e2e8f0",
-              borderRadius: 6,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-            title="Brainstorm content ideas"
-          >
-            💡 Brainstorm Ideas
-          </button>
+        <div className="content-persona-writing-box__chip-row">
+          <PersonaChip platform="linkedin" onPersonaUpdate={onPersonaUpdate} />
+        </div>
+        <div className="content-persona-writing-box__hint">
+          Click persona to edit writing style, tone, and preferences
         </div>
       </div>
     </>

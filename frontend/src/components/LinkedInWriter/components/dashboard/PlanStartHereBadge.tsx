@@ -1,7 +1,6 @@
 import React, { useId } from "react";
 
 interface PlanStartHereBadgeProps {
-  accent: string;
   className?: string;
 }
 
@@ -12,7 +11,6 @@ const BOOKMARK_PATH = "M4 2 H36 V40 L20 31 L4 40 Z";
  * Mint bookmark START HERE badge — wide-screen Plan wedge only.
  */
 export const PlanStartHereBadge: React.FC<PlanStartHereBadgeProps> = ({
-  accent: _accent,
   className,
 }) => {
   const gradientId = useId().replace(/:/g, "");

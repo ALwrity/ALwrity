@@ -9,6 +9,7 @@ from services.integrations.linkedin.exceptions import LinkedInMediaValidationErr
 from services.integrations.linkedin.linkedin_publish_media_service import (
     LinkedInPublishMediaService,
 )
+from services.integrations.linkedin.types import MediaValidationResult
 
 
 @pytest.mark.anyio
@@ -24,7 +25,16 @@ async def test_resolve_ai_image_path_uses_storage_path(tmp_path: Path) -> None:
             "image_data": b"fake-image",
         }
     )
-    service = LinkedInPublishMediaService(storage=storage, upload_base=tmp_path / "uploads")
+    mock_validator = MagicMock()
+    mock_validator.validate_for_publish.return_value = MediaValidationResult(
+        valid=True,
+        errors=[],
+    )
+    service = LinkedInPublishMediaService(
+        storage=storage,
+        media_validator=mock_validator,
+        upload_base=tmp_path / "uploads",
+    )
 
     resolution = await service.resolve_for_publish(
         "user_1",

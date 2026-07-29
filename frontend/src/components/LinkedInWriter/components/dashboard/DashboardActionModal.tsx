@@ -27,6 +27,10 @@ interface DashboardActionModalProps {
   elevated?: boolean;
   /** Optional class on the modal panel (for mobile-specific layout tweaks). */
   modalClassName?: string;
+  /** Optional sticky footer (e.g. mobile Done button). */
+  footer?: React.ReactNode;
+  /** When false, modal body does not scroll internally. Default true. */
+  scrollBody?: boolean;
 }
 
 export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
@@ -46,6 +50,8 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   closeLabel,
   elevated = false,
   modalClassName,
+  footer,
+  scrollBody = true,
 }) => {
   if (!open) return null;
 
@@ -159,10 +165,19 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         </div>
         <div
           className="linkedin-dashboard-action-modal-body"
-          style={{ padding: 20, overflowY: "auto", flex: 1, minHeight: 0 }}
+          style={{
+            padding: 20,
+            overflowY: scrollBody ? "auto" : "visible",
+            overflowX: "hidden",
+            flex: scrollBody ? 1 : "0 1 auto",
+            minHeight: scrollBody ? 0 : undefined,
+          }}
         >
           {children}
         </div>
+        {footer ? (
+          <div className="linkedin-dashboard-action-modal-footer">{footer}</div>
+        ) : null}
       </div>
     </div>,
     document.body,
