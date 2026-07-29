@@ -11,24 +11,7 @@ import {
 import { OptimiseProfileControl } from "./dashboard/OptimiseProfileControl";
 import "./persona/content-persona-preferences.css";
 import { LinkedInIndustryAutocomplete } from "./LinkedInIndustryAutocomplete";
-import type { LinkedInIndustryItem } from "../utils/filterLinkedInIndustries";
-
-/** Phase 1 sample catalog — replaced in Phase 3 with cached API list. */
-const PHASE1_SAMPLE_INDUSTRY_ITEMS: LinkedInIndustryItem[] = [
-  { id: "sample-1", title: "Retail Art Supplies" },
-  { id: "sample-2", title: "Artists and Writers" },
-  { id: "sample-3", title: "Performing Arts" },
-  { id: "sample-4", title: "Retail Art Dealers" },
-  { id: "sample-5", title: "Artificial Intelligence" },
-  { id: "sample-6", title: "Performing Arts and Spectator Sports" },
-  { id: "sample-7", title: "Fine Arts Schools" },
-  { id: "sample-8", title: "Technology" },
-  { id: "sample-9", title: "Healthcare" },
-  {
-    id: "sample-10",
-    title: "Artificial Rubber and Synthetic Fiber Manufacturing",
-  },
-];
+import { useLinkedInIndustryList } from "../hooks/useLinkedInIndustryList";
 
 interface ContentPersonaPreferencesBodyProps {
   userPreferences: LinkedInPreferences;
@@ -65,6 +48,16 @@ export const ContentPersonaPreferencesBody: React.FC<
   const personaTone = resolvePersonaTone(userPreferences);
   const toneDropdownValue = getToneDropdownValue(userPreferences);
   const showCustomToneInput = isCustomToneSelection(toneDropdownValue);
+  const {
+    industries,
+    isLoading: isIndustryListLoading,
+    error: industryListError,
+    isLiveFallback,
+  } = useLinkedInIndustryList({
+    connected,
+    query: userPreferences.industry,
+    enabled: true,
+  });
 
   const handleToneSelect = (value: string) => {
     if (value === LINKEDIN_CUSTOM_TONE_OPTION) {
@@ -136,9 +129,15 @@ export const ContentPersonaPreferencesBody: React.FC<
           <LinkedInIndustryAutocomplete
             value={userPreferences.industry}
             onChange={(next) => onPreferenceChange("industry", next)}
-            items={PHASE1_SAMPLE_INDUSTRY_ITEMS}
+            items={industries}
+            isLoading={isIndustryListLoading}
             placeholder="e.g., Technology"
           />
+          {industryListError && isLiveFallback && (
+            <div style={{ marginTop: 4, fontSize: 10, color: "#64748b" }}>
+              Suggestions unavailable — you can still type your industry.
+            </div>
+          )}
         </div>
 
         <div>

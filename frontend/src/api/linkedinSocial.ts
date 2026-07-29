@@ -978,6 +978,22 @@ export interface LinkedInSearchParametersResponse {
   provider: string;
 }
 
+export type LinkedInIndustryCacheStatus = 'warm' | 'stale' | 'empty';
+
+export interface LinkedInIndustryItem {
+  id: string;
+  title: string;
+}
+
+export interface LinkedInIndustriesCacheResponse {
+  success: boolean;
+  items: LinkedInIndustryItem[];
+  synced_at?: string | null;
+  item_count: number;
+  cache_status: LinkedInIndustryCacheStatus;
+  provider: string;
+}
+
 const LINKEDIN_SEARCH_NOT_CONNECTED =
   'Connect your LinkedIn account to search.';
 
@@ -1002,6 +1018,14 @@ export async function getLinkedInSearchParameters(
     params,
     signal,
   });
+  return response.data;
+}
+
+/** Load cached LinkedIn industry titles for persona autocomplete. */
+export async function getLinkedInIndustries(
+  signal?: AbortSignal,
+): Promise<LinkedInIndustriesCacheResponse> {
+  const response = await apiClient.get(`${BASE}/industries`, { signal });
   return response.data;
 }
 
