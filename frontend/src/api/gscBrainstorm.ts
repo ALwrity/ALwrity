@@ -107,11 +107,12 @@ class GSCBrainstormAPI {
     });
   }
 
-  async brainstorm(keywords: string, siteUrl?: string): Promise<BrainstormResult> {
+  async brainstorm(keywords: string, siteUrl?: string, forceRefresh?: boolean): Promise<BrainstormResult> {
     const client = await this.getAuthenticatedClient();
     const response = await client.post(`${this.baseUrl}/brainstorm`, {
       keywords,
       site_url: siteUrl || undefined,
+      force_refresh: forceRefresh || false,
     });
     return response.data;
   }

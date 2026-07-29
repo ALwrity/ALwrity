@@ -57,9 +57,9 @@ export function computeBlogRadialLayout(
   outerR = Math.max(hubVisualR + MIN_WEDGE_DEPTH, outerR);
   const innerR = hubVisualR;
 
-  const iconFontSize = Math.round(Math.min(28, Math.max(15, viewW * 0.022)));
+  const iconFontSize = Math.round(Math.min(32, Math.max(16, viewW * 0.026)));
   const labelFontSize = Math.round(Math.min(16, Math.max(12, viewW * 0.014)));
-  const descFontSize = Math.round(Math.min(12, Math.max(10, viewW * 0.011)));
+  const descFontSize = Math.round(Math.min(13, Math.max(10, viewW * 0.012)));
 
   const extent = outerVisualRadius(outerR);
   const centerY = Math.round(extent + RING_EDGE_PAD);
@@ -70,8 +70,8 @@ export function computeBlogRadialLayout(
   const halfSliceDeg = WORKFLOW_WEDGE_SLICE_DEG / 2 - WEDGE_PANEL_GAP_DEG;
   const halfSliceRad = (halfSliceDeg * Math.PI) / 180;
   const labelBoxWidth = Math.min(
-    230,
-    Math.round(2 * midR * Math.sin(halfSliceRad) * 0.92),
+    260,
+    Math.round(2 * midR * Math.sin(halfSliceRad) * 0.95),
   );
 
   return {

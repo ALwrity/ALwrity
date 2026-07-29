@@ -30,10 +30,10 @@ export const WedgeMetricBadge: React.FC<WedgeMetricBadgeProps> = ({
       borderRadius: 999,
       padding: compact ? "1px 7px" : "2px 9px",
       lineHeight: 1.4,
-      whiteSpace: "nowrap",
       maxWidth: "100%",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
+      overflowWrap: "break-word",
+      wordBreak: "break-word",
+      textAlign: "center",
     }}
   >
     {label}

@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
-import { useCopilotTrigger } from '../../hooks/useCopilotTrigger';
-import BlogWriterPhasesSection from './BlogWriterPhasesSection';
+import React, { useState, useEffect } from 'react';
 import { BlogWorkflowHeroSection } from './dashboard/BlogWorkflowHeroSection';
+import { GSCBrainstormModal } from './GSCBrainstormModal';
+import { useGSCBrainstorm } from '../../hooks/useGSCBrainstorm';
 
 interface BlogWriterLandingProps {
   onStartWriting: () => void;
-  /** Optional: lets the new radial workflow wedges jump straight to a specific phase. */
   navigateToPhase?: (phase: string) => void;
   hasResearch?: boolean;
-  /** Optional: restores a saved blog asset (Remarket wedge "Refresh this post", Create wedge "Continue draft"). */
   onRestoreAsset?: (assetId: number) => void;
+  currentPhase?: string;
 }
 
 const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({
@@ -17,391 +16,379 @@ const BlogWriterLanding: React.FC<BlogWriterLandingProps> = ({
   navigateToPhase,
   hasResearch,
   onRestoreAsset,
+  currentPhase,
 }) => {
-  const [showSuperPowers, setShowSuperPowers] = useState(false);
-  const { triggerResearch } = useCopilotTrigger();
+  const [showBrainstorm, setShowBrainstorm] = useState(false);
 
-  const handleStartWriting = () => {
-    // Open the copilot sidebar (same functionality as LinkedIn writer)
-    const copilotButton = document.querySelector('.copilotkit-open-button') ||
-                         document.querySelector('[data-copilot-open]') ||
-                         document.querySelector('button[aria-label*="Open"]') ||
-                         document.querySelector('.alwrity-copilot-sidebar button');
-    
-    if (copilotButton) {
-      (copilotButton as HTMLElement).click();
-    } else {
-      // Fallback: scroll to bottom right where the button should be
-      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  const {
+    gscConnected,
+    isConnecting,
+    connectError,
+    isBrainstorming,
+    brainstormError,
+    brainstormResult,
+    contentOpportunities,
+    keywordGaps,
+    quickWins,
+    pageOpportunities,
+    aiRecommendations,
+    summary,
+    connectGSC,
+    brainstorm,
+    reset,
+    progressMessage,
+    lastKeywords,
+  } = useGSCBrainstorm();
+
+  const handleReRun = (keywords: string, forceRefresh?: boolean) => {
+    if (keywords.trim() && !isBrainstorming) {
+      brainstorm(keywords.trim(), undefined, forceRefresh);
     }
-    
-    // Also call the parent callback
+  };
+
+  // Auto-fill input with last keywords on mount
+  useEffect(() => {
+    if (lastKeywords) {
+      const input = document.getElementById('gsc-sidebar-input') as HTMLInputElement;
+      if (input) input.value = lastKeywords;
+    }
+  }, [lastKeywords]);
+
+  const handleSelectSuggestion = (keyword: string) => {
+    if (navigateToPhase) {
+      navigateToPhase('research');
+    }
     onStartWriting();
   };
 
-  const superPowers = [
-    {
-      icon: "🔍",
-      title: "AI-Powered Research",
-      description: "Comprehensive research with Google Search grounding, competitor analysis, and content gap identification"
-    },
-    {
-      icon: "📝",
-      title: "Intelligent Outline Generation",
-      description: "AI-generated outlines with source mapping, grounding insights, and optimization recommendations"
-    },
-    {
-      icon: "✨",
-      title: "Content Enhancement",
-      description: "Section-by-section content generation with SEO optimization and engagement improvements"
-    },
-    {
-      icon: "🎯",
-      title: "SEO Intelligence",
-      description: "Advanced SEO analysis, metadata generation, and keyword optimization for maximum visibility"
-    },
-    {
-      icon: "🔍",
-      title: "Fact-Checking & Quality",
-      description: "Hallucination detection, claim verification, and content quality assurance"
-    },
-    {
-      icon: "🚀",
-      title: "Multi-Platform Publishing",
-      description: "Direct publishing to WordPress, Wix, and other platforms with scheduling capabilities"
-    }
-  ];
-
   return (
-    <>
+    <div style={{
+      display: 'flex',
+      height: '100vh',
+      boxSizing: 'border-box',
+      background: 'linear-gradient(180deg, #f8f9ff 0%, #eef2ff 40%, #faf5ff 100%)',
+      overflow: 'hidden',
+    }}>
+      {/* Main area — wheel fills all available space */}
       <div style={{
-        position: 'relative',
-        minHeight: '100vh',
-        backgroundImage: 'url(/blog-writer-bg.png)',
-        backgroundSize: '56% auto',
-        backgroundPosition: 'left center',
-        backgroundRepeat: 'no-repeat',
-        backgroundColor: '#ffffff',
+        flex: 1,
         display: 'flex',
-        flexWrap: 'wrap',
-        alignItems: 'flex-start',
-        justifyContent: 'flex-start',
-        gap: '16px',
-        overflow: 'hidden'
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden',
+        boxSizing: 'border-box',
+        minWidth: 0,
       }}>
-
-        {/* Main content container */}
+        {/* Ambient glow */}
         <div style={{
-          position: 'relative',
-          zIndex: 2,
-          textAlign: 'left',
-          maxWidth: '400px',
-          padding: '20px 16px',
-          flex: '0 0 auto',
-          boxSizing: 'border-box'
+          position: 'absolute', inset: 0,
+          background: 'radial-gradient(ellipse 60% 60% at 50% 50%, rgba(120,119,198,0.12) 0%, rgba(25,118,210,0.06) 35%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        <div style={{
+          width: '100%',
+          maxWidth: 'min(88vw, 780px)',
+          maxHeight: 'min(82vh, 780px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
         }}>
-          {/* Main heading */}
-          <div style={{
-            marginBottom: '20px'
-          }}>
-            <h1 style={{
-              fontSize: '1.75rem',
-              fontWeight: '700',
-              background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text',
-              margin: '0 0 20px 0',
-              textShadow: '0 2px 4px rgba(0,0,0,0.1)',
-              lineHeight: '1.2'
-            }}>
-              AI-First, Contextual, Click through Blog Writer
-            </h1>
-          </div>
-
-          {/* Action buttons */}
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '12px',
-            alignItems: 'flex-start'
-          }}>
-            {/* Primary CTA Button */}
-            <button
-              onClick={handleStartWriting}
-              style={{
-                background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-                color: 'white',
-                border: 'none',
-                padding: '9px 24px',
-                borderRadius: '50px',
-                fontSize: '0.6rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(25, 118, 210, 0.3)',
-                transition: 'all 0.3s ease',
-                position: 'relative',
-                overflow: 'hidden',
-                minWidth: '140px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px) scale(1.03)';
-                e.currentTarget.style.boxShadow = '0 6px 18px rgba(25, 118, 210, 0.4)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(25, 118, 210, 0.3)';
-              }}
-            >
-              <span style={{ position: 'relative', zIndex: 2 }}>
-                ✨ Chat/Write with ALwrity Copilot
-              </span>
-              <div style={{
-                position: 'absolute',
-                top: 0,
-                left: '-100%',
-                width: '100%',
-                height: '100%',
-                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                transition: 'left 0.5s ease'
-              }} />
-            </button>
-
-            {/* Secondary CTA Button */}
-            <button
-              onClick={() => setShowSuperPowers(true)}
-              style={{
-                background: 'rgba(255, 255, 255, 0.9)',
-                color: '#1976d2',
-                border: '2px solid #1976d2',
-                padding: '7px 18px',
-                borderRadius: '50px',
-                fontSize: '0.5rem',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 2px 7px rgba(0,0,0,0.1)',
-                transition: 'all 0.3s ease',
-                backdropFilter: 'blur(10px)',
-                minWidth: '140px'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#1976d2';
-                e.currentTarget.style.color = 'white';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-                e.currentTarget.style.boxShadow = '0 3px 10px rgba(25, 118, 210, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.9)';
-                e.currentTarget.style.color = '#1976d2';
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 2px 7px rgba(0,0,0,0.1)';
-              }}
-            >
-              🚀 ALwrity Blog Writer SuperPowers
-            </button>
-          </div>
-
-
+          <BlogWorkflowHeroSection
+            inline
+            onStartWriting={onStartWriting}
+            navigateToPhase={navigateToPhase}
+            hasResearch={hasResearch}
+            onRestoreAsset={onRestoreAsset}
+            currentPhase={currentPhase}
+          />
         </div>
-
-        {/* Radial Workflow Hero (6 wedges) — now part of the same hero section,
-            sitting beside the headline and CTAs on desktop and stacking below on mobile. */}
-        <BlogWorkflowHeroSection
-          inline
-          onStartWriting={handleStartWriting}
-          navigateToPhase={navigateToPhase}
-          hasResearch={hasResearch}
-          onRestoreAsset={onRestoreAsset}
-        />
       </div>
 
-      {/* SuperPowers Modal with 6 Phases */}
-      {showSuperPowers && (
+      {/* Right sidebar area — GSC brainstorm trigger */}
+      <div style={{
+        width: 360,
+        flexShrink: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        borderLeft: '1px solid #e8ecf1',
+        background: '#fff',
+        boxShadow: '-2px 0 16px rgba(0,0,0,0.04)',
+        overflow: 'hidden',
+        zIndex: 10,
+      }}>
+        {/* Sidebar header */}
         <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.95)',
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-          zIndex: 1000,
-          overflowY: 'auto'
+          padding: '16px 18px 12px',
+          borderBottom: '1px solid #e8ecf1',
         }}>
-          <div style={{
-            backgroundColor: 'white',
-            width: '100%',
-            maxWidth: '1400px',
-            minHeight: '100%',
-            boxShadow: '0 25px 50px rgba(0, 0, 0, 0.3)'
-          }}>
-            {/* Modal Header */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '30px',
-              paddingBottom: '20px',
-              borderBottom: '2px solid #f0f0f0'
-            }}>
-              <div>
-                <h2 style={{
-                  margin: '0 0 8px 0',
-                  fontSize: '2rem',
-                  background: 'linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text'
-                }}>
-                  🚀 ALwrity Blog Writer SuperPowers
-                </h2>
-                <p style={{ margin: 0, color: '#666', fontSize: '1.1rem' }}>
-                  Discover the powerful features that make ALwrity the ultimate blog writing assistant
-                </p>
-              </div>
-              <button
-                onClick={() => setShowSuperPowers(false)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '2rem',
-                  cursor: 'pointer',
-                  color: '#999',
-                  padding: '8px',
-                  borderRadius: '50%',
-                  transition: 'all 0.2s ease'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f0f0f0';
-                  e.currentTarget.style.color = '#333';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#999';
-                }}
-              >
-                ×
-              </button>
-            </div>
+          <h3 style={{ margin: '0 0 4px', fontSize: '1rem', fontWeight: 700, color: '#1e293b' }}>
+            Brainstorm Topics
+          </h3>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.4 }}>
+            Discover content ideas from your Google Search Console data
+          </p>
+        </div>
 
-            {/* 6 Phases Section */}
-            <BlogWriterPhasesSection />
-            
-            {/* Quick SuperPowers Grid */}
-            <div style={{ padding: '40px', borderTop: '1px solid #f0f0f0' }}>
-              <h2 style={{
-                margin: '0 0 20px 0',
-                fontSize: '1.5rem',
-                textAlign: 'center',
-                color: '#333'
-              }}>
-                Quick Feature Overview
-              </h2>
+        {/* Keyword input + brainstorm trigger */}
+        <div style={{ padding: '14px 18px', borderBottom: '1px solid #f0f0f0' }}>
+          <input
+            type="text"
+            placeholder="Enter topic keywords..."
+            disabled={isBrainstorming || !gscConnected}
+            style={{
+              width: '100%',
+              padding: '10px 12px',
+              borderRadius: 10,
+              border: '1px solid #e2e8f0',
+              fontSize: '0.85rem',
+              boxSizing: 'border-box',
+              outline: 'none',
+              background: '#f8fafc',
+            }}
+            onFocus={(e) => (e.target.style.borderColor = '#1976d2')}
+            onBlur={(e) => (e.target.style.borderColor = '#e2e8f0')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                handleReRun(e.currentTarget.value);
+              }
+            }}
+            id="gsc-sidebar-input"
+          />
+          <button
+            onClick={() => {
+              const input = document.getElementById('gsc-sidebar-input') as HTMLInputElement;
+              if (input?.value.trim()) handleReRun(input.value);
+            }}
+            disabled={isBrainstorming || !gscConnected}
+            style={{
+              width: '100%',
+              marginTop: 8,
+              padding: '10px 16px',
+              borderRadius: 10,
+              border: 'none',
+              background: gscConnected && !isBrainstorming
+                ? 'linear-gradient(135deg, #1976d2 0%, #7c3aed 100%)'
+                : '#e2e8f0',
+              color: gscConnected && !isBrainstorming ? '#fff' : '#94a3b8',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: gscConnected && !isBrainstorming ? 'pointer' : 'default',
+              transition: 'all 0.2s',
+            }}
+          >
+            {isBrainstorming ? progressMessage || 'Analyzing...' : 'Brainstorm Topics'}
+          </button>
+        </div>
+
+        {/* Not connected state */}
+        {!gscConnected && (
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '24px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12, opacity: 0.4 }}>🔗</div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+              Connect Google Search Console
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginBottom: 16, lineHeight: 1.5 }}>
+              Unlock real search data to discover what your audience is searching for
+            </div>
+            <button
+              onClick={connectGSC}
+              disabled={isConnecting}
+              style={{
+                padding: '9px 24px', borderRadius: 10, border: 'none',
+                background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+                color: '#fff', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+              }}
+            >
+              {isConnecting ? 'Connecting...' : 'Connect GSC'}
+            </button>
+            {connectError && (
+              <div style={{ color: '#dc2626', fontSize: '0.75rem', marginTop: 12 }}>
+                {connectError}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quick hint — connected but no brainstorm yet */}
+        {gscConnected && !brainstormResult && !isBrainstorming && (
+          <div style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center',
+            padding: '24px', textAlign: 'center',
+          }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: 12, opacity: 0.4 }}>💡</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#334155', marginBottom: 4 }}>
+              Enter a topic above
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#94a3b8', lineHeight: 1.5 }}>
+              Type keywords related to your blog niche and click Brainstorm to analyze GSC data for content ideas
+            </div>
+          </div>
+        )}
+
+        {/* Brainstorm error */}
+        {brainstormError && !isBrainstorming && (
+          <div style={{ padding: '12px 18px' }}>
+            <div style={{
+              padding: '12px', borderRadius: 10,
+              background: '#fef2f2', color: '#dc2626',
+              fontSize: '0.8rem', lineHeight: 1.4,
+            }}>
+              {brainstormError}
+            </div>
+          </div>
+        )}
+
+        {/* Summary + Quick wins preview — scrollable */}
+        {brainstormResult && !isBrainstorming && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 18px' }}>
+            {/* Summary mini cards */}
+            {summary && (
               <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-                gap: '20px'
+                marginBottom: 14,
+                padding: '12px 14px',
+                borderRadius: 12,
+                background: 'linear-gradient(135deg, #f0f4ff 0%, #faf5ff 100%)',
+                border: '1px solid #e8ecf1',
               }}>
-                {superPowers.map((power, index) => (
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr',
+                  gap: '6px 12px',
+                }}>
+                  {[
+                    { label: 'Keywords', value: summary.total_keywords_analyzed?.toLocaleString() },
+                    { label: 'Impressions', value: summary.total_impressions?.toLocaleString() },
+                    { label: 'Clicks', value: summary.total_clicks?.toLocaleString() },
+                    { label: 'CTR', value: `${summary.avg_ctr}%` },
+                    { label: 'Avg Position', value: `${summary.avg_position}` },
+                    { label: 'SEO Health', value: `${summary.health_score}/100` },
+                  ].map((m) => (
+                    <div key={m.label}>
+                      <div style={{ fontSize: '0.65rem', color: '#94a3b8' }}>{m.label}</div>
+                      <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e293b' }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Quick wins preview */}
+            {quickWins.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontSize: '0.7rem', fontWeight: 700, color: '#059669',
+                  textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6,
+                }}>
+                  Quick Wins ({quickWins.length})
+                </div>
+                {quickWins.slice(0, 5).map((qw, i) => (
                   <div
-                    key={index}
+                    key={i}
                     style={{
-                      padding: '20px',
-                      borderRadius: '12px',
-                      border: '1px solid #e0e0e0',
-                      transition: 'all 0.3s ease'
+                      padding: '8px 12px', borderRadius: 10, border: '1px solid #e8ecf1',
+                      background: '#fafbfc', marginBottom: 6, cursor: 'pointer',
+                      transition: 'all 0.15s',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
-                      e.currentTarget.style.borderColor = '#1976d2';
+                      e.currentTarget.style.background = '#f0f4ff';
+                      e.currentTarget.style.borderColor = '#c7d2fe';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = 'none';
-                      e.currentTarget.style.borderColor = '#e0e0e0';
+                      e.currentTarget.style.background = '#fafbfc';
+                      e.currentTarget.style.borderColor = '#e8ecf1';
                     }}
+                    onClick={() => handleSelectSuggestion(qw.keyword)}
                   >
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      marginBottom: '12px'
-                    }}>
-                      <div style={{
-                        fontSize: '2rem',
-                        width: '60px',
-                        height: '60px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)',
-                        borderRadius: '12px'
-                      }}>
-                        {power.icon}
-                      </div>
-                      <h3 style={{
-                        margin: 0,
-                        fontSize: '1.1rem',
-                        color: '#333',
-                        fontWeight: '600'
-                      }}>
-                        {power.title}
-                      </h3>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#1e293b', marginBottom: 2 }}>
+                      {qw.keyword}
                     </div>
-                    <p style={{
-                      margin: 0,
-                      color: '#666',
-                      lineHeight: '1.6',
-                      fontSize: '0.9rem'
-                    }}>
-                      {power.description}
-                    </p>
+                    <div style={{ fontSize: '0.65rem', color: '#64748b' }}>
+                      Pos {qw.position} · {qw.impressions?.toLocaleString()} imp
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
+            )}
 
-            {/* Modal Footer */}
-            <div style={{
-              marginTop: '30px',
-              paddingTop: '20px',
-              borderTop: '1px solid #f0f0f0',
-              textAlign: 'center'
-            }}>
+            {/* View full results + Refresh */}
+            <div style={{ display: 'flex', gap: 8 }}>
               <button
-                onClick={handleStartWriting}
+                onClick={() => setShowBrainstorm(true)}
                 style={{
-                  background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '16px 32px',
-                  borderRadius: '50px',
-                  fontSize: '1.1rem',
-                  fontWeight: '600',
+                  flex: 1,
+                  padding: '10px 16px',
+                  borderRadius: 10,
+                  border: '1px solid #c7d2fe',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontWeight: 600,
+                  fontSize: '0.85rem',
                   cursor: 'pointer',
-                  boxShadow: '0 6px 20px rgba(25, 118, 210, 0.3)',
-                  transition: 'all 0.3s ease'
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = '#dbeafe'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = '#eff6ff'; }}
+              >
+                View Full Results →
+              </button>
+              <button
+                onClick={() => {
+                  const input = document.getElementById('gsc-sidebar-input') as HTMLInputElement;
+                  const kw = input?.value.trim() || lastKeywords;
+                  if (kw) handleReRun(kw, true);
+                }}
+                disabled={isBrainstorming}
+                title="Fetch fresh GSC data (bypasses cache)"
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: '1px solid #e2e8f0',
+                  background: isBrainstorming ? '#f1f5f9' : '#fff',
+                  color: isBrainstorming ? '#94a3b8' : '#64748b',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  cursor: isBrainstorming ? 'default' : 'pointer',
+                  transition: 'all 0.2s',
+                  whiteSpace: 'nowrap',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)';
-                  e.currentTarget.style.boxShadow = '0 8px 25px rgba(25, 118, 210, 0.4)';
+                  if (!isBrainstorming) { e.currentTarget.style.borderColor = '#94a3b8'; e.currentTarget.style.background = '#f8fafc'; }
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 6px 20px rgba(25, 118, 210, 0.3)';
+                  if (!isBrainstorming) { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.background = '#fff'; }
                 }}
               >
-                ✨ Chat/Write with ALwrity Copilot
+                🔄 Refresh
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
-    </>
+      {/* Full GSC Brainstorm Modal — same as what appears when clicking Brainstorm Topics in research phase */}
+      <GSCBrainstormModal
+        open={showBrainstorm}
+        onClose={() => setShowBrainstorm(false)}
+        contentOpportunities={contentOpportunities}
+        keywordGaps={keywordGaps}
+        quickWins={quickWins}
+        pageOpportunities={pageOpportunities}
+        aiRecommendations={aiRecommendations}
+        summary={summary}
+        error={brainstormError}
+        isBrainstorming={isBrainstorming}
+        progressMessage={progressMessage}
+        onSelectSuggestion={handleSelectSuggestion}
+        initialKeywords=""
+        onReRun={handleReRun}
+      />
+    </div>
   );
 };
 

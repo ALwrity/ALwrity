@@ -6,6 +6,7 @@ Handles blog rewriting based on user feedback using structured AI calls.
 
 import time
 import uuid
+from datetime import datetime
 from typing import Dict, Any
 from loguru import logger
 
@@ -77,7 +78,7 @@ class BlogRewriter:
             self.task_manager.update_task_status(task_id, "processing", "Analyzing current content and feedback...")
             
             # Build rewrite prompt with user feedback
-            system_prompt = f"""You are an expert blog writer tasked with rewriting content based on user feedback. 
+            system_prompt = f"""You are an expert blog writer in {datetime.now().year}, tasked with rewriting content based on user feedback. 
             
             Current Blog Title: {title}
             User Feedback: {feedback}

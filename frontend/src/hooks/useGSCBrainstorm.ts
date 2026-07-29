@@ -31,6 +31,7 @@ interface UseGSCBrainstormReturn {
   brainstorm: (keywords: string, siteUrl?: string, forceRefresh?: boolean) => Promise<BrainstormResult | null>;
   reset: () => void;
   progressMessage: string;
+  lastKeywords: string;
 }
 
 const PROGRESS_MESSAGES = [
@@ -43,6 +44,19 @@ const PROGRESS_MESSAGES = [
   'Generating AI-powered blog post recommendations tailored to your GSC data...',
   'Formatting insights into actionable topic suggestions you can use today...',
 ];
+
+const LAST_KEYWORDS_KEY = 'gsc_last_keywords';
+const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+const readLS = (key: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+
+const writeLS = (key: string, value: string): void => {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(key, value); } catch { /* quota exceeded */ }
+};
 
 export const useGSCBrainstorm = (): UseGSCBrainstormReturn => {
   const { getToken } = useAuth();
@@ -59,15 +73,36 @@ export const useGSCBrainstorm = (): UseGSCBrainstormReturn => {
   const [brainstormError, setBrainstormError] = useState<string | null>(null);
   const [brainstormResult, setBrainstormResult] = useState<BrainstormResult | null>(null);
   const [progressMessage, setProgressMessage] = useState('');
+  const [lastKeywords, setLastKeywords] = useState('');
   const progressIndexRef = useRef(0);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const autoRestoreDoneRef = useRef(false);
 
   useEffect(() => {
     return () => {
-      if (progressTimerRef.current) {
-        clearInterval(progressTimerRef.current);
-      }
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
     };
+  }, []);
+
+  // Auto-restore last brainstorm on mount
+  useEffect(() => {
+    if (autoRestoreDoneRef.current) return;
+    const savedKw = readLS(LAST_KEYWORDS_KEY);
+    if (savedKw && savedKw.trim()) {
+      setLastKeywords(savedKw.trim());
+      // Restore cached result for this keyword
+      const cacheKey = makeCacheKey(savedKw.trim());
+      const cached = readLS(cacheKey);
+      if (cached) {
+        try {
+          const parsed: BrainstormResult = JSON.parse(cached);
+          if (parsed && !parsed.error && parsed.content_opportunities?.length && isFresh(parsed)) {
+            setBrainstormResult(parsed);
+          }
+        } catch { /* ignore corrupt cache */ }
+      }
+    }
+    autoRestoreDoneRef.current = true;
   }, []);
 
   const startProgressMessages = () => {
@@ -97,6 +132,12 @@ export const useGSCBrainstorm = (): UseGSCBrainstormReturn => {
     return `gsc_brainstorm_${norm}_${siteUrl || ''}`;
   };
 
+  const isFresh = (result: BrainstormResult): boolean => {
+    const ts = (result as any)._cachedAt;
+    if (!ts) return false;
+    return Date.now() - ts < CACHE_TTL;
+  };
+
   const brainstorm = useCallback(
     async (keywords: string, siteUrl?: string, forceRefresh?: boolean): Promise<BrainstormResult | null> => {
       setIsBrainstorming(true);
@@ -106,33 +147,33 @@ export const useGSCBrainstorm = (): UseGSCBrainstormReturn => {
       const cacheKey = makeCacheKey(keywords, siteUrl);
 
       if (!forceRefresh) {
-        try {
-          const cached = typeof window !== 'undefined' ? localStorage.getItem(cacheKey) : null;
-          if (cached) {
+        const cached = readLS(cacheKey);
+        if (cached) {
+          try {
             const parsed: BrainstormResult = JSON.parse(cached);
-            if (parsed && !parsed.error && parsed.content_opportunities?.length) {
+            if (parsed && !parsed.error && parsed.content_opportunities?.length && isFresh(parsed)) {
               setBrainstormResult(parsed);
               stopProgressMessages();
               setIsBrainstorming(false);
               return parsed;
             }
-          }
-        } catch { /* cache read failed — proceed with API call */ }
+          } catch { /* cache read failed — proceed with API call */ }
+        }
       }
 
       try {
         gscBrainstormAPI.setAuthTokenGetter(async () => {
-          try {
-            return await getToken();
-          } catch {
-            return null;
-          }
+          try { return await getToken(); } catch { return null; }
         });
 
-        const result = await gscBrainstormAPI.brainstorm(keywords, siteUrl);
+        const result = await gscBrainstormAPI.brainstorm(keywords, siteUrl, forceRefresh);
         setBrainstormResult(result);
         if (result && !result.error) {
-          try { localStorage.setItem(cacheKey, JSON.stringify(result)); } catch { /* quota exceeded */ }
+          (result as any)._cachedAt = Date.now();
+          writeLS(cacheKey, JSON.stringify(result));
+          // Persist last keywords
+          setLastKeywords(keywords.trim());
+          writeLS(LAST_KEYWORDS_KEY, keywords.trim());
         }
         return result;
       } catch (error: any) {
@@ -183,5 +224,8 @@ export const useGSCBrainstorm = (): UseGSCBrainstormReturn => {
     brainstorm,
     reset,
     progressMessage,
+    lastKeywords,
   };
 };
+
+export default useGSCBrainstorm;
