@@ -191,6 +191,7 @@ export const Header: React.FC<HeaderProps> = ({
     profileStrengthLoading,
     onOptimiseProfile: handleOpenOptimiseProfile,
     onPreferenceChange: handlePreferenceChange,
+    onPreferencesChange,
     onPersonaUpdate: handlePersonaUpdate,
     onClose: () => onPreferencesModalChange(false),
   };

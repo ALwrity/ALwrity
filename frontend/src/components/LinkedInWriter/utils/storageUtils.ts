@@ -14,9 +14,23 @@ export type ChatMsg = {
   result?: any; // Store action results for context
 };
 
+export const LINKEDIN_PRESET_TONES = [
+  "Professional",
+  "Casual",
+  "Thought Leadership",
+  "Conversational",
+  "Technical",
+] as const;
+
+export const LINKEDIN_CUSTOM_TONE_OPTION = "Custom";
+
+export type LinkedInPresetTone = (typeof LINKEDIN_PRESET_TONES)[number];
+
 // User preferences interface
 export interface LinkedInPreferences {
   tone: string;
+  /** Free-form tone text when `tone` is set to Custom. */
+  custom_tone?: string;
   industry: string;
   target_audience: string;
   content_goals: string[];
@@ -26,6 +40,35 @@ export interface LinkedInPreferences {
   last_used_actions: string[];
   favorite_topics: string[];
   last_updated?: number;
+}
+
+export function isCustomToneSelection(tone: string | undefined): boolean {
+  return (tone || "").trim().toLowerCase() === LINKEDIN_CUSTOM_TONE_OPTION.toLowerCase();
+}
+
+/** Tone label shown in persona UI, chips, and copilot guidance. */
+export function resolvePersonaTone(
+  prefs: Pick<LinkedInPreferences, "tone" | "custom_tone">,
+): string {
+  if (isCustomToneSelection(prefs.tone)) {
+    const custom = (prefs.custom_tone || "").trim();
+    return custom || LINKEDIN_CUSTOM_TONE_OPTION;
+  }
+  return (prefs.tone || "Professional").trim() || "Professional";
+}
+
+/** Value bound to the tone dropdown (preset or Custom). */
+export function getToneDropdownValue(
+  prefs: Pick<LinkedInPreferences, "tone" | "custom_tone">,
+): string {
+  if (isCustomToneSelection(prefs.tone)) {
+    return LINKEDIN_CUSTOM_TONE_OPTION;
+  }
+  const tone = (prefs.tone || "").trim();
+  if ((LINKEDIN_PRESET_TONES as readonly string[]).includes(tone)) {
+    return tone;
+  }
+  return tone || "Professional";
 }
 
 // Default preferences

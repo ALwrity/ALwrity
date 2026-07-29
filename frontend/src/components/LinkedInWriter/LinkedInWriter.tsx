@@ -38,6 +38,7 @@ import PublishLinkedInPanel from './components/PublishLinkedInPanel';
 import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssistiveEditor';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
+import { resolvePersonaTone } from './utils/storageUtils';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
 import { LinkedInConnectionProvider } from '../../contexts/LinkedInConnectionContext';
@@ -515,7 +516,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
       const currentDraft = draft
         ? `Current draft content:\n${draft}`
         : "No current draft content.";
-      const tone = prefs.tone || "professional";
+      const tone = resolvePersonaTone(prefs);
       const industry = prefs.industry || "Technology";
       const audience = prefs.target_audience || "professionals";
 
