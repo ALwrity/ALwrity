@@ -23,7 +23,7 @@ import { SetupSummary, CapabilitiesOverview, AgentTeamSection, TaskSchedulingPan
 import { FinalStepProps, OnboardingData, Capability, OnboardingCompletionResult } from './types';
 import { getAgentTeam, type AgentTeamCatalogEntry } from '../../../api/agentsTeam';
 
-const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }) => {
+const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, onboardingType }) => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -39,15 +39,19 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
   const [countdown, setCountdown] = useState<number | null>(null);
   // const buttonRef = useRef<HTMLButtonElement>(null);
 
+  const isLinkedIn = onboardingType === 'linkedin';
+
   useEffect(() => {
     updateHeaderContent({
-      title: 'Review & Launch Alwrity 🚀',
-      description: 'Review your configuration and confirm all settings before launching your AI-powered content creation workspace.'
+      title: isLinkedIn ? 'Review & Launch Your LinkedIn Workspace 🚀' : 'Review & Launch Alwrity 🚀',
+      description: isLinkedIn
+        ? 'Review your LinkedIn profile, persona, and content preferences before launching your AI-powered LinkedIn growth workspace.'
+        : 'Review your configuration and confirm all settings before launching your AI-powered content creation workspace.'
     });
     // Always attempt to load data once on mount
     loadOnboardingData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [updateHeaderContent]);
+  }, [updateHeaderContent, isLinkedIn]);
 
   // Auto-redirect countdown after successful onboarding completion
   useEffect(() => {
@@ -175,6 +179,23 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
       canonical?.competitors ||
       [];
 
+    if (isLinkedIn) {
+      return {
+        profile_name: websiteName,
+        profile_url: onboardingData.websiteUrl,
+        brand_voice: persona?.corePersona || persona?.platformPersonas || persona?.brand_voice || canonical?.brand_voice || "",
+        target_audience: research?.target_audience || style?.target_audience || canonical?.target_audience || "",
+        content_pillars: Array.isArray(contentPillars) ? contentPillars : [],
+        competitors: Array.isArray(competitors) ? competitors : [],
+        growth_summary: research?.growth_summary || "",
+        content_types: research?.content_types || [],
+        posting_cadence: onboardingData.integrations?.postingCadence || "",
+        preferred_formats: onboardingData.integrations?.preferredFormats || [],
+        content_topics: onboardingData.integrations?.contentTopics || "",
+        engagement_goals: onboardingData.integrations?.engagementGoals || "",
+      };
+    }
+
     return {
       website_name: websiteName,
       website_url: onboardingData.websiteUrl,
@@ -185,7 +206,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
       competitors: Array.isArray(competitors) ? competitors : [],
       business_goals: canonical?.business_goals || [],
     };
-  }, [onboardingData, websiteName]);
+  }, [onboardingData, websiteName, isLinkedIn]);
 
   // Safe JSON parser for cached data
   const safeParseJSON = (raw: string | null): any | undefined => {
@@ -195,52 +216,74 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
 
   const validateOnboardingCompletionWithData = async (data: OnboardingData): Promise<{isValid: boolean, missingSteps: string[]}> => {
     console.log('FinalStep: Validating onboarding completion with data...');
-    console.log('FinalStep: Data to validate:', data);
+    console.log('FinalStep: Data to validate:', data, 'onboardingType:', onboardingType);
     const missingSteps: string[] = [];
     
     try {
-      const apiKeyEntries = Object.entries(data.apiKeys || {}).filter(([, v]) => v && String(v).length > 0);
-      const hasApiKeys = apiKeyEntries.length > 0;
+      if (!isLinkedIn) {
+        // Website onboarding: user must have entered API keys in step 1.
+        const apiKeyEntries = Object.entries(data.apiKeys || {}).filter(([, v]) => v && String(v).length > 0);
+        const hasApiKeys = apiKeyEntries.length > 0;
 
-      if (!hasApiKeys) {
-        missingSteps.push('API Keys');
+        if (!hasApiKeys) {
+          missingSteps.push('API Keys');
+        }
       }
       
-      // Check Website Analysis (Step 2) - Check for website URL or analysis data
-      const hasWebsiteAnalysis = (data.websiteUrl && data.websiteUrl.trim() !== '') ||
-                               (data.styleAnalysis && Object.keys(data.styleAnalysis).length > 0);
-      console.log('FinalStep: Website Analysis check:', {
-        websiteUrl: data.websiteUrl, 
-        styleAnalysis: data.styleAnalysis,
-        hasWebsiteAnalysis
-      });
-      if (!hasWebsiteAnalysis) {
-        missingSteps.push('Website Analysis');
-      }
-      
-      // Check Research Preferences (Step 3) - Check for research preferences data
-      const hasResearchPreferences = data.researchPreferences && 
-                                   (data.researchPreferences.research_depth || 
-                                    data.researchPreferences.content_characteristics ||
-                                    Object.keys(data.researchPreferences).length > 0);
-      console.log('FinalStep: Research Preferences check:', {
-        researchPreferences: data.researchPreferences,
-        hasResearchPreferences
-      });
-      if (!hasResearchPreferences) {
-        missingSteps.push('Research Preferences');
-      }
-      
-      // Check Persona Generation (Step 4) - Check for persona readiness or data
-      const hasPersonaData = (data.personaReadiness && data.personaReadiness.isReady) ||
-                            (data.personalizationSettings && Object.keys(data.personalizationSettings).length > 0);
-      console.log('FinalStep: Persona Generation check:', {
-        personaReadiness: data.personaReadiness,
-        personalizationSettings: data.personalizationSettings,
-        hasPersonaData
-      });
-      if (!hasPersonaData) {
-        missingSteps.push('Persona Generation');
+      if (isLinkedIn) {
+        // LinkedIn onboarding: the backend has already validated connection,
+        // profile, research, and persona. We only sanity-check that research
+        // preferences and persona data are present.
+        const hasResearchPreferences = data.researchPreferences &&
+                                     (data.researchPreferences.research_depth ||
+                                      data.researchPreferences.content_types ||
+                                      Object.keys(data.researchPreferences).length > 0);
+        if (!hasResearchPreferences) {
+          missingSteps.push('LinkedIn Research');
+        }
+
+        const hasPersonaData = (data.personaReadiness && data.personaReadiness.isReady) ||
+                              (data.personalizationSettings && Object.keys(data.personalizationSettings).length > 0);
+        if (!hasPersonaData) {
+          missingSteps.push('LinkedIn Persona');
+        }
+      } else {
+        // Website onboarding: Check Website Analysis (Step 2) - website URL or analysis data
+        const hasWebsiteAnalysis = (data.websiteUrl && data.websiteUrl.trim() !== '') ||
+                                 (data.styleAnalysis && Object.keys(data.styleAnalysis).length > 0);
+        console.log('FinalStep: Website Analysis check:', {
+          websiteUrl: data.websiteUrl, 
+          styleAnalysis: data.styleAnalysis,
+          hasWebsiteAnalysis
+        });
+        if (!hasWebsiteAnalysis) {
+          missingSteps.push('Website Analysis');
+        }
+        
+        // Check Research Preferences (Step 3) - Check for research preferences data
+        const hasResearchPreferences = data.researchPreferences && 
+                                     (data.researchPreferences.research_depth || 
+                                      data.researchPreferences.content_characteristics ||
+                                      Object.keys(data.researchPreferences).length > 0);
+        console.log('FinalStep: Research Preferences check:', {
+          researchPreferences: data.researchPreferences,
+          hasResearchPreferences
+        });
+        if (!hasResearchPreferences) {
+          missingSteps.push('Research Preferences');
+        }
+        
+        // Check Persona Generation (Step 4) - Check for persona readiness or data
+        const hasPersonaData = (data.personaReadiness && data.personaReadiness.isReady) ||
+                              (data.personalizationSettings && Object.keys(data.personalizationSettings).length > 0);
+        console.log('FinalStep: Persona Generation check:', {
+          personaReadiness: data.personaReadiness,
+          personalizationSettings: data.personalizationSettings,
+          hasPersonaData
+        });
+        if (!hasPersonaData) {
+          missingSteps.push('Persona Generation');
+        }
       }
       
       // Check Integrations (Step 5) - For now, we'll consider this optional
@@ -354,51 +397,103 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
   // Helper to compute steps length for storing active step (fallback value)
   const stepsLengthFallback = () => 6;
 
-  const capabilities: Capability[] = [
-    {
-      id: 'ai-content',
-      title: 'AI Content Generation',
-      description: 'Generate high-quality, personalized content using advanced AI models',
-      icon: <CheckCircle />,
-      unlocked: Object.keys(onboardingData.apiKeys).length > 0,
-      required: ['API Keys']
-    },
-    {
-      id: 'style-analysis',
-      title: 'Style Analysis',
-      description: 'Analyze and match your brand\'s writing style and tone',
-      icon: <CheckCircle />,
-      unlocked: !!onboardingData.websiteUrl,
-      required: ['Website URL']
-    },
-    {
-      id: 'research-tools',
-      title: 'AI Research Tools',
-      description: 'Automated research and fact-checking capabilities',
-      icon: <CheckCircle />,
-      unlocked: !!onboardingData.researchPreferences,
-      required: ['Research Configuration']
-    },
-    {
-      id: 'personalization',
-      title: 'Content Personalization',
-      description: 'Tailored content based on your brand voice and preferences',
-      icon: <CheckCircle />,
-      unlocked: !!onboardingData.personalizationSettings,
-      required: ['Personalization Settings']
-    },
-    {
-      id: 'integrations',
-      title: 'Third-party Integrations',
-      description: 'Connect with external tools and platforms',
-      icon: <CheckCircle />,
-      unlocked: !!onboardingData.integrations,
-      required: ['Integration Setup']
-    }
-  ];
+  const capabilities: Capability[] = isLinkedIn
+    ? [
+        {
+          id: 'linkedin-persona',
+          title: 'LinkedIn Persona',
+          description: 'A custom persona based on your profile, posts, and growth goals',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.personalizationSettings,
+          required: ['Persona Generation']
+        },
+        {
+          id: 'linkedin-research',
+          title: 'LinkedIn Research',
+          description: 'Audience, content, and competitor insights for LinkedIn',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.researchPreferences,
+          required: ['Research Configuration']
+        },
+        {
+          id: 'linkedin-content',
+          title: 'LinkedIn Content Engine',
+          description: 'Generate posts, articles, and carousels matched to your voice',
+          icon: <CheckCircle />,
+          unlocked: Object.keys(onboardingData.apiKeys).length > 0 || !!onboardingData.personalizationSettings,
+          required: ['API Keys']
+        },
+        {
+          id: 'linkedin-monitoring',
+          title: 'LinkedIn Monitoring',
+          description: 'Scheduled profile sync, post analytics, and growth reanalysis',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.researchPreferences && !!onboardingData.personalizationSettings,
+          required: ['Research & Persona']
+        },
+        {
+          id: 'linkedin-integrations',
+          title: 'Content Preferences',
+          description: 'Posting cadence, formats, topics, and engagement goals',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.integrations,
+          required: ['Preferences']
+        }
+      ]
+    : [
+        {
+          id: 'ai-content',
+          title: 'AI Content Generation',
+          description: 'Generate high-quality, personalized content using advanced AI models',
+          icon: <CheckCircle />,
+          unlocked: Object.keys(onboardingData.apiKeys).length > 0,
+          required: ['API Keys']
+        },
+        {
+          id: 'style-analysis',
+          title: 'Style Analysis',
+          description: 'Analyze and match your brand\'s writing style and tone',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.websiteUrl,
+          required: ['Website URL']
+        },
+        {
+          id: 'research-tools',
+          title: 'AI Research Tools',
+          description: 'Automated research and fact-checking capabilities',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.researchPreferences,
+          required: ['Research Configuration']
+        },
+        {
+          id: 'personalization',
+          title: 'Content Personalization',
+          description: 'Tailored content based on your brand voice and preferences',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.personalizationSettings,
+          required: ['Personalization Settings']
+        },
+        {
+          id: 'integrations',
+          title: 'Third-party Integrations',
+          description: 'Connect with external tools and platforms',
+          icon: <CheckCircle />,
+          unlocked: !!onboardingData.integrations,
+          required: ['Integration Setup']
+        }
+      ];
 
   const getMissingRequirements = () => {
     const missing = [];
+    if (isLinkedIn) {
+      if (!onboardingData.researchPreferences) {
+        missing.push('LinkedIn research data');
+      }
+      if (!onboardingData.personalizationSettings) {
+        missing.push('LinkedIn persona data');
+      }
+      return missing;
+    }
     if (Object.keys(onboardingData.apiKeys).length === 0) {
       missing.push('At least one AI provider API key');
     }
@@ -481,6 +576,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
                   capabilities={capabilities}
                   expandedSection={expandedSection}
                   setExpandedSection={setExpandedSection}
+                  onboardingType={onboardingType}
                 />
 
                 {/* Capabilities Overview */}
@@ -604,14 +700,16 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
               }
             }}
                   >
-                    Launch Alwrity & Complete Setup
+                    {isLinkedIn ? 'Launch LinkedIn Workspace' : 'Launch Alwrity & Complete Setup'}
                   </Button>
                 </Box>
 
                 {/* Help Text */}
                 <Box sx={{ mt: 3, textAlign: 'center' }}>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                    This will complete your onboarding and launch Alwrity with your configured settings.
+                    {isLinkedIn
+                      ? 'This will complete your LinkedIn onboarding and start your personalized content engine.'
+                      : 'This will complete your onboarding and launch Alwrity with your configured settings.'}
                   </Typography>
                   <Typography
                     variant="body2"
@@ -619,7 +717,9 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent }
                     sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}
                   >
                     <Star sx={{ fontSize: 16, color: '#fbbf24' }} />
-                    Your SIF Agent Framework is ready to orchestrate your marketing.
+                    {isLinkedIn
+                      ? 'Your LinkedIn growth agents are ready to build authority and engagement.'
+                      : 'Your SIF Agent Framework is ready to orchestrate your marketing.'}
                   </Typography>
                 </Box>
               </React.Fragment>

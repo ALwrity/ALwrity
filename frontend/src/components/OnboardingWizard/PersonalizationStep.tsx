@@ -34,6 +34,7 @@ interface PersonalizationStepProps {
   updateHeaderContent: (content: { title: string; description: string }) => void;
   onValidationChange?: (isValid: boolean) => void;
   onDataChange?: (data: any) => void;
+  onboardingType?: string;
   onboardingData?: {
     websiteAnalysis?: any;
     competitorResearch?: any;
@@ -65,6 +66,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
   updateHeaderContent, 
   onValidationChange,
   onDataChange,
+  onboardingType,
   onboardingData = {},
   stepData
 }) => {
@@ -460,7 +462,11 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
 
   useEffect(() => {
     const hasValidData = !!(corePersona && platformPersonas && Object.keys(platformPersonas).length > 0 && qualityMetrics);
-    const isComplete = !isGenerating && hasValidData && generationStep === 'preview' && brandAvatarSet && voiceCloneSet;
+    // LinkedIn onboarding only requires the text persona; website onboarding
+    // also requires brand avatar and voice clone.
+    const isLinkedIn = onboardingType === 'linkedin';
+    const isComplete = !isGenerating && hasValidData && generationStep === 'preview' &&
+      (isLinkedIn || (brandAvatarSet && voiceCloneSet));
     
     if (onValidationChange) {
       onValidationChange(isComplete);

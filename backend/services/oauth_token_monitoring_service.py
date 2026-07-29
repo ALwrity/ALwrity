@@ -90,7 +90,7 @@ def _check_linkedin(user_id: str) -> bool:
         if token_status.get('has_active_tokens'):
             return True
         expired = token_status.get('expired_tokens', [])
-        return bool(expired) and any(t.get('linkedin_refresh_token') for t in expired)
+        return bool(expired) and any(t.get('has_refresh_token') for t in expired)
     except Exception as exc:
         # Constructor may raise (missing key) or the status call may
         # hit a database error. Either way, treat as "not connected"

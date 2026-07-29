@@ -63,7 +63,7 @@ FEATURE_GROUPS: Dict[str, FeatureGroup] = {
         routers=("routers.backlink_outreach:router",),
     ),
     "linkedin": FeatureGroup(
-        features=("linkedin",),
+        features=("linkedin", "persona"),
         routers=(
             "routers.linkedin:router",
             "api.linkedin_image_generation:router",
@@ -88,7 +88,7 @@ PROFILE_GROUP_MAP: Dict[str, Tuple[str, ...]] = {
     "youtube": ("core", "youtube"),
     "blog_writer": ("core", "blog_writer"),
     "backlinking": ("core", "backlinking"),
-    "linkedin": ("core", "linkedin"),
+    "linkedin": ("core", "linkedin", "persona"),
     "facebook": ("core", "facebook"),
     "story_writer": ("core", "story_writer"),
     "planning": ("core", "content_planning"),

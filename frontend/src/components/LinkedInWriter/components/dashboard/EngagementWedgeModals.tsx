@@ -1179,22 +1179,22 @@ export const PostPulseModal: React.FC<PostPulseModalProps> = ({
   // On mount: reset state, auto-load from DB cache
   useEffect(() => {
     if (!open) return;
-    setError("");
-    setBoosted({});
-    setPosts([]);
-    setLoadedAt(null);
-    void fetchPosts(false);
-  }, [open, fetchPosts]);
+      setError("");
+      setBoosted({});
+      setPosts([]);
+      setLoadedAt(null);
+      void fetchPosts(false);
+    }, [open, fetchPosts]);
 
-  const sorted = useMemo(
-    () =>
-      [...posts].sort(
-        (a, b) =>
-          (b.engagement?.engagement_rate ?? 0) -
-          (a.engagement?.engagement_rate ?? 0),
-      ),
-    [posts],
-  );
+    const sorted = useMemo(
+      () =>
+        [...posts].sort(
+          (a, b) =>
+            (b.engagement?.engagement_rate ?? 0) -
+            (a.engagement?.engagement_rate ?? 0),
+        ),
+      [posts],
+    );
   const topPosts = sorted.slice(0, 3);
   const bottomPost = sorted[sorted.length - 1];
 

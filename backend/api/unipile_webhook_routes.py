@@ -13,6 +13,8 @@ from fastapi import APIRouter, Request
 from loguru import logger
 
 from services.integrations.linkedin_oauth import LinkedInOAuthService
+from services.database import get_session_for_user
+from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
 
 router = APIRouter(prefix="/api/unipile", tags=["Unipile"])
 _oauth_service = LinkedInOAuthService()
@@ -99,4 +101,16 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
         f"[UnipileWebhook] Credential storage user_id={user_id} "
         f"account_id={account_id} stored={stored}"
     )
+
+    if stored:
+        try:
+            db = get_session_for_user(user_id)
+            if db:
+                try:
+                    create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
+                finally:
+                    db.close()
+        except Exception as e:
+            logger.warning(f"[UnipileWebhook] Failed to create monitoring task: {e}")
+
     return {"ok": stored}

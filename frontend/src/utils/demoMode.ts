@@ -154,11 +154,15 @@ export function getDefaultLandingRoute(): string {
 
 /**
  * Check if the app should skip onboarding.
- * Returns true in feature-only mode.
+ * Returns true in feature-only mode EXCEPT for linkedin, which now has
+ * its own dedicated onboarding wizard.
  */
 export function shouldSkipOnboarding(): boolean {
   const enabled = getEnabledFeatures();
-  return !enabled.has('all');
+  if (enabled.has('all')) return false;
+  // LinkedIn now has its own onboarding — don't skip
+  if (enabled.has('linkedin')) return false;
+  return true; // other feature-only modes still skip
 }
 
 /** Shared routes allowed in feature-only mode without completing onboarding. */

@@ -10,6 +10,7 @@ import models.agent_activity_models  # noqa: F401
 import models.daily_workflow_models  # noqa: F401
 import models.enhanced_calendar_models  # noqa: F401
 import models.gsc_brainstorm_cache_models  # noqa: F401
+import models.linkedin_monitoring_models  # noqa: F401
 import models.oauth_token_monitoring_models  # noqa: F401
 import models.platform_insights_monitoring_models  # noqa: F401
 import models.sif_indexing_watermark  # noqa: F401

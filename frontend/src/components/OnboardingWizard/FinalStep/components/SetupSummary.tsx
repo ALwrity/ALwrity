@@ -29,14 +29,17 @@ interface SetupSummaryProps {
   capabilities: Capability[];
   expandedSection: string | null;
   setExpandedSection: (section: string | null) => void;
+  onboardingType?: string;
 }
 
 export const SetupSummary: React.FC<SetupSummaryProps> = ({
   onboardingData,
   capabilities,
   expandedSection,
-  setExpandedSection
+  setExpandedSection,
+  onboardingType
 }) => {
+  const isLinkedIn = onboardingType === 'linkedin';
   const [showApiKeys, setShowApiKeys] = useState(false);
   const unlockedCapabilities = capabilities.filter(cap => cap.unlocked);
 
@@ -61,7 +64,7 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
           {/* Stats Chips */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
             <Chip 
-              label={`${Object.keys(onboardingData.apiKeys).length} AI Providers`}
+              label={isLinkedIn ? `${Object.keys(onboardingData.apiKeys).length} AI Providers (optional)` : `${Object.keys(onboardingData.apiKeys).length} AI Providers`}
               color="primary"
               variant="filled"
               size="small"
@@ -142,7 +145,7 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                     </Box>
                   </Grid>
 
-                  {/* Website Analysis */}
+                  {/* Website / LinkedIn Profile Analysis */}
                   <Grid item xs={6} sm={3}>
                     <Box 
                       sx={{ 
@@ -158,7 +161,7 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Web sx={{ color: 'primary.main', fontSize: 18 }} />
                          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#000000' }}>
-                           Website Analysis
+                           {isLinkedIn ? 'LinkedIn Profile' : 'Website Analysis'}
                          </Typography>
                        </Box>
                        <Typography variant="body2" sx={{ color: '#000000' }}>
@@ -263,19 +266,19 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                         </Box>
                       )}
 
-                      {/* Website Analysis Details */}
+                      {/* Website / LinkedIn Profile Analysis Details */}
                       {expandedSection === 'website' && (
                         <Box>
                            <Typography variant="h6" sx={{ fontWeight: 600, mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: '#000000' }}>
                             <Web sx={{ color: 'primary.main' }} />
-                            Website Analysis
+                            {isLinkedIn ? 'LinkedIn Profile' : 'Website Analysis'}
                           </Typography>
                           {onboardingData.websiteUrl ? (
                             <Box>
                               <Typography variant="body2" sx={{ mb: 2 }}>
-                                <strong>URL:</strong> {onboardingData.websiteUrl}
+                                <strong>{isLinkedIn ? 'Profile URL:' : 'URL:'}</strong> {onboardingData.websiteUrl}
                               </Typography>
-                              {onboardingData.styleAnalysis && (
+                              {onboardingData.styleAnalysis && !isLinkedIn && (
                                 <Typography variant="body2" color="success.main">
                                   ✓ Style analysis completed
                                 </Typography>
@@ -283,7 +286,7 @@ export const SetupSummary: React.FC<SetupSummaryProps> = ({
                             </Box>
                           ) : (
                             <Typography variant="body2" color="warning.main">
-                              ⚠️ No website URL configured
+                              ⚠️ {isLinkedIn ? 'No LinkedIn profile URL configured' : 'No website URL configured'}
                             </Typography>
                           )}
                         </Box>

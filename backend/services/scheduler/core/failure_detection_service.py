@@ -169,6 +169,51 @@ class FailureDetectionService:
                     }
                     for log in logs
                 ]
+            elif task_type == "linkedin_profile_sync":
+                from models.linkedin_monitoring_models import LinkedInProfileSyncExecutionLog
+                logs = self.db.query(LinkedInProfileSyncExecutionLog).filter(
+                    LinkedInProfileSyncExecutionLog.task_id == task_id
+                ).order_by(LinkedInProfileSyncExecutionLog.execution_date.desc()).all()
+                
+                return [
+                    {
+                        "status": log.status,
+                        "error_message": log.error_message,
+                        "execution_date": log.execution_date,
+                        "result_data": log.result_data
+                    }
+                    for log in logs
+                ]
+            elif task_type == "linkedin_post_analytics_sync":
+                from models.linkedin_monitoring_models import LinkedInPostAnalyticsSyncExecutionLog
+                logs = self.db.query(LinkedInPostAnalyticsSyncExecutionLog).filter(
+                    LinkedInPostAnalyticsSyncExecutionLog.task_id == task_id
+                ).order_by(LinkedInPostAnalyticsSyncExecutionLog.execution_date.desc()).all()
+                
+                return [
+                    {
+                        "status": log.status,
+                        "error_message": log.error_message,
+                        "execution_date": log.execution_date,
+                        "result_data": log.result_data
+                    }
+                    for log in logs
+                ]
+            elif task_type == "linkedin_growth_reanalysis":
+                from models.linkedin_monitoring_models import LinkedInGrowthReanalysisExecutionLog
+                logs = self.db.query(LinkedInGrowthReanalysisExecutionLog).filter(
+                    LinkedInGrowthReanalysisExecutionLog.task_id == task_id
+                ).order_by(LinkedInGrowthReanalysisExecutionLog.execution_date.desc()).all()
+                
+                return [
+                    {
+                        "status": log.status,
+                        "error_message": log.error_message,
+                        "execution_date": log.execution_date,
+                        "result_data": log.result_data
+                    }
+                    for log in logs
+                ]
             else:
                 # Fallback to monitoring_task execution logs
                 from models.monitoring_models import TaskExecutionLog
@@ -483,12 +528,85 @@ class FailureDetectionService:
                 advertools_tasks = advertools_tasks.filter(AdvertoolsTask.user_id == user_id)
             
             for task in advertools_tasks.all():
-                pattern = self.analyze_task_failures(task.id, "advertools", task.user_id)
+                pattern = failure_detection.analyze_task_failures(task.id, "advertools", task.user_id)
                 tasks_needing_intervention.append({
                     "task_id": task.id,
                     "task_type": "advertools",
                     "user_id": task.user_id,
                     "website_url": task.website_url,
+                    "failure_pattern": {
+                        "consecutive_failures": pattern.consecutive_failures if pattern else task.consecutive_failures,
+                        "recent_failures": pattern.recent_failures if pattern else 0,
+                        "failure_reason": pattern.failure_reason.value if pattern else "unknown",
+                        "last_failure_time": pattern.last_failure_time.isoformat() if pattern and pattern.last_failure_time else None,
+                        "error_patterns": pattern.error_patterns if pattern else [],
+                    },
+                    "failure_reason": task.failure_reason,
+                    "last_failure": task.last_failure.isoformat() if task.last_failure else None
+                })
+            
+            # Check LinkedIn background tasks
+            from models.linkedin_monitoring_models import (
+                LinkedInProfileSyncTask,
+                LinkedInPostAnalyticsSyncTask,
+                LinkedInGrowthReanalysisTask,
+            )
+            
+            linkedin_profile_tasks = self.db.query(LinkedInProfileSyncTask).filter(
+                LinkedInProfileSyncTask.status == "needs_intervention"
+            )
+            if user_id:
+                linkedin_profile_tasks = linkedin_profile_tasks.filter(LinkedInProfileSyncTask.user_id == user_id)
+            for task in linkedin_profile_tasks.all():
+                pattern = failure_detection.analyze_task_failures(task.id, "linkedin_profile_sync", task.user_id)
+                tasks_needing_intervention.append({
+                    "task_id": task.id,
+                    "task_type": "linkedin_profile_sync",
+                    "user_id": task.user_id,
+                    "failure_pattern": {
+                        "consecutive_failures": pattern.consecutive_failures if pattern else task.consecutive_failures,
+                        "recent_failures": pattern.recent_failures if pattern else 0,
+                        "failure_reason": pattern.failure_reason.value if pattern else "unknown",
+                        "last_failure_time": pattern.last_failure_time.isoformat() if pattern and pattern.last_failure_time else None,
+                        "error_patterns": pattern.error_patterns if pattern else [],
+                    },
+                    "failure_reason": task.failure_reason,
+                    "last_failure": task.last_failure.isoformat() if task.last_failure else None
+                })
+            
+            linkedin_post_tasks = self.db.query(LinkedInPostAnalyticsSyncTask).filter(
+                LinkedInPostAnalyticsSyncTask.status == "needs_intervention"
+            )
+            if user_id:
+                linkedin_post_tasks = linkedin_post_tasks.filter(LinkedInPostAnalyticsSyncTask.user_id == user_id)
+            for task in linkedin_post_tasks.all():
+                pattern = failure_detection.analyze_task_failures(task.id, "linkedin_post_analytics_sync", task.user_id)
+                tasks_needing_intervention.append({
+                    "task_id": task.id,
+                    "task_type": "linkedin_post_analytics_sync",
+                    "user_id": task.user_id,
+                    "failure_pattern": {
+                        "consecutive_failures": pattern.consecutive_failures if pattern else task.consecutive_failures,
+                        "recent_failures": pattern.recent_failures if pattern else 0,
+                        "failure_reason": pattern.failure_reason.value if pattern else "unknown",
+                        "last_failure_time": pattern.last_failure_time.isoformat() if pattern and pattern.last_failure_time else None,
+                        "error_patterns": pattern.error_patterns if pattern else [],
+                    },
+                    "failure_reason": task.failure_reason,
+                    "last_failure": task.last_failure.isoformat() if task.last_failure else None
+                })
+            
+            linkedin_growth_tasks = self.db.query(LinkedInGrowthReanalysisTask).filter(
+                LinkedInGrowthReanalysisTask.status == "needs_intervention"
+            )
+            if user_id:
+                linkedin_growth_tasks = linkedin_growth_tasks.filter(LinkedInGrowthReanalysisTask.user_id == user_id)
+            for task in linkedin_growth_tasks.all():
+                pattern = failure_detection.analyze_task_failures(task.id, "linkedin_growth_reanalysis", task.user_id)
+                tasks_needing_intervention.append({
+                    "task_id": task.id,
+                    "task_type": "linkedin_growth_reanalysis",
+                    "user_id": task.user_id,
                     "failure_pattern": {
                         "consecutive_failures": pattern.consecutive_failures if pattern else task.consecutive_failures,
                         "recent_failures": pattern.recent_failures if pattern else 0,

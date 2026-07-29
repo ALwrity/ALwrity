@@ -21,24 +21,32 @@ class StepManagementService:
     def __init__(self):
         self.integration_service = OnboardingDataIntegrationService()
 
-    def _get_or_create_session(self, user_id: str, db: Session) -> OnboardingSession:
-        """Get or create onboarding session."""
+    def _get_or_create_session(
+        self, user_id: str, db: Session, onboarding_type: Optional[str] = None
+    ) -> OnboardingSession:
+        """Get or create onboarding session.
+
+        When ``onboarding_type`` is provided and a new session is created,
+        it is set on the session so the correct platform strategy is used
+        from the very first step.
+        """
         session = db.query(OnboardingSession).filter(
             OnboardingSession.user_id == user_id
         ).first()
-        
+
         if not session:
             session = OnboardingSession(
                 user_id=user_id,
                 current_step=1,
                 progress=0.0,
                 started_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                updated_at=datetime.utcnow(),
+                onboarding_type=onboarding_type or "website",
             )
             db.add(session)
             db.commit()
             db.refresh(session)
-            
+
         return session
 
     def _save_api_key(self, user_id: str, provider: str, api_key: str, db: Session) -> bool:
@@ -653,7 +661,13 @@ class StepManagementService:
             raise HTTPException(status_code=500, detail="Internal server error")
     
     async def complete_step(self, step_number: int, request_data: Dict[str, Any], current_user: Dict[str, Any]) -> Dict[str, Any]:
-        """Mark a step as completed."""
+        """Mark a step as completed.
+
+        Delegates platform-specific data persistence + task scheduling to the
+        registered :class:`PlatformOnboardingStrategy` for the session's
+        ``onboarding_type``.  Shared concerns (validation, progress tracking,
+        SSOT refresh) stay here.
+        """
         try:
             logger.info(f"[complete_step] Completing step {step_number}")
             user_id = str(current_user.get('clerk_user_id') or current_user.get('id'))
@@ -670,195 +684,58 @@ class StepManagementService:
                 pass
 
             db = next(get_db(current_user))
-            
-            save_errors = []  # Track save failures
 
-            # Step-specific side effects: save data to DB
-            if step_number == 1 and request_data:
-                step_data = request_data.get('data') or request_data
-                logger.info(f" Step 1: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f" Step 1: Extracted step_data keys: {list(step_data.keys()) if step_data else 'None'}")
+            # ------------------------------------------------------------------
+            # Platform strategy dispatch
+            # ------------------------------------------------------------------
+            from api.onboarding_utils.platform_strategies import get_strategy
+            # Allow frontend to set onboarding_type on first step
+            requested_type = (
+                (request_data or {}).get("onboarding_type")
+                or (request_data or {}).get("data", {}).get("onboarding_type")
+            )
+            session = self._get_or_create_session(user_id, db, onboarding_type=requested_type)
+            strategy = get_strategy(session.onboarding_type)
+            logger.info(f"[complete_step] Using '{strategy.onboarding_type}' strategy for user {user_id}")
 
-                # Save API keys (legacy step 1)
-                api_keys = step_data.get('api_keys', {})
-                logger.info(f" Step 1: API keys found: {list(api_keys.keys()) if api_keys else 'None'}")
-                if api_keys:
-                    for provider, key in api_keys.items():
-                        if key:
-                            try:
-                                saved = self._save_api_key(user_id, provider, key, db)
-                                if saved:
-                                    logger.info(f" Saved API key for provider {provider}")
-                            except Exception as e:
-                                logger.error(f" BLOCKING ERROR: Failed to save API key for provider {provider}: {str(e)}")
-                                raise HTTPException(
-                                    status_code=500,
-                                    detail=f"Failed to save API key for {provider}. Onboarding cannot proceed until this is resolved."
-                                ) from e
-
-                # Save integrations data (website platforms, analytics, social, primary site)
-                integrations = step_data.get('integrations')
-                if integrations and isinstance(integrations, dict):
-                    try:
-                        logger.info(f" Step 1: Saving integrations data for user {user_id}")
-                        session = self._get_or_create_session(user_id, db)
-                        if session.platform_integrations:
-                            pi = session.platform_integrations
-                        else:
-                            pi = PlatformIntegration(session_id=session.id)
-                            db.add(pi)
-                        pi.primary_website = integrations.get("primaryWebsite")
-                        pi.website_platforms = integrations.get("websitePlatforms", {})
-                        pi.analytics_platforms = integrations.get("analyticsPlatforms", {})
-                        pi.social_platforms = integrations.get("socialPlatforms", {})
-                        pi.connected_platforms = integrations.get("connectedPlatforms", [])
-                        db.commit()
-                        logger.info(f" Step 1: Integrations data persisted for user {user_id}")
-                    except Exception as e:
-                        logger.error(f" Step 1: Failed to save integrations data: {str(e)}")
-                        db.rollback()
-                        raise HTTPException(
-                            status_code=500,
-                            detail="Failed to save integrations data. Onboarding cannot proceed until this is resolved."
-                        ) from e
-
-            # Step 2: Save website analysis data
-            elif step_number == 2 and request_data:
-                website_data = request_data.get('data') or request_data
-                logger.info(f" Step 2: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f" Step 2: Extracted website_data keys: {list(website_data.keys()) if website_data else 'None'}")
-                if website_data:
-                    try:
-                        saved = self._save_website_analysis(user_id, website_data, db)
-                        if saved:
-                            logger.info(f" Saved website analysis for user {user_id}")
-                            
-                            # Schedule background tasks for Step 2 (non-blocking)
-                            website_url = website_data.get('website') or website_data.get('website_url')
-                            if website_url:
-                                from api.onboarding_utils.onboarding_task_scheduler import schedule_step2_tasks
-                                schedule_step2_tasks(user_id, db, website_url)
-                    except Exception as e:
-                        logger.error(f" BLOCKING ERROR: Failed to save website analysis: {str(e)}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail="Failed to save website analysis data. Onboarding cannot proceed until this is resolved."
-                        ) from e
-
-            # Step 3: Save research preferences data
-            elif step_number == 3 and request_data:
-                research_data = request_data.get('data') or request_data
-                logger.info(f" Step 3: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f" Step 3: Extracted research_data keys: {list(research_data.keys()) if research_data else 'None'}")
-                if research_data:
-                    try:
-                        saved = self._save_research_preferences(user_id, research_data, db)
-                        if saved:
-                            logger.info(f" Saved research preferences for user {user_id}")
-                            
-                        # Also save competitors if present
-                        competitors = research_data.get('competitors')
-                        if competitors:
-                            industry_context = research_data.get('industryContext') or research_data.get('industry_context')
-                            logger.info(f" Step 3: Found {len(competitors)} competitors to save")
-                            self._save_competitor_analysis(user_id, competitors, industry_context, db)
-
-                            # Schedule deep competitor analysis (non-blocking)
-                            website_url = None
-                            try:
-                                session = self._get_or_create_session(user_id, db)
-                                existing_analysis = db.query(WebsiteAnalysis).filter(
-                                    WebsiteAnalysis.session_id == session.id
-                                ).first()
-                                if existing_analysis and existing_analysis.website_url:
-                                    website_url = existing_analysis.website_url
-                            except Exception:
-                                pass
-                            if website_url:
-                                from api.onboarding_utils.onboarding_task_scheduler import schedule_step3_tasks
-                                schedule_step3_tasks(user_id, db, website_url, competitors)
-                            
-                        # Save social media presence if available (Update WebsiteAnalysis)
-                        social_media = research_data.get('social_media_accounts')
-                        if social_media:
-                            logger.info(f" Step 3: Found social media accounts to save")
-                            try:
-                                session = self._get_or_create_session(user_id, db)
-                                existing_analysis = db.query(WebsiteAnalysis).filter(
-                                    WebsiteAnalysis.session_id == session.id
-                                ).first()
-                                if existing_analysis:
-                                    existing_analysis.social_media_presence = social_media
-                                    existing_analysis.updated_at = datetime.utcnow()
-                                    db.commit()
-                                    logger.info(f" Updated social media presence for user {user_id}")
-                                else:
-                                    logger.warning(f" Could not save social media: WebsiteAnalysis not found for user {user_id}")
-                            except Exception as e:
-                                logger.error(f" Failed to save social media presence: {str(e)}")
-                                # Don't block completion for this, as it's secondary data
-                    
-                    except Exception as e:
-                        logger.error(f" BLOCKING ERROR: Failed to save research preferences: {str(e)}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail="Failed to save research preferences. Onboarding cannot proceed until this is resolved."
-                        ) from e
-
-            # Step 4: Save persona data
-            elif step_number == 4 and request_data:
-                persona_data = request_data.get('data') or request_data
-                logger.info(f" Step 4: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f" Step 4: Extracted persona_data keys: {list(persona_data.keys()) if persona_data else 'None'}")
-                if persona_data:
-                    try:
-                        saved = self._save_persona_data(user_id, persona_data, db)
-                        if saved:
-                            logger.info(f" Saved persona data for user {user_id}")
-                            # Schedule persona generation tasks (non-blocking)
-                            from api.onboarding_utils.onboarding_task_scheduler import schedule_step4_tasks
-                            schedule_step4_tasks(user_id, db)
-                    except Exception as e:
-                        logger.error(f" BLOCKING ERROR: Failed to save persona data: {str(e)}")
-                        raise HTTPException(
-                            status_code=500,
-                            detail="Failed to save persona data. Onboarding cannot proceed until this is resolved."
-                        ) from e
-
-
-            # Step 5: Save integrations data to flat context
-            elif step_number == 5 and request_data:
-                step5_data = request_data.get('data') or request_data
-                logger.info(f" Step 5: Raw request_data keys: {list(request_data.keys()) if request_data else 'None'}")
-                logger.info(f" Step 5: Extracted step5_data keys: {list(step5_data.keys()) if step5_data else 'None'}")
-                if step5_data:
-                    saved = self._save_step5_integrations_context(user_id, step5_data, db)
-                    if saved:
-                        logger.info(f" Saved Step 5 integrations context for user {user_id}")
-                        # Schedule Step 5 background tasks (non-blocking)
-                        from api.onboarding_utils.onboarding_task_scheduler import schedule_step5_tasks
-                        schedule_step5_tasks(user_id, db)
-                    else:
-                        logger.warning(f" Step 5 integrations context not persisted for user {user_id}")
+            strategy_result = await strategy.complete_step(
+                svc=self,
+                step_number=step_number,
+                user_id=user_id,
+                request_data=request_data or {},
+                db=db,
+            )
+            save_errors = strategy_result.get("warnings") or []
 
             # Persist current step and progress in DB
+            # If the platform strategy already marked onboarding as complete
+            # (current_step >= 6 or progress >= 100%), do not overwrite it.
             from services.onboarding.progress_service import OnboardingProgressService
             progress_service = OnboardingProgressService()
-            progress_service.update_step(user_id, step_number)
             try:
-                progress_pct = min(100.0, round((step_number / 6) * 100))
-                progress_service.update_progress(user_id, float(progress_pct))
-            except Exception as e:
-                logger.warning(f"Failed to update progress: {e}")
+                session = self._get_or_create_session(user_id, db)
+                already_completed = (session.current_step or 0) >= 6 or (session.progress or 0.0) >= 100.0
+            except Exception:
+                already_completed = False
+
+            if not already_completed:
+                progress_service.update_step(user_id, step_number)
+                try:
+                    progress_pct = min(100.0, round((step_number / 6) * 100))
+                    progress_service.update_progress(user_id, float(progress_pct))
+                except Exception as e:
+                    logger.warning(f"Failed to update progress: {e}")
+            else:
+                logger.info(f"[complete_step] Strategy already marked onboarding complete for {user_id}; skipping progress overwrite")
 
             # Log save errors but don't block step completion (non-blocking)
             if save_errors:
                 logger.warning(f" Step {step_number} completed but some data save operations failed: {save_errors}")
-            
+
             # Refresh SSOT (Canonical Profile) - non-blocking try/except inside method
             if not save_errors:
                 await self.integration_service.refresh_integrated_data(user_id, db)
-            
+
             logger.info(f"[complete_step] Step {step_number} persisted to DB for user {user_id}")
             return {
                 "message": "Step completed successfully",

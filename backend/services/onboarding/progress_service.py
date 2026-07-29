@@ -72,25 +72,27 @@ class OnboardingProgressService:
                         "completion_percentage": 0.0,
                         "started_at": None,
                         "last_updated": None,
-                        "completed_at": None
+                        "completed_at": None,
+                        "onboarding_type": "website"
                     }
-                
+
                 # Check if onboarding is complete
                 # Consider complete if either the final step is reached OR progress hit 100%
                 is_completed = (session.current_step >= 6) or (session.progress >= 100.0)
-                
+
                 return {
                     "is_completed": is_completed,
                     "current_step": session.current_step,
                     "completion_percentage": session.progress,
                     "started_at": session.started_at.isoformat() if session.started_at else None,
                     "last_updated": session.updated_at.isoformat() if session.updated_at else None,
-                    "completed_at": session.updated_at.isoformat() if is_completed else None
+                    "completed_at": session.updated_at.isoformat() if is_completed else None,
+                    "onboarding_type": session.onboarding_type or "website",
                 }
-                
+
             finally:
                 db.close()
-                
+
         except Exception as e:
             logger.error(f"Error getting onboarding status: {e}")
             return {
@@ -99,7 +101,8 @@ class OnboardingProgressService:
                 "completion_percentage": 0.0,
                 "started_at": None,
                 "last_updated": None,
-                "completed_at": None
+                "completed_at": None,
+                "onboarding_type": "website"
             }
     
     def update_step(self, user_id: str, step_number: int) -> bool:

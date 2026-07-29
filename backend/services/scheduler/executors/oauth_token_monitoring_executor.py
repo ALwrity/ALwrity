@@ -21,6 +21,7 @@ from services.gsc_service import GSCService
 from services.integrations.bing_oauth import BingOAuthService
 from services.integrations.wordpress_oauth import WordPressOAuthService
 from services.integrations.wix_oauth import WixOAuthService
+from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.wix_service import WixService
 from services.database import get_user_db_path
 
@@ -252,6 +253,8 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 return await self._check_wordpress_token(user_id)
             elif platform == 'wix':
                 return await self._check_wix_token(user_id)
+            elif platform == 'linkedin':
+                return await self._check_linkedin_token(user_id)
             else:
                 return TaskExecutionResult(
                     success=False,
@@ -491,6 +494,181 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 retryable=False
             )
     
+    async def _check_linkedin_token(self, user_id: str) -> TaskExecutionResult:
+        """
+        Check and refresh LinkedIn credentials.
+
+        Supports native OAuth (access/refresh tokens), Zernio API keys, and
+        Unipile account references. For native tokens we proactively refresh
+        when expiring or already expired; Zernio/Unipile are validated via a
+        health/check call because the provider manages token lifecycles.
+        """
+        try:
+            linkedin_service = LinkedInOAuthService()
+            token_status = linkedin_service.get_user_token_status(user_id)
+
+            if not token_status.get('has_tokens'):
+                return TaskExecutionResult(
+                    success=False,
+                    error_message="No LinkedIn credentials found for user",
+                    result_data={
+                        'platform': 'linkedin',
+                        'user_id': user_id,
+                        'status': 'not_found',
+                        'check_time': datetime.utcnow().isoformat()
+                    },
+                    retryable=False
+                )
+
+            provider_mode = token_status.get('provider_mode')
+
+            # Provider-managed credentials: validate by resolving them.
+            if provider_mode in ('zernio', 'unipile'):
+                try:
+                    creds = linkedin_service.get_valid_credentials(user_id, monitoring=True)
+                    return TaskExecutionResult(
+                        success=True,
+                        result_data={
+                            'platform': 'linkedin',
+                            'user_id': user_id,
+                            'status': 'valid',
+                            'provider_mode': provider_mode,
+                            'check_time': datetime.utcnow().isoformat(),
+                            'message': f'LinkedIn {provider_mode} credentials are valid'
+                        }
+                    )
+                except Exception as e:
+                    return TaskExecutionResult(
+                        success=False,
+                        error_message=f"LinkedIn {provider_mode} credentials invalid: {str(e)}",
+                        result_data={
+                            'platform': 'linkedin',
+                            'user_id': user_id,
+                            'status': 'expired',
+                            'provider_mode': provider_mode,
+                            'check_time': datetime.utcnow().isoformat(),
+                            'message': f'LinkedIn {provider_mode} connection is no longer valid. User needs to reconnect.'
+                        },
+                        retryable=False
+                    )
+
+            # Native OAuth: inspect active/expired token metadata and refresh when possible.
+            active_tokens = token_status.get('active_tokens', [])
+            expired_tokens = token_status.get('expired_tokens', [])
+            now = datetime.utcnow()
+
+            if active_tokens:
+                needs_refresh = False
+                token_to_refresh = None
+
+                for token in active_tokens:
+                    expires_at_str = token.get('expires_at_dt') or token.get('expires_at')
+                    if expires_at_str:
+                        try:
+                            expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+                            days_until_expiry = (expires_at - now).days
+                            if days_until_expiry < self.expiration_warning_days:
+                                needs_refresh = True
+                                token_to_refresh = token
+                                break
+                        except Exception:
+                            pass
+
+                if needs_refresh and token_to_refresh and token_to_refresh.get('has_refresh_token'):
+                    refresh_result = linkedin_service.refresh_access_token(
+                        user_id, token_to_refresh.get('refresh_token')
+                    )
+                    if refresh_result:
+                        return TaskExecutionResult(
+                            success=True,
+                            result_data={
+                                'platform': 'linkedin',
+                                'user_id': user_id,
+                                'status': 'refreshed',
+                                'check_time': datetime.utcnow().isoformat(),
+                                'message': 'LinkedIn native token refreshed successfully'
+                            }
+                        )
+                    return TaskExecutionResult(
+                        success=False,
+                        error_message="Failed to refresh LinkedIn native token",
+                        result_data={
+                            'platform': 'linkedin',
+                            'user_id': user_id,
+                            'status': 'refresh_failed',
+                            'check_time': datetime.utcnow().isoformat()
+                        },
+                        retryable=False
+                    )
+
+                return TaskExecutionResult(
+                    success=True,
+                    result_data={
+                        'platform': 'linkedin',
+                        'user_id': user_id,
+                        'status': 'valid',
+                        'check_time': datetime.utcnow().isoformat(),
+                        'message': 'LinkedIn native token is valid'
+                    }
+                )
+
+            # No active tokens: try to refresh the most recent expired native token.
+            if expired_tokens:
+                latest_token = expired_tokens[0]
+                if latest_token.get('has_refresh_token'):
+                    refresh_result = linkedin_service.refresh_access_token(
+                        user_id, latest_token.get('refresh_token')
+                    )
+                    if refresh_result:
+                        return TaskExecutionResult(
+                            success=True,
+                            result_data={
+                                'platform': 'linkedin',
+                                'user_id': user_id,
+                                'status': 'refreshed',
+                                'check_time': datetime.utcnow().isoformat(),
+                                'message': 'LinkedIn native token refreshed from expired state'
+                            }
+                        )
+
+                return TaskExecutionResult(
+                    success=False,
+                    error_message="LinkedIn native token expired and could not be refreshed",
+                    result_data={
+                        'platform': 'linkedin',
+                        'user_id': user_id,
+                        'status': 'expired',
+                        'check_time': datetime.utcnow().isoformat(),
+                        'message': 'LinkedIn token expired. User needs to reconnect.'
+                    },
+                    retryable=False
+                )
+
+            return TaskExecutionResult(
+                success=False,
+                error_message="No valid LinkedIn tokens found",
+                result_data={
+                    'platform': 'linkedin',
+                    'user_id': user_id,
+                    'status': 'invalid',
+                    'check_time': datetime.utcnow().isoformat()
+                },
+                retryable=False
+            )
+
+        except Exception as e:
+            self.logger.error(f"Error checking LinkedIn token for user {user_id}: {e}", exc_info=True)
+            return TaskExecutionResult(
+                success=False,
+                error_message=f"LinkedIn token check failed: {str(e)}",
+                result_data={
+                    'platform': 'linkedin',
+                    'user_id': user_id,
+                    'error': str(e)
+                },
+                retryable=False
+            )
+
     async def _check_wordpress_token(self, user_id: str) -> TaskExecutionResult:
         """
         Check WordPress token validity.
@@ -841,7 +1019,8 @@ class OAuthTokenMonitoringExecutor(TaskExecutor):
                 'gsc': 'Google Search Console',
                 'bing': 'Bing Webmaster Tools',
                 'wordpress': 'WordPress',
-                'wix': 'Wix'
+                'wix': 'Wix',
+                'linkedin': 'LinkedIn'
             }
             platform_display = platform_names.get(platform, platform.upper())
             

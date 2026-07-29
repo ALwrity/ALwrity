@@ -30,6 +30,7 @@ from services.integrations.linkedin.unipile_health import (
     get_cached_unipile_health,
 )
 from services.integrations.linkedin_oauth import LinkedInOAuthService
+from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
 from services.integrations.oauth_callback_utils import (
     build_oauth_callback_html,
     sanitize_error,
@@ -298,6 +299,14 @@ async def handle_oauth_callback_get(
                 )
 
             logger.info(f"[LinkedInConnect] Unipile callback succeeded user_id={user_id}")
+
+            try:
+                db = get_session_for_user(user_id)
+                create_oauth_monitoring_tasks(user_id, db, ["linkedin"])
+                db.close()
+            except Exception as e:
+                logger.warning(f"[LinkedInConnect] Failed to create monitoring task: {e}")
+
             payload = {
                 "type": "LINKEDIN_OAUTH_SUCCESS",
                 "success": True,
