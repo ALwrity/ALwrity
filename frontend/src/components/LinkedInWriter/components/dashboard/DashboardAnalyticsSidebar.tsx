@@ -81,14 +81,21 @@ export const DashboardAnalyticsSidebar: React.FC<
   DashboardAnalyticsSidebarProps
 > = ({ onViewAll }) => {
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
-  const { data, panelState, refreshPosts, errorMessage } = usePostAnalytics();
+  const { data, panelState, fetchPosts, refreshPosts, errorMessage } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
   const [profileGrowthReloadToken, setProfileGrowthReloadToken] = useState(0);
 
-  // Only fetch on explicit user action — not on every mount.
-  // Always force Unipile refresh so retrieve-post enrichment can fill
-  // creator analytics missing from list-posts cache.
+  // Initial load — serve from DB cache (positionProfileGrowthWidget populates
+  // the cache via /analytics/personal, so posts are fast even on first visit).
   const handleLoadPosts = useCallback(async () => {
+    if (panelState === "loading") return;
+    // Use DB cache — Profile Growth already synced Unipile on mount.
+    await fetchPosts({ limit: 50, refresh: false });
+    setProfileGrowthReloadToken((n) => n + 1);
+  }, [panelState, fetchPosts]);
+
+  // Refresh — force Unipile fetch for fresh engagement counters.
+  const handleRefreshPosts = useCallback(async () => {
     if (panelState === "loading") return;
     await refreshPosts();
     setProfileGrowthReloadToken((n) => n + 1);
@@ -104,6 +111,18 @@ export const DashboardAnalyticsSidebar: React.FC<
 
   const isError = panelState === "error";
   const isLoaded = panelState === "loaded";
+
+  const lastRefreshedLabel = useMemo(() => {
+    const syncedAt = data?.last_synced_at;
+    if (!syncedAt) return null;
+    const delta = Date.now() - new Date(syncedAt).getTime();
+    const mins = Math.floor(delta / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  }, [data?.last_synced_at]);
 
   const totals = useMemo(() => {
     let impressions = 0;
@@ -293,7 +312,7 @@ export const DashboardAnalyticsSidebar: React.FC<
                     </div>
                     <button
                       type="button"
-                      onClick={handleLoadPosts}
+                      onClick={handleRefreshPosts}
                       disabled={isLoading}
                       style={{
                         background: "none", border: "none", color: isLoading ? "#94a3b8" : "#0a66c2",
@@ -303,6 +322,11 @@ export const DashboardAnalyticsSidebar: React.FC<
                       {isLoading ? "Loading…" : "↻ Refresh"}
                     </button>
                   </div>
+                  {lastRefreshedLabel && (
+                    <div style={{ fontSize: 8, fontWeight: 500, color: "#94a3b8", textAlign: "right", marginTop: -2, marginBottom: 4 }}>
+                      Last refreshed: {lastRefreshedLabel}
+                    </div>
+                  )}
                   <MiniBarChart posts={posts} />
                 </div>
               )}

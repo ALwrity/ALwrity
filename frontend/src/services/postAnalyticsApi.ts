@@ -54,6 +54,7 @@ export interface PostListResponse {
   cursor?: string | null;
   has_more: boolean;
   total_count?: number | null;
+  last_synced_at?: string | null;
 }
 
 export interface FetchPostsParams {

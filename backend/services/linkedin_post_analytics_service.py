@@ -63,11 +63,13 @@ class LinkedInPostAnalyticsService:
             .all()
         )
         posts = [row_to_linkedin_post(r) for r in rows]
+        most_recent = rows[0].last_synced_at if rows else None
         return PostListResponse(
             posts=posts,
             cursor=None,
             has_more=False,
             total_count=len(posts),
+            last_synced_at=most_recent,
         )
 
     def get_last_synced_at(self, user_id: str) -> Optional[datetime]:
