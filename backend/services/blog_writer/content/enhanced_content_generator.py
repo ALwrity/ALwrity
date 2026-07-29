@@ -7,6 +7,7 @@ Provider parity:
 """
 
 from typing import Any, Dict, List
+from datetime import datetime
 
 from services.llm_providers.main_text_generation import llm_text_gen
 from .source_url_manager import SourceURLManager
@@ -214,6 +215,7 @@ class EnhancedContentGenerator:
             f"- Target word count: ~{target_words}\n"
             f"- Use the following key points: {', '.join(key_points)}\n"
             f"- Include these keywords naturally: {', '.join(keywords)}\n"
+            f"- Use facts and statistics that feel current for {datetime.now().strftime('%B %Y')}\n"
         )
 
         if subheadings:

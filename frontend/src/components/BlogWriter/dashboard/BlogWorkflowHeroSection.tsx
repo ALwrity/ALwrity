@@ -46,6 +46,8 @@ interface BlogWorkflowHeroSectionProps {
    * hero container alongside the headline and CTAs.
    */
   inline?: boolean;
+  /** Current active phase from the top navigation — highlights the matching wedge. */
+  currentPhase?: string;
 }
 
 /**
@@ -60,24 +62,53 @@ export const BlogWorkflowHeroSection: React.FC<BlogWorkflowHeroSectionProps> = (
   hasResearch = false,
   onRestoreAsset,
   inline = false,
+  currentPhase,
 }) => {
   const isDesktop = useIsDesktop();
   const canvasRef = useRef<HTMLDivElement>(null);
   const [containerWidth, setContainerWidth] = useState(640);
+  const [containerHeight, setContainerHeight] = useState(0);
+
+  // Map currentPhase string to wheel card ID
+  const activeCardId: BlogWorkflowCardId | undefined = useMemo(() => {
+    const phaseToWedge: Record<string, BlogWorkflowCardId> = {
+      research: "plan",
+      outline: "create",
+      content: "create",
+      seo: "analysis",
+      publish: "publish",
+    };
+    return currentPhase ? phaseToWedge[currentPhase] : undefined;
+  }, [currentPhase]);
 
   useEffect(() => {
     const el = canvasRef.current;
     if (!el) return undefined;
-    const readWidth = () => {
+    const readDimensions = () => {
       if (el.clientWidth > 0) setContainerWidth(el.clientWidth);
+      if (el.parentElement && el.parentElement.clientHeight > 0) {
+        setContainerHeight(el.parentElement.clientHeight);
+      }
     };
-    readWidth();
-    const ro = new ResizeObserver(readWidth);
+    readDimensions();
+    const ro = new ResizeObserver(readDimensions);
     ro.observe(el);
+    // Also observe the parent for height changes
+    if (el.parentElement) {
+      const parentRo = new ResizeObserver(readDimensions);
+      parentRo.observe(el.parentElement);
+      return () => {
+        ro.disconnect();
+        parentRo.disconnect();
+      };
+    }
     return () => ro.disconnect();
   }, []);
 
-  const layout = useMemo(() => computeBlogRadialLayout(containerWidth), [containerWidth]);
+  const layout = useMemo(
+    () => computeBlogRadialLayout(containerWidth, containerHeight || undefined),
+    [containerWidth, containerHeight],
+  );
 
   // Lifted so connection checks resolve well before a wedge is clicked.
   const wp = useWordPressConnection();
@@ -156,48 +187,14 @@ export const BlogWorkflowHeroSection: React.FC<BlogWorkflowHeroSectionProps> = (
 
   const Wrapper = inline ? "div" : "section";
 
-  const heading = (
+  const heading = inline ? null : (
     <div
-      className={!inline ? "blog-workflow-hero-heading" : undefined}
-      style={
-        inline
-          ? {
-              textAlign: "center",
-              maxWidth: 480,
-              margin: "0 0 12px",
-            }
-          : undefined
-      }
+      className="blog-workflow-hero-heading"
     >
-      <h2
-        style={
-          inline
-            ? {
-                fontSize: "1.25rem",
-                fontWeight: 700,
-                margin: "0 0 4px",
-                background: "linear-gradient(135deg, #1976d2 0%, #9c27b0 100%)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-              }
-            : undefined
-        }
-      >
+      <h2>
         Your Blog, at a Glance
       </h2>
-      <p
-        style={
-          inline
-            ? {
-                margin: 0,
-                fontSize: "0.8rem",
-                color: "#64748b",
-                lineHeight: 1.4,
-              }
-            : undefined
-        }
-      >
+      <p>
         Six steps, one view — track research, drafts, SEO score, publishing, search visibility,
         and refresh opportunities as you grow your thought leadership.
       </p>
@@ -222,7 +219,11 @@ export const BlogWorkflowHeroSection: React.FC<BlogWorkflowHeroSectionProps> = (
     >
       {heading}
 
-      <div className="blog-workflow-hero-canvas" ref={canvasRef}>
+      <div
+        className="blog-workflow-hero-canvas"
+        ref={canvasRef}
+        style={inline ? { maxWidth: 'none' } : undefined}
+      >
         {isDesktop ? (
           <>
             <BlogRadialWorkflow
@@ -230,6 +231,7 @@ export const BlogWorkflowHeroSection: React.FC<BlogWorkflowHeroSectionProps> = (
               onCardAction={handleCardAction}
               connected={publishConnected}
               metrics={metrics}
+              activeCardId={activeCardId}
             />
             <div
               className="blog-workflow-hero-hub"

@@ -123,19 +123,20 @@ export const BlogWriterProfileHub: React.FC<BlogWriterProfileHubProps> = ({
       <button
         onClick={onStartWriting}
         style={{
-          background: "linear-gradient(135deg, #1976d2 0%, #1565c0 100%)",
+          background: "linear-gradient(135deg, #1976d2 0%, #7c3aed 100%)",
           color: "white",
           border: "none",
-          padding: "10px 22px",
+          padding: "12px 28px",
           borderRadius: 50,
-          fontSize: 13,
+          fontSize: 14,
           fontWeight: 700,
           cursor: "pointer",
-          boxShadow: "0 6px 18px rgba(25, 118, 210, 0.35)",
+          boxShadow: "0 6px 20px rgba(25, 118, 210, 0.4)",
           whiteSpace: "nowrap",
+          letterSpacing: "0.01em",
         }}
       >
-        ✨ Start Writing
+        Start Writing
       </button>
     </div>
   );

@@ -6,6 +6,7 @@ Handles generation of medium-length blogs (≤1000 words) using structured AI ca
 
 import time
 import json
+from datetime import datetime
 from typing import Dict, Any, List
 from loguru import logger
 from fastapi import HTTPException
@@ -140,7 +141,7 @@ class MediumBlogGenerator:
             """
         
         system = (
-            "You are a professional blog writer with deep expertise in your field. "
+            f"You are a professional blog writer in {datetime.now().year}. "
             "Generate high-quality, persona-driven content for each section based on the provided outline. "
             "Write engaging, informative content that follows the section's key points and target word count. "
             "Ensure the content flows naturally and maintains consistent voice and authority. "

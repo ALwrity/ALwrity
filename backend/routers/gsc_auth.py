@@ -27,6 +27,7 @@ class GSCAnalyticsRequest(BaseModel):
 class GSCBrainstormRequest(BaseModel):
     keywords: str
     site_url: Optional[str] = None
+    force_refresh: bool = False
 
 class GSCStatusResponse(BaseModel):
     connected: bool
@@ -251,6 +252,14 @@ async def brainstorm_topics(
 
         logger.info(f"GSC brainstorm for user: {user_id}, keywords: {request.keywords!r}")
 
+        # Check DB cache first (unless forced refresh)
+        if not request.force_refresh:
+            from services.gsc_brainstorm_cache_service import get_cached_result
+            cached = get_cached_result(user_id, request.keywords, request.site_url)
+            if cached:
+                logger.info(f"GSC brainstorm cache HIT for user: {user_id}")
+                return cached
+
         result = brainstorm_service.brainstorm_topics(
             user_id=user_id,
             keywords=request.keywords,
@@ -260,6 +269,11 @@ async def brainstorm_topics(
         if "error" in result and not result.get("content_opportunities"):
             status = 400 if "No GSC sites" in result["error"] else 500
             raise HTTPException(status_code=status, detail=result["error"])
+
+        # Save successful result to DB cache
+        if not result.get("error") and result.get("content_opportunities"):
+            from services.gsc_brainstorm_cache_service import save_cached_result
+            save_cached_result(user_id, request.keywords, result, request.site_url)
 
         logger.info(f"GSC brainstorm completed for user: {user_id}")
         return result

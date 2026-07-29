@@ -17,12 +17,14 @@ interface BlogRadialWorkflowProps {
   /** True when a publishing platform (WordPress/Wix) is connected. */
   connected?: boolean;
   metrics?: BlogWedgeMetrics;
+  /** The currently active phase's wedge card ID (from top nav). */
+  activeCardId?: BlogWorkflowCardId;
 }
 
 const PANEL_GAP_DEGREES = WEDGE_PANEL_GAP_DEG;
 const OUTER_BULGE_FACTOR = 0.14;
-const HOVER_POP_PX = 10;
-const HOVER_SCALE = 1.06;
+const HOVER_POP_PX = 12;
+const HOVER_SCALE = 1.08;
 
 function usePrefersReducedMotion(): boolean {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -137,6 +139,7 @@ export const BlogRadialWorkflow: React.FC<BlogRadialWorkflowProps> = ({
   onCardAction,
   connected = true,
   metrics = {},
+  activeCardId,
 }) => {
   const [hoveredId, setHoveredId] = useState<BlogWorkflowCardId | null>(null);
   const [focusedId, setFocusedId] = useState<BlogWorkflowCardId | null>(null);
@@ -177,7 +180,8 @@ export const BlogRadialWorkflow: React.FC<BlogRadialWorkflowProps> = ({
   const renderWedge = (card: (typeof BLOG_WORKFLOW_CARDS)[number]) => {
     const isHovered = hoveredId === card.id;
     const isFocused = focusedId === card.id;
-    const isActive = isHovered || isFocused;
+    const isNavActive = activeCardId === card.id;
+    const isActive = isHovered || isFocused || isNavActive;
     const isRecommended = showRecommended && card.id === RECOMMENDED_WORKFLOW_CARD_ID;
     const isConnectLocked = !connected && CONNECT_GATED_WORKFLOW_IDS.includes(card.id);
     const panelStartDeg = card.startAngle - PANEL_GAP_DEGREES;
