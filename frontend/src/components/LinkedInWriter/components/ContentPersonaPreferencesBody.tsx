@@ -10,6 +10,25 @@ import {
 } from "../utils/storageUtils";
 import { OptimiseProfileControl } from "./dashboard/OptimiseProfileControl";
 import "./persona/content-persona-preferences.css";
+import { LinkedInIndustryAutocomplete } from "./LinkedInIndustryAutocomplete";
+import type { LinkedInIndustryItem } from "../utils/filterLinkedInIndustries";
+
+/** Phase 1 sample catalog — replaced in Phase 3 with cached API list. */
+const PHASE1_SAMPLE_INDUSTRY_ITEMS: LinkedInIndustryItem[] = [
+  { id: "sample-1", title: "Retail Art Supplies" },
+  { id: "sample-2", title: "Artists and Writers" },
+  { id: "sample-3", title: "Performing Arts" },
+  { id: "sample-4", title: "Retail Art Dealers" },
+  { id: "sample-5", title: "Artificial Intelligence" },
+  { id: "sample-6", title: "Performing Arts and Spectator Sports" },
+  { id: "sample-7", title: "Fine Arts Schools" },
+  { id: "sample-8", title: "Technology" },
+  { id: "sample-9", title: "Healthcare" },
+  {
+    id: "sample-10",
+    title: "Artificial Rubber and Synthetic Fiber Manufacturing",
+  },
+];
 
 interface ContentPersonaPreferencesBodyProps {
   userPreferences: LinkedInPreferences;
@@ -114,10 +133,10 @@ export const ContentPersonaPreferencesBody: React.FC<
 
         <div>
           <div className="content-persona-field-label">Industry</div>
-          <input
-            className="content-persona-field-input"
+          <LinkedInIndustryAutocomplete
             value={userPreferences.industry}
-            onChange={(e) => onPreferenceChange("industry", e.target.value)}
+            onChange={(next) => onPreferenceChange("industry", next)}
+            items={PHASE1_SAMPLE_INDUSTRY_ITEMS}
             placeholder="e.g., Technology"
           />
         </div>
