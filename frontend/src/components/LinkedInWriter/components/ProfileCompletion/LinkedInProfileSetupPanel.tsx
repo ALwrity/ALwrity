@@ -378,10 +378,18 @@ export const LinkedInProfileSetupPanel: React.FC<
       setShowAnalysisModal(false);
       void openOptimizationPanel();
     };
+    const onOpenQuickCreate = () => {
+      setIsTopicPanelOpen(false);
+      collapseRecommendations();
+    };
     window.addEventListener("linkedinwriter:getTopicIdeas", onGetTopicIdeas);
     window.addEventListener(
       "linkedinwriter:openOptimiseProfile",
       onOpenOptimise,
+    );
+    window.addEventListener(
+      "linkedinwriter:openQuickCreate",
+      onOpenQuickCreate,
     );
     return () => {
       window.removeEventListener(
@@ -392,8 +400,12 @@ export const LinkedInProfileSetupPanel: React.FC<
         "linkedinwriter:openOptimiseProfile",
         onOpenOptimise,
       );
+      window.removeEventListener(
+        "linkedinwriter:openQuickCreate",
+        onOpenQuickCreate,
+      );
     };
-  }, [runTopicAnalysis, openOptimizationPanel]);
+  }, [runTopicAnalysis, openOptimizationPanel, collapseRecommendations]);
 
   const dismissAnalysisModal = () => {
     storeDismissal();
