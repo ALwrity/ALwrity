@@ -632,3 +632,20 @@ class _PatchedUserDB:
         if _ACTIVE_DB_PATH.get("path") == self.db_path:
             _ACTIVE_DB_PATH["path"] = ""
         return result
+
+
+# ---------------------------------------------------------------------------
+# ``pandas`` is referenced at module-import time by some smoke tests but is
+# not a required dependency for the unit suite. Provide a permissive stub
+# so collection succeeds in environments without ``pandas``.
+# ---------------------------------------------------------------------------
+if "pandas" not in sys.modules:
+    try:
+        importlib.import_module("pandas")
+    except Exception:
+        _pandas_stub = types.ModuleType("pandas")
+        _pandas_stub.DataFrame = type("DataFrame", (), {})
+        _pandas_stub.Series = type("Series", (), {})
+        _pandas_stub.read_csv = lambda *args, **kwargs: None
+        _pandas_stub.read_json = lambda *args, **kwargs: None
+        sys.modules["pandas"] = _pandas_stub
