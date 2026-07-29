@@ -109,6 +109,9 @@ export const LinkedInIndustryAutocomplete: React.FC<
         console.debug(`${LOG_PREFIX} ignored invalid suggestion selection`);
         return;
       }
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
       onChange(item.title);
       closeDropdown();
       inputRef.current?.focus();
@@ -227,6 +230,13 @@ export const LinkedInIndustryAutocomplete: React.FC<
         <div
           id={listboxId}
           role="listbox"
+          onMouseDown={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+          }}
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
           style={{
             position: "absolute",
             top: "calc(100% + 2px)",
@@ -278,7 +288,11 @@ export const LinkedInIndustryAutocomplete: React.FC<
                   aria-selected={isActive}
                   onMouseDown={(event) => {
                     event.preventDefault();
+                    event.stopPropagation();
                     selectSuggestion(item);
+                  }}
+                  onClick={(event) => {
+                    event.stopPropagation();
                   }}
                   onMouseEnter={() => setActiveIndex(index)}
                   style={{
