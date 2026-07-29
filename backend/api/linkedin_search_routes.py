@@ -187,12 +187,21 @@ async def get_linkedin_search_parameters(
 ) -> LinkedInSearchParametersResponse:
     """Retrieve LinkedIn search parameter IDs for filter autocomplete."""
     user_id = _user_id(current_user)
-    logger.info(
-        "[LinkedInSearch] GET /search/parameters user_id={} type={} keywords={!r}",
-        user_id,
-        type,
-        keywords,
-    )
+    normalized_type = (type or "").strip().upper()
+    keywords_len = len(keywords.strip()) if keywords else 0
+    if normalized_type == "INDUSTRY":
+        logger.info(
+            "[LinkedInIndustrySuggest] GET /search/parameters user_id={} keywords_len={}",
+            user_id,
+            keywords_len,
+        )
+    else:
+        logger.info(
+            "[LinkedInSearch] GET /search/parameters user_id={} type={} keywords={!r}",
+            user_id,
+            type,
+            keywords,
+        )
     try:
         return await get_search_parameters(
             user_id,

@@ -9,6 +9,7 @@ export interface LinkedInIndustryItem {
 }
 
 const LOG_PREFIX = "[LinkedInIndustryFilter]";
+export const LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH = 100;
 
 /**
  * Case-insensitive substring match with prefix matches ranked first.
@@ -25,6 +26,13 @@ export function filterLinkedInIndustries(
 
   const trimmed = (query || "").trim();
   if (!trimmed) {
+    return [];
+  }
+
+  if (trimmed.length > LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH) {
+    console.debug(
+      `${LOG_PREFIX} query exceeds max length (${LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH}) — freestyle only`,
+    );
     return [];
   }
 

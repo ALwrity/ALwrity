@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal, Optional
@@ -196,13 +197,24 @@ def get_industries() -> dict[str, Any]:
     if isinstance(hot, dict) and isinstance(hot.get("items"), list):
         items = _normalize_items(hot.get("items"))
         synced_at = hot.get("synced_at")
+        logger.debug(
+            "{} cache read hit source=memory item_count={}",
+            LOG_PREFIX,
+            len(items),
+        )
     else:
         loaded = load_cache()
         items = loaded.get("items") or []
         synced_at = loaded.get("synced_at")
+        if items:
+            logger.debug(
+                "{} cache read hit source=file item_count={}",
+                LOG_PREFIX,
+                len(items),
+            )
 
     if not items:
-        logger.debug("{} get_industries cache_status=empty", LOG_PREFIX)
+        logger.warning("{} cache miss or empty", LOG_PREFIX)
         return {
             "items": [],
             "synced_at": synced_at,
@@ -242,13 +254,15 @@ async def sync_industries_from_unipile(
     )
 
     logger.info(
-        "{} sync_industries_from_unipile start user_id={} account_id={}",
+        "{} sync start user_id={} account_id={} strategy=alphabet_seeds",
         LOG_PREFIX,
         user_id,
-        account_id or "resolved",
+        _mask_account_id(account_id),
     )
 
+    started = time.monotonic()
     merged: dict[str, LinkedInIndustryItem] = {}
+    raw_count = 0
     keywords_batches = [None, *list("abcdefghijklmnopqrstuvwxyz"), "tech", "art", "health"]
 
     for keywords in keywords_batches:
@@ -261,6 +275,7 @@ async def sync_industries_from_unipile(
                 limit=100,
                 account_id=account_id,
             )
+            raw_count += len(response.items)
             for item in response.items:
                 merged[item.id] = LinkedInIndustryItem(id=item.id, title=item.title)
             logger.debug(
@@ -272,27 +287,44 @@ async def sync_industries_from_unipile(
             )
         except Exception as exc:
             logger.warning(
-                "{} sync keyword={!r} failed user_id={}: {}",
+                "{} sync keyword={!r} failed user_id={} error_type={}: {}",
                 LOG_PREFIX,
                 label,
                 user_id,
+                type(exc).__name__,
                 exc,
             )
 
     if not merged:
+        duration_ms = int((time.monotonic() - started) * 1000)
         logger.warning(
-            "{} sync completed with zero industries user_id={}",
+            "{} sync completed with zero industries user_id={} duration_ms={}",
             LOG_PREFIX,
             user_id,
+            duration_ms,
         )
         return 0
 
     items = sorted(merged.values(), key=lambda item: item.title.lower())
     save_cache(items)
+    duration_ms = int((time.monotonic() - started) * 1000)
+    synced_at = _utc_now_iso()
     logger.info(
-        "{} sync_industries_from_unipile complete user_id={} item_count={}",
+        "{} sync complete user_id={} raw_count={} deduped_count={} duration_ms={} synced_at={}",
         LOG_PREFIX,
         user_id,
+        raw_count,
         len(items),
+        duration_ms,
+        synced_at,
     )
     return len(items)
+
+
+def _mask_account_id(account_id: Optional[str]) -> str:
+    """Mask Unipile account id for logs."""
+    if not account_id:
+        return "none"
+    if len(account_id) <= 4:
+        return "****"
+    return f"{account_id[:4]}...{account_id[-2:]}"

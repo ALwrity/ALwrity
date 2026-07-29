@@ -51,8 +51,7 @@ export const ContentPersonaPreferencesBody: React.FC<
   const {
     industries,
     isLoading: isIndustryListLoading,
-    error: industryListError,
-    isLiveFallback,
+    suggestionsUnavailable,
   } = useLinkedInIndustryList({
     connected,
     query: userPreferences.industry,
@@ -133,7 +132,7 @@ export const ContentPersonaPreferencesBody: React.FC<
             isLoading={isIndustryListLoading}
             placeholder="e.g., Technology"
           />
-          {industryListError && isLiveFallback && (
+          {suggestionsUnavailable && (
             <div style={{ marginTop: 4, fontSize: 10, color: "#64748b" }}>
               Suggestions unavailable — you can still type your industry.
             </div>

@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getLinkedInIndustries,
-  getLinkedInSearchErrorMessage,
   getLinkedInSearchParameters,
   type LinkedInIndustryCacheStatus,
 } from "../../../api/linkedinSocial";
-import type { LinkedInIndustryItem } from "../utils/filterLinkedInIndustries";
+import {
+  LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH,
+  type LinkedInIndustryItem,
+} from "../utils/filterLinkedInIndustries";
 
 const LOG_PREFIX = "[LinkedInIndustryList]";
 const SESSION_KEY = "alwrity_linkedin_industry_cache_v1";
@@ -32,11 +34,13 @@ interface UseLinkedInIndustryListResult {
   industries: LinkedInIndustryItem[];
   isLoading: boolean;
   cacheStatus: LinkedInIndustryCacheStatus;
-  error: string | null;
+  /** True when catalog fetch failed — show subtle unavailable hint. */
+  suggestionsUnavailable: boolean;
   isLiveFallback: boolean;
   fetchLiveSuggestions: (keywords: string) => Promise<LinkedInIndustryItem[]>;
 }
 
+let memoryCatalogCache: IndustrySessionCache | null = null;
 let catalogLoadPromise: Promise<IndustrySessionCache | null> | null = null;
 
 function readSessionCache(): IndustrySessionCache | null {
@@ -93,8 +97,16 @@ function normalizeIndustryItems(items: unknown): LinkedInIndustryItem[] {
 }
 
 async function loadIndustryCatalog(): Promise<IndustrySessionCache | null> {
+  if (memoryCatalogCache) {
+    console.debug(
+      `${LOG_PREFIX} using in-memory cache item_count=${memoryCatalogCache.items.length}`,
+    );
+    return memoryCatalogCache;
+  }
+
   const cached = readSessionCache();
   if (cached) {
+    memoryCatalogCache = cached;
     console.debug(
       `${LOG_PREFIX} using session cache item_count=${cached.items.length}`,
     );
@@ -111,6 +123,7 @@ async function loadIndustryCatalog(): Promise<IndustrySessionCache | null> {
           syncedAt: response.synced_at,
           fetchedAt: Date.now(),
         };
+        memoryCatalogCache = payload;
         writeSessionCache(payload);
         console.debug(
           `${LOG_PREFIX} catalog loaded cache_status=${payload.cacheStatus} item_count=${payload.items.length}`,
@@ -137,31 +150,39 @@ export function useLinkedInIndustryList({
   const [cacheStatus, setCacheStatus] =
     useState<LinkedInIndustryCacheStatus>("empty");
   const [isLoadingCatalog, setIsLoadingCatalog] = useState(false);
-  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [suggestionsUnavailable, setSuggestionsUnavailable] = useState(false);
 
   const [liveItems, setLiveItems] = useState<LinkedInIndustryItem[]>([]);
   const [isLoadingLive, setIsLoadingLive] = useState(false);
-  const [liveError, setLiveError] = useState<string | null>(null);
 
   const liveAbortRef = useRef<AbortController | null>(null);
   const liveSeqRef = useRef(0);
+  const catalogLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
+    if (catalogLoadedRef.current && memoryCatalogCache) {
+      setCatalogItems(memoryCatalogCache.items);
+      setCacheStatus(memoryCatalogCache.cacheStatus);
+      setSuggestionsUnavailable(false);
+      return;
+    }
+
     let cancelled = false;
     setIsLoadingCatalog(true);
-    setCatalogError(null);
+    setSuggestionsUnavailable(false);
 
     loadIndustryCatalog()
       .then((payload) => {
         if (cancelled) {
           return;
         }
+        catalogLoadedRef.current = true;
         if (!payload) {
-          setCatalogError("Unable to load industry suggestions.");
+          setSuggestionsUnavailable(true);
           setCatalogItems([]);
           setCacheStatus("empty");
           return;
@@ -185,7 +206,11 @@ export function useLinkedInIndustryList({
   const fetchLiveSuggestions = useCallback(
     async (keywords: string): Promise<LinkedInIndustryItem[]> => {
       const trimmed = keywords.trim();
-      if (!connected || trimmed.length < LIVE_FALLBACK_MIN_QUERY_LENGTH) {
+      if (
+        !connected ||
+        trimmed.length < LIVE_FALLBACK_MIN_QUERY_LENGTH ||
+        trimmed.length > LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH
+      ) {
         return [];
       }
 
@@ -195,9 +220,11 @@ export function useLinkedInIndustryList({
       const seq = ++liveSeqRef.current;
 
       setIsLoadingLive(true);
-      setLiveError(null);
 
       try {
+        console.debug(
+          `${LOG_PREFIX} live fallback request keywords_len=${trimmed.length}`,
+        );
         const response = await getLinkedInSearchParameters(
           { type: "INDUSTRY", keywords: trimmed, limit: 20 },
           controller.signal,
@@ -210,11 +237,7 @@ export function useLinkedInIndustryList({
         if (seq !== liveSeqRef.current) {
           return [];
         }
-        const message = getLinkedInSearchErrorMessage(error);
-        if (message) {
-          setLiveError(message);
-          console.debug(`${LOG_PREFIX} live fallback failed`, error);
-        }
+        console.debug(`${LOG_PREFIX} live fallback failed — freestyle only`, error);
         return [];
       } finally {
         if (seq === liveSeqRef.current) {
@@ -229,13 +252,15 @@ export function useLinkedInIndustryList({
     if (!useLiveFallback) {
       liveAbortRef.current?.abort();
       setLiveItems([]);
-      setLiveError(null);
       setIsLoadingLive(false);
       return;
     }
 
     const trimmed = query.trim();
-    if (trimmed.length < LIVE_FALLBACK_MIN_QUERY_LENGTH) {
+    if (
+      trimmed.length < LIVE_FALLBACK_MIN_QUERY_LENGTH ||
+      trimmed.length > LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH
+    ) {
       liveAbortRef.current?.abort();
       setLiveItems([]);
       setIsLoadingLive(false);
@@ -262,13 +287,12 @@ export function useLinkedInIndustryList({
   const industries = catalogItems.length > 0 ? catalogItems : liveItems;
   const isLoading =
     isLoadingCatalog || (useLiveFallback && isLoadingLive && industries.length === 0);
-  const error = catalogError || liveError;
 
   return {
     industries,
     isLoading,
     cacheStatus,
-    error,
+    suggestionsUnavailable,
     isLiveFallback: useLiveFallback,
     fetchLiveSuggestions,
   };

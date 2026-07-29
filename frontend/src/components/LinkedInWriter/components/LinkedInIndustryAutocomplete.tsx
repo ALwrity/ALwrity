@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   filterLinkedInIndustries,
+  LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH,
   type LinkedInIndustryItem,
 } from "../utils/filterLinkedInIndustries";
 
@@ -73,10 +74,12 @@ export const LinkedInIndustryAutocomplete: React.FC<
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  const suggestions = useMemo(
-    () => filterLinkedInIndustries(items, value),
-    [items, value],
-  );
+  const suggestions = useMemo(() => {
+    if (value.trim().length > LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH) {
+      return [];
+    }
+    return filterLinkedInIndustries(items, value);
+  }, [items, value]);
 
   const showDropdown =
     isOpen && !disabled && (isLoading || suggestions.length > 0);
@@ -199,6 +202,7 @@ export const LinkedInIndustryAutocomplete: React.FC<
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled}
+          maxLength={LINKEDIN_INDUSTRY_MAX_QUERY_LENGTH}
           autoComplete="off"
           role="combobox"
           aria-expanded={showDropdown}
