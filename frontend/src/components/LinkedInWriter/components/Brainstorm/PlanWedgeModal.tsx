@@ -1,10 +1,13 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import DataSourceSelector from './DataSourceSelector';
 import type { BrainstormOptions } from './DataSourceSelector';
 import MySavedIdeas from './MySavedIdeas';
+import PlanWedgeBrainstormInline from './PlanWedgeBrainstormInline';
+import PlanWedgeComingSoonCard from './PlanWedgeComingSoonCard';
 import { usePlatformPersonaContext } from '../../../shared/PersonaContext/PlatformPersonaProvider';
 import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocialConnection';
+import { usePlanWedgeBrainstorm } from '../../hooks/usePlanWedgeBrainstorm';
 import { showToastNotification } from '../../../../utils/toastNotifications';
 import { apiClient } from '../../../../api/client';
 
@@ -35,11 +38,15 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
 
   const [myIdeasOpen, setMyIdeasOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
-  const [brainstorming, setBrainstorming] = useState(false);
-  const brainstormingRef = useRef(false);
 
-  const { corePersona } = usePlatformPersonaContext();
+  const { corePersona, platformPersona } = usePlatformPersonaContext();
   const { connected } = useLinkedInSocialConnection();
+
+  const brainstorm = usePlanWedgeBrainstorm({
+    corePersona,
+    platformPersona,
+    onSavedCountChange: setSavedCount,
+  });
 
   const refreshSavedCount = useCallback(async () => {
     try {
@@ -54,10 +61,13 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     if (open) void refreshSavedCount();
   }, [open, refreshSavedCount]);
 
+  useEffect(() => {
+    if (!open) brainstorm.resetResults();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const canGenerate =
     Boolean((brainstormSeed || '').trim()) || usePersona || includeTrending || remarketContent;
 
-  // Pre-fill brainstorm seed from growth task context
   useEffect(() => {
     if (!open) return;
     try {
@@ -84,35 +94,10 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     };
   }, []);
 
-  useEffect(() => {
-    const onStarted = () => {
-      brainstormingRef.current = false;
-      setBrainstorming(false);
-    };
-    const onCancel = () => {
-      brainstormingRef.current = false;
-      setBrainstorming(false);
-    };
-    window.addEventListener('linkedinwriter:brainstormStarted', onStarted);
-    window.addEventListener('linkedinwriter:cancelBrainstorm', onCancel);
-    return () => {
-      window.removeEventListener('linkedinwriter:brainstormStarted', onStarted);
-      window.removeEventListener('linkedinwriter:cancelBrainstorm', onCancel);
-    };
-  }, []);
-
-  const runBrainstorm = () => {
-    if (!canGenerate || brainstormingRef.current) return;
-    brainstormingRef.current = true;
-    setBrainstorming(true);
+  const handleGeneratePost = (prompt: string, contentType: string = 'post') => {
     window.dispatchEvent(
-      new CustomEvent('linkedinwriter:runBrainstormIdeas', {
-        detail: {
-          seed: (brainstormSeed || '').trim(),
-          type: 'post',
-          options: { usePersona, includeTrending, remarketContent },
-          forceRefresh: false,
-        },
+      new CustomEvent('linkedinwriter:openQuickCreate', {
+        detail: { type: contentType, topic: prompt },
       })
     );
     onClose();
@@ -142,142 +127,141 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
 
   return (
     <>
-    <DashboardActionModal open={open} title="Plan" onClose={onClose} maxWidth={680} titleSize="lg">
+    <DashboardActionModal
+      open={open}
+      title="Plan"
+      onClose={onClose}
+      modalClassName="linkedin-plan-wedge-modal"
+      maxWidth="min(97vw, 1200px)"
+      maxHeight="min(98dvh, calc(100dvh - 8px))"
+      titleSize="lg"
+    >
       <div className="plan-wedge">
-        <section className="plan-wedge-brainstorm">
-          <header className="plan-wedge-brainstorm__header">
-            <span className="plan-wedge-brainstorm__icon" aria-hidden>
-              🧠
-            </span>
-            <div className="plan-wedge-brainstorm__titles">
-              <h3 className="plan-wedge-brainstorm__title">Brainstorm Ideas</h3>
-              <p className="plan-wedge-brainstorm__subtitle">
-                Get 5 AI ideas in seconds from your persona and trending topics
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMyIdeasOpen(true)}
-              style={{
-                marginLeft: 'auto',
-                padding: '4px 10px',
-                borderRadius: 6,
-                border: '1px solid #6366f1',
-                background: 'white',
-                color: '#6366f1',
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                flexShrink: 0,
-              }}
-            >
-              📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
-            </button>
-          </header>
-
-          <div className="plan-wedge-brainstorm__body">
-            <textarea
-              className="plan-wedge-brainstorm__input"
-              value={brainstormSeed}
-              onChange={(e) => setBrainstormSeed(e.target.value)}
-              placeholder={placeholder}
-              rows={3}
-              aria-label="Brainstorm seed topic"
-            />
-
-            <div className="plan-wedge-brainstorm__actions">
-              <DataSourceSelector
-                variant="pill"
-                options={{ usePersona, includeTrending, remarketContent }}
-                onChange={handleBrainstormOptionsChange}
-                connected={connected}
-              />
+        <div className="plan-wedge-main">
+          <section className="plan-wedge-brainstorm plan-wedge-brainstorm--primary">
+            <header className="plan-wedge-brainstorm__header">
+              <span className="plan-wedge-brainstorm__icon" aria-hidden>
+                🧠
+              </span>
+              <div className="plan-wedge-brainstorm__titles">
+                <h3 className="plan-wedge-brainstorm__title">Brainstorm Ideas</h3>
+                <p className="plan-wedge-brainstorm__subtitle">
+                  Get 5 tailored Topic Ideas in seconds — powered by Your unique voice and trending topics
+                </p>
+              </div>
               <button
                 type="button"
-                className={generateBtnClass}
-                onClick={runBrainstorm}
-                disabled={!canGenerate || brainstorming}
+                onClick={() => setMyIdeasOpen(true)}
+                style={{
+                  marginLeft: 'auto',
+                  padding: '4px 10px',
+                  borderRadius: 6,
+                  border: '1px solid #6366f1',
+                  background: 'white',
+                  color: '#6366f1',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  flexShrink: 0,
+                }}
               >
-                {brainstorming ? '⏳ Generating...' : 'Generate Ideas'}
+                📚 My Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
               </button>
-            </div>
-          </div>
-        </section>
+            </header>
 
-        <div className="plan-wedge-divider" role="separator">
-          <span>Other Planning Tools</span>
-        </div>
+            <div className="plan-wedge-brainstorm__body">
+              <textarea
+                className="plan-wedge-brainstorm__input"
+                value={brainstormSeed}
+                onChange={(e) => setBrainstormSeed(e.target.value)}
+                placeholder={placeholder}
+                rows={3}
+                aria-label="Brainstorm seed topic"
+                disabled={brainstorm.isLoading}
+              />
 
-        <div className="plan-wedge-coming-soon-grid">
-          <div className="plan-wedge-coming-soon-card">
-            <div className="plan-wedge-coming-soon-card__header">
-              <span className="plan-wedge-coming-soon-card__icon plan-wedge-coming-soon-card__icon--watchdog" aria-hidden>
-                🔍
-              </span>
-              <span className="plan-wedge-coming-soon-card__badge">Coming Soon</span>
-            </div>
-            <div className="plan-wedge-coming-soon-card__copy">
-              <span className="plan-wedge-coming-soon-card__title">Watchdog</span>
-              <p className="plan-wedge-coming-soon-card__desc">
-                Track industry news and turn it into posts
-              </p>
-            </div>
-            <button
-              type="button"
-              className={`plan-wedge-coming-soon-card__notify${notifyRequested.watchdog ? ' plan-wedge-coming-soon-card__notify--done' : ''}`}
-              onClick={() => handleNotify('watchdog', 'Watchdog')}
-              disabled={notifyRequested.watchdog}
-            >
-              {notifyRequested.watchdog ? 'Notified' : 'Notify me'}
-            </button>
-          </div>
+              <div className="plan-wedge-brainstorm__actions">
+                <DataSourceSelector
+                  variant="pill"
+                  options={{ usePersona, includeTrending, remarketContent }}
+                  onChange={handleBrainstormOptionsChange}
+                  connected={connected}
+                />
+                <button
+                  type="button"
+                  className={generateBtnClass}
+                  onClick={() =>
+                    void brainstorm.runBrainstorm(
+                      (brainstormSeed || '').trim(),
+                      { usePersona, includeTrending, remarketContent },
+                      brainstorm.hasResults
+                    )
+                  }
+                  disabled={!canGenerate || brainstorm.isLoading}
+                >
+                  {brainstorm.isLoading ? 'Generating…' : brainstorm.hasResults ? 'Regenerate Ideas' : 'Generate Ideas'}
+                </button>
+              </div>
 
-          <div className="plan-wedge-coming-soon-card">
-            <div className="plan-wedge-coming-soon-card__header">
-              <span className="plan-wedge-coming-soon-card__icon plan-wedge-coming-soon-card__icon--weekly" aria-hidden>
-                📅
-              </span>
-              <span className="plan-wedge-coming-soon-card__badge">Coming Soon</span>
+              <PlanWedgeBrainstormInline
+                activeStep={brainstorm.activeStep as 1 | 2 | 3}
+                isLoading={brainstorm.isLoading}
+                hasResults={brainstorm.hasResults}
+                phase={brainstorm.phase}
+                personalizedPhase={brainstorm.personalizedPhase}
+                ideas={brainstorm.ideas}
+                sources={brainstorm.sources}
+                personalizedIdeas={brainstorm.personalizedIdeas}
+                personalizedDataSummary={brainstorm.personalizedDataSummary}
+                seedError={brainstorm.seedError}
+                personalizedError={brainstorm.personalizedError}
+                loaderMessageIndex={brainstorm.loaderMessageIndex}
+                loaderMessages={brainstorm.loaderMessages}
+                isUsingCache={brainstorm.isUsingCache}
+                savedPromptHashes={brainstorm.savedPromptHashes}
+                savingIndex={brainstorm.savingIndex}
+                saveError={brainstorm.saveError}
+                lastOptions={brainstorm.lastOptions}
+                hashPrompt={brainstorm.hashPrompt}
+                onGeneratePost={handleGeneratePost}
+                onRefreshPersonalized={() => void brainstorm.refreshPersonalized()}
+                onRetrySeed={() => void brainstorm.retrySeed()}
+                onSaveIdea={(idx) => void brainstorm.handleSaveIdea(idx, (brainstormSeed || '').trim())}
+                onEditInputs={() => brainstorm.resetResults()}
+              />
             </div>
-            <div className="plan-wedge-coming-soon-card__copy">
-              <span className="plan-wedge-coming-soon-card__title">Weekly Plan</span>
-              <p className="plan-wedge-coming-soon-card__desc">
-                Mon–Fri AI content plan with one-click CTAs
-              </p>
-            </div>
-            <button
-              type="button"
-              className={`plan-wedge-coming-soon-card__notify${notifyRequested.weeklyPlan ? ' plan-wedge-coming-soon-card__notify--done' : ''}`}
-              onClick={() => handleNotify('weeklyPlan', 'Weekly Plan')}
-              disabled={notifyRequested.weeklyPlan}
-            >
-              {notifyRequested.weeklyPlan ? 'Notified' : 'Notify me'}
-            </button>
-          </div>
+          </section>
 
-          <div className="plan-wedge-coming-soon-card">
-            <div className="plan-wedge-coming-soon-card__header">
-              <span className="plan-wedge-coming-soon-card__icon plan-wedge-coming-soon-card__icon--calendar" aria-hidden>
-                🗓️
-              </span>
-              <span className="plan-wedge-coming-soon-card__badge">Coming Soon</span>
+          <aside className="plan-wedge-sidebar" aria-label="Other planning tools">
+            <p className="plan-wedge-sidebar__label">Other Planning Tools</p>
+            <div className="plan-wedge-coming-soon-stack">
+              <PlanWedgeComingSoonCard
+                icon="🔍"
+                iconVariant="watchdog"
+                title="Watchdog"
+                description="Track industry news and turn it into posts"
+                notified={notifyRequested.watchdog}
+                onNotify={() => handleNotify('watchdog', 'Watchdog')}
+              />
+              <PlanWedgeComingSoonCard
+                icon="📅"
+                iconVariant="weekly"
+                title="Weekly Plan"
+                description="Mon–Fri AI content plan with one-click CTAs"
+                notified={notifyRequested.weeklyPlan}
+                onNotify={() => handleNotify('weeklyPlan', 'Weekly Plan')}
+              />
+              <PlanWedgeComingSoonCard
+                icon="🗓️"
+                iconVariant="calendar"
+                title="Content Calendar"
+                description="Drag, drop, and schedule all your LinkedIn posts in one unified calendar view"
+                notified={notifyRequested.calendar}
+                onNotify={() => handleNotify('calendar', 'Content Calendar')}
+              />
             </div>
-            <div className="plan-wedge-coming-soon-card__copy">
-              <span className="plan-wedge-coming-soon-card__title">Content Calendar</span>
-              <p className="plan-wedge-coming-soon-card__desc">
-                Drag, drop, and schedule all your LinkedIn posts in one unified calendar view
-              </p>
-            </div>
-            <button
-              type="button"
-              className={`plan-wedge-coming-soon-card__notify${notifyRequested.calendar ? ' plan-wedge-coming-soon-card__notify--done' : ''}`}
-              onClick={() => handleNotify('calendar', 'Content Calendar')}
-              disabled={notifyRequested.calendar}
-            >
-              {notifyRequested.calendar ? 'Notified' : 'Notify me'}
-            </button>
-          </div>
+          </aside>
         </div>
       </div>
     </DashboardActionModal>

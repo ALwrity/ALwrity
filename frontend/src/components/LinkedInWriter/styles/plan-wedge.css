@@ -404,6 +404,14 @@
   min-height: 26px;
 }
 
+.plan-wedge-coming-soon-card__header-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .plan-wedge-coming-soon-card__copy {
   flex: 1 1 auto;
   min-width: 0;
@@ -499,6 +507,499 @@
   .plan-wedge-calendar__notify {
     width: 100%;
     text-align: center;
+  }
+}
+
+/* Plan wedge — two-column: brainstorm (85%) + sidebar stack */
+.plan-wedge-main {
+  display: grid;
+  grid-template-columns: minmax(0, 85fr) minmax(200px, 15fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.plan-wedge-brainstorm--primary {
+  min-width: 0;
+}
+
+.plan-wedge-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  align-self: start;
+  position: sticky;
+  top: 0;
+}
+
+.plan-wedge-sidebar__label {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.plan-wedge-coming-soon-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.plan-wedge-coming-soon-stack .plan-wedge-coming-soon-card {
+  flex: 0 0 auto;
+}
+
+.plan-wedge-coming-soon-card--locked {
+  pointer-events: none;
+  cursor: default;
+}
+
+.plan-wedge-coming-soon-card--locked .plan-wedge-coming-soon-card__notify {
+  pointer-events: auto;
+  cursor: pointer;
+  position: relative;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.96) !important;
+  border-color: rgba(100, 116, 139, 0.45) !important;
+  color: #475569 !important;
+}
+
+.plan-wedge-coming-soon-card--locked .plan-wedge-coming-soon-card__notify:hover:not(:disabled) {
+  background: #ffffff !important;
+  border-color: rgba(71, 85, 105, 0.55) !important;
+}
+
+.plan-wedge-coming-soon-card__lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  flex-shrink: 0;
+}
+
+/* Plan wedge modal — wide canvas like Optimise Profile */
+.linkedin-plan-wedge-modal {
+  width: min(97vw, 1200px) !important;
+  max-width: min(97vw, 1200px) !important;
+  max-height: min(98dvh, calc(100dvh - 8px)) !important;
+}
+
+.linkedin-plan-wedge-modal .linkedin-dashboard-action-modal-body {
+  padding: clamp(14px, 2vw, 20px);
+}
+
+.plan-wedge-brainstorm__inline {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px dashed #e5e7eb;
+}
+
+.plan-wedge-brainstorm__steps {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  margin-bottom: 16px;
+  width: 70%;
+  max-width: 70%;
+}
+
+.plan-wedge-brainstorm__step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  opacity: 0.72;
+  flex: 1;
+  min-width: 0;
+  transition: opacity 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.plan-wedge-brainstorm__step-arrow {
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #d1d5db;
+  line-height: 1;
+  padding: 0 2px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.plan-wedge-brainstorm__step-arrow--done {
+  color: #059669;
+}
+
+.plan-wedge-brainstorm__step-arrow--flowing {
+  color: #0a66c2;
+  animation: plan-wedge-arrow-flow 1s ease-in-out infinite;
+}
+
+@keyframes plan-wedge-arrow-flow {
+  0%,
+  100% {
+    transform: translateX(0);
+    opacity: 0.65;
+  }
+  50% {
+    transform: translateX(3px);
+    opacity: 1;
+  }
+}
+
+.plan-wedge-brainstorm__step--active {
+  opacity: 1;
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.plan-wedge-brainstorm__step--done {
+  opacity: 1;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.plan-wedge-brainstorm__step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: #e5e7eb;
+  color: #374151;
+  flex-shrink: 0;
+}
+
+.plan-wedge-brainstorm__step--active .plan-wedge-brainstorm__step-num {
+  background: #0a66c2;
+  color: #fff;
+}
+
+.plan-wedge-brainstorm__step--done .plan-wedge-brainstorm__step-num {
+  background: #059669;
+  color: #fff;
+}
+
+.plan-wedge-brainstorm__step-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.2;
+}
+
+.plan-wedge-brainstorm__loading {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 14px;
+  align-items: start;
+  padding: 14px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.plan-wedge-brainstorm__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #0a66c2;
+  border-top-color: transparent;
+  animation: plan-wedge-spin 0.8s linear infinite;
+}
+
+@keyframes plan-wedge-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.plan-wedge-brainstorm__loading-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.plan-wedge-brainstorm__loading-msg {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.plan-wedge-brainstorm__loading-list {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-left: 20px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plan-wedge-brainstorm__error {
+  padding: 16px;
+  border-radius: 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  text-align: center;
+}
+
+.plan-wedge-brainstorm__error-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #991b1b;
+}
+
+.plan-wedge-brainstorm__error-msg {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: #b91c1c;
+  line-height: 1.5;
+}
+
+.plan-wedge-brainstorm__error-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.plan-wedge-brainstorm__btn-primary,
+.plan-wedge-brainstorm__btn-secondary,
+.plan-wedge-brainstorm__btn-post,
+.plan-wedge-brainstorm__btn-article {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.plan-wedge-brainstorm__btn-primary,
+.plan-wedge-brainstorm__btn-post {
+  background: #0a66c2;
+  color: #fff;
+}
+
+.plan-wedge-brainstorm__btn-secondary {
+  background: #fff;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.plan-wedge-brainstorm__btn-article {
+  background: #057642;
+  color: #fff;
+}
+
+.plan-wedge-brainstorm__results-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.plan-wedge-brainstorm__results-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.plan-wedge-brainstorm__cache-badge {
+  font-size: 11px;
+  color: #059669;
+  background: #d1fae5;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.plan-wedge-brainstorm__save-error {
+  font-size: 11px;
+  color: #b91c1c;
+  background: #fee2e2;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.plan-wedge-brainstorm__ideas-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.plan-wedge-brainstorm__idea-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: flex-start;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 14px 18px;
+  background: #ffffff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.plan-wedge-brainstorm__idea-prompt {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.plan-wedge-brainstorm__idea-rationale {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.plan-wedge-brainstorm__idea-evidence {
+  margin: 6px 0 0;
+  font-size: 11px;
+  color: #0891b2;
+  background: #ecfeff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  line-height: 1.35;
+}
+
+.plan-wedge-brainstorm__idea-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.plan-wedge-brainstorm__save-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #0a66c2;
+  background: #fff;
+  color: #0a66c2;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.plan-wedge-brainstorm__save-btn--saved {
+  border-color: #6ee7b7;
+  background: #d1fae5;
+  color: #047857;
+  cursor: default;
+}
+
+.plan-wedge-brainstorm__sources {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.plan-wedge-brainstorm__sources-list {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}
+
+.plan-wedge-brainstorm__source-item {
+  font-size: 11px;
+  color: #4b5563;
+  background: #f9fafb;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid #f3f4f6;
+}
+
+.plan-wedge-brainstorm__source-item p {
+  margin: 4px 0;
+  color: #6b7280;
+}
+
+.plan-wedge-brainstorm__source-item a {
+  color: #0a66c2;
+  font-size: 10px;
+}
+
+.plan-wedge-brainstorm__empty {
+  margin: 0;
+  padding: 12px;
+  text-align: center;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.plan-wedge-brainstorm__results--personalized {
+  margin: 0 -4px;
+}
+
+.plan-wedge-brainstorm__results--personalized > div {
+  padding: 0 !important;
+}
+
+@media (max-width: 900px) {
+  .plan-wedge-main {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-wedge-sidebar {
+    order: 2;
+  }
+
+  .plan-wedge-coming-soon-stack {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .plan-wedge-brainstorm__steps {
+    width: 100%;
+    max-width: 100%;
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .plan-wedge-brainstorm__step {
+    flex: 1 1 calc(33% - 20px);
+  }
+
+  .plan-wedge-brainstorm__step-arrow {
+    display: none;
+  }
+
+  .plan-wedge-brainstorm__step-label {
+    font-size: 12px;
+  }
+
+  .plan-wedge-brainstorm__ideas-grid {
+    gap: 12px;
+  }
+
+  .plan-wedge-brainstorm__idea-card {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-wedge-brainstorm__save-btn {
+    justify-self: start;
   }
 }
 
