@@ -103,9 +103,22 @@ export const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     if (!showPreferencesModal) return;
     const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (personaDropdownRef.current?.contains(target)) return;
-      if (personaPanelRef.current?.contains(target)) return;
+      const panel = personaPanelRef.current;
+      const dropdown = personaDropdownRef.current;
+      const path =
+        typeof event.composedPath === "function"
+          ? event.composedPath()
+          : [event.target as Node];
+
+      const clickedInsidePanel = Boolean(panel && path.includes(panel));
+      const clickedInsidePersonaTrigger = Boolean(
+        dropdown && path.includes(dropdown),
+      );
+
+      if (clickedInsidePanel || clickedInsidePersonaTrigger) {
+        return;
+      }
+
       onPreferencesModalChange(false);
     };
     document.addEventListener("mousedown", handleClickOutside);

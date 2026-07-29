@@ -234,6 +234,11 @@ export function mapIndustry(industry: string | undefined): string {
   if (ind.includes("telecom") || ind.includes("communication"))
     return "Telecommunications";
 
+  const original = (industry || "").trim();
+  if (original) {
+    return original;
+  }
+
   return "Technology";
 }
 

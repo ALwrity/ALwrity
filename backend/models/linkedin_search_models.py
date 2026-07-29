@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 
 LinkedInSearchCategory = Literal["posts", "jobs", "people", "companies"]
+LinkedInIndustryCacheStatus = Literal["warm", "stale", "empty"]
 
 
 class LinkedInSearchFilters(BaseModel):
@@ -82,4 +83,22 @@ class LinkedInSearchParametersResponse(BaseModel):
     paging: LinkedInSearchParametersPagingResponse = Field(
         default_factory=LinkedInSearchParametersPagingResponse
     )
+    provider: str = "unipile"
+
+
+class LinkedInIndustryItem(BaseModel):
+    """Cached LinkedIn industry for persona autocomplete."""
+
+    id: str
+    title: str
+
+
+class LinkedInIndustriesCacheResponse(BaseModel):
+    """Response for GET /api/linkedin-social/industries."""
+
+    success: bool = True
+    items: List[LinkedInIndustryItem] = Field(default_factory=list)
+    synced_at: Optional[str] = None
+    item_count: int = 0
+    cache_status: LinkedInIndustryCacheStatus = "empty"
     provider: str = "unipile"

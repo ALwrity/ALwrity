@@ -10,6 +10,8 @@ import {
 } from "../utils/storageUtils";
 import { OptimiseProfileControl } from "./dashboard/OptimiseProfileControl";
 import "./persona/content-persona-preferences.css";
+import { LinkedInIndustryAutocomplete } from "./LinkedInIndustryAutocomplete";
+import { useLinkedInIndustryList } from "../hooks/useLinkedInIndustryList";
 
 interface ContentPersonaPreferencesBodyProps {
   userPreferences: LinkedInPreferences;
@@ -46,6 +48,15 @@ export const ContentPersonaPreferencesBody: React.FC<
   const personaTone = resolvePersonaTone(userPreferences);
   const toneDropdownValue = getToneDropdownValue(userPreferences);
   const showCustomToneInput = isCustomToneSelection(toneDropdownValue);
+  const {
+    industries,
+    isLoading: isIndustryListLoading,
+    suggestionsUnavailable,
+  } = useLinkedInIndustryList({
+    connected,
+    query: userPreferences.industry,
+    enabled: true,
+  });
 
   const handleToneSelect = (value: string) => {
     if (value === LINKEDIN_CUSTOM_TONE_OPTION) {
@@ -114,12 +125,18 @@ export const ContentPersonaPreferencesBody: React.FC<
 
         <div>
           <div className="content-persona-field-label">Industry</div>
-          <input
-            className="content-persona-field-input"
+          <LinkedInIndustryAutocomplete
             value={userPreferences.industry}
-            onChange={(e) => onPreferenceChange("industry", e.target.value)}
+            onChange={(next) => onPreferenceChange("industry", next)}
+            items={industries}
+            isLoading={isIndustryListLoading}
             placeholder="e.g., Technology"
           />
+          {suggestionsUnavailable && (
+            <div style={{ marginTop: 4, fontSize: 10, color: "#64748b" }}>
+              Suggestions unavailable — you can still type your industry.
+            </div>
+          )}
         </div>
 
         <div>

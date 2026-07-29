@@ -7,16 +7,25 @@ linkedin_social_routes.py to avoid further growth of that module.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Dict, Optional
+
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 
 from middleware.auth_middleware import get_current_user
 from models.linkedin_search_models import (
+    LinkedInIndustriesCacheResponse,
     LinkedInSearchParametersResponse,
     LinkedInSearchRequest,
     LinkedInSearchResponse,
+)
+from services.integrations.linkedin.linkedin_industry_cache_service import (
+    get_industries,
+)
+from services.integrations.linkedin.linkedin_industry_sync_job import (
+    sync_linkedin_industries_scheduled,
 )
 from services.integrations.linkedin.linkedin_search_service import (
     LinkedInSearchNotAvailableError,
@@ -36,6 +45,34 @@ def _user_id(current_user: dict) -> str:
     if not uid:
         raise HTTPException(status_code=401, detail="Authentication required")
     return str(uid)
+
+
+def _ensure_admin(current_user: dict) -> None:
+    """Restrict manual industry sync to admin users."""
+    disable_auth = os.getenv("DISABLE_AUTH", "false").lower() == "true"
+    if disable_auth:
+        return
+
+    email = (current_user.get("email") or "").lower()
+    role = None
+    public_metadata = current_user.get("public_metadata")
+    if isinstance(public_metadata, dict):
+        role = public_metadata.get("role") or current_user.get("role")
+    else:
+        role = current_user.get("role")
+
+    admin_emails_raw = os.getenv("ADMIN_EMAILS", "")
+    admin_emails = {
+        item.strip().lower() for item in admin_emails_raw.split(",") if item.strip()
+    }
+    admin_domain = (os.getenv("ADMIN_EMAIL_DOMAIN") or "").lower().strip()
+
+    is_admin_email = bool(email and email in admin_emails)
+    is_admin_domain = bool(email and admin_domain and email.endswith("@" + admin_domain))
+    is_admin_role = role == "admin"
+
+    if not (is_admin_email or is_admin_domain or is_admin_role):
+        raise HTTPException(status_code=403, detail="Admin access required")
 
 
 def _raise_search_http_error(exc: Exception, *, user_id: str, operation: str) -> None:
@@ -150,12 +187,21 @@ async def get_linkedin_search_parameters(
 ) -> LinkedInSearchParametersResponse:
     """Retrieve LinkedIn search parameter IDs for filter autocomplete."""
     user_id = _user_id(current_user)
-    logger.info(
-        "[LinkedInSearch] GET /search/parameters user_id={} type={} keywords={!r}",
-        user_id,
-        type,
-        keywords,
-    )
+    normalized_type = (type or "").strip().upper()
+    keywords_len = len(keywords.strip()) if keywords else 0
+    if normalized_type == "INDUSTRY":
+        logger.info(
+            "[LinkedInIndustrySuggest] GET /search/parameters user_id={} keywords_len={}",
+            user_id,
+            keywords_len,
+        )
+    else:
+        logger.info(
+            "[LinkedInSearch] GET /search/parameters user_id={} type={} keywords={!r}",
+            user_id,
+            type,
+            keywords,
+        )
     try:
         return await get_search_parameters(
             user_id,
@@ -169,3 +215,61 @@ async def get_linkedin_search_parameters(
         raise
     except Exception as exc:
         _raise_search_http_error(exc, user_id=user_id, operation="GET /search/parameters")
+
+
+@router.get("/industries", response_model=LinkedInIndustriesCacheResponse)
+async def get_linkedin_industries(
+    current_user: dict = Depends(get_current_user),
+) -> LinkedInIndustriesCacheResponse:
+    """Return cached LinkedIn industry titles for persona autocomplete."""
+    user_id = _user_id(current_user)
+    logger.info("[LinkedInIndustryCache] GET /industries user_id={}", user_id)
+    try:
+        payload = get_industries()
+        return LinkedInIndustriesCacheResponse(
+            success=True,
+            items=payload["items"],
+            synced_at=payload.get("synced_at"),
+            item_count=payload.get("item_count", 0),
+            cache_status=payload.get("cache_status", "empty"),
+        )
+    except Exception as exc:
+        logger.exception(
+            "[LinkedInIndustryCache] GET /industries failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to load LinkedIn industry cache",
+        ) from exc
+
+
+@router.post("/industries/sync")
+async def sync_linkedin_industries_manual(
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Admin-only manual refresh of the LinkedIn industry cache."""
+    user_id = _user_id(current_user)
+    _ensure_admin(current_user)
+    logger.info("[LinkedInIndustrySync] POST /industries/sync user_id={}", user_id)
+    try:
+        result = await sync_linkedin_industries_scheduled()
+        if not result.get("success"):
+            raise HTTPException(
+                status_code=503,
+                detail=result.get("reason") or "Industry sync did not produce any items",
+            )
+        return result
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception(
+            "[LinkedInIndustrySync] POST /industries/sync failed user_id={}: {}",
+            user_id,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to sync LinkedIn industry cache",
+        ) from exc

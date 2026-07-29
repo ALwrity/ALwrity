@@ -37,6 +37,10 @@ from .utils.sif_indexing_task_loader import load_due_sif_indexing_tasks
 from .utils.market_trends_task_loader import load_due_market_trends_tasks
 from services.daily_workflow_batch import generate_scheduled_daily_workflows
 from services.linkedin_today_workflow_batch import generate_scheduled_linkedin_workflows
+from services.integrations.linkedin.linkedin_industry_sync_job import (
+    schedule_bootstrap_sync_if_missing,
+    sync_linkedin_industries_scheduled,
+)
 
 # Global scheduler instance (initialized on first access)
 _scheduler_instance: TaskScheduler = None
@@ -172,6 +176,23 @@ def get_scheduler() -> TaskScheduler:
             coalesce=True,
             misfire_grace_time=3600,
         )
+
+        linkedin_industry_hour_utc = int(os.getenv('LINKEDIN_INDUSTRY_SYNC_HOUR_UTC', '4'))
+        linkedin_industry_minute_utc = int(os.getenv('LINKEDIN_INDUSTRY_SYNC_MINUTE_UTC', '0'))
+        _scheduler_instance.scheduler.add_job(
+            sync_linkedin_industries_scheduled,
+            trigger=CronTrigger(
+                hour=linkedin_industry_hour_utc,
+                minute=linkedin_industry_minute_utc,
+                timezone='UTC',
+            ),
+            id='sync_linkedin_industries',
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=3600,
+        )
+        schedule_bootstrap_sync_if_missing(_scheduler_instance.scheduler)
     
     return _scheduler_instance
 
