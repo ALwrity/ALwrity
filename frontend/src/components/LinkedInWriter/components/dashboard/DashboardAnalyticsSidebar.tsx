@@ -112,6 +112,18 @@ export const DashboardAnalyticsSidebar: React.FC<
   const isError = panelState === "error";
   const isLoaded = panelState === "loaded";
 
+  const lastRefreshedLabel = useMemo(() => {
+    const syncedAt = data?.last_synced_at;
+    if (!syncedAt) return null;
+    const delta = Date.now() - new Date(syncedAt).getTime();
+    const mins = Math.floor(delta / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    return `${Math.floor(hours / 24)}d ago`;
+  }, [data?.last_synced_at]);
+
   const totals = useMemo(() => {
     let impressions = 0;
     let clicks = 0;
@@ -310,6 +322,11 @@ export const DashboardAnalyticsSidebar: React.FC<
                       {isLoading ? "Loading…" : "↻ Refresh"}
                     </button>
                   </div>
+                  {lastRefreshedLabel && (
+                    <div style={{ fontSize: 8, fontWeight: 500, color: "#94a3b8", textAlign: "right", marginTop: -2, marginBottom: 4 }}>
+                      Last refreshed: {lastRefreshedLabel}
+                    </div>
+                  )}
                   <MiniBarChart posts={posts} />
                 </div>
               )}
