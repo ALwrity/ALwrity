@@ -81,14 +81,21 @@ export const DashboardAnalyticsSidebar: React.FC<
   DashboardAnalyticsSidebarProps
 > = ({ onViewAll }) => {
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
-  const { data, panelState, refreshPosts, errorMessage } = usePostAnalytics();
+  const { data, panelState, fetchPosts, refreshPosts, errorMessage } = usePostAnalytics();
   const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
   const [profileGrowthReloadToken, setProfileGrowthReloadToken] = useState(0);
 
-  // Only fetch on explicit user action — not on every mount.
-  // Always force Unipile refresh so retrieve-post enrichment can fill
-  // creator analytics missing from list-posts cache.
+  // Initial load — serve from DB cache (positionProfileGrowthWidget populates
+  // the cache via /analytics/personal, so posts are fast even on first visit).
   const handleLoadPosts = useCallback(async () => {
+    if (panelState === "loading") return;
+    // Use DB cache — Profile Growth already synced Unipile on mount.
+    await fetchPosts({ limit: 50, refresh: false });
+    setProfileGrowthReloadToken((n) => n + 1);
+  }, [panelState, fetchPosts]);
+
+  // Refresh — force Unipile fetch for fresh engagement counters.
+  const handleRefreshPosts = useCallback(async () => {
     if (panelState === "loading") return;
     await refreshPosts();
     setProfileGrowthReloadToken((n) => n + 1);
@@ -293,7 +300,7 @@ export const DashboardAnalyticsSidebar: React.FC<
                     </div>
                     <button
                       type="button"
-                      onClick={handleLoadPosts}
+                      onClick={handleRefreshPosts}
                       disabled={isLoading}
                       style={{
                         background: "none", border: "none", color: isLoading ? "#94a3b8" : "#0a66c2",
