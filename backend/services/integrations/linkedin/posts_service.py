@@ -21,7 +21,11 @@ from models.linkedin_posts_models import (
     PostEngagementMetrics,
     PostListResponse,
 )
-from services.integrations.linkedin.post_attachments import normalize_post_attachments
+from services.integrations.linkedin.post_analytics_clicks import (
+    derive_clickthrough_rate,
+    resolve_clicks,
+    resolve_clickthrough_rate,
+)
 from services.integrations.linkedin.post_analytics_enrichment import (
     enrich_posts_with_retrieve_analytics,
 )
@@ -136,8 +140,7 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
         or 0
     )
 
-    clicks_raw = _first_present(analytics, "clicks", "clicks_counter")
-    clicks = _optional_non_negative_int(clicks_raw) or 0
+    clicks = resolve_clicks(unipile_item, analytics)
 
     followers_raw = _first_present(
         analytics,
@@ -160,8 +163,9 @@ def _normalize_engagement(unipile_item: dict[str, Any]) -> PostEngagementMetrics
     if engagements is None:
         engagements = reactions_i + comments_i + reposts_i + clicks
 
-    clickthrough_rate = _optional_non_negative_float(
-        _first_present(analytics, "clickthrough_rate", "clickthrough_rate_counter")
+    clickthrough_rate = resolve_clickthrough_rate(unipile_item, analytics)
+    clickthrough_rate = derive_clickthrough_rate(
+        clicks, impressions_i, clickthrough_rate
     )
     page_viewers = _optional_non_negative_int(
         _first_present(
@@ -343,7 +347,16 @@ class PostsService:
                 if isinstance(raw_analytics, dict):
                     raw_analytics = {
                         k: raw_analytics[k] for k in
-                        ("reactions", "comments", "reposts", "impressions", "clicks")
+                        (
+                            "reactions",
+                            "comments",
+                            "reposts",
+                            "impressions",
+                            "clicks",
+                            "clicks_counter",
+                            "clickthrough_rate",
+                            "clickthrough_rate_counter",
+                        )
                         if k in raw_analytics
                     }
                 logger.info(
@@ -358,6 +371,7 @@ class PostsService:
                     f"comments={normalized.comments} "
                     f"reposts={normalized.reposts} "
                     f"clicks={normalized.clicks} "
+                    f"ctr={normalized.clickthrough_rate} "
                     f"followers_gained={normalized.followers_gained}"
                 )
             if enrich_analytics and hasattr(self._client, "get_post"):
@@ -405,10 +419,28 @@ class PostsService:
                     or p.engagement.clickthrough_rate is not None
                 )
             )
+            with_clicks = sum(1 for p in normalized_posts if p.engagement.clicks > 0)
+            with_ctr = sum(
+                1 for p in normalized_posts if p.engagement.clickthrough_rate is not None
+            )
+            zero_clicks_with_impressions = sum(
+                1
+                for p in normalized_posts
+                if p.engagement.impressions > 0 and p.engagement.clicks == 0
+            )
             logger.info(
                 f"[PostsService] Successfully normalized {len(normalized_posts)} posts "
-                f"for identifier={identifier} with_creator_analytics={with_creator}"
+                f"for identifier={identifier} with_creator_analytics={with_creator} "
+                f"with_clicks={with_clicks} with_ctr={with_ctr} "
+                f"zero_clicks_with_impressions={zero_clicks_with_impressions}"
             )
+            if zero_clicks_with_impressions > 0:
+                logger.warning(
+                    "[PostsService] {} posts have impressions but clicks=0 after "
+                    "enrichment — verify Unipile retrieve-post analytics for account_id={}",
+                    zero_clicks_with_impressions,
+                    account_id,
+                )
 
             return PostListResponse(
                 posts=normalized_posts,

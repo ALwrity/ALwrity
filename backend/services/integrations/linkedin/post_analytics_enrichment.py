@@ -13,12 +13,23 @@ from typing import Any, Optional, Protocol
 
 from loguru import logger
 
+from services.integrations.linkedin.post_analytics_clicks import (
+    CLICKS_KEYS,
+    CTR_KEYS,
+    clicks_analytics_complete,
+    merge_analytics_prefer_detail,
+    resolve_clicks,
+    resolve_clickthrough_rate,
+    resolve_impressions,
+)
 from services.integrations.linkedin.unipile_client import UnipileAPIError
 
 _ENRICH_CONCURRENCY = 4
-_ENRICH_MAX_POSTS = 30
+_ENRICH_MAX_POSTS = 50
 
 _ENGAGEMENTS_KEYS = ("engagements", "engagements_counter")
+_CLICKS_KEYS = CLICKS_KEYS
+_CTR_KEYS = CTR_KEYS
 _PAGE_VIEWERS_KEYS = (
     "page_viewers_from_this_post",
     "page_viewers_from_this_post_counter",
@@ -48,15 +59,20 @@ def item_needs_analytics_enrichment(item: dict[str, Any]) -> bool:
     """
     True when retrieve-post may still add missing creator fields.
 
-    Partial list analytics (followers/reach only) must still be enriched so
-    engagements and page viewers are not skipped forever.
+    List-posts often returns engagements + page viewers plus a stub
+    ``clicks_counter: 0`` without ``clickthrough_rate``. Those posts still
+    need retrieve-post for real clicks/CTR per Unipile's analytics schema.
     """
     analytics = item.get("analytics")
     if not isinstance(analytics, dict) or not analytics:
         return True
     has_engagements = _analytics_has_any(analytics, _ENGAGEMENTS_KEYS)
     has_page_viewers = _analytics_has_any(analytics, _PAGE_VIEWERS_KEYS)
-    return not (has_engagements and has_page_viewers)
+    if not (has_engagements and has_page_viewers):
+        return True
+    if not clicks_analytics_complete(item):
+        return True
+    return False
 
 
 # Backward-compatible alias used by tests / callers
@@ -104,16 +120,18 @@ def merge_post_analytics(
     merged = dict(list_item)
     existing = merged.get("analytics")
     base = dict(existing) if isinstance(existing, dict) else {}
-    merged["analytics"] = {**base, **detail_analytics}
+    merged["analytics"] = merge_analytics_prefer_detail(base, detail_analytics)
     return merged
 
 
-def _count_analytics_presence(analytics: dict[str, Any]) -> tuple[int, int, int, int]:
+def _count_analytics_presence(analytics: dict[str, Any]) -> tuple[int, int, int, int, int, int]:
     return (
         1 if _analytics_has_any(analytics, _FOLLOWERS_KEYS) else 0,
         1 if _analytics_has_any(analytics, _PAGE_VIEWERS_KEYS) else 0,
         1 if _analytics_has_any(analytics, _ENGAGEMENTS_KEYS) else 0,
         1 if _analytics_has_any(analytics, _REACH_KEYS) else 0,
+        1 if _analytics_has_any(analytics, _CLICKS_KEYS) else 0,
+        1 if _analytics_has_any(analytics, _CTR_KEYS) else 0,
     )
 
 
@@ -153,7 +171,7 @@ async def enrich_posts_with_retrieve_analytics(
     if not targets:
         logger.info(
             "[PostAnalyticsEnrichment] no enrichment needed "
-            "(list already has engagements + page viewers, or empty)"
+            "(list already has engagements + page viewers + clicks, or empty)"
         )
         return items
 
@@ -174,6 +192,8 @@ async def enrich_posts_with_retrieve_analytics(
     with_page_viewers = 0
     with_engagements = 0
     with_reach = 0
+    with_clicks = 0
+    with_ctr = 0
 
     async def _fetch_detail(post_ids: list[str]) -> Optional[dict[str, Any]]:
         last_error: Optional[Exception] = None
@@ -205,7 +225,7 @@ async def enrich_posts_with_retrieve_analytics(
         return None
 
     async def _enrich_one(index: int, post_ids: list[str]) -> None:
-        nonlocal ok, failed, with_followers, with_page_viewers, with_engagements, with_reach
+        nonlocal ok, failed, with_followers, with_page_viewers, with_engagements, with_reach, with_clicks, with_ctr
         async with semaphore:
             detail = await _fetch_detail(post_ids)
             if detail is None:
@@ -220,15 +240,20 @@ async def enrich_posts_with_retrieve_analytics(
             ok += 1
             analytics = merged.get("analytics")
             if isinstance(analytics, dict):
-                f, p, e, r = _count_analytics_presence(analytics)
+                f, p, e, r, c, ctr = _count_analytics_presence(analytics)
                 with_followers += f
                 with_page_viewers += p
                 with_engagements += e
                 with_reach += r
+                with_clicks += c
+                with_ctr += ctr
                 logger.info(
                     "[PostAnalyticsEnrichment] merged post index={} "
-                    "analytics_keys={}",
+                    "impressions={} clicks={} ctr={} analytics_keys={}",
                     index,
+                    resolve_impressions(merged),
+                    resolve_clicks(merged),
+                    resolve_clickthrough_rate(merged),
                     sorted(analytics.keys()),
                 )
 
@@ -238,12 +263,15 @@ async def enrich_posts_with_retrieve_analytics(
 
     logger.info(
         "[PostAnalyticsEnrichment] done ok={} failed={} with_followers={} "
-        "with_page_viewers={} with_engagements={} with_reach={}",
+        "with_page_viewers={} with_engagements={} with_reach={} "
+        "with_clicks={} with_ctr={}",
         ok,
         failed,
         with_followers,
         with_page_viewers,
         with_engagements,
         with_reach,
+        with_clicks,
+        with_ctr,
     )
     return enriched_items
