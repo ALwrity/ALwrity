@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { LinkedInPreferences } from '../utils/storageUtils';
+import { LinkedInPreferences, getToneDropdownValue, isCustomToneSelection, resolvePersonaTone } from '../utils/storageUtils';
 import { linkedInWriterApi } from '../../../services/linkedInWriterApi';
 import { getPlatformPersona } from '../../../api/persona';
 import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/linkedInWriterUtils';
@@ -12,6 +12,7 @@ import { KeyPointsSection } from './KeyPointsSection';
 import { VariationPicker, assembleFullContent, type VariationResult } from './VariationPicker';
 import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
 import { DEFAULT_LINKEDIN_POST_MAX_LENGTH } from '../utils/linkedInPostAssembly';
+import { CustomToneSelect } from './CustomToneSelect';
 
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
@@ -281,6 +282,7 @@ const defaultForm = {
   topic: '',
   industry: '',
   tone: '',
+  custom_tone: '',
   target_audience: '',
   key_points: '',
   post_type: 'thought_leadership',
@@ -355,7 +357,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setFormData({
       ...defaultForm,
       industry: userPreferences?.industry || '',
-      tone: userPreferences?.tone || 'Professional',
+      tone: getToneDropdownValue(userPreferences),
+      custom_tone: userPreferences?.custom_tone || '',
       target_audience: userPreferences?.target_audience || '',
     });
     setSelectedType(type);
@@ -418,7 +421,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         setFormData({
           ...defaultForm,
           industry: detail?.industry || userPreferences?.industry || '',
-          tone: userPreferences?.tone || 'Professional',
+          tone: getToneDropdownValue(userPreferences),
+          custom_tone: userPreferences?.custom_tone || '',
           target_audience: detail?.target_audience || userPreferences?.target_audience || '',
           ...(detail?.topic ? { topic: detail.topic } : {}),
           ...(detail?.key_points ? { key_points: detail.key_points } : {}),
@@ -514,7 +518,17 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       setTopicError('Please enter a topic to continue.');
       return;
     }
+    if (isCustomToneSelection(formData.tone) && !formData.custom_tone?.trim()) {
+      setGenerationError('Please enter a custom tone or select a preset tone.');
+      return;
+    }
     setTopicError(null);
+    setGenerationError(null);
+
+    const resolvedToneLabel = resolvePersonaTone({
+      tone: formData.tone,
+      custom_tone: formData.custom_tone,
+    });
 
     // Feature 5 — variations path (posts only)
     if (variationsMode && selectedType === 'post') {
@@ -538,7 +552,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       };
 
       const toneVariants = [
-        { tone: mapTone(formData.tone || 'professional') as any, label: formData.tone || 'Your Tone', toneIcon: '🎯' },
+        { tone: mapTone(formData.tone, formData.custom_tone) as any, label: resolvedToneLabel, toneIcon: '🎯' },
         { tone: 'conversational' as any, label: 'Conversational', toneIcon: '💬' },
         { tone: 'inspirational' as any, label: 'Inspirational', toneIcon: '🚀' },
       ];
@@ -779,14 +793,18 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}>Tone</label>
-                  <select
-                    value={formData.tone}
-                    onChange={e => setField('tone', e.target.value)}
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', background: 'white' }}
-                  >
-                    {TONES.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
+                  <CustomToneSelect
+                    tone={formData.tone}
+                    customTone={formData.custom_tone}
+                    presets={TONES}
+                    onChange={({ tone, custom_tone }) => {
+                      setField('tone', tone);
+                      setField('custom_tone', custom_tone ?? '');
+                    }}
+                    labelStyle={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 12, color: '#374151' }}
+                    selectStyle={{ width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', background: 'white' }}
+                    inputStyle={{ width: '100%', marginTop: 8, padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+                  />
                 </div>
               </div>
               <div>
@@ -812,7 +830,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             {personaInfo && (
               <PersonaBadge
                 persona={personaInfo}
-                toneLabel={formData.tone || 'Professional'}
+                toneLabel={resolvePersonaTone({ tone: formData.tone, custom_tone: formData.custom_tone })}
               />
             )}
             <PostFormatPicker
@@ -823,7 +841,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             <KeyPointsSection
               topic={formData.topic}
               industry={formData.industry}
-              tone={formData.tone}
+              tone={resolvePersonaTone({ tone: formData.tone, custom_tone: formData.custom_tone })}
               targetAudience={formData.target_audience}
               keyPoints={formData.key_points}
               onChange={value => setField('key_points', value)}
@@ -998,6 +1016,11 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
             {/* Modal body — swaps to VariationPicker when in variations phase */}
             <div className="linkedin-quick-create-body">
+              {generationError && (
+                <p style={{ margin: '0 0 12px', color: '#b91c1c', fontSize: 13, fontWeight: 500 }}>
+                  {generationError}
+                </p>
+              )}
               {variationsPhase !== 'idle'
                 ? (
                   <VariationPicker
