@@ -15,13 +15,19 @@ These tests pin down:
 - publish_blog_post reports 'not found' when no credentials exist.
 """
 
+import os
 import sys
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-# Ensure the backend root is on the path.
-sys.path.insert(0, '.')
+# Ensure the backend root is on the path so `from conftest import ...` works.
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+if os.getcwd() not in sys.path:
+    sys.path.insert(0, os.getcwd())
 
 # All imports done at the top so the closure captures the patched class
 # reference at test time. See conftest.py for the patch_user_db_path
@@ -409,7 +415,28 @@ def sqlite3_helpers():
     current conftest-managed temp DB path. Used inside `with` blocks
     after `with patch_user_db_path(...) as ctx`."""
     import sqlite3
-    from conftest import _ACTIVE_DB_PATH
+    import sys
+
+    conftest_mod = sys.modules.get("conftest")
+    if conftest_mod is None or not hasattr(conftest_mod, "_ACTIVE_DB_PATH"):
+        import importlib.util
+        conftest_path = Path(__file__).resolve().parent / "conftest.py"
+        spec = importlib.util.spec_from_file_location("conftest", conftest_path)
+        conftest_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(conftest_mod)
+        sys.modules["conftest"] = conftest_mod
+    _ACTIVE_DB_PATH = conftest_mod._ACTIVE_DB_PATH
+    if not _ACTIVE_DB_PATH.get("path"):
+        # Fallback: scan sys.modules for the conftest pytest loaded
+        for mod_name, mod in sys.modules.items():
+            if mod_name.endswith("conftest") and hasattr(mod, "_ACTIVE_DB_PATH"):
+                _ACTIVE_DB_PATH = mod._ACTIVE_DB_PATH
+                break
+        else:
+            raise RuntimeError(
+                "patch_user_db_path context is not active. Wrap "
+                "sqlite3_helpers() inside `with patch_user_db_path(...) as ctx:`."
+            )
 
     class _Conn:
         def __enter__(self):
