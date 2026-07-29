@@ -74,8 +74,9 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "rgba(0, 0, 0, 0.45)",
-        backdropFilter: "blur(2px)",
+        background: "rgba(15, 23, 42, 0.38)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
         padding: 24,
       }}
       onClick={handleBackdropClose}

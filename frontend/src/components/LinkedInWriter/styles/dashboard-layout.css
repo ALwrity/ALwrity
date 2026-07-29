@@ -4010,8 +4010,9 @@ body.linkedin-quick-create-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
+  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   padding: clamp(12px, 3vw, 24px);
 }
 
@@ -4350,7 +4351,8 @@ body.linkedin-quick-create-open {
 .linkedin-optimise-profile-rail-btn.linkedin-studio-connect-locked::after,
 .linkedin-dashboard-mobile-workflow-card.linkedin-studio-connect-locked::after,
 .linkedin-mobile-analytics-icon-btn.linkedin-studio-connect-locked::after,
-.linkedin-search-bar.linkedin-studio-connect-locked::after {
+.linkedin-search-bar.linkedin-studio-connect-locked::after,
+.plan-wedge-coming-soon-card.linkedin-studio-connect-locked::after {
   content: "";
   position: absolute;
   inset: 0;
