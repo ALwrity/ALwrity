@@ -9,6 +9,7 @@ import {
   Paper,
   Tooltip,
   Chip,
+  Stack,
 } from "@mui/material";
 import CheckIcon from "@mui/icons-material/Check";
 import CloseIcon from "@mui/icons-material/Close";
@@ -16,15 +17,14 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
 import { apiClient, getApiUrl } from "../../api/client";
+import PricingPageLayout from "./PricingPageLayout";
 import type { SubscriptionPlan } from "./pricingTypes";
 import {
   LINKEDIN_FEATURES,
   LINKEDIN_PRICING_HERO,
-  type LinkedInPlanFeature,
 } from "./linkedinFeatureMap";
 
 const LINKEDIN_PRIMARY = "#0a66c2";
-const LINKEDIN_HOVER = "#004182";
 
 export const LinkedInPricingPage: React.FC = () => {
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
@@ -69,20 +69,90 @@ export const LinkedInPricingPage: React.FC = () => {
     fetchPlans();
   }, [fetchPlans]);
 
-  const handleSubscribe = async (planId: number) => {
+  const handlePlanCtaClick = async (planId: number) => {
+    const plan = plans.find((p) => p.id === planId);
+    if (!plan) return;
+
     if (!isSignedIn || !user) {
       navigate("/sign-in?redirect=/linkedin-studio/pricing");
       return;
     }
+
+    if (plan.tier === "free") {
+      await activateFreePlan(planId);
+      return;
+    }
+
+    if (plan.tier === "basic") {
+      await handleBasicSubscribe(plan);
+      return;
+    }
+  };
+
+  const activateFreePlan = async (planId: number) => {
+    const userId = user?.id || localStorage.getItem("user_id") || "anonymous";
+    setSubscribing(true);
     try {
-      setSubscribing(true);
-      await apiClient.post(`/api/subscription/subscribe/${user.id}`, {
+      await apiClient.post(`/api/subscription/subscribe/${userId}`, {
         plan_id: planId,
+        billing_cycle: yearly ? "yearly" : "monthly",
       });
+      window.dispatchEvent(new CustomEvent("subscription-updated"));
       navigate("/linkedin-studio");
     } catch (err) {
-      console.error("LinkedInPricing: subscribe failed", err);
-      setError("Subscription failed. Please try again or email info@alwrity.com");
+      console.error("LinkedInPricing: free plan subscribe failed", err);
+      setError("Failed to activate plan. Please try again.");
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const handleBasicSubscribe = async (plan: SubscriptionPlan) => {
+    const requireStripeCheckout = ["1", "true", "yes", "on"].includes(
+      (process.env.REACT_APP_REQUIRE_STRIPE_CHECKOUT || "").toLowerCase()
+    );
+    const stripePublishableKey = process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY;
+
+    if (requireStripeCheckout && !stripePublishableKey) {
+      setError("Stripe checkout is required but not configured.");
+      return;
+    }
+
+    setSubscribing(true);
+    try {
+      if (stripePublishableKey) {
+        const response = await apiClient.post("/api/subscription/create-checkout-session", {
+          tier: plan.tier,
+          billing_cycle: yearly ? "yearly" : "monthly",
+          success_url: `${window.location.origin}/linkedin-studio?subscription=success`,
+          cancel_url: `${window.location.origin}/linkedin-studio/pricing?subscription=cancel`,
+        });
+
+        if (response.data.url) {
+          window.location.href = response.data.url;
+          return;
+        }
+
+        if (requireStripeCheckout) {
+          throw new Error("Stripe checkout is required but checkout URL was not returned.");
+        }
+      }
+
+      if (requireStripeCheckout) {
+        throw new Error("Stripe checkout is required but REACT_APP_STRIPE_PUBLISHABLE_KEY is not configured.");
+      }
+
+      // Fallback: direct subscribe only when Stripe is explicitly not required
+      const userId = user?.id || "anonymous";
+      await apiClient.post(`/api/subscription/subscribe/${userId}`, {
+        plan_id: plan.id,
+        billing_cycle: yearly ? "yearly" : "monthly",
+      });
+      window.dispatchEvent(new CustomEvent("subscription-updated"));
+      navigate("/linkedin-studio");
+    } catch (err) {
+      console.error("LinkedInPricing: basic subscribe failed", err);
+      setError(err instanceof Error ? err.message : "Subscription failed. Please try again.");
     } finally {
       setSubscribing(false);
     }
@@ -118,57 +188,29 @@ export const LinkedInPricingPage: React.FC = () => {
   }
 
   return (
-    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh" }}>
-      {/* Hero */}
-      <Box
-        sx={{
-          background: `linear-gradient(135deg, ${LINKEDIN_PRIMARY} 0%, #023b66 100%)`,
-          color: "#fff",
-          textAlign: "center",
-          py: { xs: 6, md: 8 },
-          px: 2,
-        }}
-      >
-        <Container maxWidth="md">
-          <Typography
-            variant="h2"
-            component="h1"
-            sx={{ fontWeight: 800, fontSize: { xs: 28, md: 40 }, mb: 2 }}
-          >
-            {LINKEDIN_PRICING_HERO.title}
-          </Typography>
-          <Typography
-            variant="h6"
-            sx={{ fontWeight: 400, opacity: 0.9, fontSize: { xs: 16, md: 20 }, mb: 1 }}
-          >
-            {LINKEDIN_PRICING_HERO.subtitle}
-          </Typography>
-          <Chip
-            label="All plans unlock LinkedIn Studio. Limits reset monthly."
-            size="small"
-            sx={{
-              bgcolor: "rgba(255,255,255,0.15)",
-              color: "#fff",
-              mt: 1,
-              fontWeight: 500,
-            }}
-          />
-        </Container>
+    <PricingPageLayout>
+    <Container maxWidth="lg" sx={{ pt: 4 }}>
+      {/* Header */}
+      <Box sx={{ textAlign: "center", mb: 4 }}>
+        <Typography variant="h3" component="h1" sx={{ fontWeight: 800, color: "#1a1a2e", mb: 1 }}>
+          {LINKEDIN_PRICING_HERO.title}
+        </Typography>
+        <Typography variant="h6" sx={{ color: "#64748b", fontWeight: 400, maxWidth: 600, mx: "auto" }}>
+          {LINKEDIN_PRICING_HERO.subtitle}
+        </Typography>
+        <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
+          <Chip label="All plans unlock LinkedIn Studio" size="small" sx={{ fontWeight: 500, color: "#64748b" }} />
+        </Stack>
       </Box>
 
       {/* Billing Toggle */}
-      <Container maxWidth="md" sx={{ py: 3, textAlign: "center" }}>
+      <Box sx={{ textAlign: "center", mb: 4 }}>
         <Button
           variant={yearly ? "contained" : "outlined"}
           onClick={() => setYearly(true)}
           sx={{
-            mr: 1,
-            borderRadius: "20px 0 0 20px",
-            textTransform: "none",
-            fontWeight: 600,
-            ...(yearly
-              ? { bgcolor: LINKEDIN_PRIMARY, "&:hover": { bgcolor: LINKEDIN_HOVER } }
-              : { color: LINKEDIN_PRIMARY, borderColor: LINKEDIN_PRIMARY }),
+            mr: 1, borderRadius: "20px 0 0 20px", textTransform: "none", fontWeight: 600,
+            ...(yearly ? { bgcolor: LINKEDIN_PRIMARY } : { color: LINKEDIN_PRIMARY, borderColor: LINKEDIN_PRIMARY }),
           }}
         >
           Yearly (save 17%)
@@ -177,29 +219,22 @@ export const LinkedInPricingPage: React.FC = () => {
           variant={!yearly ? "contained" : "outlined"}
           onClick={() => setYearly(false)}
           sx={{
-            borderRadius: "0 20px 20px 0",
-            textTransform: "none",
-            fontWeight: 600,
-            ...(!yearly
-              ? { bgcolor: LINKEDIN_PRIMARY, "&:hover": { bgcolor: LINKEDIN_HOVER } }
-              : { color: LINKEDIN_PRIMARY, borderColor: LINKEDIN_PRIMARY }),
+            borderRadius: "0 20px 20px 0", textTransform: "none", fontWeight: 600,
+            ...(!yearly ? { bgcolor: LINKEDIN_PRIMARY } : { color: LINKEDIN_PRIMARY, borderColor: LINKEDIN_PRIMARY }),
           }}
         >
           Monthly
         </Button>
-      </Container>
+      </Box>
 
       {/* Plan Cards */}
-      <Container maxWidth="md" sx={{ pb: 4 }}>
-        <Box
-          sx={{
-            display: "flex",
-            gap: 3,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            alignItems: "stretch",
-          }}
-        >
+      <Box
+        sx={{
+          display: "flex", gap: 3, flexWrap: "wrap",
+          justifyContent: "center", alignItems: "stretch",
+          pb: 6,
+        }}
+      >
           {sorted.map((plan) => {
             const planPrice = price(plan);
             const isFree = plan.tier === "free";
@@ -269,7 +304,7 @@ export const LinkedInPricingPage: React.FC = () => {
                     fullWidth
                     variant={isFree ? "outlined" : "contained"}
                     disabled={subscribing}
-                    onClick={() => handleSubscribe(plan.id)}
+                    onClick={() => handlePlanCtaClick(plan.id)}
                     sx={{
                       py: 1.5,
                       borderRadius: 2,
@@ -278,10 +313,10 @@ export const LinkedInPricingPage: React.FC = () => {
                       fontSize: 15,
                       ...(isFree
                         ? { borderColor: LINKEDIN_PRIMARY, color: LINKEDIN_PRIMARY }
-                        : { bgcolor: LINKEDIN_PRIMARY, "&:hover": { bgcolor: LINKEDIN_HOVER } }),
+                        : { bgcolor: LINKEDIN_PRIMARY, "&:hover": { bgcolor: "#004182" } }),
                     }}
                   >
-                    {subscribing ? "Subscribing…" : isFree ? "Start Free" : "Upgrade to Basic"}
+                    {subscribing ? "SubscribingΓÇª" : isFree ? "Start Free" : "Upgrade to Basic"}
                   </Button>
                 </Box>
 
@@ -289,7 +324,7 @@ export const LinkedInPricingPage: React.FC = () => {
                 <Box sx={{ px: 3, pb: 3, flex: 1 }}>
                   {LINKEDIN_FEATURES.map((feature) => {
                     const value = plan.tier === "free" ? feature.free : feature.basic;
-                    const hasFeature = value !== "—";
+                    const hasFeature = value !== "ΓÇö";
                     return (
                       <Box
                         key={feature.label}
@@ -335,8 +370,8 @@ export const LinkedInPricingPage: React.FC = () => {
             );
           })}
         </Box>
-      </Container>
-    </Box>
+    </Container>
+    </PricingPageLayout>
   );
 };
 
