@@ -110,17 +110,12 @@ step3_routes = None
 if _is_full_mode():
     from api.onboarding_utils.step3_routes import router as step3_routes
 
-# Load step4_persona routes for LinkedIn mode too
-if _is_full_mode() or _is_feature_enabled("linkedin"):
+# Persona generation routes — full mode only (requires nltk/spacy; tied to onboarding)
+step4_persona_routes = None
+persona_routes = None
+if _is_full_mode():
     from api.onboarding_utils.step4_persona_routes_optimized import router as step4_persona_routes
-else:
-    step4_persona_routes = None
-
-# Load persona routes for LinkedIn mode too
-if _is_full_mode() or _is_feature_enabled("linkedin"):
     from api.persona_routes import router as persona_routes
-else:
-    persona_routes = None
 
 # Import SEO tools router (skip in feature-only modes - uses seo_analyzer)
 seo_tools_router = None
@@ -196,11 +191,10 @@ from services.startup_health import (
 
 # Trigger reload for monitoring fix
 
-# Import OAuth token monitoring routes (skip in feature-only modes)
-if _is_full_mode() or _is_feature_enabled("linkedin"):
+# OAuth token monitoring routes — full mode only (requires apscheduler; scheduler disabled in feature-limited modes)
+oauth_token_monitoring_router = None
+if _is_full_mode():
     from api.oauth_token_monitoring_routes import router as oauth_token_monitoring_router
-else:
-    oauth_token_monitoring_router = None
 
 # Import SEO Dashboard endpoints (skip in feature-only modes to save memory)
 if _is_full_mode():
@@ -494,18 +488,6 @@ else:
         "mounted": True,
         "reason": f"Feature-only mode: {enabled_features}",
     }
-
-    # LinkedIn-specific routers that are not matched by feature-only filtering
-    if "linkedin" in enabled_features:
-        # OAuth token monitoring (required for LinkedIn token health)
-        if oauth_token_monitoring_router:
-            router_manager.include_router_safely(oauth_token_monitoring_router, "oauth_token_monitoring")
-        # Step 4 persona routes
-        if step4_persona_routes:
-            router_manager.include_router_safely(step4_persona_routes, "step4_persona")
-        # Persona routes
-        if persona_routes:
-            router_manager.include_router_safely(persona_routes, "persona")
 
 # Safety net: explicitly include hallucination detector (import may fail gracefully)
 if hallucination_detector_router:
