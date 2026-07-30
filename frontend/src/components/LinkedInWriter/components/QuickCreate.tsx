@@ -13,6 +13,12 @@ import { VariationPicker, assembleFullContent, type VariationResult } from './Va
 import { StudioModalCloseButton } from './dashboard/StudioModalCloseButton';
 import { DEFAULT_LINKEDIN_POST_MAX_LENGTH } from '../utils/linkedInPostAssembly';
 import { CustomToneSelect } from './CustomToneSelect';
+import {
+  isCreateWedgeContentTypeLocked,
+  type CreateWedgeLockedContentType,
+} from '../utils/linkedInConnectLockedUi';
+import { CreateWedgeComingSoonTile } from './dashboard/CreateWedgeComingSoonTile';
+import { useCreateWedgeNotify } from '../hooks/useCreateWedgeNotify';
 
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
@@ -333,6 +339,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [includeTrending, setIncludeTrending] = useState(false);
   const [remarketContent, setRemarketContent] = useState(false);
   const { connected } = useLinkedInSocialConnection();
+  const { notifyRequested, handleNotify } = useCreateWedgeNotify();
 
   const refreshSavedCount = useCallback(async () => {
     try {
@@ -348,6 +355,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   }, [selectedType, refreshSavedCount]);
 
   const openModal = useCallback((type: ContentType) => {
+    if (isCreateWedgeContentTypeLocked(type)) return;
     if (brainstormTimeoutRef.current) {
       window.clearTimeout(brainstormTimeoutRef.current);
       brainstormTimeoutRef.current = null;
@@ -929,38 +937,56 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           <div style={{ fontSize: 14, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 12, textAlign: 'center' }}>Quick Create</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
             {CONTENT_TYPES.map(({ type, label, icon, description, color }) => {
-              const disabled = type === 'carousel' || type === 'video_script';
+              const locked = isCreateWedgeContentTypeLocked(type);
+              if (locked) {
+                return (
+                  <div key={type} className="create-wedge-coming-soon-grid-cell">
+                    <CreateWedgeComingSoonTile
+                      contentType={type as CreateWedgeLockedContentType}
+                      icon={icon}
+                      title={label}
+                      description={description}
+                      notified={notifyRequested[type as CreateWedgeLockedContentType]}
+                      onNotify={() =>
+                        handleNotify(type as CreateWedgeLockedContentType, label)
+                      }
+                    />
+                  </div>
+                );
+              }
               return (
                 <button
                   key={type}
-                  onClick={() => { if (!disabled) openModal(type); }}
+                  type="button"
+                  onClick={() => openModal(type)}
+                  aria-label={`Create ${label}`}
+                  className="linkedin-quick-create-type-card"
                   style={{
                     padding: '14px 10px',
-                    border: `1px solid ${disabled ? '#e5e7eb' : '#e5e7eb'}`,
+                    border: '1px solid #e5e7eb',
                     borderRadius: 12,
-                    background: disabled ? '#f9fafb' : 'white',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: 'white',
+                    cursor: 'pointer',
                     transition: 'all 0.2s',
                     textAlign: 'center',
-                    boxShadow: disabled ? 'none' : '0 1px 3px rgba(0,0,0,0.06)',
-                    opacity: disabled ? 0.45 : 1,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                   }}
                   onMouseEnter={e => {
-                    if (disabled) return;
                     e.currentTarget.style.borderColor = color;
                     e.currentTarget.style.boxShadow = `0 4px 12px ${color}20`;
                     e.currentTarget.style.transform = 'translateY(-2px)';
                   }}
                   onMouseLeave={e => {
-                    if (disabled) return;
                     e.currentTarget.style.borderColor = '#e5e7eb';
                     e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.06)';
                     e.currentTarget.style.transform = 'translateY(0)';
                   }}
                 >
-                  <div style={{ fontSize: 28, marginBottom: 6, filter: disabled ? 'grayscale(1)' : 'none' }}>{icon}</div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: disabled ? '#9ca3af' : '#111827' }}>{label}</div>
-                  <div style={{ fontSize: 11, color: disabled ? '#d1d5db' : '#6b7280', marginTop: 4, lineHeight: '1.3' }}>{disabled ? 'Coming soon' : description}</div>
+                  <div style={{ fontSize: 28, marginBottom: 6 }}>{icon}</div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#111827' }}>{label}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4, lineHeight: '1.3' }}>
+                    {description}
+                  </div>
                 </button>
               );
             })}

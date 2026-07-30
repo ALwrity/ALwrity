@@ -550,6 +550,29 @@
     width: 15px;
     height: 15px;
   }
+
+  /* Content Persona pill — match LinkedIn Search bar height & visual weight */
+  .linkedin-writer-header-pill-btn {
+    box-sizing: border-box;
+    min-height: 38px;
+    padding: 7px 14px;
+    border-radius: 24px;
+    border-width: 1.5px;
+    font-size: 13px;
+    box-shadow: 0 1px 3px rgba(10, 102, 194, 0.08);
+  }
+
+  .linkedin-writer-header-pill-btn:hover {
+    box-shadow: 0 2px 8px rgba(10, 102, 194, 0.12);
+  }
+
+  .linkedin-writer-header-pill-icon {
+    font-size: 15px;
+  }
+
+  .linkedin-writer-header-pill-label {
+    font-size: 13px;
+  }
 }
 
 .linkedin-optimise-profile-control {

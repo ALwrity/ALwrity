@@ -3,11 +3,13 @@ import { ConnectLockBadge } from '../dashboard/ConnectLockIcon';
 
 interface PlanWedgeComingSoonCardProps {
   icon: string;
-  iconVariant: 'watchdog' | 'weekly' | 'calendar';
+  iconVariant: "watchdog" | "weekly" | "calendar" | "carousel" | "video_script";
   title: string;
   description: string;
   notified: boolean;
   onNotify: () => void;
+  /** Hide the purple "Coming Soon" pill (Create wedge locked tiles). */
+  showComingSoonBadge?: boolean;
 }
 
 export const PlanWedgeComingSoonCard: React.FC<PlanWedgeComingSoonCardProps> = ({
@@ -17,6 +19,7 @@ export const PlanWedgeComingSoonCard: React.FC<PlanWedgeComingSoonCardProps> = (
   description,
   notified,
   onNotify,
+  showComingSoonBadge = true,
 }) => (
   <div
     className="plan-wedge-coming-soon-card linkedin-studio-connect-locked plan-wedge-coming-soon-card--locked"
@@ -30,7 +33,9 @@ export const PlanWedgeComingSoonCard: React.FC<PlanWedgeComingSoonCardProps> = (
         {icon}
       </span>
       <div className="plan-wedge-coming-soon-card__header-badges">
-        <span className="plan-wedge-coming-soon-card__badge">Coming Soon</span>
+        {showComingSoonBadge && (
+          <span className="plan-wedge-coming-soon-card__badge">Coming Soon</span>
+        )}
         <ConnectLockBadge size={10} className="plan-wedge-coming-soon-card__lock" />
       </div>
     </div>
