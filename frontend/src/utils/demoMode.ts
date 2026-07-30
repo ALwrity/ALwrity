@@ -160,9 +160,10 @@ export function getDefaultLandingRoute(): string {
 export function shouldSkipOnboarding(): boolean {
   const enabled = getEnabledFeatures();
   if (enabled.has('all')) return false;
-  // LinkedIn now has its own onboarding — don't skip
-  if (enabled.has('linkedin')) return false;
-  return true; // other feature-only modes still skip
+  // LinkedIn onboarding endpoints are gated behind OnboardingManager
+  // (full-mode only). Skip until full onboarding is deployed.
+  if (enabled.has('linkedin')) return true;
+  return true; // other feature-only modes skip
 }
 
 /** Shared routes allowed in feature-only mode without completing onboarding. */

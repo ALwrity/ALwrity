@@ -4,7 +4,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useOAuthTokenAlerts } from '../../hooks/useOAuthTokenAlerts';
-import { shouldSkipOnboarding, getDefaultLandingRoute } from '../../utils/demoMode';
+import { shouldSkipOnboarding, getDefaultLandingRoute, getEnabledFeatures } from '../../utils/demoMode';
 import { restoreNavigationState } from '../../utils/navigationState';
 import ConnectionErrorPage from '../shared/ConnectionErrorPage';
 
@@ -104,7 +104,7 @@ const InitialRouteHandler: React.FC = () => {
       if (subscription.active && !isNewUser) {
         console.log('InitialRouteHandler: Subscription confirmed, initializing onboarding...');
 
-        if (!isCheckoutSuccess) {
+        if (!isCheckoutSuccess && !shouldSkipOnboarding()) {
           initializeOnboarding();
         }
       }
@@ -301,7 +301,10 @@ const InitialRouteHandler: React.FC = () => {
     }
 
     console.log('InitialRouteHandler: No subscription data after check → Pricing page');
-    return navigateAndLog("/pricing");
+    const pricingRoute = shouldSkipOnboarding() && getEnabledFeatures().has('linkedin')
+      ? '/linkedin-studio/pricing'
+      : '/pricing';
+    return navigateAndLog(pricingRoute);
   }
 
   const isNewUser = !subscription || subscription.plan === 'none' || subscription.plan === 'free';
@@ -309,8 +312,11 @@ const InitialRouteHandler: React.FC = () => {
   if (isNewUser || !subscription.active) {
     console.log('InitialRouteHandler: No active subscription - modal will be shown by SubscriptionContext');
     if (isNewUser) {
-      console.log('InitialRouteHandler: New user (no subscription) → Pricing page');
-      return <Navigate to="/pricing" replace />;
+      const pricingRoute = shouldSkipOnboarding() && getEnabledFeatures().has('linkedin')
+        ? '/linkedin-studio/pricing'
+        : '/pricing';
+      console.log(`InitialRouteHandler: New user (no subscription) → ${pricingRoute}`);
+      return <Navigate to={pricingRoute} replace />;
     }
     console.log('InitialRouteHandler: Inactive subscription - allowing access to show modal');
   }
