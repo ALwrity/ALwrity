@@ -6,6 +6,7 @@ Coordinates research, outline generation, content creation, and optimization.
 
 from typing import Dict, Any, List, Optional
 from loguru import logger
+from sqlalchemy.orm import Session
 
 from models.blog_models import (
     BlogResearchRequest,
