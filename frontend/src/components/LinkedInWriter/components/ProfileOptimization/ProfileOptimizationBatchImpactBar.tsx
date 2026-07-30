@@ -69,7 +69,7 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
           <Tooltip
             title={
               batchGainHint ||
-              `+${projection.gainPoints}% profile strength if you apply this batch`
+              `+${projection.gainPoints}% profile strength if you apply Suggestions`
             }
             arrow
             placement="top"
@@ -139,7 +139,7 @@ export const ProfileOptimizationBatchImpactBar: React.FC<
 
       {projection.gainPoints > 0 && (
         <p className="profile-opt-batch-impact__caption">
-          Apply this batch for <strong>+{projection.gainPoints}%</strong>{" "}
+          Apply Suggestions for <strong>+{projection.gainPoints}%</strong>{" "}
           strength
         </p>
       )}
