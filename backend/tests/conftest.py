@@ -649,3 +649,86 @@ if "pandas" not in sys.modules:
         _pandas_stub.read_csv = lambda *args, **kwargs: None
         _pandas_stub.read_json = lambda *args, **kwargs: None
         sys.modules["pandas"] = _pandas_stub
+
+
+# ---------------------------------------------------------------------------
+# ``apscheduler`` is referenced at module-import time by
+# ``services/scheduler/__init__.py`` (CronTrigger) but is not part of the
+# unit suite's required deps. Provide a permissive stub so collection
+# succeeds in environments without ``apscheduler``.
+# ---------------------------------------------------------------------------
+if "apscheduler" not in sys.modules:
+    try:
+        importlib.import_module("apscheduler")
+    except Exception:
+        _apscheduler_pkg = types.ModuleType("apscheduler")
+        _apscheduler_pkg.__path__ = []
+        sys.modules["apscheduler"] = _apscheduler_pkg
+
+        _apscheduler_triggers = types.ModuleType("apscheduler.triggers")
+        sys.modules["apscheduler.triggers"] = _apscheduler_triggers
+
+        _apscheduler_cron = types.ModuleType("apscheduler.triggers.cron")
+
+        class _CronTrigger:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        _apscheduler_cron.CronTrigger = _CronTrigger
+        sys.modules["apscheduler.triggers.cron"] = _apscheduler_cron
+
+        _apscheduler_triggers.cron = _apscheduler_cron
+
+
+# ---------------------------------------------------------------------------
+# ``pytrends`` is referenced at module-import time by
+# ``services/research/trends/google_trends_service.py`` (TrendReq). The
+# service uses ``_TrendReq`` at module-load time to monkey-patch
+# ``related_topics`` / ``related_queries``. Without ``pytrends`` installed,
+# the module raises ``NameError`` during import. Provide a minimal stub
+# so collection succeeds; tests that actually exercise the trends code
+# path will still need pytrends installed.
+# ---------------------------------------------------------------------------
+if "pytrends" not in sys.modules:
+    try:
+        importlib.import_module("pytrends")
+    except Exception:
+        _pytrends_pkg = types.ModuleType("pytrends")
+        _pytrends_pkg.__path__ = []
+        sys.modules["pytrends"] = _pytrends_pkg
+
+        _pytrends_request = types.ModuleType("pytrends.request")
+
+        class _TrendReq:
+            RELATED_QUERIES_URL = "https://trends.google.com/trends/api/datarank/relatedqueries"
+            RELATED_TOPICS_URL = "https://trends.google.com/trends/api/datarank/relatedtopics"
+            GET_METHOD = "GET"
+
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def related_topics(self, *args, **kwargs):
+                return {}
+
+            def related_queries(self, *args, **kwargs):
+                return {}
+
+            def interest_over_time(self, *args, **kwargs):
+                return None
+
+            def interest_by_region(self, *args, **kwargs):
+                return None
+
+        _pytrends_request.TrendReq = _TrendReq
+        sys.modules["pytrends.request"] = _pytrends_request
+
+        _pytrends_exceptions = types.ModuleType("pytrends.exceptions")
+
+        class _TooManyRequestsError(Exception):
+            pass
+
+        _pytrends_exceptions.TooManyRequestsError = _TooManyRequestsError
+        sys.modules["pytrends.exceptions"] = _pytrends_exceptions
+
+        _pytrends_pkg.request = _pytrends_request
+        _pytrends_pkg.exceptions = _pytrends_exceptions
