@@ -309,8 +309,8 @@ router_manager = RouterManager(app)
 router_group_status: Dict[str, Dict[str, Any]] = {}
 
 onboarding_manager = None
-# Create OnboardingManager in full mode or LinkedIn mode
-if _is_full_mode() or _is_feature_enabled("linkedin"):
+# Create OnboardingManager in full mode only (triggers heavy imports)
+if _is_full_mode():
     from alwrity_utils import OnboardingManager
     onboarding_manager = OnboardingManager(app)
 
@@ -842,10 +842,16 @@ async def startup_event():
         else:
             logger.info(f"[FEATURE-MODE] Skipping startup health routine (features: {enabled_features})")
 
-        # Start task scheduler in full mode or LinkedIn mode (for background executors)
-        if _is_full_mode() or _is_feature_enabled("linkedin"):
+        # Start task scheduler (required for daily workflow cron jobs)
+        if _is_full_mode():
             from services.scheduler import get_scheduler
             await get_scheduler().start()
+        elif _is_feature_enabled("linkedin"):
+            logger.warning(
+                "[FEATURE-MODE] Scheduler DISABLED in linkedin-only mode — "
+                "daily workflow cron jobs will not run. Set ALWRITY_ENABLED_FEATURES=all "
+                "or remove the variable to enable scheduled generation."
+            )
         else:
             logger.info(f"[FEATURE-MODE] Skipping scheduler startup (features: {enabled_features})")
 

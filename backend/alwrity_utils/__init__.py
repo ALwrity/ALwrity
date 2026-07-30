@@ -25,11 +25,12 @@ from .feature_runtime import (
     is_enabled,
 )
 
-# Lazy load OnboardingManager - it triggers heavy imports (aiohttp, etc.)
+# OnboardingManager triggers heavy imports (aiohttp, scheduler, all endpoint modules).
+# Only load in full mode — feature-only deployments skip it for lean startup.
 if _is_full_mode:
     from .onboarding_manager import OnboardingManager
 else:
-    OnboardingManager = None
+    OnboardingManager = None  # type: ignore[assignment]
 
 __all__ = [
     'DependencyManager',

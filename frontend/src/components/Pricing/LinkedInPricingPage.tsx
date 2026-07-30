@@ -6,12 +6,6 @@ import {
   Button,
   Alert,
   CircularProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Paper,
   Tooltip,
   Chip,
@@ -21,13 +15,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useNavigate } from "react-router-dom";
 import { useClerk } from "@clerk/clerk-react";
-import { apiClient, getApiUrl } from "../../../api/client";
-import type { SubscriptionPlan } from "../pricingTypes";
+import { apiClient, getApiUrl } from "../../api/client";
+import type { SubscriptionPlan } from "./pricingTypes";
 import {
   LINKEDIN_FEATURES,
   LINKEDIN_PRICING_HERO,
   type LinkedInPlanFeature,
-} from "../linkedinFeatureMap";
+} from "./linkedinFeatureMap";
 
 const LINKEDIN_PRIMARY = "#0a66c2";
 const LINKEDIN_HOVER = "#004182";

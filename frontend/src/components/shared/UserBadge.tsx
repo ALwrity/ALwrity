@@ -4,7 +4,7 @@ import {
 } from '@mui/material';
 import { useUser, useClerk } from '@clerk/clerk-react';
 import { useSubscription } from '../../contexts/SubscriptionContext';
-import { isFeatureOnlyMode } from '../../utils/demoMode';
+import { isFeatureOnlyMode, getEnabledFeatures } from '../../utils/demoMode';
 import {
   apiClient,
   isBackendCooldownActive,
@@ -322,7 +322,9 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
               handleClose();
               saveNavigationState(window.location.pathname);
               sessionStorage.setItem('pending_subscription_change', 'true');
-              window.location.href = '/pricing';
+              const enabled = getEnabledFeatures();
+              const pricingPage = enabled.has('all') ? '/pricing' : '/linkedin-studio/pricing';
+              window.location.href = pricingPage;
             }}
             onViewCosting={() => {
               handleClose();

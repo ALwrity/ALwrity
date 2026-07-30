@@ -1,9 +1,11 @@
 /**
  * LinkedIn Studio — pricing feature definitions per plan.
  * 
- * Maps the backend plan limits (from SubscriptionPlan.limits) to
- * human-readable feature rows shown on the LinkedIn pricing page.
- * Only Free and Basic tiers are surfaced; Pro/Enterprise are gated.
+ * Maps the backend plan limits (from plan_definitions.py / pricing.yaml) to
+ * human-readable feature rows. Only Free and Basic tiers are surfaced.
+ * 
+ * Note: AI limits are shared across all ALwrity tools; in LinkedIn-only
+ * deployments the full pool is available for LinkedIn Studio exclusively.
  */
 
 export interface LinkedInPlanFeature {
@@ -15,63 +17,57 @@ export interface LinkedInPlanFeature {
 
 export const LINKEDIN_FEATURES: LinkedInPlanFeature[] = [
   {
-    label: "AI-Generated Posts",
-    free: "5 / month",
-    basic: "50 / month",
-    tooltip: "Full LinkedIn posts with research grounding, citations, and quality analysis",
+    label: "AI Text Generation",
+    free: "50 calls / month",
+    basic: "500 calls / month",
+    tooltip: "AI-powered posts, rewrites, comments, and content suggestions",
   },
   {
-    label: "Profile Optimization",
-    free: "Basic suggestions",
-    basic: "AI-powered analysis + suggestions",
-    tooltip: "Analyze and improve your LinkedIn profile with AI recommendations",
-  },
-  {
-    label: "AI Profile Headshot",
-    free: "—",
-    basic: "5 / month",
+    label: "Profile Headshot (AI)",
+    free: "5 edits / month",
+    basic: "25 edits / month",
     tooltip: "Transform your photo into a professional LinkedIn headshot",
   },
   {
+    label: "Video Posts (AI)",
+    free: "2 videos / month",
+    basic: "10 videos / month",
+    tooltip: "Generate AI videos for LinkedIn posts",
+  },
+  {
+    label: "Profile Optimization",
+    free: "Included",
+    basic: "Included",
+    tooltip: "AI-powered profile analysis with optimization suggestions",
+  },
+  {
     label: "Post Analytics",
-    free: "Last 7 days",
-    basic: "Last 30 days",
-    tooltip: "Track impressions, engagement, CTR, and follower growth",
+    free: "Included",
+    basic: "Included",
+    tooltip: "Track impressions, engagement, CTR, and follower growth over time",
   },
   {
     label: "Growth Engine",
-    free: "—",
-    basic: "3 trending topics / month",
-    tooltip: "Discover trending topics, content gaps, and network suggestions",
+    free: "Limited access",
+    basic: "Full access",
+    tooltip: "Trending topics, content gaps, network suggestions, and brand scorecard",
   },
   {
     label: "Topic Recommendations",
-    free: "—",
-    basic: "10 / month",
+    free: "Included",
+    basic: "Included",
     tooltip: "AI-powered topic ideas tailored to your industry and audience",
   },
   {
-    label: "Post Scheduling",
-    free: "—",
-    basic: "Included",
-    tooltip: "Schedule posts for optimal LinkedIn engagement times",
-  },
-  {
     label: "LinkedIn Accounts",
-    free: "1 account",
-    basic: "1 account",
+    free: "1 personal account",
+    basic: "1 personal account",
     tooltip: "Connect your personal LinkedIn profile",
-  },
-  {
-    label: "Video Posts",
-    free: "—",
-    basic: "2 / month",
-    tooltip: "Generate AI videos for LinkedIn posts",
   },
   {
     label: "Priority Support",
     free: "Community",
-    basic: "Email support",
+    basic: "Email",
     tooltip: "Get help when you need it",
   },
 ];
