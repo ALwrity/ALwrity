@@ -13,6 +13,7 @@ import Landing from './components/Landing/Landing';
 import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
 import PricingPage from './components/Pricing/PricingPage';
+const LinkedInPricingPage = React.lazy(() => import('./components/Pricing/LinkedInPricingPage'));
 import ContactPage from './components/Landing/ContactPage';
 import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
 
@@ -238,6 +239,7 @@ const App: React.FC = () => {
                     <Route path="/content-planning" element={<ProtectedRoute><FeatureRoute feature="content-planning"><ContentPlanningDashboard /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/facebook-writer" element={<ProtectedRoute><FeatureRoute feature="facebook"><FacebookWriter /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/linkedin-studio" element={<ProtectedRoute><FeatureRoute feature="linkedin"><LinkedInWriter /></FeatureRoute></ProtectedRoute>} />
+                    <Route path="/linkedin-studio/pricing" element={<LinkedInPricingPage />} />
                     <Route path="/linkedin-writer" element={<LinkedInWriterLegacyRedirect />} />
                     <Route path="/blog-writer" element={<ProtectedRoute><FeatureRoute feature="blog_writer"><BlogWriter /></FeatureRoute></ProtectedRoute>} />
                     <Route path="/story-writer" element={<ProtectedRoute><FeatureRoute feature="story_writer"><StoryWriter /></FeatureRoute></ProtectedRoute>} />
