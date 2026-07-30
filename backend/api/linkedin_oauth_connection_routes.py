@@ -185,6 +185,7 @@ async def get_authorization_url(
             "authorization_url": payload["auth_url"],
             "state": payload["state"],
             "provider": payload["provider"],
+            "purpose": payload.get("purpose", "connect"),
         }
     except ValueError as e:
         error_str = str(e).lower()
@@ -398,13 +399,17 @@ async def disconnect_linkedin(
         result = await _oauth_service.disconnect_user(user_id)
         logger.info(
             f"[LinkedInConnect] disconnect completed user_id={user_id} "
-            f"revoked={result.get('revoked')} unipile_account_deleted={result.get('unipile_account_deleted')}"
+            f"revoked={result.get('revoked')} "
+            f"preserved_account_id={result.get('preserved_unipile_account_id')} "
+            f"needs_reconnect={result.get('needs_reconnect')} "
+            f"unipile_account_deleted={result.get('unipile_account_deleted')}"
         )
         return {
             "success": result.get("success", False),
             "connected": result.get("connected", False),
+            "needs_reconnect": bool(result.get("needs_reconnect")),
             "has_env_fallback": False,
-            "message": "LinkedIn account disconnected successfully",
+            "message": "LinkedIn account disconnected. You can reconnect anytime.",
         }
     except Exception as e:
         logger.exception(f"[LinkedInConnect] disconnect failed user_id={user_id}: {e}")

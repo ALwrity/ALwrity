@@ -76,6 +76,7 @@ export function connectWithLinkedInOAuth(
       authResponse = await getLinkedInAuthUrl();
       console.info('[LinkedInConnect] auth URL fetched', {
         provider: authResponse.provider,
+        purpose: authResponse.purpose ?? 'connect',
       });
     } catch (err) {
       console.error('[LinkedInConnect] auth URL fetch failed', {

@@ -266,6 +266,15 @@ const useLinkedInSocialConnectionStandalone = () => {
     }
   }, [loadOrganizations, uid]);
 
+  const clearLocalConnectionSession = useCallback(() => {
+    clearSelectionKeys(uid);
+    setSelectedAccountId('');
+    setSelectedTarget('profile');
+    setSelectedOrgId('');
+    clearCachedAvatar(uid);
+    setCachedAvatarUrl(null);
+  }, [uid]);
+
   const setDisconnected = useCallback(() => {
     invalidateSharedConnectionStatus();
     setStatus({
@@ -283,14 +292,9 @@ const useLinkedInSocialConnectionStandalone = () => {
   }, []);
 
   const applyDisconnectedLocally = useCallback(() => {
-    clearSelectionKeys(uid);
-    setSelectedAccountId('');
-    setSelectedTarget('profile');
-    setSelectedOrgId('');
-    clearCachedAvatar(uid);
-    setCachedAvatarUrl(null);
+    clearLocalConnectionSession();
     setDisconnected();
-  }, [setDisconnected, uid]);
+  }, [clearLocalConnectionSession, setDisconnected]);
 
   useEffect(() => {
     void checkStatus().catch((err) => {
@@ -323,7 +327,14 @@ const useLinkedInSocialConnectionStandalone = () => {
 
     const onDisconnected = () => {
       console.info('[LinkedInConnect] received', LINKEDIN_DISCONNECTED_EVENT);
-      applyDisconnectedLocally();
+      clearLocalConnectionSession();
+      invalidateSharedConnectionStatus();
+      void checkStatus().catch((err) => {
+        console.error('[LinkedInConnect] status refresh after disconnect failed:', {
+          detail: getLinkedInSocialErrorMessage(err),
+          error: err,
+        });
+      });
     };
 
     window.addEventListener(LINKEDIN_OAUTH_SUCCESS_EVENT, onOAuthSuccess);
@@ -332,7 +343,7 @@ const useLinkedInSocialConnectionStandalone = () => {
       window.removeEventListener(LINKEDIN_OAUTH_SUCCESS_EVENT, onOAuthSuccess);
       window.removeEventListener(LINKEDIN_DISCONNECTED_EVENT, onDisconnected);
     };
-  }, [applyDisconnectedLocally, checkStatus]);
+  }, [checkStatus, clearLocalConnectionSession]);
 
   const handleAccountChange = useCallback(
     async (accountId: string) => {
@@ -365,10 +376,13 @@ const useLinkedInSocialConnectionStandalone = () => {
 
     try {
       const result = await disconnectLinkedIn();
-      applyDisconnectedLocally();
+      clearLocalConnectionSession();
+      invalidateSharedConnectionStatus();
+      await checkStatus();
       dispatchLinkedInDisconnected();
       console.info('[LinkedInConnect] disconnect succeeded', {
         success: result.success,
+        needsReconnect: result.needs_reconnect,
       });
       return result.success;
     } catch (err: unknown) {
@@ -390,7 +404,7 @@ const useLinkedInSocialConnectionStandalone = () => {
       setDisconnectError(msg);
       return false;
     }
-  }, [applyDisconnectedLocally]);
+  }, [checkStatus, clearLocalConnectionSession, applyDisconnectedLocally]);
 
   const connectWithOAuth = useCallback(async (): Promise<boolean> => {
     setIsConnecting(true);
@@ -441,6 +455,7 @@ const useLinkedInSocialConnectionStandalone = () => {
   const connected = status?.connected ?? false;
   const provider = status?.provider ?? 'unipile';
   const hasPerUserToken = status?.has_per_user_token ?? false;
+  const needsReconnect = Boolean(status?.needs_reconnect);
 
   const primaryProfile: LinkedInProfileSummary | null = useMemo(() => {
     if (!connected) return null;
@@ -471,6 +486,7 @@ const useLinkedInSocialConnectionStandalone = () => {
     connected,
     provider,
     hasPerUserToken,
+    needsReconnect,
     accountName: status?.account_name,
     avatarUrl,
     displayName,

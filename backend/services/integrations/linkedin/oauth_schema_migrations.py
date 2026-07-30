@@ -27,6 +27,7 @@ LINKEDIN_OAUTH_TOKEN_REQUIRED_COLUMNS: Dict[str, str] = {
     "updated_at": "TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
     "unipile_account_id": "TEXT",
     "unipile_org_account_id": "TEXT",
+    "unipile_sync_status": "TEXT",
 }
 
 # Columns used by plaintext token encryption migration (never assume they exist).

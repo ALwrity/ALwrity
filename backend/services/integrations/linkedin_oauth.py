@@ -66,7 +66,7 @@ class LinkedInOAuthService(OAuthProviderBase):
         id, user_id, provider_mode,
         linkedin_access_token, linkedin_refresh_token,
         expires_at, account_name, profile_urn, is_active, created_at, updated_at,
-        unipile_account_id, unipile_org_account_id
+        unipile_account_id, unipile_org_account_id, unipile_sync_status
     """
 
     def __init__(self, db_path: Optional[str] = None):
@@ -100,7 +100,8 @@ class LinkedInOAuthService(OAuthProviderBase):
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     unipile_account_id TEXT,
-                    unipile_org_account_id TEXT
+                    unipile_org_account_id TEXT,
+                    unipile_sync_status TEXT
                 )
                 """
             )
@@ -623,12 +624,22 @@ class LinkedInOAuthService(OAuthProviderBase):
         # Genuine credential errors (LinkedInNotConnectedError) return immediately.
         for attempt in (1, 2):
             try:
-                return self._get_connection_status_impl(user_id, provider)
+                status = self._get_connection_status_impl(user_id, provider)
+                from services.integrations.linkedin.linkedin_oauth_unipile_status import (
+                    enrich_connection_status,
+                )
+
+                return enrich_connection_status(self, user_id, status)
             except LinkedInNotConnectedError:
-                return self._disconnected_status(
+                status = self._disconnected_status(
                     provider,
                     has_db_token=self._has_active_token(user_id),
                 )
+                from services.integrations.linkedin.linkedin_oauth_unipile_status import (
+                    enrich_connection_status,
+                )
+
+                return enrich_connection_status(self, user_id, status)
             except Exception as e:
                 if not self._is_transient_error(e):
                     raise  # Non-transient — let it propagate
@@ -637,10 +648,15 @@ class LinkedInOAuthService(OAuthProviderBase):
                         f"[LinkedInOAuth] get_connection_status failed after retry for "
                         f"user {user_id}: {e}"
                     )
-                    return self._disconnected_status(
+                    status = self._disconnected_status(
                         provider,
                         has_db_token=self._has_active_token(user_id),
                     )
+                    from services.integrations.linkedin.linkedin_oauth_unipile_status import (
+                        enrich_connection_status,
+                    )
+
+                    return enrich_connection_status(self, user_id, status)
                 time.sleep(0.15)
 
     @staticmethod
@@ -731,47 +747,12 @@ class LinkedInOAuthService(OAuthProviderBase):
             return False
 
     async def disconnect_user(self, user_id: str) -> Dict[str, Any]:
-        """Unlink LinkedIn from ALwrity (local tokens only; remote accounts may be deleted based on provider)."""
-        logger.info(f"[LinkedInConnect] disconnect_user start user_id={user_id}")
-
-        # Check if Unipile and attempt to delete remote account
-        provider = os.getenv("LINKEDIN_PROVIDER", "unipile").lower()
-        unipile_account_deleted = False
-
-        if provider == "unipile":
-            try:
-                creds = self.resolve_credentials(user_id)
-                if creds.unipile_account_id:
-                    from services.integrations.linkedin.unipile_client import UnipileClient
-
-                    client = UnipileClient()
-                    unipile_account_deleted = await client.delete_account(creds.unipile_account_id)
-                    logger.info(
-                        f"[LinkedInConnect] Unipile account deletion attempted user_id={user_id} "
-                        f"account_id={creds.unipile_account_id} success={unipile_account_deleted}"
-                    )
-            except Exception as e:
-                logger.warning(
-                    f"[LinkedInConnect] Failed to delete Unipile account for user_id={user_id}: {e}"
-                )
-
-        revoked = self.revoke_token(user_id)
-        status = self.get_connection_status(user_id)
-
-        logger.warning(
-            f"[LinkedInConnect] disconnect_user done user_id={user_id} "
-            f"revoked={revoked} provider={provider} "
-            f"unipile_account_deleted={unipile_account_deleted}"
+        """Soft-disconnect LinkedIn — preserve Unipile account_id for reconnect (billing-safe)."""
+        from services.integrations.linkedin.linkedin_oauth_soft_disconnect import (
+            soft_disconnect_linkedin_user,
         )
 
-        return {
-            "success": revoked,
-            "revoked": revoked,
-            "provider": provider,
-            "unipile_account_deleted": unipile_account_deleted,
-            "connected": status.get("connected", False),
-            "has_env_fallback": False,
-        }
+        return await soft_disconnect_linkedin_user(self, user_id)
 
     def validate_callback_base(self, callback_base: Optional[str]) -> Optional[str]:
         """
@@ -1074,35 +1055,24 @@ class LinkedInOAuthService(OAuthProviderBase):
 
             logger.info(f"[LinkedInConnect] generating Unipile auth URL user_id={user_id}")
 
-            # Import Unipile client here to avoid circular imports
-            from services.integrations.linkedin.unipile_client import UnipileClient
+            from services.integrations.linkedin.unipile_account_lifecycle import (
+                UnipileAccountLifecycleService,
+            )
 
-            client = UnipileClient()
-            redirect_urls = self._get_unipile_redirect_urls(user_id, callback_base)
+            lifecycle = UnipileAccountLifecycleService(self)
             backend_url = self._resolve_public_backend_url(callback_base)
             logger.info(
-                f"[LinkedInConnect] Unipile redirect base_url={backend_base} user_id={user_id} "
-                f"success={redirect_urls['success']}"
+                f"[LinkedInConnect] Unipile redirect base_url={backend_base} user_id={user_id}"
             )
 
             try:
-                result = await client.create_hosted_auth_link(
-                    user_id=user_id,
-                    success_redirect_url=redirect_urls["success"],
-                    failure_redirect_url=redirect_urls["failure"],
-                    notify_url=redirect_urls["notify"],
-                    providers=["LINKEDIN"],
+                return await lifecycle.generate_connect_or_reconnect_url(
+                    user_id,
+                    callback_base=callback_base,
                 )
             except Exception as e:
                 logger.error(f"[LinkedInConnect] Failed to create Unipile auth link: {e}")
-                raise ValueError(f"Failed to generate LinkedIn auth URL: {e}")
-
-            logger.info(f"[LinkedInConnect] Unipile auth URL generated for user={user_id}")
-            return {
-                "auth_url": result.auth_url,
-                "state": user_id,  # Unipile uses 'name' param for user matching
-                "provider": "unipile",
-            }
+                raise ValueError(f"Failed to generate LinkedIn auth URL: {e}") from e
 
         client_id = os.getenv("LINKEDIN_CLIENT_ID")
         if not client_id:
@@ -1325,6 +1295,13 @@ class LinkedInOAuthService(OAuthProviderBase):
             logger.error(f"[LinkedInConnect] Unipile callback missing account_id for user={user_id}")
             return False
 
+        from services.integrations.linkedin.unipile_account_lifecycle import (
+            UnipileAccountLifecycleService,
+        )
+
+        lifecycle = UnipileAccountLifecycleService(self)
+        account_id = await lifecycle.resolve_duplicate_account_id(user_id, account_id)
+
         # Fetch account details from Unipile to get account name
         from services.integrations.linkedin.unipile_client import UnipileClient
 
@@ -1362,6 +1339,11 @@ class LinkedInOAuthService(OAuthProviderBase):
         )
 
         if stored:
+            from services.integrations.linkedin.linkedin_oauth_unipile_status import (
+                set_unipile_sync_status,
+            )
+
+            set_unipile_sync_status(self, user_id, "OK")
             logger.info(
                 f"[LinkedInConnect] Unipile callback succeeded for user={user_id}, account_id={account_id}"
             )

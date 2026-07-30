@@ -18,6 +18,9 @@ class LinkedInConnectionStatusResponse(BaseModel):
     accounts: List[Dict[str, Any]] = Field(default_factory=list)
     organizations: List[Dict[str, Any]] = Field(default_factory=list)
     account_name: Optional[str] = None
+    needs_reconnect: bool = False
+    unipile_sync_status: Optional[str] = None
+    stored_unipile_account_id: Optional[str] = None
 
 
 class LinkedInAccountResponse(BaseModel):
