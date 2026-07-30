@@ -4,6 +4,30 @@ export const LINKEDIN_CONNECT_LOCKED_HINT =
 export const LINKEDIN_COPILOT_COMING_SOON_HINT =
   "Launching Soon ✨ — Chat to brainstorm ideas, refine drafts in real time, and stay on-brand with your persona.";
 
+/** Create wedge — frontend-only lock; backend carousel/video APIs stay available elsewhere. */
+export const CREATE_WEDGE_LOCKED_CONTENT_TYPES = new Set([
+  "carousel",
+  "video_script",
+]);
+
+export type CreateWedgeLockedContentType =
+  | "carousel"
+  | "video_script";
+
+export const CREATE_WEDGE_NOTIFY_KEYS: Record<
+  CreateWedgeLockedContentType,
+  string
+> = {
+  carousel: "linkedin_create_carousel_notify_requested",
+  video_script: "linkedin_create_video_script_notify_requested",
+};
+
+export function isCreateWedgeContentTypeLocked(
+  type: string,
+): type is CreateWedgeLockedContentType {
+  return CREATE_WEDGE_LOCKED_CONTENT_TYPES.has(type);
+}
+
 export const LINKEDIN_CONNECT_LOCKED_HINTS = {
   growth: "Connect LinkedIn to unlock today\u2019s growth tasks",
   optimiseProfile: "Connect LinkedIn to optimise your profile",

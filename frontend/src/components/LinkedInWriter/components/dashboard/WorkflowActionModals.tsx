@@ -31,7 +31,13 @@ import {
   PerfToPlanModal,
 } from "./RemarkWedgeModals";
 import { DraftLibraryModal, PublishNowModal } from "./PublishWedgeModals";
-import { PeopleYouMayKnowModal } from "../PeopleYouMayKnow/PeopleYouMayKnowModal";
+import { PeopleYouMayKnowModal } from "../PeopleYouMayKnow";
+import { CreateWedgeComingSoonTile } from "./CreateWedgeComingSoonTile";
+import { useCreateWedgeNotify } from "../../hooks/useCreateWedgeNotify";
+import {
+  isCreateWedgeContentTypeLocked,
+  type CreateWedgeLockedContentType,
+} from "../../utils/linkedInConnectLockedUi";
 
 type AnalysisSub = "snapshot" | "brand_score" | "viral" | "trends" | null;
 type EngagementSub =
@@ -90,6 +96,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const [publishSub, setPublishSub] = useState<PublishSub>(null);
 
   const { connected } = useLinkedInSocialConnection();
+  const { notifyRequested, handleNotify } = useCreateWedgeNotify();
 
   // ── shared dispatchers ─────────────────────────────────────────────────────
   const dispatch = (evt: string, detail?: Record<string, unknown>) => {
@@ -169,13 +176,29 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           </div>
           {CREATE_TILE_TOOLS.map((tool) => (
             <div key={tool.id} style={{ width: 140, flexShrink: 0 }}>
-              <DashboardToolTile
-                title={tool.title}
-                description={tool.description}
-                icon={tool.icon}
-                accent={tool.accent}
-                onClick={() => openQuickCreate(tool.id)}
-              />
+              {isCreateWedgeContentTypeLocked(tool.id) ? (
+                <CreateWedgeComingSoonTile
+                  contentType={tool.id as CreateWedgeLockedContentType}
+                  icon={tool.icon}
+                  title={tool.title}
+                  description={tool.description}
+                  notified={notifyRequested[tool.id as CreateWedgeLockedContentType]}
+                  onNotify={() =>
+                    handleNotify(
+                      tool.id as CreateWedgeLockedContentType,
+                      tool.title,
+                    )
+                  }
+                />
+              ) : (
+                <DashboardToolTile
+                  title={tool.title}
+                  description={tool.description}
+                  icon={tool.icon}
+                  accent={tool.accent}
+                  onClick={() => openQuickCreate(tool.id)}
+                />
+              )}
             </div>
           ))}
         </div>

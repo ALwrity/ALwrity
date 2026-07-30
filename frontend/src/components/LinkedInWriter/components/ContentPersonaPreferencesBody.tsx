@@ -92,7 +92,7 @@ export const ContentPersonaPreferencesBody: React.FC<
       </div>
 
       <div className="content-persona-prefs-grid">
-        <div className={showCustomToneInput ? "content-persona-prefs-grid--wide" : undefined}>
+        <div className="content-persona-tone-field">
           <div className="content-persona-field-label">Tone</div>
           <select
             className="content-persona-field-input"
@@ -119,11 +119,12 @@ export const ContentPersonaPreferencesBody: React.FC<
                 })
               }
               placeholder="Enter custom tone (e.g., Energetic & direct)"
+              aria-label="Custom tone"
             />
           )}
         </div>
 
-        <div>
+        <div className="content-persona-grid-field">
           <div className="content-persona-field-label">Industry</div>
           <LinkedInIndustryAutocomplete
             value={userPreferences.industry}
@@ -131,6 +132,7 @@ export const ContentPersonaPreferencesBody: React.FC<
             items={industries}
             isLoading={isIndustryListLoading}
             placeholder="e.g., Technology"
+            inputClassName="content-persona-field-input content-persona-field-input--industry"
           />
           {suggestionsUnavailable && (
             <div style={{ marginTop: 4, fontSize: 10, color: "#64748b" }}>
@@ -139,7 +141,7 @@ export const ContentPersonaPreferencesBody: React.FC<
           )}
         </div>
 
-        <div>
+        <div className="content-persona-grid-field">
           <div className="content-persona-field-label">Target Audience</div>
           <input
             className="content-persona-field-input"
@@ -151,7 +153,7 @@ export const ContentPersonaPreferencesBody: React.FC<
           />
         </div>
 
-        <div>
+        <div className="content-persona-grid-field">
           <div className="content-persona-field-label">Writing Style</div>
           <select
             className="content-persona-field-input"

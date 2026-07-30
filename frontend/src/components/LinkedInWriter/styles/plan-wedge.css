@@ -396,6 +396,36 @@
   background: rgba(139, 92, 246, 0.12);
 }
 
+.plan-wedge-coming-soon-card__icon--carousel {
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.plan-wedge-coming-soon-card__icon--video_script {
+  background: rgba(220, 38, 38, 0.12);
+}
+
+/* Create wedge — plan-wedge-style locked tiles (Watchdog pattern) */
+.create-wedge-coming-soon-tile {
+  width: 100%;
+  min-height: 132px;
+  height: 100%;
+}
+
+.create-wedge-coming-soon-tile .plan-wedge-coming-soon-card {
+  height: 100%;
+  min-height: 132px;
+  box-sizing: border-box;
+}
+
+.create-wedge-coming-soon-tile .plan-wedge-coming-soon-card__desc {
+  -webkit-line-clamp: 3;
+  min-height: calc(10.5px * 1.35 * 3);
+}
+
+.create-wedge-coming-soon-grid-cell {
+  min-width: 0;
+}
+
 .plan-wedge-coming-soon-card__header {
   display: flex;
   align-items: center;

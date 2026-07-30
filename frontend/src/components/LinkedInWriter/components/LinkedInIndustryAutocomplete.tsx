@@ -15,6 +15,8 @@ export interface LinkedInIndustryAutocompleteProps {
   placeholder?: string;
   disabled?: boolean;
   isLoading?: boolean;
+  /** Optional class for the text input (e.g. persona panel field styling). */
+  inputClassName?: string;
 }
 
 const SearchIcon: React.FC = () => (
@@ -65,6 +67,7 @@ export const LinkedInIndustryAutocomplete: React.FC<
   placeholder = "e.g., Technology",
   disabled = false,
   isLoading = false,
+  inputClassName,
 }) => {
   const listboxId = useId();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -214,15 +217,20 @@ export const LinkedInIndustryAutocomplete: React.FC<
           aria-activedescendant={
             activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
           }
-          style={{
-            width: "100%",
-            padding: "6px 8px 6px 28px",
-            border: "1px solid #ddd",
-            borderRadius: 4,
-            background: disabled ? "#f1f5f9" : "#f8f9fa",
-            fontSize: "12px",
-            boxSizing: "border-box",
-          }}
+          className={inputClassName}
+          style={
+            inputClassName
+              ? undefined
+              : {
+                  width: "100%",
+                  padding: "6px 8px 6px 28px",
+                  border: "1px solid #ddd",
+                  borderRadius: 4,
+                  background: disabled ? "#f1f5f9" : "#f8f9fa",
+                  fontSize: "12px",
+                  boxSizing: "border-box",
+                }
+          }
         />
       </div>
 

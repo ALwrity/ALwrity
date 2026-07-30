@@ -16,7 +16,10 @@ import { StudioTourTrigger } from "./dashboard/StudioTourTrigger";
 import { ContentPersonaPreferencesBody } from "./ContentPersonaPreferencesBody";
 import { StudioModalCloseButton } from "./dashboard/StudioModalCloseButton";
 import { DashboardActionModal } from "./dashboard/DashboardActionModal";
-import { STUDIO_TAB_ACTION_MODAL_CLASS } from "./dashboard/dashboardLayoutConstants";
+import {
+  CONTENT_PERSONA_PANEL_WIDTH_PX,
+  STUDIO_TAB_ACTION_MODAL_CLASS,
+} from "./dashboard/dashboardLayoutConstants";
 
 const NAV_TITLE_CLASS = "linkedin-writer-header-title";
 
@@ -51,6 +54,7 @@ export const Header: React.FC<HeaderProps> = ({
   const [personaPanelPos, setPersonaPanelPos] = useState<{
     top: number;
     left: number;
+    maxHeight: number;
   } | null>(null);
   const { connected, connectWithOAuth } = useLinkedInSocialConnection();
   const linkedInSearch = useLinkedInSearch({ connected });
@@ -135,13 +139,18 @@ export const Header: React.FC<HeaderProps> = ({
       const button = personaButtonRef.current;
       if (!button) return;
       const rect = button.getBoundingClientRect();
-      const panelWidth = 400;
+      const panelWidth = CONTENT_PERSONA_PANEL_WIDTH_PX;
       const left = Math.min(
         Math.max(16, rect.left + rect.width / 2 - panelWidth / 2),
         window.innerWidth - panelWidth - 16,
       );
       const top = rect.bottom + 8;
-      setPersonaPanelPos({ top, left });
+      const viewportMargin = 16;
+      const maxHeight = Math.max(
+        280,
+        window.innerHeight - top - viewportMargin,
+      );
+      setPersonaPanelPos({ top, left, maxHeight });
     };
 
     updatePosition();
@@ -199,41 +208,15 @@ export const Header: React.FC<HeaderProps> = ({
         ref={personaPanelRef}
         role="dialog"
         aria-label="Content persona settings"
+        className="content-persona-desktop-panel"
         style={{
-          position: "fixed",
           top: personaPanelPos.top,
           left: personaPanelPos.left,
-          width: 400,
-          maxWidth: "min(400px, calc(100vw - 32px))",
-          overflow: "visible",
-          background: "white",
-          borderRadius: "12px",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)",
-          border: "1px solid #e9ecef",
-          padding: "20px",
-          zIndex: 10050,
-          animation: "slideIn 0.2s ease-out",
-          display: "flex",
-          flexDirection: "column",
+          maxHeight: personaPanelPos.maxHeight,
         }}
       >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 12,
-            marginBottom: "16px",
-          }}
-        >
-          <h4
-            style={{
-              margin: 0,
-              color: "#333",
-              fontSize: "16px",
-              fontWeight: 600,
-            }}
-          >
+        <div className="content-persona-desktop-panel__header">
+          <h4 className="content-persona-desktop-panel__title">
             Content Preferences & Persona
           </h4>
           <StudioModalCloseButton
@@ -241,13 +224,9 @@ export const Header: React.FC<HeaderProps> = ({
             ariaLabel="Close content persona settings"
           />
         </div>
-        <ContentPersonaPreferencesBody {...personaPreferencesBodyProps} />
-        <style>{`
-          @keyframes slideIn {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-        `}</style>
+        <div className="content-persona-desktop-panel__body">
+          <ContentPersonaPreferencesBody {...personaPreferencesBodyProps} />
+        </div>
       </div>,
       document.body,
     );
@@ -260,7 +239,7 @@ export const Header: React.FC<HeaderProps> = ({
       maxWidth="100%"
       maxHeight="min(85dvh, 640px)"
       modalClassName={`${STUDIO_TAB_ACTION_MODAL_CLASS} linkedin-content-persona-mobile-modal`}
-      scrollBody={false}
+      scrollBody
       footer={
         <button
           type="button"

@@ -41,5 +41,8 @@ export const LINKEDIN_HUB_AXIS_UPDATED_EVENT = "linkedinwriter:hubAxisUpdated";
 /** Fixed width of the desktop analytics rail (matches dashboard-layout.css). */
 export const DASHBOARD_ANALYTICS_RAIL_WIDTH_PX = 340;
 
+/** Desktop Content Persona dropdown panel width (matches content-persona-preferences.css). */
+export const CONTENT_PERSONA_PANEL_WIDTH_PX = 460;
+
 /** Centered modal panel for mobile header studio tab actions (Growth, Persona, Resume, Optimise). */
 export const STUDIO_TAB_ACTION_MODAL_CLASS = "linkedin-studio-tab-action-modal";
