@@ -9,9 +9,10 @@ from loguru import logger
 import sqlite3
 
 from services.database import get_db
+from services.subscription.plans_db import get_plans_db
 from models.subscription_models import SubscriptionPlan
 from services.subscription.schema_utils import ensure_subscription_plan_columns
-from ..utils import format_plan_limits, handle_schema_error
+from ..utils import enum_value, format_plan_limits, handle_schema_error
 from fastapi import Query
 from typing import Optional
 
@@ -20,9 +21,9 @@ router = APIRouter()
 
 @router.get("/plans")
 async def get_subscription_plans(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_plans_db),
 ) -> Dict[str, Any]:
-    """Get all available subscription plans."""
+    """Get all available subscription plans (public — no auth required)."""
     
     try:
         ensure_subscription_plan_columns(db)
@@ -39,7 +40,7 @@ async def get_subscription_plans(
             plans_data.append({
                 "id": plan.id,
                 "name": plan.name,
-                "tier": plan.tier.value,
+                "tier": enum_value(plan.tier),
                 "price_monthly": plan.price_monthly,
                 "price_yearly": plan.price_yearly,
                 "description": plan.description,

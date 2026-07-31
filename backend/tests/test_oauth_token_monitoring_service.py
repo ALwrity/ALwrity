@@ -94,8 +94,9 @@ class TestGetConnectedPlatforms:
             # GSC is special: it doesn't use the user DB; it stores
             # credentials in gsc_credentials.json. Mock GSCService to
             # return truthy so the dispatch finds it.
+            # Patch at source — GSCService is imported lazily inside _check_gsc.
             with patch(
-                "services.oauth_token_monitoring_service.GSCService"
+                "services.gsc_service.GSCService"
             ) as GSC:
                 GSC.return_value.load_user_credentials.return_value = object()
                 from services.oauth_token_monitoring_service import get_connected_platforms
@@ -121,7 +122,7 @@ class TestGetConnectedPlatforms:
                 conn.commit()
 
             with patch(
-                "services.oauth_token_monitoring_service.GSCService"
+                "services.gsc_service.GSCService"
             ) as GSC:
                 GSC.return_value.load_user_credentials.return_value = None
                 from services.oauth_token_monitoring_service import get_connected_platforms
@@ -142,7 +143,7 @@ class TestGetConnectedPlatforms:
                 conn.commit()
 
             with patch(
-                "services.oauth_token_monitoring_service.GSCService"
+                "services.gsc_service.GSCService"
             ) as GSC:
                 GSC.return_value.load_user_credentials.side_effect = RuntimeError(
                     "GSC DB corrupt"
@@ -297,3 +298,62 @@ class TestPlatformChecksRegistry:
         }
         for calls in call_counts.values():
             assert calls == ["user_xyz"]
+
+
+class TestLazyPlatformImports:
+    """Lean LinkedIn-only mode must not import GSC/Bing/WP/Wix at module load.
+
+    Regression: eager imports caused
+    ``Failed to mount linkedin_oauth_connection: No module named 'googleapiclient'``.
+    """
+
+    _EAGER_ATTRS = (
+        "GSCService",
+        "BingOAuthService",
+        "WordPressOAuthService",
+        "WixOAuthService",
+        "YouTubeOAuthService",
+        "LinkedInOAuthService",
+    )
+
+    def test_monitoring_module_has_no_eager_platform_service_attrs(self):
+        import services.oauth_token_monitoring_service as mod
+
+        for attr in self._EAGER_ATTRS:
+            assert not hasattr(mod, attr), (
+                f"{attr} must not be a module-level import "
+                f"(lazy import required for LinkedIn-only lean startup)"
+            )
+
+    def test_create_tasks_with_linkedin_only_skips_platform_detection(self):
+        """Explicit platforms=['linkedin'] must not call get_connected_platforms
+        (which would import GSC and other full-platform services)."""
+        from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
+        from unittest.mock import MagicMock
+
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = object()
+
+        with patch(
+            "services.oauth_token_monitoring_service.get_connected_platforms"
+        ) as detect:
+            created = create_oauth_monitoring_tasks(
+                "user_lean_li", db, platforms=["linkedin"]
+            )
+
+        detect.assert_not_called()
+        assert created == []
+        db.commit.assert_called_once()
+
+    def test_gsc_checker_still_resolves_via_lazy_import(self):
+        """Lazy import must not break GSC detection when the package is available."""
+        from services.oauth_token_monitoring_service import _check_gsc
+
+        with patch("services.gsc_service.GSCService") as GSC:
+            GSC.return_value.load_user_credentials.return_value = {"token": "x"}
+            with patch(
+                "services.oauth_token_monitoring_service.get_user_db_path",
+                return_value=":memory:",
+            ):
+                assert _check_gsc("user_gsc") is True
+            GSC.assert_called_once()

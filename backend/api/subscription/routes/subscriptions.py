@@ -19,7 +19,7 @@ from models.subscription_models import (
     SubscriptionTier, BillingCycle, UsageStatus, SubscriptionRenewalHistory
 )
 from ..dependencies import verify_user_access
-from ..utils import format_plan_limits, handle_schema_error
+from ..utils import enum_value, format_plan_limits, handle_schema_error
 
 router = APIRouter()
 
@@ -309,18 +309,41 @@ async def subscribe_to_plan(
     verify_user_access(user_id, current_user)
 
     try:
+        from services.database.init_db import init_user_database
+
+        init_user_database(user_id)
         ensure_subscription_plan_columns(db)
-        plan_id = subscription_data.get('plan_id')
-        billing_cycle = subscription_data.get('billing_cycle', 'monthly')
+        plan_id = subscription_data.get("plan_id")
+        tier_hint = subscription_data.get("tier")
+        billing_cycle = subscription_data.get("billing_cycle", "monthly")
 
-        if not plan_id:
-            raise HTTPException(status_code=400, detail="plan_id is required")
+        if not plan_id and not tier_hint:
+            raise HTTPException(status_code=400, detail="plan_id or tier is required")
 
-        # Get the plan
-        plan = db.query(SubscriptionPlan).filter(
-            SubscriptionPlan.id == plan_id,
-            SubscriptionPlan.is_active == True
-        ).first()
+        plan = None
+        if plan_id:
+            plan = db.query(SubscriptionPlan).filter(
+                SubscriptionPlan.id == plan_id,
+                SubscriptionPlan.is_active == True,
+            ).first()
+
+        if not plan and tier_hint:
+            try:
+                tier_enum = SubscriptionTier(str(tier_hint).strip().lower())
+                plan = db.query(SubscriptionPlan).filter(
+                    SubscriptionPlan.tier == tier_enum,
+                    SubscriptionPlan.is_active == True,
+                ).first()
+                if plan:
+                    plan_id = plan.id
+                    logger.info(
+                        f"[SUBSCRIPTION] Resolved plan by tier={tier_hint} "
+                        f"plan_id={plan_id} user_id={user_id}"
+                    )
+            except ValueError:
+                logger.warning(
+                    f"[SUBSCRIPTION] Invalid tier hint tier={tier_hint} user_id={user_id}"
+                )
 
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
@@ -356,7 +379,7 @@ async def subscribe_to_plan(
                 "total_cost": float(usage_before.total_cost) if usage_before.total_cost else 0.0,
                 "gemini_calls": usage_before.gemini_calls or 0,
                 "mistral_calls": usage_before.mistral_calls or 0,
-                "usage_status": usage_before.usage_status.value if (usage_before.usage_status and hasattr(usage_before.usage_status, 'value')) else str(usage_before.usage_status)
+                "usage_status": enum_value(usage_before.usage_status, "active"),
             }
         
         if existing_subscription:
@@ -365,7 +388,7 @@ async def subscribe_to_plan(
             previous_period_end = existing_subscription.current_period_end
             previous_plan = existing_subscription.plan
             previous_plan_name = previous_plan.name if previous_plan else None
-            previous_plan_tier = previous_plan.tier.value if previous_plan else None
+            previous_plan_tier = enum_value(previous_plan.tier) if previous_plan else None
             
             # Determine renewal type
             if previous_plan and previous_plan.id == plan_id:
@@ -375,7 +398,7 @@ async def subscribe_to_plan(
                 # Different plan - check if upgrade or downgrade
                 tier_order = {"free": 0, "basic": 1, "pro": 2, "enterprise": 3}
                 previous_tier_order = tier_order.get(previous_plan_tier or "free", 0)
-                new_tier_order = tier_order.get(plan.tier.value, 0)
+                new_tier_order = tier_order.get(enum_value(plan.tier, "free"), 0)
                 if new_tier_order > previous_tier_order:
                     renewal_type = "upgrade"
                 elif new_tier_order < previous_tier_order:
@@ -400,6 +423,8 @@ async def subscribe_to_plan(
             existing_subscription.current_period_end = now + timedelta(
                 days=365 if billing_cycle == 'yearly' else 30
             )
+            existing_subscription.status = UsageStatus.ACTIVE
+            existing_subscription.is_active = True
             existing_subscription.updated_at = now
 
             subscription = existing_subscription
@@ -438,7 +463,7 @@ async def subscribe_to_plan(
             user_id=user_id,
             plan_id=plan_id,
             plan_name=plan.name,
-            plan_tier=plan.tier.value,
+            plan_tier=enum_value(plan.tier),
             previous_period_start=previous_period_start,
             previous_period_end=previous_period_end,
             new_period_start=now,
@@ -467,7 +492,7 @@ async def subscribe_to_plan(
         logger.info("=" * 80)
         logger.info(f"[SUBSCRIPTION RENEWAL] 🔄 Processing renewal request")
         logger.info(f"   ├─ User: {user_id}")
-        logger.info(f"   ├─ Plan: {plan.name} (ID: {plan_id}, Tier: {plan.tier.value})")
+        logger.info(f"   ├─ Plan: {plan.name} (ID: {plan_id}, Tier: {enum_value(plan.tier)})")
         logger.info(f"   ├─ Billing Cycle: {billing_cycle}")
         logger.info(f"   ├─ Period Start: {now.strftime('%Y-%m-%d %H:%M:%S')}")
         logger.info(f"   └─ Period End: {subscription.current_period_end.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -480,7 +505,7 @@ async def subscribe_to_plan(
             logger.info(f"      ├─ Stability (Images): {usage_before.stability_calls or 0} calls")
             logger.info(f"      ├─ Total Tokens: {usage_before.total_tokens or 0}")
             logger.info(f"      ├─ Total Calls: {usage_before.total_calls or 0}")
-            logger.info(f"      └─ Usage Status: {usage_before.usage_status.value if usage_before.usage_status else 'N/A'}")
+            logger.info(f"      └─ Usage Status: {enum_value(usage_before.usage_status, 'active')}")
         else:
             logger.info(f"   📊 No usage summary found for period {current_period} (will be created on reset)")
 
@@ -530,7 +555,7 @@ async def subscribe_to_plan(
                     logger.info(f"      ├─ Stability (Images): {usage_after.stability_calls or 0} calls")
                     logger.info(f"      ├─ Total Tokens: {usage_after.total_tokens or 0}")
                     logger.info(f"      ├─ Total Calls: {usage_after.total_calls or 0}")
-                    logger.info(f"      └─ Usage Status: {usage_after.usage_status.value if usage_after.usage_status else 'N/A'}")
+                    logger.info(f"      └─ Usage Status: {enum_value(usage_after.usage_status, 'active')}")
                 else:
                     logger.warning(f"   ⚠️  Usage summary not found after reset - may need to be created on next API call")
             else:
@@ -559,7 +584,7 @@ async def subscribe_to_plan(
                 "billing_cycle": billing_cycle,
                 "current_period_start": subscription.current_period_start.isoformat(),
                 "current_period_end": subscription.current_period_end.isoformat(),
-                "status": subscription.status.value,
+                "status": enum_value(subscription.status, "active"),
                 "limits": format_plan_limits(plan)
             }
         }

@@ -79,7 +79,7 @@ export const LinkedInPricingPage: React.FC = () => {
     }
 
     if (plan.tier === "free") {
-      await activateFreePlan(planId);
+      await activateFreePlan(plan);
       return;
     }
 
@@ -89,12 +89,13 @@ export const LinkedInPricingPage: React.FC = () => {
     }
   };
 
-  const activateFreePlan = async (planId: number) => {
+  const activateFreePlan = async (plan: SubscriptionPlan) => {
     const userId = user?.id || localStorage.getItem("user_id") || "anonymous";
     setSubscribing(true);
     try {
       await apiClient.post(`/api/subscription/subscribe/${userId}`, {
-        plan_id: planId,
+        plan_id: plan.id,
+        tier: plan.tier,
         billing_cycle: yearly ? "yearly" : "monthly",
       });
       window.dispatchEvent(new CustomEvent("subscription-updated"));
@@ -146,6 +147,7 @@ export const LinkedInPricingPage: React.FC = () => {
       const userId = user?.id || "anonymous";
       await apiClient.post(`/api/subscription/subscribe/${userId}`, {
         plan_id: plan.id,
+        tier: plan.tier,
         billing_cycle: yearly ? "yearly" : "monthly",
       });
       window.dispatchEvent(new CustomEvent("subscription-updated"));
