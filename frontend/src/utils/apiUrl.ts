@@ -1,20 +1,12 @@
 /**
  * Shared API URL resolution utility.
  *
- * Determines the correct backend URL based on:
- *  1. Explicit REACT_APP_API_URL env var (production)
- *  2. Browser origin when accessed via localhost (development)
- *  3. Fallback to http://127.0.0.1:8000
+ * Development on localhost (port 3000, etc.):
+ *  - Default: empty string → requests use the CRA dev-server proxy
+ *    (package.json `"proxy": "http://localhost:8000"`) — same-origin, no CORS.
+ *  - Remote tunnel in REACT_APP_API_URL / REACT_APP_API_BASE_URL → use that URL.
  *
- * This ensures that when a developer accesses the app via
- * `http://localhost:3000`, the API calls go to `http://127.0.0.1:8000`
- * regardless of what REACT_APP_API_URL (e.g. an ngrok URL) is set to.
- * Conversely, when accessed via an ngrok URL, the API calls go to that
- * same ngrok URL.
- *
- * NOTE: We use 127.0.0.1 instead of localhost because the backend binds to
- * IPv4 (0.0.0.0) by default, and browsers may resolve "localhost" to IPv6
- * (::1) first, causing connection failures.
+ * Production: REACT_APP_API_URL is required.
  */
 
 const LOCALHOST_PORTS = [3000, 3001, 5173, 5174, 8080, 4173];
@@ -29,18 +21,41 @@ function isLocalhostAccess(): boolean {
   }
 }
 
-function getLocalhostApiUrl(): string {
+function readDevEnvApiUrl(): string | undefined {
+  const url =
+    process.env.REACT_APP_API_URL ||
+    process.env.REACT_APP_API_BASE_URL ||
+    process.env.REACT_APP_BACKEND_URL;
+  const trimmed = url?.trim();
+  return trimmed || undefined;
+}
+
+function isLocalBackendUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === "localhost" || hostname === "127.0.0.1";
+  } catch {
+    return false;
+  }
+}
+
+function shouldUseDevServerProxy(): boolean {
+  try {
+    if (typeof window === "undefined") return false;
+    const numericPort = parseInt(window.location.port, 10);
+    return LOCALHOST_PORTS.includes(numericPort) || Number.isNaN(numericPort);
+  } catch {
+    return false;
+  }
+}
+
+function getLocalhostDirectApiUrl(): string {
   try {
     if (typeof window === "undefined") return "http://127.0.0.1:8000";
     const { port } = window.location;
     const numericPort = parseInt(port, 10);
-    // If the frontend is running on a common dev port, assume backend is on 8000
-    if (LOCALHOST_PORTS.includes(numericPort) || isNaN(numericPort)) {
-      return "http://127.0.0.1:8000";
-    }
-    // If on port 8000 itself (served by backend), use same origin
     if (numericPort === 8000) {
-      return `${window.location.origin}`;
+      return window.location.origin;
     }
     return "http://127.0.0.1:8000";
   } catch {
@@ -50,21 +65,14 @@ function getLocalhostApiUrl(): string {
 
 /**
  * Returns the appropriate API base URL.
- *
- * Priority (development):
- *  1. Non-localhost access (ngrok tunnel, etc.) → use window.location.origin
- *  2. Localhost access with env var → use the explicit env var
- *  3. Localhost access without env var → auto-detect localhost:8000
- *
- * Priority (production):
- *  1. REACT_APP_API_URL env var (required, thrown if missing)
  */
 export const getApiBaseUrl = (): string => {
-  const envUrl = process.env.REACT_APP_API_URL;
+  const envUrl = readDevEnvApiUrl();
   const isProduction = process.env.NODE_ENV === "production";
 
   if (isProduction) {
-    if (!envUrl) {
+    const prodUrl = process.env.REACT_APP_API_URL?.trim();
+    if (!prodUrl) {
       console.error(
         "[getApiBaseUrl] REACT_APP_API_URL is not set for production!",
       );
@@ -72,27 +80,36 @@ export const getApiBaseUrl = (): string => {
         "REACT_APP_API_URL environment variable is required for production.",
       );
     }
-    return envUrl;
+    return prodUrl;
   }
 
-  // Development: when accessed via a non-localhost origin (e.g., ngrok tunnel),
-  // use the browser's origin as the API base URL. The env var (usually
-  // localhost:8000) won't resolve from a remote client.
+  // ngrok / remote tunnel: browser origin or explicit remote API URL
   if (!isLocalhostAccess()) {
     try {
+      if (envUrl && !isLocalBackendUrl(envUrl)) {
+        return envUrl;
+      }
       return window.location.origin;
     } catch {
-      return envUrl || 'http://localhost:8000';
+      return envUrl || "http://localhost:8000";
     }
   }
 
-  // Localhost access: respect explicit env var (e.g., pointing at a remote
-  // backend via ngrok) or fall back to localhost:8000.
-  if (envUrl) {
+  // Explicit remote backend while developing locally (e.g. ngrok tunnel)
+  if (envUrl && !isLocalBackendUrl(envUrl)) {
     return envUrl;
   }
 
-  return getLocalhostApiUrl();
+  // Local dev on :3000 etc. → CRA proxy (avoids CORS and localhost/127.0.0.1 mismatches)
+  if (shouldUseDevServerProxy()) {
+    return "";
+  }
+
+  if (envUrl && isLocalBackendUrl(envUrl)) {
+    return envUrl;
+  }
+
+  return getLocalhostDirectApiUrl();
 };
 
 export default getApiBaseUrl;

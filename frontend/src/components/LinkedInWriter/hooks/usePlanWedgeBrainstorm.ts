@@ -79,7 +79,7 @@ export function usePlanWedgeBrainstorm({
 
   const getCacheKey = useCallback(
     (seed: string, personaId?: string, platformPersonaId?: string) =>
-      `brainstorm_ideas_${seed}_${personaId || 'default'}_${platformPersonaId || 'default'}`,
+      `brainstorm_ideas_v2_${seed}_${personaId || 'default'}_${platformPersonaId || 'default'}`,
     []
   );
 
@@ -168,6 +168,7 @@ export function usePlanWedgeBrainstorm({
       lastOptionsRef.current = { seed, options };
       setPersonalizedError(null);
       setSeedError(null);
+      setSources([]);
       setPersonalizedPhase('loading');
       setPhase('idle');
       startLoaderAnimation();
@@ -182,8 +183,10 @@ export function usePlanWedgeBrainstorm({
         });
         clearLoaderInterval();
         const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
+        const srcList = Array.isArray(res.data?.sources) ? res.data.sources : [];
         setPersonalizedIdeas(list);
         setPersonalizedDataSummary(res.data?.data_summary || '');
+        setSources(srcList);
         if (list.length > 0) {
           setPersonalizedPhase('results');
         } else {
@@ -200,6 +203,7 @@ export function usePlanWedgeBrainstorm({
           err?.response?.data?.detail || err?.message || 'Failed to generate personalized ideas'
         );
         setPersonalizedDataSummary('');
+        setSources([]);
         setPersonalizedPhase('idle');
       }
     },
@@ -288,6 +292,19 @@ export function usePlanWedgeBrainstorm({
         } else {
           await runSeedOnly(trimmedSeed, forceRefresh);
         }
+      } catch (e: unknown) {
+        const err = e as { message?: string };
+        const msg =
+          err?.message ||
+          'Unable to reach the server. Check that the backend is running and try again.';
+        if (hasOptions) {
+          setPersonalizedError(msg);
+          setPersonalizedPhase('idle');
+        } else {
+          setSeedError(msg);
+          setPhase('results');
+        }
+        console.error('[Brainstorm] runBrainstorm failed:', e);
       } finally {
         isRunningRef.current = false;
       }
@@ -341,6 +358,47 @@ export function usePlanWedgeBrainstorm({
     [ideas, savedPromptHashes, hashPrompt, onSavedCountChange, refreshSavedHashes]
   );
 
+  const handleSavePersonalizedIdea = useCallback(
+    async (idx: number, sourceSeed: string) => {
+      const idea = personalizedIdeas[idx];
+      if (!idea) return;
+      const prompt = idea.title?.trim() || '';
+      if (!prompt) return;
+      const hash = hashPrompt(prompt);
+      if (savedPromptHashes.has(hash)) return;
+
+      setSavingIndex(idx);
+      setSaveError(null);
+      try {
+        await apiClient.post('/api/brainstorm/saved-ideas', {
+          prompt,
+          rationale: idea.rationale || '',
+          source_seed: sourceSeed,
+        });
+        setSavedPromptHashes((prev) => {
+          const next = new Set(prev);
+          next.add(hash);
+          return next;
+        });
+        onSavedCountChange?.(savedPromptHashes.size + 1);
+        if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = window.setTimeout(() => setSavingIndex(null), 1200);
+        void refreshSavedHashes();
+      } catch (e: unknown) {
+        const err = e as { response?: { data?: { detail?: string } }; message?: string };
+        setSaveError(err?.response?.data?.detail || err?.message || 'Failed to save idea');
+        setSavingIndex(null);
+      }
+    },
+    [
+      personalizedIdeas,
+      savedPromptHashes,
+      hashPrompt,
+      onSavedCountChange,
+      refreshSavedHashes,
+    ]
+  );
+
   const isLoading = phase === 'loading' || personalizedPhase === 'loading';
   const hasResults =
     phase === 'results' ||
@@ -374,6 +432,7 @@ export function usePlanWedgeBrainstorm({
     refreshPersonalized,
     retrySeed,
     handleSaveIdea,
+    handleSavePersonalizedIdea,
     resetResults,
   };
 }

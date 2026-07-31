@@ -15,6 +15,7 @@ import MySavedIdeas, {
 import PersonalizedIdeasPanel, {
   type PersonalizedIdeaItem,
 } from "./Brainstorm/PersonalizedIdeasPanel";
+import BrainstormIdeaCard from "./Brainstorm/BrainstormIdeaCard";
 import { StudioModalCloseButton } from "./dashboard/StudioModalCloseButton";
 import { LI_Z_MODAL } from "../utils/linkedInStudioZIndex";
 
@@ -175,7 +176,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
 
   const getCacheKey = useCallback(
     (seed: string, personaId?: string, platformPersonaId?: string) =>
-      `brainstorm_ideas_${seed}_${personaId || "default"}_${platformPersonaId || "default"}`,
+      `brainstorm_ideas_v2_${seed}_${personaId || "default"}_${platformPersonaId || "default"}`,
     [],
   );
 
@@ -311,6 +312,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
         if (hasOptions) {
           setStage("loading");
           setLoaderMessageIndex(0);
+          setSources([]);
           lastPersonalizeOptionsRef.current = {
             seed: finalSeed || "",
             options: {
@@ -331,9 +333,11 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
               },
             );
             const list = Array.isArray(res.data?.ideas) ? res.data.ideas : [];
+            const srcList = Array.isArray(res.data?.sources) ? res.data.sources : [];
             setPersonalizedIdeas(list);
             const summary = res.data?.data_summary || "";
             setPersonalizedDataSummary(summary);
+            setSources(srcList);
             if (list.length > 0) {
               setPersonalizedStage("results");
             } else {
@@ -351,6 +355,7 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                 "Failed to generate personalized ideas",
             );
             setPersonalizedDataSummary("");
+            setSources([]);
             setPersonalizedStage("idle");
             setStage("idle");
           }
@@ -789,200 +794,23 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
                         )}
                       </div>
                       {ideas.length > 0 && (
-                        <div
-                          style={{ display: "grid", gap: 12, marginBottom: 20 }}
-                        >
-                          {ideas.map((idea, i) => {
-                            const isSaved = savedPromptHashes.has(
-                              hashPrompt(idea.prompt),
-                            );
-                            const isSavingThis = savingIndex === i;
-                            return (
-                              <div
-                                key={i}
-                                style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "1fr auto",
-                                  gap: 12,
-                                  alignItems: "flex-start",
-                                  border: "1px solid #e5e7eb",
-                                  borderRadius: 10,
-                                  padding: "14px 18px",
-                                  background: "#ffffff",
-                                }}
-                              >
-                                <div>
-                                  <div
-                                    style={{
-                                      fontSize: 14,
-                                      color: "#111827",
-                                      fontWeight: 600,
-                                      lineHeight: 1.4,
-                                    }}
-                                  >
-                                    {idea.prompt}
-                                  </div>
-                                  {idea.rationale && (
-                                    <div
-                                      style={{
-                                        marginTop: 6,
-                                        color: "#6b7280",
-                                        fontSize: 12,
-                                        lineHeight: 1.3,
-                                      }}
-                                    >
-                                      {idea.rationale}
-                                    </div>
-                                  )}
-                                  {idea.evidence && (
-                                    <div
-                                      style={{
-                                        marginTop: 6,
-                                        color: "#0891b2",
-                                        fontSize: 11,
-                                        lineHeight: 1.3,
-                                        background: "#ecfeff",
-                                        padding: "6px 10px",
-                                        borderRadius: 6,
-                                      }}
-                                    >
-                                      📊 {idea.evidence}
-                                    </div>
-                                  )}
-                                  <div
-                                    style={{
-                                      marginTop: 8,
-                                      display: "flex",
-                                      gap: 8,
-                                    }}
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleGeneratePost(idea.prompt, "post")
-                                      }
-                                      style={{
-                                        padding: "4px 12px",
-                                        borderRadius: 6,
-                                        border: "none",
-                                        background: "#0a66c2",
-                                        color: "white",
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      Generate Post
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        handleGeneratePost(
-                                          idea.prompt,
-                                          "article",
-                                        )
-                                      }
-                                      style={{
-                                        padding: "4px 12px",
-                                        borderRadius: 6,
-                                        border: "none",
-                                        background: "#057642",
-                                        color: "white",
-                                        fontSize: 12,
-                                        fontWeight: 600,
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      Generate Article
-                                    </button>
-                                  </div>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    void handleSaveIdea(i);
-                                  }}
-                                  disabled={isSaved || isSavingThis}
-                                  style={{
-                                    padding: "4px 10px",
-                                    borderRadius: 6,
-                                    border: isSaved
-                                      ? "1px solid #6ee7b7"
-                                      : "1px solid #0a66c2",
-                                    background: isSaved ? "#d1fae5" : "#ffffff",
-                                    color: isSaved ? "#047857" : "#0a66c2",
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    cursor: isSaved ? "default" : "pointer",
-                                    whiteSpace: "nowrap",
-                                    alignSelf: "flex-start",
-                                  }}
-                                >
-                                  {isSaved
-                                    ? "✓ Saved"
-                                    : isSavingThis
-                                      ? "Saving…"
-                                      : "🔖 Save"}
-                                </button>
-                              </div>
-                            );
-                          })}
+                        <div className="plan-wedge-brainstorm__ideas-grid">
+                          {ideas.map((idea, i) => (
+                            <BrainstormIdeaCard
+                              key={i}
+                              idea={idea}
+                              sources={sources}
+                              cardIndex={i}
+                              isLastCard={i === ideas.length - 1}
+                              isSaved={savedPromptHashes.has(hashPrompt(idea.prompt))}
+                              isSaving={savingIndex === i}
+                              onGeneratePost={handleGeneratePost}
+                              onSave={() => {
+                                void handleSaveIdea(i);
+                              }}
+                            />
+                          ))}
                         </div>
-                      )}
-                      {sources.length > 0 && (
-                        <details style={{ marginTop: 4 }}>
-                          <summary
-                            style={{
-                              fontSize: 12,
-                              color: "#6b7280",
-                              cursor: "pointer",
-                              userSelect: "none",
-                              padding: "4px 0",
-                            }}
-                          >
-                            📰 Sources used ({sources.length})
-                          </summary>
-                          <div
-                            style={{ marginTop: 8, display: "grid", gap: 8 }}
-                          >
-                            {sources.map((src, i) => (
-                              <div
-                                key={i}
-                                style={{
-                                  fontSize: 11,
-                                  color: "#4b5563",
-                                  background: "#f9fafb",
-                                  padding: "8px 10px",
-                                  borderRadius: 6,
-                                  border: "1px solid #f3f4f6",
-                                }}
-                              >
-                                <div
-                                  style={{ fontWeight: 600, marginBottom: 2 }}
-                                >
-                                  Source {i + 1}: {src.title}
-                                </div>
-                                <div style={{ color: "#6b7280" }}>
-                                  {src.snippet}
-                                </div>
-                                <a
-                                  href={src.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{
-                                    color: "#0a66c2",
-                                    textDecoration: "underline",
-                                    fontSize: 10,
-                                  }}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  Read more ↗
-                                </a>
-                              </div>
-                            ))}
-                          </div>
-                        </details>
                       )}
                     </>
                   )}

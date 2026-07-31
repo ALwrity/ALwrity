@@ -274,7 +274,9 @@ app = FastAPI(
 # Build allowed origins list with env overrides to support dynamic tunnels (e.g., ngrok)
 default_allowed_origins = [
     "http://localhost:3000",  # React dev server
+    "http://127.0.0.1:3000",  # React dev server (127.0.0.1)
     "http://localhost:8000",  # Backend dev server
+    "http://127.0.0.1:8000",  # Backend dev server (127.0.0.1)
     "http://localhost:3001",  # Alternative React port
 ]
 

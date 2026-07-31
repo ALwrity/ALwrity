@@ -147,6 +147,14 @@ def _parse_llm_ideas(raw_response: Any, cls: type) -> list:
     return validated
 
 
+def _to_source_info(sources: List[Dict[str, str]]) -> List[SourceInfo]:
+    """Map raw Exa source dicts to API SourceInfo models (no count cap)."""
+    return [
+        SourceInfo(title=s["title"], url=s["url"], snippet=s["snippet"])
+        for s in sources
+    ]
+
+
 # ── POST /ideas (Exa-based seed brainstorming) ────────────────────────
 
 
@@ -237,7 +245,7 @@ Rules:
 
         return IdeasResponse(
             ideas=ideas[: req.count],
-            sources=[SourceInfo(title=s["title"], url=s["url"], snippet=s["snippet"]) for s in sources[:5]],
+            sources=_to_source_info(sources),
         )
     except HTTPException:
         raise
@@ -330,7 +338,7 @@ async def generate_personalized_ideas(
         return PersonalizedIdeasResponse(
             ideas=ideas[: req.count],
             data_summary=data.get("data_summary", ""),
-            sources=[SourceInfo(title=s["title"], url=s["url"], snippet=s["snippet"]) for s in exa_sources[:5]],
+            sources=_to_source_info(exa_sources),
         )
 
     except HTTPException:
