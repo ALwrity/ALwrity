@@ -58,7 +58,7 @@ We wanted a system that:
 - **Podcast Maker / Test Persona**: Turn voice + avatar into short videos using the shared video pipeline.
 - **Video Studio**: Multi-module video creation, editing, and transformation (`frontend/src/components/VideoStudio`).
 - **SEO Dashboard**: Analysis, metadata, and Google Search Console insights (see docs under `docs-site/docs/features/seo-dashboard`).
-- **LinkedIn (Factual, Google‑Grounded)**: Real Google grounding + citations + quality metrics for posts/articles/carousels/scripts (see `frontend/docs/linkedin_factual_google_grounded_url_content.md`).
+- **LinkedIn (Factual, Google‑Grounded)**: Real Google grounding + citations + quality metrics for posts/articles/carousels/scripts (see `docs/linkedin_factual_google_grounded_url_content.md`).
 - **Persona System**: Core personas and platform adaptations via APIs (`backend/api/persona.py`).
 - **Facebook Persona Service**: Gemini structured JSON for Facebook‑specific persona optimization (`backend/services/persona/facebook/facebook_persona_service.py`).
 - **Personalization & Brand Voice**: Validation and configuration of writing style, tone, structure (`backend/services/component_logic/personalization_logic.py`).
@@ -136,7 +136,7 @@ For module details, see `backend/services/llm_providers/README.md`.
 - Blog Writer (phases and UI): `docs-site/docs/features/blog-writer/overview.md`
 - SEO Dashboard overview: `docs-site/docs/features/seo-dashboard/overview.md`
 - SEO Dashboard GSC integration: `docs-site/docs/features/seo-dashboard/gsc-integration.md`
-- LinkedIn factual, Google-grounded content: `frontend/docs/linkedin_factual_google_grounded_url_content.md`
+- LinkedIn factual, Google-grounded content: `docs/linkedin_factual_google_grounded_url_content.md`
 - Persona Development (docs-site): `docs-site/docs/features/content-strategy/personas.md`
 
 For additional pages, browse the `docs-site/docs/` folder.
@@ -151,7 +151,7 @@ ALwrity generates a core writing persona from onboarding data, then adapts it pe
 - Personalization/Brand Voice logic: `backend/services/component_logic/personalization_logic.py`
 - Docs (GitHub paths):
   - Personas (docs-site): https://github.com/AJaySi/AI-Writer/blob/main/docs-site/docs/features/content-strategy/personas.md
-  - LinkedIn Grounded Content plan: https://github.com/AJaySi/AI-Writer/blob/main/frontend/docs/linkedin_factual_google_grounded_url_content.md
+  - LinkedIn Grounded Content plan: https://github.com/AJaySi/AI-Writer/blob/main/docs/linkedin_factual_google_grounded_url_content.md
 
 At a glance:
 - Data → Persona: Onboarding + website analysis → core persona
