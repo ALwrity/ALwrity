@@ -198,3 +198,28 @@ class TestDisconnect:
         payload = response.json()
         assert payload["success"] is True
         assert payload["connected"] is False
+
+    def test_disconnect_response_includes_needs_reconnect(
+        self, linkedin_client, monkeypatch
+    ):
+        from api.linkedin_oauth_connection_routes import _oauth_service
+
+        async def _fake_disconnect(self, user_id):
+            return {
+                "success": True,
+                "connected": False,
+                "revoked": True,
+                "unipile_account_deleted": False,
+                "preserved_unipile_account_id": "uni-preserved-789",
+                "needs_reconnect": True,
+            }
+
+        monkeypatch.setattr(
+            type(_oauth_service), "disconnect_user", _fake_disconnect
+        )
+
+        response = linkedin_client.post("/api/linkedin-social/disconnect")
+        assert_status(response, 200)
+        payload = response.json()
+        assert payload["needs_reconnect"] is True
+        assert payload["connected"] is False

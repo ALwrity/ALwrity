@@ -281,6 +281,7 @@ class TestConnectionStatusShape:
     REQUIRED_KEYS = {
         "connected", "provider", "has_per_user_token", "has_env_fallback",
         "accounts", "account_name", "organizations",
+        "needs_reconnect", "unipile_sync_status", "stored_unipile_account_id",
     }
 
     def test_disconnected_response_has_all_keys(self, linkedin_client, monkeypatch):
