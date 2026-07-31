@@ -209,6 +209,70 @@ def mark_user_soft_disconnected(oauth: "LinkedInOAuthService", user_id: str) -> 
         return False
 
 
+def clear_stale_unipile_account_id(
+    oauth: "LinkedInOAuthService",
+    user_id: str,
+    *,
+    account_id: Optional[str] = None,
+) -> bool:
+    """
+    Clear a preserved Unipile account_id that no longer exists on Unipile.
+
+    Used when reconnect returns 404 or Unipile reports DELETED so the next
+    connect creates a fresh account instead of clinging to a ghost id.
+    """
+    try:
+        oauth._init_db(user_id)
+        db_path = oauth._get_db_path(user_id)
+        if not os.path.exists(db_path):
+            return False
+
+        target = account_id.strip() if isinstance(account_id, str) and account_id.strip() else None
+        with sqlite3.connect(db_path) as conn:
+            cursor = conn.cursor()
+            if target:
+                cursor.execute(
+                    """
+                    UPDATE linkedin_oauth_tokens
+                    SET unipile_account_id = NULL,
+                        unipile_sync_status = ?,
+                        updated_at = datetime('now')
+                    WHERE user_id = ? AND unipile_account_id = ?
+                    """,
+                    ("DELETED", user_id, target),
+                )
+            else:
+                cursor.execute(
+                    """
+                    UPDATE linkedin_oauth_tokens
+                    SET unipile_account_id = NULL,
+                        unipile_sync_status = ?,
+                        updated_at = datetime('now')
+                    WHERE user_id = ? AND unipile_account_id IS NOT NULL
+                    """,
+                    ("DELETED", user_id),
+                )
+            conn.commit()
+            updated = cursor.rowcount > 0
+
+        if updated:
+            logger.warning(
+                f"{LOG_PREFIX} cleared stale Unipile account_id user_id={user_id} "
+                f"account_id={target or 'all-rows'}"
+            )
+        else:
+            logger.info(
+                f"{LOG_PREFIX} no stale Unipile account_id to clear user_id={user_id} "
+                f"account_id={target or 'all-rows'}"
+            )
+        return updated
+    except Exception as exc:
+        logger.exception(
+            f"{LOG_PREFIX} failed to clear stale account_id user_id={user_id}: {exc}"
+        )
+        return False
+
+
 def needs_unipile_reconnect(oauth: "LinkedInOAuthService", user_id: str) -> bool:
     """True when a preserved account_id exists and the user is not connected."""
     reconnect_id = get_reconnect_unipile_account_id(oauth, user_id)

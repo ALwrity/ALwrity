@@ -15,6 +15,7 @@ from loguru import logger
 from services.integrations.linkedin.linkedin_oauth_unipile_status import (
     HEALTHY_UNIPILE_STATUSES,
     DISCONNECTED_UNIPILE_STATUSES,
+    clear_stale_unipile_account_id,
     get_reconnect_unipile_account_id,
     normalize_unipile_status,
     set_unipile_sync_status,
@@ -124,8 +125,13 @@ class UnipileAccountLifecycleService:
                 if exc.status_code == 404:
                     logger.warning(
                         f"{LOG_PREFIX} stored account missing on Unipile — "
-                        f"falling back to create user_id={user_id} account_id={stored_id}"
+                        f"clearing stale id and falling back to create "
+                        f"user_id={user_id} account_id={stored_id}"
                     )
+                    clear_stale_unipile_account_id(
+                        self._oauth, user_id, account_id=stored_id
+                    )
+                    stored_id = None
                 else:
                     logger.warning(
                         f"{LOG_PREFIX} reconnect link failed user_id={user_id} "
@@ -158,18 +164,44 @@ class UnipileAccountLifecycleService:
         """
         Keep original account_id when Unipile returns a new duplicate.
 
-        Deletes the duplicate on Unipile to avoid extra billed accounts.
+        If the stored id no longer exists on Unipile (deleted in dashboard),
+        adopt the incoming id instead of deleting the new account.
         """
         stored_id = get_reconnect_unipile_account_id(self._oauth, user_id)
         incoming = incoming_account_id.strip()
         if not stored_id or stored_id == incoming:
             return incoming
 
+        client = UnipileClient()
+        try:
+            await client.get_account(stored_id)
+        except UnipileAPIError as exc:
+            if exc.status_code == 404:
+                logger.warning(
+                    f"{LOG_PREFIX} stored account gone on Unipile — adopting "
+                    f"incoming id user_id={user_id} stale_id={stored_id} "
+                    f"incoming_id={incoming}"
+                )
+                clear_stale_unipile_account_id(
+                    self._oauth, user_id, account_id=stored_id
+                )
+                return incoming
+            logger.warning(
+                f"{LOG_PREFIX} cannot verify stored account user_id={user_id} "
+                f"stored_id={stored_id}: {exc}; adopting incoming without delete"
+            )
+            return incoming
+        except Exception as exc:
+            logger.warning(
+                f"{LOG_PREFIX} stored account verify failed user_id={user_id} "
+                f"stored_id={stored_id}: {exc}; adopting incoming without delete"
+            )
+            return incoming
+
         logger.warning(
             f"{LOG_PREFIX} duplicate account detected user_id={user_id} "
             f"stored_id={stored_id} incoming_id={incoming}; deleting duplicate"
         )
-        client = UnipileClient()
         try:
             deleted = await client.delete_account(incoming)
             logger.info(
@@ -216,6 +248,10 @@ class UnipileAccountLifecycleService:
                 normalized,
                 account_id=account_id,
             )
+            if normalized == "DELETED":
+                clear_stale_unipile_account_id(
+                    self._oauth, resolved_user_id, account_id=account_id
+                )
             logger.warning(
                 f"{LOG_PREFIX} account disconnected user_id={resolved_user_id} "
                 f"account_id={account_id} status={normalized} updated={updated}"
