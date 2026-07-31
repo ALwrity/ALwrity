@@ -356,7 +356,7 @@ async def subscribe_to_plan(
                 "total_cost": float(usage_before.total_cost) if usage_before.total_cost else 0.0,
                 "gemini_calls": usage_before.gemini_calls or 0,
                 "mistral_calls": usage_before.mistral_calls or 0,
-                "usage_status": usage_before.usage_status.value if hasattr(usage_before.usage_status, 'value') else str(usage_before.usage_status)
+                "usage_status": usage_before.usage_status.value if (usage_before.usage_status and hasattr(usage_before.usage_status, 'value')) else str(usage_before.usage_status)
             }
         
         if existing_subscription:
@@ -480,7 +480,7 @@ async def subscribe_to_plan(
             logger.info(f"      ├─ Stability (Images): {usage_before.stability_calls or 0} calls")
             logger.info(f"      ├─ Total Tokens: {usage_before.total_tokens or 0}")
             logger.info(f"      ├─ Total Calls: {usage_before.total_calls or 0}")
-            logger.info(f"      └─ Usage Status: {usage_before.usage_status.value}")
+            logger.info(f"      └─ Usage Status: {usage_before.usage_status.value if usage_before.usage_status else 'N/A'}")
         else:
             logger.info(f"   📊 No usage summary found for period {current_period} (will be created on reset)")
 
@@ -530,7 +530,7 @@ async def subscribe_to_plan(
                     logger.info(f"      ├─ Stability (Images): {usage_after.stability_calls or 0} calls")
                     logger.info(f"      ├─ Total Tokens: {usage_after.total_tokens or 0}")
                     logger.info(f"      ├─ Total Calls: {usage_after.total_calls or 0}")
-                    logger.info(f"      └─ Usage Status: {usage_after.usage_status.value}")
+                    logger.info(f"      └─ Usage Status: {usage_after.usage_status.value if usage_after.usage_status else 'N/A'}")
                 else:
                     logger.warning(f"   ⚠️  Usage summary not found after reset - may need to be created on next API call")
             else:
