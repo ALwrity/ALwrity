@@ -10,11 +10,9 @@ import { AnalysisErrorAlert } from "../TopicRecommendations/TopicSuggestionIntro
 import { LinkedInAdvisorActionsBar } from "../ProfileOptimization/LinkedInAdvisorActionsBar";
 import { ProfileOptimizationPanel } from "../ProfileOptimization/ProfileOptimizationPanel";
 import {
-  ProfileOptimizationModalFooter,
   ProfileOptimizationModalHeader,
 } from "../ProfileOptimization/ProfileOptimizationModalChrome";
 import { TransformedPhotoPreview } from "../ProfileOptimization/TransformedPhotoPreview";
-import { findProfileOptimizationQuickWin } from "../ProfileOptimization/profileOptimizationQuickWin";
 import { ProfileCompletionForm } from "./ProfileCompletionForm";
 import { ProfileCompletionQuestionsModal } from "./ProfileCompletionQuestionsModal";
 import {
@@ -223,11 +221,6 @@ export const LinkedInProfileSetupPanel: React.FC<
 
   useModalFocusTrap(optimizationDialogRef, centered && isOptimizationOpen, () =>
     closeOptimizationPanel(),
-  );
-
-  const modalFocusedRecommendation = useMemo(
-    () => findProfileOptimizationQuickWin(optimizationRecommendations),
-    [optimizationRecommendations],
   );
 
   /** Phase 4 — skip the ready modal when analysis/optimisation data already exists or was dismissed. */
@@ -585,24 +578,6 @@ export const LinkedInProfileSetupPanel: React.FC<
                   onDownloadProfilePhoto={handleDownloadProfilePhoto}
                 />
               </div>
-              <ProfileOptimizationModalFooter
-                focusedItem={modalFocusedRecommendation}
-                markingRecommendationId={markingRecommendationId}
-                showNextBatchCta={showNextBatchCta}
-                isLoadingNextBatch={isLoadingNextBatch}
-                onSkip={(recommendationId) => {
-                  void markOptimizationItemComplete(
-                    recommendationId,
-                    "skipped",
-                  );
-                }}
-                onMarkDone={(recommendationId) => {
-                  void markOptimizationItemComplete(recommendationId, "done");
-                }}
-                onLoadNextBatch={() => {
-                  void loadNextOptimizationBatch();
-                }}
-              />
             </div>
           </div>,
           document.body,

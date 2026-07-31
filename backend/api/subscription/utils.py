@@ -10,6 +10,15 @@ import sqlite3
 from models.subscription_models import SubscriptionPlan
 
 
+def enum_value(value: Any, default: str = "") -> str:
+    """Safely read an enum or nullable DB column as a string."""
+    if value is None:
+        return default
+    if hasattr(value, "value"):
+        return str(value.value)
+    return str(value)
+
+
 def format_plan_limits(plan: SubscriptionPlan) -> Dict[str, Any]:
     """
     Format subscription plan limits for API response.

@@ -351,7 +351,9 @@ body.linkedin-profile-optimization-open {
 .linkedin-profile-optimization-dialog__header-brand
   .linkedin-profile-strength-ticker--popover {
   flex-shrink: 0;
-  margin-left: 12px;
+  margin-left: 10px;
+  transform: scale(0.8);
+  transform-origin: left center;
 }
 
 .linkedin-profile-optimization-dialog__header-center {
@@ -366,6 +368,8 @@ body.linkedin-profile-optimization-open {
 .linkedin-profile-optimization-dialog__header-center
   .linkedin-profile-strength-ticker--popover {
   flex-shrink: 0;
+  transform: scale(0.8);
+  transform-origin: center center;
 }
 
 .linkedin-profile-optimization-dialog__header-utilities {
@@ -482,7 +486,7 @@ body.linkedin-profile-optimization-open {
 .linkedin-profile-optimization-dialog__photo-label {
   font-size: 13px;
   font-weight: 700;
-  color: #0f172a;
+  color: #0a66c2;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -493,7 +497,7 @@ body.linkedin-profile-optimization-open {
 .linkedin-profile-optimization-dialog__photo-sublabel {
   font-size: 10px;
   font-weight: 600;
-  color: #64748b;
+  color: #475569;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -511,24 +515,84 @@ body.linkedin-profile-optimization-open {
   display: none;
 }
 
+.linkedin-profile-optimization-dialog__photo-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  align-self: center;
+  width: auto;
+  min-width: 0;
+}
+
 .linkedin-profile-optimization-dialog__photo-btn {
   appearance: none;
-  flex-shrink: 0;
+  flex: 0 0 83px;
+  box-sizing: border-box;
+  width: 83px;
+  min-width: 83px;
+  max-width: 83px;
+  height: 34px;
   min-height: 34px;
-  padding: 7px 14px;
+  max-height: 34px;
+  padding: 0 6px;
   border-radius: 999px;
-  border: 1px solid #0a66c2;
-  background: linear-gradient(135deg, #0a66c2 0%, #004182 100%);
-  color: #fff;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
   font-family: inherit;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.linkedin-profile-optimization-dialog__photo-btn:hover:not(:disabled) {
+.linkedin-profile-optimization-dialog__photo-btn--presentable {
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0a66c2;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+  white-space: normal;
+  padding: 0 10px;
+}
+
+.linkedin-profile-optimization-dialog__photo-btn-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  line-height: 1.05;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.linkedin-profile-optimization-dialog__photo-btn-label-line {
+  display: block;
+}
+
+.linkedin-profile-optimization-dialog__photo-btn--upload {
+  flex: 0 0 71px;
+  width: 71px;
+  min-width: 71px;
+  max-width: 71px;
+  border: 1px solid #0a66c2;
+  background: linear-gradient(135deg, #0a66c2 0%, #004182 100%);
+  color: #fff;
+}
+
+.linkedin-profile-optimization-dialog__photo-btn--upload:hover:not(:disabled) {
   filter: brightness(1.05);
+}
+
+.linkedin-profile-optimization-dialog__photo-btn--presentable:hover:not(:disabled) {
+  background: #f8fbff;
+  border-color: #0a66c2;
+  color: #004182;
 }
 
 .linkedin-profile-optimization-dialog__photo-btn:disabled {
@@ -861,7 +925,7 @@ body.linkedin-profile-optimization-open {
 
 .profile-opt-panel__grid--modal {
   display: grid;
-  grid-template-columns: 7fr 23fr;
+  grid-template-columns: 6.3fr 23.7fr;
   grid-template-rows: auto;
   gap: 10px 14px;
   align-items: stretch;
@@ -877,12 +941,21 @@ body.linkedin-profile-optimization-open {
   --profile-opt-font-body-size: 13px;
   --profile-opt-font-body-weight: 500;
   --profile-opt-font-line-height: 1.45;
+  /* Shared rail card title typography (Identity + Content Angles). */
+  --profile-opt-rail-title-size: 15px;
+  --profile-opt-rail-title-weight: 700;
+  --profile-opt-rail-title-line-height: 1.4;
+  --profile-opt-rail-title-color: #0c4a6e;
+  --profile-opt-rail-content-angles-title-color: #5b21b6;
+  --profile-opt-rail-title-family: inherit;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-brand-identity-card--modal h4 {
-  font-size: 17px !important;
-  font-weight: var(--profile-opt-font-title-weight) !important;
-  line-height: var(--profile-opt-font-line-height) !important;
+  font-family: var(--profile-opt-rail-title-family) !important;
+  font-size: var(--profile-opt-rail-title-size) !important;
+  font-weight: var(--profile-opt-rail-title-weight) !important;
+  line-height: var(--profile-opt-rail-title-line-height) !important;
+  color: var(--profile-opt-rail-title-color) !important;
 }
 
 .profile-opt-panel__grid--modal
@@ -896,23 +969,33 @@ body.linkedin-profile-optimization-open {
   line-height: var(--profile-opt-font-line-height);
 }
 
-.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-title,
-.profile-opt-panel__grid--modal .profile-opt-content-angles__title {
+.profile-opt-panel__grid--modal .profile-opt-batch-impact__sections-heading,
+.profile-opt-panel__grid--modal
+  .profile-opt-content-angles:not(.profile-opt-content-angles--modal)
+  .profile-opt-content-angles__title {
   font-size: 18px;
   font-weight: var(--profile-opt-font-title-weight);
   line-height: var(--profile-opt-font-line-height);
 }
 
-.profile-opt-panel__grid--modal .profile-opt-card__title,
-.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-title {
-  font-size: 15px;
+.profile-opt-panel__grid--modal .profile-opt-card__title {
+  font-size: 14px !important;
   font-weight: var(--profile-opt-font-title-weight);
   line-height: var(--profile-opt-font-line-height);
 }
 
+.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-title {
+  font-family: var(--profile-opt-rail-title-family) !important;
+  font-size: var(--profile-opt-rail-title-size) !important;
+  font-weight: var(--profile-opt-rail-title-weight) !important;
+  line-height: var(--profile-opt-rail-title-line-height) !important;
+}
+
 .profile-opt-panel__grid--modal .profile-opt-content-angles__subtitle,
 .profile-opt-panel__grid--modal .profile-opt-section-embedded__label,
-.profile-opt-panel__grid--modal .profile-opt-content-angles__text {
+.profile-opt-panel__grid--modal
+  .profile-opt-content-angles:not(.profile-opt-content-angles--modal)
+  .profile-opt-content-angles__text {
   font-size: var(--profile-opt-font-subtitle-size);
   font-weight: var(--profile-opt-font-subtitle-weight);
   line-height: var(--profile-opt-font-line-height);
@@ -951,9 +1034,13 @@ body.linkedin-profile-optimization-open {
   display: flex;
   flex-direction: column;
   overflow: visible;
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-inner {
+  position: relative;
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -963,9 +1050,167 @@ body.linkedin-profile-optimization-open {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  gap: 10px;
+  gap: 4px;
   padding: 10px 12px;
   background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  box-sizing: border-box;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner:has(.profile-opt-card--expanded) {
+  overflow-y: hidden;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner:has(.profile-opt-card--expanded)
+  .profile-opt-panel__suggestions-cards {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  align-self: stretch;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-lead {
+  margin: 0 0 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  font-family: var(--profile-opt-rail-title-family) !important;
+  font-size: var(--profile-opt-rail-title-size) !important;
+  font-weight: var(--profile-opt-rail-title-weight) !important;
+  line-height: var(--profile-opt-rail-title-line-height) !important;
+  color: #56687a;
+  flex-shrink: 0;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-header {
+  display: none;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-card--stack .profile-opt-card__badges {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 0;
+  scrollbar-width: thin;
+  width: 100%;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__badges
+  > span:not(.profile-opt-card__effort-time) {
+  flex-shrink: 0;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-card--stack .profile-opt-card__effort-time {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-card--stack .profile-opt-card__actions {
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__actions {
+  flex-direction: row;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-card--stack .profile-opt-card__action-row {
+  display: contents;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-card--stack .profile-opt-card__action {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  font-size: 12px;
+}
+
+/* Collapsed modal cards: compact height — badges only (2+), badges + actions (first). */
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded) {
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: hidden;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__summary-block,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__recommended-action-block,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__copy-preview {
+  display: none !important;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded):not(
+    .profile-opt-card--first
+  )
+  .profile-opt-card__actions {
+  display: none !important;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__header {
+  padding-bottom: 0;
+}
+
+/* Closed box 1: grow to align last suggestion with batch impact; space badges from actions. */
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--first:not(.profile-opt-card--expanded) {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--first:not(.profile-opt-card--expanded)
+  .profile-opt-card__top {
+  flex: 0 0 auto;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--first:not(.profile-opt-card--expanded)
+  .profile-opt-card__actions {
+  margin-top: auto;
+  padding-top: 16px;
 }
 
 .profile-opt-panel__grid--modal
@@ -985,9 +1230,64 @@ body.linkedin-profile-optimization-open {
   min-height: 0;
 }
 
+/* Modal: batch impact left; suggestion cards stacked vertically on the right. */
+.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-cards {
+  position: relative;
+  grid-template-columns: 6.93fr 16.77fr;
+  align-items: stretch;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-card-column {
+  grid-column: 2;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  align-self: stretch;
+  min-height: 100%;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-batch-impact--stack-card {
+  grid-column: 1;
+  grid-row: 1;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  min-height: 100%;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__stack-meta {
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card.profile-opt-batch-impact--vertical {
+  flex: 1 1 auto;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__chart {
+  margin-bottom: 2px;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-card--stack {
+  grid-column: unset;
+  width: 100%;
+  flex-shrink: 0;
+}
+
 .profile-opt-panel__suggestions-cards:has(.profile-opt-card--expanded) {
   position: relative;
-  padding-bottom: 20px;
+  padding-bottom: 0;
 }
 
 .profile-opt-panel__suggestions-cards:has(.profile-opt-card--expanded)
@@ -1002,17 +1302,17 @@ body.linkedin-profile-optimization-open {
     opacity 200ms ease;
 }
 
-.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-header {
-  padding: 10px 14px;
-  background: transparent;
-  border-bottom: none;
-}
-
 .profile-opt-panel__suggestions-cards .profile-opt-card--stack,
 .profile-opt-panel__grid--modal .profile-opt-card--stack {
   min-height: 410px;
   height: 410px;
   padding: 12px 14px !important;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded) {
+  min-height: 0 !important;
+  height: auto !important;
 }
 
 .profile-opt-panel__suggestions-cards
@@ -1030,6 +1330,33 @@ body.linkedin-profile-optimization-open {
   border: none !important;
   box-shadow: none !important;
   order: -1;
+}
+
+/* Modal expanded overlay: full width, anchored to top of suggestions row. */
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-cards
+  .profile-opt-card--stack.profile-opt-card--expanded {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  order: unset;
+  grid-column: unset;
+  min-height: 0 !important;
+  height: auto !important;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: #fff !important;
+  background-image: none !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.14) !important;
+  border-radius: 12px !important;
+  padding: 12px 14px !important;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-card__title-row {
@@ -1085,13 +1412,13 @@ body.linkedin-profile-optimization-open {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   direction: rtl;
-  padding-left: 4px;
+  padding-left: 3px;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-panel__rail-inner > * {
@@ -1102,7 +1429,7 @@ body.linkedin-profile-optimization-open {
 .profile-opt-panel__grid--modal .profile-opt-brand-identity-card--modal {
   margin-bottom: 0 !important;
   flex-shrink: 0;
-  padding: 14px 16px !important;
+  padding: 11px 12px !important;
 }
 
 .profile-opt-panel__grid--modal
@@ -1110,8 +1437,8 @@ body.linkedin-profile-optimization-open {
   > div:first-of-type {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px !important;
+  gap: 5px;
+  margin-bottom: 5px !important;
 }
 
 .profile-opt-panel__grid--modal
@@ -1120,9 +1447,10 @@ body.linkedin-profile-optimization-open {
   > div:first-of-type {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 9px;
   width: auto !important;
   height: auto !important;
+  margin-bottom: 5px !important;
 }
 
 .profile-opt-panel__grid--modal
@@ -1130,31 +1458,49 @@ body.linkedin-profile-optimization-open {
   > div:first-of-type
   > div:first-of-type
   > div:first-of-type {
-  width: 28px !important;
-  height: 28px !important;
+  width: 22px !important;
+  height: 22px !important;
 }
 
 .profile-opt-panel__grid--modal
   .profile-opt-brand-identity-card--modal
   > div:nth-of-type(2) {
-  padding: 12px 14px !important;
-  margin-bottom: 10px !important;
+  padding: 9px 11px !important;
+  margin-bottom: 7px !important;
+}
+
+.profile-opt-panel__grid--modal .profile-opt-brand-identity-card--modal p,
+.profile-opt-panel__grid--modal
+  .profile-opt-brand-identity-card--modal
+  > div:nth-of-type(2)
+  p,
+.profile-opt-panel__grid--modal
+  .profile-opt-brand-identity-card--modal
+  > div:first-of-type
+  > p,
+.profile-opt-panel__grid--modal
+  .profile-opt-brand-identity-card--modal
+  > div:nth-of-type(2)
+  span {
+  font-size: 12px !important;
+  line-height: 1.45 !important;
 }
 
 .profile-opt-panel__grid--modal
   .profile-opt-brand-identity-card--modal
   > p:last-of-type {
   margin: 0 !important;
-  font-size: 12px !important;
-  line-height: 1.4 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 1.45 !important;
 }
 
 .profile-opt-content-angles--modal {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 14px;
-  border-radius: 12px;
+  padding: 11px;
+  border-radius: 9px;
   background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
   border: 1px solid #c4b5fd;
   overflow: visible;
@@ -1163,23 +1509,23 @@ body.linkedin-profile-optimization-open {
 .profile-opt-content-angles--modal .profile-opt-content-angles__head {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 5px;
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__title-row {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 8px;
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__icon {
-  width: 28px;
-  height: 28px;
+  width: 21px;
+  height: 21px;
   border-radius: 50%;
   background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
   color: #fff;
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 800;
   display: inline-flex;
   align-items: center;
@@ -1188,10 +1534,12 @@ body.linkedin-profile-optimization-open {
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__title {
-  margin: 0 0 4px;
-  font-size: 17px;
-  font-weight: 800;
+  margin: 0 0 3px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
   color: #5b21b6;
+  line-height: 1.4;
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__subtitle {
@@ -1212,8 +1560,8 @@ body.linkedin-profile-optimization-open {
 .profile-opt-content-angles--modal .profile-opt-content-angles__list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin: 0 0 8px;
+  gap: 5px;
+  margin: 0 0 6px;
   padding: 0;
   max-height: none;
   overflow: visible;
@@ -1221,17 +1569,17 @@ body.linkedin-profile-optimization-open {
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__item {
   flex-shrink: 0;
-  padding: 8px 10px;
-  gap: 8px;
-  border-radius: 8px;
+  padding: 6px 8px;
+  gap: 6px;
+  border-radius: 7px;
   background: #fff;
   border: 1px solid #ddd6fe;
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__index {
-  width: 20px;
-  height: 20px;
-  font-size: 11px;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
   font-weight: 800;
   background: #f3e8ff;
   color: #7c3aed;
@@ -1239,14 +1587,14 @@ body.linkedin-profile-optimization-open {
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__text {
   line-height: 1.45;
-  font-size: 13px;
+  font-size: 12px;
   color: #4c1d95;
   font-weight: 500;
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__cta {
   flex-shrink: 0;
-  padding: 8px 12px;
+  padding: 6px 10px;
   font-size: 12px;
   font-weight: 700;
   color: #fff;
@@ -1264,22 +1612,31 @@ body.linkedin-profile-optimization-open {
 .profile-opt-panel__grid--modal
   .profile-opt-content-angles--modal
   .profile-opt-content-angles__title {
-  font-size: 17px !important;
-  color: #5b21b6;
+  font-family: var(--profile-opt-rail-title-family) !important;
+  font-size: var(--profile-opt-rail-title-size) !important;
+  font-weight: var(--profile-opt-rail-title-weight) !important;
+  line-height: var(--profile-opt-rail-title-line-height) !important;
+  color: var(--profile-opt-rail-content-angles-title-color) !important;
 }
 
 .profile-opt-panel__grid--modal
   .profile-opt-content-angles--modal
   .profile-opt-content-angles__subtitle {
-  font-size: 13px;
+  font-size: 12px !important;
   color: #7c3aed;
 }
 
 .profile-opt-panel__grid--modal
   .profile-opt-content-angles--modal
   .profile-opt-content-angles__text {
-  font-size: 13px;
+  font-size: 12px !important;
   color: #4c1d95;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-content-angles--modal
+  .profile-opt-content-angles__cta {
+  font-size: 12px !important;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-content-angles,
@@ -3838,9 +4195,9 @@ body.linkedin-quick-create-open {
     align-items: start;
   }
 
-  /* Modal: left rail ~29.4% (another 2% wider than ~28.8%) */
+  /* Modal: left rail ~10% narrower than prior 15fr / 36fr split */
   .profile-opt-panel__grid--modal {
-    grid-template-columns: 15fr 36fr !important;
+    grid-template-columns: 13.5fr 37.5fr !important;
   }
 
   .profile-opt-panel__rail {
@@ -5373,6 +5730,18 @@ body.linkedin-quick-create-open {
     grid-template-columns: 1fr;
   }
 
+  .profile-opt-panel__grid--modal .profile-opt-panel__suggestions-card-column {
+    grid-column: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .profile-opt-panel__grid--modal .profile-opt-batch-impact--stack-card,
+  .profile-opt-panel__grid--modal .profile-opt-card--stack {
+    grid-column: auto;
+  }
+
   .profile-opt-panel__suggestions-cards .profile-opt-card--first {
     grid-column: auto;
     grid-row: auto;
@@ -6117,26 +6486,35 @@ body.linkedin-quick-create-open {
 
 /* Restored batch-impact styles for ProfileOptimizationBatchImpactBar */
 
-.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-title,
 .profile-opt-panel__grid--modal .profile-opt-batch-impact__sections-heading,
-.profile-opt-panel__grid--modal .profile-opt-content-angles__title {
+.profile-opt-panel__grid--modal
+  .profile-opt-content-angles:not(.profile-opt-content-angles--modal)
+  .profile-opt-content-angles__title {
   font-size: 18px;
   font-weight: var(--profile-opt-font-title-weight);
   line-height: var(--profile-opt-font-line-height);
 }
 
-.profile-opt-panel__grid--modal .profile-opt-card__title,
-.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-title {
-  font-size: 15px;
+.profile-opt-panel__grid--modal .profile-opt-card__title {
+  font-size: 14px !important;
   font-weight: var(--profile-opt-font-title-weight);
   line-height: var(--profile-opt-font-line-height);
+}
+
+.profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-title {
+  font-family: var(--profile-opt-rail-title-family) !important;
+  font-size: var(--profile-opt-rail-title-size) !important;
+  font-weight: var(--profile-opt-rail-title-weight) !important;
+  line-height: var(--profile-opt-rail-title-line-height) !important;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-content-angles__subtitle,
 .profile-opt-panel__grid--modal .profile-opt-batch-impact__caption,
 .profile-opt-panel__grid--modal .profile-opt-batch-impact__meter-label,
 .profile-opt-panel__grid--modal .profile-opt-section-embedded__label,
-.profile-opt-panel__grid--modal .profile-opt-content-angles__text {
+.profile-opt-panel__grid--modal
+  .profile-opt-content-angles:not(.profile-opt-content-angles--modal)
+  .profile-opt-content-angles__text {
   font-size: var(--profile-opt-font-subtitle-size);
   font-weight: var(--profile-opt-font-subtitle-weight);
   line-height: var(--profile-opt-font-line-height);
@@ -6160,6 +6538,13 @@ body.linkedin-quick-create-open {
   min-height: 410px;
   height: 410px;
   box-sizing: border-box;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner
+  .profile-opt-batch-impact--stack-card {
+  min-height: 0;
+  height: auto;
 }
 
 .profile-opt-panel__suggestions-grid .profile-opt-card,

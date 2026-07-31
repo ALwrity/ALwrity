@@ -13,13 +13,8 @@ import os
 logger = get_service_logger("oauth_token_monitoring")
 
 from models.oauth_token_monitoring_models import OAuthTokenMonitoringTask
-from services.gsc_service import GSCService
-from services.integrations.bing_oauth import BingOAuthService
-from services.integrations.wordpress_oauth import WordPressOAuthService
-from services.integrations.wix_oauth import WixOAuthService
-# YouTube OAuth service is imported lazily inside _check_youtube() so the
-# module import doesn't fail in environments where Google credentials aren't
-# configured.
+# Platform OAuth services are imported lazily inside each _check_*() so this
+# module loads in LinkedIn-only / lean envs without GSC/Google/Bing/WP/Wix deps.
 from services.database import get_user_db_path
 
 
@@ -28,12 +23,17 @@ from services.database import get_user_db_path
 # platform. Order matches the historical order of the inline blocks so the
 # returned list preserves stability for callers.
 def _check_gsc(user_id: str) -> bool:
+    # Lazy: gsc_service pulls google_auth_oauthlib / googleapiclient.
+    from services.gsc_service import GSCService
+
     db_path = get_user_db_path(user_id)
     gsc_service = GSCService(db_path=db_path)
     return bool(gsc_service.load_user_credentials(user_id))
 
 
 def _check_bing(user_id: str) -> bool:
+    from services.integrations.bing_oauth import BingOAuthService
+
     bing_service = BingOAuthService()
     token_status = bing_service.get_user_token_status(user_id)
     if token_status.get('has_active_tokens'):
@@ -43,6 +43,8 @@ def _check_bing(user_id: str) -> bool:
 
 
 def _check_wordpress(user_id: str) -> bool:
+    from services.integrations.wordpress_oauth import WordPressOAuthService
+
     db_path = get_user_db_path(user_id)
     wordpress_service = WordPressOAuthService(db_path=db_path)
     token_status = wordpress_service.get_user_token_status(user_id)
@@ -50,6 +52,8 @@ def _check_wordpress(user_id: str) -> bool:
 
 
 def _check_wix(user_id: str) -> bool:
+    from services.integrations.wix_oauth import WixOAuthService
+
     db_path = get_user_db_path(user_id)
     wix_service = WixOAuthService(db_path=db_path)
     token_status = wix_service.get_user_token_status(user_id)

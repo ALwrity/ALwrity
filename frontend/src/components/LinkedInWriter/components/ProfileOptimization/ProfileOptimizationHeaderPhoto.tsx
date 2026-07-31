@@ -64,7 +64,7 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
         ) : null}
       </div>
       {onUploadProfilePhoto && (
-        <>
+        <div className="linkedin-profile-optimization-dialog__photo-actions">
           <input
             ref={fileInputRef}
             type="file"
@@ -78,24 +78,34 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
           />
           <button
             type="button"
-            className="linkedin-profile-optimization-dialog__photo-btn"
+            className="linkedin-profile-optimization-dialog__photo-btn linkedin-profile-optimization-dialog__photo-btn--upload"
             onClick={() => fileInputRef.current?.click()}
             disabled={uploadingProfilePhoto || transformingProfilePhoto}
           >
             {uploadingProfilePhoto ? "Uploading…" : "Upload"}
           </button>
-        </>
-      )}
-      {photoSrc && onMakeProfilePhotoPresentable && (
-        <button
-          type="button"
-          className="linkedin-profile-optimization-dialog__photo-btn"
-          onClick={onMakeProfilePhotoPresentable}
-          disabled={uploadingProfilePhoto || transformingProfilePhoto}
-          style={{ marginTop: 4 }}
-        >
-          {transformingProfilePhoto ? "Enhancing…" : "✨ Make Presentable"}
-        </button>
+          {photoSrc && onMakeProfilePhotoPresentable && (
+            <button
+              type="button"
+              className="linkedin-profile-optimization-dialog__photo-btn linkedin-profile-optimization-dialog__photo-btn--presentable"
+              onClick={onMakeProfilePhotoPresentable}
+              disabled={uploadingProfilePhoto || transformingProfilePhoto}
+            >
+              {transformingProfilePhoto ? (
+                "Enhancing…"
+              ) : (
+                <span className="linkedin-profile-optimization-dialog__photo-btn-label">
+                  <span className="linkedin-profile-optimization-dialog__photo-btn-label-line">
+                    ✨ Make
+                  </span>
+                  <span className="linkedin-profile-optimization-dialog__photo-btn-label-line">
+                    Presentable
+                  </span>
+                </span>
+              )}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

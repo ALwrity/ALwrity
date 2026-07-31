@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { DashboardActionModal } from '../dashboard/DashboardActionModal';
 import DataSourceSelector from './DataSourceSelector';
 import type { BrainstormOptions } from './DataSourceSelector';
@@ -38,6 +38,8 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
 
   const [myIdeasOpen, setMyIdeasOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  const [brainstorming, setBrainstorming] = useState(false);
+  const brainstormingRef = useRef(false);
 
   const { corePersona, platformPersona } = usePlatformPersonaContext();
   const { connected } = useLinkedInSocialConnection();
@@ -125,6 +127,24 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     .filter(Boolean)
     .join(' ');
 
+  const handleGenerateIdeas = () => {
+    if (brainstormingRef.current) return;
+    if (!canGenerate || brainstorm.isLoading) return;
+
+    brainstormingRef.current = true;
+    setBrainstorming(true);
+    void brainstorm
+      .runBrainstorm(
+        (brainstormSeed || '').trim(),
+        { usePersona, includeTrending, remarketContent },
+        brainstorm.hasResults,
+      )
+      .finally(() => {
+        brainstormingRef.current = false;
+        setBrainstorming(false);
+      });
+  };
+
   return (
     <>
     <DashboardActionModal
@@ -191,16 +211,14 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
                 <button
                   type="button"
                   className={generateBtnClass}
-                  onClick={() =>
-                    void brainstorm.runBrainstorm(
-                      (brainstormSeed || '').trim(),
-                      { usePersona, includeTrending, remarketContent },
-                      brainstorm.hasResults
-                    )
-                  }
-                  disabled={!canGenerate || brainstorm.isLoading}
+                  onClick={handleGenerateIdeas}
+                  disabled={!canGenerate || brainstorm.isLoading || brainstorming}
                 >
-                  {brainstorm.isLoading ? 'Generating…' : brainstorm.hasResults ? 'Regenerate Ideas' : 'Generate Ideas'}
+                  {brainstorm.isLoading || brainstorming
+                    ? 'Generating…'
+                    : brainstorm.hasResults
+                      ? 'Regenerate Ideas'
+                      : 'Generate Ideas'}
                 </button>
               </div>
 

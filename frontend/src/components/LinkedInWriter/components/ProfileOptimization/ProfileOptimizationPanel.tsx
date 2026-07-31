@@ -894,17 +894,12 @@ export const ProfileOptimizationPanel: React.FC<
                       id="profile-optimization-list"
                       className="profile-opt-panel__suggestions-stack profile-opt-panel__suggestions-stack--modal profile-opt-panel__suggestions-stack--hover-tip"
                     >
-                      <div className="profile-opt-panel__suggestions-stack-header">
-                        <h3
-                          id="profile-opt-batch-stack-title"
-                          className="profile-opt-panel__suggestions-stack-title"
-                        >
+                      <div className="profile-opt-panel__suggestions-stack-inner">
+                        <p className="profile-opt-panel__suggestions-stack-lead">
                           {profileStrengthPercent != null
                             ? `Your profile currently communicates ${profileStrengthPercent}% of this positioning — here's how to strengthen it.`
                             : quickWinsLabel}
-                        </h3>
-                      </div>
-                      <div className="profile-opt-panel__suggestions-stack-inner">
+                        </p>
                         <div className="profile-opt-panel__suggestions-cards">
                           <ProfileOptimizationBatchImpactBar
                             stackCard
@@ -912,7 +907,7 @@ export const ProfileOptimizationPanel: React.FC<
                             batchLabel={batchNumberLabel}
                             batchGainHint={
                               batchProjection.gainPoints > 0
-                                ? `+${batchProjection.gainPoints}% profile strength if you apply this batch`
+                                ? `+${batchProjection.gainPoints}% profile strength if you apply Suggestions`
                                 : undefined
                             }
                             recommendations={sortedRecommendations}
@@ -922,6 +917,7 @@ export const ProfileOptimizationPanel: React.FC<
                             activeSectionKeys={activeSectionKeys}
                             activeSectionCount={activeSectionCount}
                           />
+                          <div className="profile-opt-panel__suggestions-card-column">
                           {sortedRecommendations.map((item, index) => (
                             <ProfileOptimizationCard
                               key={item.id}
@@ -943,6 +939,7 @@ export const ProfileOptimizationPanel: React.FC<
                                 .join(" ")}
                             />
                           ))}
+                          </div>
                         </div>
                       </div>
                     </div>

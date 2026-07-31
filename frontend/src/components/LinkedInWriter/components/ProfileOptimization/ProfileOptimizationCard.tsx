@@ -172,26 +172,42 @@ export const ProfileOptimizationCard: React.FC<
   const cardRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!isDetailsExpanded || !cardRef.current) return;
+    const card = cardRef.current;
+    if (!card) return;
+
+    if (!isDetailsExpanded) return;
+
+    const isModal = Boolean(card.closest(".profile-opt-panel__grid--modal"));
+
+    if (isModal) {
+      const stackInner = card.closest(
+        ".profile-opt-panel__suggestions-stack-inner",
+      ) as HTMLElement | null;
+
+      if (stackInner) {
+        stackInner.scrollTop = 0;
+      }
+      return;
+    }
 
     const timeout = window.setTimeout(() => {
-      const card = cardRef.current;
-      if (!card) return;
+      const scrollCard = cardRef.current;
+      if (!scrollCard) return;
 
-      const scrollParent = card.closest(
+      const scrollParent = scrollCard.closest(
         ".profile-opt-panel__suggestions-stack-inner",
       ) as HTMLElement | null;
 
       if (scrollParent) {
         const parentRect = scrollParent.getBoundingClientRect();
-        const cardRect = card.getBoundingClientRect();
+        const cardRect = scrollCard.getBoundingClientRect();
         const targetTop =
           cardRect.top - parentRect.top + scrollParent.scrollTop - 8;
         scrollParent.scrollTo({ top: targetTop, behavior: "smooth" });
         return;
       }
 
-      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      scrollCard.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 350);
 
     return () => window.clearTimeout(timeout);
@@ -306,18 +322,12 @@ export const ProfileOptimizationCard: React.FC<
             <span style={effortBadgeStyle(recommendation.effort)}>
               {formatOptimizationEffort(recommendation.effort)}
             </span>
-            {showEffortTimeLabel && isDetailsExpanded && (
+            {showEffortTimeLabel && (
               <span className="profile-opt-card__effort-time">
                 {showEffortTimeLabel}
               </span>
             )}
           </div>
-
-          {showEffortTimeLabel && !isDetailsExpanded && (
-            <div className="profile-opt-card__effort-time-row">
-              {showEffortTimeLabel}
-            </div>
-          )}
 
           {!isDetailsExpanded && (
             <div className="profile-opt-card__summary-block">
