@@ -69,7 +69,7 @@ export const LinkedInPricingPage: React.FC = () => {
     fetchPlans();
   }, [fetchPlans]);
 
-  const handleSubscribe = async (planId: number) => {
+  const handleSubscribe = async (plan: SubscriptionPlan) => {
     if (!isSignedIn || !user) {
       navigate("/sign-in?redirect=/linkedin-studio/pricing");
       return;
@@ -77,7 +77,8 @@ export const LinkedInPricingPage: React.FC = () => {
     try {
       setSubscribing(true);
       await apiClient.post(`/api/subscription/subscribe/${user.id}`, {
-        plan_id: planId,
+        plan_id: plan.id,
+        tier: plan.tier,
       });
       navigate("/linkedin-studio");
     } catch (err) {
@@ -269,7 +270,7 @@ export const LinkedInPricingPage: React.FC = () => {
                     fullWidth
                     variant={isFree ? "outlined" : "contained"}
                     disabled={subscribing}
-                    onClick={() => handleSubscribe(plan.id)}
+                    onClick={() => handleSubscribe(plan)}
                     sx={{
                       py: 1.5,
                       borderRadius: 2,

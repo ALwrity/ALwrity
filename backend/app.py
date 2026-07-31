@@ -895,7 +895,10 @@ async def startup_event():
 
 def _assert_router_mounted(router_name: str) -> None:
     """Assert that a critical router is mounted. Fails startup if not found."""
-    from fastapi import routing
+    if router_name in router_manager.included_routers:
+        logger.info(f"✅ Critical router '{router_name}' is mounted")
+        return
+
     mounted_routes = [getattr(route, 'path', None) for route in app.routes if hasattr(route, 'path')]
     
     # Check for router-specific paths

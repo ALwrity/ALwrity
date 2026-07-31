@@ -14,7 +14,6 @@ from loguru import logger
 
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.database import get_session_for_user
-from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
 
 router = APIRouter(prefix="/api/unipile", tags=["Unipile"])
 _oauth_service = LinkedInOAuthService()
@@ -104,6 +103,11 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
 
     if stored:
         try:
+            # Lazy import so Unipile webhook mounts without GSC/Google deps.
+            from services.oauth_token_monitoring_service import (
+                create_oauth_monitoring_tasks,
+            )
+
             db = get_session_for_user(user_id)
             if db:
                 try:
