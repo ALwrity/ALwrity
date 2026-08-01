@@ -8,7 +8,6 @@ Leverages existing non-AI SEO tools and uses single AI prompt for structured ana
 import asyncio
 import math
 import re
-import textstat
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 from utils.logger_utils import get_service_logger
@@ -292,6 +291,7 @@ class BlogContentSEOAnalyzer:
     async def _analyze_readability(self, content: str) -> Dict[str, Any]:
         """Analyze content readability using textstat integration"""
         try:
+            import textstat
             # Calculate readability metrics
             readability_metrics = {
                 'flesch_reading_ease': textstat.flesch_reading_ease(content),
@@ -816,6 +816,14 @@ class BlogContentSEOAnalyzer:
             research_block += f"\nPLANNED CONTENT ANGLES: {', '.join(suggested_angles[:3])}"
         if industry_leaders:
             research_block += f"\nINDUSTRY LEADERS: {', '.join(industry_leaders[:3])}"
+
+        outline_block = ""
+        if outline_text:
+            outline_block = f"\n\n        PLANNED OUTLINE STRUCTURE:\n{outline_text}"
+
+        advantage_block = ""
+        if competitive_advantage:
+            advantage_block = f"\n\n        FOCUSED ADVANTAGE: {competitive_advantage}"
         
         prompt = f"""
         Analyze this blog content for SEO optimization and user experience. Provide structured insights based ONLY on what is actually present in the content and keyword data. Do NOT fabricate data, statistics, competitor names, or case studies that are not in the content.
@@ -837,13 +845,7 @@ class BlogContentSEOAnalyzer:
         Word Count: {non_ai_results.get('content_quality', {}).get('word_count', 0)}
         Sections: {non_ai_results.get('content_structure', {}).get('total_sections', 0)}
         Has Introduction: {non_ai_results.get('content_structure', {}).get('has_introduction', False)}
-        Has Conclusion: {non_ai_results.get('content_structure', {}).get('has_conclusion', False)}{f"""
-
-        PLANNED OUTLINE STRUCTURE:
-{outline_text}""" if outline_text else ""}
-{f"""
-
-        FOCUSED ADVANTAGE: {competitive_advantage}""" if competitive_advantage else ""}
+        Has Conclusion: {non_ai_results.get('content_structure', {}).get('has_conclusion', False)}{outline_block}{advantage_block}
 
         IMPORTANT: SEO metadata (title tag, meta description, Open Graph tags, Twitter cards, JSON-LD schema) will be generated in a separate step. Do NOT recommend adding or improving meta descriptions, title tags, OG tags, or structured data markup — focus only on content-level improvements.
 

@@ -84,13 +84,29 @@ class TestEnterpriseSEOService:
     @pytest.mark.asyncio
     async def test_quick_audit(self, service):
         """Test quick 5-minute audit execution"""
-        result = await service.execute_quick_audit("https://example.com")
-        
-        assert result['audit_type'] == 'quick_audit'
-        assert result['website_url'] == "https://example.com"
-        assert 'quick_score' in result
-        assert 'critical_issues' in result
-        assert 'top_recommendation' in result
+        with patch.object(service.pagespeed_service, "analyze_pagespeed", new_callable=AsyncMock) as mock_analyze:
+            mock_analyze.return_value = {
+                'status': 'success',
+                'score': 85,
+                'metrics': {
+                    'FCP': 1.2,
+                    'LCP': 2.5,
+                    'CLS': 0.1,
+                    'TBT': 200,
+                    'SpeedIndex': 2.0
+                },
+                'recommendations': [
+                    {'title': 'Optimize images', 'impact': 'high', 'priority': 'high'},
+                    {'title': 'Minify JS', 'impact': 'medium', 'priority': 'medium'}
+                ]
+            }
+            result = await service.execute_quick_audit("https://example.com")
+            
+            assert result['audit_type'] == 'quick_audit'
+            assert result['website_url'] == "https://example.com"
+            assert 'quick_score' in result
+            assert 'critical_issues' in result
+            assert 'top_recommendation' in result
     
     @pytest.mark.asyncio
     async def test_component_execution_concurrency(self, service):
