@@ -66,18 +66,18 @@ def _advisory_lock(file_handle, exclusive: bool = True):
     else:
         try:
             import msvcrt as _msvcrt
-            # ``_locking`` expects a 32-bit count. Use 1 byte as
-            # the lock region; this serialises writers but the
-            # critical section is short (a few KB append).
-            LK_NBLCK = 0x80000000  # non-blocking flag, ignored
-            LK_LOCK = 0x80000000 | 1  # exclusive lock, 1 byte
-            LK_UNLCK = 0x80000000 | 2  # unlock
-            # 32-bit count: 0xFFFFFFFF = 1 file
-            _msvcrt.locking(file_handle.fileno(), LK_LOCK, 0xFFFFFFFF)
+            # Seek to start of file to ensure locking works at consistent offset
+            # (locking locks a region starting from current position)
+            file_handle.seek(0)
+            _msvcrt.locking(file_handle.fileno(), _msvcrt.LK_LOCK, 1)
             try:
                 yield
             finally:
-                _msvcrt.locking(file_handle.fileno(), LK_UNLCK, 0xFFFFFFFF)
+                try:
+                    file_handle.seek(0)
+                    _msvcrt.locking(file_handle.fileno(), _msvcrt.LK_UNLCK, 1)
+                except Exception:
+                    pass
         except ImportError:
             yield
 

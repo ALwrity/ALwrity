@@ -8,8 +8,8 @@ import re
 import sys
 from pathlib import Path
 
-BACKEND_ROOT = Path(r"C:/Users/diksha rawat/Desktop/ALwrity_github/windsurf/ALwrity/backend")
-FRONTEND_ROOT = BACKEND_ROOT.parent / "frontend/src"
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+FRONTEND_ROOT = Path(__file__).resolve().parents[2] / "frontend/src"
 
 
 def _read_backend(rel: str) -> str:
@@ -139,7 +139,7 @@ def test_pillar_backfill_resolves_tenant_provider():
     body = "\n".join(body_lines)
     assert "_resolve_backfill_provider" in body
     assert "preferred_provider=preferred_provider" in body
-    assert "model=preferred_model" in body
+    assert "preferred_hf_models=" in body
 
 
 def test_resolve_backfill_provider_smoke():

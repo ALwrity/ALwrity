@@ -340,8 +340,6 @@ async def analyze_podcast_idea(
             logger.error(f"[Podcast Analyze] ❌ Failed to generate avatar: {e}")
             # Non-fatal: continue analysis even if avatar generation fails
     
-    # --- END: Avatar Generation ---
-
     # Incorporate user feedback if provided
     feedback_context = ""
     if request.feedback:
@@ -352,11 +350,15 @@ The user was not satisfied with the previous analysis. They provided the followi
 Please prioritize this feedback and adjust the analysis accordingly.
 """
 
+    personalization_context = ""
+    if bible_context:
+        personalization_context = f"USER PERSONALIZATION CONTEXT (Podcast Bible):\n{bible_context}\n"
+
     prompt = f"""
 You are an expert podcast producer and research strategist. Given a podcast idea, craft concise podcast-ready assets
 that sound like episode plans (not fiction stories).
 
-{f"USER PERSONALIZATION CONTEXT (Podcast Bible):\n{bible_context}\n" if bible_context else ""}
+{personalization_context}
 {feedback_context}
 
 Podcast Idea: "{request.idea}"
@@ -510,14 +512,26 @@ async def regenerate_research_queries(
         except Exception as e:
             logger.warning(f"Failed to serialize bible for query regeneration: {e}")
     
+    feedback_block = ""
+    if feedback:
+        feedback_block = f"USER FEEDBACK: {feedback}"
+
+    existing_analysis_block = ""
+    if request.existing_analysis:
+        existing_analysis_block = f"EXISTING ANALYSIS CONTEXT:\n- Topic: {topic}\n- Keywords: {keywords}\n- Audience: {audience}\n"
+
+    bible_context_block = ""
+    if bible_context:
+        bible_context_block = f"PODCAST BIBLE CONTEXT:\n{bible_context}\n"
+
     prompt = f"""
 You are a research strategist for podcast content. Given a podcast idea, existing analysis, and user feedback,
 generate 7 new research queries that address the user's specific needs.
 
-{f"USER FEEDBACK: {feedback}" if feedback else ""}
+{feedback_block}
 
-{f"EXISTING ANALYSIS CONTEXT:\n- Topic: {topic}\n- Keywords: {keywords}\n- Audience: {audience}\n" if request.existing_analysis else ""}
-{f"PODCAST BIBLE CONTEXT:\n{bible_context}\n" if bible_context else ""}
+{existing_analysis_block}
+{bible_context_block}
 
 Podcast Idea: "{idea}"
 

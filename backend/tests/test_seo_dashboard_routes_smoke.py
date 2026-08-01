@@ -47,7 +47,7 @@ def test_seo_dashboard_routes_registered(module_name: str) -> None:
     module = importlib.import_module(module_name)
     fastapi_app = module.app
 
-    registered_paths = {route.path for route in fastapi_app.routes}
+    registered_paths = {route.path for route in fastapi_app.routes if hasattr(route, 'path')}
 
     missing_paths = TARGET_PATHS - registered_paths
     assert not missing_paths, (
