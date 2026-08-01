@@ -71,7 +71,7 @@ const CARD_DEFS: Omit<DashboardWorkflowCard, "startAngle" | "endAngle">[] = [
   {
     id: "publish",
     title: "Publish",
-    description: "Save drafts and schedule on your content calendar",
+    description: "Drafts, quality checks, and best-time insights",
     icon: "publish",
     accent: "#0ea5e9",
   },

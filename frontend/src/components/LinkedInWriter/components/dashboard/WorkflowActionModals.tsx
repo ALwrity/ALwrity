@@ -29,21 +29,24 @@ import {
   StaleReviverModal,
   PerfToPlanModal,
 } from "./RemarkWedgeModals";
-import { DraftLibraryModal, PublishNowModal } from "./PublishWedgeModals";
+import { DraftLibraryModal } from "./PublishWedgeModals";
 import { PeopleYouMayKnowModal } from "../PeopleYouMayKnow";
 import { CreateWedgeComingSoonTile } from "./CreateWedgeComingSoonTile";
+import { PublishWedgeComingSoonTile } from "./PublishWedgeComingSoonTile";
 import { useCreateWedgeNotify } from "../../hooks/useCreateWedgeNotify";
+import { usePublishWedgeNotify } from "../../hooks/usePublishWedgeNotify";
 import {
   isCreateWedgeContentTypeLocked,
   type CreateWedgeLockedContentType,
 } from "../../utils/linkedInConnectLockedUi";
+import { isPublishWedgeFeatureLocked } from "../../utils/linkedInPublishWedgeLockedUi";
 
 type AnalysisSub = "snapshot" | "brand_score" | "viral" | "trends" | null;
 type EngagementSub =
   "booster" | "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
 type RemarkSub =
   "repurpose" | "transformer" | "refresh" | "reviver" | "perf_plan" | null;
-type PublishSub = "drafts" | "publish_now" | null;
+type PublishSub = "drafts" | null;
 
 export type WorkflowModalId =
   "plan" | "create" | "publish" | "analysis" | "engagement" | "remarket";
@@ -96,6 +99,10 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
   const { connected } = useLinkedInSocialConnection();
   const { notifyRequested, handleNotify } = useCreateWedgeNotify();
+  const {
+    notifyRequested: publishNotifyRequested,
+    handleNotify: handlePublishNotify,
+  } = usePublishWedgeNotify();
 
   // ── shared dispatchers ─────────────────────────────────────────────────────
   const dispatch = (evt: string, detail?: Record<string, unknown>) => {
@@ -210,49 +217,63 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "publish"}
         title="Publish"
         onClose={onClose}
-        maxWidth={560}
+        maxWidth={504}
         titleSize="xl"
         modalClassName="linkedin-publish-wedge-modal"
       >
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(2, 1fr)",
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "stretch",
             gap: 12,
+            justifyContent: "center",
           }}
+          className="linkedin-publish-wedge-tiles"
         >
-          <DashboardToolTile
-            title="My Drafts"
-            description="Browse your last 5 saved drafts. Open any in Studio, run a quality check, or schedule. No LinkedIn needed."
-            icon="📁"
-            accent="#0a66c2"
-            onClick={() => {
-              onClose();
-              setPublishSub("drafts");
-            }}
-          />
-          <DashboardToolTile
-            title="Publish to LinkedIn"
-            description="Publish your draft directly with a 3-step pre-flight check"
-            icon="🚀"
-            accent="#dc2626"
-            disabled={!connected}
-            disabledReason="Connect LinkedIn to publish posts"
-            onClick={() => {
-              onClose();
-              setPublishSub("publish_now");
-            }}
-          />
+          <div style={{ width: 140, flexShrink: 0 }}>
+            <DashboardToolTile
+              title="My Drafts"
+              description="Browse your last 5 saved drafts. Open in Studio, run a quality check, or find the best time."
+              icon="📁"
+              accent="#0a66c2"
+              onClick={() => {
+                onClose();
+                setPublishSub("drafts");
+              }}
+            />
+          </div>
+          <div style={{ width: 140, flexShrink: 0 }}>
+            {isPublishWedgeFeatureLocked("publish_campaign") ? (
+              <PublishWedgeComingSoonTile
+                feature="publish_campaign"
+                icon="📊"
+                title="Publish Campaign"
+                description="See scheduled posts ranked by ROI — with actionable insights for your week."
+                notified={publishNotifyRequested.publish_campaign}
+                onNotify={() =>
+                  handlePublishNotify("publish_campaign", "Publish Campaign")
+                }
+              />
+            ) : (
+              <DashboardToolTile
+                title="Publish Campaign"
+                description="See scheduled posts ranked by ROI — with actionable insights for your week."
+                icon="📊"
+                accent="#0ea5e9"
+                onClick={() => {
+                  onClose();
+                  setPublishSub("drafts");
+                }}
+              />
+            )}
+          </div>
         </div>
       </DashboardActionModal>
 
       {/* ── Publish sub-modals ── */}
       <DraftLibraryModal
         open={publishSub === "drafts"}
-        onClose={() => setPublishSub(null)}
-      />
-      <PublishNowModal
-        open={publishSub === "publish_now"}
         onClose={() => setPublishSub(null)}
       />
 

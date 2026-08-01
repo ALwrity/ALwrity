@@ -22,6 +22,11 @@ import {
   getDraftAssetContent,
   type LinkedInDraftAsset,
 } from "../../utils/linkedInDraftLibraryUtils";
+import {
+  isPublishWedgeScheduleLocked,
+  PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT,
+} from "../../utils/linkedInPublishWedgeLockedUi";
+import { ConnectLockIcon } from "./ConnectLockIcon";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -53,6 +58,7 @@ function openInStudio(content: string, onDone: () => void) {
 const panelBtn = (
   primary?: boolean,
   danger?: boolean,
+  locked?: boolean,
 ): React.CSSProperties => ({
   display: "inline-flex",
   alignItems: "center",
@@ -64,7 +70,8 @@ const panelBtn = (
   color: danger ? "#fff" : primary ? "#fff" : "#374151",
   fontSize: 13,
   fontWeight: 600,
-  cursor: "pointer",
+  cursor: locked ? "not-allowed" : "pointer",
+  opacity: locked ? 0.72 : 1,
   transition: "opacity 140ms",
 });
 
@@ -125,7 +132,12 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
   const [qualityCheckAsset, setQualityCheckAsset] =
     useState<LinkedInDraftAsset | null>(null);
   const [showTiming, setShowTiming] = useState(false);
+  const [timingForAsset, setTimingForAsset] =
+    useState<LinkedInDraftAsset | null>(null);
+  const [schedulePrefillDate, setSchedulePrefillDate] = useState("");
+  const [schedulePrefillTime, setSchedulePrefillTime] = useState("");
   const [scheduleAsset, setScheduleAsset] = useState<LinkedInDraftAsset | null>(null);
+  const scheduleLocked = isPublishWedgeScheduleLocked();
 
   useEffect(() => {
     if (!open) return;
@@ -133,6 +145,9 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
     setError("");
     setQualityCheckAsset(null);
     setShowTiming(false);
+    setTimingForAsset(null);
+    setSchedulePrefillDate("");
+    setSchedulePrefillTime("");
     setScheduleAsset(null);
     apiClient
       .get("/api/content-assets/", {
@@ -206,8 +221,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
               Saved Drafts
             </div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1 }}>
-              Your last 5 LinkedIn drafts — open, score, schedule, or check
-              timing
+              Your last 5 LinkedIn drafts — open, score, or check timing
             </div>
           </div>
         </div>
@@ -388,14 +402,27 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
                   📊 Quality Check
                 </button>
                 <button
+                  type="button"
                   style={{
-                    ...panelBtn(),
-                    borderColor: "#10b981",
-                    color: "#10b981",
+                    ...panelBtn(false, false, scheduleLocked),
+                    borderColor: scheduleLocked ? "#d1d5db" : "#10b981",
+                    color: scheduleLocked ? "#9ca3af" : "#10b981",
                   }}
-                  onClick={() => setScheduleAsset(asset)}
+                  disabled={scheduleLocked}
+                  title={
+                    scheduleLocked ? PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT : undefined
+                  }
+                  aria-label={
+                    scheduleLocked
+                      ? "Schedule — coming soon"
+                      : "Schedule this draft"
+                  }
+                  onClick={() => {
+                    if (!scheduleLocked) setScheduleAsset(asset);
+                  }}
                 >
                   📅 Schedule
+                  {scheduleLocked && <ConnectLockIcon size={12} />}
                 </button>
                 <button
                   style={{
@@ -403,7 +430,10 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
                     borderColor: "#0ea5e9",
                     color: "#0ea5e9",
                   }}
-                  onClick={() => setShowTiming(true)}
+                  onClick={() => {
+                    setTimingForAsset(asset);
+                    setShowTiming(true);
+                  }}
                 >
                   ⏰ Best Time
                 </button>
@@ -464,13 +494,36 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
       {/* Best Time to Post sub-modal */}
       <TimingAdvisorModal
         open={showTiming}
-        onClose={() => setShowTiming(false)}
+        onClose={() => {
+          setShowTiming(false);
+          setTimingForAsset(null);
+        }}
+        scheduleLocked={scheduleLocked}
+        onScheduleSlot={
+          scheduleLocked
+            ? undefined
+            : (date, time) => {
+                setSchedulePrefillDate(date);
+                setSchedulePrefillTime(time);
+                setShowTiming(false);
+                if (timingForAsset) {
+                  setScheduleAsset(timingForAsset);
+                }
+                setTimingForAsset(null);
+              }
+        }
       />
 
       {/* Schedule sub-modal for selected draft */}
       <ScheduleQuickModal
         open={!!scheduleAsset}
-        onClose={() => setScheduleAsset(null)}
+        onClose={() => {
+          setScheduleAsset(null);
+          setSchedulePrefillDate("");
+          setSchedulePrefillTime("");
+        }}
+        prefillDate={schedulePrefillDate}
+        prefillTime={schedulePrefillTime}
         initialContent={
           scheduleAsset ? getAssetContent(scheduleAsset) : undefined
         }
@@ -693,6 +746,7 @@ interface TimingAdvisorModalProps {
   open: boolean;
   onClose: () => void;
   onScheduleSlot?: (date: string, time: string) => void;
+  scheduleLocked?: boolean;
 }
 
 type ReachLevel = "high" | "medium" | "low" | "off";
@@ -767,6 +821,7 @@ export const TimingAdvisorModal: React.FC<TimingAdvisorModalProps> = ({
   open,
   onClose,
   onScheduleSlot,
+  scheduleLocked = false,
 }) => {
   const [industry, setIndustry] = useState("Technology");
   const [selectedSlot, setSelectedSlot] = useState<{
@@ -1005,11 +1060,21 @@ export const TimingAdvisorModal: React.FC<TimingAdvisorModalProps> = ({
               </div>
             </div>
             <button
-              style={panelBtn(true)}
+              type="button"
+              style={panelBtn(true, false, scheduleLocked || !onScheduleSlot)}
               onClick={handleScheduleThis}
-              disabled={!onScheduleSlot}
+              disabled={scheduleLocked || !onScheduleSlot}
+              title={
+                scheduleLocked ? PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT : undefined
+              }
+              aria-label={
+                scheduleLocked
+                  ? "Schedule for this slot — coming soon"
+                  : "Schedule for this slot"
+              }
             >
               📅 Schedule for this slot
+              {scheduleLocked && <ConnectLockIcon size={12} />}
             </button>
           </div>
         )}
