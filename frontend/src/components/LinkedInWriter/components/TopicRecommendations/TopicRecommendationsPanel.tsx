@@ -15,6 +15,7 @@ import {
 import { TopicRecommendationsSummaryBar } from "./TopicRecommendationsSummaryBar";
 import { AnalysisErrorAlert } from "./TopicSuggestionIntro";
 import { AnalysisStepIndicator } from "../shared/AnalysisStepIndicator";
+import { useSavedTopicIdeas } from "../../hooks/useSavedTopicIdeas";
 
 interface TopicRecommendationsPanelProps {
   recommendations: LinkedInTopicRecommendation[] | null;
@@ -94,6 +95,7 @@ export const TopicRecommendationsPanel: React.FC<
   onRetry,
   variant = "standalone",
 }) => {
+  const { isSaved, savingId, saveError, saveTopicIdea } = useSavedTopicIdeas();
   const isModal = variant === "modal";
   const updatedLabel = formatRelativeUpdatedAt(
     recommendationsMeta?.recommendations_updated_at,
@@ -356,11 +358,32 @@ export const TopicRecommendationsPanel: React.FC<
               id="topic-recommendations-list"
               style={{ display: "flex", flexDirection: "column", gap: 12 }}
             >
+              {saveError && (
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13,
+                    color: "#b91c1c",
+                    fontWeight: 500,
+                  }}
+                >
+                  {saveError}
+                </p>
+              )}
               {recommendations.map((item, index) => (
                 <TopicRecommendationCard
                   key={item.id}
                   recommendation={item}
                   index={index}
+                  isSaved={isSaved(item.title)}
+                  isSaving={savingId === item.id}
+                  onSave={() =>
+                    void saveTopicIdea(
+                      item.id,
+                      item.title,
+                      item.why_this_fits,
+                    )
+                  }
                 />
               ))}
             </div>

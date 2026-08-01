@@ -644,6 +644,41 @@
   gap: 12px;
 }
 
+/* Create wedge tile modal — original width, no header divider */
+.linkedin-create-wedge-modal {
+  width: min(820px, 100%) !important;
+  max-width: min(820px, 100%) !important;
+}
+
+.linkedin-create-wedge-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 6px !important;
+}
+
+.linkedin-create-wedge-modal .linkedin-dashboard-action-modal-body {
+  padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
+}
+
+/* Topic ideas modal — wider canvas, no header divider, 24px title */
+.linkedin-topic-ideas-modal {
+  width: min(896px, 97vw) !important;
+  max-width: min(896px, 97vw) !important;
+}
+
+.linkedin-topic-ideas-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 4px !important;
+}
+
+.linkedin-topic-ideas-modal .linkedin-dashboard-action-modal-header h2 {
+  font-size: 24px;
+  color: #0a66c2;
+}
+
+.linkedin-topic-ideas-modal .linkedin-dashboard-action-modal-body {
+  padding: 4px 20px 20px !important;
+}
+
 .plan-wedge-brainstorm__saved-ideas-btn {
   margin-left: auto;
   padding: 4px 11px;

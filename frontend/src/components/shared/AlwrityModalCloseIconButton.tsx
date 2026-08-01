@@ -13,7 +13,7 @@ interface AlwrityModalCloseIconButtonProps {
   variant?: AlwrityModalCloseVariant;
 }
 
-/** Standard ✕ close control — matches Landing mobile detail dialog (section 4). */
+/** Standard circular ✕ close control — consistent across LinkedIn Studio popups. */
 export const AlwrityModalCloseIconButton: React.FC<AlwrityModalCloseIconButtonProps> = ({
   onClick,
   ariaLabel = 'Close',
@@ -30,25 +30,28 @@ export const AlwrityModalCloseIconButton: React.FC<AlwrityModalCloseIconButtonPr
       onClick={onClick}
       disabled={disabled}
       size="small"
-      className={className}
+      className={['alwrity-modal-close-btn', className].filter(Boolean).join(' ')}
       sx={{
-        width: 36,
-        height: 36,
+        width: 32,
+        height: 32,
         flexShrink: 0,
-        bgcolor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(15, 23, 42, 0.06)',
-        border: isDark ? '1px solid rgba(255,255,255,0.35)' : '1px solid rgba(148, 163, 184, 0.45)',
-        color: isDark ? '#fff' : '#475569',
-        boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.45)' : '0 1px 4px rgba(15, 23, 42, 0.08)',
+        borderRadius: '50%',
+        bgcolor: isDark ? 'rgba(255, 255, 255, 0.16)' : '#f8fafc',
+        border: isDark
+          ? '1px solid rgba(255, 255, 255, 0.35)'
+          : '1px solid #e2e8f0',
+        color: isDark ? '#ffffff' : '#64748b',
+        boxShadow: 'none',
         '&:hover': {
-          bgcolor: isDark ? 'rgba(255,255,255,0.22)' : 'rgba(15, 23, 42, 0.1)',
-          color: isDark ? '#fff' : '#0f172a',
+          bgcolor: isDark ? 'rgba(255, 255, 255, 0.24)' : '#f1f5f9',
+          color: isDark ? '#ffffff' : '#475569',
         },
         '&.Mui-disabled': {
           opacity: 0.45,
         },
       }}
     >
-      <CloseIcon sx={{ fontSize: 20 }} />
+      <CloseIcon sx={{ fontSize: 18, strokeWidth: 0.5 }} />
     </IconButton>
   );
 };

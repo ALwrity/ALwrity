@@ -31,30 +31,32 @@ import { useModalFocusTrap } from "../../hooks/useModalFocusTrap";
 
 const ANALYSIS_MODAL_DISMISSED_KEY =
   "linkedin_profile_analysis_modal_dismissed_v2";
-const DISMISSAL_EXPIRY_HOURS = 24;
 
-/** Check if dismissal is still valid (within expiry window) */
+/** Check if the analysis-ready modal was dismissed (persists across sessions). */
 function isDismissalValid(): boolean {
   try {
     const raw = localStorage.getItem(ANALYSIS_MODAL_DISMISSED_KEY);
     if (!raw) return false;
-    const data = JSON.parse(raw) as { timestamp: number; expires: number };
-    if (!data.expires) return false;
-    return Date.now() < data.expires;
+    const data = JSON.parse(raw) as {
+      permanent?: boolean;
+      expires?: number;
+    };
+    if (data.permanent) return true;
+    if (data.expires && Date.now() < data.expires) return true;
+    return false;
   } catch {
     return false;
   }
 }
 
-/** Store dismissal with 24-hour expiry */
+/** Store permanent dismissal so the modal shows at most once per user. */
 function storeDismissal(): void {
   try {
-    const dismissForHours = DISMISSAL_EXPIRY_HOURS;
     localStorage.setItem(
       ANALYSIS_MODAL_DISMISSED_KEY,
       JSON.stringify({
+        permanent: true,
         timestamp: Date.now(),
-        expires: Date.now() + dismissForHours * 60 * 60 * 1000,
       }),
     );
   } catch {
@@ -164,12 +166,6 @@ export const LinkedInProfileSetupPanel: React.FC<
     }
   }, [recheckProfile, applyProfileRefreshResponse]);
 
-  const handleImproveProfile = () => {
-    storeDismissal();
-    setShowAnalysisModal(false);
-    void openOptimizationPanel();
-  };
-
   const handleGetTopicIdeas = () => {
     setIsTopicPanelOpen(true);
     void runTopicAnalysis(false);
@@ -216,6 +212,9 @@ export const LinkedInProfileSetupPanel: React.FC<
   );
 
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analysisModalDismissed, setAnalysisModalDismissed] = useState(() =>
+    isDismissalValid(),
+  );
   const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
   const optimizationDialogRef = useRef<HTMLDivElement>(null);
 
@@ -225,7 +224,7 @@ export const LinkedInProfileSetupPanel: React.FC<
 
   /** Phase 4 — skip the ready modal when analysis/optimisation data already exists or was dismissed. */
   const skipAnalysisReadyModal = useMemo(() => {
-    if (isDismissalValid()) return true;
+    if (analysisModalDismissed) return true;
     if (optimizationRecommendations && optimizationRecommendations.length > 0)
       return true;
     const source = optimizationMeta?.source;
@@ -239,7 +238,18 @@ export const LinkedInProfileSetupPanel: React.FC<
     }
     if (optimizationMeta?.profile_optimization_updated_at) return true;
     return false;
-  }, [optimizationRecommendations, optimizationMeta]);
+  }, [analysisModalDismissed, optimizationRecommendations, optimizationMeta]);
+
+  const markAnalysisModalDismissed = useCallback(() => {
+    storeDismissal();
+    setAnalysisModalDismissed(true);
+    setShowAnalysisModal(false);
+  }, []);
+
+  const handleImproveProfile = () => {
+    markAnalysisModalDismissed();
+    void openOptimizationPanel();
+  };
 
   useEffect(() => {
     if (!centered || !isOptimizationOpen) return;
@@ -367,8 +377,7 @@ export const LinkedInProfileSetupPanel: React.FC<
       void runTopicAnalysis(false);
     };
     const onOpenOptimise = () => {
-      storeDismissal();
-      setShowAnalysisModal(false);
+      markAnalysisModalDismissed();
       void openOptimizationPanel();
     };
     const onOpenQuickCreate = () => {
@@ -398,15 +407,19 @@ export const LinkedInProfileSetupPanel: React.FC<
         onOpenQuickCreate,
       );
     };
-  }, [runTopicAnalysis, openOptimizationPanel, collapseRecommendations]);
+  }, [
+    runTopicAnalysis,
+    openOptimizationPanel,
+    collapseRecommendations,
+    markAnalysisModalDismissed,
+  ]);
 
   const dismissAnalysisModal = () => {
-    storeDismissal();
-    setShowAnalysisModal(false);
+    markAnalysisModalDismissed();
   };
 
   const handleOptimiseFromModal = () => {
-    dismissAnalysisModal();
+    markAnalysisModalDismissed();
     void openOptimizationPanel();
   };
 
@@ -699,10 +712,12 @@ export const LinkedInProfileSetupPanel: React.FC<
       {showTopicModal && (
         <DashboardActionModal
           open
-          title={isAnalyzing ? "Generating topic ideas…" : "Topic ideas"}
+          title={isAnalyzing ? "Generating Topic Ideas…" : "Topic Ideas"}
           onClose={closeTopicPanel}
-          maxWidth={640}
+          maxWidth={896}
           maxHeight="min(90vh, 720px)"
+          modalClassName="linkedin-topic-ideas-modal"
+          titleSize="xl"
           zIndex={12100}
         >
           <TopicRecommendationsPanel

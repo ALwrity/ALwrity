@@ -155,6 +155,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         title="Quick Create"
         onClose={onClose}
         maxWidth={820}
+        modalClassName="linkedin-create-wedge-modal"
         titleSize="xl"
       >
         <div

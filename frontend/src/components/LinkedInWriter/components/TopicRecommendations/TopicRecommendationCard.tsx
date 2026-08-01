@@ -11,6 +11,9 @@ import {
 interface TopicRecommendationCardProps {
   recommendation: LinkedInTopicRecommendation;
   index: number;
+  isSaved?: boolean;
+  isSaving?: boolean;
+  onSave?: () => void;
 }
 
 const CARD_STYLE: React.CSSProperties = {
@@ -49,7 +52,7 @@ const MAX_VISIBLE_AUDIENCE = 2;
 
 export const TopicRecommendationCard: React.FC<
   TopicRecommendationCardProps
-> = ({ recommendation, index }) => {
+> = ({ recommendation, index, isSaved = false, isSaving = false, onSave }) => {
   const visibleAudience = recommendation.target_audience.slice(
     0,
     MAX_VISIBLE_AUDIENCE,
@@ -174,7 +177,15 @@ export const TopicRecommendationCard: React.FC<
             </div>
           )}
 
-          <div style={{ marginTop: 14 }}>
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              alignItems: "center",
+            }}
+          >
             <button
               type="button"
               onClick={() => {
@@ -222,6 +233,34 @@ export const TopicRecommendationCard: React.FC<
                 ? "Article"
                 : "Post"}
             </button>
+            {onSave && (
+              <button
+                type="button"
+                onClick={onSave}
+                disabled={isSaved || isSaving}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  borderRadius: 8,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  background: isSaved ? "#ecfdf5" : "#ffffff",
+                  color: isSaved ? "#059669" : "#4338ca",
+                  border: `1px solid ${isSaved ? "#6ee7b7" : "#c7d2fe"}`,
+                  cursor: isSaved || isSaving ? "default" : "pointer",
+                  transition: "background 150ms ease, border-color 150ms ease",
+                }}
+                title={
+                  isSaved
+                    ? "Saved to My Ideas — use it later in Quick Create"
+                    : "Save this topic to My Ideas for later"
+                }
+              >
+                {isSaved ? "✓ Saved" : isSaving ? "Saving…" : "💾 Save to My Ideas"}
+              </button>
+            )}
           </div>
         </div>
       </div>

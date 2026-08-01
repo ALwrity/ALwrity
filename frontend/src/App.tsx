@@ -13,9 +13,9 @@ import Landing from './components/Landing/Landing';
 import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
 import PricingPage from './components/Pricing/PricingPage';
-const LinkedInPricingPage = React.lazy(() => import('./components/Pricing/LinkedInPricingPage'));
 import ContactPage from './components/Landing/ContactPage';
 import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
+const LinkedInPricingPage = React.lazy(() => import('./components/Pricing/LinkedInPricingPage'));
 
 // ΓöÇΓöÇΓöÇ Lazy loaded route components ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // Default exports
