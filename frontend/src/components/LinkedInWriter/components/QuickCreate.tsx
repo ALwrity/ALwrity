@@ -27,6 +27,7 @@ export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_sc
 interface PostFormat {
   value: string;
   label: string;
+  shortLabel: string;
   icon: string;
   tip: string;
   accent: string;
@@ -36,6 +37,7 @@ const POST_FORMATS: PostFormat[] = [
   {
     value: 'thought_leadership',
     label: 'Thought Leadership',
+    shortLabel: 'Thought Leadership',
     icon: '🏆',
     tip: 'Bold POV with data & analysis',
     accent: '#6366f1',
@@ -43,6 +45,7 @@ const POST_FORMATS: PostFormat[] = [
   {
     value: 'personal_story',
     label: 'Personal Story',
+    shortLabel: 'Personal',
     icon: '🙋',
     tip: '3–5× more comments than text posts',
     accent: '#ec4899',
@@ -50,6 +53,7 @@ const POST_FORMATS: PostFormat[] = [
   {
     value: 'industry_news',
     label: 'Industry News',
+    shortLabel: 'Industry',
     icon: '📰',
     tip: 'Comment on what\'s happening now',
     accent: '#0ea5e9',
@@ -57,6 +61,7 @@ const POST_FORMATS: PostFormat[] = [
   {
     value: 'professional',
     label: 'Professional',
+    shortLabel: 'Professional',
     icon: '💼',
     tip: 'Clear insight, concise structure',
     accent: '#0a66c2',
@@ -64,6 +69,7 @@ const POST_FORMATS: PostFormat[] = [
   {
     value: 'company_update',
     label: 'Company Update',
+    shortLabel: 'Company Update',
     icon: '📢',
     tip: 'Milestones, launches & team wins',
     accent: '#10b981',
@@ -71,6 +77,7 @@ const POST_FORMATS: PostFormat[] = [
   {
     value: 'poll',
     label: 'Poll',
+    shortLabel: 'Poll',
     icon: '📊',
     tip: 'Drives follower spikes quickly',
     accent: '#f59e0b',
@@ -110,12 +117,12 @@ interface PostFormatPickerProps {
 const PostFormatPicker: React.FC<PostFormatPickerProps> = ({ selected, onSelect }) => {
   const [hoveredValue, setHoveredValue] = React.useState<string | null>(null);
   return (
-    <div style={{ marginBottom: 16 }}>
+    <div className="linkedin-post-format-picker" style={{ marginBottom: 16 }}>
       <label style={{ display: 'block', marginBottom: 8, fontWeight: 700, fontSize: 13, color: '#374151' }}>
         Post Format
         <span style={{ fontWeight: 400, color: '#6b7280', marginLeft: 6 }}>— pick the narrative that fits your goal</span>
       </label>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+      <div className="linkedin-post-format-picker__grid">
         {POST_FORMATS.map(fmt => {
           const isSelected = selected === fmt.value;
           const isHovered = hoveredValue === fmt.value;
@@ -124,36 +131,37 @@ const PostFormatPicker: React.FC<PostFormatPickerProps> = ({ selected, onSelect 
             <button
               key={fmt.value}
               type="button"
+              className="linkedin-post-format-picker__option"
               onClick={() => onSelect(fmt.value)}
               onMouseEnter={() => setHoveredValue(fmt.value)}
               onMouseLeave={() => setHoveredValue(null)}
               style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                textAlign: 'center',
-                padding: '10px 8px',
                 border: `2px solid ${isSelected ? fmt.accent : active ? fmt.accent + '80' : '#e5e7eb'}`,
-                borderRadius: 10,
                 background: isSelected ? fmt.accent + '12' : active ? fmt.accent + '08' : '#ffffff',
-                cursor: 'pointer',
-                transition: 'all 150ms ease',
                 boxShadow: isSelected ? `0 2px 10px ${fmt.accent}28` : 'none',
-                outline: 'none',
-                gap: 3,
               }}
               aria-pressed={isSelected}
               aria-label={`${fmt.label}: ${fmt.tip}`}
+              title={fmt.tip}
             >
-              <span style={{ fontSize: 22, lineHeight: 1 }}>{fmt.icon}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: isSelected ? fmt.accent : '#111827', lineHeight: 1.2 }}>
-                {fmt.label}
+              <span className="linkedin-post-format-picker__icon" aria-hidden>{fmt.icon}</span>
+              <span
+                className="linkedin-post-format-picker__label"
+                style={{ color: isSelected ? fmt.accent : '#111827' }}
+              >
+                {fmt.shortLabel}
               </span>
-              <span style={{ fontSize: 10, color: isSelected ? fmt.accent : '#6b7280', lineHeight: 1.3, fontWeight: 500 }}>
+              <span
+                className="linkedin-post-format-picker__tip"
+                style={{ color: isSelected ? fmt.accent : '#6b7280' }}
+              >
                 {fmt.tip}
               </span>
               {isSelected && (
-                <span style={{ marginTop: 2, fontSize: 9, fontWeight: 800, letterSpacing: '0.4px', color: fmt.accent, textTransform: 'uppercase' }}>
+                <span
+                  className="linkedin-post-format-picker__selected"
+                  style={{ color: fmt.accent }}
+                >
                   ✓ Selected
                 </span>
               )}
@@ -649,83 +657,105 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     const commonFields = (
       <>
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>Topic *</label>
-          <div style={{ position: 'relative' }}>
+          <label style={{ display: 'block', marginBottom: 4, fontWeight: 600, fontSize: 13, color: '#374151' }}>
+            Topic
+          </label>
+          {selectedType === 'post' || selectedType === 'article' ? (
+            <div
+              className={`linkedin-quick-create-field-card${topicError ? ' linkedin-quick-create-field-card--error' : ''}`}
+            >
+              <input
+                value={formData.topic}
+                onChange={e => setField('topic', e.target.value)}
+                onFocus={() => setTopicFocused(true)}
+                onBlur={() => setTimeout(() => setTopicFocused(false), 200)}
+                placeholder={`e.g., AI trends in ${formData.industry || 'Technology'}`}
+                className="linkedin-quick-create-field-card__input"
+              />
+              {(selectedType === 'post' || (selectedType === 'article' && topicFocused)) && (
+                <div className="linkedin-quick-create-field-card__actions">
+                  {selectedType === 'post' && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setMyIdeasOpen(true)}
+                      className="linkedin-quick-create-field-card__btn linkedin-quick-create-field-card__btn--saved"
+                    >
+                      📚 Browse Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    disabled={brainstorming}
+                    onClick={() => {
+                      if (brainstormingRef.current) return;
+                      const topic = formData.topic.trim();
+                      const brainstormType = selectedType;
+                      if (!topic) {
+                        setTopicError('Enter a topic first to brainstorm ideas.');
+                        return;
+                      }
+
+                      brainstormingRef.current = true;
+                      setBrainstorming(true);
+                      brainstromActiveRef.current = true;
+                      setTopicError(null);
+
+                      variationAbortRef.current?.abort();
+                      setSelectedType(null);
+
+                      brainstormTimeoutRef.current = window.setTimeout(() => {
+                        if (brainstromActiveRef.current) {
+                          brainstromActiveRef.current = false;
+                          brainstormingRef.current = false;
+                          setBrainstorming(false);
+                          openModal(brainstormType);
+                        }
+                      }, 15000);
+
+                      window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
+                        detail: {
+                          seed: topic,
+                          type: brainstormType,
+                          options: { usePersona, includeTrending, remarketContent },
+                          forceRefresh: false,
+                          industry: formData.industry,
+                          tone: formData.tone,
+                          target_audience: formData.target_audience,
+                        },
+                      }));
+                    }}
+                    className={`linkedin-quick-create-field-card__btn linkedin-quick-create-field-card__btn--brainstorm${brainstorming ? ' linkedin-quick-create-field-card__btn--disabled' : ''}`}
+                  >
+                    {brainstorming ? '⏳ Generating...' : '🧠 Brainstorm'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
             <input
               value={formData.topic}
               onChange={e => setField('topic', e.target.value)}
-              onFocus={() => setTopicFocused(true)}
-              onBlur={() => setTimeout(() => setTopicFocused(false), 200)}
               placeholder={`e.g., ${selectedType === 'video_script' ? 'Networking tips' : 'AI trends in ' + (formData.industry || 'Technology')}`}
-              style={{ width: '100%', padding: '10px 12px', border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`, borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                border: `1px solid ${topicError ? '#ef4444' : '#d1d5db'}`,
+                borderRadius: 8,
+                fontSize: 14,
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
             />
-            {topicFocused && (selectedType === 'post' || selectedType === 'article') && (
-              <button
-                type="button"
-                disabled={brainstorming}
-                onClick={() => {
-                  if (brainstormingRef.current) return;
-                  const topic = formData.topic.trim();
-                  const brainstormType = selectedType;
-                  if (!topic) {
-                    setTopicError('Enter a topic first to brainstorm ideas.');
-                    return;
-                  }
-
-                  brainstormingRef.current = true;
-                  setBrainstorming(true);
-                  brainstromActiveRef.current = true;
-                  setTopicError(null);
-
-                  // Lightweight close — hide modal without clearing brainstorm safety net
-                  variationAbortRef.current?.abort();
-                  setSelectedType(null);
-
-                  // Safety timeout: reopen same modal type if BrainstormFlow closes without selecting an idea
-                  brainstormTimeoutRef.current = window.setTimeout(() => {
-                    if (brainstromActiveRef.current) {
-                      brainstromActiveRef.current = false;
-                      brainstormingRef.current = false;
-                      setBrainstorming(false);
-                      openModal(brainstormType);
-                    }
-                  }, 15000);
-
-                  window.dispatchEvent(new CustomEvent('linkedinwriter:runBrainstormIdeas', {
-                    detail: {
-                      seed: topic,
-                      type: brainstormType,
-                      options: { usePersona, includeTrending, remarketContent },
-                      forceRefresh: false,
-                      industry: formData.industry,
-                      tone: formData.tone,
-                      target_audience: formData.target_audience,
-                    },
-                  }));
-                  console.log('[Brainstorm] event dispatched');
-                }}
-                style={{
-                  position: 'absolute', right: 6, top: 5,
-                  padding: '4px 10px', borderRadius: 6,
-                  border: `1px solid ${brainstorming ? '#9ca3af' : '#0a66c2'}`,
-                  background: brainstorming ? '#f3f4f6' : '#fff',
-                  color: brainstorming ? '#9ca3af' : '#0a66c2',
-                  fontWeight: 700, fontSize: 12,
-                  cursor: brainstorming ? 'not-allowed' : 'pointer',
-                  whiteSpace: 'nowrap',
-                  display: 'flex', alignItems: 'center', gap: 4,
-                }}
-              >
-                {brainstorming ? '⏳ Generating...' : '🧠 Brainstorm'}
-              </button>
-            )}
-          </div>
+          )}
           {topicError && (
             <p style={{ margin: '6px 0 0', color: '#b91c1c', fontSize: 12 }}>{topicError}</p>
           )}
         </div>
 
-        {/* Saved Ideas — quick access to previously saved brainstorm ideas */}
+        {/* Saved Ideas — article / carousel / video (post uses inline topic action) */}
+        {selectedType !== 'post' && (
         <div style={{ marginBottom: 14 }}>
           <button
             type="button"
@@ -751,6 +781,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             📚 Browse Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
           </button>
         </div>
+        )}
 
         {/* DataSourceSelector — Post only, always visible */}
             {selectedType === 'post' && (
@@ -926,7 +957,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData, topicError, personaInfo, topicFocused, advancedOpen, setField, closeModal]);
+  }, [selectedType, formData, topicError, personaInfo, topicFocused, advancedOpen, setField, closeModal, savedCount, brainstorming, openModal, usePersona, includeTrending, remarketContent, connected]);
 
   const showInlineGrid = variant === 'default';
 
@@ -1004,39 +1035,37 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           onClick={closeModal}
         >
           <div
-            className={`linkedin-quick-create-dialog${variationsPhase !== 'idle' ? ' linkedin-quick-create-dialog--variations' : ''}`}
+            className={[
+              'linkedin-quick-create-dialog',
+              variationsPhase !== 'idle' ? 'linkedin-quick-create-dialog--variations' : '',
+              selectedType === 'post' ? 'linkedin-quick-create-dialog--plan-size' : '',
+            ].filter(Boolean).join(' ')}
             onClick={(e) => e.stopPropagation()}
           >
 
             {/* Modal header */}
             <div className="linkedin-quick-create-header">
-              <div id="linkedin-quick-create-title" className="linkedin-quick-create-title">
-                {CONTENT_TYPES.find(c => c.type === selectedType)?.icon}{' '}
-                {variationsPhase !== 'idle'
-                  ? '3 Tone Variations'
-                  : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
-              </div>
+              {selectedType === 'post' && variationsPhase === 'idle' ? (
+                <div
+                  id="linkedin-quick-create-title"
+                  className="linkedin-quick-create-title linkedin-quick-create-title--xl"
+                >
+                  <span className="linkedin-quick-create-title__icon" aria-hidden>📝</span>
+                  <span className="linkedin-quick-create-title__text">Post</span>
+                </div>
+              ) : (
+                <div
+                  id="linkedin-quick-create-title"
+                  className="linkedin-quick-create-title"
+                >
+                  {CONTENT_TYPES.find(c => c.type === selectedType)?.icon}{' '}
+                  {variationsPhase !== 'idle'
+                    ? '3 Tone Variations'
+                    : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
+                </div>
+              )}
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                {variationsPhase === 'idle' && (
-                  <button
-                    type="button"
-                    onClick={() => setMyIdeasOpen(true)}
-                    style={{
-                      padding: '4px 10px',
-                      borderRadius: 6,
-                      border: '1px solid #6366f1',
-                      background: 'white',
-                      color: '#6366f1',
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    📚 My Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
-                  </button>
-                )}
-                <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" className="linkedin-quick-create-close" />
+                <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" />
               </div>
             </div>
 

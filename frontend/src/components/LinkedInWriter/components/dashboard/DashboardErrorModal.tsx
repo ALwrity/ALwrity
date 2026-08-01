@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { LI_Z_TOUR } from "../../utils/linkedInStudioZIndex";
 import type { LinkedInProfileAnalysisError } from "../../../../api/linkedinSocial";
 import { FRAME_COLOR } from "./dashboardWorkflowConfig";
+import { StudioModalCloseButton } from "./StudioModalCloseButton";
 
 interface DashboardErrorModalProps {
   open: boolean;
@@ -76,22 +77,7 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
           >
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onDismiss}
-            aria-label="Close"
-            style={{
-              background: "transparent",
-              border: "none",
-              fontSize: 20,
-              lineHeight: 1,
-              cursor: "pointer",
-              color: "#78716c",
-              padding: 4,
-            }}
-          >
-            ✕
-          </button>
+          <StudioModalCloseButton onClick={onDismiss} ariaLabel="Close" />
         </div>
 
         <div style={{ padding: "16px 18px", color: "#92400e" }}>

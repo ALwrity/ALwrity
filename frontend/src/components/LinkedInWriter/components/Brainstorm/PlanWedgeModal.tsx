@@ -139,6 +139,9 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
         { usePersona, includeTrending, remarketContent },
         brainstorm.hasResults,
       )
+      .catch((err: unknown) => {
+        console.error('[PlanWedge] brainstorm failed:', err);
+      })
       .finally(() => {
         brainstormingRef.current = false;
         setBrainstorming(false);
@@ -154,7 +157,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
       modalClassName="linkedin-plan-wedge-modal"
       maxWidth="min(97vw, 1200px)"
       maxHeight="min(98dvh, calc(100dvh - 8px))"
-      titleSize="lg"
+      titleSize="xl"
     >
       <div className="plan-wedge">
         <div className="plan-wedge-main">
@@ -171,20 +174,8 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
               </div>
               <button
                 type="button"
+                className="plan-wedge-brainstorm__saved-ideas-btn"
                 onClick={() => setMyIdeasOpen(true)}
-                style={{
-                  marginLeft: 'auto',
-                  padding: '4px 10px',
-                  borderRadius: 6,
-                  border: '1px solid #6366f1',
-                  background: 'white',
-                  color: '#6366f1',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
               >
                 📚 My Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
               </button>
@@ -246,6 +237,9 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
                 onRefreshPersonalized={() => void brainstorm.refreshPersonalized()}
                 onRetrySeed={() => void brainstorm.retrySeed()}
                 onSaveIdea={(idx) => void brainstorm.handleSaveIdea(idx, (brainstormSeed || '').trim())}
+                onSavePersonalizedIdea={(idx) =>
+                  void brainstorm.handleSavePersonalizedIdea(idx, (brainstormSeed || '').trim())
+                }
                 onEditInputs={() => brainstorm.resetResults()}
               />
             </div>

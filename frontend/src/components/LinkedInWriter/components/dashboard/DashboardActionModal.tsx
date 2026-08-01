@@ -19,8 +19,8 @@ interface DashboardActionModalProps {
   minHeight?: number | string;
   zIndex?: number;
   disableClose?: boolean;
-  /** Slightly larger title for primary wedge modals (e.g. Plan). */
-  titleSize?: "default" | "lg";
+  /** Title scale: default 15px, lg 18px, xl 24px (primary workflow wedges). */
+  titleSize?: "default" | "lg" | "xl";
   /** Text close control instead of ✕ (e.g. "Explore first"). */
   closeLabel?: string;
   /** Above studio tour / error overlays when set. */
@@ -60,6 +60,9 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   };
 
   const modalZIndex = elevated ? LI_Z_ELEVATED_MODAL : zIndex;
+
+  const titleFontSize =
+    titleSize === "xl" ? 24 : titleSize === "lg" ? 18 : 15;
 
   return createPortal(
     <div
@@ -121,7 +124,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
             id="dashboard-action-modal-title"
             style={{
               margin: 0,
-              fontSize: titleSize === "lg" ? 18 : 15,
+              fontSize: titleFontSize,
               fontWeight: 700,
               color: "#0a66c2",
               letterSpacing: "-0.01em",

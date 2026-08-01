@@ -155,6 +155,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         title="Quick Create"
         onClose={onClose}
         maxWidth={820}
+        modalClassName="linkedin-create-wedge-modal"
+        titleSize="xl"
       >
         <div
           style={{
@@ -210,6 +212,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         title="Publish"
         onClose={onClose}
         maxWidth={640}
+        titleSize="xl"
       >
         <div
           style={{
@@ -273,6 +276,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         title="Analysis"
         onClose={onClose}
         maxWidth={720}
+        titleSize="xl"
       >
         <div
           style={{
@@ -369,6 +373,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         title="Engagement"
         onClose={onClose}
         maxWidth={680}
+        titleSize="xl"
       >
         <div
           style={{
@@ -489,6 +494,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         title="Remarket"
         onClose={onClose}
         maxWidth={680}
+        titleSize="xl"
       >
         <div
           style={{

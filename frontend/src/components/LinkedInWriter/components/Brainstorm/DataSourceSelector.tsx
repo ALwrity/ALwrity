@@ -26,7 +26,7 @@ interface CheckboxDef {
 const CHECKBOXES: CheckboxDef[] = [
   {
     key: "usePersona",
-    label: "Persona",
+    label: "Profile Persona",
     icon: "🎨",
     tooltip: "Match your writing persona (tone, style, audience)",
     requiresConnected: false,

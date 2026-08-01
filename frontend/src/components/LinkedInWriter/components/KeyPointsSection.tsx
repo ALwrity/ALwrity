@@ -26,12 +26,6 @@ export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleGenerate = async () => {
-    console.log(
-      "[KeyPointsSection] handleGenerate called, topic:",
-      JSON.stringify(topic),
-      "trimmed:",
-      JSON.stringify(topic.trim()),
-    );
     setErrorMsg(null);
     setPhase("generating");
     try {
@@ -42,33 +36,17 @@ export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
         target_audience: targetAudience || undefined,
         brainstorm_context: keyPoints?.trim() || undefined,
       };
-      console.log("[KeyPointsSection] calling API with payload:", payload);
       const res = await generateKeyPoints(payload);
-      console.log(
-        "[KeyPointsSection] API response:",
-        JSON.stringify(res).slice(0, 500),
-      );
       if (res.success && res.data?.key_point_sets?.length) {
-        console.log(
-          "[KeyPointsSection] got",
-          res.data.key_point_sets.length,
-          "key point sets",
-        );
         setSets(res.data.key_point_sets);
         setPhase("ready");
       } else {
-        console.log(
-          "[KeyPointsSection] no key points or success=false",
-          res.success,
-          res.data?.key_point_sets?.length,
-        );
         setErrorMsg(
           res?.error || "No key points returned. Try a different topic.",
         );
         setPhase("idle");
       }
     } catch (err) {
-      console.log("[KeyPointsSection] API call failed:", err);
       const msg =
         err instanceof Error ? err.message : "An unexpected error occurred.";
       setErrorMsg(msg);
@@ -207,7 +185,7 @@ export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
           </button>
         </div>
       ) : (
-        <div style={{ position: "relative" }}>
+        <div className="linkedin-quick-create-field-card">
           <textarea
             value={keyPoints}
             onChange={(e) => {
@@ -216,114 +194,27 @@ export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
             }}
             placeholder="Key point 1 / Key point 2 / Key point 3"
             rows={3}
-            style={{
-              width: "100%",
-              padding: "10px 12px",
-              border: "1px solid #d1d5db",
-              borderRadius: 8,
-              fontSize: 14,
-              outline: "none",
-              resize: "vertical",
-              fontFamily: "inherit",
-              boxSizing: "border-box",
-            }}
+            className="linkedin-quick-create-field-card__textarea"
           />
-          {phase === "generating" ? (
-            <div
-              style={{
-                position: "absolute",
-                right: 6,
-                bottom: 8,
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "4px 10px",
-                borderRadius: 6,
-                background: "#f3f4f6",
-                color: "#6b7280",
-                fontSize: 12,
-                fontWeight: 600,
-              }}
-            >
-              <div
-                style={{
-                  width: 12,
-                  height: 12,
-                  borderRadius: "50%",
-                  border: "2px solid #8b5cf6",
-                  borderTopColor: "transparent",
-                  animation: "spin 0.8s linear infinite",
-                }}
-              />
-              Generating...
-            </div>
-          ) : (
-            <button
-              type="button"
-              disabled={!topic.trim()}
-              onClick={handleGenerate}
-              style={{
-                position: "absolute",
-                right: 6,
-                bottom: 8,
-                padding: "5px 12px",
-                borderRadius: 6,
-                border: "none",
-                background: topic.trim()
-                  ? "linear-gradient(135deg, #8b5cf6, #6366f1)"
-                  : "#f3f4f6",
-                color: topic.trim() ? "#fff" : "#9ca3af",
-                fontWeight: 700,
-                fontSize: 12,
-                cursor: topic.trim() ? "pointer" : "not-allowed",
-                whiteSpace: "nowrap",
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                boxShadow: topic.trim()
-                  ? "0 2px 8px rgba(99,102,241,0.3)"
-                  : "none",
-                transition: "all 0.15s ease",
-              }}
-              onMouseEnter={(e) => {
-                if (topic.trim()) {
-                  e.currentTarget.style.background =
-                    "linear-gradient(135deg, #7c3aed, #4f46e5)";
-                  e.currentTarget.style.boxShadow =
-                    "0 3px 12px rgba(99,102,241,0.4)";
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (topic.trim()) {
-                  e.currentTarget.style.background =
-                    "linear-gradient(135deg, #8b5cf6, #6366f1)";
-                  e.currentTarget.style.boxShadow =
-                    "0 2px 8px rgba(99,102,241,0.3)";
-                  e.currentTarget.style.transform = "translateY(0)";
-                }
-              }}
-            >
-              ✨ Get Key Points
-            </button>
-          )}
+          <div className="linkedin-quick-create-field-card__actions">
+            {phase === "generating" ? (
+              <div className="linkedin-quick-create-field-card__generating">
+                <div className="linkedin-quick-create-field-card__spinner" />
+                Generating...
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={!topic.trim()}
+                onClick={handleGenerate}
+                className={`linkedin-quick-create-field-card__btn linkedin-quick-create-field-card__btn--keypoints${!topic.trim() ? " linkedin-quick-create-field-card__btn--disabled" : ""}`}
+              >
+                ✨ Get Key Points
+              </button>
+            )}
+          </div>
           {errorMsg && (
-            <div
-              style={{
-                position: "absolute",
-                left: 6,
-                bottom: 8,
-                fontSize: 11,
-                color: "#b91c1c",
-                fontWeight: 500,
-                maxWidth: "calc(100% - 140px)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              ⚠ {errorMsg}
-            </div>
+            <p className="linkedin-quick-create-field-card__error">⚠ {errorMsg}</p>
           )}
         </div>
       )}

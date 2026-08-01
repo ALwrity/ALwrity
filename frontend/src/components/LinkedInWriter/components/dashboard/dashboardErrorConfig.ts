@@ -84,7 +84,7 @@ export function buildDashboardErrorConfig(input: {
       error: input.topicError,
       onRetry: input.onRetryTopic,
       isRetrying: input.isAnalyzing,
-      title: "Topic ideas",
+      title: "Topic Ideas",
       key: `topic-${input.topicError.error_code}`,
     };
   }
@@ -112,7 +112,7 @@ export function buildDashboardErrorConfig(input: {
       },
       onRetry: input.onRetryTopic,
       isRetrying: input.isAnalyzing,
-      title: "Topic ideas",
+      title: "Topic Ideas",
       key: `rec-${input.recommendationsError}`,
     };
   }

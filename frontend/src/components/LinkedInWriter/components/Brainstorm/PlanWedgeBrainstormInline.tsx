@@ -1,5 +1,6 @@
 import React from 'react';
 import PersonalizedIdeasPanel from './PersonalizedIdeasPanel';
+import BrainstormIdeaCard from './BrainstormIdeaCard';
 import type { BrainstormOptions, BrainstormIdea, BrainstormSource } from '../../hooks/usePlanWedgeBrainstorm';
 import type { PersonalizedIdeaItem } from './PersonalizedIdeasPanel';
 
@@ -27,6 +28,7 @@ interface PlanWedgeBrainstormInlineProps {
   onRefreshPersonalized: () => void;
   onRetrySeed: () => void;
   onSaveIdea: (idx: number) => void;
+  onSavePersonalizedIdea?: (idx: number) => void;
   onEditInputs: () => void;
 }
 
@@ -60,9 +62,17 @@ export const PlanWedgeBrainstormInline: React.FC<PlanWedgeBrainstormInlineProps>
   onRefreshPersonalized,
   onRetrySeed,
   onSaveIdea,
+  onSavePersonalizedIdea,
   onEditInputs,
 }) => {
   const showResultsPanel = isLoading || hasResults || seedError || personalizedError;
+  const showPersonalizedSave = Boolean(
+    onSavePersonalizedIdea &&
+      lastOptions &&
+      (lastOptions.usePersona ||
+        lastOptions.includeTrending ||
+        lastOptions.remarketContent)
+  );
 
   if (!showResultsPanel) return null;
 
@@ -82,7 +92,15 @@ export const PlanWedgeBrainstormInline: React.FC<PlanWedgeBrainstormInlineProps>
   personalizedLoadingItems.push('Formulating personalized angles');
 
   return (
-    <div className="plan-wedge-brainstorm__inline" aria-live="polite">
+    <div
+      className={[
+        'plan-wedge-brainstorm__inline',
+        showResultsPanel && (isLoading || hasResults) && 'plan-wedge-brainstorm__inline--generating',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+      aria-live="polite"
+    >
       <nav className="plan-wedge-brainstorm__steps" aria-label="Brainstorm progress">
         {STEPS.map((step, index) => (
           <React.Fragment key={step.num}>
@@ -185,6 +203,13 @@ export const PlanWedgeBrainstormInline: React.FC<PlanWedgeBrainstormInlineProps>
             dataSummary={personalizedDataSummary}
             onGeneratePost={onGeneratePost}
             onRefresh={onRefreshPersonalized}
+            variant="plan-wedge"
+            sources={sources}
+            savedPromptHashes={savedPromptHashes}
+            savingIndex={savingIndex}
+            saveError={showPersonalizedSave ? saveError : null}
+            hashPrompt={hashPrompt}
+            onSaveIdea={showPersonalizedSave ? onSavePersonalizedIdea : undefined}
           />
         </div>
       )}
@@ -206,74 +231,20 @@ export const PlanWedgeBrainstormInline: React.FC<PlanWedgeBrainstormInlineProps>
           </div>
 
           <div className="plan-wedge-brainstorm__ideas-grid">
-            {ideas.map((idea, i) => {
-              const isSaved = savedPromptHashes.has(hashPrompt(idea.prompt));
-              const isSavingThis = savingIndex === i;
-
-              return (
-                <article key={i} className="plan-wedge-brainstorm__idea-card">
-                  <div className="plan-wedge-brainstorm__idea-main">
-                    <p className="plan-wedge-brainstorm__idea-prompt">{idea.prompt}</p>
-                    {idea.rationale && (
-                      <p className="plan-wedge-brainstorm__idea-rationale">{idea.rationale}</p>
-                    )}
-                    {idea.evidence && (
-                      <p className="plan-wedge-brainstorm__idea-evidence">{idea.evidence}</p>
-                    )}
-                    <div className="plan-wedge-brainstorm__idea-actions">
-                      <button
-                        type="button"
-                        className="plan-wedge-brainstorm__btn-post"
-                        onClick={() => onGeneratePost(idea.prompt, 'post')}
-                      >
-                        Generate Post
-                      </button>
-                      <button
-                        type="button"
-                        className="plan-wedge-brainstorm__btn-article"
-                        onClick={() => onGeneratePost(idea.prompt, 'article')}
-                      >
-                        Generate Article
-                      </button>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className={[
-                      'plan-wedge-brainstorm__save-btn',
-                      isSaved && 'plan-wedge-brainstorm__save-btn--saved',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onClick={() => onSaveIdea(i)}
-                    disabled={isSaved || isSavingThis}
-                    aria-label={isSaved ? 'Idea saved' : 'Save idea'}
-                  >
-                    {isSaved ? 'Saved' : isSavingThis ? 'Saving…' : 'Save'}
-                  </button>
-                </article>
-              );
-            })}
+            {ideas.map((idea, i) => (
+              <BrainstormIdeaCard
+                key={i}
+                idea={idea}
+                sources={sources}
+                cardIndex={i}
+                isLastCard={i === ideas.length - 1}
+                isSaved={savedPromptHashes.has(hashPrompt(idea.prompt))}
+                isSaving={savingIndex === i}
+                onGeneratePost={onGeneratePost}
+                onSave={() => onSaveIdea(i)}
+              />
+            ))}
           </div>
-
-          {sources.length > 0 && (
-            <details className="plan-wedge-brainstorm__sources">
-              <summary>Sources used ({sources.length})</summary>
-              <div className="plan-wedge-brainstorm__sources-list">
-                {sources.map((src, i) => (
-                  <div key={i} className="plan-wedge-brainstorm__source-item">
-                    <strong>
-                      Source {i + 1}: {src.title}
-                    </strong>
-                    <p>{src.snippet}</p>
-                    <a href={src.url} target="_blank" rel="noopener noreferrer">
-                      Read more
-                    </a>
-                  </div>
-                ))}
-              </div>
-            </details>
-          )}
         </div>
       )}
 

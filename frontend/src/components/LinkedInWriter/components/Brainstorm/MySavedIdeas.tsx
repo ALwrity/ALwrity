@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { LI_Z_MODAL } from "../../utils/linkedInStudioZIndex";
 import { apiClient } from "../../../../api/client";
+import { StudioModalCloseButton } from "../dashboard/StudioModalCloseButton";
 
 export interface SavedBrainstormIdea {
   id: string;
@@ -228,23 +229,11 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
                 : `${total} saved idea${total === 1 ? "" : "s"}`}
             </div>
           </div>
-          <button
-            type="button"
+          <StudioModalCloseButton
             onClick={onClose}
-            aria-label="Close saved ideas"
-            style={{
-              background: "rgba(255, 255, 255, 0.2)",
-              border: "none",
-              color: "#ffffff",
-              padding: "6px 10px",
-              borderRadius: 8,
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
-            ✕
-          </button>
+            ariaLabel="Close saved ideas"
+            variant="dark"
+          />
         </div>
 
         <div

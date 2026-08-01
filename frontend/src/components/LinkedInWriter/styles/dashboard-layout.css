@@ -4391,13 +4391,31 @@ body.linkedin-quick-create-open {
   width: min(868px, 100%);
 }
 
-.linkedin-quick-create-header {
-  padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
+/* Post modal — Plan wedge canvas size, narrowed 20% for Post window */
+.linkedin-quick-create-dialog--plan-size {
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
+  max-height: min(98dvh, calc(100dvh - 8px)) !important;
+}
+
+.linkedin-quick-create-dialog--plan-size .linkedin-quick-create-body {
+  max-height: none;
+  flex: 1 1 auto;
+  padding-top: 6px;
+}
+
+.linkedin-quick-create-dialog--plan-size .linkedin-quick-create-header {
+  padding: 12px 16px 4px;
+}
+
+.linkedin-quick-create-title--xl {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  flex-shrink: 0;
+  gap: 8px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #0a66c2;
+  letter-spacing: -0.01em;
 }
 
 .linkedin-quick-create-title {
@@ -4406,53 +4424,233 @@ body.linkedin-quick-create-open {
   color: #111827;
 }
 
-.linkedin-quick-create-close {
-  background: none;
-  border: none;
-  font-size: 20px;
-  cursor: pointer;
-  color: #6b7280;
-  padding: 4px 8px;
-  border-radius: 6px;
-  line-height: 1;
+/* Post header — must follow base title rule so 24px is not overridden */
+.linkedin-quick-create-title.linkedin-quick-create-title--xl {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0a66c2;
 }
 
-.linkedin-studio-modal-close {
-  background: transparent;
-  border: none;
-  font-size: 18px;
+.linkedin-quick-create-title__text {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.linkedin-quick-create-title__icon {
+  font-size: 26px;
   line-height: 1;
-  cursor: pointer;
-  color: #9ca3af;
-  padding: 4px 8px;
-  border-radius: 6px;
   flex-shrink: 0;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
 }
 
-.linkedin-studio-modal-close:hover:not(:disabled) {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.linkedin-studio-modal-close:disabled {
-  cursor: not-allowed;
-  opacity: 0.45;
-}
-
-.linkedin-studio-modal-close--on-dark {
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-  font-size: 16px;
-  padding: 6px 10px;
+.linkedin-quick-create-field-card {
+  border: 1px solid #d1d5db;
   border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
 }
 
-.linkedin-studio-modal-close--on-dark:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.32);
-  color: #ffffff;
+.linkedin-quick-create-field-card--error {
+  border-color: #ef4444;
+}
+
+.linkedin-quick-create-field-card__input,
+.linkedin-quick-create-field-card__textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 0;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  background: transparent;
+  font-family: inherit;
+  display: block;
+}
+
+.linkedin-quick-create-field-card__textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.linkedin-quick-create-field-card__input:focus,
+.linkedin-quick-create-field-card__textarea:focus {
+  outline: none;
+}
+
+.linkedin-quick-create-field-card__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 6px 8px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.linkedin-quick-create-field-card__btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 150ms ease;
+}
+
+.linkedin-quick-create-field-card__btn--saved {
+  border: 1px solid #6366f1;
+  background: #fff;
+  color: #6366f1;
+}
+
+.linkedin-quick-create-field-card__btn--brainstorm {
+  border: 1px solid #0a66c2;
+  background: #fff;
+  color: #0a66c2;
+}
+
+.linkedin-quick-create-field-card__btn--keypoints {
+  padding: 5px 12px;
+  border: none;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.linkedin-quick-create-field-card__btn--keypoints:not(.linkedin-quick-create-field-card__btn--disabled):hover {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  box-shadow: 0 3px 12px rgba(99, 102, 241, 0.4);
+  transform: translateY(-1px);
+}
+
+.linkedin-quick-create-field-card__btn--disabled {
+  border: 1px solid #9ca3af;
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.linkedin-quick-create-field-card__generating {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: #f3f4f6;
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.linkedin-quick-create-field-card__spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid #8b5cf6;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+.linkedin-quick-create-field-card__error {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 11px;
+  color: #b91c1c;
+  font-weight: 500;
+  border-top: 1px solid #fecaca;
+  background: #fef2f2;
+}
+
+/* Post format picker — six formats in one row on desktop */
+.linkedin-post-format-picker__grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.linkedin-post-format-picker__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  width: 98%;
+  max-width: 100%;
+  justify-self: center;
+  min-height: 108px;
+  padding: 10px 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  outline: none;
+  gap: 3px;
+}
+
+.linkedin-post-format-picker__icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.linkedin-post-format-picker__label {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.linkedin-post-format-picker__tip {
+  font-size: 10px;
+  line-height: 1.35;
+  font-weight: 500;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.linkedin-post-format-picker__selected {
+  margin-top: 2px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 720px) {
+  .linkedin-post-format-picker__grid {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+
+  .linkedin-post-format-picker__option {
+    flex: 0 0 129px;
+    width: 129px;
+    min-height: 112px;
+  }
+}
+
+.linkedin-quick-create-header {
+  padding: 16px;
+  border-bottom: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Circular close — do not override AlwrityModalCloseIconButton circle styling */
+.alwrity-modal-close-btn {
+  flex-shrink: 0;
 }
 
 .linkedin-knowledge-center-panel {
@@ -4480,11 +4678,6 @@ body.linkedin-quick-create-open {
   font-weight: 700;
   color: #0a66c2;
   letter-spacing: -0.01em;
-}
-
-.linkedin-quick-create-close:hover {
-  background: #f3f4f6;
-  color: #374151;
 }
 
 .linkedin-quick-create-body {
