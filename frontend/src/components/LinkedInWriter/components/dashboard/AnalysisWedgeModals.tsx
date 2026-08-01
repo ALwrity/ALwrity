@@ -802,6 +802,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
       onClose={onClose}
       maxWidth={560}
       maxHeight="min(92vh, 700px)"
+      modalClassName="linkedin-post-today-modal"
     >
       <div>
         <p
@@ -812,7 +813,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
             lineHeight: 1.5,
           }}
         >
-          AI-ranked post opportunities across all your growth signals — trending
+          ALwrity-ranked post opportunities across all your growth signals — trending
           topics, content gaps, weekly strategy, and engagement wins.
         </p>
 
@@ -827,7 +828,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
               description={
                 error
                   ? "Try again or close and reopen the modal."
-                  : "Load your growth analysis to get AI-ranked post recommendations."
+                  : "Load your growth analysis to get ALwrity-ranked post recommendations."
               }
               buttonLabel={error ? "🔁 Retry" : "🚀 Load Insights"}
               onLoad={handleLoadAll}

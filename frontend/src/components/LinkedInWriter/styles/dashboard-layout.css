@@ -4443,6 +4443,14 @@ body.linkedin-quick-create-open {
   flex-shrink: 0;
 }
 
+.linkedin-quick-create-title--article {
+  color: #057642;
+}
+
+.linkedin-quick-create-title__icon--article {
+  font-size: 22px;
+}
+
 .linkedin-quick-create-field-card {
   border: 1px solid #d1d5db;
   border-radius: 8px;
@@ -4506,6 +4514,16 @@ body.linkedin-quick-create-open {
   border: 1px solid #6366f1;
   background: #fff;
   color: #6366f1;
+}
+
+.linkedin-quick-create-field-card__btn--post-today {
+  border: 1px solid #0a66c2;
+  background: #eff6ff;
+  color: #0a66c2;
+}
+
+.linkedin-quick-create-field-card__btn--post-today:not(.linkedin-quick-create-field-card__btn--disabled):hover {
+  background: #dbeafe;
 }
 
 .linkedin-quick-create-field-card__btn--brainstorm {

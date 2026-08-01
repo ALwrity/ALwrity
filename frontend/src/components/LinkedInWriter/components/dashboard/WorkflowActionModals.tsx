@@ -11,7 +11,6 @@ import {
 } from "../../utils/linkedInDashboardEvents";
 import {
   GrowthSnapshotModal,
-  PostTodayModal,
   BrandScorecardModal,
   ViralCopywriterModal,
   EngagementTrendsModal,
@@ -44,7 +43,7 @@ type EngagementSub =
   "booster" | "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
 type RemarkSub =
   "repurpose" | "transformer" | "refresh" | "reviver" | "perf_plan" | null;
-type PublishSub = "drafts" | "post_today" | "publish_now" | null;
+type PublishSub = "drafts" | "publish_now" | null;
 
 export type WorkflowModalId =
   "plan" | "create" | "publish" | "analysis" | "engagement" | "remarket";
@@ -211,13 +210,14 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "publish"}
         title="Publish"
         onClose={onClose}
-        maxWidth={640}
+        maxWidth={560}
         titleSize="xl"
+        modalClassName="linkedin-publish-wedge-modal"
       >
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(2, 1fr)",
             gap: 12,
           }}
         >
@@ -229,16 +229,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             onClick={() => {
               onClose();
               setPublishSub("drafts");
-            }}
-          />
-          <DashboardToolTile
-            title="Post Today"
-            description="AI ranks your top 3 post opportunities from drafts, trends & past posts. Get timing & hookline tips. No LinkedIn needed."
-            icon="🎯"
-            accent="#0a66c2"
-            onClick={() => {
-              onClose();
-              setPublishSub("post_today");
             }}
           />
           <DashboardToolTile
@@ -259,10 +249,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       {/* ── Publish sub-modals ── */}
       <DraftLibraryModal
         open={publishSub === "drafts"}
-        onClose={() => setPublishSub(null)}
-      />
-      <PostTodayModal
-        open={publishSub === "post_today"}
         onClose={() => setPublishSub(null)}
       />
       <PublishNowModal

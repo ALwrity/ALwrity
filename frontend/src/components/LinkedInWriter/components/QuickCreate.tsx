@@ -19,6 +19,7 @@ import {
 } from '../utils/linkedInConnectLockedUi';
 import { CreateWedgeComingSoonTile } from './dashboard/CreateWedgeComingSoonTile';
 import { useCreateWedgeNotify } from '../hooks/useCreateWedgeNotify';
+import { PostTodayModal } from './dashboard/analysisWedgeModalExports';
 
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
@@ -339,10 +340,10 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const brainstormingRef = useRef(false);
 
   const [myIdeasOpen, setMyIdeasOpen] = useState(false);
+  const [postTodayOpen, setPostTodayOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [topicFocused, setTopicFocused] = useState(false);
   const [usePersona, setUsePersona] = useState(false);
   const [includeTrending, setIncludeTrending] = useState(false);
   const [remarketContent, setRemarketContent] = useState(false);
@@ -667,23 +668,11 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               <input
                 value={formData.topic}
                 onChange={e => setField('topic', e.target.value)}
-                onFocus={() => setTopicFocused(true)}
-                onBlur={() => setTimeout(() => setTopicFocused(false), 200)}
                 placeholder={`e.g., AI trends in ${formData.industry || 'Technology'}`}
                 className="linkedin-quick-create-field-card__input"
               />
-              {(selectedType === 'post' || (selectedType === 'article' && topicFocused)) && (
+              {(selectedType === 'post' || selectedType === 'article') && (
                 <div className="linkedin-quick-create-field-card__actions">
-                  {selectedType === 'post' && (
-                    <button
-                      type="button"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => setMyIdeasOpen(true)}
-                      className="linkedin-quick-create-field-card__btn linkedin-quick-create-field-card__btn--saved"
-                    >
-                      📚 Browse Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
-                    </button>
-                  )}
                   <button
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
@@ -730,6 +719,24 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                   >
                     {brainstorming ? '⏳ Generating...' : '🧠 Brainstorm'}
                   </button>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setMyIdeasOpen(true)}
+                    className="linkedin-quick-create-field-card__btn linkedin-quick-create-field-card__btn--saved"
+                  >
+                    📚 Browse Saved Ideas{savedCount > 0 ? ` (${savedCount})` : ''}
+                  </button>
+                  {selectedType === 'post' && (
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setPostTodayOpen(true)}
+                      className="linkedin-quick-create-field-card__btn linkedin-quick-create-field-card__btn--post-today"
+                    >
+                      🎯 Post Today
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -754,8 +761,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           )}
         </div>
 
-        {/* Saved Ideas — article / carousel / video (post uses inline topic action) */}
-        {selectedType !== 'post' && (
+        {/* Saved Ideas — carousel / video (post & article use inline topic actions) */}
+        {selectedType !== 'post' && selectedType !== 'article' && (
         <div style={{ marginBottom: 14 }}>
           <button
             type="button"
@@ -957,7 +964,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData, topicError, personaInfo, topicFocused, advancedOpen, setField, closeModal, savedCount, brainstorming, openModal, usePersona, includeTrending, remarketContent, connected]);
+  }, [selectedType, formData, topicError, personaInfo, advancedOpen, setField, closeModal, savedCount, brainstorming, openModal, usePersona, includeTrending, remarketContent, connected]);
 
   const showInlineGrid = variant === 'default';
 
@@ -1052,6 +1059,19 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                 >
                   <span className="linkedin-quick-create-title__icon" aria-hidden>📝</span>
                   <span className="linkedin-quick-create-title__text">Post</span>
+                </div>
+              ) : selectedType === 'article' && variationsPhase === 'idle' ? (
+                <div
+                  id="linkedin-quick-create-title"
+                  className="linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
+                >
+                  <span
+                    className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
+                    aria-hidden
+                  >
+                    📄
+                  </span>
+                  <span className="linkedin-quick-create-title__text">Article</span>
                 </div>
               ) : (
                 <div
@@ -1207,6 +1227,11 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           setMyIdeasOpen(false);
           setField('topic', prompt);
         }}
+      />
+
+      <PostTodayModal
+        open={postTodayOpen}
+        onClose={() => setPostTodayOpen(false)}
       />
     </>
   );

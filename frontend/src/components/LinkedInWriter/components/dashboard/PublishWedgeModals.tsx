@@ -17,6 +17,11 @@ import type { PostPreviewScoreResponse } from "../../../../services/linkedInGrow
 import { contentPlanningApi } from "../../../../services/contentPlanningApi";
 import { formatDraftForPublish } from "../../utils/linkedInPublishFormatters";
 import { LinkedInPublishChecklist } from "../LinkedInPublishChecklist";
+import {
+  filterCompleteLinkedInDrafts,
+  getDraftAssetContent,
+  type LinkedInDraftAsset,
+} from "../../utils/linkedInDraftLibraryUtils";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -101,18 +106,8 @@ const Spinner = () => (
 // F4 — Draft Library Modal
 // ---------------------------------------------------------------------------
 
-interface ContentAsset {
-  id: string;
-  title: string;
-  description: string;
-  created_at: string;
-  source_module?: string;
-  asset_metadata?: {
-    content?: string;
-    word_count?: number;
-    [key: string]: unknown;
-  };
-}
+const DRAFT_FETCH_LIMIT = 50;
+const DRAFT_DISPLAY_LIMIT = 5;
 
 interface DraftLibraryModalProps {
   open: boolean;
@@ -124,13 +119,13 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
   onClose,
 }) => {
   const navigate = useNavigate();
-  const [drafts, setDrafts] = useState<ContentAsset[]>([]);
+  const [drafts, setDrafts] = useState<LinkedInDraftAsset[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [qualityCheckAsset, setQualityCheckAsset] =
-    useState<ContentAsset | null>(null);
+    useState<LinkedInDraftAsset | null>(null);
   const [showTiming, setShowTiming] = useState(false);
-  const [scheduleAsset, setScheduleAsset] = useState<ContentAsset | null>(null);
+  const [scheduleAsset, setScheduleAsset] = useState<LinkedInDraftAsset | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -143,23 +138,24 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
       .get("/api/content-assets/", {
         params: {
           source_module: "linkedin_writer",
-          limit: 5,
+          limit: DRAFT_FETCH_LIMIT,
           sort_by: "created_at",
           sort_order: "desc",
         },
       })
       .then((res) => {
         const data = res.data;
-        setDrafts(Array.isArray(data) ? data : (data?.assets ?? []));
+        const raw = Array.isArray(data) ? data : (data?.assets ?? []);
+        setDrafts(filterCompleteLinkedInDrafts(raw, DRAFT_DISPLAY_LIMIT));
       })
       .catch(() => setError("Could not load drafts. Please try again."))
       .finally(() => setLoading(false));
   }, [open]);
 
-  const getAssetContent = (asset: ContentAsset): string =>
-    asset.asset_metadata?.content || asset.description || "";
+  const getAssetContent = (asset: LinkedInDraftAsset): string =>
+    getDraftAssetContent(asset);
 
-  const handleOpenInStudio = (asset: ContentAsset) => {
+  const handleOpenInStudio = (asset: LinkedInDraftAsset) => {
     openInStudio(getAssetContent(asset), onClose);
   };
 
@@ -178,6 +174,8 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
       title="My Drafts"
       onClose={onClose}
       maxWidth="80vw"
+      titleSize="xl"
+      modalClassName="linkedin-my-drafts-modal"
     >
       <div>
         <div
@@ -186,8 +184,6 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
             alignItems: "center",
             gap: 10,
             marginBottom: 18,
-            paddingBottom: 14,
-            borderBottom: "1px solid #e5e7eb",
           }}
         >
           <div
@@ -257,8 +253,8 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
               fontSize: 13,
             }}
           >
-            No saved drafts yet. Generate content in the Create wedge to get
-            started.
+            No complete drafts yet. Generate a post, article, carousel, or video
+            script in the Create wedge to get started.
           </div>
         )}
 
