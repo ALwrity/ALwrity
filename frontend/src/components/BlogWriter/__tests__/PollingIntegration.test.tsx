@@ -59,13 +59,10 @@ describe('Polling Integration', () => {
 
     const onResearchComplete = jest.fn();
 
-    // Component should render without throwing.
-    // startResearch is only called when a user submits the form, not on mount.
-    expect(() => render(<ResearchAction onResearchComplete={onResearchComplete} />)).not.toThrow();
-
-    // Mocks are configured and ready for when user interaction triggers them
-    expect(mockStartResearch).toBeDefined();
-    expect(mockPollStatus).toBeDefined();
+    // Rendering should not trigger any API calls on mount.
+    render(<ResearchAction onResearchComplete={onResearchComplete} />);
+    expect(mockStartResearch).not.toHaveBeenCalled();
+    expect(mockPollStatus).not.toHaveBeenCalled();
   });
 
   it('should handle polling errors gracefully and render without errors', async () => {
