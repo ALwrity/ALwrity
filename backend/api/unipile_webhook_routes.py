@@ -1,8 +1,8 @@
 """
-Unipile webhook routes for Hosted Auth account notifications.
+Unipile webhook routes for Hosted Auth and Account Status notifications.
 
-Unipile calls notify_url server-to-server when a user completes Hosted Auth.
-This provides a fallback when the browser success redirect fails.
+Unipile calls notify_url server-to-server when auth completes or account status changes.
+Docs: https://developer.unipile.com/docs/account-lifecycle
 """
 
 from __future__ import annotations
@@ -12,22 +12,21 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Request
 from loguru import logger
 
+from services.integrations.linkedin.unipile_account_lifecycle import (
+    UnipileAccountLifecycleService,
+    find_user_id_by_unipile_account_id,
+)
+from services.integrations.linkedin.linkedin_oauth_unipile_status import (
+    HEALTHY_UNIPILE_STATUSES,
+    is_disconnected_unipile_status,
+    normalize_unipile_status,
+)
 from services.integrations.linkedin_oauth import LinkedInOAuthService
 from services.database import get_session_for_user
 
 router = APIRouter(prefix="/api/unipile", tags=["Unipile"])
 _oauth_service = LinkedInOAuthService()
-
-_SUCCESS_STATUSES = frozenset(
-    {
-        "OK",
-        "RUNNING",
-        "CONNECTED",
-        "CREATION_SUCCESS",
-        "SYNC_SUCCESS",
-        "SUCCESS",
-    }
-)
+_lifecycle = UnipileAccountLifecycleService(_oauth_service)
 
 
 def _extract_webhook_fields(payload: Dict[str, Any]) -> tuple[Optional[str], Optional[str], Optional[str]]:
@@ -54,6 +53,24 @@ def _extract_webhook_fields(payload: Dict[str, Any]) -> tuple[Optional[str], Opt
     )
 
 
+async def _create_monitoring_task(user_id: str) -> None:
+    """Best-effort OAuth monitoring task; lazy-import keeps lean LinkedIn mounts working."""
+    try:
+        # Lazy import so Unipile webhook mounts without GSC/Google deps.
+        from services.oauth_token_monitoring_service import (
+            create_oauth_monitoring_tasks,
+        )
+
+        db = get_session_for_user(user_id)
+        if db:
+            try:
+                create_oauth_monitoring_tasks(user_id, db, ["linkedin"])
+            finally:
+                db.close()
+    except Exception as exc:
+        logger.warning(f"[UnipileWebhook] Failed to create monitoring task: {exc}")
+
+
 @router.post("/webhook")
 async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
     """
@@ -72,22 +89,42 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
         return {"ok": True}
 
     account_id, user_id, status = _extract_webhook_fields(payload)
+    normalized_status = normalize_unipile_status(status)
+
     logger.info(
         f"[UnipileWebhook] Received notification account_id={account_id} "
-        f"user_id={user_id} status={status} keys={list(payload.keys())}"
+        f"user_id={user_id} status={normalized_status} keys={list(payload.keys())}"
     )
 
-    if not account_id or not user_id:
-        logger.warning(
-            "[UnipileWebhook] Missing account_id or name; skipping credential storage"
-        )
+    if not account_id:
+        logger.warning("[UnipileWebhook] Missing account_id; skipping")
         return {"ok": True}
 
-    normalized_status = (status or "OK").upper()
-    if normalized_status not in _SUCCESS_STATUSES:
+    if not user_id:
+        user_id = find_user_id_by_unipile_account_id(account_id)
+
+    if user_id and normalized_status:
+        await _lifecycle.handle_account_status(
+            account_id=account_id,
+            status=normalized_status,
+            user_id=user_id,
+        )
+
+    if is_disconnected_unipile_status(normalized_status):
+        return {"ok": True}
+
+    should_store_credentials = (
+        user_id
+        and (
+            normalized_status is None
+            or normalized_status in HEALTHY_UNIPILE_STATUSES
+            or normalized_status == "RECONNECTED"
+        )
+    )
+    if not should_store_credentials:
         logger.info(
-            f"[UnipileWebhook] Non-success status={normalized_status} for user_id={user_id}; "
-            "skipping credential storage"
+            f"[UnipileWebhook] Skipping credential storage account_id={account_id} "
+            f"status={normalized_status}"
         )
         return {"ok": True}
 
@@ -102,19 +139,6 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
     )
 
     if stored:
-        try:
-            # Lazy import so Unipile webhook mounts without GSC/Google deps.
-            from services.oauth_token_monitoring_service import (
-                create_oauth_monitoring_tasks,
-            )
-
-            db = get_session_for_user(user_id)
-            if db:
-                try:
-                    create_oauth_monitoring_tasks(user_id, db, ['linkedin'])
-                finally:
-                    db.close()
-        except Exception as e:
-            logger.warning(f"[UnipileWebhook] Failed to create monitoring task: {e}")
+        await _create_monitoring_task(user_id)
 
     return {"ok": stored}

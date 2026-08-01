@@ -6,6 +6,7 @@ import { LinkedInProfileSetupPanel } from "./ProfileCompletion/LinkedInProfileSe
 import { LinkedInProfileHubStrip } from "./LinkedInProfileHubStrip";
 import { useDesktopViewport } from "../hooks/useDesktopViewport";
 import { linkedInPlaceholderCardStyles } from "./linkedInPlaceholderStyles";
+import { getLinkedInConnectCta } from "../utils/linkedInConnectLockedUi";
 import { DashboardActionModal } from "./dashboard/DashboardActionModal";
 import { DashboardSimpleErrorModal } from "./dashboard/DashboardSimpleErrorModal";
 
@@ -47,7 +48,6 @@ const CONNECT_WELCOME_REASSURANCE =
   "Explore planning and creation tools first — connect when you're ready to publish.";
 const CONNECT_WELCOME_SIGN_IN_HINT =
   "Sign in via LinkedIn and choose your personal profile";
-const CONNECT_WELCOME_CTA = "Connect LinkedIn⚡";
 const CONNECT_WELCOME_DISMISS_LABEL = "Explore first";
 const CONNECT_WELCOME_DISMISSED_KEY = "linkedin_connect_welcome_dismissed";
 const MAX_CONNECT_WELCOME_LOGIN_COUNT = 3;
@@ -183,6 +183,7 @@ const DisconnectedState: React.FC<{
   connectError: string | null;
   statusError: string | null;
   onConnect: () => void;
+  needsReconnect?: boolean;
   centered?: boolean;
   splitConnectAction?: boolean;
   mobileProfileStrip?: boolean;
@@ -195,6 +196,7 @@ const DisconnectedState: React.FC<{
   connectError,
   statusError,
   onConnect,
+  needsReconnect = false,
   centered = false,
   splitConnectAction = false,
   mobileProfileStrip = false,
@@ -203,7 +205,9 @@ const DisconnectedState: React.FC<{
   onConnectWelcomeOpenChange,
   userId,
 }) => {
-  const connectCtaLabel = isConnecting ? "Connecting..." : CONNECT_WELCOME_CTA;
+  const connectCtaLabel = isConnecting
+    ? "Connecting..."
+    : getLinkedInConnectCta(needsReconnect);
   const displayStatusError = connectError ? null : statusError;
   // On the dashboard, keep the welcome popup visible — don't overlay a status-check error modal.
   const activeError = connectError || (centered ? null : displayStatusError);
@@ -578,6 +582,7 @@ export const LinkedInPlanConnectAction: React.FC<
     disconnectError,
     error,
     connectWithOAuth,
+    needsReconnect,
   } = social;
   const modalError = connected ? disconnectError : connectError || error;
   const { showErrorModal, dismissError } = useDismissibleError(modalError);
@@ -673,7 +678,7 @@ export const LinkedInPlanConnectAction: React.FC<
             boxShadow: "0 6px 20px rgba(10, 102, 194, 0.35)",
           }}
         >
-          {isConnecting ? "Connecting..." : CONNECT_WELCOME_CTA}
+          {isConnecting ? "Connecting..." : getLinkedInConnectCta(needsReconnect)}
         </button>
       </ConnectTourAnchor>
     </>
@@ -718,6 +723,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
     avatarUrl,
     connectWithOAuth,
     disconnect,
+    needsReconnect,
   } = socialConnection ?? internalSocial;
 
   const [isDisconnectingLocal, setIsDisconnectingLocal] = useState(false);
@@ -786,6 +792,7 @@ export const LinkedInConnectionPlaceholder: React.FC<{
         isConnecting={isConnecting}
         connectError={connectError}
         statusError={error}
+        needsReconnect={needsReconnect}
         onConnect={handleConnect}
         onConnectWelcomeDismissed={onConnectWelcomeDismissed}
         onConnectWelcomeOpenChange={onConnectWelcomeOpenChange}

@@ -65,6 +65,7 @@ export interface LinkedInConnectionState {
   connected: boolean;
   provider: string;
   hasPerUserToken: boolean;
+  needsReconnect: boolean;
   accountName: string | undefined;
   avatarUrl: string | null | undefined;
   displayName: string;
@@ -291,6 +292,15 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
     }
   }, [loadOrganizations, uid]);
 
+  const clearLocalConnectionSession = useCallback(() => {
+    clearSelectionKeys(uid);
+    setSelectedAccountId('');
+    setSelectedTarget('profile');
+    setSelectedOrgId('');
+    clearCachedAvatar(uid);
+    setCachedAvatarUrl(null);
+  }, [uid]);
+
   const setDisconnected = useCallback(() => {
     invalidateSharedConnectionStatus();
     setStatus({
@@ -308,14 +318,9 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
   }, []);
 
   const applyDisconnectedLocally = useCallback(() => {
-    clearSelectionKeys(uid);
-    setSelectedAccountId('');
-    setSelectedTarget('profile');
-    setSelectedOrgId('');
-    clearCachedAvatar(uid);
-    setCachedAvatarUrl(null);
+    clearLocalConnectionSession();
     setDisconnected();
-  }, [setDisconnected, uid]);
+  }, [clearLocalConnectionSession, setDisconnected]);
 
   useEffect(() => {
     void checkStatus().catch((err) => {
@@ -348,7 +353,14 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
 
     const onDisconnected = () => {
       console.info('[LinkedInConnect] received', LINKEDIN_DISCONNECTED_EVENT);
-      applyDisconnectedLocally();
+      clearLocalConnectionSession();
+      invalidateSharedConnectionStatus();
+      void checkStatus().catch((err) => {
+        console.error('[LinkedInConnect] status refresh after disconnect failed:', {
+          detail: getLinkedInSocialErrorMessage(err),
+          error: err,
+        });
+      });
     };
 
     window.addEventListener(LINKEDIN_OAUTH_SUCCESS_EVENT, onOAuthSuccess);
@@ -357,7 +369,7 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
       window.removeEventListener(LINKEDIN_OAUTH_SUCCESS_EVENT, onOAuthSuccess);
       window.removeEventListener(LINKEDIN_DISCONNECTED_EVENT, onDisconnected);
     };
-  }, [applyDisconnectedLocally, checkStatus]);
+  }, [checkStatus, clearLocalConnectionSession]);
 
   const handleAccountChange = useCallback(
     async (accountId: string) => {
@@ -390,10 +402,13 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
 
     try {
       const result = await disconnectLinkedIn();
-      applyDisconnectedLocally();
+      clearLocalConnectionSession();
+      invalidateSharedConnectionStatus();
+      await checkStatus();
       dispatchLinkedInDisconnected();
       console.info('[LinkedInConnect] disconnect succeeded', {
         success: result.success,
+        needsReconnect: result.needs_reconnect,
       });
       return result.success;
     } catch (err: unknown) {
@@ -415,7 +430,7 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
       setDisconnectError(msg);
       return false;
     }
-  }, [applyDisconnectedLocally]);
+  }, [checkStatus, clearLocalConnectionSession, applyDisconnectedLocally]);
 
   const connectWithOAuth = useCallback(async (): Promise<boolean> => {
     setIsConnecting(true);
@@ -466,6 +481,7 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
   const connected = status?.connected ?? false;
   const provider = status?.provider ?? 'unipile';
   const hasPerUserToken = status?.has_per_user_token ?? false;
+  const needsReconnect = Boolean(status?.needs_reconnect);
 
   const primaryProfile: LinkedInProfileSummary | null = useMemo(() => {
     if (!connected) return null;
@@ -497,6 +513,7 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
       connected,
       provider,
       hasPerUserToken,
+      needsReconnect,
       accountName: status?.account_name ?? undefined,
       avatarUrl,
       displayName,
@@ -521,7 +538,7 @@ export const LinkedInConnectionProvider: React.FC<LinkedInConnectionProviderProp
       disconnect,
     }),
     [
-      connected, provider, hasPerUserToken, status?.account_name,
+      connected, provider, hasPerUserToken, needsReconnect, status?.account_name,
       avatarUrl, displayName, accounts, organizations,
       selectedAccountId, selectedTarget, selectedOrgId,
       isLoading, isProfileLoading, isConnecting,

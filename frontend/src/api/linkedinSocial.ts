@@ -48,6 +48,9 @@ export interface LinkedInConnectionStatus {
   connected: boolean;
   provider: string;
   has_per_user_token: boolean;
+  needs_reconnect?: boolean;
+  unipile_sync_status?: string | null;
+  stored_unipile_account_id?: string | null;
   accounts: Array<{
     account_id: string;
     account_type?: string;
@@ -89,12 +92,13 @@ export interface LinkedInAuthUrlResponse {
   authorization_url: string;
   state: string;
   provider: string;
-  purpose?: string;
+  purpose?: 'connect' | 'reconnect';
 }
 
 export interface LinkedInDisconnectResponse {
   success: boolean;
   connected: boolean;
+  needs_reconnect?: boolean;
   message?: string;
 }
 
