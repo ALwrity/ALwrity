@@ -659,6 +659,55 @@
   padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
 }
 
+/* Publish wedge tile modal — no header divider, seamless title → tiles */
+.linkedin-publish-wedge-modal {
+  width: min(560px, 100%) !important;
+  max-width: min(560px, 100%) !important;
+}
+
+.linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 6px !important;
+}
+
+.linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-body {
+  padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
+}
+
+/* Post Today sub-modal — no header divider, seamless title → subtitle */
+.linkedin-post-today-modal {
+  width: min(560px, 100%) !important;
+  max-width: min(560px, 100%) !important;
+}
+
+.linkedin-post-today-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 4px !important;
+}
+
+.linkedin-post-today-modal .linkedin-dashboard-action-modal-body {
+  padding: 4px 20px 20px !important;
+}
+
+/* My Drafts sub-modal — no header divider, 24px title */
+.linkedin-my-drafts-modal {
+  width: min(80vw, 720px) !important;
+  max-width: min(80vw, 720px) !important;
+}
+
+.linkedin-my-drafts-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 6px !important;
+}
+
+.linkedin-my-drafts-modal .linkedin-dashboard-action-modal-header h2 {
+  font-size: 24px;
+}
+
+.linkedin-my-drafts-modal .linkedin-dashboard-action-modal-body {
+  padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
+}
+
 /* Topic ideas modal — wider canvas, no header divider, 24px title */
 .linkedin-topic-ideas-modal {
   width: min(896px, 97vw) !important;
