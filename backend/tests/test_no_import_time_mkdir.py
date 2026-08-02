@@ -7,15 +7,15 @@ from pathlib import Path
 
 
 STARTUP_MODULES = [
-    "backend/app.py",
-    "backend/alwrity_utils/router_manager.py",
-    "backend/routers/seo_tools.py",
-    "backend/middleware/logging_middleware.py",
-    "backend/api/youtube/router.py",
-    "backend/api/youtube/handlers/avatar.py",
-    "backend/api/youtube/handlers/images.py",
-    "backend/api/youtube/handlers/audio.py",
-    "backend/utils/media_utils.py",
+    "app.py",
+    "alwrity_utils/router_manager.py",
+    "routers/seo_tools.py",
+    "middleware/logging_middleware.py",
+    "api/youtube/router.py",
+    "api/youtube/handlers/avatar.py",
+    "api/youtube/handlers/images.py",
+    "api/youtube/handlers/audio.py",
+    "utils/media_utils.py",
 ]
 
 
