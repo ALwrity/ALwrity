@@ -4,6 +4,7 @@ import type { PostDelta } from "../../../../services/postAnalyticsApi";
 import { colors, rowBase } from "../GrowthEngine/styles";
 import { GrowthContributionBadge } from "./GrowthContributionBadge";
 import { METRIC_LABELS, METRIC_TOOLTIPS } from "./engagementTrendsCopy";
+import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from "../../utils/personalPostAnalyticsLimits";
 
 const DeltaChip: React.FC<{ icon: string; delta: number; label?: string }> = ({
   icon,
@@ -132,7 +133,8 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
             label={METRIC_LABELS.followersFromPosts}
           />
         )}
-        {typeof clicksDelta === "number" && (
+        {PERSONAL_POST_CLICKS_CTR_AVAILABLE &&
+          typeof clicksDelta === "number" && (
           <DeltaChip
             icon="🔗"
             delta={clicksDelta}

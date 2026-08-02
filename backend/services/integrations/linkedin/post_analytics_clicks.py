@@ -139,9 +139,13 @@ def merge_analytics_prefer_detail(
 def derive_clickthrough_rate(
     clicks: int, impressions: int, provider_rate: Optional[float]
 ) -> Optional[float]:
-    """Use provider CTR when present; else derive from clicks/impressions."""
+    """Use provider CTR when present; else derive only when clicks > 0.
+
+    Personal LinkedIn posts often omit clicks entirely; do not invent CTR=0
+    from impressions alone (misleading vs LinkedIn company-page analytics).
+    """
     if provider_rate is not None:
         return provider_rate
-    if impressions <= 0:
+    if impressions <= 0 or clicks <= 0:
         return None
     return round(clicks / impressions, 4)

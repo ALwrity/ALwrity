@@ -70,13 +70,8 @@ const METRIC_DEFS = [
     color: "#4f46e5",
     format: fmtNum,
   },
-  { key: "clicks", label: "Clicks", color: "#7c3aed", format: fmtNum },
-  {
-    key: "clickthroughRate",
-    label: "CTR",
-    color: "#0284c7",
-    format: fmtPct,
-  },
+  // Clicks / CTR omitted: LinkedIn does not expose them for personal posts.
+  // Re-enable via PERSONAL_POST_CLICKS_CTR_AVAILABLE when company pages ship.
   {
     key: "page_viewers",
     label: "Page viewers",

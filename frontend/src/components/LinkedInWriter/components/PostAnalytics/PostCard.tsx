@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { LinkedInPost } from '../../../../services/postAnalyticsApi';
+import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from '../../utils/personalPostAnalyticsLimits';
 import { PostCardMedia } from './PostCardMedia';
 import { cardBase, colors } from './styles';
 
@@ -201,12 +202,20 @@ export const PostCard: React.FC<PostCardProps> = React.memo(({ post, onGenerateS
           label="Engagements"
           value={formatOptionalMetric(post.engagement.engagements)}
         />
-        <MetricPill label="Clicks" value={formatMetric(post.engagement.clicks)} accent />
-        <MetricPill
-          label="CTR"
-          value={formatCtr(post.engagement.clickthrough_rate, post.engagement.clicks, post.engagement.impressions)}
-          accent
-        />
+        {PERSONAL_POST_CLICKS_CTR_AVAILABLE && (
+          <>
+            <MetricPill label="Clicks" value={formatMetric(post.engagement.clicks)} accent />
+            <MetricPill
+              label="CTR"
+              value={formatCtr(
+                post.engagement.clickthrough_rate,
+                post.engagement.clicks,
+                post.engagement.impressions,
+              )}
+              accent
+            />
+          </>
+        )}
         <MetricPill
           label="Page viewers"
           value={formatOptionalMetric(post.engagement.page_viewers)}

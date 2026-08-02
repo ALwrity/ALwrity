@@ -29,6 +29,7 @@ from services.integrations.linkedin.post_analytics_clicks import (
 from services.integrations.linkedin.post_analytics_enrichment import (
     enrich_posts_with_retrieve_analytics,
 )
+from services.integrations.linkedin.post_attachments import normalize_post_attachments
 from services.integrations.linkedin.unipile_client import UnipileClient, UnipileAPIError
 from services.integrations.linkedin.unipile_retrieve_post_client import (
     UnipileRetrievePostClient,

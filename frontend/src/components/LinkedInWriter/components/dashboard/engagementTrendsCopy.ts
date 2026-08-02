@@ -34,7 +34,7 @@ export const METRIC_TOOLTIPS = {
     "How often people who saw your post reacted, commented, reposted, or clicked.",
   followersFromPosts:
     "New followers attributed to these posts in the selected time range.",
-  clicks: "Clicks on your post or links (when LinkedIn provides them).",
+  clicks: "Clicks on your post or links. Available for LinkedIn Company Page posts only — not personal profiles.",
   reposts: "Times people shared your post.",
   unavailable:
     "This detail will appear when enough history is available for the selected range.",

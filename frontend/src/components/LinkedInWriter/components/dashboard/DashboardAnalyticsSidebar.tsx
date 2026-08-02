@@ -5,6 +5,7 @@ import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 import { ProfileGrowthWidget } from "./ProfileGrowthWidget";
 import { DailyDigestWidget } from "./DailyDigestWidget";
 import { ConnectLockBadge } from "./ConnectLockIcon";
+import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from "../../utils/personalPostAnalyticsLimits";
 
 const SIDEBAR_WIDTH = 340;
 
@@ -356,23 +357,43 @@ export const DashboardAnalyticsSidebar: React.FC<
                     {`+${totals.followers}`}
                   </div>
                 </div>
-                <div className="linkedin-analytics-stat-chip">
-                  <div
-                    style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
-                  >
-                    CTR
+                {PERSONAL_POST_CLICKS_CTR_AVAILABLE ? (
+                  <div className="linkedin-analytics-stat-chip">
+                    <div
+                      style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                    >
+                      CTR
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: "#0a66c2",
+                        marginTop: 2,
+                      }}
+                    >
+                      {totals.impressions > 0 ? formatPct(totals.ctr) : "—"}
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 800,
-                      color: "#0a66c2",
-                      marginTop: 2,
-                    }}
-                  >
-                    {totals.impressions > 0 ? formatPct(totals.ctr) : "—"}
+                ) : (
+                  <div className="linkedin-analytics-stat-chip">
+                    <div
+                      style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
+                    >
+                      Impressions
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 800,
+                        color: "#0369a1",
+                        marginTop: 2,
+                      }}
+                    >
+                      {totals.impressions}
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="linkedin-analytics-stat-chip">
                   <div
                     style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}
