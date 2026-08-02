@@ -6,6 +6,7 @@ import type {
   MetricDelta,
 } from "../../../../services/postAnalyticsApi";
 import { METRIC_LABELS, METRIC_TOOLTIPS } from "./engagementTrendsCopy";
+import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from "../../utils/personalPostAnalyticsLimits";
 
 interface EngagementTrendsSummaryGridProps {
   summary: EngagementSummary;
@@ -214,12 +215,14 @@ export const EngagementTrendsSummaryGrid: React.FC<
         metric={summary.followers}
         tooltip={METRIC_TOOLTIPS.followersFromPosts}
       />
-      <OptionalMetricCard
-        icon="🔗"
-        label={METRIC_LABELS.clicks}
-        metric={summary.clicks}
-        tooltip={METRIC_TOOLTIPS.clicks}
-      />
+      {PERSONAL_POST_CLICKS_CTR_AVAILABLE && (
+        <OptionalMetricCard
+          icon="🔗"
+          label={METRIC_LABELS.clicks}
+          metric={summary.clicks}
+          tooltip={METRIC_TOOLTIPS.clicks}
+        />
+      )}
       <OptionalMetricCard
         icon="🔁"
         label={METRIC_LABELS.reposts}

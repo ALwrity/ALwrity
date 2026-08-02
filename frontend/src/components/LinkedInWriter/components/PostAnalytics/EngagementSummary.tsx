@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
+import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from "../../utils/personalPostAnalyticsLimits";
 
 interface EngagementSummaryProps {
   posts: LinkedInPost[];
@@ -54,6 +55,8 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
       let bestScore = 0;
       let bestCtaPost: LinkedInPost | null = null;
       let bestClicks = 0;
+      let ctrWeightedNum = 0;
+      let ctrWeightedDen = 0;
 
       for (const post of posts) {
         const e = post.engagement;
@@ -64,6 +67,14 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
         totalEngagementRate += e.engagement_rate;
         totalClicks += e.clicks ?? 0;
         totalFollowersGained += e.followers_gained ?? 0;
+        if (e.clickthrough_rate != null && e.impressions > 0) {
+          const rate =
+            e.clickthrough_rate > 1
+              ? e.clickthrough_rate / 100
+              : e.clickthrough_rate;
+          ctrWeightedNum += rate * e.impressions;
+          ctrWeightedDen += e.impressions;
+        }
         if (e.engagements != null) {
           engagementsKnown = true;
           totalEngagements += e.engagements;
@@ -104,7 +115,11 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
         totalPageViewers: pageViewersKnown ? totalPageViewers : null,
         totalReach: reachKnown ? totalReach : null,
         avgCtr:
-          totalImpressions > 0 ? totalClicks / totalImpressions : null,
+          ctrWeightedDen > 0
+            ? ctrWeightedNum / ctrWeightedDen
+            : totalImpressions > 0
+              ? totalClicks / totalImpressions
+              : null,
         bestPost,
         bestCtaPost: bestClicks > 0 ? bestCtaPost : null,
       };
@@ -160,19 +175,25 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
         color: "#4f46e5",
         bg: "#eef2ff",
       },
-      {
-        label: "Clicks",
-        value: formatNumber(stats.totalClicks),
-        color: "#7c3aed",
-        bg: "#f5f3ff",
-      },
-      {
-        label: "Avg. CTR",
-        value:
-          stats.avgCtr != null ? `${(stats.avgCtr * 100).toFixed(1)}%` : "—",
-        color: "#0284c7",
-        bg: "#e0f2fe",
-      },
+      ...(PERSONAL_POST_CLICKS_CTR_AVAILABLE
+        ? [
+            {
+              label: "Clicks",
+              value: formatNumber(stats.totalClicks),
+              color: "#7c3aed",
+              bg: "#f5f3ff",
+            },
+            {
+              label: "Avg. CTR",
+              value:
+                stats.avgCtr != null
+                  ? `${(stats.avgCtr * 100).toFixed(1)}%`
+                  : "—",
+              color: "#0284c7",
+              bg: "#e0f2fe",
+            },
+          ]
+        : []),
       {
         label: "Page viewers",
         value:
@@ -291,7 +312,7 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
           </div>
         )}
 
-        {stats.bestCtaPost && (
+        {PERSONAL_POST_CLICKS_CTR_AVAILABLE && stats.bestCtaPost && (
           <div
             style={{
               marginTop: 8,
