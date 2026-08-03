@@ -23,7 +23,7 @@ describe("linkedInImageService", () => {
   });
 
   describe("buildPromptFromSelection", () => {
-    it("returns a short seed prompt with topic and industry", () => {
+    it("returns a LinkedIn cover seed prompt with topic and industry", () => {
       const prompt = buildPromptFromSelection(
         "AI is transforming how teams collaborate.",
         "Future of Work",
@@ -33,7 +33,9 @@ describe("linkedInImageService", () => {
       expect(prompt).toContain("AI is transforming how teams collaborate.");
       expect(prompt).toContain("Topic: Future of Work.");
       expect(prompt).toContain("Industry: Technology.");
-      expect(prompt).toContain("Visual for LinkedIn post:");
+      expect(prompt).toContain(
+        "Create LinkedIn post cover image for below LinkedIn post -",
+      );
       expect(prompt).not.toContain(
         "Professional business aesthetic, mobile-optimized",
       );

@@ -82,14 +82,16 @@ class LinkedInImageGenerator:
             )
 
             structured_prompt = build_linkedin_selection_prompt(
-                prompt, content_context, aspect_ratio, style
+                prompt, content_context, aspect_ratio, style, model=model
             )
             logger.info(
                 f"[LinkedInImageGen] Structured prompt ({len(structured_prompt)} chars): "
                 f"{structured_prompt[:200]}..."
             )
 
-            enhanced_prompt = await optimize_linkedin_prompt(structured_prompt, user_id)
+            enhanced_prompt = await optimize_linkedin_prompt(
+                structured_prompt, user_id, model=model
+            )
             logger.info(
                 f"[LinkedInImageGen] Optimized prompt ({len(enhanced_prompt)} chars): "
                 f"{enhanced_prompt[:200]}..."
