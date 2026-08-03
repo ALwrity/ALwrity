@@ -17,6 +17,44 @@ import { showToastNotification } from "../../../utils/toastNotifications";
 
 const LOG_PREFIX = "[LinkedInEditorImageStrip]";
 
+/** LinkedIn Studio secondary / destructive button styles (matches image modal + toolbar). */
+const downloadBtnSx = {
+  textTransform: "none" as const,
+  fontWeight: 600,
+  fontSize: 12,
+  borderColor: "#0A66C2",
+  color: "#0A66C2",
+  bgcolor: "#fff",
+  boxShadow: "none",
+  "&:hover": {
+    bgcolor: "#e8f4fd",
+    borderColor: "#004182",
+    color: "#004182",
+    boxShadow: "none",
+  },
+  "&.Mui-disabled": {
+    borderColor: "#cbd5e1",
+    color: "#94a3b8",
+    bgcolor: "#f8fafc",
+  },
+};
+
+const deleteBtnSx = {
+  textTransform: "none" as const,
+  fontWeight: 600,
+  fontSize: 12,
+  borderColor: "#fca5a5",
+  color: "#dc2626",
+  bgcolor: "#fff",
+  boxShadow: "none",
+  "&:hover": {
+    bgcolor: "#fef2f2",
+    borderColor: "#dc2626",
+    color: "#b91c1c",
+    boxShadow: "none",
+  },
+};
+
 interface LinkedInEditorImageStripProps {
   images: LinkedInEditorImageBlock[];
   onRemove: (imageId: string) => void;
@@ -181,40 +219,26 @@ export const LinkedInEditorImageStrip: React.FC<
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
               <Button
                 size="small"
-                variant="contained"
+                variant="outlined"
                 startIcon={
                   downloadingId === image.id ? (
-                    <CircularProgress size={14} color="inherit" />
+                    <CircularProgress size={14} sx={{ color: "#0A66C2" }} />
                   ) : (
                     <DownloadIcon fontSize="small" />
                   )
                 }
                 onClick={() => handleDownload(image)}
                 disabled={downloadingId === image.id}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  bgcolor: "#0A66C2",
-                  color: "#fff",
-                  boxShadow: "none",
-                  "&:hover": { bgcolor: "#004182", boxShadow: "none" },
-                  "&.Mui-disabled": { bgcolor: "#94a3b8", color: "#fff" },
-                }}
+                sx={downloadBtnSx}
               >
                 Download
               </Button>
               <Button
                 size="small"
-                variant="contained"
-                color="error"
+                variant="outlined"
                 startIcon={<DeleteOutlineIcon fontSize="small" />}
                 onClick={() => handleRemove(image)}
-                sx={{
-                  textTransform: "none",
-                  fontWeight: 600,
-                  boxShadow: "none",
-                  "&:hover": { boxShadow: "none" },
-                }}
+                sx={deleteBtnSx}
               >
                 Delete
               </Button>

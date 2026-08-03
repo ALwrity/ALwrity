@@ -151,6 +151,17 @@ export const LinkedInSelectionImageModal: React.FC<
             variant="outlined"
             startIcon={<DownloadIcon />}
             onClick={handleDownload}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              borderColor: "#0A66C2",
+              color: "#0A66C2",
+              "&:hover": {
+                bgcolor: "#e8f4fd",
+                borderColor: "#004182",
+                color: "#004182",
+              },
+            }}
           >
             Download Image
           </Button>
