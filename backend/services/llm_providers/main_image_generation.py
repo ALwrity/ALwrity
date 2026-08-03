@@ -92,7 +92,12 @@ def generate_image(prompt: str, options: Optional[Dict[str, Any]] = None, user_i
     model_lower = (image_options.model or "").lower()
     
     # Detect Wavespeed models and remap provider if needed
-    wavespeed_models = ["qwen-image", "ideogram-v3-turbo", "flux-kontext-pro"]
+    wavespeed_models = [
+        "qwen-image",
+        "ideogram-v3-turbo",
+        "flux-kontext-pro",
+        "gemini-3-pro-image",
+    ]
     if model_lower in wavespeed_models and provider_name != "wavespeed":
         logger.info("Remapping provider to wavespeed for model=%s", image_options.model)
         provider_name = "wavespeed"
