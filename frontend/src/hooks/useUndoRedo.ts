@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 interface UndoRedoState<T> {
   past: T[];
@@ -6,9 +6,20 @@ interface UndoRedoState<T> {
   future: T[];
 }
 
-export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
+export type UseUndoRedoOptions = {
+  /** Max past snapshots to retain. Default 50. */
+  limit?: number;
+  /**
+   * When true (default), Ctrl/Cmd+Z / Shift+Z / Y are handled on window.
+   * Disable for native textareas so toolbar undo does not fight browser undo.
+   */
+  enableKeyboardShortcuts?: boolean;
+};
+
+export function useUndoRedo<T>(initialValue: T, options?: UseUndoRedoOptions) {
   const limit = options?.limit ?? 50;
-  
+  const enableKeyboardShortcuts = options?.enableKeyboardShortcuts ?? true;
+
   const [state, setState] = useState<UndoRedoState<T>>({
     past: [],
     present: initialValue,
@@ -35,10 +46,13 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
     });
   }, [limit]);
 
-  const undo = useCallback(() => {
+  /** Undo one step; returns restored present, or undefined if nothing to undo. */
+  const undo = useCallback((): T | undefined => {
+    let restored: T | undefined;
     setState((current) => {
       if (current.past.length === 0) return current;
       const previous = current.past[current.past.length - 1];
+      restored = previous;
       const newPast = current.past.slice(0, -1);
       return {
         past: newPast,
@@ -46,12 +60,16 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
         future: [current.present, ...current.future],
       };
     });
+    return restored;
   }, []);
 
-  const redo = useCallback(() => {
+  /** Redo one step; returns restored present, or undefined if nothing to redo. */
+  const redo = useCallback((): T | undefined => {
+    let restored: T | undefined;
     setState((current) => {
       if (current.future.length === 0) return current;
       const next = current.future[0];
+      restored = next;
       const newFuture = current.future.slice(1);
       return {
         past: [...current.past, current.present],
@@ -59,6 +77,7 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
         future: newFuture,
       };
     });
+    return restored;
   }, []);
 
   const reset = useCallback((newValue: T) => {
@@ -69,8 +88,9 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
     });
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
+    if (!enableKeyboardShortcuts) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
         e.preventDefault();
@@ -83,7 +103,7 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, enableKeyboardShortcuts]);
 
   return {
     value: state.present,
@@ -96,5 +116,7 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
     historyLength: state.past.length + state.future.length,
   };
 }
+
+export type { UndoRedoState };
 
 export type { UndoRedoState };
