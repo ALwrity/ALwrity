@@ -3,6 +3,7 @@ import {
   resolveLinkedInImageUrl,
   generateLinkedInImage,
   mapAspectRatioToLinkedIn,
+  downloadLinkedInImageBlob,
 } from "../../../services/linkedInImageService";
 import { aiApiClient } from "../../../api/client";
 
@@ -61,6 +62,56 @@ describe("linkedInImageService", () => {
   describe("mapAspectRatioToLinkedIn", () => {
     it("maps 16:9 to LinkedIn 1.91:1 feed ratio", () => {
       expect(mapAspectRatioToLinkedIn("16:9")).toBe("1.91:1");
+    });
+  });
+
+  describe("downloadLinkedInImageBlob", () => {
+    it("triggers an anchor download for a blob URL", () => {
+      const click = jest.fn();
+      const append = jest.spyOn(document.body, "appendChild").mockImplementation(
+        (node) => node,
+      );
+      const removeChild = jest
+        .spyOn(document.body, "removeChild")
+        .mockImplementation((node) => node);
+      const createElementSpy = jest
+        .spyOn(document, "createElement")
+        .mockImplementation((tag: string) => {
+          if (tag === "a") {
+            return {
+              href: "",
+              download: "",
+              click,
+            } as unknown as HTMLAnchorElement;
+          }
+          return document.createElement(tag);
+        });
+
+      downloadLinkedInImageBlob(
+        "blob:http://localhost/img",
+        "linkedin-image-abc.png",
+      );
+
+      expect(createElementSpy).toHaveBeenCalledWith("a");
+      expect(click).toHaveBeenCalled();
+      expect(append).toHaveBeenCalled();
+      expect(removeChild).toHaveBeenCalled();
+
+      createElementSpy.mockRestore();
+      append.mockRestore();
+      removeChild.mockRestore();
+    });
+
+    it("throws when blobUrl is missing", () => {
+      expect(() => downloadLinkedInImageBlob("", "x.png")).toThrow(
+        "missing blob URL",
+      );
+    });
+
+    it("throws when filename is blank", () => {
+      expect(() =>
+        downloadLinkedInImageBlob("blob:http://localhost/img", "   "),
+      ).toThrow("missing filename");
     });
   });
 

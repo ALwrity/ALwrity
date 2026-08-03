@@ -118,5 +118,3 @@ export function useUndoRedo<T>(initialValue: T, options?: UseUndoRedoOptions) {
 }
 
 export type { UndoRedoState };
-
-export type { UndoRedoState };
