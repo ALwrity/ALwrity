@@ -732,3 +732,76 @@ if "pytrends" not in sys.modules:
 
         _pytrends_pkg.request = _pytrends_request
         _pytrends_pkg.exceptions = _pytrends_exceptions
+
+
+# ---------------------------------------------------------------------------
+# ``reportlab`` is imported by LinkedIn carousel PDF rendering when
+# ``services.linkedin`` package init loads. Not required for Gemini image
+# unit tests — stub so collection works without the full venv.
+# ---------------------------------------------------------------------------
+if "reportlab" not in sys.modules:
+    try:
+        importlib.import_module("reportlab")
+    except Exception:
+        _rl = types.ModuleType("reportlab")
+        _rl.__path__ = []
+        sys.modules["reportlab"] = _rl
+
+        _rl_lib = types.ModuleType("reportlab.lib")
+        _rl_lib.__path__ = []
+        sys.modules["reportlab.lib"] = _rl_lib
+
+        _rl_pagesizes = types.ModuleType("reportlab.lib.pagesizes")
+        _rl_pagesizes.landscape = lambda size: size
+        _rl_pagesizes.letter = (612, 792)
+        sys.modules["reportlab.lib.pagesizes"] = _rl_pagesizes
+
+        _rl_units = types.ModuleType("reportlab.lib.units")
+        _rl_units.mm = 1.0
+        _rl_units.inch = 72.0
+        sys.modules["reportlab.lib.units"] = _rl_units
+
+        _rl_platypus = types.ModuleType("reportlab.platypus")
+
+        class _SimpleDocTemplate:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            def build(self, *args, **kwargs):
+                return None
+
+        class _RLImage:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        class _PageBreak:
+            pass
+
+        _rl_platypus.SimpleDocTemplate = _SimpleDocTemplate
+        _rl_platypus.Image = _RLImage
+        _rl_platypus.PageBreak = _PageBreak
+        sys.modules["reportlab.platypus"] = _rl_platypus
+
+        _rl.lib = _rl_lib
+        _rl.platypus = _rl_platypus
+        _rl_lib.pagesizes = _rl_pagesizes
+        _rl_lib.units = _rl_units
+
+
+# ---------------------------------------------------------------------------
+# ``huggingface_hub`` is imported by HF image provider when
+# ``services.llm_providers.image_generation`` package init loads.
+# Stub so WaveSpeed Gemini unit tests collect without HF installed.
+# ---------------------------------------------------------------------------
+if "huggingface_hub" not in sys.modules:
+    try:
+        importlib.import_module("huggingface_hub")
+    except Exception:
+        _hf_hub = types.ModuleType("huggingface_hub")
+
+        class _InferenceClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        _hf_hub.InferenceClient = _InferenceClient
+        sys.modules["huggingface_hub"] = _hf_hub
