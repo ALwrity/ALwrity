@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 interface UndoRedoState<T> {
   past: T[];
@@ -26,6 +26,11 @@ export function useUndoRedo<T>(initialValue: T, options?: UseUndoRedoOptions) {
     future: [],
   });
 
+  // Keep a sync mirror so undo/redo can return the restored value immediately
+  // (setState updater side-effects are not reliable under React 18 batching).
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   const canUndo = state.past.length > 0;
   const canRedo = state.future.length > 0;
 
@@ -37,55 +42,56 @@ export function useUndoRedo<T>(initialValue: T, options?: UseUndoRedoOptions) {
       
       if (resolvedValue === current.present) return current;
       
-      const newPast = [...current.past, current.present].slice(-limit);
-      return {
-        past: newPast,
+      const next: UndoRedoState<T> = {
+        past: [...current.past, current.present].slice(-limit),
         present: resolvedValue,
         future: [],
       };
+      stateRef.current = next;
+      return next;
     });
   }, [limit]);
 
   /** Undo one step; returns restored present, or undefined if nothing to undo. */
   const undo = useCallback((): T | undefined => {
-    let restored: T | undefined;
-    setState((current) => {
-      if (current.past.length === 0) return current;
-      const previous = current.past[current.past.length - 1];
-      restored = previous;
-      const newPast = current.past.slice(0, -1);
-      return {
-        past: newPast,
-        present: previous,
-        future: [current.present, ...current.future],
-      };
-    });
-    return restored;
+    const current = stateRef.current;
+    if (current.past.length === 0) return undefined;
+
+    const previous = current.past[current.past.length - 1];
+    const next: UndoRedoState<T> = {
+      past: current.past.slice(0, -1),
+      present: previous,
+      future: [current.present, ...current.future],
+    };
+    stateRef.current = next;
+    setState(next);
+    return previous;
   }, []);
 
   /** Redo one step; returns restored present, or undefined if nothing to redo. */
   const redo = useCallback((): T | undefined => {
-    let restored: T | undefined;
-    setState((current) => {
-      if (current.future.length === 0) return current;
-      const next = current.future[0];
-      restored = next;
-      const newFuture = current.future.slice(1);
-      return {
-        past: [...current.past, current.present],
-        present: next,
-        future: newFuture,
-      };
-    });
-    return restored;
+    const current = stateRef.current;
+    if (current.future.length === 0) return undefined;
+
+    const upcoming = current.future[0];
+    const next: UndoRedoState<T> = {
+      past: [...current.past, current.present],
+      present: upcoming,
+      future: current.future.slice(1),
+    };
+    stateRef.current = next;
+    setState(next);
+    return upcoming;
   }, []);
 
   const reset = useCallback((newValue: T) => {
-    setState({
+    const next: UndoRedoState<T> = {
       past: [],
       present: newValue,
       future: [],
-    });
+    };
+    stateRef.current = next;
+    setState(next);
   }, []);
 
   useEffect(() => {

@@ -11,7 +11,11 @@ jest.mock("emoji-picker-react", () => {
   const MockPicker = ({
     onEmojiClick,
   }: {
-    onEmojiClick: (data: { emoji: string; unified: string; names: string[] }) => void;
+    onEmojiClick: (data: {
+      emoji: string;
+      unified: string;
+      names: string[];
+    }) => void;
   }) =>
     React.createElement(
       "button",
@@ -34,13 +38,15 @@ jest.mock("emoji-picker-react", () => {
 
 describe("LinkedInEmojiPicker", () => {
   it("opens picker and inserts selected emoji via onSelect", () => {
+    const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
     const onSelect = jest.fn();
     render(React.createElement(LinkedInEmojiPicker, { onSelect }));
 
-    fireEvent.click(screen.getByLabelText("Add emoji"));
+    fireEvent.click(screen.getByRole("button", { name: "Add emoji" }));
     fireEvent.click(screen.getByTestId("mock-emoji-picker"));
 
     expect(onSelect).toHaveBeenCalledWith("🚀");
+    logSpy.mockRestore();
   });
 
   it("does not open when disabled", () => {
@@ -49,7 +55,7 @@ describe("LinkedInEmojiPicker", () => {
       React.createElement(LinkedInEmojiPicker, { onSelect, disabled: true }),
     );
 
-    fireEvent.click(screen.getByLabelText("Add emoji"));
+    fireEvent.click(screen.getByRole("button", { name: "Add emoji" }));
     expect(screen.queryByTestId("mock-emoji-picker")).toBeNull();
   });
 });

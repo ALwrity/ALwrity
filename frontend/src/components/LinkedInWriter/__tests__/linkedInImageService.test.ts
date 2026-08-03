@@ -67,6 +67,7 @@ describe("linkedInImageService", () => {
 
   describe("downloadLinkedInImageBlob", () => {
     it("triggers an anchor download for a blob URL", () => {
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => {});
       const click = jest.fn();
       const append = jest.spyOn(document.body, "appendChild").mockImplementation(
         (node) => node,
@@ -100,18 +101,23 @@ describe("linkedInImageService", () => {
       createElementSpy.mockRestore();
       append.mockRestore();
       removeChild.mockRestore();
+      logSpy.mockRestore();
     });
 
     it("throws when blobUrl is missing", () => {
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
       expect(() => downloadLinkedInImageBlob("", "x.png")).toThrow(
         "missing blob URL",
       );
+      errorSpy.mockRestore();
     });
 
     it("throws when filename is blank", () => {
+      const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
       expect(() =>
         downloadLinkedInImageBlob("blob:http://localhost/img", "   "),
       ).toThrow("missing filename");
+      errorSpy.mockRestore();
     });
   });
 
