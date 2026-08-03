@@ -121,6 +121,37 @@ export async function fetchLinkedInImageBlobUrl(imageId: string): Promise<string
   return URL.createObjectURL(response.data);
 }
 
+/**
+ * Trigger a browser download from an existing blob URL (mirrors downloadLinkedInVideoBlob).
+ * Does not re-fetch when blobUrl is already available from generation preview.
+ */
+export function downloadLinkedInImageBlob(blobUrl: string, filename: string): void {
+  if (!blobUrl) {
+    console.error('[LinkedInImageService] download skipped: empty blobUrl');
+    throw new Error('Image download failed: missing blob URL');
+  }
+  if (!filename.trim()) {
+    console.error('[LinkedInImageService] download skipped: empty filename');
+    throw new Error('Image download failed: missing filename');
+  }
+
+  try {
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    console.log('[LinkedInImageService] image download triggered', { filename });
+  } catch (err) {
+    console.error('[LinkedInImageService] image download failed', {
+      filename,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
+}
+
 export interface LinkedInImageUploadResult {
   success: boolean;
   imageId?: string;

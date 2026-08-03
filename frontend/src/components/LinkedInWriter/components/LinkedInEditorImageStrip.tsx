@@ -1,8 +1,21 @@
-import React from "react";
-import { Box, IconButton, Typography } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import React, { useCallback, useState } from "react";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Typography,
+} from "@mui/material";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import DownloadIcon from "@mui/icons-material/Download";
 import { LinkedInAuthenticatedImage } from "./LinkedInAuthenticatedImage";
 import type { LinkedInEditorImageBlock } from "../utils/linkedInEditorDraftUtils";
+import {
+  downloadLinkedInImageBlob,
+  fetchLinkedInImageBlobUrl,
+} from "../../../services/linkedInImageService";
+import { showToastNotification } from "../../../utils/toastNotifications";
+
+const LOG_PREFIX = "[LinkedInEditorImageStrip]";
 
 interface LinkedInEditorImageStripProps {
   images: LinkedInEditorImageBlock[];
@@ -10,11 +23,70 @@ interface LinkedInEditorImageStripProps {
 }
 
 /**
- * Inline image previews below the assistive editor textarea (LinkedIn-style media strip).
+ * Compact photo strip for Assistive Writing.
+ * Actions sit beside a thumbnail (not under a tall image) so Download/Delete stay on-screen.
  */
 export const LinkedInEditorImageStrip: React.FC<
   LinkedInEditorImageStripProps
 > = ({ images, onRemove }) => {
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const handleDownload = useCallback(async (image: LinkedInEditorImageBlock) => {
+    setDownloadingId(image.id);
+    let createdBlobUrl: string | null = null;
+    try {
+      if (image.imageId) {
+        createdBlobUrl = await fetchLinkedInImageBlobUrl(image.imageId);
+        downloadLinkedInImageBlob(
+          createdBlobUrl,
+          `linkedin-image-${image.imageId}.png`,
+        );
+      } else if (image.url?.startsWith("blob:") || image.url?.startsWith("data:")) {
+        downloadLinkedInImageBlob(
+          image.url,
+          `linkedin-image-${image.id}.png`,
+        );
+      } else {
+        console.error(`${LOG_PREFIX} download unavailable: no imageId or blob url`, {
+          imageId: image.id,
+        });
+        showToastNotification("Download unavailable for this image", "error");
+        return;
+      }
+      console.log(`${LOG_PREFIX} download started`, {
+        imageId: image.imageId || image.id,
+      });
+      showToastNotification("Image download started", "success");
+    } catch (err) {
+      console.error(`${LOG_PREFIX} download failed`, {
+        imageId: image.imageId || image.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      showToastNotification("Failed to download image", "error");
+    } finally {
+      if (createdBlobUrl) {
+        URL.revokeObjectURL(createdBlobUrl);
+      }
+      setDownloadingId(null);
+    }
+  }, []);
+
+  const handleRemove = useCallback(
+    (image: LinkedInEditorImageBlock) => {
+      try {
+        onRemove(image.id);
+        console.log(`${LOG_PREFIX} image removed`, {
+          imageId: image.imageId || image.id,
+        });
+        showToastNotification("Image removed from post", "info");
+      } catch (err) {
+        console.error(`${LOG_PREFIX} remove failed`, err);
+        showToastNotification("Failed to remove image", "error");
+      }
+    },
+    [onRemove],
+  );
+
   if (images.length === 0) return null;
 
   return (
@@ -22,13 +94,16 @@ export const LinkedInEditorImageStrip: React.FC<
       sx={{
         display: "flex",
         flexDirection: "column",
-        gap: 1.5,
-        mt: 1.5,
-        pt: 1.5,
-        borderTop: "1px solid #e2e8f0",
+        gap: 1,
+        py: 1.25,
+        position: "relative",
+        zIndex: 2,
       }}
     >
-      <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+      <Typography
+        variant="subtitle2"
+        sx={{ color: "#0f172a", fontWeight: 700, fontSize: 13 }}
+      >
         Photos ({images.length})
       </Typography>
 
@@ -36,47 +111,115 @@ export const LinkedInEditorImageStrip: React.FC<
         <Box
           key={image.id}
           sx={{
-            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            p: 1.25,
             borderRadius: 2,
-            overflow: "hidden",
-            border: "1px solid #e2e8f0",
-            bgcolor: "#fff",
+            border: "1px solid #cbd5e1",
+            bgcolor: "#ffffff",
+            boxShadow: "0 1px 2px rgba(15, 23, 42, 0.06)",
+            minHeight: 88,
           }}
         >
-          {image.imageId ? (
-            <LinkedInAuthenticatedImage
-              imageId={image.imageId}
-              alt={image.alt}
-            />
-          ) : (
-            <Box
-              component="img"
-              src={image.url}
-              alt={image.alt}
-              sx={{
-                width: "100%",
-                maxHeight: 420,
+          <Box
+            sx={{
+              width: 72,
+              height: 72,
+              flexShrink: 0,
+              borderRadius: 1.5,
+              overflow: "hidden",
+              border: "1px solid #e2e8f0",
+              bgcolor: "#f1f5f9",
+              "& img": {
+                width: "72px !important",
+                height: "72px !important",
+                maxWidth: "72px !important",
+                maxHeight: "72px !important",
+                margin: "0 !important",
+                borderRadius: "0 !important",
+                border: "none !important",
                 objectFit: "cover",
                 display: "block",
-              }}
-            />
-          )}
-
-          <IconButton
-            size="small"
-            aria-label="Remove image"
-            onClick={() => onRemove(image.id)}
-            sx={{
-              position: "absolute",
-              top: 8,
-              right: 8,
-              bgcolor: "rgba(255,255,255,0.92)",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-              "&:hover": { bgcolor: "#fff" },
+              },
             }}
           >
-            <CloseIcon fontSize="small" />
-          </IconButton>
+            {image.imageId ? (
+              <LinkedInAuthenticatedImage
+                imageId={image.imageId}
+                alt={image.alt}
+              />
+            ) : (
+              <Box
+                component="img"
+                src={image.url}
+                alt={image.alt}
+                sx={{
+                  width: 72,
+                  height: 72,
+                  objectFit: "cover",
+                  display: "block",
+                }}
+              />
+            )}
+          </Box>
+
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "#334155",
+                fontWeight: 600,
+                mb: 1,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {image.alt || "LinkedIn post image"}
+            </Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={
+                  downloadingId === image.id ? (
+                    <CircularProgress size={14} color="inherit" />
+                  ) : (
+                    <DownloadIcon fontSize="small" />
+                  )
+                }
+                onClick={() => handleDownload(image)}
+                disabled={downloadingId === image.id}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 600,
+                  bgcolor: "#0A66C2",
+                  color: "#fff",
+                  boxShadow: "none",
+                  "&:hover": { bgcolor: "#004182", boxShadow: "none" },
+                  "&.Mui-disabled": { bgcolor: "#94a3b8", color: "#fff" },
+                }}
+              >
+                Download
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                color="error"
+                startIcon={<DeleteOutlineIcon fontSize="small" />}
+                onClick={() => handleRemove(image)}
+                sx={{
+                  textTransform: "none",
+                  fontWeight: 600,
+                  boxShadow: "none",
+                  "&:hover": { boxShadow: "none" },
+                }}
+              >
+                Delete
+              </Button>
+            </Box>
+          </Box>
         </Box>
       ))}
     </Box>
