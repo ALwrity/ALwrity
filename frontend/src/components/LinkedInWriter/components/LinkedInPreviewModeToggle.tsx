@@ -15,7 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import { LinkedInDraftPreview } from "./LinkedInDraftPreview";
-import { LinkedInPublishPreviewPlain } from "./LinkedInPublishPreviewPlain";
+import { LinkedInFeedLivePreview } from "./LinkedInFeedLivePreview";
 
 export type LinkedInPreviewMode = "studio" | "linkedin";
 
@@ -66,7 +66,7 @@ export const LinkedInPreviewModeToggle: React.FC<
         </ToggleButtonGroup>
         <Typography variant="caption" sx={{ color: "#64748b", maxWidth: 300 }}>
           {mode === "linkedin"
-            ? "How the post reads on LinkedIn — plain text, line breaks, no citation badges."
+            ? "Feed mockup — desktop/mobile, see-more fold, and media layout."
             : "Research view — shows cited sources and reference markers inline."}
         </Typography>
       </Box>
@@ -78,10 +78,7 @@ export const LinkedInPreviewModeToggle: React.FC<
           researchSources={researchSources}
         />
       ) : (
-        <LinkedInPublishPreviewPlain
-          draft={draft}
-          title="LinkedIn-style preview"
-        />
+        <LinkedInFeedLivePreview draft={draft} />
       )}
     </Box>
   );
