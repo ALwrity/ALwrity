@@ -27,6 +27,7 @@
     "@wix/sdk": "^1.17.1",
     "ajv": "^8.18.0",
     "axios": "^1.12.0",
+    "emoji-picker-react": "^4.19.1",
     "framer-motion": "^12.23.12",
     "html2canvas": "^1.4.1",
     "lucide-react": "^0.543.0",
