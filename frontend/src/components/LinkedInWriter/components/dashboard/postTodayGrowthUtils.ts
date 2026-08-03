@@ -1,5 +1,6 @@
 import type { ConsolidatedGrowthResponse } from "../../../../services/linkedInGrowthApi";
 import type { PostCandidate } from "./PostTodayCandidateList";
+import { sanitizePostTodayText } from "./postTodayTextUtils";
 
 const CARD_PRIORITY: Record<string, number> = {
   trending: 0.5,
@@ -35,16 +36,17 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   const trending = c.trending?.trending_topics ?? [];
   trending.forEach((item, index) => {
     if (!item?.topic?.trim()) return;
+    const context = sanitizePostTodayText(item.why_now);
     candidates.push({
-      topic: item.topic,
-      hook: item.suggested_hook || item.why_now || "",
+      topic: sanitizePostTodayText(item.topic),
+      hook: sanitizePostTodayText(item.suggested_hook),
       sourceLabel: index === 0 ? "Top Trending Topic" : "Trending Now",
       sourceIcon: "🔥",
       confidence: normalizeConfidence(item.confidence),
       score: scoreFor(item.confidence, "trending"),
       sourceType: "trending",
       emoji: item.emoji,
-      context: item.why_now,
+      context: context || undefined,
       hookLabel: "Hook idea",
       actionLabel: "✍️ Create Post",
     });
@@ -53,15 +55,16 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   const dailyPosts = c.weekly_strategy?.daily_posts ?? [];
   dailyPosts.forEach((post, index) => {
     if (!post?.headline?.trim()) return;
+    const context = sanitizePostTodayText(post.why_this_works);
     candidates.push({
-      topic: post.headline,
-      hook: post.hook || post.why_this_works || "",
+      topic: sanitizePostTodayText(post.headline),
+      hook: sanitizePostTodayText(post.hook),
       sourceLabel: index === 0 ? "Today's Weekly Plan Pick" : `Weekly Plan · ${post.day || "Day"}`,
       sourceIcon: "📅",
       confidence: normalizeConfidence(post.confidence),
       score: scoreFor(post.confidence, "strategy"),
       sourceType: "strategy",
-      context: post.why_this_works,
+      context: context || undefined,
       hookLabel: "Hook idea",
       actionLabel: "✍️ Create Post",
     });
@@ -70,16 +73,18 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   const opportunities = c.engagement_opportunities?.opportunities ?? [];
   opportunities.forEach((item, index) => {
     if (!item?.title?.trim()) return;
-    const contextParts = [item.author_context, item.why_engage].filter(Boolean);
+    const contextParts = [item.author_context, item.why_engage]
+      .map((part) => sanitizePostTodayText(part))
+      .filter(Boolean);
     candidates.push({
-      topic: item.title,
-      hook: item.suggested_comment || item.why_engage || "",
+      topic: sanitizePostTodayText(item.title),
+      hook: sanitizePostTodayText(item.suggested_comment),
       sourceLabel: index === 0 ? "Top Engagement Opportunity" : "Engagement Opportunity",
       sourceIcon: "💬",
       confidence: normalizeConfidence(item.confidence),
       score: scoreFor(item.confidence, "engagement"),
       sourceType: "engagement",
-      context: contextParts.join(" — "),
+      context: contextParts.length > 0 ? contextParts.join(" — ") : undefined,
       hookLabel: "Comment idea",
       actionLabel: "✍️ Create Post",
     });
@@ -88,15 +93,16 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   const gaps = c.content_gaps?.gaps ?? [];
   gaps.forEach((gap, index) => {
     if (!gap?.gap_topic?.trim()) return;
+    const context = sanitizePostTodayText(gap.why_it_matters || gap.why_gap);
     candidates.push({
-      topic: gap.gap_topic,
-      hook: gap.suggested_angle || gap.why_it_matters || "",
+      topic: sanitizePostTodayText(gap.gap_topic),
+      hook: sanitizePostTodayText(gap.suggested_angle),
       sourceLabel: index === 0 ? "Biggest Content Gap" : "Content Gap",
       sourceIcon: "🔍",
       confidence: normalizeConfidence(gap.confidence),
       score: scoreFor(gap.confidence, "gaps"),
       sourceType: "content_gap",
-      context: gap.why_it_matters || gap.why_gap,
+      context: context || undefined,
       hookLabel: "Post angle",
       actionLabel: "✍️ Fill This Gap",
     });
@@ -104,22 +110,22 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
 
   const patterns = c.viral_analysis?.patterns ?? [];
   patterns.forEach((p, index) => {
-    const topic = p.example_headline || p.pattern_name;
-    if (!topic?.trim()) return;
+    const topic = sanitizePostTodayText(p.example_headline || p.pattern_name);
+    if (!topic) return;
     const contextParts = [
-      p.pattern_name,
+      sanitizePostTodayText(p.pattern_name),
       p.engagement_multiplier ? `${p.engagement_multiplier} engagement` : "",
-      p.example_author ? `Example by ${p.example_author}` : "",
+      p.example_author ? `Example by ${sanitizePostTodayText(p.example_author)}` : "",
     ].filter(Boolean);
     candidates.push({
       topic,
-      hook: p.description || c.viral_analysis?.top_recommendation || "",
+      hook: sanitizePostTodayText(p.description || c.viral_analysis?.top_recommendation),
       sourceLabel: index === 0 ? "Top Viral Pattern" : "Viral Pattern",
       sourceIcon: "📈",
       confidence: normalizeConfidence(p.confidence),
       score: scoreFor(p.confidence, "viral"),
       sourceType: "viral",
-      context: contextParts.join(" · "),
+      context: contextParts.length > 0 ? contextParts.join(" · ") : undefined,
       hookLabel: "Pattern insight",
       actionLabel: "✍️ Write in This Style",
     });
@@ -128,15 +134,18 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   const suggestions = c.network_suggestions?.suggestions ?? [];
   suggestions.forEach((s, index) => {
     if (!s?.name?.trim()) return;
+    const name = sanitizePostTodayText(s.name);
+    const title = sanitizePostTodayText(s.title || "Connection");
+    const company = sanitizePostTodayText(s.company);
     candidates.push({
-      topic: `${s.name} — ${s.title || "Connection"}${s.company ? ` @ ${s.company}` : ""}`,
-      hook: s.suggested_note || s.why_connect || "",
+      topic: `${name} — ${title}${company ? ` @ ${company}` : ""}`,
+      hook: sanitizePostTodayText(s.suggested_note),
       sourceLabel: index === 0 ? "Top Network Suggestion" : "Network Suggestion",
       sourceIcon: "🤝",
       confidence: normalizeConfidence(s.confidence),
       score: scoreFor(s.confidence, "network"),
       sourceType: "network",
-      context: s.why_connect,
+      context: sanitizePostTodayText(s.why_connect) || undefined,
       hookLabel: "Connection note",
       actionLabel: "✍️ Create Post",
     });
@@ -148,8 +157,8 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
     if (!topic?.trim()) return;
     if (candidates.some((x) => x.topic === topic)) return;
     candidates.push({
-      topic,
-      hook: c.weekly_strategy?.focus_area || c.weekly_strategy?.theme || "",
+      topic: sanitizePostTodayText(topic),
+      hook: sanitizePostTodayText(c.weekly_strategy?.focus_area || c.weekly_strategy?.theme),
       sourceLabel: index === 0 ? "Weekly Strategy Topic" : "Strategy Topic",
       sourceIcon: "📅",
       confidence: "medium",
@@ -169,7 +178,7 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   ) {
     candidates.push({
       topic: "Viral content opportunity",
-      hook: c.viral_analysis.top_recommendation,
+      hook: sanitizePostTodayText(c.viral_analysis.top_recommendation),
       sourceLabel: "Viral Pattern Insight",
       sourceIcon: "📈",
       confidence: "medium",
@@ -187,7 +196,7 @@ export function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
   if (brand?.top_recommendation?.trim()) {
     candidates.push({
       topic: "Strengthen your personal brand",
-      hook: brand.top_recommendation,
+      hook: sanitizePostTodayText(brand.top_recommendation),
       sourceLabel: "Brand Score Insight",
       sourceIcon: "🏆",
       confidence: "medium",

@@ -9,6 +9,7 @@ from models.linkedin_growth_models import (
 )
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import build_temporal_llm_prompts, format_industry_search_queries
 
 
 class NetworkGrowthService:
@@ -63,10 +64,14 @@ class NetworkGrowthService:
             logger.warning("[NetworkGrowth] Exa provider not available")
             return []
 
-        queries = [
-            f"leading {industry} {title} professionals thought leadership",
-            f"top voices in {industry} LinkedIn",
-        ]
+        queries = format_industry_search_queries(
+            [
+                "leading {industry} {title} professionals thought leadership {year}",
+                "top voices in {industry} LinkedIn {year}",
+            ],
+            industry=industry,
+            title=title,
+        )
         all_results: List[Dict[str, Any]] = []
         for query in queries:
             cache_key = growth_cache.exa_key(query, 5, user_id)
@@ -129,6 +134,9 @@ class NetworkGrowthService:
             "of exactly 3 people."
         )
 
+        now = datetime.now(timezone.utc)
+        prompt, enriched_system = build_temporal_llm_prompts(prompt, system_prompt, now)
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -163,7 +171,7 @@ class NetworkGrowthService:
             "required": ["suggestions"],
         }
 
-        llm_cache_key = growth_cache.llm_key(prompt[:200] + str(json_schema), user_id)
+        llm_cache_key = growth_cache.llm_key(prompt[:200] + enriched_system[:200], user_id)
         cached_llm = growth_cache.get(llm_cache_key)
         if cached_llm is not None:
             logger.info("[NetworkGrowth] LLM cache hit")
@@ -173,7 +181,7 @@ class NetworkGrowthService:
             raw = await protected_llm_call(
                 llm_text_gen,
                 prompt=prompt,
-                system_prompt=system_prompt,
+                system_prompt=enriched_system,
                 json_struct=json_schema,
                 user_id=user_id,
             )

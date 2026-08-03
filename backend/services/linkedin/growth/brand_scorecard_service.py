@@ -5,6 +5,7 @@ from loguru import logger
 from models.linkedin_growth_models import BrandDimension, BrandScorecardResponse
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import build_temporal_llm_prompts
 
 
 class BrandScorecardService:
@@ -107,6 +108,9 @@ class BrandScorecardService:
             "'top_recommendation' (string)."
         )
 
+        now = datetime.now(timezone.utc)
+        prompt, enriched_system = build_temporal_llm_prompts(prompt, system_prompt, now)
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -139,7 +143,7 @@ class BrandScorecardService:
             "required": ["dimensions", "overall_score", "top_recommendation"],
         }
 
-        llm_cache_key = growth_cache.llm_key(prompt[:200] + str(json_schema), user_id)
+        llm_cache_key = growth_cache.llm_key(prompt[:200] + enriched_system[:200], user_id)
         cached_llm = growth_cache.get(llm_cache_key)
         if cached_llm is not None:
             logger.info("[BrandScorecard] LLM cache hit")
@@ -149,7 +153,7 @@ class BrandScorecardService:
             raw = await protected_llm_call(
                 llm_text_gen,
                 prompt=prompt,
-                system_prompt=system_prompt,
+                system_prompt=enriched_system,
                 json_struct=json_schema,
                 user_id=user_id,
             )

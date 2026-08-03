@@ -901,18 +901,52 @@
   font-size: 12px;
   line-height: 1.5;
   color: #4b5563;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
 }
 
 .linkedin-post-today-card__hook {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0 0 10px;
-  font-size: 11px;
-  font-style: italic;
-  line-height: 1.5;
-  color: #64748b;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #475569;
   background: #f1f5f9;
-  padding: 6px 10px;
   border-radius: 6px;
-  word-break: break-word;
+  letter-spacing: normal;
+  text-transform: none;
+  overflow: visible;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.linkedin-post-today-card__hook-icon {
+  flex-shrink: 0;
+  line-height: 1.55;
+  font-style: normal;
+}
+
+.linkedin-post-today-card__hook-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  white-space: normal;
+}
+
+.linkedin-post-today-card__hook-label {
+  font-weight: 600;
+  font-style: normal;
+}
+
+.linkedin-post-today-card__hook-quote {
+  margin: 0;
+  font-style: italic;
+  quotes: "\201C" "\201D" "\2018" "\2019";
 }
 
 .linkedin-post-today-card__footer {

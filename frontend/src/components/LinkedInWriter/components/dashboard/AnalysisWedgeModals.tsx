@@ -1,5 +1,5 @@
-﻿/**
- * Analysis Wedge â€” AI-first feature modals
+/**
+ * Analysis Wedge — AI-first feature modals
  *
  * F1  PostTodayModal           â€” AI-ranked post opportunities (Create wedge)
  * F2  BrandScorecardModal      â€” full BrandScorecard component in a modal
@@ -29,12 +29,13 @@ import {
   rowBase,
 } from "../GrowthEngine/styles";
 import { CREATE_WEDGE_NESTED_MODAL_SIZE } from "../../utils/createWedgeNestedModalLayout";
+import { buildInsightRefreshLabel } from "./growthInsightsFormatUtils";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-const CACHE_KEY = "alwrity_growth_engine";
+const CACHE_KEY = "alwrity_growth_engine_v3";
 
 interface CachePayload {
   data: ConsolidatedGrowthResponse;
@@ -72,16 +73,6 @@ function writeCache(data: ConsolidatedGrowthResponse) {
   } catch {
     // storage full â€” silent
   }
-}
-
-function formatAge(cachedAt: number): string {
-  const ms = Date.now() - cachedAt;
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
 }
 
 function openInCreate(topic: string, keyPoints: string, type: string = "post") {
@@ -262,9 +253,10 @@ const ErrorBanner: React.FC<{ message: string }> = ({ message }) => (
 
 const RefreshBar: React.FC<{
   cachedAt: number;
+  generatedAt?: string | null;
   onRefresh: () => void;
   label?: string;
-}> = ({ cachedAt, onRefresh, label = "Last refreshed" }) => (
+}> = ({ cachedAt, generatedAt, onRefresh, label = "Last refreshed" }) => (
   <div
     style={{
       display: "flex",
@@ -275,9 +267,7 @@ const RefreshBar: React.FC<{
       color: colors.textTertiary,
     }}
   >
-    <span>
-      {label} {formatAge(cachedAt)}
-    </span>
+    <span>{buildInsightRefreshLabel(cachedAt, generatedAt, label)}</span>
     <button
       type="button"
       onClick={onRefresh}
@@ -386,8 +376,8 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
             {cachedAt && (
               <RefreshBar
                 cachedAt={cachedAt}
+                generatedAt={data?.generated_at}
                 onRefresh={handleLoadAll}
-                label="Based on analysis from"
               />
             )}
             <PostTodayCandidateList

@@ -9,6 +9,7 @@ from models.linkedin_growth_models import (
 )
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import build_temporal_llm_prompts, format_industry_search_queries
 
 
 class EngagementService:
@@ -51,10 +52,13 @@ class EngagementService:
             logger.warning("[Engagement] Exa provider not available")
             return []
 
-        queries = [
-            f"{industry} thought leadership insights",
-            f"{industry} debate discussion analysis",
-        ]
+        queries = format_industry_search_queries(
+            [
+                "{industry} thought leadership insights {year}",
+                "{industry} debate discussion analysis {year}",
+            ],
+            industry=industry,
+        )
         all_results: List[Dict[str, Any]] = []
         for query in queries:
             cache_key = growth_cache.exa_key(query, 5, user_id)
@@ -115,6 +119,9 @@ class EngagementService:
             "array of exactly 3 items."
         )
 
+        now = datetime.now(timezone.utc)
+        prompt, enriched_system = build_temporal_llm_prompts(prompt, system_prompt, now)
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -149,7 +156,7 @@ class EngagementService:
             "required": ["opportunities"],
         }
 
-        llm_cache_key = growth_cache.llm_key(prompt[:200] + str(json_schema), user_id)
+        llm_cache_key = growth_cache.llm_key(prompt[:200] + enriched_system[:200], user_id)
         cached_llm = growth_cache.get(llm_cache_key)
         if cached_llm is not None:
             logger.info("[Engagement] LLM cache hit")
@@ -159,7 +166,7 @@ class EngagementService:
             raw = await protected_llm_call(
                 llm_text_gen,
                 prompt=prompt,
-                system_prompt=system_prompt,
+                system_prompt=enriched_system,
                 json_struct=json_schema,
                 user_id=user_id,
             )

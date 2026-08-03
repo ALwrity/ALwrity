@@ -6,6 +6,7 @@ from loguru import logger
 from models.linkedin_growth_models import ContentGapItem, ContentGapsResponse
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import build_temporal_llm_prompts, format_industry_search_queries
 
 
 class ContentGapService:
@@ -48,10 +49,14 @@ class ContentGapService:
         if not provider:
             return []
 
-        queries = [
-            f"hot topics {industry} {title} 2026",
-            f"underrated LinkedIn topics {industry} professionals should post about",
-        ]
+        queries = format_industry_search_queries(
+            [
+                "hot topics {industry} {title} {year}",
+                "underrated LinkedIn topics {industry} professionals should post about {year}",
+            ],
+            industry=industry,
+            title=title,
+        )
         all_results: List[Dict[str, Any]] = []
         for query in queries:
             cache_key = growth_cache.exa_key(query, 5, user_id)
@@ -108,6 +113,9 @@ class ContentGapService:
             "Identify content gaps. Return JSON with a 'gaps' array of exactly 4 items."
         )
 
+        now = datetime.now(timezone.utc)
+        prompt, enriched_system = build_temporal_llm_prompts(prompt, system_prompt, now)
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -140,7 +148,7 @@ class ContentGapService:
             "required": ["gaps"],
         }
 
-        llm_cache_key = growth_cache.llm_key(prompt[:200] + str(json_schema), user_id)
+        llm_cache_key = growth_cache.llm_key(prompt[:200] + enriched_system[:200], user_id)
         cached_llm = growth_cache.get(llm_cache_key)
         if cached_llm is not None:
             logger.info("[ContentGap] LLM cache hit")
@@ -150,7 +158,7 @@ class ContentGapService:
             raw = await protected_llm_call(
                 llm_text_gen,
                 prompt=prompt,
-                system_prompt=system_prompt,
+                system_prompt=enriched_system,
                 json_struct=json_schema,
                 user_id=user_id,
             )

@@ -9,6 +9,12 @@ from models.linkedin_growth_models import (
 )
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import (
+    build_temporal_llm_prompts,
+    format_industry_search_queries,
+    sanitize_llm_text,
+)
+from .temporal_validation import should_exclude_for_stale_years
 
 
 class TrendingService:
@@ -46,7 +52,10 @@ class TrendingService:
         raise ValueError("Could not resolve user industry from profile or persona")
 
     def _build_search_query(self, industry: str) -> str:
-        return f"{industry} trends insights news {datetime.now().year}"
+        return format_industry_search_queries(
+            ["{industry} trends insights news {year}"],
+            industry=industry,
+        )[0]
 
     async def _search_trending_articles(
         self, industry: str, user_id: str
@@ -96,18 +105,21 @@ class TrendingService:
             "- topic: short label (2-4 words)\n"
             "- emoji: a single relevant emoji\n"
             "- why_now: 1-sentence explanation of why this matters right now\n"
-            "- suggested_hook: a LinkedIn post hook the user could write\n"
+            "- suggested_hook: a complete LinkedIn post opening line (8–20 words, no wrapping quotes)\n"
             "- data_source_detail: brief explanation of what data this comes from\n"
             "- confidence: high/medium/low\n"
             "Output ONLY valid JSON matching the schema."
         )
 
-        prompt = (
+        base_prompt = (
             f"Industry: {industry}\n\n"
             f"Recent articles and content:\n{articles_text}\n\n"
             "What are the top 3 trending topics right now? "
             "Return JSON with a 'trending_topics' array."
         )
+
+        now = datetime.now(timezone.utc)
+        prompt, enriched_system = build_temporal_llm_prompts(base_prompt, system_prompt, now)
 
         json_schema = {
             "type": "object",
@@ -138,7 +150,7 @@ class TrendingService:
             "required": ["trending_topics"],
         }
 
-        llm_cache_key = growth_cache.llm_key(prompt[:200] + str(json_schema), user_id)
+        llm_cache_key = growth_cache.llm_key(prompt[:200] + enriched_system[:200], user_id)
         cached_llm = growth_cache.get(llm_cache_key)
         if cached_llm is not None:
             logger.info("[TrendingService] LLM cache hit")
@@ -148,13 +160,49 @@ class TrendingService:
             raw = await protected_llm_call(
                 llm_text_gen,
                 prompt=prompt,
-                system_prompt=system_prompt,
+                system_prompt=enriched_system,
                 json_struct=json_schema,
                 user_id=user_id,
             )
             if isinstance(raw, dict) and "trending_topics" in raw:
                 topics_data = raw["trending_topics"]
-                result = [TrendingTopicItem(**t) for t in topics_data]
+                result: list[TrendingTopicItem] = []
+                for t in topics_data:
+                    if not isinstance(t, dict):
+                        continue
+                    try:
+                        topic = sanitize_llm_text(t.get("topic"))
+                        why_now = sanitize_llm_text(t.get("why_now"))
+                        suggested_hook = sanitize_llm_text(t.get("suggested_hook"))
+                        if not topic or not why_now or not suggested_hook:
+                            continue
+                        if should_exclude_for_stale_years(
+                            "TrendingService",
+                            "trending",
+                            topic,
+                            {"why_now": why_now, "suggested_hook": suggested_hook},
+                            now,
+                        ):
+                            logger.info(
+                                "[TrendingService] Excluding topic '{}' — stale year reference",
+                                topic,
+                            )
+                            continue
+                        result.append(
+                            TrendingTopicItem(
+                                **{
+                                    **t,
+                                    "topic": topic,
+                                    "why_now": why_now,
+                                    "suggested_hook": suggested_hook,
+                                }
+                            )
+                        )
+                    except Exception as item_exc:
+                        logger.warning(
+                            "[TrendingService] Skipping malformed trending topic: {}",
+                            item_exc,
+                        )
                 growth_cache.set(llm_cache_key, result, ttl_seconds=3600)
                 return result
             logger.warning("[TrendingService] LLM returned unexpected shape: {}", type(raw))

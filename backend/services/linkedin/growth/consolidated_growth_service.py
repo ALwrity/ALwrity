@@ -27,6 +27,12 @@ from services.integrations.linkedin.profile_repository import ProfileRepository
 from services.llm_providers.main_text_generation import llm_text_gen
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import (
+    build_temporal_llm_prompts,
+    format_industry_search_queries,
+    sanitize_llm_text,
+)
+from .temporal_validation import should_exclude_for_stale_years
 
 
 class ConsolidatedLLMData(BaseModel):
@@ -121,7 +127,7 @@ SYSTEM_PROMPT = """You are a LinkedIn growth strategist. Your task is to generat
 
 ## SECTIONS (all required)
 
-1. **Trending Topics** (exactly 2 items): topic label, emoji, why_now (1 sentence), suggested_hook (1 sentence).
+1. **Trending Topics** (exactly 2 items): topic label, emoji, why_now (1 sentence), suggested_hook (1 complete opening line, 8–20 words, no wrapping quotes).
 2. **Network Suggestions** (exactly 2 items): name, title, company, why_connect (1 sentence), suggested_note (1-2 sentences).
 3. **Engagement Opportunities** (exactly 2 items): title, author, author_context, why_engage (1 sentence), suggested_comment (1-2 sentences).
 4. **Viral Content Patterns** (exactly 2 items): pattern_name, description (1 sentence), engagement_multiplier (e.g. "3x"), example_headline, example_author.
@@ -201,8 +207,11 @@ class ConsolidatedGrowthService:
         return "professional"
 
     def _build_queries(self, queries_spec: list[str], industry: str, title: str) -> list[str]:
-        year = datetime.now().year
-        return [q.format(industry=industry, title=title, year=year) for q in queries_spec]
+        return format_industry_search_queries(
+            queries_spec,
+            industry=industry,
+            title=title,
+        )
 
     async def _search_section(self, queries: list[str], user_id: str) -> list[Dict[str, Any]]:
         provider = self._get_exa_provider()
@@ -285,11 +294,12 @@ class ConsolidatedGrowthService:
                 research_lines.append("(No search results available for this section.)")
 
         research_context = "\n".join(research_lines)
+        now = datetime.now()
 
         json_schema = ConsolidatedLLMData.model_json_schema()
         schema_str = _json.dumps(json_schema, indent=2)
 
-        prompt = (
+        base_prompt = (
             f"## USER PROFILE\n{context_str}\n\n"
             f"## USER INDUSTRY\n{industry}\n\n"
             f"## USER ROLE/TITLE\n{title}\n\n"
@@ -298,13 +308,14 @@ class ConsolidatedGrowthService:
             "Generate insights for all 7 sections above. Output ONLY valid JSON matching the provided schema."
         )
 
-        llm_cache_key = growth_cache.llm_key(prompt + SYSTEM_PROMPT, user_id)
+        prompt, system_prompt = build_temporal_llm_prompts(base_prompt, SYSTEM_PROMPT, now)
+        llm_cache_key = growth_cache.llm_key(prompt + system_prompt, user_id)
         cached_raw = growth_cache.get(llm_cache_key)
         if cached_raw is not None:
             logger.info("[ConsolidatedGrowth] LLM cache hit")
             raw = cached_raw
         else:
-            raw = await self._call_llm_with_retry(prompt, user_id)
+            raw = await self._call_llm_with_retry(prompt, system_prompt, user_id)
             if raw:
                 growth_cache.set(llm_cache_key, raw, ttl_seconds=3600)
 
@@ -319,9 +330,7 @@ class ConsolidatedGrowthService:
             logger.warning("[ConsolidatedGrowth] LLM returned unexpected type: {}", type(raw))
             return self._empty_response()
 
-        now = datetime.now()
-
-        return ConsolidatedGrowthResponse(
+        response = ConsolidatedGrowthResponse(
             trending=self._parse_trending(raw, now),
             network_suggestions=self._parse_network(raw, now),
             engagement_opportunities=self._parse_engagement(raw, now),
@@ -331,14 +340,31 @@ class ConsolidatedGrowthService:
             brand_scorecard=self._parse_brand(raw, now),
             generated_at=now,
         )
+        logger.info(
+            "[ConsolidatedGrowth] Parsed insights for user {} — trending={} engagement={} "
+            "viral={} strategy_posts={} gaps={} (generated {})",
+            user_id,
+            len(response.trending.trending_topics if response.trending else []),
+            len(response.engagement_opportunities.opportunities if response.engagement_opportunities else []),
+            len(response.viral_analysis.patterns if response.viral_analysis else []),
+            len(response.weekly_strategy.daily_posts if response.weekly_strategy else []),
+            len(response.content_gaps.gaps if response.content_gaps else []),
+            now.strftime("%Y-%m-%d"),
+        )
+        return response
 
     # ── Retry logic ─────────────────────────────────────────────────
 
-    async def _call_llm_with_retry(self, prompt: str, user_id: str) -> Optional[Any]:
+    async def _call_llm_with_retry(
+        self,
+        prompt: str,
+        system_prompt: str,
+        user_id: str,
+    ) -> Optional[Any]:
         max_attempts = 2
         for attempt in range(1, max_attempts + 1):
             try:
-                system = SYSTEM_PROMPT
+                system = system_prompt
                 if attempt > 1:
                     system += "\n\nIMPORTANT: Your previous response did not match the required JSON schema. Please output ONLY valid JSON matching the schema exactly. No extra text, no markdown."
 
@@ -381,15 +407,41 @@ class ConsolidatedGrowthService:
 
     def _parse_trending(self, raw: dict, now: datetime) -> TrendingTopicsResponse:
         try:
-            items = [
-                TrendingTopicItem(**t)
-                for t in raw.get("trending_topics", [])
-                if isinstance(t, dict)
-                and t.get("topic")
-                and t.get("why_now")
-                and t.get("suggested_hook")
-                and t.get("confidence") in ("high", "medium", "low")
-            ]
+            items: list[TrendingTopicItem] = []
+            for t in raw.get("trending_topics", []):
+                if not isinstance(t, dict):
+                    continue
+                topic = sanitize_llm_text(t.get("topic"))
+                why_now = sanitize_llm_text(t.get("why_now"))
+                suggested_hook = sanitize_llm_text(t.get("suggested_hook"))
+                confidence = t.get("confidence")
+                if (
+                    not topic
+                    or not why_now
+                    or not suggested_hook
+                    or confidence not in ("high", "medium", "low")
+                ):
+                    continue
+                if len(suggested_hook) < 12:
+                    logger.warning(
+                        "[ConsolidatedGrowth] Short suggested_hook for topic '{}': {!r}",
+                        topic,
+                        suggested_hook,
+                    )
+                if should_exclude_for_stale_years(
+                    "ConsolidatedGrowth",
+                    "trending",
+                    topic,
+                    {"why_now": why_now, "suggested_hook": suggested_hook},
+                    now,
+                ):
+                    logger.info(
+                        "[ConsolidatedGrowth] Excluding trending topic '{}' — stale year reference",
+                        topic,
+                    )
+                    continue
+                t_clean = {**t, "topic": topic, "why_now": why_now, "suggested_hook": suggested_hook}
+                items.append(TrendingTopicItem(**t_clean))
             return TrendingTopicsResponse(
                 industry=raw.get("trending_industry", ""),
                 trending_topics=items,
@@ -423,7 +475,37 @@ class ConsolidatedGrowthService:
 
     def _parse_engagement(self, raw: dict, now: datetime) -> EngagementOpportunitiesResponse:
         try:
-            items = [EngagementOpportunityItem(**o) for o in raw.get("engagement_opportunities", [])]
+            items: list[EngagementOpportunityItem] = []
+            for o in raw.get("engagement_opportunities", []):
+                if not isinstance(o, dict):
+                    continue
+                title = sanitize_llm_text(o.get("title"))
+                why_engage = sanitize_llm_text(o.get("why_engage"))
+                suggested_comment = sanitize_llm_text(o.get("suggested_comment"))
+                if not title or not why_engage:
+                    continue
+                if should_exclude_for_stale_years(
+                    "ConsolidatedGrowth",
+                    "engagement",
+                    title,
+                    {"why_engage": why_engage, "suggested_comment": suggested_comment},
+                    now,
+                ):
+                    logger.info(
+                        "[ConsolidatedGrowth] Excluding engagement opportunity '{}' — stale year reference",
+                        title,
+                    )
+                    continue
+                items.append(
+                    EngagementOpportunityItem(
+                        **{
+                            **o,
+                            "title": title,
+                            "why_engage": why_engage,
+                            "suggested_comment": suggested_comment,
+                        }
+                    )
+                )
             return EngagementOpportunitiesResponse(
                 opportunities=items,
                 data_source_summary=raw.get("engagement_data_source_summary", ""),
@@ -439,11 +521,57 @@ class ConsolidatedGrowthService:
 
     def _parse_viral(self, raw: dict, now: datetime) -> ViralAnalysisResponse:
         try:
-            patterns = [ViralPattern(**p) for p in raw.get("viral_patterns", [])]
+            patterns: list[ViralPattern] = []
+            for p in raw.get("viral_patterns", []):
+                if not isinstance(p, dict):
+                    continue
+                pattern_name = sanitize_llm_text(p.get("pattern_name"))
+                description = sanitize_llm_text(p.get("description"))
+                example_headline = sanitize_llm_text(p.get("example_headline"))
+                label = pattern_name or example_headline or "viral-pattern"
+                if should_exclude_for_stale_years(
+                    "ConsolidatedGrowth",
+                    "viral",
+                    label,
+                    {
+                        "description": description,
+                        "example_headline": example_headline,
+                    },
+                    now,
+                ):
+                    logger.info(
+                        "[ConsolidatedGrowth] Excluding viral pattern '{}' — stale year reference",
+                        label,
+                    )
+                    continue
+                patterns.append(
+                    ViralPattern(
+                        **{
+                            **p,
+                            "pattern_name": pattern_name,
+                            "description": description,
+                            "example_headline": example_headline,
+                        }
+                    )
+                )
+
+            top_recommendation = sanitize_llm_text(raw.get("viral_top_recommendation"))
+            if should_exclude_for_stale_years(
+                "ConsolidatedGrowth",
+                "viral",
+                "top_recommendation",
+                {"top_recommendation": top_recommendation},
+                now,
+            ):
+                logger.info(
+                    "[ConsolidatedGrowth] Clearing viral top_recommendation — stale year reference",
+                )
+                top_recommendation = ""
+
             return ViralAnalysisResponse(
                 industry=raw.get("viral_industry", ""),
                 patterns=patterns,
-                top_recommendation=raw.get("viral_top_recommendation", ""),
+                top_recommendation=top_recommendation,
                 data_source_summary=raw.get("viral_data_source_summary", ""),
                 generated_at=now,
             )
@@ -459,13 +587,45 @@ class ConsolidatedGrowthService:
 
     def _parse_strategy(self, raw: dict, now: datetime) -> WeeklyStrategyResponse:
         try:
-            posts = [DailyPostIdea(**p) for p in raw.get("strategy_daily_posts", [])]
+            posts: list[DailyPostIdea] = []
+            for p in raw.get("strategy_daily_posts", []):
+                if not isinstance(p, dict):
+                    continue
+                headline = sanitize_llm_text(p.get("headline"))
+                hook = sanitize_llm_text(p.get("hook"))
+                why_this_works = sanitize_llm_text(p.get("why_this_works"))
+                day = sanitize_llm_text(p.get("day")) or "Day"
+                label = headline or f"{day}-post"
+                if not headline or not hook:
+                    continue
+                if should_exclude_for_stale_years(
+                    "ConsolidatedGrowth",
+                    "strategy",
+                    label,
+                    {"hook": hook, "why_this_works": why_this_works, "headline": headline},
+                    now,
+                ):
+                    logger.info(
+                        "[ConsolidatedGrowth] Excluding strategy post '{}' — stale year reference",
+                        label,
+                    )
+                    continue
+                posts.append(
+                    DailyPostIdea(
+                        **{
+                            **p,
+                            "headline": headline,
+                            "hook": hook,
+                            "why_this_works": why_this_works,
+                        }
+                    )
+                )
             return WeeklyStrategyResponse(
-                theme=raw.get("strategy_theme", ""),
+                theme=sanitize_llm_text(raw.get("strategy_theme")),
                 week_of=raw.get("strategy_week_of", ""),
                 daily_posts=posts,
                 key_topics=raw.get("strategy_key_topics", []),
-                focus_area=raw.get("strategy_focus_area", ""),
+                focus_area=sanitize_llm_text(raw.get("strategy_focus_area")),
                 data_source_summary=raw.get("strategy_data_source_summary", ""),
                 generated_at=now,
             )
@@ -483,7 +643,43 @@ class ConsolidatedGrowthService:
 
     def _parse_content_gaps(self, raw: dict, now: datetime) -> ContentGapsResponse:
         try:
-            items = [ContentGapItem(**g) for g in raw.get("content_gaps", [])]
+            items: list[ContentGapItem] = []
+            for g in raw.get("content_gaps", []):
+                if not isinstance(g, dict):
+                    continue
+                gap_topic = sanitize_llm_text(g.get("gap_topic"))
+                why_it_matters = sanitize_llm_text(g.get("why_it_matters"))
+                suggested_angle = sanitize_llm_text(g.get("suggested_angle"))
+                why_gap = sanitize_llm_text(g.get("why_gap"))
+                if not gap_topic:
+                    continue
+                if should_exclude_for_stale_years(
+                    "ConsolidatedGrowth",
+                    "content_gaps",
+                    gap_topic,
+                    {
+                        "why_it_matters": why_it_matters,
+                        "suggested_angle": suggested_angle,
+                        "why_gap": why_gap,
+                    },
+                    now,
+                ):
+                    logger.info(
+                        "[ConsolidatedGrowth] Excluding content gap '{}' — stale year reference",
+                        gap_topic,
+                    )
+                    continue
+                items.append(
+                    ContentGapItem(
+                        **{
+                            **g,
+                            "gap_topic": gap_topic,
+                            "why_it_matters": why_it_matters,
+                            "suggested_angle": suggested_angle,
+                            "why_gap": why_gap,
+                        }
+                    )
+                )
             return ContentGapsResponse(
                 gaps=items,
                 data_source_summary=raw.get("content_gaps_data_source_summary", ""),

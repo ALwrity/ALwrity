@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { sanitizePostTodayText, shouldShowHook } from "./postTodayTextUtils";
 
 export interface PostCandidate {
   topic: string;
@@ -73,6 +74,8 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
   const actionLabel =
     candidate.actionLabel ?? (rank === 1 ? "✍️ Create This Post" : "✍️ Create Post");
   const hookLabel = candidate.hookLabel ?? "Hook idea";
+  const hookText = sanitizePostTodayText(candidate.hook);
+  const showHook = shouldShowHook(hookText, candidate.context);
   const actionModifier =
     candidate.sourceType === "content_gap"
       ? "linkedin-post-today-card__action--gap"
@@ -124,10 +127,16 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
         <p className="linkedin-post-today-card__context">{candidate.context}</p>
       ) : null}
 
-      {candidate.hook ? (
-        <p className="linkedin-post-today-card__hook">
-          💡 {hookLabel}: &ldquo;{candidate.hook}&rdquo;
-        </p>
+      {showHook ? (
+        <div className="linkedin-post-today-card__hook" role="note">
+          <span className="linkedin-post-today-card__hook-icon" aria-hidden="true">
+            💡
+          </span>
+          <div className="linkedin-post-today-card__hook-body">
+            <span className="linkedin-post-today-card__hook-label">{hookLabel}:</span>{" "}
+            <q className="linkedin-post-today-card__hook-quote">{hookText}</q>
+          </div>
+        </div>
       ) : null}
 
       <div className="linkedin-post-today-card__footer">
@@ -168,7 +177,7 @@ export const PostTodayCandidateList: React.FC<PostTodayCandidateListProps> = ({
       key={key}
       candidate={candidate}
       rank={rank}
-      onUse={() => onUseCandidate(candidate.topic, candidate.hook)}
+      onUse={() => onUseCandidate(candidate.topic, hookText || candidate.hook)}
     />
   );
 
