@@ -10,9 +10,6 @@ import {
   openPostAnalyticsModal,
 } from "../../utils/linkedInDashboardEvents";
 import {
-  GrowthSnapshotModal,
-  BrandScorecardModal,
-  ViralCopywriterModal,
   EngagementTrendsModal,
 } from "./analysisWedgeModalExports";
 import {
@@ -33,15 +30,18 @@ import { DraftLibraryModal } from "./PublishWedgeModals";
 import { PeopleYouMayKnowModal } from "../PeopleYouMayKnow";
 import { CreateWedgeComingSoonTile } from "./CreateWedgeComingSoonTile";
 import { PublishWedgeComingSoonTile } from "./PublishWedgeComingSoonTile";
+import { AnalysisWedgeComingSoonTile } from "./AnalysisWedgeComingSoonTile";
 import { useCreateWedgeNotify } from "../../hooks/useCreateWedgeNotify";
 import { usePublishWedgeNotify } from "../../hooks/usePublishWedgeNotify";
+import { useAnalysisWedgeNotify } from "../../hooks/useAnalysisWedgeNotify";
 import {
   isCreateWedgeContentTypeLocked,
   type CreateWedgeLockedContentType,
 } from "../../utils/linkedInConnectLockedUi";
 import { isPublishWedgeFeatureLocked } from "../../utils/linkedInPublishWedgeLockedUi";
+import { isAnalysisWedgeFeatureLocked } from "../../utils/linkedInAnalysisWedgeLockedUi";
 
-type AnalysisSub = "snapshot" | "brand_score" | "viral" | "trends" | null;
+type AnalysisSub = "trends" | null;
 type EngagementSub =
   "booster" | "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
 type RemarkSub =
@@ -103,6 +103,10 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     notifyRequested: publishNotifyRequested,
     handleNotify: handlePublishNotify,
   } = usePublishWedgeNotify();
+  const {
+    notifyRequested: analysisNotifyRequested,
+    handleNotify: handleAnalysisNotify,
+  } = useAnalysisWedgeNotify();
 
   // ── shared dispatchers ─────────────────────────────────────────────────────
   const dispatch = (evt: string, detail?: Record<string, unknown>) => {
@@ -217,57 +221,51 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "publish"}
         title="Publish"
         onClose={onClose}
-        maxWidth={504}
+        maxWidth={720}
         titleSize="xl"
         modalClassName="linkedin-publish-wedge-modal"
       >
         <div
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "stretch",
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
             gap: 12,
-            justifyContent: "center",
           }}
           className="linkedin-publish-wedge-tiles"
         >
-          <div style={{ width: 140, flexShrink: 0 }}>
+          <DashboardToolTile
+            title="My Drafts"
+            description="Browse your last 5 saved drafts. Open in Studio, run a quality check, or find the best time."
+            icon="📁"
+            accent="#0a66c2"
+            onClick={() => {
+              onClose();
+              setPublishSub("drafts");
+            }}
+          />
+          {isPublishWedgeFeatureLocked("publish_campaign") ? (
+            <PublishWedgeComingSoonTile
+              feature="publish_campaign"
+              icon="📊"
+              title="Publish Campaign"
+              description="See scheduled posts ranked by ROI — with actionable insights for your week."
+              notified={publishNotifyRequested.publish_campaign}
+              onNotify={() =>
+                handlePublishNotify("publish_campaign", "Publish Campaign")
+              }
+            />
+          ) : (
             <DashboardToolTile
-              title="My Drafts"
-              description="Browse your last 5 saved drafts. Open in Studio, run a quality check, or find the best time."
-              icon="📁"
-              accent="#0a66c2"
+              title="Publish Campaign"
+              description="See scheduled posts ranked by ROI — with actionable insights for your week."
+              icon="📊"
+              accent="#0ea5e9"
               onClick={() => {
                 onClose();
                 setPublishSub("drafts");
               }}
             />
-          </div>
-          <div style={{ width: 140, flexShrink: 0 }}>
-            {isPublishWedgeFeatureLocked("publish_campaign") ? (
-              <PublishWedgeComingSoonTile
-                feature="publish_campaign"
-                icon="📊"
-                title="Publish Campaign"
-                description="See scheduled posts ranked by ROI — with actionable insights for your week."
-                notified={publishNotifyRequested.publish_campaign}
-                onNotify={() =>
-                  handlePublishNotify("publish_campaign", "Publish Campaign")
-                }
-              />
-            ) : (
-              <DashboardToolTile
-                title="Publish Campaign"
-                description="See scheduled posts ranked by ROI — with actionable insights for your week."
-                icon="📊"
-                accent="#0ea5e9"
-                onClick={() => {
-                  onClose();
-                  setPublishSub("drafts");
-                }}
-              />
-            )}
-          </div>
+          )}
         </div>
       </DashboardActionModal>
 
@@ -284,6 +282,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={onClose}
         maxWidth={720}
         titleSize="xl"
+        modalClassName="linkedin-analysis-wedge-modal"
       >
         <div
           style={{
@@ -291,46 +290,14 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             gridTemplateColumns: "repeat(4, 1fr)",
             gap: 12,
           }}
+          className="linkedin-analysis-wedge-tiles"
         >
           <DashboardToolTile
-            title="Growth Snapshot"
-            description="Instant view: top trending topic, biggest content gap, brand score"
-            icon="⚡"
-            accent="#f59e0b"
-            onClick={() => {
-              onClose();
-              setAnalysisSub("snapshot");
-            }}
-          />
-          <DashboardToolTile
-            title="Brand Score"
-            description="Full personal brand breakdown across 5 dimensions"
-            icon="🏆"
-            accent="#8b5cf6"
-            onClick={() => {
-              onClose();
-              setAnalysisSub("brand_score");
-            }}
-          />
-          <DashboardToolTile
-            title="Viral Patterns"
-            description="Top viral formats in your niche — write in any style"
-            icon="🔥"
-            accent="#dc2626"
-            onClick={() => {
-              onClose();
-              setAnalysisSub("viral");
-            }}
-          />
-          <DashboardToolTile
-            title="Engagement Since You Joined ALwrity"
-            description="Track growth since you joined — Top, Rising, and Falling posts"
-            icon="📈"
-            accent="#16a34a"
-            onClick={() => {
-              onClose();
-              setAnalysisSub("trends");
-            }}
+            title="Content Analytics"
+            description="Post performance, engagement trends, and growth engine"
+            icon="📊"
+            accent="#0ea5e9"
+            onClick={openContentAnalytics}
           />
           <DashboardToolTile
             title="Profile Analytics"
@@ -340,34 +307,38 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             onClick={openProfileAnalytics}
           />
           <DashboardToolTile
-            title="Content Analytics"
-            description="Post performance, engagement trends, and growth engine"
-            icon="📊"
-            accent="#0ea5e9"
-            onClick={openContentAnalytics}
+            title="Engagement since You joined ALwrity"
+            description="Track growth since you joined — Top, Rising, and Falling posts"
+            icon="📈"
+            accent="#16a34a"
+            onClick={() => {
+              onClose();
+              setAnalysisSub("trends");
+            }}
           />
-          <DashboardToolTile
-            title="SEO Analytics"
-            description="See how your LinkedIn content ranks in search"
-            icon="🔎"
-            accent="#475569"
-            onClick={openSeoAnalytics}
-          />
+          {isAnalysisWedgeFeatureLocked("seo_analytics") ? (
+            <AnalysisWedgeComingSoonTile
+              feature="seo_analytics"
+              icon="🔎"
+              title="SEO Analytics"
+              description="See how your LinkedIn content ranks in search"
+              notified={analysisNotifyRequested.seo_analytics}
+              onNotify={() =>
+                handleAnalysisNotify("seo_analytics", "SEO Analytics")
+              }
+            />
+          ) : (
+            <DashboardToolTile
+              title="SEO Analytics"
+              description="See how your LinkedIn content ranks in search"
+              icon="🔎"
+              accent="#475569"
+              onClick={openSeoAnalytics}
+            />
+          )}
         </div>
       </DashboardActionModal>
 
-      <GrowthSnapshotModal
-        open={analysisSub === "snapshot"}
-        onClose={() => setAnalysisSub(null)}
-      />
-      <BrandScorecardModal
-        open={analysisSub === "brand_score"}
-        onClose={() => setAnalysisSub(null)}
-      />
-      <ViralCopywriterModal
-        open={analysisSub === "viral"}
-        onClose={() => setAnalysisSub(null)}
-      />
       <EngagementTrendsModal
         open={analysisSub === "trends"}
         onClose={() => setAnalysisSub(null)}
