@@ -356,7 +356,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         params: { limit: 100, offset: 0 },
       });
       setSavedCount(Number(res.data?.total) || 0);
-    } catch { /* best-effort */ }
+    } catch (err) {
+      console.debug('[QuickCreate] saved ideas count refresh failed', err);
+    }
   }, []);
 
   useEffect(() => {
@@ -460,6 +462,35 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     window.addEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
     return () => window.removeEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
   }, [userPreferences]);
+
+  // Apply topic from nested Brainstorm / Post Today without closing Post modal
+  useEffect(() => {
+    const onApplyTopic = (event: Event) => {
+      const detail = (event as CustomEvent<{
+        topic?: string;
+        key_points?: string;
+        industry?: string;
+        tone?: string;
+        target_audience?: string;
+      }>).detail;
+      if (!detail) return;
+      console.debug('[QuickCreate] applying topic from nested modal', detail);
+      setFormData((prev) => ({
+        ...prev,
+        ...(detail.topic != null ? { topic: detail.topic } : {}),
+        ...(detail.key_points != null ? { key_points: detail.key_points } : {}),
+        ...(detail.industry != null ? { industry: detail.industry } : {}),
+        ...(detail.tone != null ? { tone: detail.tone } : {}),
+        ...(detail.target_audience != null
+          ? { target_audience: detail.target_audience }
+          : {}),
+      }));
+      setTopicError(null);
+    };
+    window.addEventListener('linkedinwriter:quickCreateApplyTopic', onApplyTopic);
+    return () =>
+      window.removeEventListener('linkedinwriter:quickCreateApplyTopic', onApplyTopic);
+  }, []);
 
   // Cancel brainstorm safety timeout when BrainstormFlow starts (it's actively processing)
   useEffect(() => {
@@ -692,14 +723,15 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                       setTopicError(null);
 
                       variationAbortRef.current?.abort();
-                      setSelectedType(null);
 
                       brainstormTimeoutRef.current = window.setTimeout(() => {
                         if (brainstromActiveRef.current) {
                           brainstromActiveRef.current = false;
                           brainstormingRef.current = false;
                           setBrainstorming(false);
-                          openModal(brainstormType);
+                          console.warn(
+                            '[QuickCreate] brainstorm safety timeout — BrainstormFlow did not start',
+                          );
                         }
                       }, 15000);
 
@@ -712,6 +744,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                           industry: formData.industry,
                           tone: formData.tone,
                           target_audience: formData.target_audience,
+                          stackOverQuickCreate: true,
                         },
                       }));
                     }}
@@ -1039,7 +1072,10 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="linkedin-quick-create-title"
-          onClick={closeModal}
+          onClick={() => {
+            if (myIdeasOpen || postTodayOpen) return;
+            closeModal();
+          }}
         >
           <div
             className={[
@@ -1222,6 +1258,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       <MySavedIdeas
         open={myIdeasOpen}
         onClose={() => setMyIdeasOpen(false)}
+        stacked={Boolean(selectedType === 'post' || selectedType === 'article')}
         onAfterDelete={() => void refreshSavedCount()}
         onUseInCopilot={(prompt: string) => {
           setMyIdeasOpen(false);
@@ -1232,6 +1269,11 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       <PostTodayModal
         open={postTodayOpen}
         onClose={() => setPostTodayOpen(false)}
+        stacked={selectedType === 'post'}
+        onApplyCandidate={(topic, hook) => {
+          setField('topic', topic);
+          if (hook) setField('key_points', hook);
+        }}
       />
     </>
   );

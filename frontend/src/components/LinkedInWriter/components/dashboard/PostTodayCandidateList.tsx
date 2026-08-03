@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from "react";
-import { colors } from "../GrowthEngine/styles";
 
 export interface PostCandidate {
   topic: string;
@@ -8,6 +7,11 @@ export interface PostCandidate {
   sourceIcon: string;
   confidence: "high" | "medium" | "low";
   score: number;
+  sourceType?: "trending" | "content_gap" | "strategy" | "engagement" | "viral" | "network";
+  emoji?: string;
+  context?: string;
+  hookLabel?: string;
+  actionLabel?: string;
 }
 
 interface PostCandidateCardProps {
@@ -22,6 +26,27 @@ const RANK_STYLES: Record<number, { border: string; badge: string; badgeText: st
   3: { border: "#e2e8f0", badge: "#f1f5f9", badgeText: "#64748b" },
 };
 
+const RANK_LABELS: Record<number, string> = {
+  1: "Top Pick",
+  2: "Strong Match",
+  3: "Also Recommended",
+};
+
+const RANK_MEDALS: Record<number, string> = {
+  1: "🥇",
+  2: "🥈",
+  3: "🥉",
+};
+
+const SOURCE_ACCENTS: Record<NonNullable<PostCandidate["sourceType"]>, string> = {
+  trending: "#f59e0b",
+  content_gap: "#8b5cf6",
+  strategy: "#0ea5e9",
+  engagement: "#10b981",
+  viral: "#dc2626",
+  network: "#6366f1",
+};
+
 const CONFIDENCE_COLORS = {
   high: { bg: "#dcfce7", text: "#166534" },
   medium: { bg: "#fef9c3", text: "#854d0e" },
@@ -31,77 +56,91 @@ const CONFIDENCE_COLORS = {
 const ConfidencePill: React.FC<{ level: "high" | "medium" | "low" }> = ({ level }) => {
   const cc = CONFIDENCE_COLORS[level] ?? CONFIDENCE_COLORS.medium;
   return (
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        background: cc.bg,
-        color: cc.text,
-        padding: "2px 8px",
-        borderRadius: 999,
-        textTransform: "capitalize",
-      }}
-    >
-      {level}
+    <span className="linkedin-post-today-card__confidence" style={{ background: cc.bg, color: cc.text }}>
+      {level} confidence
     </span>
   );
 };
 
 const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, onUse }) => {
   const rs = RANK_STYLES[rank] ?? RANK_STYLES[3];
+  const accent =
+    candidate.sourceType != null
+      ? SOURCE_ACCENTS[candidate.sourceType]
+      : rs.border;
+  const rankLabel = RANK_LABELS[rank];
+  const rankMedal = RANK_MEDALS[rank];
+  const actionLabel =
+    candidate.actionLabel ?? (rank === 1 ? "✍️ Create This Post" : "✍️ Create Post");
+  const hookLabel = candidate.hookLabel ?? "Hook idea";
+  const actionModifier =
+    candidate.sourceType === "content_gap"
+      ? "linkedin-post-today-card__action--gap"
+      : rank === 1
+        ? "linkedin-post-today-card__action--primary"
+        : "linkedin-post-today-card__action--secondary";
+
   return (
-    <div
-      style={{
-        border: `1px solid #e2e8f0`,
-        borderLeft: `3px solid ${rs.border}`,
-        borderRadius: 8,
-        padding: "12px 14px",
-        marginBottom: 10,
-        background: "#fff",
-      }}
+    <article
+      className="linkedin-post-today-card"
+      style={{ borderLeftColor: accent }}
+      aria-label={`${candidate.sourceLabel}, rank ${rank}`}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <span
-          style={{
-            background: rs.badge,
-            color: rs.badgeText,
-            fontWeight: 700,
-            fontSize: 11,
-            padding: "2px 8px",
-            borderRadius: 999,
-          }}
-        >
-          #{rank}
-        </span>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#111827", flex: 1, marginLeft: 10 }}>
-          {candidate.topic}
+      <div className="linkedin-post-today-card__header">
+        <div className="linkedin-post-today-card__source">
+          <span className="linkedin-post-today-card__source-icon" aria-hidden>
+            {candidate.sourceIcon}
+          </span>
+          <span className="linkedin-post-today-card__source-label">{candidate.sourceLabel}</span>
         </div>
+        <div className="linkedin-post-today-card__rank-wrap">
+          {rankLabel && rank <= 3 ? (
+            <span className="linkedin-post-today-card__rank-label">{rankLabel}</span>
+          ) : null}
+          <span
+            className="linkedin-post-today-card__rank"
+            style={{ background: rs.badge, color: rs.badgeText }}
+          >
+            {rankMedal && rank <= 3 ? (
+              <span className="linkedin-post-today-card__rank-medal" aria-hidden>
+                {rankMedal}{" "}
+              </span>
+            ) : null}
+            #{rank}
+          </span>
+        </div>
+      </div>
+
+      <h4 className="linkedin-post-today-card__topic">
+        {candidate.emoji ? (
+          <span className="linkedin-post-today-card__emoji" aria-hidden>
+            {candidate.emoji}{" "}
+          </span>
+        ) : null}
+        {candidate.topic}
+      </h4>
+
+      {candidate.context ? (
+        <p className="linkedin-post-today-card__context">{candidate.context}</p>
+      ) : null}
+
+      {candidate.hook ? (
+        <p className="linkedin-post-today-card__hook">
+          💡 {hookLabel}: &ldquo;{candidate.hook}&rdquo;
+        </p>
+      ) : null}
+
+      <div className="linkedin-post-today-card__footer">
+        <button
+          type="button"
+          className={`linkedin-post-today-card__action ${actionModifier}`}
+          onClick={onUse}
+        >
+          {actionLabel}
+        </button>
         <ConfidencePill level={candidate.confidence} />
       </div>
-      <div style={{ fontStyle: "italic", fontSize: 12, color: "#4b5563", marginBottom: 8 }}>
-        💡 "{candidate.hook}"
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 500 }}>
-          {candidate.sourceIcon} {candidate.sourceLabel}
-        </div>
-        <button
-          onClick={onUse}
-          style={{
-            background: rank === 1 ? "#0a66c2" : "transparent",
-            border: rank === 1 ? "none" : "1px solid #d1d5db",
-            color: rank === 1 ? "#fff" : "#374151",
-            padding: "6px 14px",
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          {rank === 1 ? "✍️ Create This Post" : "Create Post"}
-        </button>
-      </div>
-    </div>
+    </article>
   );
 };
 
@@ -118,88 +157,83 @@ export const PostTodayCandidateList: React.FC<PostTodayCandidateListProps> = ({
   const rest = candidates.slice(3);
   const [tab, setTab] = useState<"top" | "all">("top");
 
-  useEffect(() => { setTab("top"); }, [candidates]);
+  useEffect(() => {
+    setTab("top");
+  }, [candidates]);
 
   if (candidates.length === 0) return null;
 
+  const renderCard = (candidate: PostCandidate, rank: number, key: string) => (
+    <PostCandidateCard
+      key={key}
+      candidate={candidate}
+      rank={rank}
+      onUse={() => onUseCandidate(candidate.topic, candidate.hook)}
+    />
+  );
+
   return (
-    <div>
-      {/* Tab bar */}
-      <div style={{
-        display: "flex",
-        gap: 0,
-        marginBottom: 14,
-        borderBottom: "1px solid #e2e8f0",
-      }}>
+    <div className="linkedin-post-today-candidate-list">
+      <div
+        className={`linkedin-post-today-candidate-list__tabs${
+          rest.length > 0 ? "" : " linkedin-post-today-candidate-list__tabs--single"
+        }`}
+        role="tablist"
+        aria-label="Post suggestions"
+      >
         <button
+          type="button"
+          role="tab"
+          id="post-today-tab-top"
+          aria-controls="post-today-panel"
+          aria-selected={tab === "top"}
           onClick={() => setTab("top")}
-          style={{
-            padding: "8px 16px",
-            background: "none",
-            border: "none",
-            borderBottom: tab === "top" ? "2px solid #0a66c2" : "2px solid transparent",
-            color: tab === "top" ? "#0a66c2" : "#64748b",
-            fontWeight: tab === "top" ? 700 : 500,
-            fontSize: 13,
-            cursor: "pointer",
-          }}
+          className={`linkedin-post-today-candidate-list__tab${
+            tab === "top" ? " linkedin-post-today-candidate-list__tab--active" : ""
+          }`}
         >
           🏆 Top Picks ({Math.min(top3.length, 3)})
         </button>
-        {rest.length > 0 && (
+        {rest.length > 0 ? (
           <button
+            type="button"
+            role="tab"
+            id="post-today-tab-all"
+            aria-controls="post-today-panel"
+            aria-selected={tab === "all"}
             onClick={() => setTab("all")}
-            style={{
-              padding: "8px 16px",
-              background: "none",
-              border: "none",
-              borderBottom: tab === "all" ? "2px solid #0a66c2" : "2px solid transparent",
-              color: tab === "all" ? "#0a66c2" : "#64748b",
-              fontWeight: tab === "all" ? 700 : 500,
-              fontSize: 13,
-              cursor: "pointer",
-            }}
+            className={`linkedin-post-today-candidate-list__tab${
+              tab === "all" ? " linkedin-post-today-candidate-list__tab--active" : ""
+            }`}
           >
             📋 All Results ({candidates.length})
           </button>
-        )}
+        ) : null}
       </div>
 
-      {/* Top Picks tab */}
-      {tab === "top" && top3.map((candidate, idx) => (
-        <PostCandidateCard
-          key={idx}
-          candidate={candidate}
-          rank={idx + 1}
-          onUse={() => onUseCandidate(candidate.topic, candidate.hook)}
-        />
-      ))}
+      <div
+        id="post-today-panel"
+        role="tabpanel"
+        aria-labelledby={tab === "top" ? "post-today-tab-top" : "post-today-tab-all"}
+        className="linkedin-post-today-candidate-list__cards"
+      >
+        {tab === "top"
+          ? top3.map((candidate, idx) =>
+              renderCard(candidate, idx + 1, `top-${candidate.sourceType ?? "item"}-${idx}`),
+            )
+          : candidates.map((candidate, idx) =>
+              renderCard(candidate, idx + 1, `all-${candidate.sourceType ?? "item"}-${idx}`),
+            )}
+      </div>
 
-      {/* All Results tab */}
-      {tab === "all" && candidates.map((candidate, idx) => (
-        <PostCandidateCard
-          key={idx}
-          candidate={candidate}
-          rank={idx + 1}
-          onUse={() => onUseCandidate(candidate.topic, candidate.hook)}
-        />
-      ))}
-
-      {/* Footer link from Top Picks to All Results */}
-      {tab === "top" && rest.length > 0 && (
-        <div style={{ fontSize: 12, color: colors.textTertiary, marginTop: 8, textAlign: "center" }}>
+      {tab === "top" && rest.length > 0 ? (
+        <div className="linkedin-post-today-candidate-list__more">
           + {rest.length} more results —{" "}
-          <button
-            onClick={() => setTab("all")}
-            style={{
-              background: "none", border: "none", color: colors.primary,
-              cursor: "pointer", fontSize: 12, fontWeight: 600, padding: 0,
-            }}
-          >
+          <button type="button" onClick={() => setTab("all")}>
             View All →
           </button>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

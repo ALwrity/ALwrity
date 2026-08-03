@@ -1,14 +1,13 @@
-/**
- * Analysis Wedge — AI-first feature modals
+﻿/**
+ * Analysis Wedge â€” AI-first feature modals
  *
- * F1  GrowthSnapshotModal      — cached trending topic + content gap + brand score
- * F2  PostTodayModal           — AI-ranked top 3 post opportunities
- * F3  BrandScorecardModal      — full BrandScorecard component in a modal
- * F4  WeeklyPlanModal          — Mon-Fri content plan with Create Now + Schedule CTAs
- * F5  ViralCopywriterModal     — top viral patterns with "Write in This Style" CTA
- * F6  EngagementTrendsModal    — see EngagementTrendsModal.tsx
+ * F1  PostTodayModal           â€” AI-ranked post opportunities (Create wedge)
+ * F2  BrandScorecardModal      â€” full BrandScorecard component in a modal
+ * F3  WeeklyPlanModal          â€” Mon-Fri content plan with Create Now + Schedule CTAs
+ * F4  ViralCopywriterModal     â€” top viral patterns with "Write in This Style" CTA
+ * F5  EngagementTrendsModal    â€” see EngagementTrendsModal.tsx
  */
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
 import {
   linkedInGrowthApi,
@@ -20,16 +19,16 @@ import {
 import { contentPlanningApi } from "../../../../services/contentPlanningApi";
 import { BrandScorecard } from "../GrowthEngine/BrandScorecard";
 import { ViralAnalysisCard } from "../GrowthEngine/ViralAnalysisCard";
-import { PostTodayCandidateList, type PostCandidate } from "./PostTodayCandidateList";
+import { PostTodayCandidateList } from "./PostTodayCandidateList";
+import {
+  isGrowthDataUsable,
+  rankCandidates,
+} from "./postTodayGrowthUtils";
 import {
   colors,
   rowBase,
-  scoreColor,
-  scoreBg,
-  barColor,
-  CONFIDENCE_COLORS,
 } from "../GrowthEngine/styles";
-import { openGrowthEngineModal } from "../../utils/linkedInDashboardEvents";
+import { CREATE_WEDGE_NESTED_MODAL_SIZE } from "../../utils/createWedgeNestedModalLayout";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -42,7 +41,7 @@ interface CachePayload {
   cachedAt: number;
 }
 
-const CACHE_TTL = 3600000; // 1 hour — matches backend LLM cache
+const CACHE_TTL = 3600000; // 1 hour â€” matches backend LLM cache
 
 function readCache(): CachePayload | null {
   try {
@@ -53,6 +52,10 @@ function readCache(): CachePayload | null {
       sessionStorage.removeItem(CACHE_KEY);
       return null;
     }
+    if (!isGrowthDataUsable(parsed.data)) {
+      sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
     return parsed;
   } catch {
     return null;
@@ -60,13 +63,14 @@ function readCache(): CachePayload | null {
 }
 
 function writeCache(data: ConsolidatedGrowthResponse) {
+  if (!isGrowthDataUsable(data)) return;
   try {
     sessionStorage.setItem(
       CACHE_KEY,
       JSON.stringify({ data, cachedAt: Date.now() }),
     );
   } catch {
-    // storage full — silent
+    // storage full â€” silent
   }
 }
 
@@ -106,54 +110,30 @@ const Spinner = () => (
   </>
 );
 
-const ConfidencePill: React.FC<{ level: "high" | "medium" | "low" }> = ({
-  level,
-}) => {
-  const cc = CONFIDENCE_COLORS[level] ?? CONFIDENCE_COLORS.medium;
-  return (
-    <span
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        background: cc.bg,
-        color: cc.text,
-        padding: "1px 6px",
-        borderRadius: 4,
-      }}
-    >
-      {level} confidence
-    </span>
-  );
-};
-
-function useGrowthInsights(open: boolean) {
+function useGrowthInsights(open: boolean, autoFetch = false) {
   const [data, setData] = useState<ConsolidatedGrowthResponse | null>(null);
   const [cachedAt, setCachedAt] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    const cached = readCache();
-    if (cached) {
-      setData(cached.data);
-      setCachedAt(cached.cachedAt);
-    } else {
-      setData(null);
-      setCachedAt(null);
-    }
-    setError("");
-    setLoading(false);
-  }, [open]);
+  const autoFetchedRef = useRef(false);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const result = await linkedInGrowthApi.analyzeAll();
-      writeCache(result);
-      setData(result);
-      setCachedAt(Date.now());
+      if (isGrowthDataUsable(result)) {
+        writeCache(result);
+        setData(result);
+        setCachedAt(Date.now());
+      } else {
+        sessionStorage.removeItem(CACHE_KEY);
+        setData(result);
+        setCachedAt(Date.now());
+        setError(
+          "Analysis completed but no post ideas were returned. Refresh to try again.",
+        );
+      }
       return result;
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: string } } };
@@ -169,6 +149,31 @@ function useGrowthInsights(open: boolean) {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (!open) {
+      autoFetchedRef.current = false;
+      return;
+    }
+    const cached = readCache();
+    if (cached) {
+      setData(cached.data);
+      setCachedAt(cached.cachedAt);
+      setError("");
+      setLoading(false);
+      return;
+    }
+    setData(null);
+    setCachedAt(null);
+    setError("");
+    setLoading(false);
+
+    if (autoFetch && !autoFetchedRef.current) {
+      autoFetchedRef.current = true;
+      setLoading(true);
+      void loadAll();
+    }
+  }, [open, autoFetch, loadAll]);
 
   return { data, cachedAt, loading, error, loadAll };
 }
@@ -293,505 +298,25 @@ const RefreshBar: React.FC<{
 );
 
 // ---------------------------------------------------------------------------
-// F1 — Growth Snapshot Modal
+// F1 — Post Today Modal
 // ---------------------------------------------------------------------------
-
-interface GrowthSnapshotModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export const GrowthSnapshotModal: React.FC<GrowthSnapshotModalProps> = ({
-  open,
-  onClose,
-}) => {
-  const { data, cachedAt, loading, error, loadAll } = useGrowthInsights(open);
-  const handleLoadAll = () => void loadAll();
-
-  const topTrend = data?.trending?.trending_topics?.[0] ?? null;
-  const topGap = data?.content_gaps?.gaps?.[0] ?? null;
-  const brandScore = data?.brand_scorecard?.overall_score ?? null;
-  const brandRank =
-    brandScore !== null
-      ? brandScore >= 85
-        ? "Exceptional"
-        : brandScore >= 65
-          ? "Strong"
-          : brandScore >= 40
-            ? "Developing"
-            : "Beginner"
-      : null;
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Growth Snapshot"
-      onClose={onClose}
-      maxWidth={540}
-      maxHeight="min(92vh, 680px)"
-    >
-      <div>
-        <p
-          style={{
-            margin: "0 0 16px",
-            fontSize: 13,
-            color: colors.textSecondary,
-            lineHeight: 1.5,
-          }}
-        >
-          Your latest AI growth insights at a glance — trending topic, content
-          gap, and brand health.
-        </p>
-
-        {/* ── No cache state ── */}
-        {!data && !loading && (
-          <CacheEmptyPrompt
-            icon="🚀"
-            title="No recent analysis found"
-            description="Run a one-time AI analysis to see your growth snapshot. Takes ~20 seconds."
-            buttonLabel="🚀 Load All Insights (1 AI call)"
-            onLoad={handleLoadAll}
-          />
-        )}
-
-        {loading && (
-          <LoadingRow message="Running AI analysis across 7 dimensions…" />
-        )}
-
-        {error && <ErrorBanner message={error} />}
-
-        {/* ── Snapshot sections ── */}
-        {data && !loading && (
-          <>
-            {/* Cache age */}
-            {cachedAt && (
-              <RefreshBar cachedAt={cachedAt} onRefresh={handleLoadAll} />
-            )}
-
-            {/* Section 1 — Trending Topic */}
-            <SnapshotSection
-              icon="🔥"
-              label="Top Trending Topic"
-              accent="#f59e0b"
-            >
-              {topTrend ? (
-                <div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: colors.textDark,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {topTrend.emoji} {topTrend.topic}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: colors.textMedium,
-                      lineHeight: 1.5,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {topTrend.why_now}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontStyle: "italic",
-                      color: colors.textSecondary,
-                      background: colors.badgeBg,
-                      padding: "6px 10px",
-                      borderRadius: 6,
-                      marginBottom: 8,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    💡 Hook idea: "{topTrend.suggested_hook}"
-                  </div>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <button
-                      onClick={() => {
-                        openInCreate(topTrend.topic, topTrend.suggested_hook);
-                        onClose();
-                      }}
-                      style={{
-                        padding: "6px 14px",
-                        background: colors.primary,
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ✍️ Create Post
-                    </button>
-                    <ConfidencePill level={topTrend.confidence} />
-                  </div>
-                </div>
-              ) : (
-                <NoDataRow label="trending topics" onRefresh={handleLoadAll} />
-              )}
-            </SnapshotSection>
-
-            {/* Section 2 — Content Gap */}
-            <SnapshotSection
-              icon="🔍"
-              label="Biggest Content Gap"
-              accent="#8b5cf6"
-            >
-              {topGap ? (
-                <div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: colors.textDark,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {topGap.gap_topic}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: colors.textMedium,
-                      lineHeight: 1.5,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {topGap.why_it_matters}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontStyle: "italic",
-                      color: colors.textSecondary,
-                      background: colors.badgeBg,
-                      padding: "6px 10px",
-                      borderRadius: 6,
-                      marginBottom: 8,
-                      lineHeight: 1.5,
-                    }}
-                  >
-                    💡 Post angle: {topGap.suggested_angle}
-                  </div>
-                  <div
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <button
-                      onClick={() => {
-                        openInCreate(topGap.gap_topic, topGap.suggested_angle);
-                        onClose();
-                      }}
-                      style={{
-                        padding: "6px 14px",
-                        background: "#8b5cf6",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        cursor: "pointer",
-                      }}
-                    >
-                      ✍️ Fill This Gap
-                    </button>
-                    <ConfidencePill level={topGap.confidence} />
-                  </div>
-                </div>
-              ) : (
-                <NoDataRow label="content gaps" onRefresh={handleLoadAll} />
-              )}
-            </SnapshotSection>
-
-            {/* Section 3 — Brand Score */}
-            <SnapshotSection
-              icon="🏆"
-              label="Personal Brand Score"
-              accent="#0ea5e9"
-            >
-              {brandScore !== null ? (
-                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                  <div
-                    style={{
-                      width: 64,
-                      height: 64,
-                      borderRadius: "50%",
-                      background: scoreBg(brandScore),
-                      color: scoreColor(brandScore),
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 800,
-                      fontSize: 22,
-                      flexShrink: 0,
-                      border: `2px solid ${barColor(brandScore)}44`,
-                    }}
-                  >
-                    {brandScore}
-                  </div>
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 15,
-                        color: scoreColor(brandScore),
-                        marginBottom: 4,
-                      }}
-                    >
-                      {brandRank} Brand
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: colors.textSecondary,
-                        marginBottom: 8,
-                      }}
-                    >
-                      {data.brand_scorecard?.top_recommendation}
-                    </div>
-                    <button
-                      onClick={() => {
-                        openGrowthEngineModal();
-                        onClose();
-                      }}
-                      style={{
-                        padding: "5px 12px",
-                        background: "none",
-                        border: `1.5px solid ${colors.primary}`,
-                        borderRadius: 6,
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: colors.primary,
-                        cursor: "pointer",
-                      }}
-                    >
-                      See Full Breakdown →
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <NoDataRow label="brand scorecard" onRefresh={handleLoadAll} />
-              )}
-            </SnapshotSection>
-
-            {/* Footer */}
-            <div
-              style={{
-                marginTop: 16,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <button
-                onClick={() => {
-                  openGrowthEngineModal();
-                  onClose();
-                }}
-                style={{
-                  fontSize: 12,
-                  color: colors.primary,
-                  background: "none",
-                  border: "none",
-                  cursor: "pointer",
-                  fontWeight: 600,
-                  padding: 0,
-                }}
-              >
-                Open Full Growth Engine →
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </DashboardActionModal>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// Snapshot section wrapper
-// ---------------------------------------------------------------------------
-interface SnapshotSectionProps {
-  icon: string;
-  label: string;
-  accent: string;
-  children: React.ReactNode;
-}
-
-const SnapshotSection: React.FC<SnapshotSectionProps> = ({
-  icon,
-  label,
-  accent,
-  children,
-}) => (
-  <div
-    style={{
-      ...rowBase,
-      marginBottom: 12,
-      borderLeft: `3px solid ${accent}`,
-    }}
-  >
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        marginBottom: 10,
-        fontSize: 11,
-        fontWeight: 700,
-        color: colors.textTertiary,
-        textTransform: "uppercase",
-        letterSpacing: 0.6,
-      }}
-    >
-      <span style={{ fontSize: 14 }}>{icon}</span>
-      {label}
-    </div>
-    {children}
-  </div>
-);
-
-const NoDataRow: React.FC<{ label: string; onRefresh: () => void }> = ({
-  label,
-  onRefresh,
-}) => (
-  <div style={{ fontSize: 12, color: colors.textTertiary }}>
-    No {label} in current analysis.{" "}
-    <button
-      onClick={onRefresh}
-      style={{
-        background: "none",
-        border: "none",
-        color: colors.primary,
-        cursor: "pointer",
-        fontSize: 12,
-        fontWeight: 600,
-        padding: 0,
-      }}
-    >
-      Refresh →
-    </button>
-  </div>
-);
-
-// ---------------------------------------------------------------------------
-// F2 — Post Today Modal
-// ---------------------------------------------------------------------------
-// PostCandidate type imported from PostTodayCandidateList.tsx
-// ---------------------------------------------------------------------------
-
-const CARD_PRIORITY: Record<string, number> = {
-  trending: 0.5,
-  strategy: 0.4,
-  engagement: 0.3,
-  gaps: 0.2,
-  viral: 0.1,
-  network: 0,
-};
-const SCORE_MAP: Record<string, number> = { high: 3, medium: 2, low: 1 };
-
-function rankCandidates(c: ConsolidatedGrowthResponse): PostCandidate[] {
-  const candidates: PostCandidate[] = [];
-
-  if (c.trending?.trending_topics) {
-    for (const item of c.trending.trending_topics) {
-      candidates.push({
-        topic: item.topic,
-        hook: item.suggested_hook,
-        sourceLabel: "Trending Now",
-        sourceIcon: "🔥",
-        confidence: item.confidence,
-        score: (SCORE_MAP[item.confidence] ?? 1) + CARD_PRIORITY.trending,
-      });
-    }
-  }
-
-  if (c.weekly_strategy?.daily_posts) {
-    for (const post of c.weekly_strategy.daily_posts) {
-      candidates.push({
-        topic: post.headline,
-        hook: post.hook,
-        sourceLabel: `Weekly Plan · ${post.day}`,
-        sourceIcon: "📅",
-        confidence: post.confidence,
-        score: (SCORE_MAP[post.confidence] ?? 1) + CARD_PRIORITY.strategy,
-      });
-    }
-  }
-
-  if (c.engagement_opportunities?.opportunities) {
-    for (const item of c.engagement_opportunities.opportunities) {
-      candidates.push({
-        topic: item.title,
-        hook: item.suggested_comment,
-        sourceLabel: "Engagement Opportunity",
-        sourceIcon: "💬",
-        confidence: item.confidence,
-        score: (SCORE_MAP[item.confidence] ?? 1) + CARD_PRIORITY.engagement,
-      });
-    }
-  }
-
-  if (c.content_gaps?.gaps) {
-    for (const gap of c.content_gaps.gaps) {
-      candidates.push({
-        topic: gap.gap_topic,
-        hook: gap.suggested_angle,
-        sourceLabel: "Content Gap",
-        sourceIcon: "🔍",
-        confidence: gap.confidence,
-        score: (SCORE_MAP[gap.confidence] ?? 1) + CARD_PRIORITY.gaps,
-      });
-    }
-  }
-
-  if (c.viral_analysis?.patterns) {
-    for (const p of c.viral_analysis.patterns) {
-      candidates.push({
-        topic: p.example_headline,
-        hook: p.description,
-        sourceLabel: "Viral Pattern",
-        sourceIcon: "📈",
-        confidence: p.confidence,
-        score: (SCORE_MAP[p.confidence] ?? 1) + CARD_PRIORITY.viral,
-      });
-    }
-  }
-
-  if (c.network_suggestions?.suggestions) {
-    for (const s of c.network_suggestions.suggestions) {
-      candidates.push({
-        topic: `${s.name} — ${s.title}${s.company ? ` @ ${s.company}` : ""}`,
-        hook: s.why_connect,
-        sourceLabel: "Network Suggestion",
-        sourceIcon: "🤝",
-        confidence: s.confidence,
-        score: (SCORE_MAP[s.confidence] ?? 1) + CARD_PRIORITY.network,
-      });
-    }
-  }
-
-  candidates.sort((a, b) => b.score - a.score);
-  return candidates;
-}
 
 interface PostTodayModalProps {
   open: boolean;
   onClose: () => void;
+  /** Stack above Quick Create Post window — same size as Brainstorm Ideas. */
+  stacked?: boolean;
+  /** When stacked, apply selection to the open Post form instead of opening a new Create flow. */
+  onApplyCandidate?: (topic: string, hook: string) => void;
 }
 
 export const PostTodayModal: React.FC<PostTodayModalProps> = ({
   open,
   onClose,
+  stacked = false,
+  onApplyCandidate,
 }) => {
-  const { data, cachedAt, loading, error, loadAll } = useGrowthInsights(open);
+  const { data, cachedAt, loading, error, loadAll } = useGrowthInsights(open, true);
   const candidates = useMemo(() => (data ? rankCandidates(data) : []), [data]);
   const handleLoadAll = () => void loadAll();
 
@@ -800,9 +325,16 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
       open={open}
       title="What Should I Post Today?"
       onClose={onClose}
-      maxWidth={560}
-      maxHeight="min(92vh, 700px)"
-      modalClassName="linkedin-post-today-modal"
+      width={stacked ? CREATE_WEDGE_NESTED_MODAL_SIZE.width : undefined}
+      maxWidth={stacked ? CREATE_WEDGE_NESTED_MODAL_SIZE.maxWidth : 560}
+      height={stacked ? CREATE_WEDGE_NESTED_MODAL_SIZE.height : undefined}
+      maxHeight={stacked ? CREATE_WEDGE_NESTED_MODAL_SIZE.maxHeight : "min(92vh, 700px)"}
+      elevated={stacked}
+      modalClassName={
+        stacked
+          ? "linkedin-post-today-modal linkedin-post-today-modal--stacked"
+          : "linkedin-post-today-modal"
+      }
     >
       <div>
         <p
@@ -817,26 +349,6 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
           topics, content gaps, weekly strategy, and engagement wins.
         </p>
 
-        {/* No cache */}
-        {!loading && candidates.length === 0 && (
-          <>
-            <CacheEmptyPrompt
-              icon="🎯"
-              title={
-                error ? "Failed to load insights" : "No insights loaded yet"
-              }
-              description={
-                error
-                  ? "Try again or close and reopen the modal."
-                  : "Load your growth analysis to get ALwrity-ranked post recommendations."
-              }
-              buttonLabel={error ? "🔁 Retry" : "🚀 Load Insights"}
-              onLoad={handleLoadAll}
-            />
-            {error && <ErrorBanner message={error} />}
-          </>
-        )}
-
         {loading && (
           <LoadingRow
             message={
@@ -844,6 +356,27 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
                 ? "Refreshing insights…"
                 : "Running AI analysis across all growth signals…"
             }
+          />
+        )}
+
+        {/* No cache / fetch failed / empty analysis */}
+        {!loading && candidates.length === 0 && (
+          <CacheEmptyPrompt
+            icon="🎯"
+            title={
+              error
+                ? error.includes("no post ideas")
+                  ? "No post recommendations yet"
+                  : "Failed to load insights"
+                : "No insights loaded yet"
+            }
+            description={
+              error ||
+              "Run your AI growth analysis to get ranked post recommendations from trending topics, content gaps, and more."
+            }
+            buttonLabel={error ? "🔄 Refresh Insights" : "🚀 Load Insights"}
+            onLoad={handleLoadAll}
+            disabled={loading}
           />
         )}
 
@@ -860,7 +393,11 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
             <PostTodayCandidateList
               candidates={candidates}
               onUseCandidate={(topic, hook) => {
-                openInCreate(topic, hook);
+                if (onApplyCandidate) {
+                  onApplyCandidate(topic, hook);
+                } else {
+                  openInCreate(topic, hook);
+                }
                 onClose();
               }}
             />
@@ -872,143 +409,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// PostCandidateCard sub-component
-// ---------------------------------------------------------------------------
-interface PostCandidateCardProps {
-  candidate: PostCandidate;
-  rank: number;
-  onUse: () => void;
-}
-
-const RANK_STYLES: Record<
-  number,
-  { border: string; badge: string; badgeText: string }
-> = {
-  1: { border: "#0a66c2", badge: "#dbeafe", badgeText: "#1d4ed8" },
-  2: { border: "#8b5cf6", badge: "#ede9fe", badgeText: "#6d28d9" },
-  3: { border: "#e2e8f0", badge: "#f1f5f9", badgeText: "#64748b" },
-};
-
-const PostCandidateCard: React.FC<PostCandidateCardProps> = ({
-  candidate,
-  rank,
-  onUse,
-}) => {
-  const rs = RANK_STYLES[rank] ?? RANK_STYLES[3];
-
-  return (
-    <div
-      style={{
-        ...rowBase,
-        marginBottom: 10,
-        borderLeft: `3px solid ${rs.border}`,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 8,
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flex: 1,
-            minWidth: 0,
-          }}
-        >
-          <span
-            style={{
-              fontSize: 10,
-              fontWeight: 800,
-              background: rs.badge,
-              color: rs.badgeText,
-              padding: "2px 7px",
-              borderRadius: 4,
-              flexShrink: 0,
-            }}
-          >
-            #{rank}
-          </span>
-          <div
-            style={{
-              fontWeight: 700,
-              fontSize: 13,
-              color: colors.textDark,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {candidate.topic}
-          </div>
-        </div>
-        <ConfidencePill level={candidate.confidence} />
-      </div>
-
-      <div
-        style={{
-          fontSize: 11,
-          color: colors.textSecondary,
-          background: colors.badgeBg,
-          padding: "6px 10px",
-          borderRadius: 6,
-          marginBottom: 10,
-          lineHeight: 1.5,
-          fontStyle: "italic",
-        }}
-      >
-        💡 "{candidate.hook}"
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 11,
-            color: colors.textTertiary,
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-          }}
-        >
-          <span>{candidate.sourceIcon}</span>
-          {candidate.sourceLabel}
-        </div>
-        <button
-          onClick={onUse}
-          style={{
-            padding: "6px 14px",
-            background: rank === 1 ? colors.primary : "none",
-            color: rank === 1 ? "#fff" : colors.primary,
-            border: `1.5px solid ${colors.primary}`,
-            borderRadius: 6,
-            fontSize: 12,
-            fontWeight: 700,
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {rank === 1 ? "✍️ Create This Post" : "Create Post"}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// F3 — Brand Score Breakdown Modal
+// F2 — Brand Score Breakdown Modal
 // ---------------------------------------------------------------------------
 
 interface BrandScorecardModalProps {
@@ -1035,15 +436,15 @@ export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({
       <div>
         {!data && !loading && (
           <CacheEmptyPrompt
-            icon="🏆"
+            icon="ðŸ†"
             title="No brand scorecard in cache"
             description="Run an AI analysis to see a detailed breakdown of your personal brand."
-            buttonLabel="🚀 Load Brand Analysis"
+            buttonLabel="ðŸš€ Load Brand Analysis"
             onLoad={handleLoad}
           />
         )}
 
-        {loading && <LoadingRow message="Analysing your personal brand…" />}
+        {loading && <LoadingRow message="Analysing your personal brandâ€¦" />}
         {error && <ErrorBanner message={error} />}
 
         {sc && !loading && (
@@ -1060,17 +461,17 @@ export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// F4 — Weekly Content Plan Modal
+// F4 â€” Weekly Content Plan Modal
 // ---------------------------------------------------------------------------
 
 const DAY_EMOJIS: Record<string, string> = {
-  Monday: "🟦",
-  Tuesday: "🟩",
-  Wednesday: "🟧",
-  Thursday: "🟪",
-  Friday: "🟥",
-  Saturday: "⬜",
-  Sunday: "⬜",
+  Monday: "ðŸŸ¦",
+  Tuesday: "ðŸŸ©",
+  Wednesday: "ðŸŸ§",
+  Thursday: "ðŸŸª",
+  Friday: "ðŸŸ¥",
+  Saturday: "â¬œ",
+  Sunday: "â¬œ",
 };
 
 interface WeeklyPlanModalProps {
@@ -1191,15 +592,15 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
 
         {!data && !loading && (
           <CacheEmptyPrompt
-            icon="📅"
+            icon="ðŸ“…"
             title="No weekly plan in cache"
-            description="Generate a personalised Mon–Fri content plan."
-            buttonLabel="🚀 Generate Weekly Plan"
+            description="Generate a personalised Monâ€“Fri content plan."
+            buttonLabel="ðŸš€ Generate Weekly Plan"
             onLoad={handleLoad}
           />
         )}
 
-        {loading && <LoadingRow message="Building your weekly content plan…" />}
+        {loading && <LoadingRow message="Building your weekly content planâ€¦" />}
         {error && <ErrorBanner message={error} />}
 
         {ws && !loading && (
@@ -1222,10 +623,10 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                   marginBottom: 2,
                 }}
               >
-                Week of {ws.week_of} · {ws.theme}
+                Week of {ws.week_of} Â· {ws.theme}
               </div>
               <div style={{ fontSize: 12, color: "#3b82f6" }}>
-                Focus: {ws.focus_area} · Topics: {ws.key_topics.join(", ")}
+                Focus: {ws.focus_area} Â· Topics: {ws.key_topics.join(", ")}
               </div>
             </div>
 
@@ -1266,7 +667,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                         }}
                       >
                         <span style={{ fontSize: 16 }}>
-                          {DAY_EMOJIS[post.day] ?? "📌"}
+                          {DAY_EMOJIS[post.day] ?? "ðŸ“Œ"}
                         </span>
                         <div>
                           <span
@@ -1320,7 +721,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                         lineHeight: 1.5,
                       }}
                     >
-                      💡 "{post.hook}"
+                      ðŸ’¡ "{post.hook}"
                     </div>
 
                     <div
@@ -1351,7 +752,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                           cursor: "pointer",
                         }}
                       >
-                        ✍️ Create Now
+                        âœï¸ Create Now
                       </button>
                       <button
                         disabled={isScheduled || isSchedulingThis}
@@ -1372,12 +773,12 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                       >
                         {isSchedulingThis ? (
                           <>
-                            <Spinner /> Adding…
+                            <Spinner /> Addingâ€¦
                           </>
                         ) : isScheduled ? (
-                          "✓ Scheduled"
+                          "âœ“ Scheduled"
                         ) : (
-                          "📅 Add to Calendar"
+                          "ðŸ“… Add to Calendar"
                         )}
                       </button>
                     </div>
@@ -1418,7 +819,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                   cursor: "pointer",
                 }}
               >
-                📅 Schedule All {posts.length} Posts to Calendar
+                ðŸ“… Schedule All {posts.length} Posts to Calendar
               </button>
             )}
 
@@ -1434,7 +835,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
                   fontSize: 13,
                 }}
               >
-                ✅ All {posts.length} posts added to your calendar!
+                âœ… All {posts.length} posts added to your calendar!
               </div>
             )}
           </>
@@ -1445,7 +846,7 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// F5 — Viral Pattern Copywriter Modal
+// F5 â€” Viral Pattern Copywriter Modal
 // ---------------------------------------------------------------------------
 
 interface ViralCopywriterModalProps {
@@ -1486,16 +887,16 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({
 
         {!data && !loading && (
           <CacheEmptyPrompt
-            icon="🔥"
+            icon="ðŸ”¥"
             title="No viral patterns in cache"
             description="Load an AI analysis to discover what formats go viral in your niche."
-            buttonLabel="🚀 Load Viral Patterns"
+            buttonLabel="ðŸš€ Load Viral Patterns"
             onLoad={handleLoad}
           />
         )}
 
         {loading && (
-          <LoadingRow message={`Analysing viral patterns in ${industry}…`} />
+          <LoadingRow message={`Analysing viral patterns in ${industry}â€¦`} />
         )}
         {error && <ErrorBanner message={error} />}
 
@@ -1550,12 +951,12 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({
                             marginBottom: 2,
                           }}
                         >
-                          📌 {pattern.pattern_name}
+                          ðŸ“Œ {pattern.pattern_name}
                         </div>
                         <div
                           style={{ fontSize: 11, color: colors.textTertiary }}
                         >
-                          {pattern.engagement_multiplier} engagement ·{" "}
+                          {pattern.engagement_multiplier} engagement Â·{" "}
                           {pattern.confidence} confidence
                         </div>
                       </div>
@@ -1584,7 +985,7 @@ export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({
                           flexShrink: 0,
                         }}
                       >
-                        🔥 Write in This Style
+                        ðŸ”¥ Write in This Style
                       </button>
                     </div>
                   ))}

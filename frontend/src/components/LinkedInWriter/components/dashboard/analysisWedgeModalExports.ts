@@ -3,7 +3,6 @@
  * Keeps EngagementTrendsModal decoupled from AnalysisWedgeModals.tsx resolution.
  */
 export {
-  GrowthSnapshotModal,
   PostTodayModal,
   BrandScorecardModal,
   WeeklyPlanModal,

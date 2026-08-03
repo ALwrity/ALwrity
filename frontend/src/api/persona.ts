@@ -153,10 +153,13 @@ export const getPersonaDetails = async (userId: number, personaId: number): Prom
  */
 export const getPlatformPersona = async (platform: string): Promise<any> => {
   try {
-    const response = await apiClient.get(`/api/personas/platform/${platform}`);
+    const response = await apiClient.get(`/api/personas/platform/${platform}`, {
+      // 404 is normal when the user has not generated a platform persona yet
+      validateStatus: (status) => status === 200 || status === 404,
+    });
+    if (response.status === 404) return null;
     return response.data;
   } catch (error: any) {
-    if (error.response?.status === 404) return null;
     console.error('Error getting platform persona:', error);
     throw new Error(error.response?.data?.detail || 'Failed to get platform persona');
   }

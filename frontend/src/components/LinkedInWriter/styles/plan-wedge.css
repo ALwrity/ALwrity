@@ -727,6 +727,21 @@
   padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
 }
 
+/* Analysis wedge tile modal — no header divider, seamless title → tiles */
+.linkedin-analysis-wedge-modal {
+  width: min(720px, 100%) !important;
+  max-width: min(720px, 100%) !important;
+}
+
+.linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 6px !important;
+}
+
+.linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-body {
+  padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
+}
+
 /* Post Today sub-modal — no header divider, seamless title → subtitle */
 .linkedin-post-today-modal {
   width: min(560px, 100%) !important;
@@ -740,6 +755,273 @@
 
 .linkedin-post-today-modal .linkedin-dashboard-action-modal-body {
   padding: 4px 20px 20px !important;
+}
+
+/* Post Today — unified candidate cards (desktop + mobile) */
+.linkedin-post-today-candidate-list__tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+  width: 100%;
+}
+
+.linkedin-post-today-candidate-list__tabs--single {
+  grid-template-columns: 1fr;
+}
+
+/* Post Today stacked over Quick Create — Brainstorm Ideas window size */
+.linkedin-post-today-modal--stacked {
+  width: min(800px, 100%) !important;
+  max-width: min(800px, 100%) !important;
+  height: 90vh !important;
+  max-height: 90vh !important;
+  display: flex;
+  flex-direction: column;
+}
+
+.linkedin-post-today-modal--stacked .linkedin-dashboard-action-modal-body {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.linkedin-post-today-candidate-list__tab {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: center;
+  box-sizing: border-box;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.linkedin-post-today-candidate-list__tab:hover:not(.linkedin-post-today-candidate-list__tab--active) {
+  color: #334155;
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.linkedin-post-today-candidate-list__tab--active {
+  border-color: #0a66c2;
+  background: #eff6ff;
+  color: #0a66c2;
+  font-weight: 700;
+}
+
+.linkedin-post-today-candidate-list__cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.linkedin-post-today-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left-width: 3px;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.linkedin-post-today-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.linkedin-post-today-card__source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.linkedin-post-today-card__source-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkedin-post-today-card__source-icon {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.linkedin-post-today-card__topic {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #111827;
+  word-break: break-word;
+}
+
+.linkedin-post-today-card__rank-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.linkedin-post-today-card__rank-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #0a66c2;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.linkedin-post-today-card__rank {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.linkedin-post-today-card__context {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.linkedin-post-today-card__hook {
+  margin: 0 0 10px;
+  font-size: 11px;
+  font-style: italic;
+  line-height: 1.5;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 6px;
+  word-break: break-word;
+}
+
+.linkedin-post-today-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.linkedin-post-today-card__action {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+}
+
+.linkedin-post-today-card__action--primary {
+  background: #0a66c2;
+  color: #fff;
+}
+
+.linkedin-post-today-card__action--secondary {
+  background: #fff;
+  color: #0a66c2;
+  border: 1.5px solid #0a66c2;
+}
+
+.linkedin-post-today-card__action--gap {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+.linkedin-post-today-card__confidence {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.linkedin-post-today-candidate-list__more {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #94a3b8;
+  text-align: center;
+}
+
+.linkedin-post-today-candidate-list__more button {
+  background: none;
+  border: none;
+  color: #0a66c2;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0;
+}
+
+@media (max-width: 480px) {
+  .linkedin-post-today-modal {
+    width: min(100vw - 16px, 560px) !important;
+    max-width: min(100vw - 16px, 560px) !important;
+  }
+
+  .linkedin-post-today-modal .linkedin-dashboard-action-modal-body {
+    padding: 4px 14px 16px !important;
+  }
+
+  .linkedin-post-today-card {
+    padding: 11px 12px;
+  }
+
+  .linkedin-post-today-card__header {
+    align-items: flex-start;
+  }
+
+  .linkedin-post-today-card__rank-wrap {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .linkedin-post-today-candidate-list__tabs {
+    gap: 6px;
+  }
+
+  .linkedin-post-today-candidate-list__tab {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .linkedin-post-today-card__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .linkedin-post-today-card__action {
+    width: 100%;
+    text-align: center;
+    padding: 10px 14px;
+  }
+
+  .linkedin-post-today-card__confidence {
+    align-self: flex-start;
+  }
 }
 
 /* My Drafts sub-modal — no header divider, 24px title */

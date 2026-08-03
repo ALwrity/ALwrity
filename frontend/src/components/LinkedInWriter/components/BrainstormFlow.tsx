@@ -17,7 +17,11 @@ import PersonalizedIdeasPanel, {
 } from "./Brainstorm/PersonalizedIdeasPanel";
 import BrainstormIdeaCard from "./Brainstorm/BrainstormIdeaCard";
 import { StudioModalCloseButton } from "./dashboard/StudioModalCloseButton";
-import { LI_Z_MODAL } from "../utils/linkedInStudioZIndex";
+import {
+  CREATE_WEDGE_NESTED_BACKDROP,
+  CREATE_WEDGE_NESTED_MODAL_SIZE,
+  nestedModalZIndex,
+} from "../utils/createWedgeNestedModalLayout";
 
 interface BrainstormOptions {
   usePersona: boolean;
@@ -90,6 +94,8 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
   const brainstormTargetAudienceRef = useRef<string>("");
   const isProcessingRef = useRef(false);
   const processingQueueRef = useRef<Event | null>(null);
+  const stackOverQuickCreateRef = useRef(false);
+  const [stackOverQuickCreate, setStackOverQuickCreate] = useState(false);
 
   const [savedPromptHashes, setSavedPromptHashes] = useState<Set<string>>(
     () => new Set(),
@@ -238,6 +244,8 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
       isProcessingRef.current = true;
       processingQueueRef.current = null;
       console.log("[BrainstormFlow] event received, detail:", ev?.detail);
+      stackOverQuickCreateRef.current = Boolean(ev?.detail?.stackOverQuickCreate);
+      setStackOverQuickCreate(stackOverQuickCreateRef.current);
       // Tell QuickCreate to clear its safety timeout — BrainstormFlow is live
       window.dispatchEvent(new CustomEvent("linkedinwriter:brainstormStarted"));
       try {
@@ -447,6 +455,8 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
 
   const handleClose = useCallback(() => {
     window.dispatchEvent(new CustomEvent("linkedinwriter:cancelBrainstorm"));
+    stackOverQuickCreateRef.current = false;
+    setStackOverQuickCreate(false);
     setBrainstormVisible(false);
     setStage("idle");
     setIdeas([]);
@@ -459,6 +469,21 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
 
   const handleGeneratePost = useCallback(
     (prompt: string, contentType: string = "post") => {
+      if (stackOverQuickCreateRef.current) {
+        console.debug("[BrainstormFlow] applying topic to open Quick Create Post");
+        window.dispatchEvent(
+          new CustomEvent("linkedinwriter:quickCreateApplyTopic", {
+            detail: {
+              topic: prompt,
+              industry: brainstormIndustryRef.current || undefined,
+              tone: brainstormToneRef.current || undefined,
+              target_audience: brainstormTargetAudienceRef.current || undefined,
+            },
+          }),
+        );
+        handleClose();
+        return;
+      }
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:openQuickCreate", {
           detail: {
@@ -531,14 +556,22 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15, 23, 42, 0.38)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)",
+            background: stackOverQuickCreate
+              ? CREATE_WEDGE_NESTED_BACKDROP.background
+              : "rgba(15, 23, 42, 0.38)",
+            backdropFilter: stackOverQuickCreate
+              ? CREATE_WEDGE_NESTED_BACKDROP.backdropFilter
+              : "blur(8px)",
+            WebkitBackdropFilter: stackOverQuickCreate
+              ? CREATE_WEDGE_NESTED_BACKDROP.WebkitBackdropFilter
+              : "blur(8px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: LI_Z_MODAL,
-            padding: 20,
+            zIndex: nestedModalZIndex(stackOverQuickCreate),
+            padding: stackOverQuickCreate
+              ? CREATE_WEDGE_NESTED_MODAL_SIZE.backdropPadding
+              : 20,
           }}
           onClick={handleClose}
           role="dialog"
@@ -548,10 +581,10 @@ const BrainstormFlow: React.FC<BrainstormFlowProps> = ({
           <div
             style={{
               background: "white",
-              width: 800,
-              maxWidth: "100%",
-              height: "90vh",
-              borderRadius: 16,
+              width: CREATE_WEDGE_NESTED_MODAL_SIZE.width,
+              maxWidth: CREATE_WEDGE_NESTED_MODAL_SIZE.maxWidth,
+              height: CREATE_WEDGE_NESTED_MODAL_SIZE.height,
+              borderRadius: CREATE_WEDGE_NESTED_MODAL_SIZE.borderRadius,
               boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
               overflow: "hidden",
               display: "flex",

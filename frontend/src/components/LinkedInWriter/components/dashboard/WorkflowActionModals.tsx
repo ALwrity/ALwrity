@@ -10,7 +10,6 @@ import {
   openPostAnalyticsModal,
 } from "../../utils/linkedInDashboardEvents";
 import {
-  GrowthSnapshotModal,
   BrandScorecardModal,
   ViralCopywriterModal,
   EngagementTrendsModal,
@@ -41,7 +40,7 @@ import {
 } from "../../utils/linkedInConnectLockedUi";
 import { isPublishWedgeFeatureLocked } from "../../utils/linkedInPublishWedgeLockedUi";
 
-type AnalysisSub = "snapshot" | "brand_score" | "viral" | "trends" | null;
+type AnalysisSub = "brand_score" | "viral" | "trends" | null;
 type EngagementSub =
   "booster" | "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
 type RemarkSub =
@@ -284,6 +283,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={onClose}
         maxWidth={720}
         titleSize="xl"
+        modalClassName="linkedin-analysis-wedge-modal"
       >
         <div
           style={{
@@ -291,17 +291,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             gridTemplateColumns: "repeat(4, 1fr)",
             gap: 12,
           }}
+          className="linkedin-analysis-wedge-tiles"
         >
-          <DashboardToolTile
-            title="Growth Snapshot"
-            description="Instant view: top trending topic, biggest content gap, brand score"
-            icon="⚡"
-            accent="#f59e0b"
-            onClick={() => {
-              onClose();
-              setAnalysisSub("snapshot");
-            }}
-          />
           <DashboardToolTile
             title="Brand Score"
             description="Full personal brand breakdown across 5 dimensions"
@@ -356,10 +347,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         </div>
       </DashboardActionModal>
 
-      <GrowthSnapshotModal
-        open={analysisSub === "snapshot"}
-        onClose={() => setAnalysisSub(null)}
-      />
       <BrandScorecardModal
         open={analysisSub === "brand_score"}
         onClose={() => setAnalysisSub(null)}
