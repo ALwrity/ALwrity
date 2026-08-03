@@ -41,7 +41,15 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
             "cost_per_image": 0.30,
             "max_resolution": (1024, 1024),
             "default_steps": 20,
-        }
+        },
+        "gemini-3-pro-image": {
+            "name": "Gemini 3 Pro Image",
+            "description": "High-quality Google text-to-image via WaveSpeed",
+            "cost_per_image": 0.14,
+            # Gemini uses resolution tiers (1k/2k/4k), not a pixel max like other models
+            "max_resolution": (1920, 1920),
+            "default_steps": None,
+        },
     }
     
     def __init__(self, api_key: Optional[str] = None):
@@ -99,6 +107,13 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
                 f"Supported models: {list(self.SUPPORTED_MODELS.keys())}"
             )
         
+        if not options.prompt or len(options.prompt.strip()) == 0:
+            raise ValueError("Prompt cannot be empty")
+
+        # Gemini uses aspect_ratio + resolution tiers; skip pixel max checks
+        if model == "gemini-3-pro-image":
+            return
+
         model_info = self.SUPPORTED_MODELS[model]
         max_width, max_height = model_info["max_resolution"]
         
@@ -107,9 +122,6 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
                 f"Resolution {options.width}x{options.height} exceeds maximum "
                 f"{max_width}x{max_height} for model {model}"
             )
-        
-        if not options.prompt or len(options.prompt.strip()) == 0:
-            raise ValueError("Prompt cannot be empty")
     
     def _generate_ideogram_v3(self, options: ImageGenerationOptions) -> bytes:
         """Generate image using Ideogram V3 Turbo.
@@ -260,6 +272,54 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         except Exception as e:
             logger.error("[FLUX Kontext Pro] ❌ Error generating image: {}", str(e), exc_info=True)
             raise RuntimeError(f"FLUX Kontext Pro generation failed: {str(e)}")
+
+    def _generate_gemini_3_pro_image(self, options: ImageGenerationOptions) -> bytes:
+        """Generate image using Gemini 3 Pro Image via WaveSpeed.
+
+        Args:
+            options: Image generation options
+
+        Returns:
+            Image bytes
+        """
+        logger.info(
+            "[Gemini 3 Pro Image] Starting image generation: {}",
+            options.prompt[:100],
+        )
+
+        try:
+            params = {
+                "model": "gemini-3-pro-image",
+                "prompt": options.prompt,
+                "width": options.width,
+                "height": options.height,
+                "enable_sync_mode": False,
+            }
+
+            result = self._call_api_with_retry(self.client.generate_image, **params)
+
+            if isinstance(result, bytes):
+                image_bytes = result
+            elif isinstance(result, dict) and "image" in result:
+                image_bytes = result["image"]
+            else:
+                raise ValueError(
+                    f"Unexpected response format from WaveSpeed API: {type(result)}"
+                )
+
+            logger.info(
+                "[Gemini 3 Pro Image] Successfully generated image: {} bytes",
+                len(image_bytes),
+            )
+            return image_bytes
+
+        except Exception as e:
+            logger.error(
+                "[Gemini 3 Pro Image] Error generating image: {}",
+                str(e),
+                exc_info=True,
+            )
+            raise RuntimeError(f"Gemini 3 Pro Image generation failed: {str(e)}")
     
     def generate(self, options: ImageGenerationOptions) -> ImageGenerationResult:
         """Generate image using WaveSpeed AI models.
@@ -287,6 +347,8 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
             image_bytes = self._generate_qwen_image(options)
         elif model == "flux-kontext-pro":
             image_bytes = self._generate_flux_kontext_pro(options)
+        elif model == "gemini-3-pro-image":
+            image_bytes = self._generate_gemini_3_pro_image(options)
         else:
             raise ValueError(f"Unsupported model: {model}")
         
@@ -297,6 +359,7 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
         # Calculate estimated cost
         model_info = self.SUPPORTED_MODELS[model]
         estimated_cost = model_info["cost_per_image"]
+        steps = options.steps if options.steps is not None else model_info.get("default_steps")
         
         # Return result
         return ImageGenerationResult(
@@ -312,7 +375,7 @@ class WaveSpeedImageProvider(ImageGenerationProvider):
                 "model_name": model_info["name"],
                 "prompt": options.prompt,
                 "negative_prompt": options.negative_prompt,
-                "steps": options.steps or model_info["default_steps"],
+                "steps": steps,
                 "guidance_scale": options.guidance_scale,
                 "estimated_cost": estimated_cost,
             }

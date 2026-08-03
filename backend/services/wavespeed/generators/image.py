@@ -34,7 +34,33 @@ class ImageGenerator:
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}",
         }
-    
+
+    @staticmethod
+    def _aspect_ratio_from_dimensions(width: int, height: int) -> str:
+        """Map pixel dimensions to a Gemini-supported aspect_ratio string."""
+        exact = {
+            (1024, 1024): "1:1",
+            (1920, 1080): "16:9",
+            (1080, 1920): "9:16",
+            (1366, 1024): "4:3",
+            (1080, 1440): "3:4",
+            # LinkedIn-optimized dimensions from LinkedInImageGenerator
+            (1200, 627): "16:9",   # 1.91:1 feed landscape
+            (1080, 1350): "3:4",   # 1:1.25 feed portrait
+        }
+        if (width, height) in exact:
+            return exact[(width, height)]
+
+        ratio = width / height if height else 1.0
+        candidates = [
+            ("1:1", 1.0),
+            ("16:9", 16 / 9),
+            ("9:16", 9 / 16),
+            ("4:3", 4 / 3),
+            ("3:4", 3 / 4),
+        ]
+        return min(candidates, key=lambda item: abs(item[1] - ratio))[0]
+
     def generate_image(
         self,
         model: str,
@@ -50,18 +76,19 @@ class ImageGenerator:
         **kwargs
     ) -> bytes:
         """
-        Generate image using WaveSpeed AI models (Ideogram V3 or Qwen Image).
+        Generate image using WaveSpeed AI models (Ideogram, Qwen, FLUX, Gemini).
         
         Args:
-            model: Model to use ("ideogram-v3-turbo" or "qwen-image")
+            model: Model id (e.g. ideogram-v3-turbo, qwen-image, flux-kontext-pro, gemini-3-pro-image)
             prompt: Text prompt for image generation
-            width: Image width (default: 1024)
-            height: Image height (default: 1024)
-            num_inference_steps: Number of inference steps
-            guidance_scale: Guidance scale for generation
-            negative_prompt: Negative prompt (what to avoid)
-            seed: Random seed for reproducibility
-            enable_sync_mode: If True, wait for result and return it directly (default: True)
+            width: Image width (default: 1024); used for Gemini aspect_ratio derivation
+            height: Image height (default: 1024); used for Gemini aspect_ratio derivation
+            num_inference_steps: Number of inference steps (ignored for Gemini)
+            guidance_scale: Guidance scale for generation (ignored for Gemini)
+            negative_prompt: Negative prompt (what to avoid; ignored for Gemini)
+            seed: Random seed for reproducibility (ignored for Gemini)
+            enable_sync_mode: If True, wait for result and return it directly (default: True).
+                Forced False for gemini-3-pro-image per WaveSpeed API guidance.
             timeout: Request timeout in seconds (default: 120)
             **kwargs: Additional parameters
             
@@ -73,6 +100,7 @@ class ImageGenerator:
             "ideogram-v3-turbo": "ideogram-ai/ideogram-v3-turbo",
             "qwen-image": "wavespeed-ai/qwen-image/text-to-image",
             "flux-kontext-pro": "wavespeed-ai/flux-kontext-pro/text-to-image",
+            "gemini-3-pro-image": "google/gemini-3-pro-image/text-to-image",
         }
         
         model_path = model_paths.get(model)
@@ -80,30 +108,56 @@ class ImageGenerator:
             raise ValueError(f"Unsupported image model: {model}. Supported: {list(model_paths.keys())}")
         
         url = f"{self.base_url}/{model_path}"
-        
-        payload = {
-            "prompt": prompt,
-            "width": width,
-            "height": height,
-            "enable_sync_mode": enable_sync_mode,
-        }
-        
-        # Add optional parameters
-        if num_inference_steps is not None:
-            payload["num_inference_steps"] = num_inference_steps
-        if guidance_scale is not None:
-            payload["guidance_scale"] = guidance_scale
-        if negative_prompt:
-            payload["negative_prompt"] = negative_prompt
-        if seed is not None:
-            payload["seed"] = seed
-        
-        # Add any extra parameters
+
+        # Gemini uses aspect_ratio/resolution (not width/height) and async submit+poll.
+        if model == "gemini-3-pro-image":
+            aspect_ratio = self._aspect_ratio_from_dimensions(width, height)
+            enable_sync_mode = False
+            resolution = kwargs.pop("resolution", "1k")
+            output_format = kwargs.pop("output_format", "png")
+            payload = {
+                "prompt": prompt,
+                "aspect_ratio": aspect_ratio,
+                "resolution": resolution,
+                "output_format": output_format,
+                "enable_sync_mode": False,
+                "enable_base64_output": False,
+            }
+            logger.info(
+                "[WaveSpeed] Generating Gemini image via {} "
+                "(aspect_ratio={}, resolution={}, prompt_length={})",
+                url,
+                aspect_ratio,
+                resolution,
+                len(prompt),
+            )
+        else:
+            payload = {
+                "prompt": prompt,
+                "width": width,
+                "height": height,
+                "enable_sync_mode": enable_sync_mode,
+            }
+
+            # Add optional parameters (existing models only)
+            if num_inference_steps is not None:
+                payload["num_inference_steps"] = num_inference_steps
+            if guidance_scale is not None:
+                payload["guidance_scale"] = guidance_scale
+            if negative_prompt:
+                payload["negative_prompt"] = negative_prompt
+            if seed is not None:
+                payload["seed"] = seed
+
+            logger.info(
+                f"[WaveSpeed] Generating image via {url} (model={model}, prompt_length={len(prompt)})"
+            )
+
+        # Add any extra parameters (safe for both branches)
         for key, value in kwargs.items():
             if key not in payload:
                 payload[key] = value
-        
-        logger.info(f"[WaveSpeed] Generating image via {url} (model={model}, prompt_length={len(prompt)})")
+
         response = requests.post(url, headers=self._get_headers(), json=payload, timeout=timeout)
         
         if response.status_code != 200:

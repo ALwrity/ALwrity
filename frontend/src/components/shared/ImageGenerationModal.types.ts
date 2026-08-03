@@ -27,7 +27,11 @@ export type AspectRatio = '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
 export type ImageModel = 'ideogram-v3-turbo' | 'qwen-image';
 
 /** LinkedIn-only model union; not part of shared ImageModel */
-export type LinkedInImageModel = 'flux-kontext-pro' | 'ideogram-v3-turbo' | 'qwen-image';
+export type LinkedInImageModel =
+  | 'flux-kontext-pro'
+  | 'ideogram-v3-turbo'
+  | 'qwen-image'
+  | 'gemini-3-pro-image';
 
 // Preset configuration for quick-apply presets
 export interface ImagePreset {
