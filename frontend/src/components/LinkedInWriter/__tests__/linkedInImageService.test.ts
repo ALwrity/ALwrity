@@ -40,6 +40,14 @@ describe("linkedInImageService", () => {
         "Professional business aesthetic, mobile-optimized",
       );
     });
+
+    it("keeps longer post body for cover generation (up to 1200 chars)", () => {
+      const longBody = "X".repeat(1500);
+      const prompt = buildPromptFromSelection(longBody, "Topic", "Industry");
+
+      expect(prompt).toContain("X".repeat(1200));
+      expect(prompt).not.toContain("X".repeat(1201));
+    });
   });
 
   describe("resolveLinkedInImageUrl", () => {
@@ -58,7 +66,7 @@ describe("linkedInImageService", () => {
 
   describe("generateLinkedInImage", () => {
     it("sends model in POST body when provided", async () => {
-      (aiApiClient.post as jest.Mock).mockResolvedValue({
+      jest.mocked(aiApiClient.post).mockResolvedValue({
         data: { success: true, image_id: "model-test-id" },
       });
 
@@ -79,12 +87,37 @@ describe("linkedInImageService", () => {
       );
     });
 
+    it("sends gemini-3-pro-image model in POST body", async () => {
+      jest.mocked(aiApiClient.post).mockResolvedValue({
+        data: { success: true, image_id: "gemini-img-id" },
+      });
+
+      await generateLinkedInImage({
+        prompt:
+          "Create LinkedIn post cover image for below LinkedIn post -\n\nStop guessing.",
+        selectedText: "Stop guessing what peers care about.",
+        topic: "GSC Brainstorm",
+        industry: "Manufacturing",
+        model: "gemini-3-pro-image",
+      });
+
+      expect(aiApiClient.post).toHaveBeenCalledWith(
+        "/api/linkedin/generate-image",
+        expect.objectContaining({
+          model: "gemini-3-pro-image",
+          prompt: expect.stringContaining(
+            "Create LinkedIn post cover image for below LinkedIn post -",
+          ),
+        }),
+      );
+    });
+
     it("logs URL on success", async () => {
       const consoleSpy = jest
         .spyOn(console, "log")
         .mockImplementation(() => {});
 
-      (aiApiClient.post as jest.Mock).mockResolvedValue({
+      jest.mocked(aiApiClient.post).mockResolvedValue({
         data: {
           success: true,
           image_id: "test-id-123",
@@ -115,7 +148,7 @@ describe("linkedInImageService", () => {
     });
 
     it("returns error when API reports failure", async () => {
-      (aiApiClient.post as jest.Mock).mockResolvedValue({
+      jest.mocked(aiApiClient.post).mockResolvedValue({
         data: {
           success: false,
           error: "Provider unavailable",
