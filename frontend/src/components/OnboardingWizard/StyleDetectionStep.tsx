@@ -17,7 +17,7 @@ import {
   IconButton,
   Tooltip
 } from '@mui/material';
-import { apiClient } from '../../api/client';
+import { longRunningApiClient } from '../../api/client';
 import {
   ExpandMore as ExpandMoreIcon,
   ContentCopy as CopyIcon,
@@ -94,7 +94,7 @@ const StyleDetectionStep: React.FC<StyleDetectionStepProps> = ({ onContinue }) =
         include_guidelines: true
       };
 
-      const response = await apiClient.post('/api/onboarding/style-detection/complete', requestData);
+      const response = await longRunningApiClient.post('/api/onboarding/style-detection/complete', requestData);
 
       if (response.data.success) {
         setAnalysis(response.data.style_analysis);

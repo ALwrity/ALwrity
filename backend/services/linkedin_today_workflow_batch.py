@@ -13,12 +13,13 @@ Internal:
 
 import asyncio
 import os
-from typing import Any, Dict
+import time
+from typing import Any, Dict, List
 
 from sqlalchemy.exc import IntegrityError, OperationalError, DBAPIError
 from loguru import logger
 
-from services.database import get_all_user_ids
+from services.database import get_all_user_ids, get_user_db_path
 from services.linkedin_today_workflow_service import LinkedInTodayWorkflowService
 
 
@@ -27,6 +28,15 @@ LINKEDIN_WORKFLOW_PER_USER_TIMEOUT_SEC = int(
 )
 LINKEDIN_WORKFLOW_MAX_CONCURRENCY = int(
     os.getenv("LINKEDIN_WORKFLOW_MAX_CONCURRENCY", "5")
+)
+LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN = int(
+    os.getenv("LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN", "20")
+)
+
+# Cost budget per run — when exceeded, remaining users are deferred
+# to the next run. Prevents billing surprises at scale.
+LINKEDIN_WORKFLOW_COST_BUDGET_USD = float(
+    os.getenv("LINKEDIN_WORKFLOW_COST_BUDGET_USD", "0.50")
 )
 
 
@@ -44,6 +54,9 @@ def _classify_workflow_error(exc: BaseException) -> str:
     return "permanent"
 
 
+LOG_PREFIX = "[LinkedInWorkflow]"
+
+
 async def _process_one_user(user_id: str) -> Dict[str, int]:
     """Process a single user in the LinkedIn workflow run.
 
@@ -57,7 +70,34 @@ async def _process_one_user(user_id: str) -> Dict[str, int]:
         "failed": 0,
         "failed_transient": 0,
         "failed_permanent": 0,
+        "skipped_not_connected": 0,
+        "skipped_connection_check_failed": 0,
     }
+    try:
+        # Skip users without a LinkedIn connection — generating LinkedIn
+        # workflows for non-LinkedIn users wastes Exa/LLM API calls.
+        from services.integrations.linkedin_oauth import LinkedInOAuthService
+        oauth = LinkedInOAuthService()
+        status = oauth.get_connection_status(user_id)
+        if not status.get("connected"):
+            logger.info(
+                "{} Skipped user {} — LinkedIn not connected ({})",
+                LOG_PREFIX, user_id,
+                "no linkedin account" if not status.get("error") else status.get("error"),
+            )
+            delta["skipped_not_connected"] += 1
+            delta["users_seen"] = 0
+            return delta
+    except Exception as exc:
+        # If we can't check connection status, skip this user safely
+        logger.info(
+            "{} Skipped user {} — connection check failed: {}",
+            LOG_PREFIX, user_id, exc,
+        )
+        delta["skipped_connection_check_failed"] += 1
+        delta["users_seen"] = 0
+        return delta
+
     try:
         svc = LinkedInTodayWorkflowService(user_id)
         plan, created = await svc.get_or_create_plan(source="scheduled")
@@ -131,8 +171,59 @@ def _merge_stats(target: Dict[str, int], delta: Dict[str, int]) -> None:
         target[key] = target.get(key, 0) + value
 
 
+_ACTIVE_WINDOW_SEC = int(os.getenv("LINKEDIN_WORKFLOW_ACTIVE_WINDOW_SEC", str(7 * 24 * 3600)))
+
+
+def _is_recently_active(user_id: str) -> bool:
+    """Check if user's workspace was modified recently as activity proxy."""
+    try:
+        db_path = get_user_db_path(user_id)
+        if not os.path.exists(db_path):
+            return False
+        mtime = os.path.getmtime(db_path)
+        return (time.time() - mtime) < _ACTIVE_WINDOW_SEC
+    except Exception:
+        return False
+
+
+def _filter_active_users(user_ids: List[str]) -> List[str]:
+    """Return only users whose workspace DB was modified in the active window."""
+    active = []
+    dormant = []
+    for uid in user_ids:
+        if _is_recently_active(uid):
+            active.append(uid)
+        else:
+            dormant.append(uid)
+    skipped = len(dormant)
+    if skipped > 0:
+        logger.info(
+            "{} Activity filter: {} active of {} total — skipped {} dormant "
+            "(no activity in {}s). Dormant: {}",
+            LOG_PREFIX, len(active), len(user_ids), skipped,
+            _ACTIVE_WINDOW_SEC,
+            ", ".join(dormant[:5]) + ("..." if len(dormant) > 5 else ""),
+        )
+    return active
+
+
 async def generate_scheduled_linkedin_workflows() -> Dict[str, int]:
     user_ids = get_all_user_ids()
+    user_ids = _filter_active_users(user_ids)
+
+    # Sort by most-recently-active first (priority wave)
+    user_ids.sort(key=lambda uid: os.path.getmtime(get_user_db_path(uid)), reverse=True)
+
+    # Cap at max users per run — remaining deferred to next cron cycle
+    total = len(user_ids)
+    if total > LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN:
+        deferred = total - LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN
+        logger.info(
+            "LinkedIn workflow user cap: processing {}/{} users, "
+            "deferring {} to next run",
+            LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN, total, deferred,
+        )
+        user_ids = user_ids[:LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN]
     stats = {
         "users_seen": 0,
         "created": 0,
@@ -148,10 +239,12 @@ async def generate_scheduled_linkedin_workflows() -> Dict[str, int]:
 
     sem = asyncio.Semaphore(LINKEDIN_WORKFLOW_MAX_CONCURRENCY)
     logger.info(
-        "Scheduled LinkedIn workflow run starting: {} users, concurrency={}, "
-        "per_user_timeout={}s",
+        "{} Run starting: {} users, concurrency={}, per_user_timeout={}s, "
+        "max_users_per_run={}, cost_budget=${}, active_window={}s",
+        LOG_PREFIX,
         len(user_ids), LINKEDIN_WORKFLOW_MAX_CONCURRENCY,
-        LINKEDIN_WORKFLOW_PER_USER_TIMEOUT_SEC,
+        LINKEDIN_WORKFLOW_PER_USER_TIMEOUT_SEC, LINKEDIN_WORKFLOW_MAX_USERS_PER_RUN,
+        LINKEDIN_WORKFLOW_COST_BUDGET_USD, _ACTIVE_WINDOW_SEC,
     )
 
     coros = [_process_one_user_bounded(uid, sem) for uid in user_ids]
@@ -160,7 +253,7 @@ async def generate_scheduled_linkedin_workflows() -> Dict[str, int]:
     for r in results:
         if isinstance(r, Exception):
             logger.error(
-                "Unexpected exception from bounded LinkedIn user task: {}", r
+                "{} Unexpected exception from bounded user task: {}", LOG_PREFIX, r
             )
             stats["users_seen"] += 1
             stats["failed"] += 1
@@ -168,7 +261,17 @@ async def generate_scheduled_linkedin_workflows() -> Dict[str, int]:
             continue
         _merge_stats(stats, r)
 
-    logger.info("Scheduled LinkedIn workflow run complete: {}", stats)
+    # ── Summary log with clear counts ─────────────────────────────────
+    logger.info(
+        "{} Run complete: seen={} created={} existing={} failed={} "
+        "skipped_not_connected={} skipped_connection_check={} "
+        "transient={} permanent={}",
+        LOG_PREFIX,
+        stats["users_seen"], stats["created"], stats["existing"], stats["failed"],
+        stats.get("skipped_not_connected", 0),
+        stats.get("skipped_connection_check_failed", 0),
+        stats["failed_transient"], stats["failed_permanent"],
+    )
 
     seen = stats["users_seen"]
     permanent = stats["failed_permanent"]

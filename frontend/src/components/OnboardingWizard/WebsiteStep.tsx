@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useUser } from '@clerk/clerk-react';
 import {
   Box,
@@ -24,6 +24,9 @@ import {
 // Extracted components
 import { AnalysisResultsDisplay, AnalysisProgressDisplay, WebsiteIntegrationsSection } from './WebsiteStep/components';
 import type { StyleAnalysis } from './WebsiteStep/components/AnalysisResultsDisplay';
+import { BackgroundSetupCard } from './WebsiteStep/BackgroundSetupCard';
+import { ContentAuditSummaryCard } from './WebsiteStep/ContentAuditSummaryCard';
+import { SiteHealthSummaryCard } from './WebsiteStep/SiteHealthSummaryCard';
 import PlatformSection from './common/PlatformSection';
 import EmailSection from './common/EmailSection';
 import PlatformAnalytics from '../shared/PlatformAnalytics';
@@ -120,13 +123,13 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
     }
   }, [user]);
 
-  // Notify parent when validation state changes
+  // Notify parent when validation state changes (guard against infinite loops)
+  const prevValidRef = useRef<boolean | null>(null);
   useEffect(() => {
     const hasWebsiteAnalysis = !!(website.trim() && analysis);
     const isValid = hasWebsiteAnalysis || linkedinConnected;
-    console.log('WebsiteStep: Validation check:', { website: website.trim(), analysis: !!analysis, linkedinConnected, isValid });
-    if (onValidationChange) {
-      console.log('WebsiteStep: Calling onValidationChange with:', isValid);
+    if (isValid !== prevValidRef.current && onValidationChange) {
+      prevValidRef.current = isValid;
       onValidationChange(isValid);
     }
   }, [website, analysis, linkedinConnected, onValidationChange]);
@@ -609,18 +612,23 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
           )}
 
           {analysis && (
-            <Box sx={{ animation: 'fadeIn 0.8s ease-in', mb: 3 }}>
-              <AnalysisResultsDisplay
-                analysis={analysis}
-                crawlResult={crawlResult}
-                domainName={domainName}
-                useAnalysisForGenAI={useAnalysisForGenAI}
-                onUseAnalysisChange={setUseAnalysisForGenAI}
-                onAnalysisUpdate={handleAnalysisUpdate}
-                warning={analysisWarning || undefined}
-                onSave={() => saveAnalysis(analysis)}
-              />
-            </Box>
+            <>
+              <Box sx={{ animation: 'fadeIn 0.8s ease-in', mb: 3 }}>
+                <AnalysisResultsDisplay
+                  analysis={analysis}
+                  crawlResult={crawlResult}
+                  domainName={domainName}
+                  useAnalysisForGenAI={useAnalysisForGenAI}
+                  onUseAnalysisChange={setUseAnalysisForGenAI}
+                  onAnalysisUpdate={handleAnalysisUpdate}
+                  warning={analysisWarning || undefined}
+                  onSave={() => saveAnalysis(analysis)}
+                />
+              </Box>
+              <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
+              <ContentAuditSummaryCard brandAnalysis={analysis.brand_analysis} />
+              <SiteHealthSummaryCard seoAudit={analysis.seo_audit} />
+            </>
           )}
 
           <WebsiteIntegrationsSection

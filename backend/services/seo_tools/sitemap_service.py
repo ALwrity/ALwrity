@@ -128,7 +128,7 @@ class SitemapService:
                 publishing_patterns = self._analyze_publishing_patterns(sitemap_data["urls"])
             
             ai_insights = {}
-            if include_ai_insights:
+            if include_ai_insights and sitemap_data.get("urls"):
                 ai_insights = await self._generate_ai_insights(
                     structure_analysis, content_trends, publishing_patterns, sitemap_url, user_id=user_id
                 )
@@ -166,7 +166,13 @@ class SitemapService:
             return result
             
         except Exception as e:
-            logger.error(f"Error analyzing sitemap {sitemap_url}: {e}")
+            err_msg = str(e)
+            # Non-sitemap URLs (GitHub, random domains) are expected — log
+            # at INFO to avoid ERROR pollution from dozens of background tasks.
+            if any(kw in err_msg.lower() for kw in ("html", "not a valid xml", "not xml", "webpage", "no element found")):
+                logger.info(f"Sitemap analysis skipped for {sitemap_url}: not a sitemap")
+            else:
+                logger.error(f"Error analyzing sitemap {sitemap_url}: {e}")
             
             # Log the error
             await seo_logger.log_tool_usage(
@@ -430,8 +436,9 @@ class SitemapService:
             logger.warning(f"Failed to parse sitemap XML: {e}")
             raise Exception(f"Failed to parse sitemap XML: {e}")
         except Exception as e:
-            if "no element found" in str(e) or "not a valid XML sitemap" in str(e):
-                logger.warning(f"⚠️ Sitemap parsing failed for {sitemap_url}: {e}")
+            err_msg = str(e).lower()
+            if any(kw in err_msg for kw in ("no element found", "not a valid xml", "not an xml", "webpage", "html")):
+                logger.info(f"Sitemap unavailable for {sitemap_url}: not a sitemap")
             else:
                 logger.error(f"Error fetching sitemap data for {sitemap_url}: {e}")
             raise
@@ -631,14 +638,24 @@ class SitemapService:
                 user_id=user_id
             )
             
-            # Enhance with onboarding-specific insights
-            onboarding_insights = await self._generate_onboarding_insights(
-                analysis_result,
-                user_url,
-                competitors,
-                industry_context,
-                user_id=user_id
-            )
+            # Enhance with onboarding-specific insights (only when sitemap has data)
+            total_urls = analysis_result.get("total_urls", 0)
+            if total_urls > 0:
+                onboarding_insights = await self._generate_onboarding_insights(
+                    analysis_result,
+                    user_url,
+                    competitors,
+                    industry_context,
+                    user_id=user_id
+                )
+            else:
+                logger.warning(f"Skipping onboarding insights — sitemap returned 0 URLs for {sitemap_url}")
+                onboarding_insights = {
+                    "competitive_positioning": "No sitemap data available for analysis",
+                    "content_gaps": [],
+                    "growth_opportunities": [],
+                    "industry_benchmarks": []
+                }
             
             # Combine results
             analysis_result["onboarding_insights"] = onboarding_insights

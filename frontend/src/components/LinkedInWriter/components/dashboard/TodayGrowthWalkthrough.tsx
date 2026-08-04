@@ -71,6 +71,8 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({
   const storeLoading = useWorkflowStore((s) => s.isLoading);
   const storeError = useWorkflowStore((s) => s.error);
   const generationProgress = useWorkflowStore((s) => s.generationProgress);
+  const scheduleStatus = useWorkflowStore((s) => s.scheduleStatus);
+  const refreshScheduleStatus = useWorkflowStore((s) => s.refreshScheduleStatus);
 
   const isMobileHeaderNav = useMobileHeaderNav();
   const isMobileTab = variant === "tab" && isMobileHeaderNav;
@@ -151,6 +153,13 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({
   useEffect(() => {
     optimisticRef.current = optimisticDone;
   }, [optimisticDone]);
+
+  // Refresh schedule status when dropdown opens
+  useEffect(() => {
+    if (open) {
+      void refreshScheduleStatus();
+    }
+  }, [open, refreshScheduleStatus]);
 
   const activePillars = useMemo((): (typeof PILLAR_ORDER)[number][] => {
     if (!currentWorkflow?.tasks) return [];
@@ -554,7 +563,8 @@ export const TodayGrowthWalkthrough: React.FC<TodayGrowthWalkthroughProps> = ({
               </div>
               <div style={{ fontSize: 12, color: "#666", lineHeight: 1.5 }}>
                 {isNotFound
-                  ? "You haven't generated today's LinkedIn growth tasks yet."
+                  ? scheduleStatus?.skip_reason ||
+                    "Your daily LinkedIn growth tasks haven't been generated yet. Click below to generate them now."
                   : noTasksPast
                     ? `No tasks were recorded for ${formatDateLabel(selectedDate)}.`
                     : errMsg ||

@@ -105,10 +105,7 @@ class ContentStrategyAgent(BaseALwrityAgent):
             ],
             llm=_llm_for_agent,
             max_iterations=8,
-            # Removed unsupported 'system' argument for MultiStepAgent
-            # Provide instruction as part of initial prompt when invoking the agent
-            # or store in context via orchestrator
-            # Instruction should be provided during invocation or via orchestrator context
+            task="language-generation",
             )
     
     # Tool Implementations

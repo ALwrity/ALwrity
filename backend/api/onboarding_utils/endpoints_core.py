@@ -192,6 +192,208 @@ async def get_step_data(step_number: int, current_user: Dict[str, Any]):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+async def get_competitor_analysis(current_user: Dict[str, Any]):
+    """Return the most recent competitor analysis data for the current user."""
+    try:
+        from services.database.sessions import get_session_for_user
+        from models.onboarding import CompetitorAnalysis, OnboardingSession
+        from sqlalchemy import select, desc
+
+        user_id = str(current_user.get('clerk_user_id') or current_user.get('id'))
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User not authenticated")
+
+        session = get_session_for_user(user_id)
+        if not session:
+            return {"competitors": [], "count": 0}
+
+        try:
+            # Get the user's onboarding session
+            onboarding_session = session.execute(
+                select(OnboardingSession)
+                .where(OnboardingSession.user_id == user_id)
+                .order_by(desc(OnboardingSession.updated_at))
+                .limit(1)
+            ).scalar_one_or_none()
+
+            if not onboarding_session:
+                return {"competitors": [], "count": 0}
+
+            # Get competitor analyses for this session
+            competitors = session.execute(
+                select(CompetitorAnalysis)
+                .where(CompetitorAnalysis.session_id == onboarding_session.id)
+                .order_by(desc(CompetitorAnalysis.analysis_date))
+            ).scalars().all()
+
+            competitor_data = [
+                {
+                    "url": c.competitor_url,
+                    "domain": c.competitor_domain,
+                    "analysis_date": c.analysis_date.isoformat() if c.analysis_date else None,
+                    "analysis_data": c.analysis_data,
+                    "status": c.status,
+                }
+                for c in competitors
+            ]
+
+            return {
+                "competitors": competitor_data,
+                "count": len(competitor_data),
+                "session_id": onboarding_session.id,
+            }
+        finally:
+            session.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Error getting competitor analysis: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+async def get_onboarding_state(current_user: Dict[str, Any]):
+    """Unified endpoint returning current step + all step data."""
+    try:
+        from services.database.sessions import get_session_for_user
+        from models.onboarding import (
+            OnboardingSession, APIKey, WebsiteAnalysis,
+            ResearchPreferences, PersonaData, CompetitorAnalysis
+        )
+        from sqlalchemy import select, desc
+
+        user_id = str(current_user.get('clerk_user_id') or current_user.get('id'))
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User not authenticated")
+
+        from services.onboarding.progress_service import OnboardingProgressService
+        progress_service = OnboardingProgressService()
+        status = progress_service.get_onboarding_status(user_id)
+
+        session = get_session_for_user(user_id)
+        if not session:
+            return {"current_step": status.get("current_step", 0), "steps": {}}
+
+        try:
+            onboarding_session = session.execute(
+                select(OnboardingSession)
+                .where(OnboardingSession.user_id == user_id)
+                .order_by(desc(OnboardingSession.updated_at))
+                .limit(1)
+            ).scalar_one_or_none()
+
+            if not onboarding_session:
+                return {"current_step": status.get("current_step", 0), "steps": {}}
+
+            sid = onboarding_session.id
+            step_data = {}
+
+            # API Keys
+            api_keys = session.execute(select(APIKey).where(APIKey.session_id == sid)).scalars().all()
+            if api_keys:
+                step_data["api_keys"] = {k.provider: k.key for k in api_keys if k.key}
+
+            # Website
+            website = session.execute(
+                select(WebsiteAnalysis).where(WebsiteAnalysis.session_id == sid)
+                .order_by(desc(WebsiteAnalysis.updated_at)).limit(1)
+            ).scalar_one_or_none()
+            if website and website.website_url:
+                step_data["website"] = {"url": website.website_url, "writing_style": website.writing_style}
+
+            # Research
+            research = session.execute(
+                select(ResearchPreferences).where(ResearchPreferences.session_id == sid)
+                .order_by(desc(ResearchPreferences.updated_at)).limit(1)
+            ).scalar_one_or_none()
+            if research:
+                step_data["research"] = {"research_depth": research.research_depth, "content_types": research.content_types}
+
+            # Persona
+            persona = session.execute(
+                select(PersonaData).where(PersonaData.session_id == sid)
+                .order_by(desc(PersonaData.updated_at)).limit(1)
+            ).scalar_one_or_none()
+            if persona:
+                step_data["persona"] = {"core_persona": persona.core_persona, "platform_personas": persona.platform_personas}
+
+            # Competitors
+            competitors = session.execute(
+                select(CompetitorAnalysis).where(CompetitorAnalysis.session_id == sid)
+                .order_by(desc(CompetitorAnalysis.analysis_date))
+            ).scalars().all()
+            if competitors:
+                step_data["competitors"] = [
+                    {"url": c.competitor_url, "domain": c.competitor_domain}
+                    for c in competitors
+                ]
+
+            return {
+                "current_step": status.get("current_step", 0),
+                "is_completed": status.get("is_completed", False),
+                "steps": step_data,
+            }
+        finally:
+            session.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Error getting onboarding state: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+async def retrigger_sif_indexing(current_user: Dict[str, Any]):
+    """Retrigger SIF indexing immediately for the current user."""
+    try:
+        from services.database.sessions import get_session_for_user
+        from models.website_analysis_monitoring_models import SIFIndexingTask
+        from datetime import datetime, timezone
+
+        user_id = str(current_user.get('clerk_user_id') or current_user.get('id'))
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User not authenticated")
+
+        session = get_session_for_user(user_id)
+        if not session:
+            raise HTTPException(status_code=500, detail="Database connection failed")
+
+        try:
+            task = session.query(SIFIndexingTask).filter(
+                SIFIndexingTask.user_id == user_id
+            ).order_by(SIFIndexingTask.updated_at.desc()).first()
+
+            if not task:
+                return {"status": "not_found", "message": "No SIF indexing task found."}
+
+            task.next_execution = datetime.now(timezone.utc)
+            task.consecutive_failures = 0
+            task.failure_reason = None
+            task.status = "active"
+            session.commit()
+
+            website_url = (task.payload or {}).get('website_url', '')
+            try:
+                import asyncio
+                from api.onboarding_utils.onboarding_task_scheduler import _run_sif_now
+                asyncio.ensure_future(_run_sif_now(user_id, website_url))
+            except Exception:
+                pass
+
+            return {
+                "status": "retriggered",
+                "website_url": website_url,
+            }
+        finally:
+            session.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        from loguru import logger
+        logger.error(f"Error retriggering SIF: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 __all__ = [name for name in globals().keys() if not name.startswith('_')]
 
 

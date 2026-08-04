@@ -235,12 +235,21 @@ def create_website_analysis_tasks(user_id: str, db: Session) -> Dict[str, Any]:
         
         # 3. Create task for each competitor
         for competitor in competitors:
-            competitor_url = competitor.get('url') or competitor.get('website_url')
+            competitor_url = (
+                competitor.get('competitor_url')
+                or competitor.get('url')
+                or competitor.get('website_url')
+            )
             if not competitor_url:
                 continue
                 
             # Extract competitor identifier
-            competitor_id = competitor.get('domain') or competitor.get('id') or _extract_domain(competitor_url)
+            competitor_id = (
+                competitor.get('competitor_domain')
+                or competitor.get('domain')
+                or competitor.get('id')
+                or _extract_domain(competitor_url)
+            )
             
             competitor_task = _create_or_update_task(
                 db=db,

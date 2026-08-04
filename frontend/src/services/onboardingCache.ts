@@ -1,6 +1,11 @@
 /**
  * Onboarding Cache Service
- * Manages client-side caching of onboarding data until final submission
+ * Manages client-side caching of onboarding data until final submission.
+ * 
+ * @deprecated This operates as a parallel cache layer outside OnboardingContext.
+ * Currently used by BusinessDescriptionStep (reads step 2 data) and UserBadge
+ * (clears on account reset). Future work should migrate BusinessDescriptionStep
+ * to OnboardingContext and remove this service.
  */
 
 export type PageImages = {

@@ -1,6 +1,7 @@
 import React from "react";
 import type { useGSCBrainstorm } from "../../../hooks/useGSCBrainstorm";
 import { GSCBrainstormModal } from "../GSCBrainstormModal";
+import TopPagesInsightsPanel from "../../shared/TopPagesInsightsPanel";
 
 interface BlogPerformanceModalProps {
   open: boolean;
@@ -134,6 +135,21 @@ export const BlogPerformanceModal: React.FC<BlogPerformanceModalProps> = ({
       onSelectSuggestion={handleClose}
       initialKeywords=""
       onReRun={handleReRun}
+      bottomContent={
+        gsc.summary?.top_pages?.length ? (
+          <div style={{ padding: "0 20px 16px" }}>
+            <TopPagesInsightsPanel
+              pages={gsc.summary.top_pages}
+              risingQueries={gsc.quickWins.map((w) => ({ query: w.keyword }))}
+              onOpenPage={(url) => window.open(url, "_blank", "noopener")}
+              onCreateBrief={(_page, _queries) => {
+                handleClose();
+              }}
+              formatNumber={(n) => n.toLocaleString()}
+            />
+          </div>
+        ) : undefined
+      }
     />
   );
 };

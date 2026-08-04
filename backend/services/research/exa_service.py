@@ -107,11 +107,17 @@ class ExaService:
             
             logger.info(f"Starting competitor discovery for: {user_url}")
             
-            # Extract user domain for exclusion
+            # Extract user domain for exclusion — add both www and non-www variants
             user_domain = urlparse(user_url).netloc
             exclude_domains_list = exclude_domains or []
             exclude_domains_list.append(user_domain)
-            
+            # Also add the alternate variant (www ↔ non-www)
+            if user_domain.startswith("www."):
+                exclude_domains_list.append(user_domain[4:])
+            else:
+                exclude_domains_list.append(f"www.{user_domain}")
+            exclude_domains_list = list(set(exclude_domains_list))  # dedupe
+
             logger.info(f"Excluding domains: {exclude_domains_list}")
             
             # Extract insights from website analysis for better targeting
@@ -143,22 +149,27 @@ class ExaService:
                 logger.info(f"Enhanced targeting with analysis data: {include_text_queries}")
             
             # Use the Exa SDK to find similar links with content and context
-            search_result = await self._run_sync_with_timeout(
-                self.exa.find_similar_and_contents,
-                url=user_url,
-                num_results=min(num_results, 10),  # Exa API limit
-                include_domains=include_domains,
-                exclude_domains=exclude_domains_list,
-                include_text=include_text_queries if include_text_queries else None,
-                text=True,
-                highlights={
+            search_params: Dict[str, Any] = {
+                "url": user_url,
+                "num_results": min(num_results, 10),
+                "exclude_domains": exclude_domains_list,
+                "text": True,
+                "highlights": {
                     "numSentences": 2,
                     "highlightsPerUrl": 3,
-                    "query": "Unique value proposition, competitive advantages, market position"
+                    "query": "Unique value proposition, competitive advantages, market position",
                 },
-                summary={
-                    "query": summary_query
-                }
+                "summary": {
+                    "query": summary_query,
+                },
+            }
+            if include_domains:
+                search_params["include_domains"] = include_domains
+            if include_text_queries:
+                search_params["include_text"] = include_text_queries
+
+            search_result = await self._run_sync_with_timeout(
+                self.exa.find_similar_and_contents, **search_params
             )
             
             # TODO: Add context generation once SDK supports it

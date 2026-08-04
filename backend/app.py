@@ -1,5 +1,10 @@
 # Ensure typing constructs and models are available globally for FastAPI type annotation evaluation
 import os
+import warnings
+
+# Silence advertools SyntaxWarnings (invalid escape sequences in robotstxt.py / crawlytics.py / youtube.py)
+# before advertools is imported by any downstream module.
+warnings.simplefilter("ignore", SyntaxWarning)
 
 # Print env vars immediately - BEFORE any imports
 print(f"[app.py] EARLY - PORT={os.getenv('PORT')}, HOST={os.getenv('HOST')}", flush=True)
@@ -107,8 +112,14 @@ from api.subscription import router as subscription_router
 
 # Import Step 3 onboarding routes (skip in feature-only modes)
 step3_routes = None
+step2_preview_routes = None
+step2_task_routes = None
+content_audit_routes = None
 if _is_full_mode():
     from api.onboarding_utils.step3_routes import router as step3_routes
+    from api.onboarding_utils.step2_preview_routes import router as step2_preview_routes
+    from api.onboarding_utils.step2_task_routes import router as step2_task_routes
+    from api.onboarding_utils.content_audit_routes import router as content_audit_routes
 
 # Persona generation routes — full mode only (requires nltk/spacy; tied to onboarding)
 step4_persona_routes = None
@@ -745,6 +756,12 @@ if _is_full_mode():
         app.include_router(oauth_token_monitoring_router)
 
     # Include persona routes for persona management
+    if step2_preview_routes:
+        app.include_router(step2_preview_routes)
+    if step2_task_routes:
+        app.include_router(step2_task_routes)
+    if content_audit_routes:
+        app.include_router(content_audit_routes)
     if step4_persona_routes:
         app.include_router(step4_persona_routes)
     if persona_routes:

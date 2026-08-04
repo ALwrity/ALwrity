@@ -31,6 +31,8 @@ import {
   TrendingFlat as TrendFlatIcon,
 } from '@mui/icons-material';
 import { GlassCard } from '../../shared/styled';
+import MetricTooltip from '../../shared/MetricTooltip';
+import { getMetricTooltip } from '../../shared/metricTooltips';
 
 interface AdvertoolsInsightsProps {
   data: any;
@@ -60,13 +62,16 @@ const TrendBadge: React.FC<{ trend: string }> = ({ trend }) => {
   return <TrendFlatIcon sx={{ fontSize: 16, color: '#f59e0b' }} />;
 };
 
-const ScoreBar: React.FC<{ value: number; label: string; max?: number }> = ({ value, label, max = 100 }) => {
+const ScoreBar: React.FC<{ value: number; label: string; max?: number; tooltip?: string }> = ({ value, label, max = 100, tooltip }) => {
   const pct = Math.min((value / max) * 100, 100);
   const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
   return (
     <Box sx={{ mb: 1.5 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{label}</Typography>
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          {label}
+          {tooltip ? <MetricTooltip title={tooltip} dark /> : null}
+        </Typography>
         <Typography variant="caption" sx={{ color: 'white', fontWeight: 600 }}>{value}</Typography>
       </Box>
       <LinearProgress
@@ -130,6 +135,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>
                   Augmented Content Themes
                 </Typography>
+                <MetricTooltip title={getMetricTooltip('augmented_themes')} dark />
               </Box>
               <Chip label={auditStatus.label} size="small" color={auditStatus.color} variant="outlined" icon={auditStatus.icon as any} sx={{ height: 20, fontSize: '0.65rem' }} />
             </Box>
@@ -149,7 +155,10 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                   {avg_word_count && (
                     <Grid item xs={6}>
                       <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Avg. Content Length</Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          Avg. Content Length
+                          <MetricTooltip title={getMetricTooltip('avg_word_count')} dark />
+                        </Typography>
                         <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{avg_word_count} words</Typography>
                       </Box>
                     </Grid>
@@ -157,7 +166,10 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                   {site_health?.top_pillars && (
                     <Grid item xs={6}>
                       <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Primary Structure</Typography>
+                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          Primary Structure
+                          <MetricTooltip title={getMetricTooltip('primary_structure')} dark />
+                        </Typography>
                         <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           /{Object.keys(site_health.top_pillars)[0] || 'root'}
                         </Typography>
@@ -189,6 +201,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <HealthIcon sx={{ color: '#10b981' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Site Health & Freshness</Typography>
+                <MetricTooltip title={getMetricTooltip('site_health')} dark />
               </Box>
               <Chip label={healthStatus.label} size="small" color={healthStatus.color} variant="outlined" icon={healthStatus.icon as any} sx={{ height: 20, fontSize: '0.65rem' }} />
             </Box>
@@ -198,7 +211,10 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 <Grid container spacing={2}>
                   <Grid item xs={4}>
                     <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Total Pages</Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        Total Pages
+                        <MetricTooltip title={getMetricTooltip('pages_crawled')} dark />
+                      </Typography>
                       <Typography variant="h6" sx={{ color: 'white' }}>{site_health.total_urls}</Typography>
                     </Box>
                   </Grid>
@@ -207,6 +223,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <VelocityIcon sx={{ fontSize: 14, color: '#3b82f6' }} />
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Velocity</Typography>
+                        <MetricTooltip title={getMetricTooltip('publishing_velocity_wk')} dark />
                       </Box>
                       <Typography variant="h6" sx={{ color: 'white' }}>
                         {site_health.publishing_velocity} <Typography component="span" variant="caption">/ wk</Typography>
@@ -218,6 +235,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <TrendBadge trend={site_health.publishing_trend || freshness?.publishing_trend} />
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Trend</Typography>
+                        <MetricTooltip title={getMetricTooltip('publishing_trend')} dark />
                       </Box>
                       <Typography variant="h6" sx={{ color: 'white', textTransform: 'capitalize' }}>
                         {site_health.publishing_trend || freshness?.publishing_trend || 'unknown'}
@@ -229,7 +247,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 {/* Freshness Score */}
                 {(freshness?.freshness_score || site_health?.freshness_score) && (
                   <Box sx={{ mt: 2 }}>
-                    <ScoreBar value={freshness?.freshness_score ?? site_health?.freshness_score} label="Content Freshness Score" />
+                    <ScoreBar value={freshness?.freshness_score ?? site_health?.freshness_score} label="Content Freshness Score" tooltip={getMetricTooltip('freshness_score')} />
                   </Box>
                 )}
 
@@ -240,6 +258,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                         <WarningIcon sx={{ fontSize: 14, color: (site_health.stale_content_percentage || 0) > 30 ? '#ef4444' : '#f59e0b' }} />
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>Stale Content (6+ months)</Typography>
+                        <MetricTooltip title={getMetricTooltip('stale_content_6mo')} dark />
                       </Box>
                       <Typography variant="h6" sx={{ color: (site_health.stale_content_percentage || 0) > 30 ? '#f87171' : 'white' }}>
                         {site_health.stale_content_count} pages ({site_health.stale_content_percentage}%)
@@ -254,7 +273,10 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 {/* Publishing Recency */}
                 {freshness?.publishing_recency && (
                   <Box sx={{ mt: 1.5, p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 1 }}>Publishing Recency</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5, mb: 1 }}>
+                      Publishing Recency
+                      <MetricTooltip title={getMetricTooltip('publishing_recency')} dark />
+                    </Typography>
                     <Grid container spacing={1}>
                       {Object.entries(freshness.publishing_recency).map(([period, count]) => (
                         <Grid item xs={3} key={period}>
@@ -291,29 +313,42 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <UrlIcon sx={{ color: '#3b82f6' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>URL Structure Analysis</Typography>
+                <MetricTooltip title={getMetricTooltip('url_structure')} dark />
               </Box>
               <Grid container spacing={2}>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>URLs Analyzed</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      URLs Analyzed
+                      <MetricTooltip title={getMetricTooltip('urls_analyzed')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{url_structure.total_urls_analyzed}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Avg Depth</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Avg Depth
+                      <MetricTooltip title={getMetricTooltip('avg_depth')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{url_structure.directory_depth?.average_depth || 0}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Max Depth</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Max Depth
+                      <MetricTooltip title={getMetricTooltip('max_depth')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{url_structure.directory_depth?.max_depth || 0}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={6}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>URLs with Parameters</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      URLs with Parameters
+                      <MetricTooltip title={getMetricTooltip('urls_with_params')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: url_structure.parameter_usage?.percentage_with_params > 20 ? '#f87171' : 'white', fontWeight: 600 }}>
                       {url_structure.parameter_usage?.percentage_with_params || 0}%
                     </Typography>
@@ -321,14 +356,20 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 </Grid>
                 <Grid item xs={6}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Subdomains</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Subdomains
+                      <MetricTooltip title={getMetricTooltip('subdomains')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{url_structure.subdomains?.unique_count || 0}</Typography>
                   </Box>
                 </Grid>
               </Grid>
               {url_structure.directory_depth?.distribution && (
                 <Box sx={{ mt: 1.5 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 0.5 }}>Depth Distribution</Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                    Depth Distribution
+                    <MetricTooltip title={getMetricTooltip('depth_distribution')} dark />
+                  </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {Object.entries(url_structure.directory_depth.distribution).slice(0, 8).map(([depth, count]) => (
                       <Tooltip key={depth} title={`Depth ${depth}: ${count} pages`}>
@@ -349,35 +390,51 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <LinkIcon sx={{ color: '#10b981' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Internal Link Health</Typography>
+                <MetricTooltip title={getMetricTooltip('link_health')} dark />
               </Box>
               <Grid container spacing={2}>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Total Links</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Total Links
+                      <MetricTooltip title={getMetricTooltip('total_links')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{link_health.total_links_found}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Internal</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Internal
+                      <MetricTooltip title={getMetricTooltip('internal_links')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{link_health.internal_link_count} ({link_health.internal_link_percentage}%)</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>External</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      External
+                      <MetricTooltip title={getMetricTooltip('external_links')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{link_health.external_link_count}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={6}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Nofollow</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Nofollow
+                      <MetricTooltip title={getMetricTooltip('nofollow_links')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{link_health.nofollow_link_count}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={6}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Avg Links/Page</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Avg Links/Page
+                      <MetricTooltip title={getMetricTooltip('avg_links_per_page')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{link_health.avg_links_per_page}</Typography>
                   </Box>
                 </Grid>
@@ -403,30 +460,43 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <RedirectIcon sx={{ color: '#f59e0b' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Redirect Audit</Typography>
+                <MetricTooltip title={getMetricTooltip('total_redirects')} dark />
               </Box>
               <Grid container spacing={2}>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Total Redirects</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Total Redirects
+                      <MetricTooltip title={getMetricTooltip('total_redirects')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{redirect_audit.total_redirects}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Unique Chains</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Unique Chains
+                      <MetricTooltip title={getMetricTooltip('unique_chains')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{redirect_audit.unique_chains}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Multi-Hop</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Multi-Hop
+                      <MetricTooltip title={getMetricTooltip('multi_hop_chains')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: redirect_audit.multi_hop_chains > 0 ? '#f87171' : 'white', fontWeight: 600 }}>{redirect_audit.multi_hop_chains}</Typography>
                   </Box>
                 </Grid>
               </Grid>
               {redirect_audit.status_distribution && Object.keys(redirect_audit.status_distribution).length > 0 && (
                 <Box sx={{ mt: 1.5 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block', mb: 0.5 }}>Status Distribution</Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                    Status Distribution
+                    <MetricTooltip title={getMetricTooltip('redirect_status')} dark />
+                  </Typography>
                   <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                     {Object.entries(redirect_audit.status_distribution).map(([code, count]) => (
                       <Chip key={code} label={`${code}: ${count}`} size="small" sx={{ bgcolor: 'rgba(245, 158, 11, 0.1)', color: '#fcd34d', border: '1px solid rgba(245, 158, 11, 0.2)', fontSize: '0.65rem' }} />
@@ -445,23 +515,33 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <ImageIcon sx={{ color: '#8b5cf6' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Image SEO</Typography>
+                <MetricTooltip title={getMetricTooltip('total_images')} dark />
               </Box>
               <Grid container spacing={2}>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Total Images</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Total Images
+                      <MetricTooltip title={getMetricTooltip('total_images')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{image_seo.total_images}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Missing Alt</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Missing Alt
+                      <MetricTooltip title={getMetricTooltip('missing_alt')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: (image_seo.missing_alt_count || 0) > 0 ? '#f87171' : 'white', fontWeight: 600 }}>{image_seo.missing_alt_count || 0}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Alt Coverage</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Alt Coverage
+                      <MetricTooltip title={getMetricTooltip('alt_coverage')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: (image_seo.alt_coverage_percentage || 0) >= 80 ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
                       {image_seo.alt_coverage_percentage || 0}%
                     </Typography>
@@ -469,7 +549,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 </Grid>
               </Grid>
               <Box sx={{ mt: 1 }}>
-                <ScoreBar value={image_seo.alt_coverage_percentage || 0} label="Alt Text Coverage" />
+                <ScoreBar value={image_seo.alt_coverage_percentage || 0} label="Alt Text Coverage" tooltip={getMetricTooltip('alt_coverage')} />
               </Box>
             </GlassCard>
           </Grid>
@@ -482,18 +562,25 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <RobotsIcon sx={{ color: '#6366f1' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Robots.txt Compliance</Typography>
+                <MetricTooltip title={getMetricTooltip('robots_compliance')} dark />
               </Box>
-              <ScoreBar value={robots_txt.compliance_score || 0} label="Compliance Score" />
+              <ScoreBar value={robots_txt.compliance_score || 0} label="Compliance Score" tooltip={getMetricTooltip('robots_compliance')} />
               <Grid container spacing={2}>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Directives</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Directives
+                      <MetricTooltip title={getMetricTooltip('robots_directives')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{robots_txt.total_directives}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Sitemap</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Sitemap
+                      <MetricTooltip title={getMetricTooltip('robots_sitemap')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: robots_txt.has_sitemap_directive ? '#10b981' : '#f87171', fontWeight: 600 }}>
                       {robots_txt.has_sitemap_directive ? 'Declared' : 'Missing'}
                     </Typography>
@@ -501,7 +588,10 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Crawl-Delay</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Crawl-Delay
+                      <MetricTooltip title={getMetricTooltip('robots_crawl_delay')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: robots_txt.has_crawl_delay ? '#10b981' : 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
                       {robots_txt.has_crawl_delay ? 'Set' : 'Not set'}
                     </Typography>
@@ -540,24 +630,34 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <BudgetIcon sx={{ color: '#f59e0b' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Crawl Budget Analysis</Typography>
+                <MetricTooltip title={getMetricTooltip('crawl_budget')} dark />
               </Box>
-              <ScoreBar value={crawl_budget.optimization_score || 0} label="Optimization Score" />
+              <ScoreBar value={crawl_budget.optimization_score || 0} label="Optimization Score" tooltip={getMetricTooltip('optimization_score')} />
               <Grid container spacing={2}>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Sitemap URLs</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Sitemap URLs
+                      <MetricTooltip title={getMetricTooltip('sitemap_total_urls')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{crawl_budget.sitemap_total_urls}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Pages Crawled</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Pages Crawled
+                      <MetricTooltip title={getMetricTooltip('pages_crawled')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 600 }}>{crawl_budget.pages_crawled}</Typography>
                   </Box>
                 </Grid>
                 <Grid item xs={4}>
                   <Box sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 2 }}>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'block' }}>Wasted</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Wasted
+                      <MetricTooltip title={getMetricTooltip('crawl_waste')} dark />
+                    </Typography>
                     <Typography variant="subtitle1" sx={{ color: (crawl_budget.waste_percentage || 0) > 20 ? '#f87171' : 'white', fontWeight: 600 }}>
                       {crawl_budget.waste_percentage || 0}%
                     </Typography>
@@ -600,6 +700,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <CheckIcon sx={{ color: '#10b981' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Page Status Distribution</Typography>
+                <MetricTooltip title={getMetricTooltip('page_status_distribution')} dark />
               </Box>
               <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                 {Object.entries(page_status).map(([code, count]) => (
@@ -622,6 +723,7 @@ export const AdvertoolsInsights: React.FC<AdvertoolsInsightsProps> = ({ data }) 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                 <UrlIcon sx={{ color: '#6366f1' }} />
                 <Typography variant="subtitle1" sx={{ color: 'white', fontWeight: 700 }}>Sitemaps Found</Typography>
+                <MetricTooltip title={getMetricTooltip('sitemaps_found')} dark />
               </Box>
               <Table size="small">
                 <TableBody>

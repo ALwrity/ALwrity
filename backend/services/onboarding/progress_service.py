@@ -253,6 +253,20 @@ class OnboardingProgressService:
                         logger.warning(f"Could not delete {cls_name} for user {user_id}: {e}")
             except Exception as e:
                 logger.warning(f"Could not import {mod_path} for hard reset: {e}")
+
+        # 3. Delete SIF FAISS index files for this user
+        try:
+            import shutil
+            from pathlib import Path
+            idx_path = Path(f"workspace/workspace_{user_id}/indices/txtai")
+            if idx_path.exists():
+                shutil.rmtree(idx_path, ignore_errors=True)
+                logger.info(f"Deleted SIF index for user {user_id} during hard reset")
+            corrupt_marker = Path(f"workspace/workspace_{user_id}/indices/txtai.corrupt")
+            if corrupt_marker.exists():
+                corrupt_marker.unlink()
+        except Exception as e:
+            logger.warning(f"Could not delete SIF index for user {user_id}: {e}")
     
     def _cancel_scheduled_tasks(self, user_id: str):
         """Pause all DB-backed scheduled tasks for a user after onboarding reset."""

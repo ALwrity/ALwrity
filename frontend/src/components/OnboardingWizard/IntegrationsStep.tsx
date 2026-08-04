@@ -23,7 +23,7 @@ import {
   CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import BenefitsSummary from './common/BenefitsSummary';
-import ComingSoonSection from './common/ComingSoonSection';
+import { SifIndexingPanel } from './common/SifIndexingPanel';
 
 interface IntegrationsStepProps {
   onContinue: (data?: any) => void;
@@ -157,10 +157,10 @@ const IntegrationsStep: React.FC<IntegrationsStepProps> = ({ onContinue, updateH
             </div>
           </Fade>
 
-      {/* Coming Soon Section */}
-      <ComingSoonSection />
+      {/* SIF Indexing Status */}
+      <SifIndexingPanel />
 
-      {/* Recommendation Panel */}
+      {/* SIF Recommendation Panel */}
       <Fade in timeout={1200}>
         <div>
           <Paper 

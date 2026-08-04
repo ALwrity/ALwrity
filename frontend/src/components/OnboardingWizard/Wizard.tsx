@@ -9,6 +9,7 @@ import {
 } from '@mui/material';
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
 import { apiClient } from '../../api/client';
+import { useOnboarding } from '../../contexts/OnboardingContext';
 import WebsiteStep from './WebsiteStep';
 import LinkedInConnectStep from './LinkedInConnectStep';
 import CompetitorAnalysisStep from './CompetitorAnalysisStep';
@@ -52,12 +53,15 @@ interface StepHeaderContent {
 
 const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const [activeStep, setActiveStep] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [progress, setProgressState] = useState(0);
+  const { loading, currentStep, completionPercentage, data, refresh, markStepComplete } = useOnboarding();
   const [direction, setDirection] = useState<'left' | 'right'>('right');
   const [showHelp, setShowHelp] = useState(false);
   const [showProgressMessage, setShowProgressMessage] = useState(false);
   const [progressMessage, setProgressMessage] = useState('');
+  // Retry state for step completion failures
+  const [retryStepNumber, setRetryStepNumber] = useState<number | null>(null);
+  const [retryStepData, setRetryStepData] = useState<any>(null);
+  const [retryNextStep, setRetryNextStep] = useState<number>(0);
   // sessionId removed - backend uses Clerk user ID from auth token
   const [stepData, setStepData] = useState<any>(null);
   const [competitorDataCollector, setCompetitorDataCollector] = useState<(() => any) | null>(null);
@@ -76,8 +80,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     all_done: boolean;
   } | null>(null);
   // Default onboarding type from enabled features when no session exists yet.
-  // This ensures ALWRITY_ENABLED_FEATURES=linkedin lands on the LinkedIn wizard
-  // before the backend session is created.
   const defaultOnboardingType = useMemo(() => {
     const enabled = new Set(
       (process.env.REACT_APP_ENABLED_FEATURES || 'all')
@@ -88,7 +90,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     return enabled.has('linkedin') && !enabled.has('all') ? 'linkedin' : 'website';
   }, []);
 
-  const [onboardingType, setOnboardingType] = useState<string>(defaultOnboardingType);
+  const onboardingType = data?.onboarding?.onboarding_type || defaultOnboardingType;
   const steps = useMemo(() => onboardingType === 'linkedin' ? linkedinSteps : websiteSteps, [onboardingType]);
 
   useEffect(() => {
@@ -104,7 +106,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     };
     fetchTasks();
-    const interval = setInterval(fetchTasks, 60000);
+    // Faster polling (30s) for active background tasks after website step
+    const interval = setInterval(fetchTasks, 30000);
     return () => clearInterval(interval);
   }, [activeStep]);
 
@@ -160,16 +163,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   // Keep refs in sync with state
   useEffect(() => {
     stepDataRef.current = stepData;
-    trace('Wizard: stepData changed:', stepData);
-    
-    // Persist stepData to localStorage to survive refreshes
-    if (stepData && Object.keys(stepData).length > 0) {
-      try {
-        localStorage.setItem('onboarding_step_data', JSON.stringify(stepData));
-      } catch (e) {
-        console.warn('Wizard: Failed to persist stepData to localStorage', e);
-      }
-    }
   }, [stepData]);
   
   useEffect(() => {
@@ -249,230 +242,57 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   }, []);
 
+  // Seed stepData from OnboardingContext when data loads
   useEffect(() => {
-    const init = async () => {
-      try {
-        setLoading(true);
-        
-        // Restore stepData from localStorage if available (robustness against refresh)
-        try {
-          const cachedStepData = localStorage.getItem('onboarding_step_data');
-          if (cachedStepData) {
-            const parsedData = JSON.parse(cachedStepData);
-            trace('Wizard: Restored stepData from localStorage backup:', Object.keys(parsedData));
-            setStepData((prev: any) => ({ ...prev, ...parsedData }));
-          }
-        } catch (e) {
-          console.warn('Wizard: Failed to restore stepData from localStorage', e);
-        }
-
-        // Fast local restore: try localStorage active step first (non-authoritative)
-        const cachedActiveStep = localStorage.getItem('onboarding_active_step');
-        if (cachedActiveStep !== null) {
-          const stepIdx = Math.max(0, Math.min(steps.length - 1, parseInt(cachedActiveStep, 10)));
-          if (!Number.isNaN(stepIdx)) {
-            setActiveStep(stepIdx);
-          }
-        }
-        
-        // Check if we already have init data from App (cached in sessionStorage)
-        let cachedInit = sessionStorage.getItem('onboarding_init');
-        
-        // Check for staleness BEFORE parsing/using
-        if (cachedInit) {
-          const lsStep = localStorage.getItem('onboarding_active_step');
-          if (lsStep !== null) {
-            const lsIdx = parseInt(lsStep, 10);
-            if (!Number.isNaN(lsIdx)) {
-              // Parse cached data to get backend state
-              try {
-                const parsedCache = JSON.parse(cachedInit);
-                const backendStep = parsedCache.onboarding?.current_step || 0;
-                // If local progress is ahead of backend state, cache is stale
-                if (lsIdx > backendStep) {
-                   console.warn(`Wizard: Local progress (step ${lsIdx}) ahead of cached backend state (step ${backendStep}). Discarding stale cache.`);
-                   sessionStorage.removeItem('onboarding_init');
-                   cachedInit = null; // Disable cache usage
-                }
-              } catch (e) {
-                console.warn('Wizard: Error parsing cached init data for staleness check', e);
-                // If we can't parse it, better to discard it
-                sessionStorage.removeItem('onboarding_init');
-                cachedInit = null;
-              }
-            }
-          }
-        }
-        
-        if (cachedInit) {
-          const data = JSON.parse(cachedInit);
-          
-          // Extract data from batch response
-          const { onboarding } = data;
-          
-          // Load step data from backend
-          if (onboarding.steps && Array.isArray(onboarding.steps)) {
-            const step1Data = onboarding.steps.find((step: any) => step.step_number === 1);
-            if (step1Data && step1Data.data) {
-              const normalizedData = {
-                ...step1Data.data,
-                website: step1Data.data.website || step1Data.data.website_url,
-                analysis: step1Data.data.analysis || step1Data.data
-              };
-              setStepData((prevData: any) => ({ ...prevData, ...normalizedData }));
-            }
-
-            const step2Data = onboarding.steps.find((step: any) => step.step_number === 2);
-            if (step2Data && step2Data.data) {
-              setStepData((prevData: any) => ({ ...prevData, ...step2Data.data }));
-            }
-
-            const step3Data = onboarding.steps.find((step: any) => step.step_number === 3);
-            if (step3Data && step3Data.data) {
-              setStepData((prevData: any) => ({ ...prevData, ...step3Data.data }));
-            }
-          }
-
-          let computedStep = Math.max(0, Math.min(steps.length - 1, onboarding.current_step));
-          if (onboarding.is_completed) {
-            computedStep = steps.length - 1;
-          }
-
-          const lsStep = localStorage.getItem('onboarding_active_step');
-          if (lsStep !== null) {
-            const lsIdx = Math.max(0, Math.min(steps.length - 1, parseInt(lsStep, 10)));
-            if (!Number.isNaN(lsIdx)) {
-              if (lsIdx >= computedStep - 1 && lsIdx <= computedStep + 1) {
-                computedStep = lsIdx;
-              }
-            }
-          }
-          
-          setActiveStep(computedStep);
-          setProgressState(onboarding.completion_percentage);
-          setOnboardingType(onboarding.onboarding_type || 'website');
-
-          setLoading(false);
-          return;
-        }
-        
-        console.log('Wizard: No cached init data, calling /api/onboarding/init');
-        
-        let response;
-        const maxRetries = 3;
-        let lastError;
-        
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          const startTime = Date.now();
-          try {
-            console.log(`Wizard: Batch init attempt ${attempt + 1}/${maxRetries}`);
-            response = await apiClient.get('/api/onboarding/init');
-            console.log(`Wizard: Batch init call success (${Date.now() - startTime}ms)`, {
-              status: response.status,
-              dataKeys: Object.keys(response.data)
-            });
-            break; // Success, exit loop
-          } catch (err: any) {
-            console.warn(`Wizard: Batch init attempt ${attempt + 1} failed (${Date.now() - startTime}ms):`, err.message);
-            lastError = err;
-            
-            // If it's the last attempt, don't wait
-            if (attempt === maxRetries - 1) break;
-            
-            // Wait with exponential backoff: 1s, 2s, 4s...
-            const delay = 1000 * Math.pow(2, attempt);
-            console.log(`Wizard: Waiting ${delay}ms before retry...`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-          }
-        }
-
-        if (!response) {
-          throw lastError || new Error('Failed to initialize onboarding after retries');
-        }
-
-        const { onboarding, session } = response.data;
-
-        // Load step data from backend
-        if (onboarding.steps && Array.isArray(onboarding.steps)) {
-          // Load website data from step 1 (Crucial for URL persistence)
-          const step1Data = onboarding.steps.find((step: any) => step.step_number === 1);
-          if (step1Data && step1Data.data) {
-            trace('Wizard: Loading website data from step 1:', Object.keys(step1Data.data));
-            const normalizedData = {
-              ...step1Data.data,
-              website: step1Data.data.website || step1Data.data.website_url,
-              analysis: step1Data.data.analysis || step1Data.data
-            };
-            setStepData((prevData: any) => ({ ...prevData, ...normalizedData }));
-          }
-
-          // Load research preferences from step 2
-          const step2Data = onboarding.steps.find((step: any) => step.step_number === 2);
-          if (step2Data && step2Data.data) {
-            trace('Wizard: Loading research data from step 2:', Object.keys(step2Data.data));
-            setStepData((prevData: any) => ({ ...prevData, ...step2Data.data }));
-          }
-
-          // Load persona data from step 3
-          const step3Data = onboarding.steps.find((step: any) => step.step_number === 3);
-          if (step3Data && step3Data.data) {
-            trace('Wizard: Loading persona data from step 3:', Object.keys(step3Data.data));
-            setStepData((prevData: any) => ({ ...prevData, ...step3Data.data }));
-          }
-        }
-
-        // Cache for future use
-        sessionStorage.setItem('onboarding_init', JSON.stringify(response.data));
-
-        // Set state from API response
-        // onboarding.current_step is 1-based; convert to 0-based index
-        let computedStep = Math.max(0, Math.min(steps.length - 1, onboarding.current_step));
-        
-        // If onboarding is marked as completed, stay on the last step
-        if (onboarding.is_completed) {
-          computedStep = steps.length - 1;
-        }
-
-        // If localStorage has a higher step index, prefer it for UX continuity
-        const lsStep = localStorage.getItem('onboarding_active_step');
-        if (lsStep !== null) {
-          const lsIdx = Math.max(0, Math.min(steps.length - 1, parseInt(lsStep, 10)));
-          if (!Number.isNaN(lsIdx)) {
-            if (lsIdx >= computedStep - 1 && lsIdx <= computedStep + 1) {
-              computedStep = lsIdx;
-            }
-          }
-        }
-        
-        console.log('Wizard: Final computed step (API):', computedStep, 'from backend step:', onboarding.current_step);
-        setActiveStep(computedStep);
-        setProgressState(onboarding.completion_percentage);
-        setOnboardingType(onboarding.onboarding_type || 'website');
-        // Note: Session managed by Clerk auth, no need to track separately
-
-        console.log('Wizard: Initialized from API:', {
-          step: onboarding.current_step,
-          progress: onboarding.completion_percentage,
-          userId: session.session_id,  // Clerk user ID from backend
-          hasPersonaData: !!stepData
-        });
-      } catch (error: any) {
-        console.error('Wizard: Error initializing onboarding:', {
-          message: error.message,
-          code: error.code,
-          response: error.response?.status,
-          url: error.config?.url,
-          stack: error.stack
-        });
-        // Error handling is managed by global API client interceptors
-      } finally {
-        console.log('Wizard: Initialization finished');
-        setLoading(false);
+    if (!data?.onboarding?.steps) return;
+    
+    const { onboarding } = data;
+    
+    // Fast local restore: try localStorage active step first (non-authoritative)
+    const cachedActiveStep = localStorage.getItem('onboarding_active_step');
+    if (cachedActiveStep !== null) {
+      const stepIdx = Math.max(0, Math.min(steps.length - 1, parseInt(cachedActiveStep, 10)));
+      if (!Number.isNaN(stepIdx)) {
+        setActiveStep(stepIdx);
       }
-    };
-    init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount - stepData is used for logging only
+    }
+    
+    // Merge step payload data from backend
+    if (onboarding.steps && Array.isArray(onboarding.steps)) {
+      const step1Data = onboarding.steps.find((step: any) => step.step_number === 1);
+      if (step1Data && step1Data.data) {
+        const normalizedData = {
+          ...step1Data.data,
+          website: step1Data.data.website || step1Data.data.website_url,
+          analysis: step1Data.data.analysis || step1Data.data
+        };
+        setStepData((prevData: any) => ({ ...prevData, ...normalizedData }));
+      }
+      const step2Data = onboarding.steps.find((step: any) => step.step_number === 2);
+      if (step2Data && step2Data.data) {
+        setStepData((prevData: any) => ({ ...prevData, ...step2Data.data }));
+      }
+      const step3Data = onboarding.steps.find((step: any) => step.step_number === 3);
+      if (step3Data && step3Data.data) {
+        setStepData((prevData: any) => ({ ...prevData, ...step3Data.data }));
+      }
+    }
+    
+    // Set active step from context (1-based → 0-based)
+    let computedStep = Math.max(0, Math.min(steps.length - 1, currentStep - 1));
+    if (onboarding.is_completed) {
+      computedStep = steps.length - 1;
+    }
+    // Local override within +/-1 tolerance
+    const lsStep = localStorage.getItem('onboarding_active_step');
+    if (lsStep !== null) {
+      const lsIdx = Math.max(0, Math.min(steps.length - 1, parseInt(lsStep, 10)));
+      if (!Number.isNaN(lsIdx) && lsIdx >= computedStep - 1 && lsIdx <= computedStep + 1) {
+        computedStep = lsIdx;
+      }
+    }
+    setActiveStep(computedStep);
+  }, [data, currentStep, steps.length]);
 
   const handleNext = useCallback(async (rawStepData?: any) => {
     const isLinkedIn = onboardingType === 'linkedin';
@@ -583,7 +403,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           currentStepData = currentData;
         } else {
           console.warn('Wizard: No valid persona data available for PersonaStep - cannot complete step');
-          setLoading(false);
           setShowProgressMessage(false);
           setProgressMessage('');
           return;
@@ -690,9 +509,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           }, 4000);
         }
       } catch (error: any) {
-        console.error('Wizard: BLOCKING ERROR - Failed to complete step with backend. Aborting progression.', error);
+        console.error('Wizard: BLOCKING ERROR - Failed to complete step with backend.', error);
 
-        // Handle blocking database errors
         let errorMessage = 'Failed to complete step. Please try again.';
         if (error.response?.data?.detail) {
           errorMessage = error.response.data.detail;
@@ -700,12 +518,14 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           errorMessage = error.message;
         }
 
-        // Show blocking error message
-        setShowProgressMessage(true);
-        setProgressMessage(`❌ CRITICAL ERROR: ${errorMessage}`);
-        setLoading(false);
+        // Save retry state so user can retry or continue anyway
+        setRetryStepNumber(currentStepNumber);
+        setRetryStepData(currentStepData);
+        setRetryNextStep(nextStep);
 
-        // Don't proceed to next step on blocking errors
+        // Show retryable error message
+        setShowProgressMessage(true);
+        setProgressMessage(`${errorMessage}`);
         return;
       }
 
@@ -714,26 +534,63 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
     
     setActiveStep(nextStep);
+    // Keep localStorage for fast UX restore on refresh
     try {
       localStorage.setItem('onboarding_active_step', String(nextStep));
-      
-      const cachedInit = sessionStorage.getItem('onboarding_init');
-      if (cachedInit) {
-        try {
-          const data = JSON.parse(cachedInit);
-          if (data.onboarding) {
-             data.onboarding.current_step = currentStepNumber;
-             data.onboarding.completion_percentage = newProgress;
-             sessionStorage.setItem('onboarding_init', JSON.stringify(data));
-          }
-        } catch (e) {
-          console.warn('Wizard: Failed to update session cache', e);
-        }
-      }
     } catch (_e) {}
+    // Context handles backend state sync
+    markStepComplete(currentStepNumber);
     
-    setProgressState(newProgress);
   }, [activeStep, onComplete]);
+
+  const retryStepCompletion = useCallback(async () => {
+    if (retryStepNumber === null || !retryStepData) return;
+    const stepToRetry = retryStepNumber;
+    const dataToRetry = retryStepData;
+    const next = retryNextStep;
+    // Clear retry state before re-attempting
+    setRetryStepNumber(null);
+    setRetryStepData(null);
+    setRetryNextStep(0);
+    setShowProgressMessage(false);
+    setProgressMessage('');
+
+    try {
+      await setCurrentStep(stepToRetry, { ...dataToRetry, onboarding_type: onboardingType });
+      const stepResponse = await getCurrentStep();
+      trace('Wizard: Retry step completion OK:', stepResponse.step);
+      setActiveStep(next);
+      try {
+        localStorage.setItem('onboarding_active_step', String(next));
+      } catch (_e) {}
+      markStepComplete(stepToRetry);
+    } catch (error: any) {
+      console.error('Wizard: Retry also failed:', error);
+      let msg = 'Retry failed. Please try again or continue anyway.';
+      if (error.response?.data?.detail) msg = error.response.data.detail;
+      else if (error.message) msg = error.message;
+      setRetryStepNumber(stepToRetry);
+      setRetryStepData(dataToRetry);
+      setRetryNextStep(next);
+      setShowProgressMessage(true);
+      setProgressMessage(`${msg}`);
+    }
+  }, [retryStepNumber, retryStepData, retryNextStep, onboardingType, markStepComplete]);
+
+  const dismissRetry = useCallback(() => {
+    const next = retryNextStep;
+    setRetryStepNumber(null);
+    setRetryStepData(null);
+    setRetryNextStep(0);
+    setShowProgressMessage(false);
+    setProgressMessage('');
+    if (next > 0) {
+      setActiveStep(next);
+      try {
+        localStorage.setItem('onboarding_active_step', String(next));
+      } catch (_e) {}
+    }
+  }, [retryNextStep]);
 
   const handleBack = useCallback(async () => {
     setDirection('left');
@@ -741,10 +598,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     setActiveStep(prevStep);
     // Do not complete a step when navigating back; just update UI state
     // Backend step progression should only occur on forward completion with valid data
-    
-    // Update progress
-    const newProgress = ((prevStep + 1) / steps.length) * 100;
-    setProgressState(newProgress);
   }, [activeStep]);
 
   const handleStepClick = (stepIndex: number) => {
@@ -912,7 +765,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         {/* Header with Stepper */}
         <WizardHeader
           activeStep={activeStep}
-          progress={progress}
+          progress={completionPercentage}
           stepHeaderContent={stepHeaderContent}
           showProgressMessage={showProgressMessage}
           progressMessage={progressMessage}
@@ -923,11 +776,61 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           onHelpToggle={() => setShowHelp(!showHelp)}
         />
 
+        {/* Retry bar for step completion failures */}
+        {retryStepNumber !== null && (
+          <div style={{
+            margin: '0 16px 8px',
+            padding: '10px 16px',
+            borderRadius: 10,
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            flexWrap: 'wrap',
+          }}>
+            <span style={{ flex: 1, fontSize: '0.85rem', color: '#dc2626', fontWeight: 500 }}>
+              {progressMessage}
+            </span>
+            <button
+              onClick={retryStepCompletion}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 8,
+                border: 'none',
+                background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                color: '#fff',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Retry
+            </button>
+            <button
+              onClick={dismissRetry}
+              style={{
+                padding: '6px 16px',
+                borderRadius: 8,
+                border: '1px solid #d1d5db',
+                background: '#fff',
+                color: '#6b7280',
+                fontWeight: 600,
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              Continue Anyway
+            </button>
+          </div>
+        )}
+
         {/* Background tasks status chip (visible after Step 2) */}
         {backgroundTasks && !backgroundTasks.all_done && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}
+            tasks={backgroundTasks.tasks}
           />
         )}
 

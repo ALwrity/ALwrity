@@ -428,6 +428,12 @@ class YouTubeOAuthService(OAuthProviderBase):
 
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
+                # Check if table exists — most users never connect YouTube
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='youtube_oauth_tokens'"
+                )
+                if not cursor.fetchone():
+                    return {"connected": False, "channels": []}
                 cursor.execute(
                     "SELECT id, channel_id, channel_name, expires_at, created_at, is_active FROM youtube_oauth_tokens WHERE user_id = ? ORDER BY created_at DESC",
                     (user_id,),
@@ -449,7 +455,7 @@ class YouTubeOAuthService(OAuthProviderBase):
             return {"connected": len(channels) > 0, "channels": channels}
 
         except Exception as e:
-            logger.error(f"YouTube OAuth: connection status error for {user_id}: {e}")
+            logger.debug(f"YouTube OAuth: connection status unavailable for {user_id}: {e}")
             return {"connected": False, "channels": [], "error": str(e)}
 
     def revoke_token(self, user_id: str, token_id: int) -> bool:

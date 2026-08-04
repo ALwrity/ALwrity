@@ -246,7 +246,7 @@ def _ensure_pkg_stub(name: str):
     sys.modules[name] = stub
 
 
-for _pkg in ("spacy", "torch", "tensorflow", "transformers", "openai", "exao", "stripe", "exa_py", "exa", "google_auth_httplib2", "textstat", "advertools", "bs4"):
+for _pkg in ("spacy", "torch", "tensorflow", "transformers", "openai", "exao", "stripe", "exa_py", "exa", "google_auth_httplib2", "textstat", "advertools", "bs4", "txtai"):
     _ensure_pkg_stub(_pkg)
 
 

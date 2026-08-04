@@ -135,7 +135,15 @@ class WebsiteOnboardingStrategy:
                     website_url = website_data.get('website') or website_data.get('website_url')
                     if website_url:
                         from api.onboarding_utils.onboarding_task_scheduler import schedule_step2_tasks
-                        schedule_step2_tasks(user_id, db, website_url)
+                        # Read user task preferences from session
+                        prefs = None
+                        try:
+                            onboarding_session = svc._get_or_create_session(user_id, db)
+                            payload = dict(onboarding_session.payload) if onboarding_session.payload else {}
+                            prefs = payload.get("task_preferences")
+                        except Exception:
+                            pass
+                        schedule_step2_tasks(user_id, db, website_url, preferences=prefs)
             except Exception as e:
                 logger.error(f" BLOCKING ERROR: Failed to save website analysis: {str(e)}")
                 from fastapi import HTTPException

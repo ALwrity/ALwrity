@@ -49,12 +49,23 @@ def _upsert_task(db, model_cls, user_id: str, filters: dict, defaults: dict):
         return row
 
 
-def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
+def schedule_step2_tasks(
+    user_id: str,
+    db: Session,
+    website_url: str,
+    preferences: Optional[Dict[str, Any]] = None,
+):
     """Schedule background tasks after Step 2 (Website Analysis) completes.
 
     Creates DB-backed monitoring tasks + advertools intelligence.
     All errors are non-blocking (logged, not raised).
+
+    Args:
+        preferences: Optional task preferences dict from the user
+            e.g. {"seo_audit": {"enabled": False}, ...}
+            If not provided, all tasks are enabled with default delays.
     """
+    from .step2_task_preferences import get_task_delay_mins, get_task_label
     from models.website_analysis_monitoring_models import (
         OnboardingFullWebsiteAnalysisTask,
         SIFIndexingTask,
@@ -62,17 +73,28 @@ def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
     )
 
     now = datetime.now(timezone.utc)
-    next_execution = now + timedelta(minutes=5)
+    default_next = now + timedelta(minutes=5)
+
+    def _delay_for(task_id: str) -> Optional[timedelta]:
+        """Return timedelta for task, or None if disabled."""
+        if not preferences:
+            return default_next
+        mins = get_task_delay_mins(task_id, preferences)
+        if mins < 0:
+            return None  # disabled
+        return now + timedelta(minutes=mins)
 
     # 1. Full-site SEO audit
+    delay = _delay_for("seo_audit")
+    task_status = "active" if delay is not None else "paused"
     try:
         _upsert_task(
             db, OnboardingFullWebsiteAnalysisTask,
             user_id=user_id,
             filters={"user_id": user_id, "website_url": website_url},
             defaults={
-                "status": "active",
-                "next_execution": next_execution,
+                "status": task_status,
+                "next_execution": delay,
                 "payload": {
                     "website_url": website_url,
                     "max_urls": 500,
@@ -88,14 +110,16 @@ def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
         logger.warning(f"[onboarding_step2] Non-blocking: failed to schedule SEO audit: {e}")
 
     # 2. SIF Indexing
+    delay = _delay_for("sif_indexing")
+    task_status = "active" if delay is not None else "paused"
     try:
         _upsert_task(
             db, SIFIndexingTask,
             user_id=user_id,
             filters={"user_id": user_id, "website_url": website_url},
             defaults={
-                "status": "active",
-                "next_execution": next_execution,
+                "status": task_status,
+                "next_execution": delay or now,
                 "frequency_hours": 48,
                 "payload": {
                     "website_url": website_url,
@@ -105,21 +129,30 @@ def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
             },
         )
         db.commit()
-        logger.info(f"[onboarding_step2] Scheduled SIF indexing for {website_url}")
+        logger.info(f"[onboarding_step2] Scheduled SIF indexing for {website_url} ({get_task_label("sif_indexing")})")
         _record_task_in_session(db, user_id, "sif_indexing", step=2, details={"website_url": website_url})
+
+        # Trigger SIF executor immediately in background (non-blocking)
+        try:
+            import asyncio
+            asyncio.ensure_future(_run_sif_now(user_id, website_url))
+        except Exception as bg_err:
+            logger.warning(f"[onboarding_step2] Could not start SIF background task: {bg_err}")
     except Exception as e:
         db.rollback()
         logger.warning(f"[onboarding_step2] Non-blocking: failed to schedule SIF indexing: {e}")
 
     # 3. Market Trends
+    delay = _delay_for("market_trends")
+    task_status = "active" if delay is not None else "paused"
     try:
         _upsert_task(
             db, MarketTrendsTask,
             user_id=user_id,
             filters={"user_id": user_id, "website_url": website_url},
             defaults={
-                "status": "active",
-                "next_execution": next_execution,
+                "status": task_status,
+                "next_execution": delay,
                 "frequency_hours": 72,
                 "payload": {
                     "website_url": website_url,
@@ -136,23 +169,32 @@ def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
         db.rollback()
         logger.warning(f"[onboarding_step2] Non-blocking: failed to schedule Market Trends: {e}")
 
-    # 4. Website analysis monitoring (APScheduler one-shot, 5 min delay)
-    try:
-        from services.website_analysis_monitoring_service import schedule_website_analysis_task_creation
-        schedule_website_analysis_task_creation(user_id=user_id, delay_minutes=5)
-        logger.info(f"[onboarding_step2] Scheduled website analysis task creation for {user_id}")
-    except Exception as e:
-        logger.warning(f"[onboarding_step2] Non-blocking: failed to schedule website analysis: {e}")
+    # 4. Website analysis monitoring
+    wa_delay = _delay_for("website_analysis_tasks")
+    if wa_delay is not None:
+        try:
+            from services.website_analysis_monitoring_service import (
+                schedule_website_analysis_task_creation,
+            )
+            mins = int((wa_delay - now).total_seconds() / 60)
+            schedule_website_analysis_task_creation(user_id=user_id, delay_minutes=mins)
+            logger.info(f"[onboarding_step2] Scheduled website analysis tasks for {website_url}")
+        except Exception as e:
+            logger.warning(f"[onboarding_step2] Non-blocking: failed to schedule website analysis: {e}")
+    else:
+        logger.info(f"[onboarding_step2] Skipped website analysis tasks for {website_url} (user deferred)")
 
     # 5. Advertools intelligence (content audit + site health)
+    delay_content = _delay_for("advertools_content")
+    delay_health = _delay_for("advertools_health")
     try:
         from models.advertools_monitoring_models import AdvertoolsTask
 
         audit = AdvertoolsTask(
             user_id=user_id,
             website_url=website_url,
-            status="active",
-            next_execution=next_execution,
+            status="active" if delay_content is not None else "paused",
+            next_execution=delay_content,
             frequency_days=7,
             payload={
                 "type": "content_audit",
@@ -165,8 +207,8 @@ def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
         health = AdvertoolsTask(
             user_id=user_id,
             website_url=website_url,
-            status="active",
-            next_execution=next_execution + timedelta(days=1),
+            status="active" if delay_health is not None else "paused",
+            next_execution=delay_health,
             frequency_days=7,
             payload={
                 "type": "site_health",
@@ -176,7 +218,7 @@ def schedule_step2_tasks(user_id: str, db: Session, website_url: str):
         )
         db.add(health)
         db.commit()
-        logger.info(f"[onboarding_step2] Scheduled Advertools tasks for {website_url}")
+        logger.info(f"[onboarding_step2] Scheduled Advertools tasks for {website_url} (content={delay_content is not None}, health={delay_health is not None})")
         _record_task_in_session(db, user_id, "advertools_content_audit", step=2, details={"website_url": website_url})
         _record_task_in_session(db, user_id, "advertools_site_health", step=2, details={"website_url": website_url})
     except Exception as e:
@@ -279,3 +321,36 @@ def schedule_step5_tasks(user_id: str, db: Session):
             logger.info(f"[onboarding_step5] No OAuth monitoring tasks created for {user_id}")
     except Exception as e:
         logger.warning(f"[onboarding_step5] Non-blocking: failed to create OAuth monitoring tasks: {e}")
+
+
+async def _run_sif_now(user_id: str, website_url: str):
+    """Trigger SIF indexing immediately in background (non-blocking).
+
+    Opens a fresh DB session, loads the SIF task, and runs the executor.
+    Errors are silently logged — the user's onboarding flow is never blocked.
+    """
+    try:
+        from models.website_analysis_monitoring_models import SIFIndexingTask
+        from services.scheduler.executors.sif_indexing_executor import SIFIndexingExecutor
+        from services.database.sessions import get_session_for_user
+
+        session = get_session_for_user(user_id)
+        if not session:
+            return
+
+        try:
+            task = session.query(SIFIndexingTask).filter(
+                SIFIndexingTask.user_id == user_id,
+                SIFIndexingTask.website_url == website_url,
+            ).first()
+
+            if not task:
+                return
+
+            executor = SIFIndexingExecutor()
+            await executor.execute_task(task, session)
+            logger.info(f"[_run_sif_now] SIF indexing completed for {website_url}")
+        finally:
+            session.close()
+    except Exception as e:
+        logger.warning(f"[_run_sif_now] Non-blocking SIF trigger failed: {e}")

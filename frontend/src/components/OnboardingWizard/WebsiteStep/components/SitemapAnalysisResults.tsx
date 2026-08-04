@@ -21,6 +21,8 @@ import {
   Business as BusinessIcon,
   Analytics as AnalyticsIcon
 } from '@mui/icons-material';
+import MetricTooltip from '../../../shared/MetricTooltip';
+import { getMetricTooltip } from '../../../shared/metricTooltips';
 
 interface StructureAnalysis {
   total_urls?: number;
@@ -134,8 +136,9 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
               <Typography variant="h4" fontWeight={700} color="primary">
                 {structureAnalysis.total_urls || 0}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#4a5568 !important' }}>
+              <Typography variant="body2" sx={{ color: '#4a5568 !important', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                 Total URLs
+                <MetricTooltip title={getMetricTooltip('total_urls_found')} />
               </Typography>
             </Box>
           </Grid>
@@ -144,8 +147,9 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
               <Typography variant="h4" fontWeight={700} color="primary">
                 {structureAnalysis.average_path_depth?.toFixed(1) || '0.0'}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#4a5568 !important' }}>
+              <Typography variant="body2" sx={{ color: '#4a5568 !important', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                 Avg. Path Depth
+                <MetricTooltip title={getMetricTooltip('avg_path_depth')} />
               </Typography>
             </Box>
           </Grid>
@@ -154,8 +158,9 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
               <Typography variant="h4" fontWeight={700} color="primary">
                 {contentTrends.publishing_velocity?.toFixed(2) || '0.00'}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#4a5568 !important' }}>
+              <Typography variant="body2" sx={{ color: '#4a5568 !important', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                 Posts/Day
+                <MetricTooltip title={getMetricTooltip('posts_per_day')} />
               </Typography>
             </Box>
           </Grid>
@@ -164,8 +169,9 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
               <Typography variant="h4" fontWeight={700} color="primary">
                 {Object.keys(structureAnalysis.url_patterns || {}).length}
               </Typography>
-              <Typography variant="body2" sx={{ color: '#4a5568 !important' }}>
+              <Typography variant="body2" sx={{ color: '#4a5568 !important', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
                 Content Categories
+                <MetricTooltip title={getMetricTooltip('content_categories')} />
               </Typography>
             </Box>
           </Grid>
@@ -216,6 +222,7 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
               <BusinessIcon sx={{ color: '#ffffff !important', fontSize: '1.25rem' }} />
             </Box>
             Competitive Positioning
+            <MetricTooltip title={getMetricTooltip('competitive_positioning')} />
           </Typography>
           <Box sx={{
             p: 3,
@@ -378,6 +385,7 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
                 >
                   <AnalyticsIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#d97706 !important' }} />
                   Content Gaps
+                  <MetricTooltip title={getMetricTooltip('content_gaps')} />
                 </Typography>
                 <Box component="ul" sx={{ pl: 2, m: 0 }}>
                   {onboardingInsights.content_gaps.map((gap: string, index: number) => (
@@ -418,6 +426,7 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
                 >
                   <TrendingUpIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#059669 !important' }} />
                   Growth Opportunities
+                  <MetricTooltip title={getMetricTooltip('growth_opportunities')} />
                 </Typography>
                 <Box component="ul" sx={{ pl: 2, m: 0 }}>
                   {onboardingInsights.growth_opportunities.map((opportunity: string, index: number) => (
@@ -458,6 +467,7 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
           >
             <LightbulbIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#be185d !important' }} />
             Strategic Recommendations
+            <MetricTooltip title={getMetricTooltip('strategic_recommendations')} />
           </Typography>
           <Box component="ul" sx={{ pl: 2, m: 0 }}>
             {onboardingInsights.strategic_recommendations.map((recommendation: string, index: number) => (
@@ -521,6 +531,7 @@ const SitemapAnalysisResults: React.FC<SitemapAnalysisResultsProps> = ({
               <AnalyticsIcon sx={{ color: '#ffffff !important', fontSize: '1.25rem' }} />
             </Box>
             Content Categories
+            <MetricTooltip title={getMetricTooltip('content_categories')} />
           </Typography>
           <Box display="flex" flexWrap="wrap" gap={1.5}>
             {Object.entries(structureAnalysis.url_patterns)
