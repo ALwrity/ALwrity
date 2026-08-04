@@ -396,6 +396,7 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({
             draft={rawDraft}
             plainText={content}
             attachment={previewAttachment}
+            forPublish
           />
         </div>
 

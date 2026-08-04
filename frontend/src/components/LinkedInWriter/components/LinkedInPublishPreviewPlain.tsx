@@ -9,6 +9,7 @@ import { LINKEDIN_PUBLISH_PLAIN_NOTE } from "../utils/linkedInPostFormatConstant
 import {
   formatCharCountLabel,
   getCharReadiness,
+  getDraftPlainTextForPreview,
   getPublishPlainText,
   getSeeMoreCaption,
 } from "../utils/linkedInPublishReadiness";
@@ -16,10 +17,12 @@ import { LinkedInAuthenticatedImage } from "./LinkedInAuthenticatedImage";
 import type { LinkedInPublishMediaAttachment } from "../utils/linkedInPublishMediaUtils";
 
 export interface LinkedInPublishPreviewPlainProps {
-  /** Draft markdown or already-plain content; always normalized via formatDraftForPublish. */
+  /** Draft markdown or already-plain content. */
   draft: string;
   /** Optional precomputed plain text (e.g. editable modal content). */
   plainText?: string;
+  /** When true, show publish pipeline text (may auto-space dense drafts). Default: WYSIWYG preview. */
+  forPublish?: boolean;
   attachment?: LinkedInPublishMediaAttachment | null;
   compact?: boolean;
   title?: string;
@@ -51,11 +54,15 @@ export const LinkedInPublishPreviewPlain: React.FC<
 > = ({
   draft,
   plainText,
+  forPublish = false,
   attachment = null,
   compact = false,
   title = "What LinkedIn will see",
 }) => {
-  const text = (plainText ?? getPublishPlainText(draft)).trim();
+  const text = (
+    plainText ??
+    (forPublish ? getPublishPlainText(draft) : getDraftPlainTextForPreview(draft))
+  ).trim();
   const chars = getCharReadiness(text);
   const seeMoreCaption = getSeeMoreCaption(chars);
   const image = resolvePreviewImage(attachment);

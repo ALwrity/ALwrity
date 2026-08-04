@@ -306,7 +306,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
   // ── Save to Asset Library (podcast-maker pattern: save only, stay on page) ──
 
   const handleSaveToAssetLibrary = async () => {
-    if (!draft) return;
+    const draftToSave = getDraftForPublish();
+    if (!draftToSave) return;
     setSaveStatus("saving");
     setSaveErrorMessage(null);
     try {
@@ -316,15 +317,15 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
             .split("\n")[0]
             .trim()
         : undefined;
-      const title = draft.split("\n")[0].substring(0, 100) || "LinkedIn Post";
+      const title = draftToSave.split("\n")[0].substring(0, 100) || "LinkedIn Post";
 
       const result = await saveLinkedInToAssetLibrary({
         title,
-        content: draft,
+        content: draftToSave,
         topic,
         tags: ["linkedin_post", "social_media"],
         assetMetadata: {
-          word_count: draft.split(/\s+/).length,
+          word_count: draftToSave.split(/\s+/).length,
           source: locationState?.calendarTopic ? "calendar" : "manual",
         },
       });

@@ -21,7 +21,10 @@ import {
   type LinkedInEditorImageBlock,
 } from "../utils/linkedInEditorDraftUtils";
 import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from "../utils/linkedInPublishMediaConstants";
-import { normalizeLinkedInPostSpacing } from "../utils/linkedInPostSpacing";
+import {
+  needsLinkedInPostSpacingNormalization,
+  normalizeLinkedInPostSpacing,
+} from "../utils/linkedInPostSpacing";
 
 const LOG_PREFIX = "[LinkedInAssistiveEditor]";
 
@@ -36,15 +39,17 @@ type AssistiveEditorSnapshot = {
   images: LinkedInEditorImageBlock[];
 };
 
-/** Always apply Best Practices spacing (idempotent for already-spaced posts). */
-function maybeNormalizeAssistiveText(text: string): string {
-  return normalizeLinkedInPostSpacing(text);
+/** Normalize dense AI text once on load; never rewrite user line breaks afterward. */
+function normalizeAssistiveTextOnLoad(text: string): string {
+  const raw = (text || "").replace(/\r\n/g, "\n");
+  if (!needsLinkedInPostSpacingNormalization(raw)) return raw;
+  return normalizeLinkedInPostSpacing(raw);
 }
 
 function buildInitialSnapshot(draft: string): AssistiveEditorSnapshot {
   const parsed = splitDraftForAssistiveEditor(draft);
   return {
-    text: maybeNormalizeAssistiveText(parsed.textContent),
+    text: normalizeAssistiveTextOnLoad(parsed.textContent),
     images: parsed.images,
   };
 }
@@ -155,7 +160,10 @@ export const LinkedInAssistiveEditor = forwardRef<
     }
 
     const parsed = splitDraftForAssistiveEditor(draft);
-    const nextText = maybeNormalizeAssistiveText(parsed.textContent);
+    const raw = parsed.textContent.replace(/\r\n/g, "\n");
+    const nextText = needsLinkedInPostSpacingNormalization(raw)
+      ? normalizeLinkedInPostSpacing(raw)
+      : raw;
     const next: AssistiveEditorSnapshot = {
       text: nextText,
       images: parsed.images,
@@ -164,23 +172,29 @@ export const LinkedInAssistiveEditor = forwardRef<
     console.log(`${LOG_PREFIX} history reset from external draft`, {
       textLength: nextText.length,
       imageCount: parsed.images.length,
+      autoSpaced: nextText !== raw,
     });
 
-    if (nextText !== parsed.textContent) {
+    if (nextText !== raw) {
       emitDraft(nextText, parsed.images, true);
     } else {
       lastEmittedDraftRef.current = draft;
     }
   }, [draft, emitDraft, resetHistory]);
 
-  // On first mount, persist auto-spacing if the initial draft was dense.
+  // One-shot: persist initial auto-spacing for dense AI drafts to parent state.
   useEffect(() => {
     const parsed = splitDraftForAssistiveEditor(draft);
-    const nextText = maybeNormalizeAssistiveText(parsed.textContent);
-    if (nextText !== parsed.textContent) {
-      emitDraft(nextText, parsed.images, true);
+    const raw = parsed.textContent.replace(/\r\n/g, "\n");
+    const normalized = normalizeAssistiveTextOnLoad(raw);
+    if (normalized !== raw) {
+      emitDraft(normalized, parsed.images, true);
+      console.log(`${LOG_PREFIX} initial dense draft spacing normalized`, {
+        rawLength: raw.length,
+        normalizedLength: normalized.length,
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot mount sync
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only sync
   }, []);
 
   useEffect(() => {

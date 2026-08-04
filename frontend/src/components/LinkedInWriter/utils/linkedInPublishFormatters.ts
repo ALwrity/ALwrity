@@ -3,7 +3,9 @@
  * Converts editor markdown to platform-native plain text and strips citation placeholders.
  */
 
-import { normalizeLinkedInPostSpacing } from "./linkedInPostSpacing";
+import {
+  normalizeLinkedInPostSpacingIfNeeded,
+} from "./linkedInPostSpacing";
 
 /** Strip inline source citation placeholders from draft content. */
 export function stripSourceCitations(content: string): string {
@@ -85,12 +87,19 @@ export function markdownToPlainText(content: string): string {
   return text.trim();
 }
 
-/** Full publish pipeline: strip citations, plain text, then LinkedIn spacing. */
+/** Strip citations + markdown while preserving author line breaks (no auto-spacing). */
+export function getDraftPlainTextForDisplay(content: string): string {
+  if (!content) return "";
+  const withoutCitations = stripSourceCitations(content);
+  return markdownToPlainText(withoutCitations).replace(/\r\n/g, "\n").trim();
+}
+
+/** Full publish pipeline: strip citations, plain text, spacing only if still dense. */
 export function formatDraftForPublish(content: string): string {
   if (!content) return "";
   const withoutCitations = stripSourceCitations(content);
   const plain = markdownToPlainText(withoutCitations).trim();
-  return normalizeLinkedInPostSpacing(plain);
+  return normalizeLinkedInPostSpacingIfNeeded(plain);
 }
 
 /** Extract LinkedIn image IDs from draft markdown for publish media (Phase 3). */

@@ -12,6 +12,47 @@ function countNewlines(text: string): number {
   return (text.match(/\n/g) || []).length;
 }
 
+/** Jammed inline bullets/steps/lists that need auto line breaks. */
+function hasJammedListMarkers(text: string): boolean {
+  return (
+    /\s+•\s+/.test(text) ||
+    /[^\n•][ \t]+(Step\s+\d+\s*:)/i.test(text) ||
+    /\s+(?=\d+\.\s+[A-Z])/.test(text)
+  );
+}
+
+/**
+ * True when content looks like a dense AI wall that benefits from auto-spacing.
+ * Returns false for hand-structured posts (single or double newlines already present).
+ */
+export function needsLinkedInPostSpacingNormalization(content: string): boolean {
+  if (!content?.trim()) return false;
+
+  const text = content.replace(/\r\n/g, "\n").trim();
+  const newlineCount = countNewlines(text);
+  const charCount = text.length;
+
+  if (hasJammedListMarkers(text)) return true;
+
+  // Already paragraph-structured — respect author spacing (including tight single newlines).
+  if (newlineCount >= 2) return false;
+
+  // Dense wall: long prose with almost no breaks.
+  if (charCount > 180 && newlineCount <= 1) return true;
+
+  return false;
+}
+
+/** Apply Best Practices spacing only when the draft still looks dense/unstructured. */
+export function normalizeLinkedInPostSpacingIfNeeded(content: string): string {
+  if (!content?.trim()) return "";
+  const normalized = content.replace(/\r\n/g, "\n");
+  if (!needsLinkedInPostSpacingNormalization(normalized)) {
+    return normalized.trim();
+  }
+  return normalizeLinkedInPostSpacing(normalized);
+}
+
 /** Split a prose block into LinkedIn-style paragraphs (typically one sentence each). */
 function breakProseIntoParagraphs(prose: string): string {
   const trimmed = prose.replace(/[ \t]+/g, " ").trim();

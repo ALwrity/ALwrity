@@ -73,6 +73,37 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     [],
   );
 
+  const flushAssistiveDraft = useCallback(() => {
+    if (assistiveEditorRef && typeof assistiveEditorRef !== "function") {
+      const flushed = assistiveEditorRef.current?.flushDraft();
+      if (typeof flushed === "string") {
+        onDraftChange(flushed);
+        return flushed;
+      }
+    }
+    return draft;
+  }, [draft, onDraftChange, assistiveEditorRef]);
+
+  const handleAssistantToggle = useCallback(
+    (enabled: boolean) => {
+      if (!enabled && assistantOn) {
+        flushAssistiveDraft();
+      }
+      setAssistantOn(enabled);
+    },
+    [assistantOn, flushAssistiveDraft],
+  );
+
+  const handlePreviewModeChange = useCallback(
+    (mode: LinkedInPreviewMode) => {
+      if (assistantOn) {
+        flushAssistiveDraft();
+      }
+      effectiveSetPreviewMode(mode);
+    },
+    [assistantOn, flushAssistiveDraft, effectiveSetPreviewMode],
+  );
+
   const handleInsertAtCaret = useCallback(
     (text: string, caretIndex: number) => {
       const beforeCaret = draft.slice(0, caretIndex);
@@ -208,9 +239,9 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               qualityMetrics={qualityMetrics}
               draft={draft}
               previewMode={effectivePreviewMode}
-              onPreviewModeChange={effectiveSetPreviewMode}
+              onPreviewModeChange={handlePreviewModeChange}
               assistantOn={assistantOn}
-              onAssistantToggle={setAssistantOn}
+              onAssistantToggle={handleAssistantToggle}
               topic={topic}
             />
 
@@ -223,7 +254,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               researchSources={researchSources}
               assistantOn={assistantOn}
               previewMode={effectivePreviewMode}
-              onPreviewModeChange={effectiveSetPreviewMode}
+              onPreviewModeChange={handlePreviewModeChange}
               assistiveWriting={{
                 suggestion: assistiveWriting.suggestion,
                 error: assistiveWriting.error,
