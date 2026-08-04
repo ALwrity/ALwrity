@@ -9,6 +9,27 @@ import random
 from services.llm_providers.main_text_generation import llm_text_gen
 
 
+def strip_assistive_citation_markers(text: str) -> str:
+    """
+    Remove URL citation hints and [Source N] markers from assistive LLM output.
+    Keeps editor text LinkedIn-native — sources are shown separately in the UI.
+    """
+    if not text:
+        return ""
+    cleaned = re.sub(
+        r"\(\(\s*[^)\]]*?\s*\)\[\s*https?://[^\]\s]+\s*\]\)",
+        " ",
+        text,
+    )
+    cleaned = re.sub(
+        r"\(\s*\[Source\s+\d+\]\s*\)|\[Source\s+\d+\]",
+        " ",
+        cleaned,
+        flags=re.IGNORECASE,
+    )
+    return re.sub(r"\s{2,}", " ", cleaned).strip()
+
+
 @dataclass
 class WritingSuggestion:
     text: str
@@ -132,16 +153,17 @@ class WritingAssistantService:
 
         system_prompt = (
             "You are an assistive writing continuation bot. "
-            "Only produce 1-2 SHORT sentences. Do not repeat or paraphrase the user's stub. "
+            "Only produce 1-2 SHORT sentences that continue the user's text. "
+            "Do not repeat or paraphrase the user's stub. "
             "Match tone and topic. Prefer concrete, current facts from the provided sources. "
-            "Include exactly one brief citation marker using the source number only, "
-            "e.g. [Source 1]. Never include raw URLs or ((Author)[url]) citation hints."
+            "Write natural LinkedIn prose — no citation markers, no URLs, no ((Author)[url]) hints, "
+            "no [Source N] tags. Source titles are shown separately in the UI."
         )
         user_prompt = (
             f"User text to continue (do not repeat):\n{text}\n\n"
             f"Relevant sources to inform your continuation:\n{sources_text}\n\n"
             "Return only the continuation text, without quotes. "
-            "Cite with [Source N] only — no URLs."
+            "No citations or URLs in the output."
         )
 
         try:
@@ -160,6 +182,8 @@ class WritingAssistantService:
             if not suggestion:
                 raise Exception("Assistive writer returned empty suggestion")
 
+            suggestion = strip_assistive_citation_markers(suggestion)
+
             # Dynamic confidence based on source quality and response signals
             confidence = 0.5
             if sources:
@@ -168,11 +192,8 @@ class WritingAssistantService:
                 confidence = 0.5 + (len(sources) / 6.0) * 0.3 + avg_score * 0.2
             if suggestion.endswith(('.', '!', '?')):
                 confidence += 0.05
-            # Prefer studio-style [Source N] markers; do not reward raw URL hints.
-            if "[Source " in suggestion or "[source " in suggestion.lower():
-                confidence += 0.05
-            if "[http" in suggestion or "((" in suggestion:
-                confidence -= 0.05
+            if "[http" in suggestion or "((" in suggestion or "[Source" in suggestion:
+                confidence -= 0.1
             confidence = min(max(confidence, 0.0), 1.0)
 
             return suggestion, round(confidence, 2)

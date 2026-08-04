@@ -1,12 +1,14 @@
 /**
- * Assistive citation hint normalization — no raw URLs in the editor.
+ * Assistive citation hint normalization — no raw URLs or [Source N] in editor.
  */
 
 import {
   formatAssistiveSuggestionText,
   normalizeAssistiveCitationHints,
+  prepareAssistiveTextForEditor,
   resolveAssistiveSourceIndex,
   stripAssistiveCitationHints,
+  stripAssistiveSourceMarkers,
 } from "../utils/linkedInAssistiveCitationUtils";
 
 describe("linkedInAssistiveCitationUtils", () => {
@@ -38,7 +40,7 @@ describe("linkedInAssistiveCitationUtils", () => {
     ).toBe(2);
   });
 
-  it("converts URL citation hints to [Source N]", () => {
+  it("converts URL citation hints to [Source N] (legacy normalize)", () => {
     const normalized = normalizeAssistiveCitationHints(raw, sources);
     expect(normalized).toContain("[Source 1]");
     expect(normalized).not.toContain("https://");
@@ -69,9 +71,27 @@ describe("linkedInAssistiveCitationUtils", () => {
     expect(stripAssistiveCitationHints(raw)).not.toContain("[Source");
   });
 
-  it("formatAssistiveSuggestionText matches normalize for cards", () => {
-    expect(formatAssistiveSuggestionText(raw, sources)).toBe(
-      normalizeAssistiveCitationHints(raw, sources),
+  it("stripAssistiveSourceMarkers removes [Source N]", () => {
+    const withMarker = "Great insight [Source 1] for leaders.";
+    expect(stripAssistiveSourceMarkers(withMarker)).toBe(
+      "Great insight for leaders.",
+    );
+  });
+
+  it("prepareAssistiveTextForEditor strips URLs and [Source N]", () => {
+    const withBoth =
+      "Shares rise ((Arclen)[https://arclen.io/x]) [Source 1] today.";
+    const cleaned = prepareAssistiveTextForEditor(withBoth);
+    expect(cleaned).not.toContain("https://");
+    expect(cleaned).not.toContain("[Source");
+    expect(cleaned).toContain("Shares rise");
+    expect(cleaned).toContain("today.");
+  });
+
+  it("formatAssistiveSuggestionText uses editor-safe cleaning", () => {
+    const withMarker = "Tip [Source 2] here.";
+    expect(formatAssistiveSuggestionText(withMarker, sources)).toBe(
+      "Tip here.",
     );
   });
 });
