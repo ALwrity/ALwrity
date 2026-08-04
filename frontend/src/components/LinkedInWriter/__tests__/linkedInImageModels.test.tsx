@@ -7,6 +7,7 @@ import {
   LINKEDIN_IMAGE_MODELS,
   LINKEDIN_RECOMMENDATIONS,
 } from "../../shared/ImageGenerationPresets";
+import { LINKEDIN_DEFAULT_IMAGE_MODEL } from "../../shared/linkedInImageModelUtils";
 
 describe("LinkedIn Gemini 3 Pro Image model option", () => {
   it("includes gemini-3-pro-image in LINKEDIN_IMAGE_MODELS", () => {
@@ -32,8 +33,9 @@ describe("LinkedIn Gemini 3 Pro Image model option", () => {
     expect(gemini?.description.toLowerCase()).toContain("google");
   });
 
-  it("keeps flux-kontext-pro as first/default-friendly option", () => {
-    expect(LINKEDIN_IMAGE_MODELS[0].id).toBe("flux-kontext-pro");
+  it("lists gemini-3-pro-image first as the default-friendly option", () => {
+    expect(LINKEDIN_IMAGE_MODELS[0].id).toBe("gemini-3-pro-image");
+    expect(LINKEDIN_DEFAULT_IMAGE_MODEL).toBe("gemini-3-pro-image");
   });
 
   it("mentions Gemini in model recommendations helper text", () => {

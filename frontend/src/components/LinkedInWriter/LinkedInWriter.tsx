@@ -35,6 +35,7 @@ import {
 } from './components';
 import OutlineEditor from './components/OutlineEditor';
 import PublishLinkedInPanel from './components/PublishLinkedInPanel';
+import { insertImageIntoLinkedInDraft } from './utils/linkedInDraftImageInsert';
 import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssistiveEditor';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
@@ -154,6 +155,22 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
   const getDraftForPublish = useCallback(() => {
     return assistiveEditorRef.current?.flushDraft() ?? draft;
   }, [draft]);
+
+  const handleInsertImageIntoDraft = useCallback(
+    (imageUrl: string) => {
+      try {
+        const newDraft = insertImageIntoLinkedInDraft(draft, imageUrl, {
+          flushDraft: getDraftForPublish,
+        });
+        handleDraftChange(newDraft);
+      } catch (error) {
+        console.error("[LinkedInWriter] failed to insert image into draft", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    },
+    [draft, getDraftForPublish, handleDraftChange],
+  );
 
   // Get persona context for enhanced AI assistance
   const { corePersona, platformPersona } = usePlatformPersonaContext();
@@ -857,6 +874,7 @@ Always use the most appropriate tool for the user's request.`.trim();
                 <PublishLinkedInPanel
                   draft={draft}
                   getDraftForPublish={getDraftForPublish}
+                  onInsertImageIntoDraft={handleInsertImageIntoDraft}
                   topic={
                     context
                       ? context.split("\n")[0].substring(0, 50)

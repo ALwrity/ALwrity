@@ -23,7 +23,28 @@ export interface LinkedInImageGenerationResult {
 }
 
 /** Max post body chars for the modal seed (backend may use full content_context). */
-const LINKEDIN_IMAGE_SEED_MAX_CHARS = 1200;
+export const LINKEDIN_IMAGE_SEED_MAX_CHARS = 1200;
+
+/** Fallback when draft/selection text is empty before image generation. */
+export const LINKEDIN_IMAGE_EMPTY_SEED_FALLBACK = 'LinkedIn post visual';
+
+/**
+ * Normalize raw post text into an image-generation seed (toolbar + selection parity).
+ * Does not truncate — `buildPromptFromSelection` applies LINKEDIN_IMAGE_SEED_MAX_CHARS.
+ */
+export function resolveLinkedInImageSeedText(rawText: string): string {
+  const trimmed = rawText.trim();
+  if (!trimmed) {
+    console.debug(
+      '[LinkedInImageService] resolveLinkedInImageSeedText: empty input, using fallback',
+    );
+    return LINKEDIN_IMAGE_EMPTY_SEED_FALLBACK;
+  }
+  console.debug('[LinkedInImageService] resolveLinkedInImageSeedText', {
+    length: trimmed.length,
+  });
+  return trimmed;
+}
 
 /**
  * Build a LinkedIn cover-oriented seed prompt from post text.

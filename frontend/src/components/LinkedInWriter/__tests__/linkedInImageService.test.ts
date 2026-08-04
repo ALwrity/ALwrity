@@ -4,6 +4,9 @@ import {
   generateLinkedInImage,
   mapAspectRatioToLinkedIn,
   downloadLinkedInImageBlob,
+  resolveLinkedInImageSeedText,
+  LINKEDIN_IMAGE_SEED_MAX_CHARS,
+  LINKEDIN_IMAGE_EMPTY_SEED_FALLBACK,
 } from "../../../services/linkedInImageService";
 import { aiApiClient } from "../../../api/client";
 
@@ -48,6 +51,26 @@ describe("linkedInImageService", () => {
 
       expect(prompt).toContain("X".repeat(1200));
       expect(prompt).not.toContain("X".repeat(1201));
+    });
+  });
+
+  describe("resolveLinkedInImageSeedText", () => {
+    it("returns trimmed text without truncating", () => {
+      const longBody = "A".repeat(2500);
+      expect(resolveLinkedInImageSeedText(`  ${longBody}  `)).toBe(longBody);
+    });
+
+    it("returns fallback for empty or whitespace-only input", () => {
+      expect(resolveLinkedInImageSeedText("")).toBe(
+        LINKEDIN_IMAGE_EMPTY_SEED_FALLBACK,
+      );
+      expect(resolveLinkedInImageSeedText("   ")).toBe(
+        LINKEDIN_IMAGE_EMPTY_SEED_FALLBACK,
+      );
+    });
+
+    it("exports seed max chars constant for prompt parity", () => {
+      expect(LINKEDIN_IMAGE_SEED_MAX_CHARS).toBe(1200);
     });
   });
 

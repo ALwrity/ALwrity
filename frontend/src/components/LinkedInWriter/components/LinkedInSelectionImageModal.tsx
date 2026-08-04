@@ -28,6 +28,10 @@ import {
   LINKEDIN_RECOMMENDATIONS,
   LINKEDIN_IMAGE_MODELS,
 } from "../../shared/ImageGenerationPresets";
+import {
+  LINKEDIN_DEFAULT_IMAGE_MODEL,
+  coerceLinkedInImageModel,
+} from "../../shared/linkedInImageModelUtils";
 import { downloadLinkedInImageBlob } from "../../../services/linkedInImageService";
 
 export interface LinkedInImageGenerationSettings {
@@ -65,17 +69,8 @@ export const LinkedInSelectionImageModal: React.FC<
   generatedPreview,
   onClosePreview,
 }) => {
-  const toLinkedInModel = (model?: string): LinkedInImageModel => {
-    if (
-      model === "flux-kontext-pro" ||
-      model === "ideogram-v3-turbo" ||
-      model === "qwen-image" ||
-      model === "gemini-3-pro-image"
-    ) {
-      return model;
-    }
-    return "flux-kontext-pro";
-  };
+  const toLinkedInModel = (model?: string): LinkedInImageModel =>
+    coerceLinkedInImageModel(model);
 
   const handleGenerate = (settings: SharedImageGenerationSettings) => {
     onGenerate({
@@ -196,7 +191,7 @@ export const LinkedInSelectionImageModal: React.FC<
       presetsHelp="Each preset adjusts style and aspect ratio only — not your prompt."
       showModelSelection={true}
       availableModels={LINKEDIN_IMAGE_MODELS}
-      defaultModel="flux-kontext-pro"
+      defaultModel={LINKEDIN_DEFAULT_IMAGE_MODEL}
       defaultStyle="Realistic"
       defaultRenderingSpeed="Quality"
       defaultAspectRatio="1:1"

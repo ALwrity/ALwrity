@@ -159,3 +159,7 @@ export function useLinkedInSelectionImage({
     handleGenerate,
   };
 }
+
+export type LinkedInSelectionImageState = ReturnType<
+  typeof useLinkedInSelectionImage
+>;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Alert,
   Box,
@@ -26,9 +26,12 @@ import {
 import { useLinkedInSocialConnection } from "../../../hooks/useLinkedInSocialConnection";
 import { getLinkedInPublishErrorMessage } from "../../../api/linkedinSocial";
 import { useLinkedInPublishMedia } from "../hooks/useLinkedInPublishMedia";
+import { useLinkedInSelectionImage } from "../hooks/useLinkedInSelectionImage";
 import { LinkedInPublishMediaSection } from "./LinkedInPublishMediaSection";
+import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInPublishPreviewPlain } from "./LinkedInPublishPreviewPlain";
 import { LinkedInPublishChecklist } from "./LinkedInPublishChecklist";
+import { readPrefs } from "../utils/linkedInWriterUtils";
 import {
   buildLinkedInPublishSuccessMessage,
   publishLinkedInWithMedia,
@@ -52,6 +55,8 @@ interface PublishLinkedInPanelProps {
   compact?: boolean;
   /** Flush assistive editor pending edits and return latest draft before publish. */
   getDraftForPublish?: () => string;
+  /** Insert AI-generated image markdown into the assistive editor draft. */
+  onInsertImageIntoDraft?: (imageUrl: string) => void;
 }
 
 interface PublishSuccessState {
@@ -74,6 +79,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   topic,
   compact = false,
   getDraftForPublish,
+  onInsertImageIntoDraft,
 }) => {
   const { connected, provider, selectedAccountId, selectedTarget, isLoading,
     isConnecting, connectWithOAuth } =
@@ -88,11 +94,30 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [mediaAnchor, setMediaAnchor] = useState<HTMLElement | null>(null);
+  const prefs = readPrefs();
 
   const publishMedia = useLinkedInPublishMedia({
     draft,
     autoDetectFromDraft: true,
   });
+
+  const selectionImage = useLinkedInSelectionImage({
+    topic,
+    industry: prefs.industry,
+    onInsertImage: onInsertImageIntoDraft,
+    onImageGenerated: (preview) => {
+      if (preview.imageId && preview.imageUrl) {
+        publishMedia.attachAiImage({
+          imageId: preview.imageId,
+          imageUrl: preview.imageUrl,
+        });
+      }
+    },
+  });
+
+  const closeMediaPopover = useCallback(() => {
+    setMediaAnchor(null);
+  }, []);
 
   const publishContent = getPublishPlainText(draft);
   const chars = getCharReadiness(publishContent);
@@ -264,14 +289,30 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           topic={topic}
           compact
           media={publishMedia}
+          selectionImage={selectionImage}
+          renderImageModal={false}
+          onBeforeOpenAiGenerator={closeMediaPopover}
         />
       </Popover>
     </>
   );
 
+  const imageGenerationModal = (
+    <LinkedInSelectionImageModal
+      open={selectionImage.modalOpen}
+      onClose={selectionImage.closeModal}
+      onGenerate={selectionImage.handleGenerate}
+      initialPrompt={selectionImage.initialPrompt}
+      isGenerating={selectionImage.isGenerating}
+      generatedPreview={selectionImage.generatedPreview}
+      onClosePreview={selectionImage.closePreview}
+    />
+  );
+
   if (compact) {
     return (
       <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+        {imageGenerationModal}
         {/* Progress modal */}
         <PublishProgressModal
           open={showProgress}
@@ -323,6 +364,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
 
   return (
     <>
+      {imageGenerationModal}
       <PublishProgressModal
         open={showProgress}
         step={publishStep}
@@ -376,6 +418,8 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         draft={draft}
         topic={topic}
         media={publishMedia}
+        selectionImage={selectionImage}
+        renderImageModal={false}
       />
 
       <Box sx={{ mb: 1.5 }}>

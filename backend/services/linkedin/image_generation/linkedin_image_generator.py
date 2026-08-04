@@ -18,6 +18,7 @@ from loguru import logger
 from ...onboarding.api_key_manager import APIKeyManager
 from ...llm_providers.main_image_generation import generate_image
 from ...llm_providers.main_image_editing import edit_image as common_edit_image
+from .linkedin_image_constants import LINKEDIN_DEFAULT_IMAGE_MODEL
 from .linkedin_image_prompt_builder import (
     build_linkedin_selection_prompt,
     optimize_linkedin_prompt,
@@ -294,9 +295,14 @@ class LinkedInImageGenerator:
                 f"aspect_ratio={aspect_ratio} dimensions={width}x{height} model={model or 'default'}"
             )
 
-            options: Dict[str, Any] = {"width": width, "height": height}
-            if model:
-                options["model"] = model
+            options: Dict[str, Any] = {
+                "width": width,
+                "height": height,
+                "model": model or LINKEDIN_DEFAULT_IMAGE_MODEL,
+            }
+            logger.debug(
+                f"[LinkedInImageGen] Provider model resolved: {options['model']}"
+            )
 
             result = generate_image(
                 prompt=prompt,

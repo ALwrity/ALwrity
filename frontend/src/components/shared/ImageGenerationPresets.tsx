@@ -266,18 +266,24 @@ export const LINKEDIN_RECOMMENDATIONS: CustomRecommendations = {
     <strong>3:4:</strong> Portrait orientation for mobile-first posts
   </>,
   model: <>
-    <strong>FLUX Kontext Pro:</strong> Best default for professional LinkedIn feed images<br />
+    <strong>Gemini 3 Pro Image:</strong> Recommended default for LinkedIn covers and strong composition<br />
+    <strong>FLUX Kontext Pro:</strong> Professional feed photography without on-image text<br />
     <strong>Ideogram V3 Turbo:</strong> Strong for detailed scenes with text-safe composition<br />
-    <strong>Qwen Image:</strong> Fast iterations and conceptual business visuals<br />
-    <strong>Gemini 3 Pro Image:</strong> High-quality Google visuals with strong composition
+    <strong>Qwen Image:</strong> Fast iterations and conceptual business visuals
   </>,
 };
 
 export const LINKEDIN_IMAGE_MODELS: LinkedInModelOption[] = [
   {
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image',
+    description: 'High-quality Google visuals • Strong composition • Recommended default',
+    costPerImage: '$0.14',
+  },
+  {
     id: 'flux-kontext-pro',
     name: 'FLUX Kontext Pro',
-    description: 'Professional feed images • High quality • Recommended default',
+    description: 'Professional feed images • High quality • $0.08/image',
     costPerImage: '$0.08',
   },
   {
@@ -291,12 +297,6 @@ export const LINKEDIN_IMAGE_MODELS: LinkedInModelOption[] = [
     name: 'Qwen Image ⚡',
     description: 'Fast generation • Conceptual visuals • $0.05/image',
     costPerImage: '$0.05',
-  },
-  {
-    id: 'gemini-3-pro-image',
-    name: 'Gemini 3 Pro Image',
-    description: 'High-quality Google visuals • Strong composition • $0.14/image',
-    costPerImage: '$0.14',
   },
 ];
 
