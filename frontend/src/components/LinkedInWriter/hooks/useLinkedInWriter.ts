@@ -998,7 +998,8 @@ export function useLinkedInWriter() {
         typeof event.detail === "string"
           ? event.detail
           : (event.detail?.target ?? "");
-      const src = draft || "";
+      const src =
+        typeof event.detail?.src === "string" ? event.detail.src : draft || "";
       if (!target) return;
       setPendingEdit({ src, target });
       setIsPreviewing(true);

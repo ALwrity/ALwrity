@@ -6,6 +6,7 @@ import { type LinkedInPreviewMode } from '../LinkedInWriter/components/LinkedInP
 import { LinkedInAssistiveEditor, type LinkedInAssistiveEditorHandle } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
 import type { LinkedInAssistiveSuggestion } from '../LinkedInWriter/services/linkedInAssistiveWritingApi';
+import type { AssistiveTextHighlightRange } from '../LinkedInWriter/utils/linkedInAssistiveHighlightUtils';
 
 interface AssistiveWritingState {
   suggestion: LinkedInAssistiveSuggestion | null;
@@ -35,6 +36,8 @@ interface ContentDisplayAreaProps {
   renderSelectionMenu: () => React.ReactNode;
   onTypingChange?: (text: string, caretIndex?: number) => void;
   assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
+  assistiveHighlightRange?: AssistiveTextHighlightRange | null;
+  onAssistiveHighlightClear?: () => void;
   previewMode: LinkedInPreviewMode;
   onPreviewModeChange: (mode: LinkedInPreviewMode) => void;
 }
@@ -53,6 +56,8 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
   renderSelectionMenu,
   onTypingChange,
   assistiveEditorRef,
+  assistiveHighlightRange,
+  onAssistiveHighlightClear,
   previewMode,
 }) => {
 
@@ -128,6 +133,8 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
                   onDraftChange={onDraftChange}
                   onTypingChange={onTypingChange}
                   onTextareaSelection={onTextareaSelection}
+                  highlightRange={assistiveHighlightRange}
+                  onHighlightClear={onAssistiveHighlightClear}
                 />
                 {previewMode === 'linkedin' && (
                   <Box sx={{ mt: 2 }}>
