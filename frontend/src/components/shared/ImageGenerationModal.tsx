@@ -49,6 +49,10 @@ import {
   DEFAULT_THEME,
   DEFAULT_MODELS,
 } from './ImageGenerationModal.types';
+import {
+  IMAGE_GENERATION_DIALOG_Z_INDEX,
+  imageGenerationSelectMenuProps,
+} from './imageGenerationSelectMenuProps';
 
 export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   // Core
@@ -155,12 +159,15 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
+      sx={{ zIndex: IMAGE_GENERATION_DIALOG_Z_INDEX }}
+      scroll="paper"
       PaperProps={{
         sx: {
           background: theme.dialogBackground,
           backdropFilter: "blur(20px)",
           border: "1px solid rgba(255,255,255,0.1)",
           borderRadius: 4,
+          overflow: "visible",
         },
       }}
     >
@@ -186,7 +193,12 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         </Stack>
       </DialogTitle>
 
-      <DialogContent>
+      <DialogContent
+        sx={{
+          overflowY: "auto",
+          overflowX: "visible",
+        }}
+      >
         <Stack spacing={3} sx={{ mt: 1 }}>
           {/* Presets Section */}
           {presets.length > 0 && (
@@ -304,6 +316,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 value={style}
                 onChange={(e) => setStyle(e.target.value as ImageStyle)}
                 sx={selectSx}
+                MenuProps={imageGenerationSelectMenuProps}
               >
                 <MenuItem value="Auto">
                   <Stack>
@@ -376,6 +389,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 value={renderingSpeed}
                 onChange={(e) => setRenderingSpeed(e.target.value as RenderingSpeed)}
                 sx={selectSx}
+                MenuProps={imageGenerationSelectMenuProps}
               >
                 <MenuItem value="Turbo">
                   <Stack>
@@ -449,6 +463,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                   value={model}
                   onChange={(e) => setModel(e.target.value as ImageModel | LinkedInImageModel)}
                   sx={selectSx}
+                  MenuProps={imageGenerationSelectMenuProps}
                 >
                   {availableModels.map((m) => (
                     <MenuItem key={m.id} value={m.id}>
@@ -508,6 +523,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 value={aspectRatio}
                 onChange={(e) => setAspectRatio(e.target.value as AspectRatio)}
                 sx={selectSx}
+                MenuProps={imageGenerationSelectMenuProps}
               >
                 <MenuItem value="16:9">
                   <Stack>

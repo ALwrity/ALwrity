@@ -11,7 +11,7 @@ import { useLinkedInSelectionImage } from "../hooks/useLinkedInSelectionImage";
 import { useLinkedInSelectionVideo } from "../hooks/useLinkedInSelectionVideo";
 import { useLinkedInAssistiveWriting } from "../hooks/useLinkedInAssistiveWriting";
 import { useLinkedInEditorTextSelection } from "../hooks/useLinkedInEditorTextSelection";
-import { appendImageMarkdownToDraft } from "../utils/linkedInImageDraftUtils";
+import { insertImageIntoLinkedInDraft } from "../utils/linkedInDraftImageInsert";
 import type { LinkedInAssistiveEditorHandle } from "./LinkedInAssistiveEditor";
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
@@ -131,19 +131,27 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const insertGeneratedImage = useCallback(
     (imageUrl: string) => {
-      // Prefer flushed assistive text so a pending debounce cannot drop the image.
-      let baseDraft = draft;
-      if (assistiveEditorRef && typeof assistiveEditorRef !== "function") {
-        const flushed = assistiveEditorRef.current?.flushDraft();
-        if (typeof flushed === "string") {
-          baseDraft = flushed;
-        }
+      try {
+        const newDraft = insertImageIntoLinkedInDraft(draft, imageUrl, {
+          flushDraft: () => {
+            if (
+              assistiveEditorRef &&
+              typeof assistiveEditorRef !== "function"
+            ) {
+              return assistiveEditorRef.current?.flushDraft();
+            }
+            return undefined;
+          },
+        });
+        console.log("[ContentEditor] image inserted into draft", {
+          draftLength: newDraft.length,
+        });
+        onDraftChange(newDraft);
+      } catch (error) {
+        console.error("[ContentEditor] failed to insert generated image", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
-      const newDraft = appendImageMarkdownToDraft(baseDraft, imageUrl);
-      console.log("[ContentEditor] image inserted into draft", {
-        draftLength: newDraft.length,
-      });
-      onDraftChange(newDraft);
     },
     [draft, onDraftChange, assistiveEditorRef],
   );

@@ -5,7 +5,10 @@ import {
   CloudUpload as UploadIcon,
 } from "@mui/icons-material";
 import { useLinkedInPublishMedia } from "../hooks/useLinkedInPublishMedia";
-import { useLinkedInSelectionImage } from "../hooks/useLinkedInSelectionImage";
+import {
+  useLinkedInSelectionImage,
+  type LinkedInSelectionImageState,
+} from "../hooks/useLinkedInSelectionImage";
 import { LinkedInPublishMediaPreview } from "./LinkedInPublishMediaPreview";
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { readPrefs } from "../utils/linkedInWriterUtils";
@@ -18,11 +21,28 @@ interface LinkedInPublishMediaSectionProps {
   compact?: boolean;
   /** Optional external media hook — share state with parent publish handler. */
   media?: ReturnType<typeof useLinkedInPublishMedia>;
+  /** Parent-owned image generation state (modal rendered outside Popover). */
+  selectionImage?: LinkedInSelectionImageState;
+  /** When false, parent renders LinkedInSelectionImageModal. Default: true if no external selectionImage. */
+  renderImageModal?: boolean;
+  /** Called before opening AI generator (e.g. close publish Popover). */
+  onBeforeOpenAiGenerator?: () => void;
+  /** Insert generated image into assistive editor draft (internal hook only). */
+  onInsertImageIntoDraft?: (imageUrl: string) => void;
 }
 
 export const LinkedInPublishMediaSection: React.FC<
   LinkedInPublishMediaSectionProps
-> = ({ draft, topic, compact = false, media: externalMedia }) => {
+> = ({
+  draft,
+  topic,
+  compact = false,
+  media: externalMedia,
+  selectionImage: externalSelectionImage,
+  renderImageModal,
+  onBeforeOpenAiGenerator,
+  onInsertImageIntoDraft,
+}) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const prefs = readPrefs();
@@ -33,9 +53,10 @@ export const LinkedInPublishMediaSection: React.FC<
   });
   const publishMedia = externalMedia ?? internalMedia;
 
-  const selectionImage = useLinkedInSelectionImage({
+  const internalSelectionImage = useLinkedInSelectionImage({
     topic,
     industry: prefs.industry,
+    onInsertImage: onInsertImageIntoDraft,
     onImageGenerated: (preview) => {
       if (preview.imageId && preview.imageUrl) {
         publishMedia.attachAiImage({
@@ -46,17 +67,38 @@ export const LinkedInPublishMediaSection: React.FC<
     },
   });
 
+  const selectionImage = externalSelectionImage ?? internalSelectionImage;
+  const shouldRenderImageModal =
+    renderImageModal ?? externalSelectionImage === undefined;
+
   const openAiGenerator = useCallback(() => {
-    const { seedText, prompt } = buildToolbarImageSeedFromDraft(
-      draft,
-      topic,
-      prefs.industry,
-    );
-    console.debug("[LinkedInPublishMediaSection] opening AI image generator", {
-      seedLength: seedText.length,
-    });
-    selectionImage.openForDraft(seedText, prompt);
-  }, [draft, topic, prefs.industry, selectionImage]);
+    try {
+      onBeforeOpenAiGenerator?.();
+      const { seedText, prompt } = buildToolbarImageSeedFromDraft(
+        draft,
+        topic,
+        prefs.industry,
+      );
+      console.debug("[LinkedInPublishMediaSection] opening AI image generator", {
+        seedLength: seedText.length,
+        externalHook: Boolean(externalSelectionImage),
+      });
+      selectionImage.openForDraft(seedText, prompt);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        "[LinkedInPublishMediaSection] failed to open AI image generator",
+        { error: message },
+      );
+    }
+  }, [
+    draft,
+    topic,
+    prefs.industry,
+    selectionImage,
+    externalSelectionImage,
+    onBeforeOpenAiGenerator,
+  ]);
 
   const handleFileChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -183,15 +225,17 @@ export const LinkedInPublishMediaSection: React.FC<
         </Alert>
       )}
 
-      <LinkedInSelectionImageModal
-        open={selectionImage.modalOpen}
-        onClose={selectionImage.closeModal}
-        onGenerate={selectionImage.handleGenerate}
-        initialPrompt={selectionImage.initialPrompt}
-        isGenerating={selectionImage.isGenerating}
-        generatedPreview={selectionImage.generatedPreview}
-        onClosePreview={selectionImage.closePreview}
-      />
+      {shouldRenderImageModal ? (
+        <LinkedInSelectionImageModal
+          open={selectionImage.modalOpen}
+          onClose={selectionImage.closeModal}
+          onGenerate={selectionImage.handleGenerate}
+          initialPrompt={selectionImage.initialPrompt}
+          isGenerating={selectionImage.isGenerating}
+          generatedPreview={selectionImage.generatedPreview}
+          onClosePreview={selectionImage.closePreview}
+        />
+      ) : null}
     </Box>
   );
 };
