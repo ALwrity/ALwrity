@@ -68,6 +68,7 @@ def _track_video_operation_usage(
     Returns:
         Dictionary with tracking information
     """
+    from datetime import datetime
     try:
         from services.database import get_session_for_user
         db_track = get_session_for_user(user_id)
