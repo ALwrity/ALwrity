@@ -4,7 +4,7 @@ import {
   mapAssistiveWritingError,
   type LinkedInAssistiveSuggestion,
 } from "../services/linkedInAssistiveWritingApi";
-import { normalizeAssistiveCitationHints } from "../utils/linkedInAssistiveCitationUtils";
+import { prepareAssistiveTextForEditor } from "../utils/linkedInAssistiveCitationUtils";
 
 const TYPING_DEBOUNCE_MS = 3000;
 const CONTINUE_COOLDOWN_MS = 15000;
@@ -214,12 +214,7 @@ export function useLinkedInAssistiveWriting({
     const caretIndex = textarea?.selectionStart ?? currentContent.length;
     const beforeCursor = currentContent.slice(0, caretIndex);
     const afterCursor = currentContent.slice(caretIndex);
-    // Never insert raw ((Author)[url]) hints — use studio [Source N] markers.
-    const cleanedText = normalizeAssistiveCitationHints(
-      suggestion.text,
-      suggestion.sources,
-      researchSources,
-    );
+    const cleanedText = prepareAssistiveTextForEditor(suggestion.text);
     const insertion = ` ${cleanedText} `;
     const newCaretIndex = caretIndex + insertion.length;
 
@@ -252,7 +247,6 @@ export function useLinkedInAssistiveWriting({
     getTextarea,
     onDraftChange,
     onInsertWithPreview,
-    researchSources,
   ]);
 
   const handleRejectSuggestion = useCallback(() => {

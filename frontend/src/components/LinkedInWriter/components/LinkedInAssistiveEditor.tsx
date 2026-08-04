@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -14,6 +15,7 @@ import {
 import { useUndoRedo } from "../../../hooks/useUndoRedo";
 import { LinkedInEditorToolbar } from "./LinkedInEditorToolbar";
 import { LinkedInEditorImageStrip } from "./LinkedInEditorImageStrip";
+import { LinkedInAssistiveHighlightField } from "./LinkedInAssistiveHighlightField";
 import { useLinkedInEditorImageUpload } from "../hooks/useLinkedInEditorImageUpload";
 import {
   mergeAssistiveEditorDraft,
@@ -25,6 +27,7 @@ import {
   needsLinkedInPostSpacingNormalization,
   normalizeLinkedInPostSpacing,
 } from "../utils/linkedInPostSpacing";
+import type { AssistiveTextHighlightRange } from "../utils/linkedInAssistiveHighlightUtils";
 
 const LOG_PREFIX = "[LinkedInAssistiveEditor]";
 
@@ -59,6 +62,8 @@ interface LinkedInAssistiveEditorProps {
   onDraftChange: (value: string) => void;
   onTypingChange?: (text: string, caretIndex?: number) => void;
   onTextareaSelection?: (textarea: HTMLTextAreaElement) => void;
+  highlightRange?: AssistiveTextHighlightRange | null;
+  onHighlightClear?: () => void;
 }
 
 /**
@@ -69,7 +74,7 @@ export const LinkedInAssistiveEditor = forwardRef<
   LinkedInAssistiveEditorHandle,
   LinkedInAssistiveEditorProps
 >(function LinkedInAssistiveEditor(
-  { draft, onDraftChange, onTypingChange, onTextareaSelection },
+  { draft, onDraftChange, onTypingChange, onTextareaSelection, highlightRange, onHighlightClear },
   ref,
 ) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -149,7 +154,7 @@ export const LinkedInAssistiveEditor = forwardRef<
     [textContent, images, onDraftChange],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (draft === lastEmittedDraftRef.current) return;
 
     // Cancel pending debounce so a stale text-only emit cannot wipe a newly
@@ -381,9 +386,12 @@ export const LinkedInAssistiveEditor = forwardRef<
         <LinkedInEditorImageStrip images={images} onRemove={handleRemoveImage} />
       </Box>
 
-      <textarea
-        ref={textareaRef}
+      <LinkedInAssistiveHighlightField
         value={textContent}
+        highlightRange={highlightRange ?? null}
+        onHighlightClear={onHighlightClear}
+        textareaRef={textareaRef}
+        borderTop={images.length > 0 ? "1px solid #e2e8f0" : "none"}
         onChange={(event) => {
           const value = event.target.value;
           commitSnapshot({ text: value, images }, false);
@@ -393,24 +401,6 @@ export const LinkedInAssistiveEditor = forwardRef<
         }}
         onMouseUp={handleTextareaSelectionEvent}
         onKeyUp={handleTextareaSelectionEvent}
-        autoFocus
-        placeholder="What do you want to talk about?"
-        style={{
-          width: "100%",
-          outline: "none",
-          border: "1px solid #e2e8f0",
-          borderTop: images.length > 0 ? "1px solid #e2e8f0" : "none",
-          borderRadius: "0 0 8px 8px",
-          padding: "12px",
-          background: "#fff",
-          color: "#333",
-          fontFamily: "inherit",
-          fontSize: "14px",
-          lineHeight: "1.6",
-          whiteSpace: "pre-wrap",
-          resize: "vertical",
-          minHeight: 160,
-        }}
       />
 
       <input

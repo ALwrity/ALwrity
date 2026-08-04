@@ -12,7 +12,11 @@ import { useLinkedInSelectionVideo } from "../hooks/useLinkedInSelectionVideo";
 import { useLinkedInAssistiveWriting } from "../hooks/useLinkedInAssistiveWriting";
 import { useLinkedInEditorTextSelection } from "../hooks/useLinkedInEditorTextSelection";
 import { appendImageMarkdownToDraft } from "../utils/linkedInImageDraftUtils";
+import { splitDraftForAssistiveEditor, mergeAssistiveEditorDraft } from "../utils/linkedInEditorDraftUtils";
+import type { AssistiveTextHighlightRange } from "../utils/linkedInAssistiveHighlightUtils";
+import { diffMarkup } from "../utils/contentFormatters";
 import type { LinkedInAssistiveEditorHandle } from "./LinkedInAssistiveEditor";
+import { LinkedInConfirmedEditHighlight } from "./LinkedInConfirmedEditHighlight";
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
 import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
@@ -60,6 +64,13 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [assistantOn, setAssistantOn] = useState(false);
+  const [assistiveHighlightRange, setAssistiveHighlightRange] =
+    useState<AssistiveTextHighlightRange | null>(null);
+  const [confirmedEditHighlightHtml, setConfirmedEditHighlightHtml] =
+    useState<string | null>(null);
+  const pendingInsertHighlightRef = useRef<AssistiveTextHighlightRange | null>(
+    null,
+  );
   const [previewMode, setPreviewMode] = useState<LinkedInPreviewMode>(
     externalPreviewMode || 'studio'
   );
@@ -106,19 +117,72 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const handleInsertAtCaret = useCallback(
     (text: string, caretIndex: number) => {
-      const beforeCaret = draft.slice(0, caretIndex);
-      const afterCaret = draft.slice(caretIndex);
+      const currentDraft = flushAssistiveDraft();
+      const parsed = splitDraftForAssistiveEditor(currentDraft);
+      const textBefore = parsed.textContent.slice(0, caretIndex);
+      const textAfter = parsed.textContent.slice(caretIndex);
       const insertion = ` ${text.trim()} `;
-      const newDraft = beforeCaret + insertion + afterCaret;
+      const newTextContent = textBefore + insertion + textAfter;
+      const newDraft = mergeAssistiveEditorDraft(
+        newTextContent,
+        parsed.images,
+      );
+
+      const highlightStart = textBefore.length;
+      const highlightEnd = highlightStart + insertion.length;
+      pendingInsertHighlightRef.current = {
+        start: highlightStart,
+        end: highlightEnd,
+      };
 
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:applyEdit", {
-          detail: { src: draft, target: newDraft },
+          detail: { src: currentDraft, target: newDraft },
         }),
       );
     },
-    [draft],
+    [flushAssistiveDraft],
   );
+
+  const handleConfirmChanges = useCallback(() => {
+    const pendingRange = pendingInsertHighlightRef.current;
+    if (pendingRange) {
+      pendingInsertHighlightRef.current = null;
+      onConfirmChanges();
+      requestAnimationFrame(() => {
+        setAssistiveHighlightRange(pendingRange);
+        console.log("[ContentEditor] in-editor highlight after confirm", {
+          range: pendingRange,
+        });
+      });
+      return;
+    }
+
+    if (pendingEdit) {
+      try {
+        setConfirmedEditHighlightHtml(
+          diffMarkup(pendingEdit.src, pendingEdit.target),
+        );
+      } catch (err) {
+        console.warn("[ContentEditor] diffMarkup failed for confirm panel", err);
+      }
+    }
+    onConfirmChanges();
+  }, [onConfirmChanges, pendingEdit]);
+
+  const clearAssistiveHighlight = useCallback(() => {
+    setAssistiveHighlightRange(null);
+  }, []);
+
+  const clearConfirmedEditHighlight = useCallback(() => {
+    setConfirmedEditHighlightHtml(null);
+  }, []);
+
+  useEffect(() => {
+    if (isPreviewing) {
+      setConfirmedEditHighlightHtml(null);
+    }
+  }, [isPreviewing]);
 
   const assistiveWriting = useLinkedInAssistiveWriting({
     enabled: assistantOn,
@@ -220,7 +284,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         isPreviewing={isPreviewing}
         pendingEdit={pendingEdit}
         livePreviewHtml={livePreviewHtml}
-        onConfirmChanges={onConfirmChanges}
+        onConfirmChanges={handleConfirmChanges}
         onDiscardChanges={onDiscardChanges}
       />
 
@@ -244,6 +308,11 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               assistantOn={assistantOn}
               onAssistantToggle={handleAssistantToggle}
               topic={topic}
+            />
+
+            <LinkedInConfirmedEditHighlight
+              html={confirmedEditHighlightHtml}
+              onDismiss={clearConfirmedEditHighlight}
             />
 
             <ContentDisplayArea
@@ -274,6 +343,8 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               renderSelectionMenu={textSelectionHandler.renderSelectionMenu}
               onTypingChange={assistiveWriting.handleTypingChange}
               assistiveEditorRef={assistiveEditorRef}
+              assistiveHighlightRange={assistiveHighlightRange}
+              onAssistiveHighlightClear={clearAssistiveHighlight}
             />
 
             <GroundingDataDisplay
