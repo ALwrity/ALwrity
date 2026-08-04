@@ -1,7 +1,5 @@
 // Content formatting utilities for LinkedIn Writer
 
-import { normalizeLinkedInPostSpacing } from "./linkedInPostSpacing";
-
 // Escape HTML characters to prevent XSS
 export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -23,8 +21,8 @@ export function formatDraftContent(
 ): string {
   if (!content?.trim()) return "";
 
-  // Normalize spacing first so Studio preview matches LinkedIn readability.
-  let formatted = escapeHtml(normalizeLinkedInPostSpacing(content));
+  // Preserve author line breaks — spacing normalization runs only on dense AI drafts at publish.
+  let formatted = escapeHtml(content.replace(/\r\n/g, "\n"));
 
   // Convert [Source N] markers when present (supports persisted drafts).
   // Do not invent citation placements that rewrite the whole body (that destroyed newlines).

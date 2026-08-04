@@ -3,7 +3,10 @@
  * UI components should call these — do not duplicate limit logic.
  */
 
-import { formatDraftForPublish } from "./linkedInPublishFormatters";
+import {
+  formatDraftForPublish,
+  getDraftPlainTextForDisplay,
+} from "./linkedInPublishFormatters";
 import {
   LINKEDIN_HASHTAG_SOFT_MAX,
   LINKEDIN_POST_HARD_LIMIT,
@@ -45,6 +48,11 @@ const CTA_PATTERN =
 /** Canonical plain text that will be sent to LinkedIn. */
 export function getPublishPlainText(draft: string): string {
   return formatDraftForPublish(draft || "");
+}
+
+/** WYSIWYG plain text for editor/feed preview — preserves manual line breaks. */
+export function getDraftPlainTextForPreview(draft: string): string {
+  return getDraftPlainTextForDisplay(draft || "");
 }
 
 export function getCharReadiness(plainText: string): CharReadiness {

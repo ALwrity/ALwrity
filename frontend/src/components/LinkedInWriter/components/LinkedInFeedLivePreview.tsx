@@ -13,7 +13,7 @@ import type { LinkedInFeedDevice } from "../utils/linkedInFeedPreviewUtils";
 import {
   formatCharCountLabel,
   getCharReadiness,
-  getPublishPlainText,
+  getDraftPlainTextForPreview,
   getSeeMoreCaption,
 } from "../utils/linkedInPublishReadiness";
 import type { LinkedInPublishMediaAttachment } from "../utils/linkedInPublishMediaUtils";
@@ -114,7 +114,7 @@ export const LinkedInFeedLivePreview: React.FC<LinkedInFeedLivePreviewProps> = (
 
   const text = useMemo(() => {
     try {
-      return (plainText ?? getPublishPlainText(draft)).trim();
+      return (plainText ?? getDraftPlainTextForPreview(draft)).trim();
     } catch (err) {
       console.error(`${LOG_PREFIX} failed to normalize draft for preview`, err);
       return "";

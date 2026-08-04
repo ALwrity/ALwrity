@@ -1,5 +1,6 @@
 import React from "react";
 import type { LinkedInAssistiveSuggestion } from "../services/linkedInAssistiveWritingApi";
+import { formatAssistiveSuggestionText } from "../utils/linkedInAssistiveCitationUtils";
 
 interface LinkedInAssistiveWritingCardProps {
   enabled: boolean;
@@ -175,7 +176,10 @@ const LinkedInAssistiveWritingCard: React.FC<
             </span>
           </div>
           <div style={{ fontSize: 14, color: "#333", marginBottom: 8 }}>
-            {suggestion.text}
+            {formatAssistiveSuggestionText(
+              suggestion.text,
+              suggestion.sources,
+            )}
           </div>
           {suggestion.sources?.length > 0 && (
             <div

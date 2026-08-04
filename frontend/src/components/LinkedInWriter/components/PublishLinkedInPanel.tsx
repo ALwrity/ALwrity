@@ -382,6 +382,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         <LinkedInPublishPreviewPlain
           draft={draft}
           attachment={previewAttachment}
+          forPublish
         />
       </Box>
 
