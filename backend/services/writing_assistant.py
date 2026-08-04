@@ -91,7 +91,7 @@ class WritingAssistantService:
 
             # If very short, use last two sentences
             if len(last_sentence) < 20 and len(sentences) >= 2:
-                last_sentence = ' '.join(s[-2:]).strip().strip('"').strip("'")
+                last_sentence = ' '.join(sentences[-2:]).strip().strip('"').strip("'")
 
             exa_query = last_sentence[:500] if len(last_sentence) > 500 else last_sentence
 
