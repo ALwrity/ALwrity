@@ -9,11 +9,15 @@
  * saved items.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { LI_Z_MODAL } from "../../utils/linkedInStudioZIndex";
 import { apiClient } from "../../../../api/client";
 import { StudioModalCloseButton } from "../dashboard/StudioModalCloseButton";
+import {
+  CREATE_WEDGE_NESTED_BACKDROP,
+  CREATE_WEDGE_NESTED_MODAL_SIZE,
+  nestedModalZIndex,
+} from "../../utils/createWedgeNestedModalLayout";
 
 export interface SavedBrainstormIdea {
   id: string;
@@ -30,14 +34,29 @@ interface MySavedIdeasProps {
   onClose: () => void;
   onAfterDelete?: () => void;
   onUseInCopilot?: (prompt: string) => void;
+  /** Stack above Quick Create Post — Brainstorm Ideas window size + elevated z-index. */
+  stacked?: boolean;
 }
 
-const PANEL_STYLE: React.CSSProperties = {
+const DEFAULT_PANEL_STYLE: React.CSSProperties = {
   background: "#ffffff",
   width: 720,
   maxWidth: "100%",
   maxHeight: "80vh",
   borderRadius: 16,
+  boxShadow: "0 20px 60px rgba(0, 0, 0, 0.25)",
+  overflow: "hidden",
+  display: "flex",
+  flexDirection: "column",
+};
+
+const STACKED_PANEL_STYLE: React.CSSProperties = {
+  background: "#ffffff",
+  width: CREATE_WEDGE_NESTED_MODAL_SIZE.width,
+  maxWidth: CREATE_WEDGE_NESTED_MODAL_SIZE.maxWidth,
+  height: CREATE_WEDGE_NESTED_MODAL_SIZE.height,
+  maxHeight: CREATE_WEDGE_NESTED_MODAL_SIZE.maxHeight,
+  borderRadius: CREATE_WEDGE_NESTED_MODAL_SIZE.borderRadius,
   boxShadow: "0 20px 60px rgba(0, 0, 0, 0.25)",
   overflow: "hidden",
   display: "flex",
@@ -131,7 +150,33 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
   onClose,
   onAfterDelete,
   onUseInCopilot,
+  stacked = false,
 }) => {
+  const panelStyle = useMemo(
+    () => (stacked ? STACKED_PANEL_STYLE : DEFAULT_PANEL_STYLE),
+    [stacked],
+  );
+  const backdropStyle = useMemo(
+    () => ({
+      position: "fixed" as const,
+      inset: 0,
+      background: stacked
+        ? CREATE_WEDGE_NESTED_BACKDROP.background
+        : "rgba(0, 0, 0, 0.4)",
+      backdropFilter: stacked ? CREATE_WEDGE_NESTED_BACKDROP.backdropFilter : undefined,
+      WebkitBackdropFilter: stacked
+        ? CREATE_WEDGE_NESTED_BACKDROP.WebkitBackdropFilter
+        : undefined,
+      display: "flex" as const,
+      alignItems: "center" as const,
+      justifyContent: "center" as const,
+      zIndex: nestedModalZIndex(stacked),
+      padding: stacked
+        ? CREATE_WEDGE_NESTED_MODAL_SIZE.backdropPadding
+        : 20,
+    }),
+    [stacked],
+  );
   const [ideas, setIdeas] = useState<SavedBrainstormIdea[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
@@ -200,20 +245,11 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
 
   return createPortal(
     <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0, 0, 0, 0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: LI_Z_MODAL,
-        padding: 20,
-      }}
+      style={backdropStyle}
       onClick={onClose}
     >
       <div
-        style={PANEL_STYLE}
+        style={panelStyle}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="My Saved Brainstorm Ideas"

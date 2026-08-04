@@ -6,6 +6,7 @@ from loguru import logger
 from models.linkedin_growth_models import DailyPostIdea, WeeklyStrategyResponse
 from .cache import growth_cache
 from .circuit_breaker import protected_llm_call
+from .prompt_context import build_temporal_llm_prompts, format_industry_search_queries
 
 
 class WeeklyStrategyService:
@@ -54,10 +55,14 @@ class WeeklyStrategyService:
         if not provider:
             return []
 
-        queries = [
-            f"LinkedIn content strategy {industry} {title}",
-            f"trending LinkedIn posts {industry} this week",
-        ]
+        queries = format_industry_search_queries(
+            [
+                "LinkedIn content strategy {industry} {title} {year}",
+                "trending LinkedIn posts {industry} {year}",
+            ],
+            industry=industry,
+            title=title,
+        )
         all_results: List[Dict[str, Any]] = []
         for query in queries:
             cache_key = growth_cache.exa_key(query, 5, user_id)
@@ -122,6 +127,9 @@ class WeeklyStrategyService:
             "'key_topics' (array of 3-5 strings), and 'focus_area' (string)."
         )
 
+        now = datetime.now(timezone.utc)
+        prompt, enriched_system = build_temporal_llm_prompts(prompt, system_prompt, now)
+
         json_schema = {
             "type": "object",
             "properties": {
@@ -162,7 +170,7 @@ class WeeklyStrategyService:
             "required": ["theme", "daily_posts", "key_topics", "focus_area"],
         }
 
-        llm_cache_key = growth_cache.llm_key(prompt[:200] + str(json_schema), user_id)
+        llm_cache_key = growth_cache.llm_key(prompt[:200] + enriched_system[:200], user_id)
         cached_llm = growth_cache.get(llm_cache_key)
         if cached_llm is not None:
             logger.info("[WeeklyStrategy] LLM cache hit")
@@ -172,7 +180,7 @@ class WeeklyStrategyService:
             raw = await protected_llm_call(
                 llm_text_gen,
                 prompt=prompt,
-                system_prompt=system_prompt,
+                system_prompt=enriched_system,
                 json_struct=json_schema,
                 user_id=user_id,
             )

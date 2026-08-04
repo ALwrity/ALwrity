@@ -11,6 +11,22 @@ declare global {
       seed?: string;
       type?: string;
       forceRefresh?: boolean;
+      options?: {
+        usePersona?: boolean;
+        includeTrending?: boolean;
+        remarketContent?: boolean;
+      };
+      industry?: string;
+      tone?: string;
+      target_audience?: string;
+      stackOverQuickCreate?: boolean;
+    }>;
+    'linkedinwriter:quickCreateApplyTopic': CustomEvent<{
+      topic?: string;
+      key_points?: string;
+      industry?: string;
+      tone?: string;
+      target_audience?: string;
     }>;
     'linkedinwriter:updateDraft': CustomEvent<string>;
     'linkedinwriter:applyEdit': CustomEvent<{ target: string }>;
