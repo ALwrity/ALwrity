@@ -9,9 +9,8 @@ import { useLinkedInSelectionImage } from "../hooks/useLinkedInSelectionImage";
 import { LinkedInPublishMediaPreview } from "./LinkedInPublishMediaPreview";
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { readPrefs } from "../utils/linkedInWriterUtils";
-import { buildPromptFromSelection } from "../../../services/linkedInImageService";
 import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from "../utils/linkedInPublishMediaConstants";
-import { formatDraftForPublish } from "../utils/linkedInPublishFormatters";
+import { buildToolbarImageSeedFromDraft } from "../utils/linkedInToolbarImageSeed";
 
 interface LinkedInPublishMediaSectionProps {
   draft: string;
@@ -48,12 +47,15 @@ export const LinkedInPublishMediaSection: React.FC<
   });
 
   const openAiGenerator = useCallback(() => {
-    const plainText = formatDraftForPublish(draft);
-    const seedText = plainText.trim().slice(0, 200) || "LinkedIn post visual";
-    selectionImage.openForDraft(
-      seedText,
-      buildPromptFromSelection(seedText, topic, prefs.industry),
+    const { seedText, prompt } = buildToolbarImageSeedFromDraft(
+      draft,
+      topic,
+      prefs.industry,
     );
+    console.debug("[LinkedInPublishMediaSection] opening AI image generator", {
+      seedLength: seedText.length,
+    });
+    selectionImage.openForDraft(seedText, prompt);
   }, [draft, topic, prefs.industry, selectionImage]);
 
   const handleFileChange = useCallback(
