@@ -24,7 +24,6 @@ import {
   MenuItem,
   FormControl,
   Divider,
-  alpha,
   Tooltip,
   IconButton,
   Paper,
@@ -51,8 +50,8 @@ import {
 } from './ImageGenerationModal.types';
 import {
   IMAGE_GENERATION_DIALOG_Z_INDEX,
-  imageGenerationSelectMenuProps,
 } from './imageGenerationSelectMenuProps';
+import { createImageGenerationModalStyles } from './imageGenerationModalStyles';
 
 export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   // Core
@@ -90,6 +89,9 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   // Custom recommendations
   recommendations,
 }) => {
+  const styles = createImageGenerationModalStyles(theme);
+  const { palette } = styles;
+
   // State
   const [prompt, setPrompt] = useState(initialPrompt);
   const [style, setStyle] = useState<ImageStyle>(defaultStyle);
@@ -97,14 +99,17 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(defaultAspectRatio);
   const [model, setModel] = useState<ImageModel | LinkedInImageModel>(defaultModel);
 
-  // Update state when initial values change
+  // Sync defaults when the modal opens or when parent-provided defaults change.
   useEffect(() => {
+    if (!open) {
+      return;
+    }
     setPrompt(initialPrompt);
     setStyle(defaultStyle);
     setRenderingSpeed(defaultRenderingSpeed);
     setAspectRatio(defaultAspectRatio);
     setModel(defaultModel);
-  }, [initialPrompt, defaultStyle, defaultRenderingSpeed, defaultAspectRatio, defaultModel]);
+  }, [open, initialPrompt, defaultStyle, defaultRenderingSpeed, defaultAspectRatio, defaultModel]);
 
   const handleGenerate = () => {
     const settings: ImageGenerationSettings = {
@@ -135,24 +140,6 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
     setAspectRatio(preset.aspectRatio);
   };
 
-  // Common select styles
-  const selectSx = {
-    backgroundColor: alpha("#ffffff", 0.05),
-    color: "white",
-    "& .MuiOutlinedInput-notchedOutline": {
-      borderColor: "rgba(255,255,255,0.2)",
-    },
-    "&:hover .MuiOutlinedInput-notchedOutline": {
-      borderColor: "rgba(255,255,255,0.3)",
-    },
-    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-      borderColor: theme.primaryAccent,
-    },
-    "& .MuiSvgIcon-root": {
-      color: "rgba(255,255,255,0.7)",
-    },
-  };
-
   return (
     <Dialog
       open={open}
@@ -162,23 +149,17 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
       sx={{ zIndex: IMAGE_GENERATION_DIALOG_Z_INDEX }}
       scroll="paper"
       PaperProps={{
-        sx: {
-          background: theme.dialogBackground,
-          backdropFilter: "blur(20px)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 4,
-          overflow: "visible",
-        },
+        sx: styles.dialogPaperSx,
       }}
     >
       <DialogTitle>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
           <Box>
-            <Typography variant="h6" sx={{ color: "white", fontWeight: 600 }}>
+            <Typography variant="h6" sx={{ ...styles.sectionTitleSx, fontWeight: 600 }}>
               {title}
             </Typography>
             {contextTitle && (
-              <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.6)", mt: 1 }}>
+              <Typography variant="body2" sx={{ ...styles.sectionCaptionSx, mt: 1 }}>
                 Customize image generation for "{contextTitle}"
               </Typography>
             )}
@@ -186,7 +167,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           <IconButton
             onClick={onClose}
             size="small"
-            sx={{ color: "rgba(255,255,255,0.7)" }}
+            sx={styles.closeIconSx}
           >
             <CloseIcon />
           </IconButton>
@@ -204,12 +185,12 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           {presets.length > 0 && (
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <PaletteIcon sx={{ color: "white", fontSize: "1.2rem" }} />
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+                <PaletteIcon sx={{ color: palette.textPrimary, fontSize: "1.2rem" }} />
+                <Typography variant="subtitle1" sx={styles.sectionTitleSx}>
                   {presetsLabel}
                 </Typography>
                 <Tooltip title={presetsHelp} arrow>
-                  <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                  <IconButton size="small" sx={styles.helpIconSx}>
                     <HelpOutlineIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -219,28 +200,15 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                   <Paper
                     key={preset.key}
                     onClick={() => applyPreset(preset)}
-                    sx={{
-                      p: 1.5,
-                      flex: 1,
-                      cursor: "pointer",
-                      backgroundColor: alpha("#ffffff", 0.04),
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 2,
-                      transition: "all 0.2s ease",
-                      "&:hover": {
-                        borderColor: alpha(theme.primaryAccent, 0.7),
-                        boxShadow: "0 8px 24px rgba(0,0,0,0.25)",
-                        backgroundColor: alpha(theme.primaryAccent, 0.08),
-                      },
-                    }}
+                    sx={styles.presetPaperSx}
                   >
-                    <Typography variant="subtitle2" sx={{ color: "white", fontWeight: 700 }}>
+                    <Typography variant="subtitle2" sx={{ ...styles.sectionTitleSx, fontWeight: 700 }}>
                       {preset.title}
                     </Typography>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.5, mb: 0.75 }}>
+                    <Typography variant="body2" sx={{ ...styles.sectionCaptionSx, lineHeight: 1.5, mb: 0.75 }}>
                       {preset.subtitle}
                     </Typography>
-                    <Stack direction="row" spacing={1} sx={{ color: "rgba(255,255,255,0.6)", fontSize: "0.8rem" }}>
+                    <Stack direction="row" spacing={1} sx={styles.presetMetaSx}>
                       <Typography variant="caption">Style: {preset.style}</Typography>
                       <Typography variant="caption">Speed: {preset.renderingSpeed}</Typography>
                       <Typography variant="caption">AR: {preset.aspectRatio}</Typography>
@@ -254,11 +222,11 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           {/* Prompt Section */}
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+              <Typography variant="subtitle1" sx={styles.sectionTitleSx}>
                 {promptLabel}
               </Typography>
               <Tooltip title={promptHelp} arrow>
-                <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <IconButton size="small" sx={styles.helpIconSx}>
                   <HelpOutlineIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -270,43 +238,26 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe the scene, visual elements, mood, and style..."
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  backgroundColor: alpha("#ffffff", 0.05),
-                  color: "white",
-                  "& fieldset": {
-                    borderColor: "rgba(255,255,255,0.2)",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "rgba(255,255,255,0.3)",
-                  },
-                  "&.Mui-focused fieldset": {
-                    borderColor: theme.primaryAccent,
-                  },
-                },
-                "& .MuiInputBase-input": {
-                  color: "white",
-                },
-              }}
+              sx={styles.textFieldSx}
             />
-            <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.5)", mt: 0.5, display: "block" }}>
+            <Typography variant="caption" sx={styles.promptHintSx}>
               Be specific about visual elements, lighting, and atmosphere.
             </Typography>
           </Box>
 
-          <Divider sx={{ borderColor: "rgba(255,255,255,0.1)" }} />
+          <Divider sx={styles.dividerSx} />
 
           {/* Style Selection */}
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+              <Typography variant="subtitle1" sx={styles.sectionTitleSx}>
                 Visual Style
               </Typography>
               <Tooltip
                 title="Determines the artistic style of the image generation. Auto lets the AI choose, Fiction creates more stylized/artistic results, and Realistic produces photorealistic results."
                 arrow
               >
-                <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <IconButton size="small" sx={styles.helpIconSx}>
                   <HelpOutlineIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -315,29 +266,29 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               <Select
                 value={style}
                 onChange={(e) => setStyle(e.target.value as ImageStyle)}
-                sx={selectSx}
-                MenuProps={imageGenerationSelectMenuProps}
+                sx={styles.selectSx}
+                MenuProps={styles.selectMenuProps}
               >
                 <MenuItem value="Auto">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>Auto</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>Auto</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       AI automatically selects the best style
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="Fiction">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>Fiction</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>Fiction</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Stylized, artistic appearance
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="Realistic">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>Realistic</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>Realistic</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Photorealistic, professional appearance
                     </Typography>
                   </Stack>
@@ -345,22 +296,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               </Select>
             </FormControl>
             {recommendations?.style && (
-              <Paper
-                sx={{
-                  mt: 1.5,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.primaryAccent, 0.1),
-                  border: `1px solid ${alpha(theme.primaryAccent, 0.3)}`,
-                  borderRadius: 2,
-                }}
-              >
+              <Paper sx={styles.infoPanelSx(palette.primaryAccent)}>
                 <Stack direction="row" spacing={1}>
-                  <InfoIcon sx={{ color: theme.primaryAccent, fontSize: "1.2rem", mt: 0.1 }} />
+                  <InfoIcon sx={{ color: palette.primaryAccent, fontSize: "1.2rem", mt: 0.1 }} />
                   <Box>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 500, mb: 0.5 }}>
+                    <Typography variant="body2" sx={styles.infoTitleSx}>
                       Style Impact:
                     </Typography>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                    <Typography variant="body2" sx={styles.infoBodySx}>
                       {recommendations.style}
                     </Typography>
                   </Box>
@@ -372,14 +315,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           {/* Rendering Speed */}
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+              <Typography variant="subtitle1" sx={styles.sectionTitleSx}>
                 Generation Speed
               </Typography>
               <Tooltip
                 title="Controls the balance between generation speed, cost, and quality. Turbo is fastest and cheapest. Quality is slowest but produces the best results."
                 arrow
               >
-                <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <IconButton size="small" sx={styles.helpIconSx}>
                   <HelpOutlineIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -388,29 +331,29 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               <Select
                 value={renderingSpeed}
                 onChange={(e) => setRenderingSpeed(e.target.value as RenderingSpeed)}
-                sx={selectSx}
-                MenuProps={imageGenerationSelectMenuProps}
+                sx={styles.selectSx}
+                MenuProps={styles.selectMenuProps}
               >
                 <MenuItem value="Turbo">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>Turbo ⚡</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>Turbo ⚡</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Fastest (~10-20s) • Cheapest • Good for quick iterations
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="Default">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>Default ⚖️</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>Default ⚖️</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Balanced (~30-60s) • Moderate cost • Great for most content
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="Quality">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>Quality ✨</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>Quality ✨</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Slowest (~60-120s) • Highest quality • Perfect for professional content
                     </Typography>
                   </Stack>
@@ -418,22 +361,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               </Select>
             </FormControl>
             {recommendations?.speed && (
-              <Paper
-                sx={{
-                  mt: 1.5,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.secondaryAccent, 0.1),
-                  border: `1px solid ${alpha(theme.secondaryAccent, 0.3)}`,
-                  borderRadius: 2,
-                }}
-              >
+              <Paper sx={styles.infoPanelSx(palette.secondaryAccent)}>
                 <Stack direction="row" spacing={1}>
-                  <InfoIcon sx={{ color: theme.secondaryAccent, fontSize: "1.2rem", mt: 0.1 }} />
+                  <InfoIcon sx={{ color: palette.secondaryAccent, fontSize: "1.2rem", mt: 0.1 }} />
                   <Box>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 500, mb: 0.5 }}>
+                    <Typography variant="body2" sx={styles.infoTitleSx}>
                       Speed vs Quality:
                     </Typography>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                    <Typography variant="body2" sx={styles.infoBodySx}>
                       {recommendations.speed}
                     </Typography>
                   </Box>
@@ -446,14 +381,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           {showModelSelection && availableModels.length > 0 && (
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+                <Typography variant="subtitle1" sx={styles.sectionTitleSx}>
                   AI Model
                 </Typography>
                 <Tooltip
                   title="Choose the AI model for image generation. Different models offer different quality levels and costs."
                   arrow
                 >
-                  <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                  <IconButton size="small" sx={styles.helpIconSx}>
                     <HelpOutlineIcon fontSize="small" />
                   </IconButton>
                 </Tooltip>
@@ -462,14 +397,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 <Select
                   value={model}
                   onChange={(e) => setModel(e.target.value as ImageModel | LinkedInImageModel)}
-                  sx={selectSx}
-                  MenuProps={imageGenerationSelectMenuProps}
+                  sx={styles.selectSx}
+                  MenuProps={styles.selectMenuProps}
                 >
                   {availableModels.map((m) => (
                     <MenuItem key={m.id} value={m.id}>
                       <Stack>
-                        <Typography sx={{ color: "white" }}>{m.name}</Typography>
-                        <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                        <Typography sx={styles.menuItemTitleSx}>{m.name}</Typography>
+                        <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                           {m.description}
                         </Typography>
                       </Stack>
@@ -478,22 +413,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
                 </Select>
               </FormControl>
               {recommendations?.model && (
-                <Paper
-                  sx={{
-                    mt: 1.5,
-                    p: 1.5,
-                    backgroundColor: alpha(theme.secondaryAccent, 0.1),
-                    border: `1px solid ${alpha(theme.secondaryAccent, 0.3)}`,
-                    borderRadius: 2,
-                  }}
-                >
+                <Paper sx={styles.infoPanelSx(palette.secondaryAccent)}>
                   <Stack direction="row" spacing={1}>
-                    <InfoIcon sx={{ color: theme.secondaryAccent, fontSize: "1.2rem", mt: 0.1 }} />
+                    <InfoIcon sx={{ color: palette.secondaryAccent, fontSize: "1.2rem", mt: 0.1 }} />
                     <Box>
-                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 500, mb: 0.5 }}>
+                      <Typography variant="body2" sx={styles.infoTitleSx}>
                         Model Recommendations:
                       </Typography>
-                      <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                      <Typography variant="body2" sx={styles.infoBodySx}>
                         {recommendations.model}
                       </Typography>
                     </Box>
@@ -506,14 +433,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           {/* Aspect Ratio */}
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-              <Typography variant="subtitle1" sx={{ color: "white", fontWeight: 600 }}>
+              <Typography variant="subtitle1" sx={styles.sectionTitleSx}>
                 Aspect Ratio
               </Typography>
               <Tooltip
                 title="The width-to-height ratio of the generated image. Choose based on your format: 16:9 for widescreen, 9:16 for vertical/mobile, 1:1 for square."
                 arrow
               >
-                <IconButton size="small" sx={{ color: "rgba(255,255,255,0.5)" }}>
+                <IconButton size="small" sx={styles.helpIconSx}>
                   <HelpOutlineIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
@@ -522,45 +449,45 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               <Select
                 value={aspectRatio}
                 onChange={(e) => setAspectRatio(e.target.value as AspectRatio)}
-                sx={selectSx}
-                MenuProps={imageGenerationSelectMenuProps}
+                sx={styles.selectSx}
+                MenuProps={styles.selectMenuProps}
               >
                 <MenuItem value="16:9">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>16:9 (Widescreen)</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>16:9 (Widescreen)</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Standard video format, best for YouTube, web
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="9:16">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>9:16 (Vertical)</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>9:16 (Vertical)</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Mobile/social media format (TikTok, Instagram Stories)
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="1:1">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>1:1 (Square)</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>1:1 (Square)</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Thumbnails, profile images, Instagram posts
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="4:3">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>4:3 (Traditional)</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>4:3 (Traditional)</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Classic format, presentations
                     </Typography>
                   </Stack>
                 </MenuItem>
                 <MenuItem value="3:4">
                   <Stack>
-                    <Typography sx={{ color: "white" }}>3:4 (Portrait)</Typography>
-                    <Typography variant="caption" sx={{ color: "rgba(255,255,255,0.6)" }}>
+                    <Typography sx={styles.menuItemTitleSx}>3:4 (Portrait)</Typography>
+                    <Typography variant="caption" sx={styles.menuItemCaptionSx}>
                       Portrait orientation, mobile apps
                     </Typography>
                   </Stack>
@@ -568,22 +495,14 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
               </Select>
             </FormControl>
             {recommendations?.aspectRatio && (
-              <Paper
-                sx={{
-                  mt: 1.5,
-                  p: 1.5,
-                  backgroundColor: alpha(theme.warningAccent, 0.1),
-                  border: `1px solid ${alpha(theme.warningAccent, 0.3)}`,
-                  borderRadius: 2,
-                }}
-              >
+              <Paper sx={styles.infoPanelSx(palette.warningAccent)}>
                 <Stack direction="row" spacing={1}>
-                  <InfoIcon sx={{ color: theme.warningAccent, fontSize: "1.2rem", mt: 0.1 }} />
+                  <InfoIcon sx={{ color: palette.warningAccent, fontSize: "1.2rem", mt: 0.1 }} />
                   <Box>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.9)", fontWeight: 500, mb: 0.5 }}>
+                    <Typography variant="body2" sx={styles.infoTitleSx}>
                       Format Recommendation:
                     </Typography>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.7)", lineHeight: 1.6 }}>
+                    <Typography variant="body2" sx={styles.infoBodySx}>
                       {recommendations.aspectRatio}
                     </Typography>
                   </Box>
@@ -598,7 +517,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
         <Button
           onClick={onClose}
           disabled={isGenerating}
-          sx={{ color: "rgba(255,255,255,0.7)" }}
+          sx={styles.cancelButtonSx}
         >
           Cancel
         </Button>
@@ -606,20 +525,7 @@ export const ImageGenerationModal: React.FC<ImageGenerationModalProps> = ({
           onClick={handleGenerate}
           disabled={isGenerating || !prompt.trim()}
           variant="contained"
-          sx={{
-            backgroundColor: isGenerating ? "rgba(255,255,255,0.1)" : theme.primaryAccent,
-            color: "white",
-            "&:hover": {
-              backgroundColor: isGenerating ? "rgba(255,255,255,0.1)" : alpha(theme.primaryAccent, 0.8),
-            },
-            "&:disabled": {
-              backgroundColor: "rgba(255,255,255,0.1)",
-              color: "rgba(255,255,255,0.3)",
-            },
-            px: 3,
-            py: 1,
-            borderRadius: 2,
-          }}
+          sx={styles.generateButtonSx(isGenerating)}
         >
           {isGenerating ? "Generating..." : generateButtonLabel}
         </Button>

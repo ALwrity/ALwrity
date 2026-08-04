@@ -63,6 +63,8 @@ export interface ModelOption {
 
 // Theme configuration for branding
 export interface ImageModalTheme {
+  /** Light matches LinkedIn Studio; dark is the default for YouTube/Podcast modals. */
+  colorScheme?: 'dark' | 'light';
   // Background colors
   dialogBackground: string;
   // Accent colors for info panels
