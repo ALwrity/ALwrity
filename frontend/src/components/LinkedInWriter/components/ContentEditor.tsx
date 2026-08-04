@@ -126,6 +126,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     getTextarea,
     onDraftChange,
     onInsertWithPreview: handleInsertAtCaret,
+    researchSources,
   });
 
   const insertGeneratedImage = useCallback(

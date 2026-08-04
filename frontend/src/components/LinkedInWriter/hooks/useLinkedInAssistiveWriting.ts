@@ -4,6 +4,7 @@ import {
   mapAssistiveWritingError,
   type LinkedInAssistiveSuggestion,
 } from "../services/linkedInAssistiveWritingApi";
+import { normalizeAssistiveCitationHints } from "../utils/linkedInAssistiveCitationUtils";
 
 const TYPING_DEBOUNCE_MS = 3000;
 const CONTINUE_COOLDOWN_MS = 15000;
@@ -19,6 +20,8 @@ interface UseLinkedInAssistiveWritingOptions {
   getTextarea: () => HTMLTextAreaElement | null;
   onDraftChange: (value: string) => void;
   onInsertWithPreview?: (text: string, caretIndex: number) => void;
+  /** Grounding research sources — used to map citation URLs to [Source N]. */
+  researchSources?: Array<{ url?: string; title?: string }> | null;
 }
 
 export function useLinkedInAssistiveWriting({
@@ -27,6 +30,7 @@ export function useLinkedInAssistiveWriting({
   getTextarea,
   onDraftChange,
   onInsertWithPreview,
+  researchSources = null,
 }: UseLinkedInAssistiveWritingOptions) {
   const [suggestion, setSuggestion] =
     useState<LinkedInAssistiveSuggestion | null>(null);
@@ -210,11 +214,23 @@ export function useLinkedInAssistiveWriting({
     const caretIndex = textarea?.selectionStart ?? currentContent.length;
     const beforeCursor = currentContent.slice(0, caretIndex);
     const afterCursor = currentContent.slice(caretIndex);
-    const insertion = ` ${suggestion.text} `;
+    // Never insert raw ((Author)[url]) hints — use studio [Source N] markers.
+    const cleanedText = normalizeAssistiveCitationHints(
+      suggestion.text,
+      suggestion.sources,
+      researchSources,
+    );
+    const insertion = ` ${cleanedText} `;
     const newCaretIndex = caretIndex + insertion.length;
 
+    console.log("[useLinkedInAssistiveWriting] accept suggestion", {
+      rawLength: suggestion.text.length,
+      cleanedLength: cleanedText.length,
+      hadUrlHint: /https?:\/\//i.test(suggestion.text),
+    });
+
     if (onInsertWithPreview) {
-      onInsertWithPreview(suggestion.text, caretIndex);
+      onInsertWithPreview(cleanedText, caretIndex);
     } else {
       onDraftChange(beforeCursor + insertion + afterCursor);
       requestAnimationFrame(() => {
@@ -230,7 +246,14 @@ export function useLinkedInAssistiveWriting({
     setAllSuggestions([]);
     setSuggestionIndex(0);
     setShowContinuePrompt(false);
-  }, [suggestion, draft, getTextarea, onDraftChange, onInsertWithPreview]);
+  }, [
+    suggestion,
+    draft,
+    getTextarea,
+    onDraftChange,
+    onInsertWithPreview,
+    researchSources,
+  ]);
 
   const handleRejectSuggestion = useCallback(() => {
     setSuggestion(null);

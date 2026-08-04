@@ -134,12 +134,14 @@ class WritingAssistantService:
             "You are an assistive writing continuation bot. "
             "Only produce 1-2 SHORT sentences. Do not repeat or paraphrase the user's stub. "
             "Match tone and topic. Prefer concrete, current facts from the provided sources. "
-            "Include exactly one brief citation hint in parentheses with an author (or 'Source') and URL in square brackets, e.g., ((Doe, 2021)[https://example.com])."
+            "Include exactly one brief citation marker using the source number only, "
+            "e.g. [Source 1]. Never include raw URLs or ((Author)[url]) citation hints."
         )
         user_prompt = (
             f"User text to continue (do not repeat):\n{text}\n\n"
             f"Relevant sources to inform your continuation:\n{sources_text}\n\n"
-            "Return only the continuation text, without quotes."
+            "Return only the continuation text, without quotes. "
+            "Cite with [Source N] only — no URLs."
         )
 
         try:
@@ -166,10 +168,12 @@ class WritingAssistantService:
                 confidence = 0.5 + (len(sources) / 6.0) * 0.3 + avg_score * 0.2
             if suggestion.endswith(('.', '!', '?')):
                 confidence += 0.05
-            # Check if citation hint was included
-            if '[http' in suggestion or '((' in suggestion:
+            # Prefer studio-style [Source N] markers; do not reward raw URL hints.
+            if "[Source " in suggestion or "[source " in suggestion.lower():
                 confidence += 0.05
-            confidence = min(confidence, 1.0)
+            if "[http" in suggestion or "((" in suggestion:
+                confidence -= 0.05
+            confidence = min(max(confidence, 0.0), 1.0)
 
             return suggestion, round(confidence, 2)
         except Exception as e:

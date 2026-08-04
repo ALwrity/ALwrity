@@ -6,12 +6,14 @@
 import {
   normalizeLinkedInPostSpacingIfNeeded,
 } from "./linkedInPostSpacing";
+import { stripAssistiveCitationHints } from "./linkedInAssistiveCitationUtils";
 
 /** Strip inline source citation placeholders from draft content. */
 export function stripSourceCitations(content: string): string {
   if (!content) return "";
 
-  let result = content;
+  // Drop assistive ((Author)[url]) hints before [Source N] stripping.
+  let result = stripAssistiveCitationHints(content);
 
   // Parenthetical groups containing citations: ([Source 3]), ([Source 7]; ... [Source 8])
   result = result.replace(
