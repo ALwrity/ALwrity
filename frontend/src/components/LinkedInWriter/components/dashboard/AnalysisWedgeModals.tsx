@@ -1,11 +1,9 @@
 /**
  * Analysis Wedge — AI-first feature modals
  *
- * F1  PostTodayModal           â€” AI-ranked post opportunities (Create wedge)
- * F2  BrandScorecardModal      â€” full BrandScorecard component in a modal
- * F3  WeeklyPlanModal          â€” Mon-Fri content plan with Create Now + Schedule CTAs
- * F4  ViralCopywriterModal     â€” top viral patterns with "Write in This Style" CTA
- * F5  EngagementTrendsModal    â€” see EngagementTrendsModal.tsx
+ * F1  PostTodayModal           — AI-ranked post opportunities (Create wedge)
+ * F2  WeeklyPlanModal          — Mon-Fri content plan with Create Now + Schedule CTAs
+ * F3  EngagementTrendsModal    — see EngagementTrendsModal.tsx
  */
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
@@ -13,12 +11,8 @@ import {
   linkedInGrowthApi,
   type ConsolidatedGrowthResponse,
   type DailyPostIdea,
-  type ViralPattern,
-  type BrandDimension,
 } from "../../../../services/linkedInGrowthApi";
 import { contentPlanningApi } from "../../../../services/contentPlanningApi";
-import { BrandScorecard } from "../GrowthEngine/BrandScorecard";
-import { ViralAnalysisCard } from "../GrowthEngine/ViralAnalysisCard";
 import { PostTodayCandidateList } from "./PostTodayCandidateList";
 import {
   isGrowthDataUsable,
@@ -399,59 +393,7 @@ export const PostTodayModal: React.FC<PostTodayModalProps> = ({
 };
 
 // ---------------------------------------------------------------------------
-// F2 — Brand Score Breakdown Modal
-// ---------------------------------------------------------------------------
-
-interface BrandScorecardModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export const BrandScorecardModal: React.FC<BrandScorecardModalProps> = ({
-  open,
-  onClose,
-}) => {
-  const { data, loading, error, loadAll } = useGrowthInsights(open);
-  const handleLoad = () => void loadAll();
-  const sc = data?.brand_scorecard;
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Personal Brand Score"
-      onClose={onClose}
-      maxWidth={560}
-      maxHeight="min(92vh, 720px)"
-    >
-      <div>
-        {!data && !loading && (
-          <CacheEmptyPrompt
-            icon="ðŸ†"
-            title="No brand scorecard in cache"
-            description="Run an AI analysis to see a detailed breakdown of your personal brand."
-            buttonLabel="ðŸš€ Load Brand Analysis"
-            onLoad={handleLoad}
-          />
-        )}
-
-        {loading && <LoadingRow message="Analysing your personal brandâ€¦" />}
-        {error && <ErrorBanner message={error} />}
-
-        {sc && !loading && (
-          <BrandScorecard
-            overallScore={sc.overall_score}
-            dimensions={sc.dimensions as BrandDimension[]}
-            topRecommendation={sc.top_recommendation}
-            dataSourceSummary={sc.data_source_summary}
-          />
-        )}
-      </div>
-    </DashboardActionModal>
-  );
-};
-
-// ---------------------------------------------------------------------------
-// F4 â€” Weekly Content Plan Modal
+// F2 — Weekly Content Plan Modal
 // ---------------------------------------------------------------------------
 
 const DAY_EMOJIS: Record<string, string> = {
@@ -835,156 +777,3 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
   );
 };
 
-// ---------------------------------------------------------------------------
-// F5 â€” Viral Pattern Copywriter Modal
-// ---------------------------------------------------------------------------
-
-interface ViralCopywriterModalProps {
-  open: boolean;
-  onClose: () => void;
-}
-
-export const ViralCopywriterModal: React.FC<ViralCopywriterModalProps> = ({
-  open,
-  onClose,
-}) => {
-  const { data, loading, error, loadAll } = useGrowthInsights(open);
-  const handleLoad = () => void loadAll();
-  const va = data?.viral_analysis;
-  const patterns: ViralPattern[] = va?.patterns ?? [];
-  const industry = va?.industry ?? "your industry";
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Viral Pattern Copywriter"
-      onClose={onClose}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
-    >
-      <div>
-        <p
-          style={{
-            margin: "0 0 14px",
-            fontSize: 13,
-            color: colors.textSecondary,
-            lineHeight: 1.5,
-          }}
-        >
-          AI-identified content patterns that drive viral engagement in your
-          industry. Pick a pattern and create a post in that exact style.
-        </p>
-
-        {!data && !loading && (
-          <CacheEmptyPrompt
-            icon="ðŸ”¥"
-            title="No viral patterns in cache"
-            description="Load an AI analysis to discover what formats go viral in your niche."
-            buttonLabel="ðŸš€ Load Viral Patterns"
-            onLoad={handleLoad}
-          />
-        )}
-
-        {loading && (
-          <LoadingRow message={`Analysing viral patterns in ${industry}â€¦`} />
-        )}
-        {error && <ErrorBanner message={error} />}
-
-        {va && !loading && (
-          <>
-            {/* Full viral analysis card */}
-            <ViralAnalysisCard
-              industry={industry}
-              patterns={patterns}
-              topRecommendation={va.top_recommendation}
-              dataSourceSummary={va.data_source_summary}
-            />
-
-            {/* Per-pattern "Write in This Style" CTAs */}
-            {patterns.length > 0 && (
-              <div style={{ marginTop: 14 }}>
-                <div
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: colors.textTertiary,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.6,
-                    marginBottom: 8,
-                  }}
-                >
-                  Write in a Viral Style
-                </div>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                >
-                  {patterns.map((pattern, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        padding: "10px 14px",
-                        background: colors.rowBg,
-                        border: `1px solid ${colors.border}`,
-                        borderRadius: 8,
-                        gap: 10,
-                      }}
-                    >
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            fontSize: 12,
-                            color: colors.textDark,
-                            marginBottom: 2,
-                          }}
-                        >
-                          ðŸ“Œ {pattern.pattern_name}
-                        </div>
-                        <div
-                          style={{ fontSize: 11, color: colors.textTertiary }}
-                        >
-                          {pattern.engagement_multiplier} engagement Â·{" "}
-                          {pattern.confidence} confidence
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => {
-                          const topic = `[Write a LinkedIn post using the "${pattern.pattern_name}" pattern]`;
-                          const keyPoints = [
-                            `Pattern: ${pattern.pattern_name}`,
-                            `Description: ${pattern.description}`,
-                            `Example format: ${pattern.example_headline}`,
-                            `Engagement goal: ${pattern.engagement_multiplier}`,
-                          ].join("\n");
-                          openInCreate(topic, keyPoints);
-                          onClose();
-                        }}
-                        style={{
-                          padding: "6px 14px",
-                          background: "#dc2626",
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 6,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          whiteSpace: "nowrap",
-                          flexShrink: 0,
-                        }}
-                      >
-                        ðŸ”¥ Write in This Style
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </DashboardActionModal>
-  );
-};

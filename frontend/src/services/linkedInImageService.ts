@@ -22,16 +22,30 @@ export interface LinkedInImageGenerationResult {
   error?: string;
 }
 
-/** Build a short seed prompt; heavy optimization happens on the backend. */
+/** Max post body chars for the modal seed (backend may use full content_context). */
+const LINKEDIN_IMAGE_SEED_MAX_CHARS = 1200;
+
+/**
+ * Build a LinkedIn cover-oriented seed prompt from post text.
+ * Keeps enough post body for conceptual covers (esp. Gemini); backend applies model-specific constraints.
+ */
 export function buildPromptFromSelection(
   selectedText: string,
   topic?: string,
   industry?: string
 ): string {
-  const snippet = selectedText.trim().slice(0, 200);
+  const body = selectedText.trim().slice(0, LINKEDIN_IMAGE_SEED_MAX_CHARS);
   const topicPart = topic ? `Topic: ${topic}.` : '';
   const industryPart = industry ? `Industry: ${industry}.` : '';
-  return `Visual for LinkedIn post: ${snippet}. ${topicPart} ${industryPart}`.trim();
+  return [
+    'Create LinkedIn post cover image for below LinkedIn post -',
+    body,
+    topicPart,
+    industryPart,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
 }
 
 /** Map modal aspect ratio to LinkedIn API aspect ratio values. */

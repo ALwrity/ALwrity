@@ -67,7 +67,8 @@ export const LinkedInSelectionImageModal: React.FC<
     if (
       model === "flux-kontext-pro" ||
       model === "ideogram-v3-turbo" ||
-      model === "qwen-image"
+      model === "qwen-image" ||
+      model === "gemini-3-pro-image"
     ) {
       return model;
     }

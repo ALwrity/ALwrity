@@ -661,20 +661,18 @@
 
 /* Publish wedge tile modal — no header divider, seamless title → tiles */
 .linkedin-publish-wedge-modal {
-  width: min(504px, 100%) !important;
-  max-width: min(504px, 100%) !important;
+  width: min(720px, 100%) !important;
+  max-width: min(720px, 100%) !important;
 }
 
 .linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-publish-wedge-tiles {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: stretch;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+  align-items: stretch;
 }
 
 .publish-wedge-coming-soon-tile {
-  width: 140px;
   min-height: 100%;
 }
 
@@ -686,17 +684,6 @@
 .publish-wedge-coming-soon-tile .plan-wedge-coming-soon-card__desc {
   font-size: 11px;
   line-height: 1.35;
-}
-
-@media (max-width: 640px) {
-  .linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-publish-wedge-tiles {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .publish-wedge-coming-soon-tile {
-    width: min(100%, 280px);
-  }
 }
 
 .linkedin-publish-campaign-modal {
@@ -736,6 +723,20 @@
 .linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-header {
   border-bottom: none !important;
   padding: 10px 20px 6px !important;
+}
+
+.analysis-wedge-coming-soon-tile {
+  min-height: 100%;
+}
+
+.analysis-wedge-coming-soon-tile .plan-wedge-coming-soon-card {
+  height: 100%;
+  min-height: 148px;
+}
+
+.analysis-wedge-coming-soon-tile .plan-wedge-coming-soon-card__desc {
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-body {

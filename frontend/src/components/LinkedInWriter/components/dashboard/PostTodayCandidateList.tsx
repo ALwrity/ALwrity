@@ -18,7 +18,7 @@ export interface PostCandidate {
 interface PostCandidateCardProps {
   candidate: PostCandidate;
   rank: number;
-  onUse: () => void;
+  onUse: (topic: string, hook: string) => void;
 }
 
 const RANK_STYLES: Record<number, { border: string; badge: string; badgeText: string }> = {
@@ -143,7 +143,7 @@ const PostCandidateCard: React.FC<PostCandidateCardProps> = ({ candidate, rank, 
         <button
           type="button"
           className={`linkedin-post-today-card__action ${actionModifier}`}
-          onClick={onUse}
+          onClick={() => onUse(candidate.topic, hookText || candidate.hook)}
         >
           {actionLabel}
         </button>
@@ -177,7 +177,7 @@ export const PostTodayCandidateList: React.FC<PostTodayCandidateListProps> = ({
       key={key}
       candidate={candidate}
       rank={rank}
-      onUse={() => onUseCandidate(candidate.topic, hookText || candidate.hook)}
+      onUse={onUseCandidate}
     />
   );
 

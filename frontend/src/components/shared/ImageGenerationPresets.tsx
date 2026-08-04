@@ -268,7 +268,8 @@ export const LINKEDIN_RECOMMENDATIONS: CustomRecommendations = {
   model: <>
     <strong>FLUX Kontext Pro:</strong> Best default for professional LinkedIn feed images<br />
     <strong>Ideogram V3 Turbo:</strong> Strong for detailed scenes with text-safe composition<br />
-    <strong>Qwen Image:</strong> Fast iterations and conceptual business visuals
+    <strong>Qwen Image:</strong> Fast iterations and conceptual business visuals<br />
+    <strong>Gemini 3 Pro Image:</strong> High-quality Google visuals with strong composition
   </>,
 };
 
@@ -290,6 +291,12 @@ export const LINKEDIN_IMAGE_MODELS: LinkedInModelOption[] = [
     name: 'Qwen Image ⚡',
     description: 'Fast generation • Conceptual visuals • $0.05/image',
     costPerImage: '$0.05',
+  },
+  {
+    id: 'gemini-3-pro-image',
+    name: 'Gemini 3 Pro Image',
+    description: 'High-quality Google visuals • Strong composition • $0.14/image',
+    costPerImage: '$0.14',
   },
 ];
 
