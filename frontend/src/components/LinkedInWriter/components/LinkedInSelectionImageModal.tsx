@@ -16,6 +16,7 @@ import {
   Typography,
   Link,
 } from "@mui/material";
+import DownloadIcon from "@mui/icons-material/Download";
 import {
   ImageGenerationModal,
   ImageGenerationSettings as SharedImageGenerationSettings,
@@ -27,6 +28,7 @@ import {
   LINKEDIN_RECOMMENDATIONS,
   LINKEDIN_IMAGE_MODELS,
 } from "../../shared/ImageGenerationPresets";
+import { downloadLinkedInImageBlob } from "../../../services/linkedInImageService";
 
 export interface LinkedInImageGenerationSettings {
   prompt: string;
@@ -85,10 +87,27 @@ export const LinkedInSelectionImageModal: React.FC<
     });
   };
 
+  const handleDownload = () => {
+    if (!generatedPreview?.blobUrl) {
+      console.error(
+        "[LinkedInSelectionImageModal] download skipped: missing blobUrl",
+      );
+      return;
+    }
+    const filename = `linkedin-image-${generatedPreview.imageId || "generated"}.png`;
+    try {
+      downloadLinkedInImageBlob(generatedPreview.blobUrl, filename);
+    } catch (err) {
+      console.error("[LinkedInSelectionImageModal] download failed", err);
+    }
+  };
+
   if (generatedPreview) {
+    // Keep preview (and Download) visible whenever a result exists — do not depend
+    // on the generate-settings modal still being marked open.
     return (
       <Dialog
-        open={open}
+        open
         onClose={onClosePreview || onClose}
         maxWidth="sm"
         fullWidth
@@ -112,20 +131,40 @@ export const LinkedInSelectionImageModal: React.FC<
               }}
             />
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              The image has been inserted into your draft. You can keep editing
-              or switch to preview mode to see how it will look.
+              The image has been inserted into your draft. Download a copy or
+              keep editing your post.
             </Typography>
-            <Link
-              href={generatedPreview.imageUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              sx={{ fontSize: "0.85rem", wordBreak: "break-all" }}
-            >
-              {generatedPreview.imageUrl}
-            </Link>
+            <Box>
+              <Link
+                href={generatedPreview.imageUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                sx={{ fontSize: "0.85rem", wordBreak: "break-all" }}
+              >
+                {generatedPreview.imageUrl}
+              </Link>
+            </Box>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={handleDownload}
+            sx={{
+              textTransform: "none",
+              fontWeight: 600,
+              borderColor: "#0A66C2",
+              color: "#0A66C2",
+              "&:hover": {
+                bgcolor: "#e8f4fd",
+                borderColor: "#004182",
+                color: "#004182",
+              },
+            }}
+          >
+            Download Image
+          </Button>
           <Button
             onClick={onClosePreview || onClose}
             variant="contained"

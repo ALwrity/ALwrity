@@ -11,6 +11,7 @@ import {
   applyMarkdownFormat,
   type MarkdownFormatType,
 } from "../../TextEditor/markdownFormatting";
+import { useUndoRedo } from "../../../hooks/useUndoRedo";
 import { LinkedInEditorToolbar } from "./LinkedInEditorToolbar";
 import { LinkedInEditorImageStrip } from "./LinkedInEditorImageStrip";
 import { useLinkedInEditorImageUpload } from "../hooks/useLinkedInEditorImageUpload";
@@ -22,14 +23,30 @@ import {
 import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from "../utils/linkedInPublishMediaConstants";
 import { normalizeLinkedInPostSpacing } from "../utils/linkedInPostSpacing";
 
+const LOG_PREFIX = "[LinkedInAssistiveEditor]";
+
 export interface LinkedInAssistiveEditorHandle {
   /** Flush pending edits and return the merged draft markdown. */
   flushDraft: () => string;
 }
 
+/** Snapshot stored in undo/redo history (text + attached images). */
+type AssistiveEditorSnapshot = {
+  text: string;
+  images: LinkedInEditorImageBlock[];
+};
+
 /** Always apply Best Practices spacing (idempotent for already-spaced posts). */
 function maybeNormalizeAssistiveText(text: string): string {
   return normalizeLinkedInPostSpacing(text);
+}
+
+function buildInitialSnapshot(draft: string): AssistiveEditorSnapshot {
+  const parsed = splitDraftForAssistiveEditor(draft);
+  return {
+    text: maybeNormalizeAssistiveText(parsed.textContent),
+    images: parsed.images,
+  };
 }
 
 interface LinkedInAssistiveEditorProps {
@@ -41,6 +58,7 @@ interface LinkedInAssistiveEditorProps {
 
 /**
  * LinkedIn-native-style assistive editor: clean text area + inline photo strip + toolbar upload.
+ * Undo/Redo reuses Story Writer's useUndoRedo (keyboard shortcuts off to protect native textarea).
  */
 export const LinkedInAssistiveEditor = forwardRef<
   LinkedInAssistiveEditorHandle,
@@ -53,15 +71,23 @@ export const LinkedInAssistiveEditor = forwardRef<
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastEmittedDraftRef = useRef<string>(draft);
-
-  const initial = splitDraftForAssistiveEditor(draft);
-  const [textContent, setTextContent] = useState(() =>
-    maybeNormalizeAssistiveText(initial.textContent),
-  );
-  const [images, setImages] = useState<LinkedInEditorImageBlock[]>(
-    initial.images,
-  );
   const [isDragOver, setIsDragOver] = useState(false);
+
+  const {
+    value: snapshot,
+    setValue: setSnapshot,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    reset: resetHistory,
+  } = useUndoRedo<AssistiveEditorSnapshot>(buildInitialSnapshot(draft), {
+    limit: 30,
+    enableKeyboardShortcuts: false,
+  });
+
+  const textContent = snapshot.text;
+  const images = snapshot.images;
 
   const { isUploading, uploadError, uploadImageFile, clearUploadError } =
     useLinkedInEditorImageUpload();
@@ -91,6 +117,14 @@ export const LinkedInAssistiveEditor = forwardRef<
     [onDraftChange],
   );
 
+  const commitSnapshot = useCallback(
+    (next: AssistiveEditorSnapshot, immediate = false) => {
+      setSnapshot(next);
+      emitDraft(next.text, next.images, immediate);
+    },
+    [setSnapshot, emitDraft],
+  );
+
   useImperativeHandle(
     ref,
     () => ({
@@ -113,18 +147,31 @@ export const LinkedInAssistiveEditor = forwardRef<
   useEffect(() => {
     if (draft === lastEmittedDraftRef.current) return;
 
+    // Cancel pending debounce so a stale text-only emit cannot wipe a newly
+    // inserted image (or other external draft updates) after Done/generate.
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
     const parsed = splitDraftForAssistiveEditor(draft);
     const nextText = maybeNormalizeAssistiveText(parsed.textContent);
-    setTextContent(nextText);
-    setImages(parsed.images);
+    const next: AssistiveEditorSnapshot = {
+      text: nextText,
+      images: parsed.images,
+    };
+    resetHistory(next);
+    console.log(`${LOG_PREFIX} history reset from external draft`, {
+      textLength: nextText.length,
+      imageCount: parsed.images.length,
+    });
 
     if (nextText !== parsed.textContent) {
-      // Persist Best Practices spacing back into the draft once for dense posts.
       emitDraft(nextText, parsed.images, true);
     } else {
       lastEmittedDraftRef.current = draft;
     }
-  }, [draft, emitDraft]);
+  }, [draft, emitDraft, resetHistory]);
 
   // On first mount, persist auto-spacing if the initial draft was dense.
   useEffect(() => {
@@ -156,8 +203,7 @@ export const LinkedInAssistiveEditor = forwardRef<
       if (!result) return;
 
       const { newValue, cursorPos } = result;
-      setTextContent(newValue);
-      emitDraft(newValue, images, true);
+      commitSnapshot({ text: newValue, images }, true);
 
       requestAnimationFrame(() => {
         if (textarea) {
@@ -166,26 +212,77 @@ export const LinkedInAssistiveEditor = forwardRef<
         }
       });
     },
-    [textContent, images, emitDraft],
+    [textContent, images, commitSnapshot],
   );
+
+  const handleInsertEmoji = useCallback(
+    (emoji: string) => {
+      const textarea = textareaRef.current;
+      const start = textarea?.selectionStart ?? textContent.length;
+      const end = textarea?.selectionEnd ?? textContent.length;
+      const nextText =
+        textContent.slice(0, start) + emoji + textContent.slice(end);
+
+      commitSnapshot({ text: nextText, images }, true);
+      console.log(`${LOG_PREFIX} emoji inserted`, {
+        at: start,
+        textLength: nextText.length,
+      });
+
+      requestAnimationFrame(() => {
+        if (!textarea) return;
+        textarea.focus();
+        const pos = start + emoji.length;
+        textarea.setSelectionRange(pos, pos);
+      });
+    },
+    [textContent, images, commitSnapshot],
+  );
+
+  const handleUndo = useCallback(() => {
+    const restored = undo();
+    if (!restored) return;
+    emitDraft(restored.text, restored.images, true);
+    onTypingChange?.(restored.text, restored.text.length);
+    console.log(`${LOG_PREFIX} undo`, {
+      textLength: restored.text.length,
+      imageCount: restored.images.length,
+    });
+  }, [undo, emitDraft, onTypingChange]);
+
+  const handleRedo = useCallback(() => {
+    const restored = redo();
+    if (!restored) return;
+    emitDraft(restored.text, restored.images, true);
+    onTypingChange?.(restored.text, restored.text.length);
+    console.log(`${LOG_PREFIX} redo`, {
+      textLength: restored.text.length,
+      imageCount: restored.images.length,
+    });
+  }, [redo, emitDraft, onTypingChange]);
 
   const appendImage = useCallback(
     (block: LinkedInEditorImageBlock) => {
-      setImages((prev) => {
-        const next = [...prev, block];
-        emitDraft(textContent, next, true);
-        return next;
+      const nextImages = [...images, block];
+      commitSnapshot({ text: textContent, images: nextImages }, true);
+      console.log(`${LOG_PREFIX} image appended`, {
+        imageId: block.id,
+        imageCount: nextImages.length,
       });
     },
-    [textContent, emitDraft],
+    [textContent, images, commitSnapshot],
   );
 
   const handleUploadFile = useCallback(
     async (file: File) => {
       clearUploadError();
-      const block = await uploadImageFile(file);
-      if (block) {
-        appendImage(block);
+      try {
+        const block = await uploadImageFile(file);
+        if (block) {
+          appendImage(block);
+        }
+      } catch (err) {
+        console.error(`${LOG_PREFIX} image upload failed`, err);
       }
     },
     [appendImage, clearUploadError, uploadImageFile],
@@ -204,13 +301,14 @@ export const LinkedInAssistiveEditor = forwardRef<
 
   const handleRemoveImage = useCallback(
     (imageId: string) => {
-      setImages((prev) => {
-        const next = prev.filter((image) => image.id !== imageId);
-        emitDraft(textContent, next, true);
-        return next;
+      const nextImages = images.filter((image) => image.id !== imageId);
+      commitSnapshot({ text: textContent, images: nextImages }, true);
+      console.log(`${LOG_PREFIX} image removed`, {
+        imageId,
+        imageCount: nextImages.length,
       });
     },
-    [textContent, emitDraft],
+    [textContent, images, commitSnapshot],
   );
 
   const handleDrop = useCallback(
@@ -249,19 +347,35 @@ export const LinkedInAssistiveEditor = forwardRef<
       <LinkedInEditorToolbar
         onFormat={handleFormat}
         onUploadImage={() => fileInputRef.current?.click()}
+        onInsertEmoji={handleInsertEmoji}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
         isUploading={isUploading}
       />
+
+      {/* Keep photo actions under the toolbar so Download/Delete stay visible. */}
+      <Box
+        sx={{
+          borderLeft: "1px solid #e2e8f0",
+          borderRight: "1px solid #e2e8f0",
+          bgcolor: "#fff",
+          px: 1.25,
+        }}
+      >
+        <LinkedInEditorImageStrip images={images} onRemove={handleRemoveImage} />
+      </Box>
 
       <textarea
         ref={textareaRef}
         value={textContent}
         onChange={(event) => {
           const value = event.target.value;
-          setTextContent(value);
+          commitSnapshot({ text: value, images }, false);
 
           const caretIndex = event.target.selectionStart ?? value.length;
           onTypingChange?.(value, caretIndex);
-          emitDraft(value, images);
         }}
         onMouseUp={handleTextareaSelectionEvent}
         onKeyUp={handleTextareaSelectionEvent}
@@ -271,8 +385,8 @@ export const LinkedInAssistiveEditor = forwardRef<
           width: "100%",
           outline: "none",
           border: "1px solid #e2e8f0",
-          borderTop: "none",
-          borderRadius: images.length > 0 ? 0 : "0 0 8px 8px",
+          borderTop: images.length > 0 ? "1px solid #e2e8f0" : "none",
+          borderRadius: "0 0 8px 8px",
           padding: "12px",
           background: "#fff",
           color: "#333",
@@ -284,8 +398,6 @@ export const LinkedInAssistiveEditor = forwardRef<
           minHeight: 160,
         }}
       />
-
-      <LinkedInEditorImageStrip images={images} onRemove={handleRemoveImage} />
 
       <input
         ref={fileInputRef}

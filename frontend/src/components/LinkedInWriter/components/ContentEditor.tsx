@@ -99,10 +99,21 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const insertGeneratedImage = useCallback(
     (imageUrl: string) => {
-      const newDraft = appendImageMarkdownToDraft(draft, imageUrl);
+      // Prefer flushed assistive text so a pending debounce cannot drop the image.
+      let baseDraft = draft;
+      if (assistiveEditorRef && typeof assistiveEditorRef !== "function") {
+        const flushed = assistiveEditorRef.current?.flushDraft();
+        if (typeof flushed === "string") {
+          baseDraft = flushed;
+        }
+      }
+      const newDraft = appendImageMarkdownToDraft(baseDraft, imageUrl);
+      console.log("[ContentEditor] image inserted into draft", {
+        draftLength: newDraft.length,
+      });
       onDraftChange(newDraft);
     },
-    [draft, onDraftChange],
+    [draft, onDraftChange, assistiveEditorRef],
   );
 
   const prefs = readPrefs();

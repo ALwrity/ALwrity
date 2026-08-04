@@ -6,14 +6,30 @@ interface UndoRedoState<T> {
   future: T[];
 }
 
-export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
+export type UseUndoRedoOptions = {
+  /** Max past snapshots to retain. Default 50. */
+  limit?: number;
+  /**
+   * When true (default), Ctrl/Cmd+Z / Shift+Z / Y are handled on window.
+   * Disable for native textareas so toolbar undo does not fight browser undo.
+   */
+  enableKeyboardShortcuts?: boolean;
+};
+
+export function useUndoRedo<T>(initialValue: T, options?: UseUndoRedoOptions) {
   const limit = options?.limit ?? 50;
-  
+  const enableKeyboardShortcuts = options?.enableKeyboardShortcuts ?? true;
+
   const [state, setState] = useState<UndoRedoState<T>>({
     past: [],
     present: initialValue,
     future: [],
   });
+
+  // Keep a sync mirror so undo/redo can return the restored value immediately
+  // (setState updater side-effects are not reliable under React 18 batching).
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   const canUndo = state.past.length > 0;
   const canRedo = state.future.length > 0;
@@ -26,51 +42,61 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
       
       if (resolvedValue === current.present) return current;
       
-      const newPast = [...current.past, current.present].slice(-limit);
-      return {
-        past: newPast,
+      const next: UndoRedoState<T> = {
+        past: [...current.past, current.present].slice(-limit),
         present: resolvedValue,
         future: [],
       };
+      stateRef.current = next;
+      return next;
     });
   }, [limit]);
 
-  const undo = useCallback(() => {
-    setState((current) => {
-      if (current.past.length === 0) return current;
-      const previous = current.past[current.past.length - 1];
-      const newPast = current.past.slice(0, -1);
-      return {
-        past: newPast,
-        present: previous,
-        future: [current.present, ...current.future],
-      };
-    });
+  /** Undo one step; returns restored present, or undefined if nothing to undo. */
+  const undo = useCallback((): T | undefined => {
+    const current = stateRef.current;
+    if (current.past.length === 0) return undefined;
+
+    const previous = current.past[current.past.length - 1];
+    const next: UndoRedoState<T> = {
+      past: current.past.slice(0, -1),
+      present: previous,
+      future: [current.present, ...current.future],
+    };
+    stateRef.current = next;
+    setState(next);
+    return previous;
   }, []);
 
-  const redo = useCallback(() => {
-    setState((current) => {
-      if (current.future.length === 0) return current;
-      const next = current.future[0];
-      const newFuture = current.future.slice(1);
-      return {
-        past: [...current.past, current.present],
-        present: next,
-        future: newFuture,
-      };
-    });
+  /** Redo one step; returns restored present, or undefined if nothing to redo. */
+  const redo = useCallback((): T | undefined => {
+    const current = stateRef.current;
+    if (current.future.length === 0) return undefined;
+
+    const upcoming = current.future[0];
+    const next: UndoRedoState<T> = {
+      past: [...current.past, current.present],
+      present: upcoming,
+      future: current.future.slice(1),
+    };
+    stateRef.current = next;
+    setState(next);
+    return upcoming;
   }, []);
 
   const reset = useCallback((newValue: T) => {
-    setState({
+    const next: UndoRedoState<T> = {
       past: [],
       present: newValue,
       future: [],
-    });
+    };
+    stateRef.current = next;
+    setState(next);
   }, []);
 
-  // Keyboard shortcuts
   useEffect(() => {
+    if (!enableKeyboardShortcuts) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'z') {
         e.preventDefault();
@@ -83,7 +109,7 @@ export function useUndoRedo<T>(initialValue: T, options?: { limit?: number }) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [undo, redo]);
+  }, [undo, redo, enableKeyboardShortcuts]);
 
   return {
     value: state.present,

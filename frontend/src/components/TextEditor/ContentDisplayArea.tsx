@@ -1,6 +1,7 @@
 import React from 'react';
+import { Box } from '@mui/material';
 import { LinkedInDraftPreview } from '../LinkedInWriter/components/LinkedInDraftPreview';
-import { LinkedInPublishPreviewPlain } from '../LinkedInWriter/components/LinkedInPublishPreviewPlain';
+import { LinkedInFeedLivePreview } from '../LinkedInWriter/components/LinkedInFeedLivePreview';
 import { type LinkedInPreviewMode } from '../LinkedInWriter/components/LinkedInPreviewModeToggle';
 import { LinkedInAssistiveEditor, type LinkedInAssistiveEditorHandle } from '../LinkedInWriter/components/LinkedInAssistiveEditor';
 import LinkedInAssistiveWritingCard from '../LinkedInWriter/components/LinkedInAssistiveWritingCard';
@@ -120,18 +121,25 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
         {draft ? (
           <div>
             {assistantOn ? (
-              <LinkedInAssistiveEditor
-                ref={assistiveEditorRef}
-                draft={draft}
-                onDraftChange={onDraftChange}
-                onTypingChange={onTypingChange}
-                onTextareaSelection={onTextareaSelection}
-              />
+              <>
+                <LinkedInAssistiveEditor
+                  ref={assistiveEditorRef}
+                  draft={draft}
+                  onDraftChange={onDraftChange}
+                  onTypingChange={onTypingChange}
+                  onTextareaSelection={onTextareaSelection}
+                />
+                {previewMode === 'linkedin' && (
+                  <Box sx={{ mt: 2 }}>
+                    <LinkedInFeedLivePreview draft={draft} />
+                  </Box>
+                )}
+              </>
             ) : (
               previewMode === 'studio' ? (
                 <LinkedInDraftPreview draft={draft} citations={citations} researchSources={researchSources} />
               ) : (
-                <LinkedInPublishPreviewPlain draft={draft} title="LinkedIn-style preview" />
+                <LinkedInFeedLivePreview draft={draft} />
               )
             )}
           </div>

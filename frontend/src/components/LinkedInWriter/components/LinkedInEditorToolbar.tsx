@@ -6,18 +6,28 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { Image as ImageIcon } from "@mui/icons-material";
+import {
+  Image as ImageIcon,
+  Redo as RedoIcon,
+  Undo as UndoIcon,
+} from "@mui/icons-material";
 import MarkdownToolbar from "../../TextEditor/MarkdownToolbar";
 import type { MarkdownFormatType } from "../../TextEditor/markdownFormatting";
+import { LinkedInEmojiPicker } from "./LinkedInEmojiPicker";
 
 interface LinkedInEditorToolbarProps {
   onFormat: (type: MarkdownFormatType) => void;
   onUploadImage: () => void;
+  onInsertEmoji?: (emoji: string) => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
   isUploading?: boolean;
   disabled?: boolean;
 }
 
-const uploadBtnSx = {
+const toolBtnSx = {
   width: 30,
   height: 30,
   borderRadius: "6px",
@@ -27,14 +37,24 @@ const uploadBtnSx = {
     bgcolor: "#e8f4fd",
     color: "#004182",
   },
+  // Keep Undo/Redo visible when disabled (MUI default washes icons out on light toolbars).
+  "&.Mui-disabled": {
+    color: "#94a3b8",
+    opacity: 1,
+  },
 };
 
 /**
- * LinkedIn assistive editor toolbar — markdown formatting plus native-style image upload.
+ * LinkedIn assistive editor toolbar — markdown, emoji, undo/redo, image upload.
  */
 export const LinkedInEditorToolbar: React.FC<LinkedInEditorToolbarProps> = ({
   onFormat,
   onUploadImage,
+  onInsertEmoji,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   isUploading = false,
   disabled = false,
 }) => {
@@ -71,13 +91,54 @@ export const LinkedInEditorToolbar: React.FC<LinkedInEditorToolbarProps> = ({
               bgcolor: "transparent",
             }}
           />
+          {onInsertEmoji && (
+            <LinkedInEmojiPicker
+              onSelect={onInsertEmoji}
+              disabled={disabled}
+              buttonSx={toolBtnSx}
+            />
+          )}
+          {(onUndo || onRedo) && (
+            <Box sx={{ display: "flex", alignItems: "center", ml: 0.25 }}>
+              {onUndo && (
+                <Tooltip title="Undo" arrow>
+                  <span>
+                    <IconButton
+                      size="small"
+                      sx={toolBtnSx}
+                      onClick={onUndo}
+                      disabled={disabled || !canUndo}
+                      aria-label="Undo"
+                    >
+                      <UndoIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+              {onRedo && (
+                <Tooltip title="Redo" arrow>
+                  <span>
+                    <IconButton
+                      size="small"
+                      sx={toolBtnSx}
+                      onClick={onRedo}
+                      disabled={disabled || !canRedo}
+                      aria-label="Redo"
+                    >
+                      <RedoIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              )}
+            </Box>
+          )}
         </Box>
 
         <Tooltip title="Add photo" arrow>
           <span>
             <IconButton
               size="small"
-              sx={uploadBtnSx}
+              sx={toolBtnSx}
               onClick={onUploadImage}
               disabled={disabled || isUploading}
               aria-label="Upload image"
