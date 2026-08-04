@@ -99,7 +99,8 @@ class GSCService:
             db_path = self._get_db_path(user_id)
             os.makedirs(os.path.dirname(db_path), exist_ok=True)
             
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 
                 # GSC credentials table
@@ -137,6 +138,8 @@ class GSCService:
                 
                 conn.commit()
                 # logger.debug(f"GSC database tables initialized for user {user_id}")
+            finally:
+                conn.close()
                 
         except Exception as e:
             logger.error(f"Error initializing GSC tables for user {user_id}: {e}")
@@ -163,7 +166,8 @@ class GSCService:
                 'scopes': credentials.scopes
             })
             
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT OR REPLACE INTO gsc_credentials 
@@ -171,6 +175,8 @@ class GSCService:
                     VALUES (?, ?, CURRENT_TIMESTAMP)
                 ''', (user_id, credentials_json))
                 conn.commit()
+            finally:
+                conn.close()
             
             logger.info(f"GSC credentials saved for user: {user_id}")
             return True
@@ -186,7 +192,8 @@ class GSCService:
             if not os.path.exists(db_path):
                 return None
                 
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='gsc_credentials'")
                 if not cursor.fetchone():
@@ -227,6 +234,8 @@ class GSCService:
                         return None
                 
                 return credentials
+            finally:
+                conn.close()
                 
         except Exception as e:
             logger.error(f"Error loading GSC credentials for user {user_id}: {e}")
@@ -267,13 +276,16 @@ class GSCService:
             self._init_gsc_tables(user_id)
             db_path = self._get_db_path(user_id)
             
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT OR REPLACE INTO gsc_oauth_states (state, user_id) 
                     VALUES (?, ?)
                 ''', (state, user_id))
                 conn.commit()
+            finally:
+                conn.close()
             
             logger.info(f"OAuth URL generated successfully for user: {user_id}")
             return authorization_url
@@ -301,10 +313,13 @@ class GSCService:
             # Verify state in user's DB (best effort — if missing, attempt code exchange anyway)
             state_valid = False
             try:
-                with sqlite3.connect(db_path) as conn:
+                conn = sqlite3.connect(db_path)
+                try:
                     cursor = conn.cursor()
                     cursor.execute('SELECT user_id FROM gsc_oauth_states WHERE state = ?', (state,))
                     state_valid = cursor.fetchone() is not None
+                finally:
+                    conn.close()
             except Exception as state_err:
                 logger.warning(f"State verification query failed, proceeding anyway: {state_err}")
 
@@ -332,10 +347,13 @@ class GSCService:
             # Clean up state if it was valid
             if state_valid:
                 try:
-                    with sqlite3.connect(db_path) as conn:
+                    conn = sqlite3.connect(db_path)
+                    try:
                         cursor = conn.cursor()
                         cursor.execute('DELETE FROM gsc_oauth_states WHERE state = ?', (state,))
                         conn.commit()
+                    finally:
+                        conn.close()
                 except Exception as cleanup_err:
                     logger.warning(f"Failed to clean up OAuth state: {cleanup_err}")
             
@@ -704,7 +722,8 @@ class GSCService:
             if not os.path.exists(db_path):
                 return True
                 
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 
                 # Delete credentials
@@ -717,6 +736,8 @@ class GSCService:
                 cursor.execute('DELETE FROM gsc_oauth_states WHERE user_id = ?', (user_id,))
                 
                 conn.commit()
+            finally:
+                conn.close()
             
             logger.info(f"GSC access revoked for user: {user_id}")
             return True
@@ -732,12 +753,15 @@ class GSCService:
             if not os.path.exists(db_path):
                 return True
                 
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute('DELETE FROM gsc_credentials WHERE user_id = ?', (user_id,))
                 cursor.execute('DELETE FROM gsc_data_cache WHERE user_id = ?', (user_id,))
                 cursor.execute('DELETE FROM gsc_oauth_states WHERE user_id = ?', (user_id,))
                 conn.commit()
+            finally:
+                conn.close()
             
             logger.info(f"Cleared incomplete GSC credentials for user: {user_id}")
             return True
@@ -753,7 +777,8 @@ class GSCService:
             if not os.path.exists(db_path):
                 return None
                 
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute('''
                     SELECT data_json FROM gsc_data_cache 
@@ -765,6 +790,8 @@ class GSCService:
                 if result:
                     return json.loads(result[0])
                 return None
+            finally:
+                conn.close()
                 
         except Exception as e:
             logger.error(f"Error getting cached data: {e}")
@@ -778,7 +805,8 @@ class GSCService:
             
             expires_at = datetime.now() + timedelta(hours=1)  # Cache for 1 hour
             
-            with sqlite3.connect(db_path) as conn:
+            conn = sqlite3.connect(db_path)
+            try:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT OR REPLACE INTO gsc_data_cache 
@@ -786,6 +814,8 @@ class GSCService:
                     VALUES (?, ?, ?, ?, ?)
                 ''', (user_id, site_url, data_type, json.dumps(data), expires_at))
                 conn.commit()
+            finally:
+                conn.close()
             
             logger.info(f"Data cached for user: {user_id}, type: {data_type}")
             
