@@ -25,7 +25,9 @@ def _should_enforce_limit(limit_value: int, tier: str) -> bool:
     - Free tier: 0 means DISABLED (not unlimited)
     - Basic/Pro/Enterprise: 0 means UNLIMITED
     """
-    return limit_value > 0
+    if not limit_value:
+        return False
+    return True
 
 
 class LimitValidator:
@@ -234,6 +236,34 @@ class LimitValidator:
             
             # Check call limits with error handling
             # NOTE: call_limit = 0 means UNLIMITED (Enterprise plans)
+
+            # CHECK COST LIMIT FIRST: users hitting call caps while under
+            # cost cap should not be blocked. The cost limit is the primary
+            # billing constraint; call limits are secondary abuse prevention.
+            try:
+                cost_limit = limits['limits'].get('monthly_cost', 0) or 0
+                current_cost = (usage.total_cost or 0) if usage else 0
+                if _should_enforce_limit(cost_limit, user_tier) and current_cost >= cost_limit:
+                    result = (False, f"Monthly cost limit reached. Current cost: ${current_cost:.2f}, Limit: ${cost_limit:.2f}", {
+                        'current_cost': current_cost,
+                        'limit': cost_limit,
+                        'usage_percentage': 100.0
+                    })
+                    self.pricing_service._limits_cache[cache_key] = {
+                        'result': result,
+                        'expires_at': now + timedelta(seconds=30)
+                    }
+                    return result
+            except Exception as e:
+                logger.error(f"Error checking cost limits: {e}")
+                # Fail closed - deny if we can't verify the limit
+                result = (False, f"Unable to verify cost limit: {str(e)}", {})
+                self.pricing_service._limits_cache[cache_key] = {
+                    'result': result,
+                    'expires_at': now + timedelta(seconds=30)
+                }
+                return result
+
             try:
                 # Use display_provider_name for error messages, but provider.value for DB queries
                 provider_name = provider.value  # For DB field names (e.g., "mistral_calls", "mistral_tokens")
@@ -349,32 +379,6 @@ class LimitValidator:
                 logger.error(f"Error checking token limits: {e}")
                 # Fail closed - deny if we can't verify the limit
                 result = (False, f"Unable to verify token limit: {str(e)}", {})
-                self.pricing_service._limits_cache[cache_key] = {
-                    'result': result,
-                    'expires_at': now + timedelta(seconds=30)
-                }
-                return result
-            
-            # Check cost limits with error handling
-            try:
-                cost_limit = limits['limits'].get('monthly_cost', 0) or 0
-                current_cost = (usage.total_cost or 0) if usage else 0
-                # Enforce limit based on tier (Free: 0=disabled, others: 0=unlimited)
-                if _should_enforce_limit(cost_limit, user_tier) and current_cost >= cost_limit:
-                    result = (False, f"Monthly cost limit reached. Current cost: ${current_cost:.2f}, Limit: ${cost_limit:.2f}", {
-                        'current_cost': current_cost,
-                        'limit': cost_limit,
-                        'usage_percentage': 100.0
-                    })
-                    self.pricing_service._limits_cache[cache_key] = {
-                        'result': result,
-                        'expires_at': now + timedelta(seconds=30)
-                    }
-                    return result
-            except Exception as e:
-                logger.error(f"Error checking cost limits: {e}")
-                # Fail closed - deny if we can't verify the limit
-                result = (False, f"Unable to verify cost limit: {str(e)}", {})
                 self.pricing_service._limits_cache[cache_key] = {
                     'result': result,
                     'expires_at': now + timedelta(seconds=30)
