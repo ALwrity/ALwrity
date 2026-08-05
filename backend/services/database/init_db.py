@@ -70,6 +70,7 @@ import models.website_analysis_monitoring_models  # noqa: E402, F401
 import models.youtube_task_models  # noqa: E402, F401
 
 _ALEMBIC_INI_PATH = Path(__file__).resolve().parents[2] / "alembic.ini"
+_MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "alembic_migrations"
 
 
 def _auto_stamp_existing_db(engine, user_id: str) -> bool:
