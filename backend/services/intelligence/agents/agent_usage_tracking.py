@@ -4,7 +4,6 @@ from datetime import datetime
 from sqlalchemy import text
 from services.database import get_session_for_user
 from models.subscription_models import APIProvider, UsageSummary
-from services.subscription import PricingService
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +48,9 @@ def track_agent_usage_sync(user_id: str, model_name: str, prompt: str, response_
             tokens_output = int(len(str(response_text).split()) * 1.3)
             tokens_total = tokens_input + tokens_output
             
+        try:
+            from services.subscription import PricingService
+
             pricing = PricingService(db)
             current_period = pricing.get_current_billing_period(user_id) or datetime.now().strftime("%Y-%m")
             
