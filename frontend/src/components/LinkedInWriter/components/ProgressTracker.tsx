@@ -16,6 +16,8 @@ export interface ProgressStep {
 interface ProgressTrackerProps {
   steps: ProgressStep[];
   active: boolean;
+  /** Session content type — wired for PR2 progress copy; unused in PR1. */
+  draftContentType?: import("../utils/linkedInDraftLibraryUtils").LinkedInDraftContentType;
 }
 
 /* User-friendly descriptions shown beneath each active step */

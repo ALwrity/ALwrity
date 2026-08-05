@@ -15,6 +15,7 @@ import {
   VALID_INDUSTRIES,
   VALID_SEARCH_ENGINES,
 } from "../utils/linkedInWriterUtils";
+import { dispatchLinkedInDraftUpdate } from "../utils/linkedInDraftContentTypeStorage";
 import { CustomToneSelect } from "./CustomToneSelect";
 import { isCustomToneSelection } from "../utils/storageUtils";
 
@@ -111,11 +112,7 @@ const ArticleHITL: React.FC<ArticleHITLProps> = ({ args, respond }) => {
           new CustomEvent("linkedinwriter:loadingEnd", { detail: {} }),
         );
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", {
-            detail: content,
-          }),
-        );
+        dispatchLinkedInDraftUpdate(content, "article");
 
         respond({
           success: true,

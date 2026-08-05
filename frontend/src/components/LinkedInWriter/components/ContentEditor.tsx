@@ -20,12 +20,15 @@ import { LinkedInConfirmedEditHighlight } from "./LinkedInConfirmedEditHighlight
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
 import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
+import type { LinkedInDraftContentType } from '../utils/linkedInDraftLibraryUtils';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
   pendingEdit: { src: string; target: string } | null;
   livePreviewHtml: string;
   draft: string;
+  /** Session content type — wired for PR2–7; no UI change in PR1. */
+  draftContentType?: LinkedInDraftContentType;
   isGenerating: boolean;
   loadingMessage: string;
   researchSources?: any[];

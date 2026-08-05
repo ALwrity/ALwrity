@@ -31,15 +31,11 @@ import {
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   joinHashtagSuggestions,
 } from "../utils/linkedInPostAssembly";
-
-function normalizeDraftDetail(detail: unknown): string {
-  if (typeof detail === "string") return detail;
-  if (detail && typeof detail === "object" && "content" in detail) {
-    const content = (detail as { content?: unknown }).content;
-    return typeof content === "string" ? content : "";
-  }
-  return "";
-}
+import { useLinkedInDraftContentType } from "./useLinkedInDraftContentType";
+import {
+  contentTypeFromWriterAction,
+  parseUpdateDraftDetail,
+} from "../utils/linkedInDraftContentTypeStorage";
 
 export function useLinkedInWriter() {
   // Core state — restore draft from sessionStorage to survive dev HMR reloads
@@ -115,6 +111,9 @@ export function useLinkedInWriter() {
   const [showContextModal, setShowContextModal] = useState(false);
   const [justGeneratedContent, setJustGeneratedContent] = useState(false);
 
+  const { draftContentType, setDraftContentType, clearDraftContentType } =
+    useLinkedInDraftContentType();
+
   // Track action usage and update preferences
   const trackActionUsage = useCallback((actionName: string) => {
     const currentPrefs = getPreferences();
@@ -145,6 +144,7 @@ export function useLinkedInWriter() {
 
   // ── Direct generation methods (UI-driven, no CopilotKit dependency) ──────────
   const generatePost = useCallback(async (params?: any) => {
+    setDraftContentType("post", "generatePost");
     const prefs = readPrefs();
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:loadingStart", {
@@ -303,10 +303,11 @@ export function useLinkedInWriter() {
       );
       return { success: false, error: error.message || "Generation failed" };
     }
-  }, []);
+  }, [setDraftContentType]);
 
   const generateArticle = useCallback(
     async (params?: any) => {
+      setDraftContentType("article", "generateArticle");
       const prefs = readPrefs();
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:loadingStart", {
@@ -451,10 +452,11 @@ export function useLinkedInWriter() {
         return { success: false, error: error.message || "Generation failed" };
       }
     },
-    [outlineSections],
+    [outlineSections, setDraftContentType],
   );
 
   const generateCarousel = useCallback(async (params?: any) => {
+    setDraftContentType("carousel", "generateCarousel");
     const prefs = readPrefs();
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:loadingStart", {
@@ -581,9 +583,10 @@ export function useLinkedInWriter() {
       );
       return { success: false, error: error.message || "Generation failed" };
     }
-  }, []);
+  }, [setDraftContentType]);
 
   const generateVideoScript = useCallback(async (params?: any) => {
+    setDraftContentType("video_script", "generateVideoScript");
     const prefs = readPrefs();
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:loadingStart", {
@@ -714,7 +717,7 @@ export function useLinkedInWriter() {
       );
       return { success: false, error: error.message || "Generation failed" };
     }
-  }, []);
+  }, [setDraftContentType]);
 
   // Initialize chat history, preferences, and grounding data from localStorage
   useEffect(() => {
@@ -946,8 +949,15 @@ export function useLinkedInWriter() {
   // Handle draft updates from CopilotKit actions
   useEffect(() => {
     const handleUpdateDraft = (event: CustomEvent) => {
-      const rawContent = normalizeDraftDetail(event.detail);
-      const cleanedContent = stripSourceCitations(rawContent);
+      const parsed = parseUpdateDraftDetail(event.detail);
+      const cleanedContent = stripSourceCitations(parsed.content);
+      const resolvedContentType =
+        parsed.contentType ??
+        contentTypeFromWriterAction(currentAction) ??
+        undefined;
+      if (resolvedContentType) {
+        setDraftContentType(resolvedContentType, "updateDraftEvent");
+      }
       console.log(
         "[LinkedIn Writer] Draft updated:",
         cleanedContent?.substring(0, 100) + "...",
@@ -1066,7 +1076,7 @@ export function useLinkedInWriter() {
         handleLoadingEnd as EventListener,
       );
     };
-  }, [draft]);
+  }, [draft, currentAction, setDraftContentType]);
 
   // Event handlers
   const handleDraftChange = useCallback((value: string) => {
@@ -1083,12 +1093,13 @@ export function useLinkedInWriter() {
     setOutlineSections([]);
     setOutlineTitleSuggestions([]);
     setOutlineMode(false);
+    clearDraftContentType();
     try {
       sessionStorage.removeItem("li_draft");
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [clearDraftContentType]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -1142,6 +1153,7 @@ export function useLinkedInWriter() {
         setOutlineSections(res.outline);
         setOutlineTitleSuggestions(res.title_suggestions || []);
         setOutlineMode(true);
+        setDraftContentType("article", "generateOutline");
         window.dispatchEvent(new CustomEvent("linkedinwriter:loadingEnd"));
         return { success: true, outline: res.outline };
       }
@@ -1159,7 +1171,7 @@ export function useLinkedInWriter() {
     } finally {
       setIsGeneratingOutline(false);
     }
-  }, []);
+  }, [setDraftContentType]);
 
   const refineOutline = useCallback(
     async (operation: string, sectionId?: string, payload?: any) => {
@@ -1205,6 +1217,7 @@ export function useLinkedInWriter() {
     showPreferencesModal,
     showContextModal,
     justGeneratedContent,
+    draftContentType,
 
     // Setters
     setDraft,
@@ -1223,6 +1236,7 @@ export function useLinkedInWriter() {
     setShowPreferencesModal,
     setShowContextModal,
     setJustGeneratedContent: setJustGeneratedContent,
+    setDraftContentType,
 
     // Handlers
     handleDraftChange,

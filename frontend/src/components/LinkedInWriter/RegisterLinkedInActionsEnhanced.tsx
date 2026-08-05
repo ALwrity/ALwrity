@@ -15,6 +15,7 @@ import {
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   joinHashtagSuggestions,
 } from "./utils/linkedInPostAssembly";
+import { dispatchLinkedInDraftUpdate } from "./utils/linkedInDraftContentTypeStorage";
 import { usePlatformPersonaContext } from "../shared/PersonaContext/PlatformPersonaProvider";
 import { useCopilotActionTyped } from "../../hooks/useCopilotActionTyped";
 
@@ -329,12 +330,7 @@ const RegisterLinkedInActionsEnhanced: React.FC = () => {
           }),
         );
 
-        // Send draft content to editor
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", {
-            detail: fullContent,
-          }),
-        );
+        dispatchLinkedInDraftUpdate(fullContent, "post");
 
         // Complete progress and end loading
         window.dispatchEvent(

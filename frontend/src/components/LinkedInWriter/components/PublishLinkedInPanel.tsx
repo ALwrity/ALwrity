@@ -51,6 +51,8 @@ import {
 
 interface PublishLinkedInPanelProps {
   draft: string;
+  /** Session content type — wired for PR2–7; no publish change in PR1. */
+  draftContentType?: import("../utils/linkedInDraftLibraryUtils").LinkedInDraftContentType;
   topic?: string;
   compact?: boolean;
   /** Flush assistive editor pending edits and return latest draft before publish. */

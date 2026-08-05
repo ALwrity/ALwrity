@@ -101,6 +101,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     showPreferencesModal,
     // showContextModal,
     justGeneratedContent,
+    draftContentType,
 
     // Grounding data
     researchSources,
@@ -350,6 +351,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
       console.log(
         "[LinkedInWriter] Saved to Asset Library, assetId:",
         result.assetId,
+        "contentType:",
+        draftContentType,
       );
 
       setSaveStatus("saved");
@@ -873,6 +876,7 @@ Always use the most appropriate tool for the user's request.`.trim();
 
                 <PublishLinkedInPanel
                   draft={draft}
+                  draftContentType={draftContentType}
                   getDraftForPublish={getDraftForPublish}
                   onInsertImageIntoDraft={handleInsertImageIntoDraft}
                   topic={
@@ -891,6 +895,7 @@ Always use the most appropriate tool for the user's request.`.trim();
               pendingEdit={pendingEdit}
               livePreviewHtml={livePreviewHtml}
               draft={draft}
+              draftContentType={draftContentType}
               isGenerating={isGenerating}
               loadingMessage={loadingMessage}
               // Grounding data
@@ -1199,6 +1204,7 @@ Always use the most appropriate tool for the user's request.`.trim();
       <ProgressTracker
         steps={progressSteps as ProgressStep[]}
         active={progressActive}
+        draftContentType={draftContentType}
       />
     </div>
   );
