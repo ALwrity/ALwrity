@@ -8,12 +8,17 @@ import {
   getDraftPlainTextForDisplay,
 } from "./linkedInPublishFormatters";
 import {
+  DEFAULT_ARTICLE_WORD_TARGET,
+  LINKEDIN_ARTICLE_SOFT_MAX,
+  LINKEDIN_ARTICLE_SOFT_MIN,
   LINKEDIN_HASHTAG_SOFT_MAX,
   LINKEDIN_POST_HARD_LIMIT,
   LINKEDIN_POST_SEE_MORE_SOFT,
   LINKEDIN_PUBLISH_EMPTY_ERROR,
   LINKEDIN_PUBLISH_TOO_LONG_ERROR,
 } from "./linkedInPostFormatConstants";
+import { normalizeDraftContentType } from "./linkedInDraftContentTypeStorage";
+import type { LinkedInDraftContentType } from "./linkedInDraftLibraryUtils";
 
 export interface CharReadiness {
   count: number;
@@ -41,6 +46,18 @@ export interface HardPublishLimitResult {
   ok: boolean;
   error?: string;
 }
+
+export interface WordReadiness {
+  count: number;
+  isEmpty: boolean;
+  target: number;
+  nearTargetOk: boolean;
+  softMinOk: boolean;
+  softMaxOk: boolean;
+}
+
+/** ±20% band around generation target counts as "near target". */
+const ARTICLE_TARGET_TOLERANCE = 0.2;
 
 const CTA_PATTERN =
   /\?|call to action|comment below|what do you think|share your|let me know|drop a|tell me|agree\?/i;
@@ -202,4 +219,72 @@ export function getSeeMoreCaption(chars: CharReadiness): string | null {
   if (chars.isEmpty) return null;
   if (chars.seeMoreSoftOk) return null;
   return `Past see more (~${LINKEDIN_POST_SEE_MORE_SOFT.toLocaleString()} characters) — still publishable.`;
+}
+
+/** Count words in plain text (same logic as draft save metadata). */
+export function countDraftWords(plainText: string): number {
+  return (plainText || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+/** Resolve article generation target from prefs or default. */
+export function resolveArticleWordTarget(
+  prefs?: Record<string, unknown>,
+): number {
+  const raw = prefs?.word_count;
+  if (typeof raw === "number" && raw > 0) {
+    return raw;
+  }
+  if (typeof raw === "string") {
+    const parsed = parseInt(raw, 10);
+    if (!Number.isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+  return DEFAULT_ARTICLE_WORD_TARGET;
+}
+
+export function getWordReadiness(
+  plainText: string,
+  targetWordCount?: number,
+): WordReadiness {
+  const target = targetWordCount ?? DEFAULT_ARTICLE_WORD_TARGET;
+  const count = countDraftWords(plainText);
+  const isEmpty = count === 0 || !(plainText || "").trim();
+  const lowerBound = Math.floor(target * (1 - ARTICLE_TARGET_TOLERANCE));
+  const upperBound = Math.ceil(target * (1 + ARTICLE_TARGET_TOLERANCE));
+
+  return {
+    count,
+    isEmpty,
+    target,
+    nearTargetOk: !isEmpty && count >= lowerBound && count <= upperBound,
+    softMinOk: count >= LINKEDIN_ARTICLE_SOFT_MIN,
+    softMaxOk: count <= LINKEDIN_ARTICLE_SOFT_MAX,
+  };
+}
+
+export function formatWordCountLabel(count: number, target: number): string {
+  return `${count.toLocaleString()} / ${target.toLocaleString()} words`;
+}
+
+/** Soft-band tooltip for article word count display. */
+export function getArticleWordCaption(words: WordReadiness): string | null {
+  if (words.isEmpty) return null;
+  if (!words.softMinOk) {
+    return `Under ${LINKEDIN_ARTICLE_SOFT_MIN.toLocaleString()} words — articles rarely rank in LinkedIn search. Aim for your ${words.target.toLocaleString()}-word target.`;
+  }
+  if (!words.softMaxOk) {
+    return `Over ${LINKEDIN_ARTICLE_SOFT_MAX.toLocaleString()} words — read-through rate often drops. Consider trimming.`;
+  }
+  if (!words.nearTargetOk) {
+    return `Generation target: ${words.target.toLocaleString()} words. Optimal band for LinkedIn articles is ${LINKEDIN_ARTICLE_SOFT_MIN.toLocaleString()}–2,000 words.`;
+  }
+  return null;
+}
+
+/** Block Unipile v1 publish for LinkedIn articles. */
+export function isArticleUnipilePublishBlocked(
+  contentType?: LinkedInDraftContentType | null,
+): boolean {
+  return normalizeDraftContentType(contentType) === "article";
 }

@@ -22,3 +22,14 @@ export const LINKEDIN_PUBLISH_TOO_LONG_ERROR =
 
 export const LINKEDIN_PUBLISH_PLAIN_NOTE =
   "Bold and headings won’t appear on LinkedIn. This is what will post.";
+
+/** LinkedIn article soft word-count band (Knowledge Center guidance). */
+export const LINKEDIN_ARTICLE_SOFT_MIN = 1500;
+
+export const LINKEDIN_ARTICLE_SOFT_MAX = 3000;
+
+/** Default generation target when prefs have no word_count. */
+export const DEFAULT_ARTICLE_WORD_TARGET = 1500;
+
+export const LINKEDIN_ARTICLE_PUBLISH_DISABLED_TOOLTIP =
+  "Article publishing is not available via Unipile v1 — finish in LinkedIn's native article editor, or copy your draft and paste it there.";

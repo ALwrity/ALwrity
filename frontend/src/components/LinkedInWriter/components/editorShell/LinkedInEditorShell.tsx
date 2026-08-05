@@ -70,7 +70,15 @@ export const LinkedInEditorShell: React.FC<LinkedInEditorShellProps> = (
   }, [shellMode, draftContentType]);
 
   if (shellMode === "article") {
-    return <ArticleEditorShell {...sharedProps} />;
+    return (
+      <ArticleEditorShell
+        {...sharedProps}
+        draftContentType={draftContentType}
+        getDraftForPublish={getDraftForPublish}
+        onInsertImageIntoDraft={onInsertImageIntoDraft}
+        topic={topic}
+      />
+    );
   }
 
   return (

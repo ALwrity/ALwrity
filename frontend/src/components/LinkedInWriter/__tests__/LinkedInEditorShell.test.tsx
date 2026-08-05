@@ -1,5 +1,7 @@
 /**
  * LinkedInEditorShell routing smoke tests.
+ * Run manually:
+ *   npx react-scripts test --watchAll=false --testPathPattern=LinkedInEditorShell
  */
 
 import React from "react";
@@ -33,7 +35,7 @@ describe("LinkedInEditorShell", () => {
     expect(screen.queryByTestId("article-editor-shell")).toBeNull();
   });
 
-  test("renders article shell without preview toggle or publish panel", () => {
+  test("renders article shell with gated publish panel", () => {
     render(
       <LinkedInEditorShell {...baseProps} draftContentType="article" />,
     );
@@ -41,7 +43,7 @@ describe("LinkedInEditorShell", () => {
     expect(screen.getByTestId("article-editor-shell")).toBeTruthy();
     expect(screen.getByTestId("article-editor-placeholder")).toBeTruthy();
     expect(screen.queryByTestId("post-preview-mode-toggle")).toBeNull();
-    expect(screen.queryByTestId("publish-linkedin-panel")).toBeNull();
+    expect(screen.getByTestId("publish-linkedin-panel")).toBeTruthy();
   });
 
   test("defaults to post shell for carousel content type", () => {

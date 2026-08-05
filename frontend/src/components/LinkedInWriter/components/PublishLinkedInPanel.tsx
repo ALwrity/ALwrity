@@ -31,6 +31,7 @@ import { LinkedInPublishMediaSection } from "./LinkedInPublishMediaSection";
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInPublishPreviewPlain } from "./LinkedInPublishPreviewPlain";
 import { LinkedInPublishChecklist } from "./LinkedInPublishChecklist";
+import { PublishLinkedInLimitCaption } from "./PublishLinkedInLimitCaption";
 import { readPrefs } from "../utils/linkedInWriterUtils";
 import {
   buildLinkedInPublishSuccessMessage,
@@ -43,11 +44,11 @@ import {
 import {
   areHardPublishChecksOk,
   assertHardPublishLimits,
-  formatCharCountLabel,
-  getCharReadiness,
   getPublishPlainText,
-  getSeeMoreCaption,
+  isArticleUnipilePublishBlocked,
+  resolveArticleWordTarget,
 } from "../utils/linkedInPublishReadiness";
+import { LINKEDIN_ARTICLE_PUBLISH_DISABLED_TOOLTIP } from "../utils/linkedInPostFormatConstants";
 
 interface PublishLinkedInPanelProps {
   draft: string;
@@ -78,6 +79,7 @@ const PUBLISH_STEPS: { step: PublishStep; label: string }[] = [
 
 const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   draft,
+  draftContentType,
   topic,
   compact = false,
   getDraftForPublish,
@@ -95,8 +97,11 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
     null,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
   const [mediaAnchor, setMediaAnchor] = useState<HTMLElement | null>(null);
   const prefs = readPrefs();
+  const articlePublishBlocked = isArticleUnipilePublishBlocked(draftContentType);
+  const articleWordTarget = resolveArticleWordTarget(prefs);
 
   const publishMedia = useLinkedInPublishMedia({
     draft,
@@ -122,8 +127,6 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   }, []);
 
   const publishContent = getPublishPlainText(draft);
-  const chars = getCharReadiness(publishContent);
-  const seeMoreCaption = getSeeMoreCaption(chars);
   const draftHasImage = Boolean(getLastDraftImageForPublish(draft));
   const hasPublishMedia = publishMedia.hasAttachment || draftHasImage;
   const previewAttachment = resolvePublishMediaAttachment(
@@ -133,13 +136,53 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
   const isOrgTarget = selectedTarget === "organization";
   const hardChecksOk = areHardPublishChecksOk(publishContent);
   const canPublish =
-    connected && hardChecksOk && !isOrgTarget && !isPublishing && !isLoading;
+    connected &&
+    hardChecksOk &&
+    !isOrgTarget &&
+    !isPublishing &&
+    !isLoading &&
+    !articlePublishBlocked;
+
+  const publishButtonLabel =
+    isPublishing
+      ? "Publishing..."
+      : isConnecting
+        ? "Connecting..."
+        : articlePublishBlocked || connected
+          ? "Publish"
+          : "Connect";
+
+  const publishButtonTooltip = articlePublishBlocked
+    ? LINKEDIN_ARTICLE_PUBLISH_DISABLED_TOOLTIP
+    : connected
+      ? "Publish to LinkedIn"
+      : "Connect your LinkedIn account to publish posts";
+
+  const handleCopyDraft = useCallback(async () => {
+    const text = getPublishPlainText(getDraftForPublish?.() ?? draft);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback("Draft copied to clipboard.");
+      console.log("[LinkedInPublish] article draft copied to clipboard", {
+        length: text.length,
+      });
+    } catch (err) {
+      console.error("[LinkedInPublish] failed to copy article draft", err);
+      setCopyFeedback("Could not copy draft. Select and copy manually.");
+    }
+  }, [draft, getDraftForPublish]);
 
   const connectionLabel = connected
     ? `Connected via ${provider}`
     : "Not connected — connect LinkedIn to publish";
 
   const handlePublish = async () => {
+    if (articlePublishBlocked) {
+      console.warn("[LinkedInPublish] blocked article publish attempt", {
+        draftContentType,
+      });
+      return;
+    }
     if (!canPublish) return;
 
     const draftForPublish = getDraftForPublish?.() ?? draft;
@@ -223,29 +266,12 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
     </Box>
   ) : null;
 
-  const charCaption = (
-    <Tooltip
-      title={
-        seeMoreCaption
-          ? "Posts over ~1,300 characters show a \"see more\" cut-off on LinkedIn. Your hook and first 2 lines should capture attention before the fold."
-          : `${chars.count} / 3,000 LinkedIn character limit`
-      }
-      arrow
-      placement="top"
-    >
-      <Typography
-        variant="caption"
-        sx={{
-          color: chars.hardOk ? "#64748b" : "#dc2626",
-          display: "block",
-          whiteSpace: "nowrap",
-          cursor: "help",
-        }}
-      >
-        {formatCharCountLabel(chars.count)}
-        {seeMoreCaption ? " · see more" : ""}
-      </Typography>
-    </Tooltip>
+  const limitCaption = (
+    <PublishLinkedInLimitCaption
+      plainText={publishContent}
+      contentType={draftContentType}
+      targetWordCount={articleWordTarget}
+    />
   );
 
   const mediaControls = (
@@ -324,13 +350,18 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
           onClose={() => setShowProgress(false)}
         />
 
-        {mediaControls}
-        {charCaption}
-        <Tooltip title={connected ? 'Publish to LinkedIn' : 'Connect your LinkedIn account to publish posts'} arrow>
+        {!articlePublishBlocked ? mediaControls : null}
+        {limitCaption}
+        <Tooltip title={publishButtonTooltip} arrow>
           <span>
             <Button
               variant="contained"
-              disabled={isPublishing || isConnecting || (connected && !hardChecksOk)}
+              disabled={
+                isPublishing ||
+                isConnecting ||
+                articlePublishBlocked ||
+                (connected && !hardChecksOk)
+              }
               onClick={connected ? handlePublish : () => { void connectWithOAuth(); }}
               startIcon={
                 isPublishing || isConnecting ? (
@@ -347,7 +378,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
                 fontWeight: 600,
               }}
             >
-              {isPublishing ? 'Publishing...' : isConnecting ? 'Connecting...' : connected ? 'Publish' : 'Connect'}
+              {publishButtonLabel}
             </Button>
           </span>
         </Tooltip>
@@ -412,44 +443,66 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         variant="caption"
         sx={{ color: "#64748b", display: "block", mb: 1.5 }}
       >
-        Publish your draft text to your LinkedIn personal profile with optional
-        image attachment.
+        {articlePublishBlocked
+          ? "Copy your article draft and finish publishing in LinkedIn's native article editor."
+          : "Publish your draft text to your LinkedIn personal profile with optional image attachment."}
       </Typography>
 
-      <LinkedInPublishMediaSection
-        draft={draft}
-        topic={topic}
-        media={publishMedia}
-        selectionImage={selectionImage}
-        renderImageModal={false}
-      />
+      {!articlePublishBlocked ? (
+        <LinkedInPublishMediaSection
+          draft={draft}
+          topic={topic}
+          media={publishMedia}
+          selectionImage={selectionImage}
+          renderImageModal={false}
+        />
+      ) : null}
 
       <Box sx={{ mb: 1.5 }}>
         <LinkedInPublishPreviewPlain
           draft={draft}
           attachment={previewAttachment}
           forPublish
+          contentType={draftContentType}
+          targetWordCount={articleWordTarget}
         />
       </Box>
 
-      <Box sx={{ mb: 1.5 }}>
-        <LinkedInPublishChecklist
-          draft={publishContent}
-          hasMedia={hasPublishMedia}
-          compact
-        />
-        <Typography
-          variant="caption"
-          sx={{
-            color: chars.hardOk ? "#64748b" : "#dc2626",
-            display: "block",
-            mt: 1,
-          }}
-        >
-          {formatCharCountLabel(chars.count)}
-          {seeMoreCaption ? ` · ${seeMoreCaption}` : ""}
-        </Typography>
-      </Box>
+      {!articlePublishBlocked ? (
+        <Box sx={{ mb: 1.5 }}>
+          <LinkedInPublishChecklist
+            draft={publishContent}
+            hasMedia={hasPublishMedia}
+            compact
+          />
+          <Box sx={{ mt: 1 }}>{limitCaption}</Box>
+        </Box>
+      ) : (
+        <Box sx={{ mb: 1.5 }}>
+          {limitCaption}
+        </Box>
+      )}
+
+      {articlePublishBlocked && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          {LINKEDIN_ARTICLE_PUBLISH_DISABLED_TOOLTIP}
+          <Box sx={{ mt: 1, display: "flex", alignItems: "center", gap: 1 }}>
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => { void handleCopyDraft(); }}
+              sx={{ textTransform: "none" }}
+            >
+              Copy draft
+            </Button>
+            {copyFeedback ? (
+              <Typography variant="caption" sx={{ color: "#64748b" }}>
+                {copyFeedback}
+              </Typography>
+            ) : null}
+          </Box>
+        </Alert>
+      )}
 
       {isOrgTarget && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
@@ -486,11 +539,16 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
         </Alert>
       )}
 
-      <Tooltip title={connected ? 'Publish to LinkedIn' : 'Connect your LinkedIn account to publish posts'} arrow>
+      <Tooltip title={publishButtonTooltip} arrow>
         <span>
           <Button
             variant="contained"
-            disabled={isPublishing || isConnecting || (connected && !hardChecksOk)}
+            disabled={
+              isPublishing ||
+              isConnecting ||
+              articlePublishBlocked ||
+              (connected && !hardChecksOk)
+            }
             onClick={connected ? handlePublish : () => { void connectWithOAuth(); }}
             startIcon={
               isPublishing || isConnecting ? (
@@ -499,7 +557,7 @@ const PublishLinkedInPanel: React.FC<PublishLinkedInPanelProps> = ({
             }
             sx={{ bgcolor: "#0A66C2", "&:hover": { bgcolor: "#004182" } }}
           >
-            {isPublishing ? 'Publishing...' : isConnecting ? 'Connecting...' : connected ? 'Publish' : 'Connect'}
+            {publishButtonLabel}
           </Button>
         </span>
       </Tooltip>

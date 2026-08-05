@@ -4,16 +4,27 @@
 
 import React from "react";
 import { Alert, Chip, ThemeProvider } from "@mui/material";
+import PublishLinkedInPanel from "../PublishLinkedInPanel";
+import type { LinkedInDraftContentType } from "../../utils/linkedInDraftLibraryUtils";
 import {
   EditorChromeShared,
   type EditorChromeSharedProps,
 } from "./EditorChromeShared";
 import { editorShellTheme, editorShellToolbarStyle } from "./editorShellTheme";
 
-export type ArticleEditorShellProps = EditorChromeSharedProps;
+export interface ArticleEditorShellProps extends EditorChromeSharedProps {
+  draftContentType?: LinkedInDraftContentType;
+  getDraftForPublish?: () => string;
+  onInsertImageIntoDraft?: (imageUrl: string) => void;
+  topic?: string;
+}
 
 export const ArticleEditorShell: React.FC<ArticleEditorShellProps> = ({
   draft,
+  draftContentType = "article",
+  getDraftForPublish,
+  onInsertImageIntoDraft,
+  topic,
   ...sharedProps
 }) => {
   return (
@@ -32,6 +43,15 @@ export const ArticleEditorShell: React.FC<ArticleEditorShellProps> = ({
               color: "#047857",
               border: "1px solid #6ee7b7",
             }}
+          />
+
+          <PublishLinkedInPanel
+            draft={draft}
+            draftContentType={draftContentType}
+            getDraftForPublish={getDraftForPublish}
+            onInsertImageIntoDraft={onInsertImageIntoDraft}
+            topic={topic}
+            compact
           />
         </div>
 

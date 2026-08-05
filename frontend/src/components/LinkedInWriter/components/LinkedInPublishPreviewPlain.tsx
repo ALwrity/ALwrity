@@ -7,12 +7,14 @@ import React, { useMemo } from "react";
 import { Alert, Box, Typography } from "@mui/material";
 import { LINKEDIN_PUBLISH_PLAIN_NOTE } from "../utils/linkedInPostFormatConstants";
 import {
-  formatCharCountLabel,
-  getCharReadiness,
   getDraftPlainTextForPreview,
   getPublishPlainText,
   getSeeMoreCaption,
+  getCharReadiness,
 } from "../utils/linkedInPublishReadiness";
+import { normalizeDraftContentType } from "../utils/linkedInDraftContentTypeStorage";
+import type { LinkedInDraftContentType } from "../utils/linkedInDraftLibraryUtils";
+import { resolvePublishLimitHeaderLabel } from "./PublishLinkedInLimitCaption";
 import { LinkedInAuthenticatedImage } from "./LinkedInAuthenticatedImage";
 import type { LinkedInPublishMediaAttachment } from "../utils/linkedInPublishMediaUtils";
 
@@ -26,6 +28,8 @@ export interface LinkedInPublishPreviewPlainProps {
   attachment?: LinkedInPublishMediaAttachment | null;
   compact?: boolean;
   title?: string;
+  contentType?: LinkedInDraftContentType | null;
+  targetWordCount?: number;
 }
 
 function resolvePreviewImage(
@@ -58,13 +62,23 @@ export const LinkedInPublishPreviewPlain: React.FC<
   attachment = null,
   compact = false,
   title = "What LinkedIn will see",
+  contentType,
+  targetWordCount,
 }) => {
+  const isArticle = normalizeDraftContentType(contentType) === "article";
+
   const text = (
     plainText ??
     (forPublish ? getPublishPlainText(draft) : getDraftPlainTextForPreview(draft))
   ).trim();
+
+  const limitHeader = resolvePublishLimitHeaderLabel(
+    text,
+    contentType,
+    targetWordCount,
+  );
   const chars = getCharReadiness(text);
-  const seeMoreCaption = getSeeMoreCaption(chars);
+  const seeMoreCaption = !isArticle ? getSeeMoreCaption(chars) : null;
   const image = resolvePreviewImage(attachment);
 
   const paragraphs = useMemo(
@@ -113,12 +127,12 @@ export const LinkedInPublishPreviewPlain: React.FC<
         <Typography
           variant="caption"
           sx={{
-            color: chars.hardOk ? "#64748b" : "#dc2626",
+            color: limitHeader.warn ? "#dc2626" : "#64748b",
             fontWeight: 600,
             whiteSpace: "nowrap",
           }}
         >
-          {formatCharCountLabel(chars.count)}
+          {limitHeader.label}
         </Typography>
       </Box>
 
@@ -164,7 +178,9 @@ export const LinkedInPublishPreviewPlain: React.FC<
             variant="body2"
             sx={{ color: "#94a3b8", fontStyle: "italic" }}
           >
-            Nothing to preview yet. Add post text first.
+            {isArticle
+              ? "Nothing to preview yet. Add article text first."
+              : "Nothing to preview yet. Add post text first."}
           </Typography>
         )}
 
