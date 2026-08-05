@@ -24,22 +24,12 @@ class DatabaseSetup:
             print("📊 Setting up essential database tables...")
         
         try:
-            from services.database import init_database, engine
+            from services.database import init_database
             
-            # Initialize database connection
+            # Initialize database connection and run migrations
             init_database()
             if verbose:
                 print("   ✅ Database connection initialized")
-            
-            # Create essential tables
-            self._create_monitoring_tables()
-            self._create_subscription_tables()
-            self._create_persona_tables()
-            self._create_onboarding_tables()
-            self._create_daily_workflow_tables()
-            
-            if verbose:
-                print("✅ Essential database tables created")
             return True
             
         except Exception as e:
@@ -58,7 +48,7 @@ class DatabaseSetup:
         
         try:
             from models.base import Base
-            MonitoringBase.metadata.create_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Monitoring tables created")
             return True
@@ -74,7 +64,7 @@ class DatabaseSetup:
         
         try:
             from models.base import Base
-            SubscriptionBase.metadata.create_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Subscription tables created")
             return True
@@ -90,7 +80,7 @@ class DatabaseSetup:
         
         try:
             from models.base import Base
-            PersonaBase.metadata.create_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Persona tables created")
             return True
@@ -106,7 +96,7 @@ class DatabaseSetup:
         
         try:
             from models.base import Base
-            OnboardingBase.metadata.create_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Onboarding tables created")
             return True
@@ -122,7 +112,7 @@ class DatabaseSetup:
         
         try:
             from models.base import Base
-            StrategyBase.metadata.create_all(bind=engine)
+            Base.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Daily workflow tables created")
             return True

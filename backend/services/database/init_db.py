@@ -20,6 +20,7 @@ from sqlalchemy.orm import sessionmaker
 
 from services.database.engine import get_engine_for_user
 from services.database.legacy import default_engine
+from models.base import Base
 
 # Trigger model imports so all tables register with the shared Base.
 # These are needed both for alembic env.py and for any code that does
@@ -121,6 +122,7 @@ def init_user_database(user_id: str) -> None:
 
         _auto_stamp_existing_db(engine, user_id)
         command.upgrade(alembic_cfg, "head")
+        Base.metadata.create_all(bind=engine, checkfirst=True)
 
         if user_id not in _pricing_initialized:
             _pricing_initialized.add(user_id)
@@ -155,11 +157,16 @@ def init_user_database(user_id: str) -> None:
 
 def init_database() -> None:
     """Initialize global database tables (backward compatibility / startup checks)."""
-    if not default_engine:
-        logger.warning(
-            "Global database initialization skipped: default_engine is disabled (Multi-tenant mode)"
+    engine = default_engine
+    if not engine:
+        logger.info(
+            "Global database: legacy default_engine is disabled, "
+            "using sqlite:///alwrity.db for startup checks"
         )
-        return
+        from sqlalchemy import create_engine
+        engine = create_engine("sqlite:///alwrity.db")
+        import services.database.legacy as _legacy
+        _legacy.default_engine = engine
 
     try:
         from alembic import command
@@ -167,10 +174,11 @@ def init_database() -> None:
 
         alembic_cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
         alembic_cfg.set_main_option(
-            "sqlalchemy.url", f"sqlite:///{default_engine.url.database}"
+            "sqlalchemy.url", f"sqlite:///{engine.url.database}"
         )
-        _auto_stamp_existing_db(default_engine, "global")
+        _auto_stamp_existing_db(engine, "global")
         command.upgrade(alembic_cfg, "head")
+        Base.metadata.create_all(bind=engine, checkfirst=True)
         logger.info("Global database initialized successfully")
     except SQLAlchemyError as e:
         logger.error(f"Error initializing global database: {str(e)}")
