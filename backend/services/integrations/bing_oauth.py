@@ -320,6 +320,7 @@ class BingOAuthService(OAuthProviderBase):
     def get_user_tokens(self, user_id: str) -> List[Dict[str, Any]]:
         """Get all active Bing tokens for a user."""
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return []
