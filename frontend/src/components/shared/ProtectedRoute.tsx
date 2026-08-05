@@ -160,10 +160,18 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
     // Subscription loaded but not active - redirect to pricing
     if (!subscription.active) {
+      if (window.location.pathname === '/pricing') {
+        return null;
+      }
+      const alreadyRedirected = sessionStorage.getItem('pricing_redirect');
+      if (alreadyRedirected) {
+        return null;
+      }
       console.log('ProtectedRoute: No active subscription, redirecting to pricing', {
         active: subscription.active,
         subError
       });
+      sessionStorage.setItem('pricing_redirect', '1');
       return <Navigate to="/pricing" replace />;
     }
   }
