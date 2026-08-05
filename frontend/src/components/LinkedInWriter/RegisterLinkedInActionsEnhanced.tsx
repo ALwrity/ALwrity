@@ -94,6 +94,7 @@ const RegisterLinkedInActionsEnhanced: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "post",
             steps: [
               { id: "persona_analysis", label: `Analyzing ${personaInfo}` },
               { id: "personalize", label: "Personalizing topic & context" },

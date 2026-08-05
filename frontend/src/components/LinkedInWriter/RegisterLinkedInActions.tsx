@@ -279,6 +279,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "post",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -539,6 +540,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "article",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -763,6 +765,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "carousel",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -921,6 +924,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "video_script",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },

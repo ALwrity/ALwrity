@@ -102,6 +102,7 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     // showContextModal,
     justGeneratedContent,
     draftContentType,
+    progressContentType,
 
     // Grounding data
     researchSources,
@@ -1204,7 +1205,7 @@ Always use the most appropriate tool for the user's request.`.trim();
       <ProgressTracker
         steps={progressSteps as ProgressStep[]}
         active={progressActive}
-        draftContentType={draftContentType}
+        contentType={progressContentType ?? draftContentType}
       />
     </div>
   );

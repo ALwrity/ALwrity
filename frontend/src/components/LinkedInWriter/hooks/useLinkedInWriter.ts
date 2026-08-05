@@ -36,6 +36,10 @@ import {
   contentTypeFromWriterAction,
   parseUpdateDraftDetail,
 } from "../utils/linkedInDraftContentTypeStorage";
+import {
+  resolveProgressContentType,
+} from "../utils/linkedInProgressCopy";
+import type { LinkedInDraftContentType } from "../utils/linkedInDraftLibraryUtils";
 
 export function useLinkedInWriter() {
   // Core state — restore draft from sessionStorage to survive dev HMR reloads
@@ -78,6 +82,8 @@ export function useLinkedInWriter() {
   };
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
   const [progressActive, setProgressActive] = useState<boolean>(false);
+  const [progressContentType, setProgressContentType] =
+    useState<LinkedInDraftContentType | null>(null);
 
   // Outline state (Phase 2)
   const [outlineSections, setOutlineSections] = useState<
@@ -157,6 +163,7 @@ export function useLinkedInWriter() {
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:progressInit", {
         detail: {
+          contentType: "post",
           steps: [
             { id: "personalize", label: "Analyzing topic & audience" },
             { id: "prepare_queries", label: "Preparing research strategy" },
@@ -320,6 +327,7 @@ export function useLinkedInWriter() {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "article",
             steps: [
               { id: "personalize", label: "Analyzing topic & audience" },
               { id: "prepare_queries", label: "Preparing research strategy" },
@@ -339,7 +347,7 @@ export function useLinkedInWriter() {
             id: "personalize",
             status: "active",
             message:
-              "Analyzing topic, industry, and target audience — tailoring the content for LinkedIn engagement...",
+              "Analyzing topic, industry, and target audience — shaping your article structure and thought-leadership angle...",
           },
         }),
       );
@@ -767,6 +775,21 @@ export function useLinkedInWriter() {
     const handleProgressInit = (event: CustomEvent) => {
       const steps: Array<{ id: string; label: string; message?: string }> =
         event.detail?.steps || [];
+      const resolvedType = resolveProgressContentType(
+        event.detail?.contentType,
+      );
+      if (!event.detail?.contentType) {
+        console.debug(
+          "[LinkedInProgress] progressInit missing contentType, defaulting to post",
+          { stepCount: steps.length },
+        );
+      } else {
+        console.debug("[LinkedInProgress] progressInit", {
+          contentType: resolvedType,
+          stepCount: steps.length,
+        });
+      }
+      setProgressContentType(resolvedType);
       const initialized: ProgressStep[] = steps.map((s, index) => ({
         id: s.id,
         label: s.label,
@@ -828,6 +851,7 @@ export function useLinkedInWriter() {
       setTimeout(() => {
         console.log("[LinkedIn Writer] Hiding progress steps after delay");
         setProgressSteps([]);
+        setProgressContentType(null);
       }, 1500);
     };
 
@@ -846,6 +870,7 @@ export function useLinkedInWriter() {
         ),
       );
       setProgressActive(false);
+      setProgressContentType(null);
     };
 
     window.addEventListener(
@@ -1218,6 +1243,7 @@ export function useLinkedInWriter() {
     showContextModal,
     justGeneratedContent,
     draftContentType,
+    progressContentType,
 
     // Setters
     setDraft,
