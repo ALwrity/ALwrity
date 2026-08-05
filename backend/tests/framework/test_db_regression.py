@@ -58,12 +58,12 @@ class TestDatabaseBaselineBeforeAlembic:
             f"Expected >= {_EXPECTED_MIN_TABLES} tables, got {len(tables)}: {sorted(tables)}"
         )
 
-    def test_no_alembic_version_before_phase_2(self):
-        """The alembic_version table must not appear before the Alembic rollout (Phase 2)."""
+    def test_alembic_version_table_exists_after_phase_4(self):
+        """Phase 4: alembic upgrade head creates the alembic_version tracking table."""
         init_user_database("test_user_2")
         tables = _table_names(self.engine)
-        assert "alembic_version" not in tables, (
-            "alembic_version table found — it should not exist before Phase 2"
+        assert "alembic_version" in tables, (
+            "alembic_version table must exist after switching to alembic upgrade head"
         )
 
     def test_extra_tables_exist(self):
