@@ -76,14 +76,23 @@ class OnboardingProgressService:
                         "onboarding_type": "website"
                     }
 
-                # Check if onboarding is complete
-                # Consider complete if either the final step is reached OR progress hit 100%
-                is_completed = (session.current_step >= 6) or (session.progress >= 100.0)
+                # If progress was never calculated (existing users before renumber),
+                # compute it from the step number and persist it.
+                progress = session.progress or 0.0
+                if session.current_step > 0 and progress == 0.0:
+                    progress = min(100.0, round((session.current_step / 4) * 100))
+                    try:
+                        session.progress = progress
+                        db.commit()
+                    except Exception:
+                        pass
+
+                is_completed = (session.current_step >= 5) or (session.progress >= 100.0)
 
                 return {
                     "is_completed": is_completed,
                     "current_step": session.current_step,
-                    "completion_percentage": session.progress,
+                    "completion_percentage": progress,
                     "started_at": session.started_at.isoformat() if session.started_at else None,
                     "last_updated": session.updated_at.isoformat() if session.updated_at else None,
                     "completed_at": session.updated_at.isoformat() if is_completed else None,
@@ -161,7 +170,7 @@ class OnboardingProgressService:
                 session = db.query(OnboardingSession).filter(OnboardingSession.user_id == user_id).first()
                 if session:
                     session.progress = 100.0
-                    session.current_step = 6  # Assuming 6 is complete
+                    session.current_step = 5  # Complete (4 steps + 1 for completion)
                     session.updated_at = datetime.utcnow()
                     db.commit()
                     return True

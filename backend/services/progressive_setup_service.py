@@ -26,9 +26,10 @@ class ProgressiveSetupService:
         try:
             logger.info(f"Initializing environment for user {user_id}")
             
-            # Get user's onboarding progress
-            progress = get_onboarding_progress_for_user(user_id)
-            current_step = progress.current_step
+            # Get user's onboarding progress (migrated step numbers)
+            from services.onboarding.progress_service import OnboardingProgressService
+            status = OnboardingProgressService().get_onboarding_status(user_id)
+            current_step = status.get('current_step', 0)
             
             # Create or get user workspace
             workspace = self.workspace_manager.get_user_workspace(user_id)
@@ -64,26 +65,23 @@ class ProgressiveSetupService:
         }
         
         try:
-            # Step 1: AI Services
+            # Step 1: AI + Content Services (Connect Platforms)
             if step >= 1:
                 services["ai_services"]["enabled"] = True
                 services["ai_services"]["services"] = ["gemini", "exa", "copilotkit"]
                 self._setup_user_ai_services(user_id)
-            
-            # Step 2: Content Services  
-            if step >= 2:
                 services["content_services"]["enabled"] = True
                 services["content_services"]["services"] = ["content_analysis", "style_detection"]
                 self._setup_user_content_services(user_id)
             
-            # Step 3: Research Services
-            if step >= 3:
+            # Step 2: Research Services
+            if step >= 2:
                 services["research_services"]["enabled"] = True
                 services["research_services"]["services"] = ["web_research", "fact_checking"]
                 self._setup_user_research_services(user_id)
             
-            # Step 5: Integration Services
-            if step >= 5:
+            # Step 4: Integration Services (Finish)
+            if step >= 4:
                 services["integration_services"]["enabled"] = True
                 services["integration_services"]["services"] = ["wix", "linkedin", "wordpress"]
                 self._setup_user_integration_services(user_id)

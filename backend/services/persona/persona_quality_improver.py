@@ -114,7 +114,7 @@ class PersonaQualityImprover:
             platform_optimization = self._assess_platform_optimization_dict(platform_personas)
             
             # Linguistic quality (20% weight)
-            linguistic_quality = self._assess_linguistic_quality(linguistic_analysis)
+            linguistic_quality = self._assess_linguistic_quality_dict(linguistic_analysis)
             
             # Calculate weighted overall score
             overall_score = int((
@@ -192,7 +192,7 @@ class PersonaQualityImprover:
         
         return int(sum(optimization_scores) / len(optimization_scores)) if optimization_scores else 75
     
-    def _assess_linguistic_quality(self, linguistic_analysis: Dict[str, Any]) -> int:
+    def _assess_linguistic_quality_dict(self, linguistic_analysis: Dict[str, Any]) -> int:
         """Assess linguistic analysis quality."""
         if not linguistic_analysis:
             return 50

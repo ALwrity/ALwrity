@@ -26,25 +26,22 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
         
         # Build steps data based on database state
         steps_data = []
-        for step_num in range(1, 7):  # Steps 1-6
+        for step_num in range(1, 6):  # Steps 1-5
             step_completed = False
             step_data = None
             
             # Check if step is completed based on database data
-            if step_num == 1:  # API Keys
-                api_keys = completion_data.get('api_keys') or {}
-                step_completed = any(v for v in api_keys.values() if v)
-            elif step_num == 2:  # Website Analysis
+            if step_num == 1:  # Connect Platforms
                 website = completion_data.get('website_analysis') or {}
                 step_completed = bool(website.get('website_url') or website.get('writing_style'))
                 if step_completed:
                     step_data = website
-            elif step_num == 3:  # Research Preferences
+            elif step_num == 2:  # Research
                 research = completion_data.get('research_preferences') or {}
                 step_completed = bool(research.get('research_depth') or research.get('content_types'))
                 if step_completed:
                     step_data = dict(research)
-                    # Merge crawl social media into social_media_accounts (same logic as get_step_data(3))
+                    # Merge crawl social media into social_media_accounts
                     website = completion_data.get('website_analysis') or {}
                     social_media = dict(website.get('social_media_presence') or website.get('social_media_accounts', {}) or {})
                     crawl_result = website.get('crawl_result', {}) or {}
@@ -71,7 +68,7 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                                 social_media[platform] = _norm_url(url)
                     step_data['social_media_accounts'] = social_media
                     step_data['crawl_social_media'] = crawl_social_media
-            elif step_num == 4:  # Persona Generation
+            elif step_num == 3:  # Personalization
                 persona = completion_data.get('persona_data') or {}
                 step_completed = bool(
                     persona.get('corePersona') or persona.get('core_persona') or
@@ -79,9 +76,9 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 )
                 if step_completed:
                     step_data = persona
-            elif step_num == 5:  # Integrations (always completed if we reach this point)
-                step_completed = status['current_step'] >= 5
-            elif step_num == 6:  # Final Step
+            elif step_num == 4:  # Finish
+                step_completed = status['is_completed']
+            elif step_num == 5:  # Complete
                 step_completed = status['is_completed']
             
             steps_data.append({
@@ -130,13 +127,13 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
             },
             "onboarding": {
                 "is_completed": status['is_completed'],
-                "current_step": 6 if status['is_completed'] else status['current_step'],
+                "current_step": 5 if status['is_completed'] else status['current_step'],
                 "completion_percentage": status['completion_percentage'],
                 "next_step": next_step,
                 "started_at": status['started_at'],
                 "last_updated": status['last_updated'],
                 "completed_at": status['completed_at'],
-                "can_proceed_to_final": True if status['is_completed'] else status['current_step'] >= 5,
+                "can_proceed_to_final": True if status['is_completed'] else status['current_step'] >= 4,
                 "onboarding_type": status.get("onboarding_type", "website"),
                 "steps": steps_data,
             },

@@ -20,6 +20,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { getApiKeys, completeOnboarding, getOnboardingSummary, getWebsiteAnalysisData, getResearchPreferencesData, setCurrentStep } from '../../../api/onboarding';
 import { SetupSummary, CapabilitiesOverview, AgentTeamSection, TaskSchedulingPanel } from './components';
+import { SifIndexingPanel } from '../common/SifIndexingPanel';
 import { FinalStepProps, OnboardingData, Capability, OnboardingCompletionResult } from './types';
 import { getAgentTeam, type AgentTeamCatalogEntry } from '../../../api/agentsTeam';
 
@@ -395,7 +396,7 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
   };
 
   // Helper to compute steps length for storing active step (fallback value)
-  const stepsLengthFallback = () => 6;
+  const stepsLengthFallback = () => 4;
 
   const capabilities: Capability[] = isLinkedIn
     ? [
@@ -536,6 +537,8 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
                   completedAt={completionResult.completed_at}
                 />
 
+                <SifIndexingPanel />
+
                 <Box sx={{ display: 'flex', justifyContent: 'center', mt: 3, gap: 2 }}>
                   <Button
                     variant="contained"
@@ -581,6 +584,9 @@ const FinalStep: React.FC<FinalStepProps> = ({ onContinue, updateHeaderContent, 
 
                 {/* Capabilities Overview */}
                 <CapabilitiesOverview capabilities={capabilities} />
+
+                {/* SIF Indexing Status */}
+                <SifIndexingPanel />
 
                 {/* Agent Team */}
                 {agentTeamError && (

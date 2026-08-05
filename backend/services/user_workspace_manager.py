@@ -200,38 +200,32 @@ class UserWorkspaceManager:
         }
         
         try:
-            # Step 1: API Keys - Enable basic AI services
+            # Step 1: Connect Platforms — Enable basic AI + content analysis
             if onboarding_step >= 1:
                 self._setup_ai_services(user_id)
                 setup_status["features_enabled"].append("ai_services")
                 setup_status["services_initialized"].append("gemini")
                 setup_status["services_initialized"].append("exa")
                 setup_status["services_initialized"].append("copilotkit")
-            
-            # Step 2: Website Analysis - Enable content analysis
-            if onboarding_step >= 2:
-                # Tables are created by init_user_database
                 setup_status["features_enabled"].append("content_analysis")
             
-            # Step 3: Research - Enable research capabilities
-            if onboarding_step >= 3:
-                # Tables are created by init_user_database
+            # Step 2: Research — Enable research capabilities
+            if onboarding_step >= 2:
                 setup_status["features_enabled"].append("research_services")
             
-            # Step 4: Personalization - Enable user-specific features
-            if onboarding_step >= 4:
-                # Tables are created by init_user_database
+            # Step 3: Personalization — Enable user-specific features
+            if onboarding_step >= 3:
                 setup_status["features_enabled"].append("personalization")
             
-            # Step 5: Integrations - Enable external integrations
-            if onboarding_step >= 5:
+            # Step 4: Finish — Enable external integrations
+            if onboarding_step >= 4:
                 self._setup_integrations(user_id)
                 setup_status["features_enabled"].append("integrations")
                 setup_status["services_initialized"].append("wix")
                 setup_status["services_initialized"].append("linkedin")
             
-            # Step 6: Complete - Enable all features
-            if onboarding_step >= 6:
+            # Step 5: Complete — Enable all features
+            if onboarding_step >= 5:
                 self._setup_complete_features(user_id)
                 setup_status["features_enabled"].append("all_features")
             

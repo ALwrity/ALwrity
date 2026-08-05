@@ -302,27 +302,6 @@ def schedule_step4_tasks(user_id: str, db: Optional[Session] = None):
         logger.warning(f"[onboarding_step4] Non-blocking: failed to schedule Facebook persona: {e}")
 
 
-def schedule_step5_tasks(user_id: str, db: Session):
-    """Schedule background tasks after Step 5 (Integrations) completes.
-
-    Creates OAuth monitoring tasks if integrations present.
-    All errors are non-blocking (logged, not raised).
-    """
-    try:
-        from services.oauth_token_monitoring_service import create_oauth_monitoring_tasks
-        monitoring_tasks = create_oauth_monitoring_tasks(user_id, db)
-        if monitoring_tasks:
-            logger.info(f"[onboarding_step5] Created {len(monitoring_tasks)} OAuth monitoring tasks for {user_id}")
-            for task in monitoring_tasks:
-                _record_task_in_session(db, user_id, "oauth_monitoring", step=5, details={
-                    "platform": getattr(task, "platform", "unknown"),
-                })
-        else:
-            logger.info(f"[onboarding_step5] No OAuth monitoring tasks created for {user_id}")
-    except Exception as e:
-        logger.warning(f"[onboarding_step5] Non-blocking: failed to create OAuth monitoring tasks: {e}")
-
-
 async def _run_sif_now(user_id: str, website_url: str):
     """Trigger SIF indexing immediately in background (non-blocking).
 

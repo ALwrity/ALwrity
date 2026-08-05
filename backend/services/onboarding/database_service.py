@@ -724,7 +724,7 @@ class OnboardingDatabaseService:
                 }
             
             return {
-                "is_completed": session.current_step >= 6 and session.progress >= 100.0,
+                "is_completed": session.current_step >= 5 and session.progress >= 100.0,
                 "current_step": session.current_step,
                 "progress": session.progress,
                 "started_at": session.started_at.isoformat() if session.started_at else None,

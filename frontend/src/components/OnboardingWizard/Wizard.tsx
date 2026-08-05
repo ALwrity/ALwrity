@@ -15,7 +15,6 @@ import LinkedInConnectStep from './LinkedInConnectStep';
 import CompetitorAnalysisStep from './CompetitorAnalysisStep';
 import LinkedInResearchStep from './LinkedInResearchStep';
 import PersonalizationStep from './PersonalizationStep';
-import IntegrationsStep from './IntegrationsStep';
 import FinalStep from './FinalStep';
 import { WizardHeader } from './common/WizardHeader';
 import { WizardNavigation } from './common/WizardNavigation';
@@ -27,10 +26,9 @@ const DEV_DEBUG = false;
 const trace = DEV_DEBUG ? console.log : (..._args: any[]) => {};
 
 const websiteSteps = [
-  { label: 'Website', description: 'Set up your website', icon: '🌐' },
+  { label: 'Connect Platforms', description: 'Set up your website and platforms', icon: '🌐' },
   { label: 'Research', description: 'Discover competitors', icon: '🔍' },
   { label: 'Personalization', description: 'Customize your experience', icon: '⚙️' },
-  { label: 'Integrations', description: 'Connect additional services', icon: '🔗' },
   { label: 'Finish', description: 'Complete setup', icon: '✅' }
 ];
 
@@ -142,8 +140,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         const hasVoiceClone = data?.voiceClone?.set;
         return !!hasValidPersonaData && !!hasBrandAvatar && !!hasVoiceClone;
       
-      case 3: // Integrations
-      case 4: // Final Step
+      case 3: // Final Step
         return true;
       
       default:
@@ -158,7 +155,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
   const stepDataRef = useRef(stepData);
   const competitorDataCollectorRef = useRef(competitorDataCollector);
   const websiteDataCollectorRef = useRef<(() => any) | null>(null);
-  const integrationsDataCollectorRef = useRef<(() => any) | null>(null);
   
   // Keep refs in sync with state
   useEffect(() => {
@@ -234,14 +230,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     }
   }, []);
 
-  const handleIntegrationsDataReady = useCallback((dataCollector: (() => any) | undefined) => {
-    if (typeof dataCollector === 'function') {
-      integrationsDataCollectorRef.current = dataCollector;
-    } else {
-      console.error('Wizard: integrations dataCollector is not a function:', dataCollector);
-    }
-  }, []);
-
   // Seed stepData from OnboardingContext when data loads
   useEffect(() => {
     if (!data?.onboarding?.steps) return;
@@ -257,24 +245,26 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
     
-    // Merge step payload data from backend
+    // Merge step payload data from backend.
+    // Renumbered: 1=Connect, 2=Research, 3=Personalization (frontend 0,1,2).
     if (onboarding.steps && Array.isArray(onboarding.steps)) {
       const step1Data = onboarding.steps.find((step: any) => step.step_number === 1);
-      if (step1Data && step1Data.data) {
-        const normalizedData = {
-          ...step1Data.data,
-          website: step1Data.data.website || step1Data.data.website_url,
-          analysis: step1Data.data.analysis || step1Data.data
-        };
-        setStepData((prevData: any) => ({ ...prevData, ...normalizedData }));
+      if (step1Data?.data) {
+        const d = step1Data.data;
+        setStepData((prev: any) => ({
+          ...prev,
+          ...d,
+          website: d.website || d.website_url,
+          analysis: d.analysis || d
+        }));
       }
       const step2Data = onboarding.steps.find((step: any) => step.step_number === 2);
-      if (step2Data && step2Data.data) {
-        setStepData((prevData: any) => ({ ...prevData, ...step2Data.data }));
+      if (step2Data?.data) {
+        setStepData((prev: any) => ({ ...prev, ...step2Data.data }));
       }
       const step3Data = onboarding.steps.find((step: any) => step.step_number === 3);
-      if (step3Data && step3Data.data) {
-        setStepData((prevData: any) => ({ ...prevData, ...step3Data.data }));
+      if (step3Data?.data) {
+        setStepData((prev: any) => ({ ...prev, ...step3Data.data }));
       }
     }
     
@@ -283,15 +273,19 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     if (onboarding.is_completed) {
       computedStep = steps.length - 1;
     }
-    // Local override within +/-1 tolerance
+    // Use localStorage only if it's ahead of the authoritative backend step
+    // (e.g. the user advanced locally but the backend hasn't committed yet).
+    // Never allow localStorage to go backwards from the backend step.
     const lsStep = localStorage.getItem('onboarding_active_step');
     if (lsStep !== null) {
       const lsIdx = Math.max(0, Math.min(steps.length - 1, parseInt(lsStep, 10)));
-      if (!Number.isNaN(lsIdx) && lsIdx >= computedStep - 1 && lsIdx <= computedStep + 1) {
+      if (!Number.isNaN(lsIdx) && lsIdx > computedStep && lsIdx <= computedStep + 2) {
         computedStep = lsIdx;
       }
     }
     setActiveStep(computedStep);
+    // Keep localStorage in sync with the authoritative source for next load
+    localStorage.setItem('onboarding_active_step', String(computedStep));
   }, [data, currentStep, steps.length]);
 
   const handleNext = useCallback(async (rawStepData?: any) => {
@@ -410,33 +404,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
 
-    // Special handling for IntegrationsStep (step 3)
-    if (activeStep === 3) {
-      const collector = integrationsDataCollectorRef.current;
-      const integrationsData = collector && typeof collector === 'function' ? collector() : {};
-      if (isLinkedIn) {
-        if (integrationsData && Object.keys(integrationsData).length > 0) {
-          currentStepData = {
-            ...(stepDataRef.current || {}),
-            ...integrationsData,
-            stepType: 'integrations',
-            completedAt: new Date().toISOString()
-          };
-          trace('Wizard: Collected LinkedIn preferences data:', currentStepData);
-        }
-      } else {
-        // Website: IntegrationsStep is informational; advance using the persona data
-        // collected in step 2 so backend step 4 can persist it and schedule tasks.
-        const currentData = stepDataRef.current || {};
-        currentStepData = {
-          ...currentData,
-          stepType: 'integrations',
-          completedAt: new Date().toISOString()
-        };
-        trace('Wizard: Advancing website IntegrationsStep with existing step data:', currentStepData);
-      }
-    }
-
     // Store step data in state
     if (currentStepData) {
       setStepData(currentStepData);
@@ -457,7 +424,8 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       setShowProgressMessage(false);
     }, 3000);
     
-    // Complete the current step (activeStep + 1 because steps are 1-indexed)
+    // Complete the current step. Backend and frontend use identical 1-indexed
+    // step numbers after the Phase-1 backend renumber (4 steps + completion at 5).
     const currentStepNumber = activeStep + 1;
 
     const hasCoreStepData = currentStepData && typeof currentStepData === 'object' && (
@@ -688,6 +656,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           onBack={handleBack}
           userUrl={stepData?.website || stepData?.website_url || localStorage.getItem('website_url') || ''}
           industryContext={stepData?.industryContext}
+          initialData={stepData}
           onDataReady={handleCompetitorDataReady}
         />
       ),
@@ -700,13 +669,6 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         onboardingType={onboardingType}
         onboardingData={personaOnboardingData}
         stepData={personaStepData}
-      />,
-      <IntegrationsStep 
-        key="integrations" 
-        onContinue={handleNext} 
-        updateHeaderContent={updateHeaderContent}
-        onboardingType={onboardingType}
-        onDataReady={handleIntegrationsDataReady}
       />,
       <FinalStep key="final" onContinue={handleComplete} updateHeaderContent={updateHeaderContent} onboardingType={onboardingType} />
     ];
