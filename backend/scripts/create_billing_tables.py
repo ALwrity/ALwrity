@@ -47,7 +47,7 @@ def create_billing_tables(user_id):
         
         # Create all tables (idempotent)
         logger.debug("Creating billing and subscription system tables...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.debug("✅ Billing and subscription tables created/verified")
         
         # Create session for data initialization

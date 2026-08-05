@@ -32,7 +32,7 @@ class YouTubeTaskManager:
             from services.database import _user_engines
             for user_id, engine in list(_user_engines.items()):
                 try:
-                    SubscriptionBase.metadata.create_all(bind=engine, checkfirst=True)
+                    Base.metadata.create_all(bind=engine, checkfirst=True)
                 except Exception:
                     pass
         except Exception:
@@ -46,7 +46,7 @@ class YouTubeTaskManager:
             session = get_session_for_user(user_id)
             if session:
                 engine = get_engine_for_user(user_id)
-                SubscriptionBase.metadata.create_all(bind=engine, checkfirst=True)
+                Base.metadata.create_all(bind=engine, checkfirst=True)
             return session
         except Exception as e:
             logger.warning(f"[YouTubeTaskManager] DB unavailable for user {user_id}: {e}")

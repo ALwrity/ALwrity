@@ -25,7 +25,7 @@ def create_story_tables() -> None:
         engine = create_engine(DATABASE_URL, echo=False)
 
         logger.info("Creating Story Studio project tables...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Story project tables created successfully")
 
         display_setup_summary(engine)

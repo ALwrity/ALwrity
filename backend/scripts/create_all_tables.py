@@ -23,17 +23,17 @@ def create_all_tables():
         
         # Step 1: Create enhanced strategy tables first
         logger.info("Step 1: Creating enhanced strategy tables...")
-        EnhancedStrategyBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Enhanced strategy tables created!")
         
         # Step 2: Create monitoring tables
         logger.info("Step 2: Creating monitoring tables...")
-        MonitoringBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Monitoring tables created!")
         
         # Step 3: Create persona tables
         logger.info("Step 3: Creating persona tables...")
-        PersonaBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Persona tables created!")
         
         logger.info("✅ All tables created successfully!")

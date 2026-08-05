@@ -31,7 +31,7 @@ def create_product_marketing_tables():
         
         # Create all tables (product marketing models share SubscriptionBase)
         logger.info("Creating product marketing tables...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Product marketing tables created successfully")
         
         # Verify tables were created

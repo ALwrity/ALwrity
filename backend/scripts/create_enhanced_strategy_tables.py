@@ -20,7 +20,7 @@ def create_enhanced_strategy_tables():
         logger.info("Creating enhanced strategy tables...")
         
         # Create enhanced strategy tables first
-        EnhancedStrategyBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         
         logger.info("✅ Enhanced strategy tables created successfully!")
         

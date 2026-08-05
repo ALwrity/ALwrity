@@ -21,7 +21,7 @@ def create_persona_tables():
         
         # Create persona tables
         logger.info("Creating persona tables...")
-        PersonaBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Persona tables created!")
         
         logger.info("✅ All persona tables created successfully!")

@@ -29,7 +29,7 @@ def create_research_tables():
         
         # Create all tables (ResearchProject uses SubscriptionBase, so it will be created)
         logger.info("Creating research projects tables...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Research tables created successfully")
         
         # Verify table was created

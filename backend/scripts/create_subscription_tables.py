@@ -30,7 +30,7 @@ def create_subscription_tables():
         
         # Create all tables
         logger.info("Creating subscription system tables...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Subscription tables created successfully")
         
         # Create session for data initialization
@@ -137,7 +137,7 @@ def display_setup_summary(engine):
             logger.info("   from api.subscription import router as subscription_router")
             logger.info("   app.include_router(subscription_router)")
             logger.info("\n2. Update database service to include subscription models:")
-            logger.info("   Add SubscriptionBase.metadata.create_all(bind=engine) to init_database()")
+            logger.info("   Add Base.metadata.create_all(bind=engine) to init_database()")
             logger.info("\n3. Test the API endpoints:")
             logger.info("   GET /api/subscription/plans")
             logger.info("   GET /api/subscription/usage/{user_id}")

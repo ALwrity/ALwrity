@@ -29,7 +29,7 @@ def create_podcast_tables():
         
         # Create all tables (PodcastProject uses SubscriptionBase, so it will be created)
         logger.info("Creating podcast maker tables...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Podcast tables created successfully")
         
         # Verify table was created

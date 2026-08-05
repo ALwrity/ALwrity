@@ -32,7 +32,7 @@ def create_product_asset_tables():
         
         # Create all tables (product asset models share SubscriptionBase)
         logger.info("Creating product asset tables for Product Marketing Suite...")
-        SubscriptionBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
         logger.info("✅ Product asset tables created successfully")
         
         # Verify tables were created

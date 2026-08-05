@@ -44,7 +44,7 @@ def create_youtube_tasks_tables():
                     continue
                 engine = default_engine
 
-            SubscriptionBase.metadata.create_all(bind=engine, checkfirst=True)
+            Base.metadata.create_all(bind=engine, checkfirst=True)
 
             # Recover stale tasks
             from sqlalchemy.orm import sessionmaker
