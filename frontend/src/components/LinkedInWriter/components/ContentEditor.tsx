@@ -21,13 +21,14 @@ import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
 import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
 import type { LinkedInDraftContentType } from '../utils/linkedInDraftLibraryUtils';
+import { resolveEditorShellMode } from '../utils/linkedInEditorShellUtils';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
   pendingEdit: { src: string; target: string } | null;
   livePreviewHtml: string;
   draft: string;
-  /** Session content type — wired for PR2–7; no UI change in PR1. */
+  /** Session content type — drives editor shell mode (PR3+). */
   draftContentType?: LinkedInDraftContentType;
   isGenerating: boolean;
   loadingMessage: string;
@@ -50,6 +51,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   pendingEdit,
   livePreviewHtml,
   draft,
+  draftContentType,
   isGenerating,
   loadingMessage,
   researchSources,
@@ -79,8 +81,21 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   );
 
   // Sync external preview mode when controlled
-  const effectivePreviewMode = onPreviewModeChange ? (externalPreviewMode ?? 'linkedin') : previewMode;
+  const shellMode = resolveEditorShellMode(draftContentType);
+  const previewModeFromState = onPreviewModeChange
+    ? (externalPreviewMode ?? "linkedin")
+    : previewMode;
+  const effectivePreviewMode: LinkedInPreviewMode =
+    shellMode === "article" ? "studio" : previewModeFromState;
   const effectiveSetPreviewMode = onPreviewModeChange || setPreviewMode;
+
+  useEffect(() => {
+    console.log("[ContentEditor] editor shell mode", {
+      shellMode,
+      draftContentType,
+      effectivePreviewMode,
+    });
+  }, [shellMode, draftContentType, effectivePreviewMode]);
 
   const getTextarea = useCallback(
     () => contentRef.current?.querySelector("textarea") ?? null,
@@ -290,7 +305,11 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   }, [draft, onDraftChange]);
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    <div
+      data-testid="linkedin-content-editor"
+      data-editor-mode={shellMode}
+      style={{ flex: 1, display: "flex", flexDirection: "column" }}
+    >
       <DiffPreviewModal
         isPreviewing={isPreviewing}
         pendingEdit={pendingEdit}
