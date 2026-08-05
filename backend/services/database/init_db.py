@@ -22,6 +22,14 @@ from services.database.engine import get_engine_for_user
 from services.database.legacy import default_engine
 from models.base import Base
 
+try:
+    from alembic import command
+    from alembic.config import Config as AlembicConfig
+    _ALEMBIC_AVAILABLE = True
+except ImportError:
+    _ALEMBIC_AVAILABLE = False
+    logger.warning("Alembic not available — falling back to create_all for schema init")
+
 # Trigger model imports so all tables register with the shared Base.
 # These are needed both for alembic env.py and for any code that does
 # ``Base.metadata.create_all()`` directly (e.g. test fixtures).
@@ -94,6 +102,9 @@ def _auto_stamp_existing_db(engine, user_id: str) -> bool:
         if has_alembic:
             return False
 
+        if not _ALEMBIC_AVAILABLE:
+            return False
+
         from alembic import command
         from alembic.config import Config as AlembicConfig
 
@@ -113,17 +124,16 @@ def init_user_database(user_id: str) -> None:
     """Initialize database tables for a specific user."""
     engine = get_engine_for_user(user_id)
     try:
-        from alembic import command
-        from alembic.config import Config as AlembicConfig
-
-        alembic_cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
-        alembic_cfg.set_main_option(
-            "sqlalchemy.url", f"sqlite:///{engine.url.database}"
-        )
-
-        _auto_stamp_existing_db(engine, user_id)
-        command.upgrade(alembic_cfg, "head")
-        Base.metadata.create_all(bind=engine, checkfirst=True)
+        if _ALEMBIC_AVAILABLE:
+            alembic_cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
+            alembic_cfg.set_main_option(
+                "sqlalchemy.url", f"sqlite:///{engine.url.database}"
+            )
+            _auto_stamp_existing_db(engine, user_id)
+            command.upgrade(alembic_cfg, "head")
+            Base.metadata.create_all(bind=engine, checkfirst=True)
+        else:
+            Base.metadata.create_all(bind=engine)
 
         if user_id not in _pricing_initialized:
             _pricing_initialized.add(user_id)
@@ -170,16 +180,16 @@ def init_database() -> None:
         _legacy.default_engine = engine
 
     try:
-        from alembic import command
-        from alembic.config import Config as AlembicConfig
-
-        alembic_cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
-        alembic_cfg.set_main_option(
-            "sqlalchemy.url", f"sqlite:///{engine.url.database}"
-        )
-        _auto_stamp_existing_db(engine, "global")
-        command.upgrade(alembic_cfg, "head")
-        Base.metadata.create_all(bind=engine, checkfirst=True)
+        if _ALEMBIC_AVAILABLE:
+            alembic_cfg = AlembicConfig(str(_ALEMBIC_INI_PATH))
+            alembic_cfg.set_main_option(
+                "sqlalchemy.url", f"sqlite:///{engine.url.database}"
+            )
+            _auto_stamp_existing_db(engine, "global")
+            command.upgrade(alembic_cfg, "head")
+            Base.metadata.create_all(bind=engine, checkfirst=True)
+        else:
+            Base.metadata.create_all(bind=engine, checkfirst=True)
         logger.info("Global database initialized successfully")
     except SQLAlchemyError as e:
         logger.error(f"Error initializing global database: {str(e)}")
