@@ -21,6 +21,7 @@ fastapi-clerk-auth>=0.0.7
 
 # Database
 sqlalchemy>=2.0.25
+alembic>=1.13.0
 
 # Payment
 stripe>=8.0.0
