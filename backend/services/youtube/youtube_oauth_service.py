@@ -339,6 +339,7 @@ class YouTubeOAuthService(OAuthProviderBase):
             google.oauth2.credentials.Credentials or None
         """
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return None
@@ -403,6 +404,7 @@ class YouTubeOAuthService(OAuthProviderBase):
     def _update_stored_token(self, user_id: str, token_id: int, credentials: Credentials):
         """Update stored token after refresh."""
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             enc_access = self._encrypt_token(credentials.token) or ""
             enc_refresh = self._encrypt_token(credentials.refresh_token)
@@ -422,6 +424,7 @@ class YouTubeOAuthService(OAuthProviderBase):
     def get_connection_status(self, user_id: str) -> Dict[str, Any]:
         """Get YouTube connection status for a user."""
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return {"connected": False, "channels": []}
@@ -461,6 +464,7 @@ class YouTubeOAuthService(OAuthProviderBase):
     def revoke_token(self, user_id: str, token_id: int) -> bool:
         """Deactivate a specific token."""
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             with sqlite3.connect(db_path) as conn:
                 conn.execute(

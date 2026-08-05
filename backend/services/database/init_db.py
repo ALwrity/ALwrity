@@ -104,6 +104,8 @@ def _auto_stamp_existing_db(engine, user_id: str) -> bool:
         logger.warning(f"Could not auto-stamp DB for user {user_id}: {exc}")
         return False
 
+_pricing_initialized: set = set()
+
 
 def init_user_database(user_id: str) -> None:
     """Initialize database tables for a specific user."""
@@ -120,28 +122,30 @@ def init_user_database(user_id: str) -> None:
         _auto_stamp_existing_db(engine, user_id)
         command.upgrade(alembic_cfg, "head")
 
-        try:
-            from services.subscription.pricing_service import PricingService
-            from services.subscription.schema_utils import ensure_subscription_plan_columns
-
-            SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-            db = SessionLocal()
+        if user_id not in _pricing_initialized:
+            _pricing_initialized.add(user_id)
             try:
-                ensure_subscription_plan_columns(db)
-                pricing_service = PricingService(db)
-                pricing_service.initialize_default_pricing()
-                pricing_service.initialize_default_plans()
-                db.commit()
-                logger.info(f"Default pricing and plans initialized for user {user_id}")
-            except Exception as data_error:
-                logger.error(f"Error initializing default data for user {user_id}: {data_error}")
-                db.rollback()
-            finally:
-                db.close()
-        except Exception as import_error:
-            logger.warning(
-                f"Could not initialize pricing data (PricingService import failed): {import_error}"
-            )
+                from services.subscription.pricing_service import PricingService
+                from services.subscription.schema_utils import ensure_subscription_plan_columns
+
+                SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+                db = SessionLocal()
+                try:
+                    ensure_subscription_plan_columns(db)
+                    pricing_service = PricingService(db)
+                    pricing_service.initialize_default_pricing()
+                    pricing_service.initialize_default_plans()
+                    db.commit()
+                    logger.info(f"Default pricing and plans initialized for user {user_id}")
+                except Exception as data_error:
+                    logger.error(f"Error initializing default data for user {user_id}: {data_error}")
+                    db.rollback()
+                finally:
+                    db.close()
+            except Exception as import_error:
+                logger.warning(
+                    f"Could not initialize pricing data (PricingService import failed): {import_error}"
+                )
 
         logger.info(f"Database initialized successfully for user {user_id}")
     except SQLAlchemyError as e:
