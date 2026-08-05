@@ -454,10 +454,10 @@ class StepManagementService:
                 "is_completed": status["is_completed"],
                 "current_step": status["current_step"],
                 "completion_percentage": status["completion_percentage"],
-                "next_step": 6 if status["is_completed"] else max(1, status["current_step"]),
+                "next_step": 5 if status["is_completed"] else max(1, status["current_step"]),
                 "started_at": status["started_at"],
                 "completed_at": status["completed_at"],
-                "can_proceed_to_final": True if status["is_completed"] else status["current_step"] >= 5,
+                "can_proceed_to_final": True if status["is_completed"] else status["current_step"] >= 4,
             }
         except Exception as e:
             logger.error(f"Error getting onboarding status: {str(e)}")
@@ -483,24 +483,15 @@ class StepManagementService:
             steps = [
                 {
                     "step_number": 1,
-                    "title": "API Keys",
-                    "description": "Connect your AI services",
-                    "status": completed(any(v for v in api_keys.values() if v)),
-                    "completed_at": None,
-                    "data": None,
-                    "validation_errors": []
-                },
-                {
-                    "step_number": 2,
-                    "title": "Website",
-                    "description": "Set up your website",
+                    "title": "Connect Platforms",
+                    "description": "Set up your website and platforms",
                     "status": completed(bool(website.get('website_url') or website.get('writing_style'))),
                     "completed_at": None,
                     "data": website or None,
                     "validation_errors": []
                 },
                 {
-                    "step_number": 3,
+                    "step_number": 2,
                     "title": "Research",
                     "description": "Discover competitors",
                     "status": completed(bool(research.get('research_depth') or research.get('content_types'))),
@@ -509,7 +500,7 @@ class StepManagementService:
                     "validation_errors": []
                 },
                 {
-                    "step_number": 4,
+                    "step_number": 3,
                     "title": "Personalization",
                     "description": "Customize your experience",
                     "status": completed(bool(persona.get('corePersona') or persona.get('core_persona') or persona.get('platformPersonas') or persona.get('platform_personas'))),
@@ -518,16 +509,7 @@ class StepManagementService:
                     "validation_errors": []
                 },
                 {
-                    "step_number": 5,
-                    "title": "Integrations",
-                    "description": "Connect additional services",
-                    "status": completed(status['current_step'] >= 5),
-                    "completed_at": None,
-                    "data": None,
-                    "validation_errors": []
-                },
-                {
-                    "step_number": 6,
+                    "step_number": 4,
                     "title": "Finish",
                     "description": "Complete setup",
                     "status": completed(status['is_completed']),
@@ -539,7 +521,7 @@ class StepManagementService:
 
             return {
                 "steps": steps,
-                "current_step": 6 if status['is_completed'] else status['current_step'],
+                "current_step": 5 if status['is_completed'] else status['current_step'],
                 "started_at": status['started_at'],
                 "last_updated": status['last_updated'],
                 "is_completed": status['is_completed'],
@@ -559,18 +541,19 @@ class StepManagementService:
             # Use SSOT for reading step data
             integrated_data = self.integration_service.get_integrated_data_sync(user_id, db)
 
-            if step_number == 2:
+            if step_number == 1:
                 website = integrated_data.get('website_analysis', {})
+                api_keys = integrated_data.get('api_keys', {})
                 return {
-                    "step_number": 2,
-                    "title": "Website",
-                    "description": "Set up your website",
+                    "step_number": 1,
+                    "title": "Connect Platforms",
+                    "description": "Set up your website and platforms",
                     "status": 'completed' if (website.get('website_url') or website.get('writing_style')) else 'pending',
                     "completed_at": None,
                     "data": website,
                     "validation_errors": []
                 }
-            if step_number == 3:
+            if step_number == 2:
                 research = integrated_data.get('research_preferences', {})
                 competitors = integrated_data.get('competitor_analysis', [])
                 website = integrated_data.get('website_analysis', {})
@@ -607,7 +590,7 @@ class StepManagementService:
                 step_data['crawl_social_media'] = crawl_social_media
                 
                 return {
-                    "step_number": 3,
+                    "step_number": 2,
                     "title": "Research",
                     "description": "Discover competitors",
                     "status": 'completed' if (research.get('research_depth') or research.get('content_types') or competitors) else 'pending',
@@ -615,10 +598,10 @@ class StepManagementService:
                     "data": step_data,
                     "validation_errors": []
                 }
-            if step_number == 4:
+            if step_number == 3:
                 persona = integrated_data.get('persona_data', {})
                 return {
-                    "step_number": 4,
+                    "step_number": 3,
                     "title": "Personalization",
                     "description": "Customize your experience",
                     "status": 'completed' if (persona.get('corePersona') or persona.get('core_persona') or persona.get('platformPersonas') or persona.get('platform_personas')) else 'pending',
@@ -626,23 +609,11 @@ class StepManagementService:
                     "data": persona,
                     "validation_errors": []
                 }
-            if step_number == 5:
-                integrations = integrated_data.get('platform_integrations', {})
-                return {
-                    "step_number": 5,
-                    "title": "Integrations",
-                    "description": "Connect additional services",
-                    "status": 'completed' if integrations.get('connected_platforms') else 'pending',
-                    "completed_at": None,
-                    "data": integrations,
-                    "validation_errors": []
-                }
-
             from services.onboarding.progress_service import OnboardingProgressService
             status = OnboardingProgressService().get_onboarding_status(user_id)
             mapping = {
-                1: ('API Keys', 'Connect your AI services', status['current_step'] >= 1),
-                6: ('Finish', 'Complete setup', status['is_completed'])
+                1: ('Connect Platforms', 'Set up your website and platforms', status['current_step'] >= 1),
+                5: ('Finish', 'Complete setup', status['is_completed'])
             }
             title, description, done = mapping.get(step_number, (f'Step {step_number}', 'Onboarding step', False))
             return {
@@ -650,7 +621,7 @@ class StepManagementService:
                 "title": title,
                 "description": description,
                 "status": 'completed' if done else 'pending',
-                "completed_at": status['completed_at'] if step_number == 6 and done else None,
+                "completed_at": status['completed_at'] if step_number == 5 and done else None,
                 "data": None,
                 "validation_errors": []
             }
@@ -709,19 +680,19 @@ class StepManagementService:
 
             # Persist current step and progress in DB
             # If the platform strategy already marked onboarding as complete
-            # (current_step >= 6 or progress >= 100%), do not overwrite it.
+            # (current_step >= 5 or progress >= 100%), do not overwrite it.
             from services.onboarding.progress_service import OnboardingProgressService
             progress_service = OnboardingProgressService()
             try:
                 session = self._get_or_create_session(user_id, db)
-                already_completed = (session.current_step or 0) >= 6 or (session.progress or 0.0) >= 100.0
+                already_completed = (session.current_step or 0) >= 5 or (session.progress or 0.0) >= 100.0
             except Exception:
                 already_completed = False
 
             if not already_completed:
                 progress_service.update_step(user_id, step_number)
                 try:
-                    progress_pct = min(100.0, round((step_number / 6) * 100))
+                    progress_pct = min(100.0, round((step_number / 4) * 100))
                     progress_service.update_progress(user_id, float(progress_pct))
                 except Exception as e:
                     logger.warning(f"Failed to update progress: {e}")

@@ -89,9 +89,16 @@ class AdvertoolsExecutor(TaskExecutor):
                 # Phase 4: Robots.txt compliance analysis
                 robots_result = await self.advertools_service.analyze_robots_txt(website_url)
                 
-                # Phase 5: Crawl budget analysis
+                # Phase 5: Crawl budget analysis — reuse Phase 1's sitemap total so we don't
+                # re-fetch a rate-limited sitemap (429); skip re-fetch since Phase 1 already
+                # attempted the primary sitemap URL. robots.txt sitemaps as fallbacks if needed.
+                robots_sitemaps = robots_result.get("sitemap_urls") or []
+                known_total = None
+                if sitemap_result.get('success'):
+                    known_total = sitemap_result.get('metrics', {}).get('total_urls')
                 budget_result = await self.advertools_service.analyze_crawl_budget(
-                    effective_url, site_domain
+                    effective_url, site_domain, fallback_sitemap_urls=robots_sitemaps,
+                    known_sitemap_total=known_total, primary_sitemap_attempted=True,
                 )
                 
                 # Merge results

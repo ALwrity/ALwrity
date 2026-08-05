@@ -222,7 +222,6 @@ class TxtaiIntelligenceService:
             logger.debug(f"Created index directory: {os.path.dirname(self.index_path)}")
             
             # Initialize embeddings with optimal configuration for ALwrity use case
-            # Hardening: Disabling quantization by default as it causes 'IndexIDMap' attribute errors with small indices on Windows
             self.embeddings = Embeddings({
                 "path": self.model_path,
                 "content": True,  # Enable content storage for retrieval
@@ -230,7 +229,10 @@ class TxtaiIntelligenceService:
                 "backend": self._backend,  # Use Faiss for efficient similarity search
                 "batch": 32,  # Batch size for processing
                 "gpu": False,  # Force CPU usage for compatibility
-                "limit": 1000  # Maximum number of results for queries
+                "limit": 1000,  # Maximum number of results for queries
+                "faiss": {
+                    "components": "IVF1,Flat",  # Force IVF to avoid IndexIDMap nprobe incompatibility
+                },
             })
             
             logger.info("Embeddings instance created successfully")
@@ -317,31 +319,73 @@ class TxtaiIntelligenceService:
                 f"Disabling ANN-dependent txtai queries for user {self.user_id} due to IndexIDMap/nprobe incompatibility"
             )
         self._disable_ann_queries = True
+        # Write .corrupt marker so index is rebuilt on next init
+        try:
+            from pathlib import Path
+            marker = f"{self.index_path}.corrupt"
+            Path(marker).touch(exist_ok=True)
+            logger.info(f"Wrote .corrupt marker for user {self.user_id} at {marker}")
+        except Exception as e:
+            logger.warning(f"Failed to write .corrupt marker: {e}")
 
     def _search_with_ann_fallback(self, query: str, limit: int, graph: bool = False):
-        """Run search with ANN when available, then fall back to scan search when needed."""
+        """Run search with ANN when available, then fall back to brute-force when incompatible."""
         try:
             if self._disable_ann_queries:
-                return self.embeddings.search(query, limit=limit, graph=graph, index=False)
+                return self._brute_force_search(query, limit)
             return self.embeddings.search(query, limit=limit, graph=graph)
         except AttributeError as ae:
             if not self._is_nprobe_incompatibility(ae):
                 raise ae
 
             self._mark_ann_incompatible()
-            try:
-                return self.embeddings.search(query, limit=limit, graph=graph, index=False)
-            except AttributeError as ae2:
-                # Some FAISS/txtai combinations still raise nprobe errors even with
-                # `index=False` (the underlying index is the same IndexIDMap). In that
-                # case return an empty result rather than letting the exception
-                # bubble up — the caller treats [] as "no matches" and continues.
-                if self._is_nprobe_incompatibility(ae2):
-                    logger.warning(
-                        f"txtai scan search also raised nprobe incompatibility for user {self.user_id}; returning empty results"
-                    )
-                    return []
-                raise
+            return self._brute_force_search(query, limit)
+
+    def _brute_force_search(self, query: str, limit: int):
+        """Bypass the FAISS ANN index by recomputing embeddings from stored content."""
+        try:
+            if not self.embeddings:
+                return []
+            ids = self.embeddings.ids()
+            if not ids:
+                return []
+            # Build (id, text, metadata) tuples for transform
+            items = [(0, query, None)]
+            for doc_id in ids:
+                text = self._get_document_text(doc_id)
+                if text:
+                    items.append((doc_id, text, None))
+            if len(items) < 2:
+                return []
+            # Transform all items to get fresh embedding vectors
+            vectors = self.embeddings.transform(items)
+            if not vectors or len(vectors) < 2:
+                return []
+            query_vec = vectors[0]
+            doc_vecs = vectors[1:]
+            # Compute cosine similarity and rank
+            results = []
+            for i, doc_vec in enumerate(doc_vecs):
+                score = self._cosine_similarity_from_vectors(query_vec, doc_vec)
+                # Map back to the original doc ID (item index + 1 = vectors index)
+                results.append((ids[min(i, len(ids) - 1)], score))
+            results.sort(key=lambda x: x[1], reverse=True)
+            return results[:limit]
+        except Exception as e:
+            logger.warning(f"Brute-force search failed for user {self.user_id}: {e}")
+            return []
+
+    def _get_document_text(self, doc_id: int) -> str:
+        """Read stored document text for brute-force re-embedding."""
+        try:
+            doc = self.embeddings.get(doc_id)
+            if isinstance(doc, dict):
+                return doc.get("text", "")
+            if isinstance(doc, (list, tuple)):
+                return doc[1] if len(doc) > 1 else str(doc[0]) if doc else ""
+            return str(doc) if doc else ""
+        except Exception:
+            return ""
 
     @staticmethod
     def _cosine_similarity_from_vectors(v1, v2) -> float:
@@ -540,7 +584,7 @@ class TxtaiIntelligenceService:
 
             logger.debug(f"Searching for query: '{query}' with limit: {limit}")
             # Phase 2.1: off-loop to keep the event loop free.
-            results = await self._search_with_ann_fallback(query, limit=limit)
+            results = self._search_with_ann_fallback(query, limit=limit)
             
             # Cache the results if caching is enabled
             if self.enable_caching and self.cache_manager and results:
@@ -692,7 +736,7 @@ class TxtaiIntelligenceService:
             # Perform a search to get graph structure
             sample_query = "content marketing digital strategy"
             # Phase 2.1: graph_results is a blocking call; off-loop.
-            graph_results = await self._search_with_ann_fallback(sample_query, limit=10, graph=True)
+            graph_results = self._search_with_ann_fallback(sample_query, limit=10, graph=True)
 
             if not graph_results:
                 logger.warning(f"No graph results for clustering user {self.user_id}")

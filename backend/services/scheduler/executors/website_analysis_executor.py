@@ -16,7 +16,7 @@ from urllib.parse import urlparse
 from ..core.executor_interface import TaskExecutor, TaskExecutionResult
 from ..core.exception_handler import TaskExecutionError, DatabaseError, SchedulerExceptionHandler
 from models.website_analysis_monitoring_models import WebsiteAnalysisTask, WebsiteAnalysisExecutionLog
-from models.onboarding import CompetitorAnalysis, OnboardingSession
+from models.onboarding import CompetitorAnalysis, OnboardingSession, SEOPageAudit
 from utils.logger_utils import get_service_logger
 
 # Import website analysis services
@@ -268,7 +268,7 @@ class WebsiteAnalysisExecutor(TaskExecutor):
                 loop = asyncio.get_event_loop()
                 return await loop.run_in_executor(
                     None, 
-                    partial(self.style_logic.analyze_content_style, crawl_result['content'], user_id=self.user_id)
+                    partial(self.style_logic.analyze_content_style, crawl_result['content'], user_id=user_id)
                 )
             
             async def run_patterns_analysis():
@@ -276,7 +276,7 @@ class WebsiteAnalysisExecutor(TaskExecutor):
                 loop = asyncio.get_event_loop()
                 return await loop.run_in_executor(
                     None, 
-                    partial(self.style_logic.analyze_style_patterns, crawl_result['content'], user_id=self.user_id)
+                    partial(self.style_logic.analyze_style_patterns, crawl_result['content'], user_id=user_id)
                 )
 
             async def run_seo_audit():
@@ -318,7 +318,7 @@ class WebsiteAnalysisExecutor(TaskExecutor):
                 loop = asyncio.get_event_loop()
                 guidelines_result = await loop.run_in_executor(
                     None, 
-                    partial(self.style_logic.generate_style_guidelines, style_analysis.get('analysis', {}), user_id=self.user_id)
+                    partial(self.style_logic.generate_style_guidelines, style_analysis.get('analysis', {}), user_id=user_id)
                 )
                 if guidelines_result and guidelines_result.get('success'):
                     style_guidelines = guidelines_result.get('guidelines')
@@ -510,6 +510,7 @@ class WebsiteAnalysisExecutor(TaskExecutor):
         """
         try:
             self.logger.info(f"Starting full site scan for {website_url}")
+            from services.seo_tools.sitemap_service import SitemapService
             sitemap_service = SitemapService()
             
             # 1. Discover Sitemap

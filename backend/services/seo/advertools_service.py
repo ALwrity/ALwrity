@@ -1,6 +1,7 @@
 import advertools as adv
 import pandas as pd
 import asyncio
+import time as _time
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from loguru import logger
@@ -13,6 +14,61 @@ import urllib.request
 import urllib.error
 import socket
 import re
+import threading
+
+# ── Per-domain rate limiter ───────────────────────────────────────────
+# Multiple background tasks (deep competitor analysis, onboarding sitemap
+# analysis, crawl budget) can all hit the same origin simultaneously,
+# causing HTTP 429 chain failures.  This semaphore ensures at most 1
+# concurrent request per domain with a 1s cooldown between requests, and
+# enforces an extended pause after any observed 429 so the origin can cool
+# down before we touch it again.
+_RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
+_MAX_RETRY_SLEEP = 10.0        # cap per backoff sleep so one URL can't stall a batch
+_BATCH_DEADLINE_SECS = 120.0   # wall-clock budget for a whole (recursive) sitemap fetch
+_429_ACTIVE_WINDOW = 20.0      # a 429 inside this window => the origin is throttling
+_PACING_MIN = 1.0
+_PACING_MAX = 3.0
+
+_DOMAIN_SEMAPHORES: Dict[str, asyncio.Semaphore] = {}
+_DOMAIN_LAST_REQUEST: Dict[str, float] = {}
+_DOMAIN_LAST_429: Dict[str, float] = {}
+_DOMAIN_429_LOCK = threading.Lock()
+
+
+def _extract_domain(url: str) -> str:
+    try:
+        return urlparse(url).netloc
+    except Exception:
+        return url
+
+
+def _note_429(domain: str) -> None:
+    with _DOMAIN_429_LOCK:
+        _DOMAIN_LAST_429[domain] = _time.monotonic()
+
+
+def _domain_429_cooldown(domain: str) -> float:
+    """Seconds still remaining in the post-429 pause for this domain (0 if none)."""
+    with _DOMAIN_429_LOCK:
+        last = _DOMAIN_LAST_429.get(domain, 0.0)
+    return max(last + _429_ACTIVE_WINDOW - _time.monotonic(), 0.0)
+
+
+async def _throttle_domain(domain: str) -> None:
+    """Acquire a per-domain semaphore and enforce a cooldown between requests."""
+    if domain not in _DOMAIN_SEMAPHORES:
+        _DOMAIN_SEMAPHORES[domain] = asyncio.Semaphore(1)
+    sem = _DOMAIN_SEMAPHORES[domain]
+
+    async with sem:
+        # Enforce 1s cooldown between requests to the same origin, plus any
+        # remaining post-429 pause so a throttled origin can recover.
+        pause = 1.0 - (_time.monotonic() - _DOMAIN_LAST_REQUEST.get(domain, 0.0))
+        pause = max(pause, _domain_429_cooldown(domain))
+        if pause > 0:
+            await asyncio.sleep(pause)
+        _DOMAIN_LAST_REQUEST[domain] = _time.monotonic()
 
 class AdvertoolsService:
     """
@@ -23,6 +79,146 @@ class AdvertoolsService:
     def __init__(self):
         self.logger = logger.bind(service="AdvertoolsService")
 
+    @staticmethod
+    def _sitemap_to_df_with_retry(
+        sitemap_url: str,
+        max_retries: int = 3,
+        _depth: int = 0,
+        _deadline: Optional[float] = None,
+    ) -> pd.DataFrame:
+        """Fetch sitemap with rate-limit-aware retry + jittered backoff.
+
+        Handles both empty responses AND exceptions (e.g. HTTP 429 / 5xx)
+        with a capped, jittered backoff (every sleep capped at 10s):
+        - 1st retry: ~3-8s (base 5s, ±50% jitter)
+        - 2nd retry: ~8-10s (base 15s, capped)
+        - 3rd retry: ~10s (base 45s, capped)
+
+        Non-retryable HTTP errors (4xx like 404/403) fail fast instead of
+        retrying — a sitemap that simply doesn't exist will never succeed.
+
+        A 429 marks the origin as rate-limited: the response's Retry-After is
+        honored (capped), a post-429 pause is enforced before the next request
+        to the same domain, and remaining sub-sitemaps are given fewer retries.
+
+        A shared wall-clock deadline bounds the entire (recursive) fetch so a
+        heavily rate-limited origin cannot stall an interactive run forever;
+        whatever has been fetched so far is returned.
+
+        IMPORTANT: advertools' own sitemap_to_df() with recursive=True fetches
+        every sub-sitemap concurrently via ThreadPoolExecutor(max_workers=8)
+        with zero delay between requests, which bypasses our per-domain
+        throttle and trips HTTP 429.  We therefore always fetch with
+        recursive=False, detect sitemap indexes ourselves from the ``loc``
+        column, and fetch sub-sitemaps SEQUENTIALLY with a pacing sleep so we
+        stay under the origin's rate limit.
+        """
+        import time as _time
+        import random
+
+        MAX_INDEX_DEPTH = 3
+        if _deadline is None:
+            _deadline = _time.monotonic() + _BATCH_DEADLINE_SECS
+
+        def _looks_like_sitemap_file(loc: str) -> bool:
+            path = urlparse(loc).path.lower()
+            return path.endswith(".xml") or path.endswith(".xml.gz")
+
+        def _looks_like_sitemap_index(df: pd.DataFrame) -> bool:
+            if df is None or df.empty or "loc" not in df.columns:
+                return False
+            locs = df["loc"].dropna().astype(str).tolist()
+            if not locs:
+                return False
+            return all(_looks_like_sitemap_file(loc) for loc in locs)
+
+        def _retry_after_seconds(err: Any) -> Optional[float]:
+            headers = getattr(err, "headers", None)
+            ra = headers.get("Retry-After") if headers else None
+            if not ra:
+                return None
+            try:
+                return float(ra)
+            except (TypeError, ValueError):
+                return None  # HTTP-date form — fall back to jittered backoff
+
+        def _fetch_once(url: str, retries: int) -> pd.DataFrame:
+            domain = _extract_domain(url)
+            df = pd.DataFrame()
+            for attempt in range(retries + 1):
+                sleep_secs = 0.0
+                if _time.monotonic() >= _deadline:
+                    logger.warning(f"sitemap_to_df batch deadline reached for {url}, giving up")
+                    break
+                try:
+                    df = adv.sitemap_to_df(url, recursive=False)
+                except urllib.error.HTTPError as e:
+                    if e.code not in _RETRYABLE_HTTP:
+                        logger.warning(
+                            f"sitemap_to_df HTTP {e.code} for {url} — permanent, skipping"
+                        )
+                        return pd.DataFrame()
+                    if e.code == 429:
+                        _note_429(domain)
+                        ra = _retry_after_seconds(e)
+                        if ra is not None:
+                            sleep_secs = min(ra, _MAX_RETRY_SLEEP)
+                    logger.warning(
+                        f"sitemap_to_df raised for {url} "
+                        f"(attempt {attempt + 1}/{retries + 1}): {e}"
+                    )
+                    df = pd.DataFrame()
+                except Exception as e:
+                    logger.warning(
+                        f"sitemap_to_df raised for {url} "
+                        f"(attempt {attempt + 1}/{retries + 1}): {e}"
+                    )
+                    df = pd.DataFrame()
+                if df is not None and not df.empty:
+                    return df
+                if attempt < retries:
+                    if sleep_secs <= 0:
+                        base_delay = 5 * (3 ** attempt)
+                        sleep_secs = min(base_delay * (0.5 + random.random()), _MAX_RETRY_SLEEP)
+                    logger.warning(
+                        f"sitemap_to_df empty/failed for {url}, "
+                        f"retrying in {sleep_secs:.1f}s..."
+                    )
+                    _time.sleep(sleep_secs)
+            return df
+
+        df = _fetch_once(sitemap_url, max_retries)
+
+        # Sitemap index detected: recurse into sub-sitemaps one at a time,
+        # pacing each request to avoid triggering the origin's rate limit.
+        if _depth < MAX_INDEX_DEPTH and _looks_like_sitemap_index(df):
+            frames = []
+            domain = _extract_domain(sitemap_url)
+            for sub_url in df["loc"].dropna().astype(str).tolist():
+                if _time.monotonic() >= _deadline:
+                    logger.warning("sitemap_to_df batch deadline reached, returning partial results")
+                    break
+                # Once the origin has shown it's throttling, cap retries for the
+                # remaining sub-sitemaps so the batch degrades quickly.
+                sub_retries = 1 if _domain_429_cooldown(domain) > 0 else max_retries
+                sub_df = AdvertoolsService._sitemap_to_df_with_retry(
+                    sub_url, max_retries=sub_retries, _depth=_depth + 1, _deadline=_deadline
+                )
+                if sub_df is not None and not sub_df.empty:
+                    frames.append(sub_df)
+                # After a 429, ride out the origin's cooldown before the next
+                # sub-sitemap; otherwise use normal pacing between requests.
+                cooldown = _domain_429_cooldown(domain)
+                if cooldown > 0:
+                    _time.sleep(min(cooldown, 8.0))
+                else:
+                    _time.sleep(_PACING_MIN + random.random() * (_PACING_MAX - _PACING_MIN))
+            if frames:
+                return pd.concat(frames, ignore_index=True)
+            return pd.DataFrame()
+
+        return df
+
     async def analyze_sitemap(self, sitemap_url: str) -> Dict[str, Any]:
         """
         Analyzes a website's sitemap to extract metrics on publishing velocity, freshness,
@@ -32,10 +228,11 @@ class AdvertoolsService:
             self.logger.info(f"Analyzing sitemap: {sitemap_url}")
             
             loop = asyncio.get_event_loop()
-            df = await loop.run_in_executor(None, lambda: adv.sitemap_to_df(sitemap_url))
+            await _throttle_domain(_extract_domain(sitemap_url))
+            df = await loop.run_in_executor(None, lambda: self._sitemap_to_df_with_retry(sitemap_url))
             
-            if df is None or df.empty:
-                return {"success": False, "error": "Sitemap is empty or could not be parsed."}
+            if df is None or df.empty or 'loc' not in df.columns:
+                return {"success": False, "error": "Sitemap is empty, unparseable, or missing URL column."}
 
             if 'lastmod' in df.columns:
                 df['lastmod'] = pd.to_datetime(df['lastmod'], errors='coerce', utc=True)
@@ -173,9 +370,13 @@ class AdvertoolsService:
 
     async def _analyze_url_structure(self, urls: List[str]) -> Dict[str, Any]:
         """Analyze URL patterns for parameter bloat, directory depth, and path patterns."""
+        # Filter out any non-string values (NaN, None, float) from the URL list
+        clean_urls = [u for u in urls if isinstance(u, str) and u.strip()]
+        if not clean_urls:
+            return {}
         try:
             loop = asyncio.get_event_loop()
-            url_df = await loop.run_in_executor(None, lambda: adv.url_to_df(urls))
+            url_df = await loop.run_in_executor(None, lambda: adv.url_to_df(clean_urls))
 
             if url_df is None or url_df.empty:
                 return {}
@@ -589,24 +790,75 @@ class AdvertoolsService:
             return pd.DataFrame()
         return pd.DataFrame(records)
 
-    async def analyze_crawl_budget(self, sitemap_url: str, site_domain: str) -> Dict[str, Any]:
+    async def analyze_crawl_budget(
+        self,
+        sitemap_url: str,
+        site_domain: str,
+        fallback_sitemap_urls: Optional[List[str]] = None,
+        known_sitemap_total: Optional[int] = None,
+        primary_sitemap_attempted: bool = False,
+    ) -> Dict[str, Any]:
         """
         Analyze crawl budget by comparing sitemap inventory against actual crawl results.
         Estimates budget utilization, waste from redirects/errors, and optimization score.
+
+        If `known_sitemap_total` is supplied (e.g. from a prior sitemap analysis in the
+        same run), the sitemap is NOT re-fetched — re-fetching a rate-limited sitemap
+        (HTTP 429) repeatedly just burns time and can hard-trip the origin's rate limiter.
+
+        If `primary_sitemap_attempted` is True, the primary sitemap URL was already
+        fetched (and possibly failed, e.g. with 429s) earlier in the same run, so it is
+        not retried here — only robots.txt fallback sitemaps are attempted.
         """
         temp_file = None
         try:
             self.logger.info(f"Analyzing crawl budget for {site_domain}")
             loop = asyncio.get_event_loop()
 
-            sitemap_df = await loop.run_in_executor(None, lambda: adv.sitemap_to_df(sitemap_url))
-            sitemap_total = len(sitemap_df) if sitemap_df is not None and not sitemap_df.empty else 0
+            sitemap_total = 0
+            if known_sitemap_total is not None and known_sitemap_total > 0:
+                sitemap_total = int(known_sitemap_total)
+                self.logger.info(
+                    f"Crawl budget: reusing sitemap total {sitemap_total} from prior "
+                    f"sitemap analysis (skipping re-fetch of {sitemap_url})."
+                )
+            else:
+                sitemap_df = None
+                if primary_sitemap_attempted:
+                    self.logger.info(
+                        f"Crawl budget: primary sitemap {sitemap_url} already fetched "
+                        f"earlier in this run; not re-fetching it. Trying fallbacks only."
+                    )
+                else:
+                    await _throttle_domain(_extract_domain(sitemap_url))
+                    sitemap_df = await loop.run_in_executor(
+                        None, lambda: self._sitemap_to_df_with_retry(sitemap_url)
+                    )
+                # Fallback: if the primary sitemap 429'd on every attempt, try robots.txt sitemaps
+                if (sitemap_df is None or sitemap_df.empty) and fallback_sitemap_urls:
+                    for fb in fallback_sitemap_urls:
+                        if not fb or fb == sitemap_url:
+                            continue
+                        self.logger.info(f"Primary sitemap failed, trying fallback: {fb}")
+                        await _throttle_domain(_extract_domain(fb))
+                        sitemap_df = await loop.run_in_executor(None, lambda u=fb: self._sitemap_to_df_with_retry(u))
+                        if sitemap_df is not None and not sitemap_df.empty:
+                            break
+                if sitemap_df is None or sitemap_df.empty:
+                    self.logger.warning(
+                        f"Crawl budget: no sitemap data available for {sitemap_url} "
+                        f"(fallbacks={fallback_sitemap_urls or []}). Crawling site root only."
+                    )
+                sitemap_total = len(sitemap_df) if sitemap_df is not None and not sitemap_df.empty else 0
 
             start_url = f"https://{site_domain}" if not site_domain.startswith("http") else site_domain
 
             with tempfile.NamedTemporaryFile(suffix=".jsonl", delete=False) as tf:
                 temp_file = tf.name
 
+            # Conservative crawl settings to avoid tripping per-domain rate limits.
+            # The sitemap fetch above already hit 429s on some origins, so we throttle
+            # the crawl hard and let scrapy retry 429s with a delay instead of failing.
             await loop.run_in_executor(None, lambda: adv.crawl(
                 url_list=[start_url],
                 output_file=temp_file,
@@ -615,8 +867,17 @@ class AdvertoolsService:
                 custom_settings={
                     'LOG_LEVEL': 'WARNING',
                     'CLOSESPIDER_PAGECOUNT': 30,
-                    'DOWNLOAD_TIMEOUT': 15,
-                    'CONCURRENT_REQUESTS_PER_DOMAIN': 5,
+                    'DOWNLOAD_TIMEOUT': 20,
+                    'CONCURRENT_REQUESTS_PER_DOMAIN': 2,
+                    'DOWNLOAD_DELAY': 0.8,
+                    'RANDOMIZE_DOWNLOAD_DELAY': True,
+                    'AUTOTHROTTLE_ENABLED': True,
+                    'AUTOTHROTTLE_START_DELAY': 1.0,
+                    'AUTOTHROTTLE_MAX_DELAY': 5.0,
+                    'AUTOTHROTTLE_TARGET_CONCURRENCY': 1.0,
+                    'RETRY_ENABLED': True,
+                    'RETRY_TIMES': 2,
+                    'RETRY_DELAY': 3.0,
                     'DEPTH_LIMIT': 2,
                 }
             ))
@@ -685,8 +946,14 @@ class AdvertoolsService:
             self.logger.info(f"Comparing sitemaps: {sitemap_a} vs {sitemap_b}")
             loop = asyncio.get_event_loop()
 
-            df_a = await loop.run_in_executor(None, lambda: adv.sitemap_to_df(sitemap_a))
-            df_b = await loop.run_in_executor(None, lambda: adv.sitemap_to_df(sitemap_b))
+            await _throttle_domain(_extract_domain(sitemap_a))
+            await _throttle_domain(_extract_domain(sitemap_b))
+            df_a = await loop.run_in_executor(
+                None, lambda: self._sitemap_to_df_with_retry(sitemap_a)
+            )
+            df_b = await loop.run_in_executor(
+                None, lambda: self._sitemap_to_df_with_retry(sitemap_b)
+            )
 
             total_a = len(df_a) if df_a is not None and not df_a.empty else 0
             total_b = len(df_b) if df_b is not None and not df_b.empty else 0

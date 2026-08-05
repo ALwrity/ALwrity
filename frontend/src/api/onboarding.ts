@@ -226,4 +226,9 @@ export async function getWebsiteAnalysisData() {
 export async function getResearchPreferencesData() {
   const res: AxiosResponse<any> = await apiClient.get('/api/onboarding/research-preferences');
   return res.data;
-} 
+}
+
+export async function getCompetitorAnalysis() {
+  const res: AxiosResponse<any> = await apiClient.get('/api/onboarding/competitor-analysis');
+  return res.data;
+}

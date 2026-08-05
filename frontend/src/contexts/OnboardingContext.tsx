@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Component } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { apiClient } from '../api/client';
 import { shouldSkipOnboarding } from '../utils/demoMode';
@@ -32,6 +32,7 @@ export interface OnboardingStep {
   status: 'pending' | 'in_progress' | 'completed' | 'skipped';
   completed_at: string | null;
   has_data: boolean;
+  data?: Record<string, any>;
 }
 
 export interface OnboardingStatus {
@@ -44,6 +45,7 @@ export interface OnboardingStatus {
   completed_at: string | null;
   can_proceed_to_final: boolean;
   steps: OnboardingStep[];
+  onboarding_type?: string;
 }
 
 export interface OnboardingSession {
@@ -67,6 +69,7 @@ interface OnboardingContextValue {
   isOnboardingComplete: boolean;
   currentStep: number;
   completionPercentage: number;
+  onboardingType: string;
   
   // Actions
   refresh: () => Promise<void>;
@@ -80,6 +83,58 @@ const OnboardingContext = createContext<OnboardingContextValue | undefined>(unde
 
 interface OnboardingProviderProps {
   children: ReactNode;
+}
+
+
+interface OnboardingErrorBoundaryState {
+  hasError: boolean;
+}
+
+class OnboardingErrorBoundary extends Component<{ children: ReactNode }, OnboardingErrorBoundaryState> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): OnboardingErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('OnboardingContext: Unhandled error in provider tree', error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return React.createElement('div', {
+        style: {
+          padding: '40px 20px',
+          textAlign: 'center',
+          color: '#64748b',
+          maxWidth: '400px',
+          margin: '80px auto',
+        },
+      }, [
+        React.createElement('div', { key: 'icon', style: { fontSize: '2rem', marginBottom: 12 } }, '⚠️'),
+        React.createElement('h3', { key: 'title', style: { margin: '0 0 8px', color: '#334155' } }, 'Something went wrong'),
+        React.createElement('p', { key: 'msg', style: { margin: '0 0 16px', fontSize: '0.9rem' } }, 'The onboarding session could not be loaded. Please refresh the page to try again.'),
+        React.createElement('button', {
+          key: 'btn',
+          onClick: () => window.location.reload(),
+          style: {
+            padding: '10px 24px',
+            borderRadius: 8,
+            border: 'none',
+            background: 'linear-gradient(135deg, #1976d2 0%, #1565c0 100%)',
+            color: '#fff',
+            fontWeight: 600,
+            cursor: 'pointer',
+          },
+        }, 'Refresh Page'),
+      ]);
+    }
+    return this.props.children;
+  }
 }
 
 export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children }) => {
@@ -243,7 +298,6 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     // Clear all cached data
     sessionStorage.removeItem('onboarding_init');
     localStorage.removeItem('onboarding_step');
-    localStorage.removeItem('onboarding_data');
     
     // Reset state
     setData(null);
@@ -260,6 +314,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   const isOnboardingComplete = shouldSkipOnboarding() || (data?.onboarding?.is_completed ?? false);
   const currentStep = data?.onboarding?.current_step ?? 1;
   const completionPercentage = data?.onboarding?.completion_percentage ?? 0;
+  const onboardingType = data?.onboarding?.onboarding_type ?? 'website';
 
   const value: OnboardingContextValue = {
     data,
@@ -268,6 +323,7 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     isOnboardingComplete,
     currentStep,
     completionPercentage,
+    onboardingType,
     refresh,
     markStepComplete,
     clearError,
@@ -276,9 +332,11 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
   };
 
   return (
-    <OnboardingContext.Provider value={value}>
-      {children}
-    </OnboardingContext.Provider>
+    <OnboardingErrorBoundary>
+      <OnboardingContext.Provider value={value}>
+        {children}
+      </OnboardingContext.Provider>
+    </OnboardingErrorBoundary>
   );
 };
 

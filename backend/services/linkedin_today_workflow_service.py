@@ -54,8 +54,11 @@ class LinkedInTodayWorkflowService:
         existing = await self._get_existing_plan(date_str)
         if existing:
             logger.info(
-                "LinkedIn workflow plan already exists for user {} date {}",
+                "[LinkedInWorkflow] Cooldown — plan exists for user {} date {} "
+                "(source={}, created_at={}), skipping regeneration",
                 self.user_id, date_str,
+                getattr(existing, "source", "unknown"),
+                getattr(existing, "created_at", "unknown"),
             )
             return existing, False
 

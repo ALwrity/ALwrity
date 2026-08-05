@@ -30,12 +30,14 @@ import {
   TrendingUp as TrendingUpIcon,
   Search as SearchIcon,
   AutoAwesome as AutoFixHighIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { aiApiClient, longRunningApiClient } from '../../api/client';  // Use aiApiClient for long-running operations
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';
 import type { Competitor } from './WebsiteStep/components';
+import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
 
 
 // Light theme constants matching requirements
@@ -102,6 +104,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [showStrategyModal, setShowStrategyModal] = useState(false);
   const [showPublishingModal, setShowPublishingModal] = useState(false);
   const [showStructureModal, setShowStructureModal] = useState(false);
+  const [backgroundSetupOpen, setBackgroundSetupOpen] = useState(false);
 
   // Ref to track if initialization has already started to prevent duplicate calls
   const initializationStarted = React.useRef(false);
@@ -124,16 +127,15 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     const timer = setTimeout(() => {
       const propUserUrl = userUrl || '';
       const localStorageUrl = localStorage.getItem('website_url') || '';
-      const sessionStorageUrl = sessionStorage.getItem('website_url') || '';
       const onboardingContextUrl = (window as any).onboardingContext?.websiteUrl || '';
       
       // Also check initialData if available
       const initialDataUrl = initialData?.website || initialData?.website_url || '';
       
-      const finalUserUrl = propUserUrl || localStorageUrl || sessionStorageUrl || onboardingContextUrl || initialDataUrl || '';
+      const finalUserUrl = propUserUrl || localStorageUrl || onboardingContextUrl || initialDataUrl || '';
       
       if (!finalUserUrl) {
-        console.warn('CompetitorAnalysisStep: No website URL found (prop, local, session, context, or initialData).');
+        console.warn('CompetitorAnalysisStep: No website URL found (prop, local, context, or initialData).');
         setMissingData(true);
       } else {
         console.log('CompetitorAnalysisStep: Valid website URL found:', finalUserUrl);
@@ -269,16 +271,14 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       // Get website URL from multiple sources with better fallbacks
       const propUserUrl = userUrl || '';
       const localStorageUrl = localStorage.getItem('website_url') || '';
-      const sessionStorageUrl = sessionStorage.getItem('website_url') || '';
       
       // Try to get from onboarding context or global state
       const onboardingContextUrl = (window as any).onboardingContext?.websiteUrl || '';
       
-      const finalUserUrl = propUserUrl || localStorageUrl || sessionStorageUrl || onboardingContextUrl || '';
+      const finalUserUrl = propUserUrl || localStorageUrl || onboardingContextUrl || '';
       
       // Get website analysis data from multiple sources
       const localStorageAnalysis = localStorage.getItem('website_analysis_data');
-      const sessionStorageAnalysis = sessionStorage.getItem('website_analysis_data');
       
       let websiteAnalysisData = null;
       if (localStorageAnalysis) {
@@ -288,22 +288,16 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
           console.warn('Failed to parse localStorage website_analysis_data:', e);
         }
       }
-      if (!websiteAnalysisData && sessionStorageAnalysis) {
-        try {
-          websiteAnalysisData = JSON.parse(sessionStorageAnalysis);
-        } catch (e) {
-          console.warn('Failed to parse sessionStorage website_analysis_data:', e);
-        }
+      if (!websiteAnalysisData) {
+        console.log('CompetitorAnalysisStep: No analysis data found from localStorage');
       }
       
       console.log('CompetitorAnalysisStep: URL sources debug:', {
         propUserUrl,
         localStorageUrl,
-        sessionStorageUrl,
         onboardingContextUrl,
         finalUserUrl,
         hasLocalStorageAnalysis: !!localStorageAnalysis,
-        hasSessionStorageAnalysis: !!sessionStorageAnalysis,
         websiteAnalysisData: websiteAnalysisData ? 'present' : 'null'
       });
 
@@ -557,6 +551,27 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     }
   }, [competitors, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis]);
 
+  // Fetch sitemap benchmark results (runs in background after competitor discovery)
+  const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
+  const [benchmarkLoading, setBenchmarkLoading] = useState(false);
+
+  useEffect(() => {
+    if (!competitors.length) return;
+    let cancelled = false;
+    setBenchmarkLoading(true);
+    aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
+      .then((resp) => {
+        if (!cancelled) setBenchmarkReport(resp.data || resp.data?.benchmark);
+      })
+      .catch(() => {
+        if (!cancelled) setBenchmarkReport(null); // 404 = not yet generated, OK
+      })
+      .finally(() => {
+        if (!cancelled) setBenchmarkLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [competitors.length]);
+
   // Data collection function for global Continue button
   const getResearchData = useCallback(() => {
     // Auto-schedule sitemap benchmark if proceeding to next step
@@ -713,6 +728,20 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         >
           {isAnalyzing ? 'Analyzing...' : 'Run Fresh Analysis'}
         </Button>
+        <Button
+          size="small"
+          variant="outlined"
+          onClick={() => setBackgroundSetupOpen(true)}
+          sx={{
+            borderColor: '#3b82f6',
+            color: '#3b82f6',
+            textTransform: 'none',
+            whiteSpace: 'nowrap',
+            '&:hover': { borderColor: '#2563eb', bgcolor: 'rgba(59,130,246,0.08)' }
+          }}
+        >
+          ⚙️ Smart Background Setup
+        </Button>
       </Box>
 
       {/* Collapsible info modal */}
@@ -788,6 +817,54 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onRemoveCompetitor={handleRemoveCompetitor}
         onAddCompetitor={handleAddCompetitor}
       />
+
+      {/* Competitor Analysis Status — benchmark results from background analysis */}
+      {benchmarkReport && (
+        <Box mt={4} mb={3}>
+          <Paper sx={{ p: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 2 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: '#1e293b' }}>
+              Competitor Sitemap Analysis
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {benchmarkReport.competitors?.summaries &&
+                Object.entries(benchmarkReport.competitors.summaries).map(([url, info]: [string, any]) => {
+                  let hostname = url;
+                  try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
+                  return (
+                  <Chip
+                    key={url}
+                    size="small"
+                    label={hostname}
+                    icon={info?.error ? <span style={{ fontSize: 14 }}>⚠️</span> : <CheckCircleIcon sx={{ fontSize: 18, color: '#10b981' }} />}
+                    color={info?.error ? 'default' : 'success'}
+                    variant={info?.error ? 'outlined' : 'filled'}
+                    title={info?.error || `Analyzed: ${(info as any)?.total_urls ?? '?'} URLs`}
+                  />
+                )})}
+              {benchmarkReport.competitors?.errors &&
+                Object.entries(benchmarkReport.competitors.errors).map(([url, err]: [string, any]) => {
+                  let hostname = url;
+                  try { hostname = new URL(url).hostname.replace('www.', ''); } catch {}
+                  return (
+                  <Chip
+                    key={`err-${url}`}
+                    size="small"
+                    label={hostname}
+                    icon={<span style={{ fontSize: 14 }}>❌</span>}
+                    color="error"
+                    variant="outlined"
+                    title={typeof err === 'string' ? err : 'Analysis failed'}
+                  />
+                )})}
+            </Box>
+            {(!benchmarkReport?.competitors?.summaries && !benchmarkReport?.competitors?.errors) && (
+              <Typography variant="body2" sx={{ color: '#64748b', fontStyle: 'italic' }}>
+                Analysis running in background — results will appear here when complete.
+              </Typography>
+            )}
+          </Paper>
+        </Box>
+      )}
 
       {/* Strategic Content Opportunities Section */}
       {(sitemapAnalysis || isAnalyzingSitemap) && (
@@ -1227,6 +1304,11 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
           )}
         </DialogContent>
       </Dialog>
+
+      <ResearchStepBackgroundSetupModal
+        open={backgroundSetupOpen}
+        onClose={() => setBackgroundSetupOpen(false)}
+      />
 
     </Box>
   );

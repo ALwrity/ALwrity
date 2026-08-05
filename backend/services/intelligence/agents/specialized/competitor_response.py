@@ -57,6 +57,7 @@ class CompetitorResponseAgent(BaseALwrityAgent):
             ],
             llm=_llm_for_agent,
             max_iterations=5,
+            task="language-generation",
         )
     
     # Tool Implementations (sync — called by txtai Agent)

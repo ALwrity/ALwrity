@@ -65,8 +65,8 @@ const clearLocalUserCaches = () => {
     onboardingCache.clearCache();
   } catch (_) {}
   const lsKeys = [
-    'onboarding_step_data', 'onboarding_active_step', 'onboarding_data',
-    'onboarding_intro_completed', 'website_url', 'website_analysis_data',
+    'onboarding_step_data', 'onboarding_active_step',
+    'website_url', 'website_analysis_data',
     'onboarding_complete', 'primary_website',
   ];
   lsKeys.forEach((k) => localStorage.removeItem(k));
@@ -295,7 +295,7 @@ const UserBadge: React.FC<UserBadgeProps> = ({ colorMode = 'light', showPlanChip
         marginThreshold={0}
         PaperProps={{
           className: 'user-badge-menu-paper',
-          sx: userBadgeMenuPaperSx,
+          sx: { ...userBadgeMenuPaperSx, maxHeight: '80vh' },
         }}
       >
         <UserBadgeMenuScroll>

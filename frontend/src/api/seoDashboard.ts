@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, longRunningApiClient } from './client';
 
 export interface SEOHealthScore {
   score: number;
@@ -62,11 +62,15 @@ export type OnboardingTaskStatus = 'active' | 'failed' | 'paused' | 'needs_inter
 
 export interface OnboardingScheduledTaskHealthItem {
   label: string;
+  results_key?: string | null;
+  task_id?: number | null;
+  task_type?: string | null;
   status: OnboardingTaskStatus;
   next_execution: string | null;
   last_success: string | null;
   last_failure: string | null;
   consecutive_failures: number;
+  result_summary: string | null;
   latest_execution: {
     status: string | null;
     execution_date: string | null;
@@ -81,6 +85,17 @@ export interface OnboardingScheduledTaskHealthResponse {
   website_url?: string | null;
   tasks: Record<string, OnboardingScheduledTaskHealthItem>;
   last_updated: string;
+}
+
+export interface SavedWebsiteAnalysis {
+  id: number;
+  session_id: number;
+  website_url: string;
+  analysis_date: string | null;
+  status: string;
+  warning_message?: string | null;
+  crawl_result?: any;
+  [key: string]: any;
 }
 
 export interface SEODashboardData {
@@ -203,13 +218,36 @@ export const seoDashboardAPI = {
 
   async getOnboardingTaskHealth(siteUrl?: string): Promise<OnboardingScheduledTaskHealthResponse> {
     try {
-      const response = await apiClient.get('/api/seo-dashboard/onboarding-task-health', {
+      const response = await longRunningApiClient.get('/api/seo-dashboard/onboarding-task-health', {
         params: siteUrl ? { site_url: siteUrl } : undefined
       });
       return response.data;
     } catch (error) {
       console.error('Error fetching onboarding task health:', error);
       throw error;
+    }
+  },
+
+  // Get the latest saved website analysis from onboarding (flat WebsiteAnalysis row)
+  async getSavedWebsiteAnalysis(): Promise<{ success: boolean; analysis?: SavedWebsiteAnalysis; error?: string }> {
+    try {
+      const response = await apiClient.get('/api/onboarding/style-detection/session-analyses');
+      const data = response.data;
+      if (data.success && Array.isArray(data.analyses) && data.analyses.length > 0) {
+        // session-analyses returns full flat rows ordered by created_at desc;
+        // sort defensively and pick the most recent analysis
+        const latest = [...data.analyses].sort((a, b) =>
+          new Date(b.created_at || b.analysis_date || 0).getTime() -
+          new Date(a.created_at || a.analysis_date || 0).getTime()
+        )[0];
+        if (latest) {
+          return { success: true, analysis: latest as SavedWebsiteAnalysis };
+        }
+      }
+      return { success: false, error: 'No saved website analysis found' };
+    } catch (error) {
+      console.error('Error fetching saved website analysis:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
   }
 

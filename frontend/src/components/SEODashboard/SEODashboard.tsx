@@ -22,7 +22,7 @@ import {
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth, useUser, SignOutButton, useClerk } from '@clerk/clerk-react';
-import { apiClient } from '../../api/client';
+import { apiClient, longRunningApiClient } from '../../api/client';
 import {
   Refresh as RefreshIcon,
   Person as PersonIcon,
@@ -35,6 +35,7 @@ import {
   ExpandMore as ExpandMoreIcon,
   AutoAwesome as AIIcon,
   Tab as TabIcon,
+  Visibility as VisibilityIcon,
 } from '@mui/icons-material';
 import { Tabs, Tab as MuiTab } from '@mui/material';
 
@@ -74,6 +75,9 @@ import ContentGapRadarCard from './components/ContentGapRadarCard';
 
 // Phase 2A: Enterprise SEO Analysis
 import SEOAnalysisController from './SEOAnalysisController';
+
+// Saved onboarding Website Analysis modal
+import WebsiteAnalysisModal from './WebsiteAnalysisModal';
 
 const SEODashboard: React.FC = () => {
   // Clerk authentication hooks
@@ -142,6 +146,9 @@ const SEODashboard: React.FC = () => {
   const [competitiveSitemapBenchmarkingLoading, setCompetitiveSitemapBenchmarkingLoading] = useState(false);
   const [competitiveSitemapBenchmarkingError, setCompetitiveSitemapBenchmarkingError] = useState<string | null>(null);
   const [onboardingTaskHealth, setOnboardingTaskHealth] = useState<OnboardingScheduledTaskHealthResponse | null>(null);
+
+  // Saved Website Analysis modal visibility (lazy-loads on first open)
+  const [websiteAnalysisOpen, setWebsiteAnalysisOpen] = useState(false);
 
   // PlatformAnalytics refresh handle
   const platformRefreshRef = useRef<(() => Promise<void>) | null>(null);
@@ -260,7 +267,7 @@ const SEODashboard: React.FC = () => {
         const [platformResponse, userData, onboardingTaskHealthResponse] = await Promise.all([
           apiClient.get('/api/seo-dashboard/platforms'),
           userDataAPI.getUserData(),
-          apiClient.get('/api/seo-dashboard/onboarding-task-health')
+          longRunningApiClient.get('/api/seo-dashboard/onboarding-task-health')
         ]);
         
         console.log('Platform status response:', platformResponse.status, platformResponse.statusText);
@@ -418,7 +425,7 @@ const SEODashboard: React.FC = () => {
   const runStrategicInsights = async () => {
     setStrategicInsightsLoading(true);
     try {
-      const res = await apiClient.post('/api/seo-dashboard/strategic-insights/run');
+      const res = await longRunningApiClient.post('/api/seo-dashboard/strategic-insights/run');
       if (res.data?.success) {
         setStrategicInsightsHistory(prev => [res.data.report, ...prev]);
       }
@@ -445,8 +452,19 @@ const SEODashboard: React.FC = () => {
     }
   };
 
-  // Load competitor analysis data from onboarding step 3
-  const loadCompetitorAnalysisData = () => {
+  // Load competitor analysis data — try API first, fall back to localStorage
+  const loadCompetitorAnalysisData = async () => {
+    try {
+      const result = await apiClient.get('/api/onboarding/competitor-analysis');
+      if (result?.data?.competitors?.length > 0) {
+        console.log('Loading competitor analysis data from API:', result.data);
+        setCompetitorAnalysisData(result.data);
+        return;
+      }
+    } catch (err) {
+      console.log('Competitor analysis API call failed, falling back to localStorage:', err);
+    }
+    // Fallback: localStorage (for backward compatibility during transition)
     try {
       const cachedData = localStorage.getItem('competitor_analysis_data');
       const cachedUrl = localStorage.getItem('competitor_analysis_url');
@@ -458,13 +476,13 @@ const SEODashboard: React.FC = () => {
         const isRecent = (Date.now() - timestamp) < (7 * 24 * 60 * 60 * 1000); // 7 days
         
         if (isRecent) {
-          console.log('Loading competitor analysis data from onboarding step 3:', analysisData);
+          console.log('Loading competitor analysis data from localStorage (fallback):', analysisData);
           setCompetitorAnalysisData(analysisData);
         } else {
           console.log('Competitor analysis data is too old, not loading');
         }
       } else {
-        console.log('No competitor analysis data found in localStorage');
+        console.log('No competitor analysis data found');
       }
     } catch (error) {
       console.error('Error loading competitor analysis data:', error);
@@ -1063,6 +1081,33 @@ const SEODashboard: React.FC = () => {
                 </Box>
               )}
 
+              {/* Website Analysis (saved onboarding style/SEO analysis) */}
+              <Box id="website-analysis" sx={{ mb: 4 }}>
+                <GlassCard sx={{ p: 3 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
+                      🎨 Website Analysis
+                    </Typography>
+                    <Tooltip title="Your saved brand voice, style guidelines, SEO audit, and sitemap insights captured during onboarding.">
+                      <InfoIcon sx={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: 18 }} />
+                    </Tooltip>
+                    <Box sx={{ flexGrow: 1 }} />
+                    <Button
+                      variant="contained"
+                      startIcon={<VisibilityIcon />}
+                      onClick={() => setWebsiteAnalysisOpen(true)}
+                      sx={{ textTransform: 'none', fontWeight: 600 }}
+                    >
+                      View Analysis
+                    </Button>
+                  </Box>
+                  <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>
+                    Review the AI analysis of your brand voice, content strategy, and technical SEO
+                    from when your website was set up.
+                  </Typography>
+                </GlassCard>
+              </Box>
+
               {/* Data-Driven Content Intelligence (Advertools) */}
               {data.advertools_insights && (
                 <AdvertoolsInsights data={data.advertools_insights} />
@@ -1229,7 +1274,7 @@ const SEODashboard: React.FC = () => {
 
               {/* Deep Competitor Analysis (auto-scheduled) */}
               {deepCompetitorAnalysisData && (
-                <Box sx={{ mb: 4 }}>
+                <Box id="seo-deep-competitor-analysis" sx={{ mb: 4, scrollMarginTop: 24 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
                     <Typography variant="h6" sx={{ color: 'white', fontWeight: 600 }}>
                       🔍 Deep Competitor Analysis
@@ -1574,6 +1619,54 @@ const SEODashboard: React.FC = () => {
                                   {ui.action}
                                   {task.latest_execution?.error_message ? ` Latest error: ${task.latest_execution.error_message}` : ''}
                                 </Alert>
+                                {(task.result_summary || task.latest_execution?.result_summary) && (
+                                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.85)', display: 'block', mt: 1 }}>
+                                    Latest results: {task.result_summary || task.latest_execution?.result_summary}
+                                  </Typography>
+                                )}
+                                <Box sx={{ mt: 1 }}>
+                                  {task.results_key === 'website_analysis' ? (
+                                    <Button
+                                      size="small"
+                                      variant="outlined"
+                                      startIcon={<VisibilityIcon />}
+                                      disabled={status === 'not_scheduled'}
+                                      onClick={() => setWebsiteAnalysisOpen(true)}
+                                      sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'rgba(255,255,255,0.6)' } }}
+                                    >
+                                      View results
+                                    </Button>
+                                  ) : task.results_key === 'competitor_analysis' ? (
+                                    <Tooltip title={deepCompetitorAnalysisData ? '' : 'Deep competitor results are not available yet'}>
+                                      <span>
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          startIcon={<VisibilityIcon />}
+                                          disabled={status === 'not_scheduled' || !deepCompetitorAnalysisData}
+                                          onClick={() => document.getElementById('seo-deep-competitor-analysis')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                          sx={{ color: 'white', borderColor: 'rgba(255,255,255,0.3)', '&:hover': { borderColor: 'rgba(255,255,255,0.6)' } }}
+                                        >
+                                          View results
+                                        </Button>
+                                      </span>
+                                    </Tooltip>
+                                  ) : task.results_key === 'sif_indexing' || task.results_key === 'market_trends' ? (
+                                    <Tooltip title="Full results are shown in the Onboarding Integrations step">
+                                      <span>
+                                        <Button
+                                          size="small"
+                                          variant="outlined"
+                                          startIcon={<VisibilityIcon />}
+                                          disabled
+                                          sx={{ color: 'rgba(255,255,255,0.5)', borderColor: 'rgba(255,255,255,0.2)' }}
+                                        >
+                                          View results
+                                        </Button>
+                                      </span>
+                                    </Tooltip>
+                                  ) : null}
+                                </Box>
                               </Box>
                             </Grid>
                           );
@@ -1583,6 +1676,12 @@ const SEODashboard: React.FC = () => {
                   </GlassCard>
                 </Box>
               )}
+
+              {/* Saved Website Analysis modal (lazy-loads on open) */}
+              <WebsiteAnalysisModal
+                open={websiteAnalysisOpen}
+                onClose={() => setWebsiteAnalysisOpen(false)}
+              />
 
               {/* SEO Analyzer Panel */}
               <SEOAnalyzerPanel

@@ -25,6 +25,8 @@ interface GSCBrainstormModalProps {
   onSelectSuggestion: (keyword: string) => void;
   initialKeywords: string;
   onReRun: (keywords: string) => void;
+  /** Optional content rendered below the tab area (e.g. TopPagesInsights). */
+  bottomContent?: React.ReactNode;
 }
 
 const tabLabels = [
@@ -51,6 +53,7 @@ export const GSCBrainstormModal: React.FC<GSCBrainstormModalProps> = ({
   onSelectSuggestion,
   initialKeywords,
   onReRun,
+  bottomContent,
 }) => {
   const [activeTab, setActiveTab] = React.useState<TabKey>('Quick Wins');
   const [topicInput, setTopicInput] = React.useState(initialKeywords);
@@ -416,6 +419,7 @@ export const GSCBrainstormModal: React.FC<GSCBrainstormModalProps> = ({
                 {activeTab === 'Pages' && <PagesTab pages={pageOpportunities} />}
                 {activeTab === 'AI Recommendations' && <AIRecommendationsTab recommendations={aiRecommendations} onSelect={onSelectSuggestion} />}
               </div>
+              {bottomContent}
             </div>
           </div>
         )}

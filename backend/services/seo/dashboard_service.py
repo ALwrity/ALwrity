@@ -35,6 +35,22 @@ from models.advertools_monitoring_models import AdvertoolsTask
 
 logger = get_service_logger("seo_dashboard")
 
+# Typed hint mapping each onboarding task model to the SEO Dashboard UI section
+# that should open when the user clicks "View results" for that task.
+RESULTS_KEY_BY_TASK_MODEL: Dict[Any, str] = {
+    OnboardingFullWebsiteAnalysisTask: "website_analysis",
+    DeepCompetitorAnalysisTask: "competitor_analysis",
+    SIFIndexingTask: "sif_indexing",
+    MarketTrendsTask: "market_trends",
+}
+
+TASK_TYPE_BY_MODEL: Dict[Any, str] = {
+    OnboardingFullWebsiteAnalysisTask: "onboarding_full_website_analysis",
+    DeepCompetitorAnalysisTask: "deep_competitor_analysis",
+    SIFIndexingTask: "sif_indexing",
+    MarketTrendsTask: "market_trends",
+}
+
 class SEODashboardService:
     """Main service for SEO dashboard data orchestration."""
     
@@ -275,6 +291,9 @@ class SEODashboardService:
         label: str,
         site_key: str,
     ) -> Dict[str, Any]:
+        results_key = RESULTS_KEY_BY_TASK_MODEL.get(task_model)
+        task_type_str = TASK_TYPE_BY_MODEL.get(task_model)
+
         query = self.db.query(task_model).filter(task_model.user_id == str(user_id))
         if site_key:
             query = query.filter(task_model.website_url.like(f"{site_key}%"))
@@ -283,11 +302,15 @@ class SEODashboardService:
         if not task:
             return {
                 "label": label,
+                "results_key": results_key,
+                "task_id": None,
+                "task_type": task_type_str,
                 "status": "not_scheduled",
                 "next_execution": None,
                 "last_success": None,
                 "last_failure": None,
                 "consecutive_failures": 0,
+                "result_summary": None,
                 "latest_execution": None,
             }
 
@@ -298,23 +321,29 @@ class SEODashboardService:
             .first()
         )
 
+        result_summary = None
         log_summary = None
         if latest_log:
+            result_summary = self._summarize_execution_result(latest_log.result_data)
             log_summary = {
                 "status": latest_log.status,
                 "execution_date": latest_log.execution_date.isoformat() if latest_log.execution_date else None,
                 "execution_time_ms": latest_log.execution_time_ms,
                 "error_message": (latest_log.error_message or "")[:500] if latest_log.error_message else None,
-                "result_summary": self._summarize_execution_result(latest_log.result_data),
+                "result_summary": result_summary,
             }
 
         return {
             "label": label,
+            "results_key": results_key,
+            "task_id": task.id,
+            "task_type": task_type_str,
             "status": task.status or "not_scheduled",
             "next_execution": task.next_execution.isoformat() if task.next_execution else None,
             "last_success": task.last_success.isoformat() if task.last_success else None,
             "last_failure": task.last_failure.isoformat() if task.last_failure else None,
             "consecutive_failures": task.consecutive_failures or 0,
+            "result_summary": result_summary,
             "latest_execution": log_summary,
         }
 
@@ -322,10 +351,71 @@ class SEODashboardService:
         if not isinstance(result_data, dict):
             return None
 
+        # Prefer an explicit summary/message key when the executor wrote one
         for key in ("summary", "message", "status_message", "note"):
             value = result_data.get(key)
             if isinstance(value, str) and value.strip():
                 return value[:300]
+
+        # Skipped runs carry a reason
+        reason = result_data.get("reason")
+        if isinstance(reason, str) and reason.strip():
+            return f"Skipped: {reason}"
+
+        parts: List[str] = []
+
+        # Website analysis (OnboardingFullWebsiteAnalysisTask)
+        crawl_result = result_data.get("crawl_result")
+        if isinstance(crawl_result, dict):
+            pages = crawl_result.get("pages")
+            url_count = len(pages) if isinstance(pages, list) else None
+            parts.append(f"{url_count} pages crawled" if url_count is not None else "website crawled")
+        if result_data.get("style_analysis"):
+            parts.append("style analysis complete")
+        if result_data.get("style_guidelines"):
+            parts.append("style guidelines generated")
+        if result_data.get("seo_audit"):
+            parts.append("SEO audit complete")
+
+        # Deep competitor analysis
+        competitors = result_data.get("competitors")
+        if isinstance(competitors, list) and competitors:
+            meta = result_data.get("metadata")
+            analyzed = None
+            if isinstance(meta, dict):
+                analyzed = meta.get("competitors_analyzed") or meta.get("competitors_requested")
+            parts.append(f"{analyzed or len(competitors)} competitors analyzed")
+
+        # SIF indexing
+        if "metadata_synced" in result_data or "content_synced" in result_data:
+            parts.append(f"metadata items synced: {result_data.get('metadata_synced') or 0}")
+            parts.append(f"content pages indexed: {'yes' if result_data.get('content_synced') else 'no'}")
+            guardian = result_data.get("guardian_report")
+            if isinstance(guardian, dict):
+                pillars = guardian.get("pillars_found") or guardian.get("pillar_count")
+                if pillars is None and isinstance(guardian.get("pillars"), list):
+                    pillars = len(guardian["pillars"])
+                pages_analyzed = guardian.get("pages_analyzed") or guardian.get("total_pages")
+                if pillars:
+                    parts.append(f"pillars found: {pillars}")
+                if pages_analyzed:
+                    parts.append(f"pages analyzed: {pages_analyzed}")
+
+        # Market trends
+        if "run_id" in result_data or "keywords" in result_data:
+            keywords = result_data.get("keywords")
+            if isinstance(keywords, list):
+                parts.append(f"trends run for {len(keywords)} keyword(s)")
+            elif isinstance(keywords, (int, str)) and keywords not in (None, ""):
+                parts.append(f"trends run for {keywords} keyword(s)")
+            geo = result_data.get("geo")
+            timeframe = result_data.get("timeframe")
+            meta_bits = [bit for bit in (geo, timeframe) if bit]
+            if meta_bits:
+                parts.append(" / ".join(meta_bits))
+
+        if parts:
+            return "; ".join(parts)
 
         if result_data:
             return f"Result keys: {', '.join(sorted(result_data.keys())[:6])}"

@@ -292,40 +292,9 @@ def validate_step_data(step_number: int, data: Dict[str, Any]) -> List[str]:
     
     logger.info(f"[validate_step_data] Validating step {step_number} with data: {data}")
     
-    if step_number == 1:  # AI LLM Providers - Now requires Gemini, Exa, and CopilotKit
-        required_providers = ['gemini', 'exa', 'copilotkit']
-        missing_providers = []
-        
-        logger.info(f"[validate_step_data] Step 1 validation - data type: {type(data)}, data: {data}")
-        
-        if not data or 'api_keys' not in data:
-            logger.warning(f"[validate_step_data] No data or api_keys missing. data: {data}")
-            errors.append("API keys configuration is required")
-        elif not data['api_keys']:
-            logger.warning(f"[validate_step_data] api_keys is empty. data: {data}")
-            errors.append("API keys configuration is required")
-        else:
-            # Check for all required providers
-            for provider in required_providers:
-                if provider not in data['api_keys'] or not data['api_keys'][provider]:
-                    missing_providers.append(provider)
-            
-            if missing_providers:
-                errors.append(f"Missing required API keys: {', '.join(missing_providers)}")
-            
-            # Validate each configured API key format
-            for provider, api_key in data['api_keys'].items():
-                if provider in required_providers and api_key:
-                    if provider == 'gemini' and not api_key.startswith('AIza'):
-                        errors.append("Gemini API key must start with 'AIza'")
-                    elif provider == 'exa':
-                        # Exa API keys are UUIDs (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
-                        import re
-                        exa_uuid_regex = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
-                        if not exa_uuid_regex.match(api_key):
-                            errors.append("Exa API key must be a valid UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)")
-                    elif provider == 'copilotkit' and not api_key.startswith('ck_pub_'):
-                        errors.append("CopilotKit API key must start with 'ck_pub_'")
+    if step_number == 1:  # API keys — platform-managed, skip end-user validation
+        logger.info("[validate_step_data] Step 1 skipped — API keys are platform-managed")
+        return errors
     
     elif step_number == 2:  # Website Analysis
         # Accept both 'website' and 'website_url' for backwards compatibility

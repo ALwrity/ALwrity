@@ -75,8 +75,8 @@ async def restore_website_analysis_tasks(scheduler):
                         if not session:
                             continue
                             
-                        # is_completed = (session.current_step >= 6) or (session.progress >= 100.0)
-                        is_completed = (session.current_step >= 6) or (session.progress >= 100.0)
+                        # is_completed = (session.current_step >= 5) or (session.progress >= 100.0)
+                        is_completed = (session.current_step >= 5) or (session.progress >= 100.0)
                         
                         if not is_completed:
                             continue

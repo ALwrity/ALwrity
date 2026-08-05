@@ -861,6 +861,7 @@ class SIFIntegrationService:
             else:
                 logger.info("No onboarding data found to sync")
             _sif_metrics_inc("sif_sync_total", "onboarding_success")
+            return len(items_to_index)
 
         except Exception as e:
             logger.error(f"Failed to sync onboarding data to SIF: {e}", exc_info=True)
@@ -1077,7 +1078,10 @@ class SIFIntegrationService:
                 await self.intelligence_service.index_content(items_to_index)
                 logger.info(f"Successfully synced {len(items_to_index)} pages to SIF index")
             _sif_metrics_inc("sif_sync_total", "website_content_success")
-            return
+            return {
+                "count": len(harvested_pages),
+                "pages": [{"url": p.get("url", ""), "title": p.get("title", "")} for p in harvested_pages if p.get("url")],
+            }
 
         except Exception as e:
             logger.error(f"Failed to sync user website content: {e}", exc_info=True)

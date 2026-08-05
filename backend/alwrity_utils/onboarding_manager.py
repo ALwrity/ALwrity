@@ -35,6 +35,9 @@ from api.onboarding import (
     get_onboarding_summary,
     get_website_analysis_data,
     get_research_preferences_data,
+    get_competitor_analysis,
+    get_onboarding_state,
+    retrigger_sif_indexing,
     save_business_info,
     get_business_info,
     get_business_info_by_user,
@@ -354,6 +357,39 @@ class OnboardingManager:
             except Exception as e:
                 logger.error(f"Error in research_preferences_data: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/onboarding/competitor-analysis")
+        async def competitor_analysis_data(current_user: dict = Depends(get_current_user)):
+            """Get competitor analysis data for SEO Dashboard."""
+            try:
+                return await get_competitor_analysis(current_user)
+            except HTTPException as he:
+                raise he
+            except Exception as e:
+                logger.error(f"Error in competitor_analysis_data: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error")
+
+        @self.app.post("/api/onboarding/state")
+        async def onboarding_state(current_user: dict = Depends(get_current_user)):
+            """Unified endpoint: current step + all step data in one call."""
+            try:
+                return await get_onboarding_state(current_user)
+            except HTTPException as he:
+                raise he
+            except Exception as e:
+                logger.error(f"Error in onboarding_state: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error")
+
+        @self.app.post("/api/onboarding/sif/retrigger")
+        async def sif_retrigger(current_user: dict = Depends(get_current_user)):
+            """Retrigger SIF indexing immediately for the current user."""
+            try:
+                return await retrigger_sif_indexing(current_user)
+            except HTTPException as he:
+                raise he
+            except Exception as e:
+                logger.error(f"Error in sif_retrigger: {e}")
+                raise HTTPException(status_code=500, detail="Internal server error")
 
         # Business Information endpoints
         @self.app.post("/api/onboarding/business-info")

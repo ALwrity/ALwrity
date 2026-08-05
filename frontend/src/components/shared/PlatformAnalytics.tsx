@@ -322,7 +322,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         initialSite = preferred;
       }
       if (!initialSite) {
-        const ls = (typeof window !== 'undefined') ? (localStorage.getItem('website_url') || sessionStorage.getItem('website_url') || '') : '';
+        const ls = (typeof window !== 'undefined') ? (localStorage.getItem('website_url') || '') : '';
         initialSite = ls || '';
       }
       if (initialSite) {

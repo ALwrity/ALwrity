@@ -130,12 +130,32 @@ class SIFIndexingExecutor(TaskExecutor):
             # Initialize SIF Service
             sif_service = SIFIntegrationService(user_id)
             
+            # Phase tracking: write progress to task payload for frontend polling
+            def _update_phase(phase: str, **extra):
+                payload = dict(task.payload) if task.payload else {}
+                payload['phase'] = phase
+                payload.update(extra)
+                task.payload = payload
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+            _update_phase("harvesting")
+
             # 1. Sync Step 2 Metadata (WebsiteAnalysis, CompetitorAnalysis)
             metadata_synced = await sif_service.sync_onboarding_data_to_sif()
             
+            _update_phase("indexing_metadata", items_indexed=metadata_synced or 0)
+
             # 2. Sync User Website Content (Deep Crawl / Snapshot)
-            content_synced = await sif_service.sync_user_website_content(website_url)
+            content_result = await sif_service.sync_user_website_content(website_url)
             
+            pages_harvested = content_result.get("count", 0) if isinstance(content_result, dict) else (content_result if isinstance(content_result, int) else 0)
+            indexed_pages = content_result.get("pages", []) if isinstance(content_result, dict) else []
+            _update_phase("indexing_content", pages_harvested=pages_harvested, indexed_pages=indexed_pages)
+            content_synced = pages_harvested > 0
+
             # 3. Trigger Content Guardian Audit (Background Analysis)
             # This ensures the agent runs immediately after new data is indexed
             guardian_report = None
@@ -168,6 +188,16 @@ class SIFIndexingExecutor(TaskExecutor):
                         # Persist the audit report in the task log result data
                     except Exception as e:
                         logger.error(f"Failed to run Content Guardian audit: {e}")
+            
+            # Phase tracking: mark complete with results
+            pillar_count = 0
+            if guardian_report and isinstance(guardian_report, dict):
+                pillar_count = (
+                    guardian_report.get('pillars_found')
+                    or guardian_report.get('pillar_count')
+                    or len(guardian_report.get('pillars', []))
+                )
+            _update_phase("complete", pillars_found=pillar_count, pages_harvested=pages_harvested)
             
             # Determine overall success
             success = metadata_synced or content_synced

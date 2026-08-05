@@ -238,6 +238,20 @@ async def get_today_workflow_status(
 
     plan = await run_in_threadpool(_get_existing)
 
+    # Determine why a plan may not have been generated
+    skip_reason = None
+    if not plan:
+        from services.integrations.linkedin_oauth import LinkedInOAuthService
+        oauth = LinkedInOAuthService()
+        conn_status = oauth.get_connection_status(user_id)
+        if not conn_status.get("connected"):
+            skip_reason = "LinkedIn not connected — connect your profile to receive daily workflows"
+        else:
+            skip_reason = (
+                "Not yet generated — workflows run daily at 3:00 UTC "
+                "for active users. Come back later or click Regenerate."
+            )
+
     return {
         "success": True,
         "data": {
@@ -246,6 +260,7 @@ async def get_today_workflow_status(
             "scheduled_run_completed": bool(plan and plan.source == "scheduled"),
             "source": plan.source if plan else None,
             "created_at": plan.created_at.isoformat() if plan and plan.created_at else None,
+            "skip_reason": skip_reason,
         },
         "timestamp": datetime.utcnow().isoformat(),
         "user_id": user_id,

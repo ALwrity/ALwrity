@@ -15,6 +15,9 @@ from .onboarding_utils.endpoints_core import (
     get_onboarding_status,
     get_onboarding_progress_full,
     get_step_data,
+    get_competitor_analysis,
+    get_onboarding_state,
+    retrigger_sif_indexing,
 )
 from .onboarding_utils.endpoints_management import (
     complete_step as _complete_step_impl,

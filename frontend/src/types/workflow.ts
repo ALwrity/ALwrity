@@ -20,6 +20,7 @@ export interface TodayWorkflowScheduleStatus {
   scheduled_run_completed: boolean;
   source: string | null;
   created_at?: string | null;
+  skip_reason?: string | null;
 }
 
 export interface TodayTask {

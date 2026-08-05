@@ -65,9 +65,7 @@ class SocialAmplificationAgent(BaseALwrityAgent):
             ],
             llm=_llm_for_agent,
             max_iterations=10,
-            # Removed unsupported 'system' argument
-            # Instruction will be provided via orchestrator context or initial prompt
-            # Instruction should be provided during invocation or via orchestrator context
+            task="language-generation",
         )
     
     # Tool Implementations

@@ -195,9 +195,11 @@ class DeepCompetitorAnalysisService:
             "competitive_landscape_detailed": competitor_changes,
         }
         
-        # Call AI for strategic intelligence
-        strategic_intelligence = await ai_manager.generate_strategic_intelligence(analysis_context, user_id=user_id)
-        content_gaps = await ai_manager.generate_content_gap_analysis(analysis_context, user_id=user_id)
+        # Call AI for strategic intelligence and content gaps in parallel
+        strategic_intelligence, content_gaps = await asyncio.gather(
+            ai_manager.generate_strategic_intelligence(analysis_context, user_id=user_id),
+            ai_manager.generate_content_gap_analysis(analysis_context, user_id=user_id),
+        )
 
         # Stage 4: Result Assembly
         report = {

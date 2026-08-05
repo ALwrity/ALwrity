@@ -98,6 +98,44 @@ export const checkExistingAnalysis = async (url: string): Promise<{
 };
 
 /**
+ * Maps a flat WebsiteAnalysis database row into the display shape expected
+ * by the UI (AnalysisResultsDisplay + summary cards).
+ * Shared by loadExistingAnalysis and the SEO Dashboard modal.
+ * @param row - The flat WebsiteAnalysis row (from to_dict() API responses)
+ * @returns Comprehensive analysis object in the UI display shape
+ */
+export const buildAnalysisDisplayModel = (row: any): any => {
+  // Database structure: flat fields at top level
+  // Need to combine them into the format expected by UI
+  return {
+    id: row.id,
+    writing_style: row.writing_style,
+    content_characteristics: row.content_characteristics,
+    target_audience: row.target_audience,
+    content_type: row.content_type,
+    brand_analysis: row.brand_analysis,
+    content_strategy_insights: row.content_strategy_insights,
+    seo_audit: row.seo_audit,
+    sitemap_analysis: row.crawl_result?.sitemap_analysis,
+    recommended_settings: row.recommended_settings,
+
+    // Extract guidelines from style_guidelines object
+    guidelines: row.style_guidelines?.guidelines,
+    best_practices: row.style_guidelines?.best_practices,
+    avoid_elements: row.style_guidelines?.avoid_elements,
+    content_strategy: row.style_guidelines?.content_strategy,
+    ai_generation_tips: row.style_guidelines?.ai_generation_tips,
+    competitive_advantages: row.style_guidelines?.competitive_advantages,
+    content_calendar_suggestions: row.style_guidelines?.content_calendar_suggestions,
+
+    // Style patterns
+    style_patterns: row.style_patterns,
+    style_consistency: row.style_patterns?.style_consistency,
+    unique_elements: row.style_patterns?.unique_elements
+  };
+};
+
+/**
  * Loads existing analysis by ID
  * @param analysisId - The ID of the analysis to load
  * @param website - The website URL for domain extraction
@@ -117,35 +155,7 @@ export const loadExistingAnalysis = async (analysisId: number, website: string):
     
     if (result.success && result.analysis) {
       const extractedDomain = extractDomainName(website);
-      
-      // Database structure: flat fields at top level
-      // Need to combine them into the format expected by UI
-      const comprehensiveAnalysis = {
-        id: result.analysis.id,
-        writing_style: result.analysis.writing_style,
-        content_characteristics: result.analysis.content_characteristics,
-        target_audience: result.analysis.target_audience,
-        content_type: result.analysis.content_type,
-        brand_analysis: result.analysis.brand_analysis,
-        content_strategy_insights: result.analysis.content_strategy_insights,
-        seo_audit: result.analysis.seo_audit,
-        sitemap_analysis: result.analysis.crawl_result?.sitemap_analysis,
-        recommended_settings: result.analysis.recommended_settings,
-        
-        // Extract guidelines from style_guidelines object
-        guidelines: result.analysis.style_guidelines?.guidelines,
-        best_practices: result.analysis.style_guidelines?.best_practices,
-        avoid_elements: result.analysis.style_guidelines?.avoid_elements,
-        content_strategy: result.analysis.style_guidelines?.content_strategy,
-        ai_generation_tips: result.analysis.style_guidelines?.ai_generation_tips,
-        competitive_advantages: result.analysis.style_guidelines?.competitive_advantages,
-        content_calendar_suggestions: result.analysis.style_guidelines?.content_calendar_suggestions,
-        
-        // Style patterns
-        style_patterns: result.analysis.style_patterns,
-        style_consistency: result.analysis.style_patterns?.style_consistency,
-        unique_elements: result.analysis.style_patterns?.unique_elements
-      };
+      const comprehensiveAnalysis = buildAnalysisDisplayModel(result.analysis);
       
       return {
         success: true,

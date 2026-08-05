@@ -131,6 +131,14 @@ class PricingService:
         
     def initialize_default_pricing(self):
         """Initialize default pricing for all API providers from pricing.yaml SSOT."""
+        # Skip if this DB already has pricing data — called per-user by
+        # init_user_database during scheduler scans.  First run seeds the
+        # table; subsequent runs are no-ops (upsert).
+        existing = self.db.query(APIProviderPricing).first()
+        if existing is not None:
+            logger.debug("[PRICING_INIT] Pricing already initialized — skipping")
+            return
+
         loader = PricingConfigLoader()
         config = loader.load()
 
@@ -173,10 +181,15 @@ class PricingService:
         providers = self.db.query(APIProviderPricing.provider).distinct().all()
         provider_list = sorted([p[0].value for p in providers]) if providers else []
         logger.info(f"[PRICING_INIT] Default API pricing initialized: {len(all_pricing)} rows configured, {total_rows} rows in DB, providers: {provider_list}")
-        logger.warning(f"[PRICING_INIT] Pricing ready: {total_rows} rows for {len(provider_list)} providers")
+        logger.debug(f"[PRICING_INIT] Pricing ready: {total_rows} rows for {len(provider_list)} providers")
 
     def initialize_default_plans(self):
         """Initialize default subscription plans from pricing.yaml SSOT."""
+        existing = self.db.query(SubscriptionPlan).first()
+        if existing is not None:
+            logger.debug("[PRICING_INIT] Plans already initialized — skipping")
+            return
+
         loader = PricingConfigLoader()
         config = loader.load()
 

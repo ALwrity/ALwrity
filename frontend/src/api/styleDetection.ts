@@ -1,6 +1,6 @@
 /** Style Detection API Integration */
 
-import { apiClient } from './client';
+import { longRunningApiClient } from './client';
 
 export interface StyleAnalysisRequest {
   content: {
@@ -59,7 +59,7 @@ export interface StyleDetectionResponse {
  */
 export const analyzeContentStyle = async (request: StyleAnalysisRequest): Promise<StyleAnalysisResponse> => {
   try {
-    const response = await apiClient.post('/api/onboarding/style-detection/analyze', request);
+    const response = await longRunningApiClient.post('/api/onboarding/style-detection/analyze', request);
     return response.data;
   } catch (error) {
     console.error('Error analyzing content style:', error);
@@ -76,7 +76,7 @@ export const analyzeContentStyle = async (request: StyleAnalysisRequest): Promis
  */
 export const crawlWebsiteContent = async (request: WebCrawlRequest): Promise<WebCrawlResponse> => {
   try {
-    const response = await apiClient.post('/api/onboarding/style-detection/crawl', request);
+    const response = await longRunningApiClient.post('/api/onboarding/style-detection/crawl', request);
     return response.data;
   } catch (error) {
     console.error('Error crawling website content:', error);
@@ -93,7 +93,7 @@ export const crawlWebsiteContent = async (request: WebCrawlRequest): Promise<Web
  */
 export const completeStyleDetection = async (request: StyleDetectionRequest): Promise<StyleDetectionResponse> => {
   try {
-    const response = await apiClient.post('/api/onboarding/style-detection/complete', request);
+    const response = await longRunningApiClient.post('/api/onboarding/style-detection/complete', request);
     return response.data;
   } catch (error) {
     console.error('Error in complete style detection:', error);
@@ -110,7 +110,7 @@ export const completeStyleDetection = async (request: StyleDetectionRequest): Pr
  */
 export const getStyleDetectionConfiguration = async (): Promise<any> => {
   try {
-    const response = await apiClient.get('/api/onboarding/style-detection/configuration-options');
+    const response = await longRunningApiClient.get('/api/onboarding/style-detection/configuration-options');
     return response.data;
   } catch (error) {
     console.error('Error getting style detection configuration:', error);
@@ -153,7 +153,7 @@ export const validateStyleDetectionRequest = (request: StyleDetectionRequest): {
  */
 export const checkExistingAnalysis = async (websiteUrl: string): Promise<any> => {
   try {
-    const response = await apiClient.get(`/api/onboarding/style-detection/check-existing/${encodeURIComponent(websiteUrl)}`);
+    const response = await longRunningApiClient.get(`/api/onboarding/style-detection/check-existing/${encodeURIComponent(websiteUrl)}`);
     return response.data;
   } catch (error) {
     console.error('Error checking existing analysis:', error);
@@ -168,7 +168,7 @@ export const checkExistingAnalysis = async (websiteUrl: string): Promise<any> =>
  */
 export const getAnalysisById = async (analysisId: number): Promise<any> => {
   try {
-    const response = await apiClient.get(`/api/onboarding/style-detection/analysis/${analysisId}`);
+    const response = await longRunningApiClient.get(`/api/onboarding/style-detection/analysis/${analysisId}`);
     return response.data;
   } catch (error) {
     console.error('Error getting analysis by ID:', error);
@@ -183,7 +183,7 @@ export const getAnalysisById = async (analysisId: number): Promise<any> => {
  */
 export const getSessionAnalyses = async (): Promise<any> => {
   try {
-    const response = await apiClient.get('/api/onboarding/style-detection/session-analyses');
+    const response = await longRunningApiClient.get('/api/onboarding/style-detection/session-analyses');
     return response.data;
   } catch (error) {
     console.error('Error getting session analyses:', error);
@@ -198,7 +198,7 @@ export const getSessionAnalyses = async (): Promise<any> => {
  */
 export const deleteAnalysis = async (analysisId: number): Promise<any> => {
   try {
-    const response = await apiClient.delete(`/api/onboarding/style-detection/analysis/${analysisId}`);
+    const response = await longRunningApiClient.delete(`/api/onboarding/style-detection/analysis/${analysisId}`);
     return response.data;
   } catch (error) {
     console.error('Error deleting analysis:', error);

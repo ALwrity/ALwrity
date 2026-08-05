@@ -23,13 +23,15 @@ from __future__ import annotations
 
 import logging
 import os
+import shutil
+import time
 from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 _CORRUPT_MARKER_SUFFIX = ".corrupt"
-_INDEX_FILE_EXTENSIONS = ("", ".index", ".config", ".ids")
+_INDEX_FILE_EXTENSIONS = (".index", ".config", ".ids")
 
 
 def has_corrupt_marker(index_path: str) -> bool:
@@ -68,11 +70,24 @@ def remediate_corrupt_index(
         user_id, index_path,
     )
     try:
+        # Delete the directory using rmtree with retry (handles Windows file locking)
+        for attempt in range(3):
+            try:
+                if os.path.isdir(index_path):
+                    shutil.rmtree(index_path, ignore_errors=True)
+                break
+            except PermissionError:
+                if attempt < 2:
+                    time.sleep(0.5)
+        # Delete any remaining loose files
         for ext in extensions:
             p = f"{index_path}{ext}"
             if os.path.exists(p):
                 try:
-                    os.unlink(p)
+                    if os.path.isdir(p):
+                        shutil.rmtree(p, ignore_errors=True)
+                    else:
+                        os.unlink(p)
                 except Exception as unlink_err:
                     logger.warning(
                         "Could not remove %s during remediation: %s",

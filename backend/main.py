@@ -1,3 +1,13 @@
+# Silence advertools SyntaxWarnings (invalid escape sequences in robotstxt.py / crawlytics.py / youtube.py)
+# before advertools is imported by any downstream module. Must run BEFORE any advertools import.
+import warnings
+import logging
+
+warnings.simplefilter("ignore", SyntaxWarning)
+# Belt-and-suspenders: scrapy's configure_logging() calls logging.captureWarnings(True),
+# which routes any surviving warnings through the "py.warnings" logger. Pin it to CRITICAL.
+logging.getLogger("py.warnings").setLevel(logging.CRITICAL)
+
 # Import onboarding models VERY early to ensure they're available before any services
 import typing
 from models.onboarding import APIKey, WebsiteAnalysis, ResearchPreferences, PersonaData, CompetitorAnalysis

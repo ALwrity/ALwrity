@@ -232,25 +232,20 @@ class BaseALwrityAgent(ABC):
                     self.llm = TrackingLLMWrapper(raw_llm, self.user_id, self.model_name)
                 
                 try:
-                    # _create_txtai_agent might be async or sync
-                    # CRITICAL FIX: We cannot await here. If it's async, we must run it in a loop or warn.
-                    # Given specialized agents define it as async, we need a sync wrapper or run_until_complete.
+                    # _create_txtai_agent might be async or sync.
+                    # Async agents cannot be awaited in __init__ when inside
+                    # a running event loop.  We defer initialization via a
+                    # background task and accept None temporarily — callers
+                    # that depend on self.txtai_agent must be None-safe.
                     
                     if asyncio.iscoroutinefunction(self._create_txtai_agent):
                          try:
-                             # Check if we are in a running loop
                              try:
                                  loop = asyncio.get_running_loop()
                              except RuntimeError:
                                  loop = None
                              
                              if loop and loop.is_running():
-                                 # We are already in a loop (e.g. server), we can't block.
-                                 # This is a design flaw in initializing async agents in __init__.
-                                 # We will defer initialization or use a sync wrapper if possible.
-                                 logger.warning(f"Cannot await async _create_txtai_agent for {agent_type} in __init__ within running loop. Initializing via create_task (agent may not be ready immediately).")
-                                 
-                                 # Create a task to initialize it
                                  async def async_init():
                                      try:
                                          self.txtai_agent = await self._create_txtai_agent()
@@ -259,39 +254,31 @@ class BaseALwrityAgent(ABC):
                                          logger.error(f"Async initialization failed for {agent_type}: {e}")
                                          
                                  loop.create_task(async_init())
-                                 # Temporarily set to None or a placeholder, but we can't set it to the result yet
-                                 self.txtai_agent = None 
+                                 self.txtai_agent = None
                              else:
-                                 # No running loop, we can run_until_complete
                                  if not loop:
                                      loop = asyncio.new_event_loop()
                                      asyncio.set_event_loop(loop)
                                  self.txtai_agent = loop.run_until_complete(self._create_txtai_agent())
                          except Exception as e:
                              logger.error(f"Failed to handle async initialization for {agent_type}: {e}")
-                             # Try fallback to sync run if possible
-                             try:
-                                 self.txtai_agent = asyncio.run(self._create_txtai_agent())
-                             except Exception as e2:
-                                 logger.error(f"Even asyncio.run failed: {e2}")
-                                 raise e
+                             self.txtai_agent = None
                     else:
                          self.txtai_agent = self._create_txtai_agent()
                          
                     if self.txtai_agent:
                         logger.info(f"Initialized txtai agent for {agent_type} - {self.agent_id}")
                     else:
-                        raise RuntimeError(f"txtai agent creation returned None for {agent_type}")
+                        logger.debug(f"txtai agent for {agent_type} running in fallback mode (no local agent)")
                 except Exception as inner_e:
                     logger.error(f"Could not initialize specific txtai agent for {agent_type}: {inner_e}")
-                    # Fail fast: Re-raise exception
-                    raise inner_e
+                    self.txtai_agent = None
             except Exception as e:
                 logger.error(f"Failed to initialize txtai agent for {agent_type}: {e}")
-                # Fail fast: Re-raise exception
-                raise e
+                self.txtai_agent = None
         else:
-            raise RuntimeError(f"txtai not available for {agent_type}")
+            logger.debug(f"txtai not available for {agent_type} — agent will run in fallback mode")
+            self.txtai_agent = None
 
         # Initialize safety framework
         self.safety_framework = get_safety_framework(user_id)

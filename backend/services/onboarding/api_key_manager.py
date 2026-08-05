@@ -470,7 +470,7 @@ class OnboardingProgress:
                 self.last_updated = session_data.get('updated_at') or self.last_updated
                 
                 # Calculate completion status
-                self.is_completed = (self.current_step >= 6) or (session_data.get('progress', 0) >= 100.0)
+                self.is_completed = (self.current_step >= 5) or (session_data.get('progress', 0) >= 100.0)
                 if self.is_completed:
                     self.completed_at = session_data.get('updated_at')
                 
