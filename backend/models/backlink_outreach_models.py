@@ -2,9 +2,8 @@
 
 from datetime import datetime
 from sqlalchemy import Column, String, Integer, Float, DateTime, Text, ForeignKey, Index, Boolean, Date
-from sqlalchemy.ext.declarative import declarative_base
 
-Base = declarative_base()
+from models.base import Base
 
 
 class BacklinkCampaign(Base):

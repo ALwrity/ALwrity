@@ -356,7 +356,7 @@ def ensure_calendar_events_user_id_column(engine, user_id: str) -> None:
 
 def ensure_enhanced_calendar_user_id_type(engine, user_id: str) -> None:
     """Migrate user_id from INTEGER to VARCHAR(255) in enhanced calendar tables."""
-    from models.content_planning import Base as EnhancedBase
+    from models.base import Base
 
     tables = [
         "ai_calendar_recommendations",

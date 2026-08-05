@@ -8,10 +8,10 @@ all other per-user workspace DB models.
 
 from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, Index
-from models.linkedin_watchdog_db_models import Base as WatchdogBase
+from models.base import Base
 
 
-class GSCBrainstormCache(WatchdogBase):
+class GSCBrainstormCache(Base):
     __tablename__ = "gsc_brainstorm_cache"
 
     id = Column(String(64), primary_key=True)

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Index, Integer, String, Text, UniqueConstraint
 
-from models.subscription_models import Base
+from models.base import Base
 
 
 class LinkedInPymkCache(Base):

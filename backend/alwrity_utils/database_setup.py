@@ -57,7 +57,7 @@ class DatabaseSetup:
         verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
         
         try:
-            from models.api_monitoring import Base as MonitoringBase
+            from models.base import Base
             MonitoringBase.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Monitoring tables created")
@@ -73,7 +73,7 @@ class DatabaseSetup:
         verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
         
         try:
-            from models.subscription_models import Base as SubscriptionBase
+            from models.base import Base
             SubscriptionBase.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Subscription tables created")
@@ -89,7 +89,7 @@ class DatabaseSetup:
         verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
         
         try:
-            from models.persona_models import Base as PersonaBase
+            from models.base import Base
             PersonaBase.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Persona tables created")
@@ -105,7 +105,7 @@ class DatabaseSetup:
         verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
         
         try:
-            from models.onboarding import Base as OnboardingBase
+            from models.base import Base
             OnboardingBase.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Onboarding tables created")
@@ -121,7 +121,7 @@ class DatabaseSetup:
         verbose = os.getenv("ALWRITY_VERBOSE", "false").lower() == "true"
         
         try:
-            from models.enhanced_strategy_models import Base as StrategyBase
+            from models.base import Base
             StrategyBase.metadata.create_all(bind=engine)
             if verbose:
                 print("   ✅ Daily workflow tables created")

@@ -3,7 +3,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, Index, UniqueConstraint
 from datetime import datetime
 
-from models.subscription_models import Base
+from models.base import Base
 
 
 class PostAnalyticsSnapshot(Base):

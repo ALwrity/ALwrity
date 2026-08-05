@@ -14,7 +14,7 @@ import traceback
 backend_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(backend_dir))
 
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from models.story_project_models import StoryProject  # noqa: F401
 from services.database import DATABASE_URL
 

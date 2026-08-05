@@ -17,7 +17,7 @@ from loguru import logger
 import traceback
 
 # Import models
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from services.database import DATABASE_URL
 from services.subscription.pricing_service import PricingService
 

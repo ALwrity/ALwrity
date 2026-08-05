@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, Float, Enum
 from datetime import datetime
 import enum
-from models.subscription_models import Base
+from models.base import Base
 
 class VideoTaskStatus(enum.Enum):
     PENDING = "pending"

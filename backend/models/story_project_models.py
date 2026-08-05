@@ -9,7 +9,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Index
 
-from models.subscription_models import Base
+from models.base import Base
 
 
 class StoryProject(Base):

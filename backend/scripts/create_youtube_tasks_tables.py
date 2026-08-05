@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from loguru import logger
 from models.youtube_task_models import YouTubeVideoTask, Base
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from services.database import get_engine_for_user, _user_engines
 from sqlalchemy import inspect
 

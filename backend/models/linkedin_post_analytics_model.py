@@ -3,7 +3,7 @@
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, Text, Index, UniqueConstraint, JSON
 from datetime import datetime
 
-from models.subscription_models import Base
+from models.base import Base
 
 
 class LinkedInPostAnalytics(Base):

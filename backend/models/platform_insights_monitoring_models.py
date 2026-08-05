@@ -8,7 +8,7 @@ from sqlalchemy.orm import relationship, synonym
 from datetime import datetime
 
 # Import the same Base from enhanced_strategy_models
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 
 class PlatformInsightsTask(Base):

@@ -53,7 +53,7 @@ def subscription_db_engine():
         echo=False,
     )
 
-    from models.subscription_models import Base
+    from models.base import Base
 
     Base.metadata.create_all(engine)
     yield engine
