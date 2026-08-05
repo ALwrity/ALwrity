@@ -58,7 +58,6 @@ export const DashboardErrorModal: React.FC<DashboardErrorModalProps> = ({
         <div
           style={{
             padding: "14px 18px",
-            borderBottom: "1px solid #fde68a",
             background: "#fff",
             display: "flex",
             alignItems: "center",

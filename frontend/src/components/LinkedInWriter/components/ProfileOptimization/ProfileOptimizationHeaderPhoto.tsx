@@ -1,14 +1,12 @@
-import React, { useRef } from "react";
+import React from "react";
+
+import { ProfileOptimizationPhotoActionButtons } from "./ProfileOptimizationPhotoActionButtons";
 
 interface ProfileOptimizationHeaderPhotoProps {
   displayName?: string;
   profilePictureUrl?: string | null;
   localProfilePhotoUrl?: string | null;
-  uploadingProfilePhoto?: boolean;
-  transformingProfilePhoto?: boolean;
   profilePhotoUploadError?: string | null;
-  onUploadProfilePhoto?: (file: File) => void;
-  onMakeProfilePhotoPresentable?: () => void;
 }
 
 /** Compact profile photo control for the Optimise Profile modal header. */
@@ -18,13 +16,8 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
   displayName,
   profilePictureUrl,
   localProfilePhotoUrl,
-  uploadingProfilePhoto = false,
-  transformingProfilePhoto = false,
   profilePhotoUploadError,
-  onUploadProfilePhoto,
-  onMakeProfilePhotoPresentable,
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const photoSrc = localProfilePhotoUrl || profilePictureUrl;
   const photoLabel = displayName?.trim() || "Profile Picture";
 
@@ -35,7 +28,7 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
         aria-hidden
       >
         {photoSrc ? (
-          <img src={photoSrc} alt="" style={{ cursor: "pointer" }} />
+          <img src={photoSrc} alt="" style={{ cursor: "default" }} />
         ) : (
           <svg
             width="20"
@@ -63,50 +56,7 @@ export const ProfileOptimizationHeaderPhoto: React.FC<
           </span>
         ) : null}
       </div>
-      {onUploadProfilePhoto && (
-        <div className="linkedin-profile-optimization-dialog__photo-actions">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="linkedin-profile-optimization-dialog__photo-input"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) onUploadProfilePhoto(file);
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            className="linkedin-profile-optimization-dialog__photo-btn linkedin-profile-optimization-dialog__photo-btn--upload"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingProfilePhoto || transformingProfilePhoto}
-          >
-            {uploadingProfilePhoto ? "Uploading…" : "Upload"}
-          </button>
-          {photoSrc && onMakeProfilePhotoPresentable && (
-            <button
-              type="button"
-              className="linkedin-profile-optimization-dialog__photo-btn linkedin-profile-optimization-dialog__photo-btn--presentable"
-              onClick={onMakeProfilePhotoPresentable}
-              disabled={uploadingProfilePhoto || transformingProfilePhoto}
-            >
-              {transformingProfilePhoto ? (
-                "Enhancing…"
-              ) : (
-                <span className="linkedin-profile-optimization-dialog__photo-btn-label">
-                  <span className="linkedin-profile-optimization-dialog__photo-btn-label-line">
-                    ✨ Make
-                  </span>
-                  <span className="linkedin-profile-optimization-dialog__photo-btn-label-line">
-                    Presentable
-                  </span>
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-      )}
+      <ProfileOptimizationPhotoActionButtons />
     </div>
   );
 };

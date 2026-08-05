@@ -60,7 +60,6 @@ export const DashboardSimpleErrorModal: React.FC<
         <div
           style={{
             padding: "16px 20px",
-            borderBottom: "1px solid #fecaca",
             background: "#fef2f2",
             display: "flex",
             alignItems: "center",

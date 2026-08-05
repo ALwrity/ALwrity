@@ -124,7 +124,6 @@ export const LinkedInSearchModal: React.FC<LinkedInSearchModalProps> = ({
         <div
           style={{
             padding: "14px 20px",
-            borderBottom: "1px solid rgba(10, 102, 194, 0.12)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",

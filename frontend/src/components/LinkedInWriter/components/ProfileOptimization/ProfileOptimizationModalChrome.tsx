@@ -23,11 +23,15 @@ interface ProfileOptimizationModalHeaderProps {
   displayName?: string;
   profilePictureUrl?: string | null;
   localProfilePhotoUrl?: string | null;
-  uploadingProfilePhoto?: boolean;
-  transformingProfilePhoto?: boolean;
   profilePhotoUploadError?: string | null;
+  /** @deprecated Photo upload is locked in modal header — ignored when passed. */
+  uploadingProfilePhoto?: boolean;
+  /** @deprecated Photo transform is locked in modal header — ignored when passed. */
+  transformingProfilePhoto?: boolean;
+  /** @deprecated Photo upload is locked in modal header — ignored when passed. */
   onUploadProfilePhoto?: (file: File) => void;
-  onMakeProfilePhotoPresentable?: () => void;
+  /** @deprecated Make presentable is locked in modal header — ignored when passed. */
+  onMakeProfilePhotoPresentable?: () => void | Promise<void>;
 }
 
 interface ProfileOptimizationModalFooterProps {
@@ -54,11 +58,7 @@ export const ProfileOptimizationModalHeader: React.FC<
   displayName,
   profilePictureUrl,
   localProfilePhotoUrl,
-  uploadingProfilePhoto,
-  transformingProfilePhoto,
   profilePhotoUploadError,
-  onUploadProfilePhoto,
-  onMakeProfilePhotoPresentable,
 }) => (
   <header className="linkedin-profile-optimization-dialog__header">
     <div className="linkedin-profile-optimization-dialog__header-row">
@@ -89,11 +89,7 @@ export const ProfileOptimizationModalHeader: React.FC<
           displayName={displayName}
           profilePictureUrl={profilePictureUrl}
           localProfilePhotoUrl={localProfilePhotoUrl}
-          uploadingProfilePhoto={uploadingProfilePhoto}
-          transformingProfilePhoto={transformingProfilePhoto}
           profilePhotoUploadError={profilePhotoUploadError}
-          onUploadProfilePhoto={onUploadProfilePhoto}
-          onMakeProfilePhotoPresentable={onMakeProfilePhotoPresentable}
         />
       </div>
 

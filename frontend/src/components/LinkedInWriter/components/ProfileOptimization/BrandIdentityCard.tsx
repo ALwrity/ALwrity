@@ -1,6 +1,7 @@
 import React from "react";
 
 import type { LinkedInAIProfileIntelligence } from "../../../../api/linkedinSocial";
+import { PROFILE_BRAND_IDENTITY_TITLE } from "./profileOptimizationLabels";
 
 interface BrandIdentityCardProps {
   intelligence?: LinkedInAIProfileIntelligence | null;
@@ -362,7 +363,7 @@ export const BrandIdentityCard: React.FC<BrandIdentityCardProps> = ({
               minWidth: 0,
             }}
           >
-            Your LinkedIn Professional Identity
+            {PROFILE_BRAND_IDENTITY_TITLE}
           </h4>
         </div>
         <p

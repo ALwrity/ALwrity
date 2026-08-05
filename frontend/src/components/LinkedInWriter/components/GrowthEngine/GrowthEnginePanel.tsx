@@ -959,7 +959,6 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
             <div
               style={{
                 padding: 16,
-                borderBottom: "1px solid #e5e7eb",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
