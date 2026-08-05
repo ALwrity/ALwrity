@@ -259,6 +259,13 @@ jobs:
           python -m pip install -r requirements-linkedin.txt || true
           python -m pip install pytest-asyncio anyio || true
 
+      - name: Verify Alembic migrations
+        working-directory: backend
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade -1
+          python -m alembic upgrade head
+
       - name: "Run suite: ${{ matrix.suite }}"
         working-directory: backend
         # Each suite marker/pass configuration lives inline here.
