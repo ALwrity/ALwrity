@@ -314,3 +314,107 @@ class TestPricingDataSeeded:
         ).first()
         assert entry is not None
         assert entry.cost_per_request == 0.035
+
+
+# ---------------------------------------------------------------------------
+# Bug #254 regression: cost limit checked before call limit
+# ---------------------------------------------------------------------------
+
+class TestCostBeforeCallLimitRegression:
+    """Verify cost limit blocks before call limit (fix for #254)."""
+
+    def test_should_enforce_limit_free_tier_zero_disabled(self):
+        """Free tier: 0 means disabled. _should_enforce_limit(0, 'free') == False."""
+        from services.subscription.limit_validation import _should_enforce_limit
+        assert _should_enforce_limit(0, "free") is False
+
+    def test_should_enforce_limit_paid_tier_zero_unlimited(self):
+        """Paid tier: 0 means unlimited. _should_enforce_limit(0, 'basic') == False."""
+        from services.subscription.limit_validation import _should_enforce_limit
+        assert _should_enforce_limit(0, "basic") is False
+        assert _should_enforce_limit(0, "pro") is False
+        assert _should_enforce_limit(0, "enterprise") is False
+
+    def test_should_enforce_limit_positive_value_enforced(self):
+        """Any tier with a positive limit should enforce."""
+        from services.subscription.limit_validation import _should_enforce_limit
+        assert _should_enforce_limit(100, "free") is True
+        assert _should_enforce_limit(100, "basic") is True
+        assert _should_enforce_limit(100, "pro") is True
+
+    def test_cost_limit_checked_before_call_limit(self):
+        """Regression: ensure cost limit check runs BEFORE call limit check."""
+        import inspect
+        from services.subscription.limit_validation import LimitValidator
+
+        lines, _ = inspect.getsourcelines(LimitValidator.check_usage_limits)
+        source = "".join(lines)
+
+        cost_pos = source.find("CHECK COST LIMIT FIRST")
+        call_pos = source.find("For LLM text generation providers")
+        assert cost_pos >= 0, "cost limit check not found in check_usage_limits"
+        assert call_pos >= 0, "call limit check not found in check_usage_limits"
+        assert cost_pos < call_pos, (
+            f"cost limit check (pos {cost_pos}) must come before "
+            f"call limit check (pos {call_pos})"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Bug #254 regression: UsageStatus enum fix
+# ---------------------------------------------------------------------------
+
+class TestSubscriptionStatusEnumFix:
+    """Verify _ensure_subscription_current uses class-level enum (fix for #254)."""
+
+    def test_ensure_subscription_current_activates_suspended_status(
+        self, subscription_db_session, _seeded_subscription_db
+    ):
+        """A SUSPENDED subscription should become ACTIVE (enum value),
+        not 'active' (raw string)."""
+        from services.subscription.pricing_service import PricingService
+        from models.subscription_models import (
+            UserSubscription, SubscriptionPlan, UsageStatus,
+        )
+        from datetime import datetime, timedelta
+
+        ps = PricingService(subscription_db_session)
+        user_id = "bug254_enum_suspended"
+
+        plan = subscription_db_session.query(SubscriptionPlan).filter(
+            SubscriptionPlan.name == "Free"
+        ).first()
+        sub = UserSubscription(
+            user_id=user_id,
+            plan_id=plan.id,
+            status=UsageStatus.SUSPENDED,
+            current_period_start=datetime.utcnow() - timedelta(days=31),
+            current_period_end=datetime.utcnow() - timedelta(days=1),
+            auto_renew=True,
+        )
+        subscription_db_session.add(sub)
+        subscription_db_session.commit()
+
+        result = ps._ensure_subscription_current(sub)
+        assert result is True
+
+        subscription_db_session.refresh(sub)
+        assert sub.status == UsageStatus.ACTIVE
+        assert isinstance(sub.status, UsageStatus)
+        assert sub.status is not "active"
+
+
+# ---------------------------------------------------------------------------
+# Bug #254 regression: agent_usage_tracking lazy import
+# ---------------------------------------------------------------------------
+
+class TestAgentUsageTrackingImport:
+    """Verify agent_usage_tracking module imports without bs4 crash."""
+
+    def test_module_imports_without_bs4_crash(self):
+        """The module-level import of PricingService was moved inside the
+        function body (lazy import). Module import should succeed."""
+        from services.intelligence.agents.agent_usage_tracking import (
+            track_agent_usage_sync,
+        )
+        assert callable(track_agent_usage_sync)

@@ -48,7 +48,6 @@ def track_agent_usage_sync(user_id: str, model_name: str, prompt: str, response_
             tokens_output = int(len(str(response_text).split()) * 1.3)
             tokens_total = tokens_input + tokens_output
             
-        try:
             from services.subscription import PricingService
 
             pricing = PricingService(db)
