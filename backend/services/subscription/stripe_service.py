@@ -90,12 +90,26 @@ def _load_stripe_plan_price_mapping() -> Dict[tuple[str, str], str]:
     return mapping
 
 
-STRIPE_PLAN_PRICE_MAPPING = _load_stripe_plan_price_mapping()
+_STRIPE_MAPPING: Optional[Dict[tuple[str, str], str]] = None
+_STRIPE_PRICE_TO_PLAN: Optional[Dict] = None
 
-STRIPE_PRICE_TO_PLAN = {
-    price_id: {"tier": SubscriptionTier(tier), "billing_cycle": BillingCycle(billing_cycle)}
-    for (tier, billing_cycle), price_id in STRIPE_PLAN_PRICE_MAPPING.items()
-}
+
+def _get_stripe_plan_price_mapping() -> Dict[tuple[str, str], str]:
+    """Load Stripe plan mapping lazily so module import never fails."""
+    global _STRIPE_MAPPING, _STRIPE_PRICE_TO_PLAN
+    if _STRIPE_MAPPING is not None:
+        return _STRIPE_MAPPING
+    _STRIPE_MAPPING = _load_stripe_plan_price_mapping()
+    _STRIPE_PRICE_TO_PLAN = {
+        price_id: {"tier": SubscriptionTier(tier), "billing_cycle": BillingCycle(billing_cycle)}
+        for (tier, billing_cycle), price_id in _STRIPE_MAPPING.items()
+    }
+    return _STRIPE_MAPPING
+
+
+def _get_stripe_price_to_plan() -> dict:
+    _get_stripe_plan_price_mapping()
+    return _STRIPE_PRICE_TO_PLAN
 
 class StripeService:
     def __init__(self, db: Session):
@@ -118,14 +132,15 @@ class StripeService:
 
     def _get_price_id_for_plan(self, tier: SubscriptionTier, billing_cycle: BillingCycle) -> str:
         key = (tier.value, billing_cycle.value)
-        price_id = STRIPE_PLAN_PRICE_MAPPING.get(key)
+        price_id = _get_stripe_plan_price_mapping().get(key)
         if not price_id:
             logger.error(f"No Stripe price configured for tier={tier.value}, billing_cycle={billing_cycle.value}")
             raise HTTPException(status_code=400, detail="Payment plan is not configured")
         return price_id
 
     def _get_plan_for_price_id(self, price_id: str) -> tuple[SubscriptionPlan, BillingCycle]:
-        mapping = STRIPE_PRICE_TO_PLAN.get(price_id)
+        price_to_plan = _get_stripe_price_to_plan()
+        mapping = price_to_plan.get(price_id)
         if not mapping:
             logger.error(f"Unknown Stripe price_id: {price_id}")
             raise HTTPException(status_code=400, detail="Unknown payment price configuration")
