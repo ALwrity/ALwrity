@@ -321,7 +321,6 @@ body.linkedin-profile-optimization-open {
   gap: 6px;
   flex-shrink: 0;
   padding: 12px 14px 10px;
-  border-bottom: 1px solid #e2e8f0;
   background: rgba(255, 255, 255, 0.98);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -377,7 +376,7 @@ body.linkedin-profile-optimization-open {
   flex-wrap: nowrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px 10px;
+  gap: 8px 18px;
   min-width: 0;
   justify-self: end;
   grid-column: 3;
@@ -598,6 +597,38 @@ body.linkedin-profile-optimization-open {
 .linkedin-profile-optimization-dialog__photo-btn:disabled {
   opacity: 0.65;
   cursor: wait;
+}
+
+.linkedin-profile-optimization-dialog__photo-btn--locked {
+  pointer-events: none;
+  cursor: default;
+  opacity: 1;
+  gap: 4px;
+  color: #475569 !important;
+  border-color: rgba(100, 116, 139, 0.45) !important;
+  background: linear-gradient(
+    145deg,
+    rgba(203, 213, 225, 0.55) 0%,
+    rgba(226, 232, 240, 0.72) 38%,
+    rgba(241, 245, 249, 0.92) 100%
+  ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -6px 12px rgba(148, 163, 184, 0.12),
+    0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.linkedin-profile-optimization-dialog__photo-btn--locked
+  .linkedin-studio-connect-lock-icon {
+  color: #475569;
+  flex-shrink: 0;
+}
+
+.linkedin-profile-optimization-dialog__photo-btn-label-line--with-lock {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
 }
 
 .linkedin-profile-optimization-dialog__session {
@@ -1051,7 +1082,7 @@ body.linkedin-profile-optimization-open {
   overflow-y: auto;
   overscroll-behavior: contain;
   gap: 4px;
-  padding: 10px 12px;
+  padding: 8px 14.4px 12px;
   background: #fff;
   border-radius: 14px;
   border: 1px solid #e2e8f0;
@@ -1076,15 +1107,15 @@ body.linkedin-profile-optimization-open {
 }
 
 .profile-opt-panel__grid--modal .profile-opt-panel__suggestions-stack-lead {
-  margin: 0 0 4px;
+  margin: 0 0 10px;
   padding: 0;
   background: none;
   border: none;
   box-shadow: none;
   font-family: var(--profile-opt-rail-title-family) !important;
-  font-size: var(--profile-opt-rail-title-size) !important;
-  font-weight: var(--profile-opt-rail-title-weight) !important;
-  line-height: var(--profile-opt-rail-title-line-height) !important;
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.45 !important;
   color: #56687a;
   flex-shrink: 0;
 }
@@ -1111,6 +1142,46 @@ body.linkedin-profile-optimization-open {
   .profile-opt-card__badges
   > span:not(.profile-opt-card__effort-time) {
   flex-shrink: 0;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__badges {
+  gap: 3.6px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__badges
+  > span:not(.profile-opt-card__effort-time) {
+  padding: 2.7px 9px !important;
+  font-size: 10.8px !important;
+  line-height: 1.25;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--first:not(.profile-opt-card--expanded)
+  .profile-opt-card__actions {
+  margin-top: auto;
+  padding-top: 0;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--expanded
+  .profile-opt-card__title-row {
+  margin-bottom: 14px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--expanded
+  .profile-opt-card__badges {
+  margin-bottom: 14px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack.profile-opt-card--expanded
+  .profile-opt-card__current-state-block {
+  margin-top: 16px;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-card--stack .profile-opt-card__effort-time {
@@ -1185,12 +1256,6 @@ body.linkedin-profile-optimization-open {
   display: none !important;
 }
 
-.profile-opt-panel__grid--modal
-  .profile-opt-card--stack:not(.profile-opt-card--expanded)
-  .profile-opt-card__header {
-  padding-bottom: 0;
-}
-
 /* Closed box 1: grow to align last suggestion with batch impact; space badges from actions. */
 .profile-opt-panel__grid--modal
   .profile-opt-card--stack.profile-opt-card--first:not(.profile-opt-card--expanded) {
@@ -1207,10 +1272,119 @@ body.linkedin-profile-optimization-open {
 }
 
 .profile-opt-panel__grid--modal
-  .profile-opt-card--stack.profile-opt-card--first:not(.profile-opt-card--expanded)
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__sections-body--inline,
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact__split-sections
+  .profile-opt-batch-impact__sections-body--inline {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__sections-body--inline::-webkit-scrollbar,
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact__split-sections
+  .profile-opt-batch-impact__sections-body--inline::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__sections-body--inline::-webkit-scrollbar-track,
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact__split-sections
+  .profile-opt-batch-impact__sections-body--inline::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__sections-body--inline::-webkit-scrollbar-thumb,
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact__split-sections
+  .profile-opt-batch-impact__sections-body--inline::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner {
+  scrollbar-width: thin;
+  scrollbar-color: #93c5fd #e0f2fe;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner::-webkit-scrollbar-track {
+  background: #e0f2fe;
+  border-radius: 999px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-stack-inner::-webkit-scrollbar-thumb {
+  background: #93c5fd;
+  border-radius: 999px;
+  border: 2px solid #e0f2fe;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-cards
+  .profile-opt-card--stack.profile-opt-card--expanded,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__badges,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
   .profile-opt-card__actions {
-  margin-top: auto;
-  padding-top: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #93c5fd #e0f2fe;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-cards
+  .profile-opt-card--stack.profile-opt-card--expanded::-webkit-scrollbar,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__badges::-webkit-scrollbar,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__actions::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-cards
+  .profile-opt-card--stack.profile-opt-card--expanded::-webkit-scrollbar-track,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__badges::-webkit-scrollbar-track,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__actions::-webkit-scrollbar-track {
+  background: #e0f2fe;
+  border-radius: 999px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-panel__suggestions-cards
+  .profile-opt-card--stack.profile-opt-card--expanded::-webkit-scrollbar-thumb,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__badges::-webkit-scrollbar-thumb,
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack
+  .profile-opt-card__actions::-webkit-scrollbar-thumb {
+  background: #93c5fd;
+  border-radius: 999px;
 }
 
 .profile-opt-panel__grid--modal
@@ -1259,13 +1433,34 @@ body.linkedin-profile-optimization-open {
   align-self: stretch;
   display: flex;
   flex-direction: column;
+  padding: 6px 7px;
 }
 
 .profile-opt-panel__grid--modal
   .profile-opt-batch-impact--stack-card
   .profile-opt-batch-impact__stack-meta {
-  margin-bottom: 14px;
-  gap: 12px;
+  margin-bottom: 7px;
+  gap: 6px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__stack-batch {
+  padding: 2.5px 6.5px;
+  font-size: 10px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__stack-gain {
+  padding: 2.5px 6.5px;
+  font-size: 10.4px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-batch-impact--stack-card
+  .profile-opt-batch-impact__split-pane {
+  padding: 7px 8px;
 }
 
 .profile-opt-panel__grid--modal
@@ -1313,6 +1508,7 @@ body.linkedin-profile-optimization-open {
   .profile-opt-card--stack:not(.profile-opt-card--expanded) {
   min-height: 0 !important;
   height: auto !important;
+  padding: 6px 7px !important;
 }
 
 .profile-opt-panel__suggestions-cards
@@ -1367,6 +1563,14 @@ body.linkedin-profile-optimization-open {
 .profile-opt-panel__grid--modal .profile-opt-card__header {
   margin: -4px -6px;
   padding: 4px 36px 4px 6px;
+}
+
+.profile-opt-panel__grid--modal
+  .profile-opt-card--stack:not(.profile-opt-card--expanded)
+  .profile-opt-card__header {
+  margin: -2px -3px;
+  padding: 2px 18px 2px 3px;
+  padding-bottom: 0;
 }
 
 .profile-opt-panel__grid--modal .profile-opt-card__close {
@@ -1499,7 +1703,7 @@ body.linkedin-profile-optimization-open {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 11px;
+  padding: 2.75px;
   border-radius: 9px;
   background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
   border: 1px solid #c4b5fd;
@@ -1509,8 +1713,8 @@ body.linkedin-profile-optimization-open {
 .profile-opt-content-angles--modal .profile-opt-content-angles__head {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  margin-bottom: 5px;
+  gap: 2.5px;
+  margin-bottom: 2.5px;
 }
 
 .profile-opt-content-angles--modal .profile-opt-content-angles__title-row {

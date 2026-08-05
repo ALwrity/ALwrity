@@ -1,5 +1,7 @@
 /** Plain-language labels for Phase 7 profile optimization enums. */
 
+export const PROFILE_BRAND_IDENTITY_TITLE = "Your Professional Identity";
+
 import type { CSSProperties } from "react";
 
 const SECTION_LABELS: Record<string, string> = {

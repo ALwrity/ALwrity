@@ -78,7 +78,6 @@ export const ProfileAnalysisReadyModal: React.FC<
           style={{
             padding: "18px 22px",
             background: FRAME_COLOR,
-            borderBottom: `1px solid ${FRAME_COLOR}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",

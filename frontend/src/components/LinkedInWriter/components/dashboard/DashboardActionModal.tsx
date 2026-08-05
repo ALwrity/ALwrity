@@ -111,7 +111,6 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
           className="linkedin-dashboard-action-modal-header"
           style={{
             padding: "14px 20px",
-            borderBottom: "1px solid #e5e7eb",
             background: "#ffffff",
             display: "flex",
             alignItems: "center",
