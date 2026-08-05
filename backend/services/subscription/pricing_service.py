@@ -16,7 +16,7 @@ import os
 
 from models.subscription_models import (
     APIProviderPricing, SubscriptionPlan, UserSubscription, 
-    UsageSummary, APIUsageLog, APIProvider, SubscriptionTier
+    UsageSummary, APIUsageLog, APIProvider, SubscriptionTier, UsageStatus
 )
 from services.subscription.pricing_config import PricingConfigLoader
 
@@ -58,7 +58,7 @@ class PricingService:
                     subscription.current_period_end = self._compute_next_period_end(now, subscription.billing_cycle)
                     # Keep status active if model enum else string
                     try:
-                        subscription.status = subscription.status.ACTIVE  # type: ignore[attr-defined]
+                        subscription.status = UsageStatus.ACTIVE
                     except Exception:
                         setattr(subscription, 'status', 'active')
                     self.db.commit()

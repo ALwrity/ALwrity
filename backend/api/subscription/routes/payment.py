@@ -68,8 +68,8 @@ async def create_checkout_session(
     except HTTPException as e:
         raise e
     except Exception as e:
-        logger.error(f"Error creating checkout session: {e}")
-        raise HTTPException(status_code=500, detail="Failed to initiate checkout")
+        logger.error(f"Error creating checkout session: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to initiate checkout: {e}")
 
 @router.post("/create-portal-session")
 async def create_portal_session(
