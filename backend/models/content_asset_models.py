@@ -4,13 +4,12 @@ Unified database models for tracking all AI-generated content assets across all 
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, Text, ForeignKey, Enum, Index, func
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 
 # Use the same Base as subscription models for consistency
-from models.subscription_models import Base
+from models.base import Base
 
 
 class AssetType(enum.Enum):

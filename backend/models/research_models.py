@@ -9,7 +9,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Boolean, JSON, Index
 from datetime import datetime
 
 # Use the same Base as subscription models for consistency
-from models.subscription_models import Base
+from models.base import Base
 
 
 class ResearchProject(Base):

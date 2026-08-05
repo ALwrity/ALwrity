@@ -5,11 +5,10 @@ Database models for podcast project persistence and state management.
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, Text, Index
-from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
 
 # Use the same Base as subscription models for consistency
-from models.subscription_models import Base
+from models.base import Base
 
 
 class PodcastProject(Base):

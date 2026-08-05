@@ -6,12 +6,11 @@ including raw query data, aggregated metrics, and trend analysis.
 """
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, Index
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
-Base = declarative_base()
+from models.base import Base
 
 
 class BingQueryStats(Base):

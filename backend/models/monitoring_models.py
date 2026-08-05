@@ -2,8 +2,8 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, F
 from sqlalchemy.orm import relationship, backref
 from datetime import datetime
 
-# Import the same Base from enhanced_strategy_models
-from models.enhanced_strategy_models import Base
+from models.base import Base
+import models.enhanced_strategy_models  # noqa: F401
 
 class StrategyMonitoringPlan(Base):
     """Model for storing strategy monitoring plans"""

@@ -4,11 +4,10 @@ Defines the enhanced database schema for content strategy with 30+ strategic inp
 """
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, ForeignKey, Boolean
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-Base = declarative_base()
+from models.base import Base
 
 class EnhancedContentStrategy(Base):
     """Enhanced Content Strategy model with 30+ strategic inputs."""

@@ -5,7 +5,7 @@ Model for storing persistent cumulative scheduler metrics that survive restarts.
 
 from sqlalchemy import Column, Integer, DateTime, Index
 from datetime import datetime
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 
 class SchedulerCumulativeStats(Base):

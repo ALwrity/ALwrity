@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, I
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 
 class LinkedInProfileSyncTask(Base):

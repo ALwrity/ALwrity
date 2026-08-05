@@ -3,12 +3,11 @@ Database models for SEO analysis data storage
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, Float, Boolean, ForeignKey, func
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from typing import Dict, Any, List
 
-Base = declarative_base()
+from models.base import Base
 
 class SEOActionType(Base):
     """Catalog of supported SEO action types (17 actions)."""

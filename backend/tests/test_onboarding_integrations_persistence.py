@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 @pytest.fixture(scope="module")
 def engine():
-    from models.onboarding import Base
+    from models.base import Base
     engine = create_engine("sqlite:///:memory:", echo=False)
     Base.metadata.create_all(engine)
     return engine

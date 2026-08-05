@@ -25,11 +25,10 @@ from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Index,
 )
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import declarative_base
 
 from loguru import logger
 
-Base = declarative_base()
+from models.base import Base
 
 
 class SemanticMonitoringSnapshot(Base):

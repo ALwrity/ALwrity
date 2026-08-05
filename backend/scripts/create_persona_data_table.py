@@ -22,7 +22,7 @@ def create_persona_data_table():
     try:
         # Import after path is set
         from services.database import engine
-        from models.onboarding import Base as OnboardingBase, PersonaData
+        from models.base import Base, PersonaData
         
         logger.info("🔍 Checking if persona_data table exists...")
         

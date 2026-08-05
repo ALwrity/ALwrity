@@ -9,7 +9,7 @@ so tasks survive server restarts.
 import enum
 from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Text, Float, Enum, Index
-from models.subscription_models import Base
+from models.base import Base
 
 
 class YouTubeTaskType(enum.Enum):

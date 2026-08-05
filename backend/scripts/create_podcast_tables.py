@@ -16,7 +16,7 @@ from loguru import logger
 import traceback
 
 # Import models - PodcastProject uses SubscriptionBase
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from models.podcast_models import PodcastProject
 from services.database import DATABASE_URL
 

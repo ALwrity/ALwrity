@@ -4,13 +4,12 @@ Caches expensive comprehensive user data operations to improve performance.
 """
 
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Index, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime, timedelta
 import hashlib
 import json
 
-Base = declarative_base()
+from models.base import Base
 
 class ComprehensiveUserDataCache(Base):
     """Cache for comprehensive user data to avoid redundant expensive operations."""

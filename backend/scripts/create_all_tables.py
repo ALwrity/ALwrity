@@ -11,9 +11,9 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.database import engine
-from models.enhanced_strategy_models import Base as EnhancedStrategyBase
-from models.monitoring_models import Base as MonitoringBase
-from models.persona_models import Base as PersonaBase
+from models.base import Base
+from models.base import Base
+from models.base import Base
 from loguru import logger
 
 def create_all_tables():

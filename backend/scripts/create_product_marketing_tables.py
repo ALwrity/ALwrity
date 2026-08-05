@@ -18,7 +18,7 @@ import traceback
 
 # Import models - Product Marketing uses SubscriptionBase
 # Import the Base first, then import product marketing models to register them
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from models.product_marketing_models import Campaign, CampaignProposal, CampaignAsset
 from services.database import DATABASE_URL
 

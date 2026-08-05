@@ -16,7 +16,7 @@ from loguru import logger
 import traceback
 
 # Import models - ResearchProject uses SubscriptionBase
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from models.research_models import ResearchProject
 from services.database import DATABASE_URL
 
