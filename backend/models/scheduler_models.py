@@ -7,7 +7,7 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Float
 from datetime import datetime
 
 # Import the same Base from enhanced_strategy_models
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 
 class SchedulerEventLog(Base):

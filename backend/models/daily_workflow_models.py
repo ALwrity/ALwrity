@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, JSON, ForeignKey, Index
 from sqlalchemy.orm import relationship
 
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 
 class DailyWorkflowPlan(Base):

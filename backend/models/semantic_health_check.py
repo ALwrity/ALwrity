@@ -33,11 +33,10 @@ from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Index, UniqueConstraint,
 )
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import declarative_base
 
 from loguru import logger
 
-Base = declarative_base()
+from models.base import Base
 
 
 class SemanticHealthCheck(Base):

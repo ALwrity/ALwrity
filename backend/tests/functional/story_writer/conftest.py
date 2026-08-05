@@ -98,7 +98,7 @@ def story_db_engine():
         echo=False,
     )
 
-    from models.subscription_models import Base
+    from models.base import Base
     from models.story_project_models import StoryProject  # noqa: F401
 
     Base.metadata.create_all(engine)

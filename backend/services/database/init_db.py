@@ -6,6 +6,9 @@ from loguru import logger
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
+from models.base import Base
+
+# Trigger model imports so all tables register with the shared Base
 import models.agent_activity_models  # noqa: F401
 import models.daily_workflow_models  # noqa: F401
 import models.enhanced_calendar_models  # noqa: F401
@@ -15,24 +18,11 @@ import models.oauth_token_monitoring_models  # noqa: F401
 import models.platform_insights_monitoring_models  # noqa: F401
 import models.sif_indexing_watermark  # noqa: F401
 import models.website_analysis_monitoring_models  # noqa: F401
-from models.api_monitoring import Base as APIMonitoringBase
-from models.bing_analytics_models import Base as BingAnalyticsBase
-from models.content_asset_models import Base as ContentAssetBase
-from models.content_planning import Base as ContentPlanningBase
 from models.daily_workflow_models import DailyWorkflowPlan, DailyWorkflowTask, TaskHistory  # noqa: F401
-from models.enhanced_calendar_models import Base as EnhancedCalendarBase
-from models.enhanced_strategy_models import Base as EnhancedStrategyBase
-from models.linkedin_comment_assistant_cache_model import (
-    Base as LinkedInCommentAssistantCacheBase,
+from models.linkedin_comment_assistant_cache_model import (  # noqa: F401
+    LinkedInCommentAssistantCache,
 )
-from models.linkedin_post_analytics_model import Base as LinkedInPostAnalyticsBase
-from models.linkedin_pymk_cache_model import Base as LinkedInPymkCacheBase
-from models.linkedin_watchdog_db_models import Base as WatchdogBase
-from models.monitoring_models import Base as MonitoringBase
-from models.onboarding import Base as OnboardingBase
-from models.persona_models import Base as PersonaBase
 from models.podcast_models import PodcastProject  # noqa: F401
-from models.post_analytics_snapshot_model import Base as PostAnalyticsSnapshotBase
 from models.product_asset_models import (  # noqa: F401
     EcommerceExport,
     ProductAsset,
@@ -44,9 +34,6 @@ from models.product_marketing_models import (  # noqa: F401
     CampaignProposal,
 )
 from models.research_models import ResearchProject  # noqa: F401
-from models.seo_analysis import Base as SEOAnalysisBase
-from models.subscription_models import Base as SubscriptionBase
-from models.user_business_info import Base as UserBusinessInfoBase
 from models.video_models import VideoGenerationTask  # noqa: F401
 from models.youtube_task_models import YouTubeVideoTask  # noqa: F401
 
@@ -59,23 +46,7 @@ def init_user_database(user_id: str) -> None:
     """Initialize database tables for a specific user."""
     engine = get_engine_for_user(user_id)
     try:
-        OnboardingBase.metadata.create_all(bind=engine)
-        SEOAnalysisBase.metadata.create_all(bind=engine)
-        ContentPlanningBase.metadata.create_all(bind=engine)
-        EnhancedStrategyBase.metadata.create_all(bind=engine)
-        MonitoringBase.metadata.create_all(bind=engine)
-        APIMonitoringBase.metadata.create_all(bind=engine)
-        PersonaBase.metadata.create_all(bind=engine)
-        SubscriptionBase.metadata.create_all(bind=engine)
-        UserBusinessInfoBase.metadata.create_all(bind=engine)
-        ContentAssetBase.metadata.create_all(bind=engine)
-        EnhancedCalendarBase.metadata.create_all(bind=engine)
-        BingAnalyticsBase.metadata.create_all(bind=engine)
-        WatchdogBase.metadata.create_all(bind=engine)
-        LinkedInPostAnalyticsBase.metadata.create_all(bind=engine)
-        PostAnalyticsSnapshotBase.metadata.create_all(bind=engine)
-        LinkedInPymkCacheBase.metadata.create_all(bind=engine)
-        LinkedInCommentAssistantCacheBase.metadata.create_all(bind=engine)
+        Base.metadata.create_all(bind=engine)
 
         run_user_schema_migrations(engine, user_id)
 
@@ -117,19 +88,7 @@ def init_database() -> None:
         return
 
     try:
-        for base in [
-            OnboardingBase,
-            SEOAnalysisBase,
-            ContentPlanningBase,
-            EnhancedStrategyBase,
-            MonitoringBase,
-            APIMonitoringBase,
-            PersonaBase,
-            SubscriptionBase,
-            UserBusinessInfoBase,
-            ContentAssetBase,
-        ]:
-            base.metadata.create_all(bind=default_engine, checkfirst=True)
+        Base.metadata.create_all(bind=default_engine, checkfirst=True)
         logger.info("Global database initialized successfully")
     except SQLAlchemyError as e:
         logger.error(f"Error initializing global database: {str(e)}")

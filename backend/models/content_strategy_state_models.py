@@ -4,7 +4,7 @@ from datetime import datetime
 
 from sqlalchemy import Column, Integer, String, DateTime, JSON, Index
 
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 
 class StrategyGenerationTaskState(Base):

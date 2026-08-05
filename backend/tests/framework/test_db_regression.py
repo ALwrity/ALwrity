@@ -90,24 +90,24 @@ class TestDatabaseBaselineBeforeAlembic:
         import models.platform_insights_monitoring_models  # noqa: F811
         import models.sif_indexing_watermark  # noqa: F811
         import models.website_analysis_monitoring_models  # noqa: F811
-        from models.api_monitoring import Base as _api  # noqa: F811, F401
-        from models.bing_analytics_models import Base as _bing  # noqa: F811, F401
-        from models.content_asset_models import Base as _ca  # noqa: F811, F401
-        from models.content_planning import Base as _cp  # noqa: F811, F401
-        from models.enhanced_strategy_models import Base as _es  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
         from models.linkedin_comment_assistant_cache_model import (
             Base as _lcc,  # noqa: F811, F401
         )
-        from models.linkedin_post_analytics_model import Base                   as _lpa
-        from models.linkedin_pymk_cache_model import Base as _lpym  # noqa: F811, F401
-        from models.linkedin_watchdog_db_models import Base                   as _wd
-        from models.monitoring_models import Base as _mon  # noqa: F811, F401
-        from models.onboarding import Base as _onb  # noqa: F811, F401
-        from models.persona_models import Base as _pers  # noqa: F811, F401
-        from models.post_analytics_snapshot_model import Base                   as _pas
-        from models.seo_analysis import Base as _seo  # noqa: F811, F401
-        from models.subscription_models import Base as _sub  # noqa: F811, F401
-        from models.user_business_info import Base as _ubi  # noqa: F811, F401
+        from models.base import Base                   as _lpa
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base                   as _wd
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base                   as _pas
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
+        from models.base import Base  # noqa: F811, F401
 
         assert True  # all imports succeeded
 

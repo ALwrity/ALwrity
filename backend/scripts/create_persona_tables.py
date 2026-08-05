@@ -11,7 +11,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.database import engine
-from models.persona_models import Base as PersonaBase
+from models.base import Base
 from loguru import logger
 
 def create_persona_tables():

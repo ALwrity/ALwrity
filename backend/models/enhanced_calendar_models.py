@@ -7,9 +7,8 @@ from sqlalchemy import Column, Integer, String, Text, DateTime, Float, JSON, For
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-# Share metadata with content_planning so FK targets (content_strategies,
-# calendar_events) resolve during per-user SQLite initialization.
-from models.content_planning import Base
+from models.base import Base
+import models.content_planning  # noqa: F401
 
 class ContentCalendarTemplate(Base):
     """Template for industry-specific content calendars."""

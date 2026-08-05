@@ -13,10 +13,10 @@ needed in services/database.py.
 
 from datetime import datetime
 from sqlalchemy import Column, String, Text, DateTime, Index
-from models.linkedin_watchdog_db_models import Base as WatchdogBase
+from models.base import Base
 
 
-class BrainstormSavedIdeaDB(WatchdogBase):
+class BrainstormSavedIdeaDB(Base):
     __tablename__ = "brainstorm_saved_ideas"
 
     id = Column(String(64), primary_key=True)

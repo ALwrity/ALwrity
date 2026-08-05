@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from models.youtube_task_models import YouTubeVideoTask, YouTubeTaskType, YouTubeTaskStatus
 from services.database import get_session_for_user, get_engine_for_user
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 
 
 class YouTubeTaskManager:

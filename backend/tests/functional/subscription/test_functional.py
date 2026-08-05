@@ -74,7 +74,7 @@ def db_session():
         connect_args={"check_same_thread": False},
         echo=False,
     )
-    from models.subscription_models import Base
+    from models.base import Base
     Base.metadata.create_all(engine)
 
     SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)

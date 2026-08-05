@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, JSON, Index
 from datetime import datetime
-from models.enhanced_strategy_models import Base
+from models.base import Base
 
 class EndUserWebsiteContent(Base):
     """

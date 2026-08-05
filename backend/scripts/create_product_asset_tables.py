@@ -18,7 +18,7 @@ from loguru import logger
 import traceback
 
 # Import models - Product Asset models use SubscriptionBase
-from models.subscription_models import Base as SubscriptionBase
+from models.base import Base
 from models.product_asset_models import ProductAsset, ProductStyleTemplate, EcommerceExport
 from services.database import DATABASE_URL
 

@@ -30,7 +30,7 @@ def migrate_user_id_column():
         if not table_exists:
             logger.warning("Table 'onboarding_sessions' does not exist. Creating it instead.")
             # Create tables using the updated models
-            from models.onboarding import Base
+            from models.base import Base
             Base.metadata.create_all(bind=engine, checkfirst=True)
             logger.success("✅ Created onboarding_sessions table with VARCHAR user_id")
             return True
@@ -80,7 +80,7 @@ def migrate_user_id_column():
         
         # Recreate table with correct schema
         logger.info("Creating new table with VARCHAR user_id...")
-        from models.onboarding import Base
+        from models.base import Base
         Base.metadata.create_all(bind=engine, tables=[Base.metadata.tables['onboarding_sessions']], checkfirst=False)
         db.commit()
         

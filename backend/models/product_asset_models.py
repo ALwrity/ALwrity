@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
 
-from models.subscription_models import Base
+from models.base import Base
 
 
 class ProductAssetType(enum.Enum):
