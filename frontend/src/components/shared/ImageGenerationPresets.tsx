@@ -243,7 +243,8 @@ export const LINKEDIN_PRESETS: ImagePreset[] = [
 ];
 
 export const LINKEDIN_THEME: ImageModalTheme = {
-  dialogBackground: 'rgba(10, 30, 60, 0.96)',
+  colorScheme: 'light',
+  dialogBackground: '#ffffff',
   primaryAccent: '#0A66C2',
   secondaryAccent: '#057642',
   warningAccent: '#f59e0b',

@@ -177,6 +177,7 @@ export const LinkedInSelectionImageModal: React.FC<
 
   return (
     <ImageGenerationModal
+      key={open ? "linkedin-image-settings" : "linkedin-image-closed"}
       open={open}
       onClose={onClose}
       onGenerate={handleGenerate}
