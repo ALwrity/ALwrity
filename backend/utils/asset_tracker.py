@@ -11,6 +11,8 @@ import logging
 import re
 from urllib.parse import urlparse
 
+from models.asset_metadata_schema import validate_asset_metadata
+
 logger = logging.getLogger(__name__)
 
 # Maximum file size (100MB)
@@ -140,6 +142,12 @@ def save_asset_to_library(
             if len(title) > 200:
                 title = title[:197] + '...'
         
+        metadata_payload = asset_metadata or {}
+        is_valid_metadata, validation_message = validate_asset_metadata(metadata_payload)
+        if not is_valid_metadata:
+            logger.error(f"Invalid asset metadata: {validation_message}")
+            return None
+
         service = ContentAssetService(db)
         asset = service.create_asset(
             user_id=user_id,
@@ -154,7 +162,7 @@ def save_asset_to_library(
             description=description,
             prompt=prompt,
             tags=tags or [],
-            asset_metadata=asset_metadata or {},
+            asset_metadata=metadata_payload,
             provider=provider,
             model=model,
             cost=cost,
