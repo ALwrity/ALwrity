@@ -2,11 +2,11 @@
  * Introduction section helpers — unify intro with section-based article editing.
  */
 
-import {
-  createArticleSectionId,
-  type LinkedInArticleSection,
-  type LinkedInArticleDraftState,
-} from "./linkedInArticleDraftUtils";
+import type {
+  LinkedInArticleDraftState,
+  LinkedInArticleSection,
+} from "./linkedInArticleDraftTypes";
+import { createArticleSectionId } from "./linkedInArticleDraftTypes";
 
 const LOG_PREFIX = "[LinkedInArticleIntro]";
 

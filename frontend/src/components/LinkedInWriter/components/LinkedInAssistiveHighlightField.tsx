@@ -29,6 +29,7 @@ export interface LinkedInAssistiveHighlightFieldProps {
   onHighlightClear?: () => void;
   onMouseUp?: () => void;
   onKeyUp?: () => void;
+  onBlur?: () => void;
   textareaRef?: React.Ref<HTMLTextAreaElement>;
   borderTop?: string;
   placeholder?: string;
@@ -44,6 +45,7 @@ export const LinkedInAssistiveHighlightField: React.FC<
   onHighlightClear,
   onMouseUp,
   onKeyUp,
+  onBlur,
   textareaRef,
   borderTop = "none",
   placeholder = "What do you want to talk about?",
@@ -204,6 +206,7 @@ export const LinkedInAssistiveHighlightField: React.FC<
           onScroll={syncBackdropScroll}
           onMouseUp={onMouseUp}
           onKeyUp={onKeyUp}
+          onBlur={onBlur}
           autoFocus
           placeholder={placeholder}
           className={hasHighlight ? "liw-assistive-highlight-active" : undefined}
