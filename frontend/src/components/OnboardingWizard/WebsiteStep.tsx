@@ -631,12 +631,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             </>
           )}
 
-          <WebsiteIntegrationsSection
-            websiteUrl={website}
-            onIntegrationChange={handleIntegrationChange}
-            connectedPlatforms={connectedPlatforms}
-            setConnectedPlatforms={setConnectedPlatforms}
-          />
+          {website && analysis && (
+            <WebsiteIntegrationsSection
+              websiteUrl={website}
+              onIntegrationChange={handleIntegrationChange}
+              connectedPlatforms={connectedPlatforms}
+              setConnectedPlatforms={setConnectedPlatforms}
+            />
+          )}
 
           {(connectedPlatforms.includes('gsc') || connectedPlatforms.includes('bing')) && (
             <Box sx={{ mt: 3 }}>
