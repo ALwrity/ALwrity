@@ -293,6 +293,7 @@ class BingOAuthService(OAuthProviderBase):
         Returns number of rows deleted.
         """
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return 0
@@ -567,6 +568,7 @@ class BingOAuthService(OAuthProviderBase):
     def revoke_token(self, user_id: str, token_id: int) -> bool:
         """Revoke a Bing OAuth token."""
         try:
+            self._init_db(user_id)
             db_path = self._get_db_path(user_id)
             with sqlite3.connect(db_path) as conn:
                 cursor = conn.cursor()
