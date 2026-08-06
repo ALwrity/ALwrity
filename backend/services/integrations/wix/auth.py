@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Optional, Tuple
 import requests
 from loguru import logger
@@ -6,11 +7,37 @@ import hashlib
 import secrets
 
 
+DEFAULT_WIX_CONNECT_TIMEOUT = 5.0
+DEFAULT_WIX_READ_TIMEOUT = 30.0
+
+
 class WixAuthService:
     def __init__(self, client_id: Optional[str], redirect_uri: str, base_url: str):
         self.client_id = client_id
         self.redirect_uri = redirect_uri
         self.base_url = base_url
+
+    def _get_request_timeout(self) -> Tuple[float, float]:
+        connect_timeout = self._read_timeout_value(
+            "WIX_HTTP_CONNECT_TIMEOUT", DEFAULT_WIX_CONNECT_TIMEOUT
+        )
+        read_timeout = self._read_timeout_value(
+            "WIX_HTTP_READ_TIMEOUT", DEFAULT_WIX_READ_TIMEOUT
+        )
+        return (connect_timeout, read_timeout)
+
+    @staticmethod
+    def _read_timeout_value(env_name: str, default_value: float) -> float:
+        raw_value = os.getenv(env_name)
+        if raw_value is None:
+            return default_value
+        try:
+            return float(raw_value)
+        except (TypeError, ValueError):
+            logger.warning(
+                f"Invalid {env_name} value {raw_value!r}; using default {default_value}"
+            )
+            return default_value
 
     def generate_authorization_url(self, state: Optional[str] = None) -> Tuple[str, str]:
         if not self.client_id:
@@ -48,7 +75,16 @@ class WixAuthService:
         }
         token_url = f'{self.base_url}/oauth2/token'
         logger.info(f"Wix token exchange: client_id={self.client_id}, redirect_uri={self.redirect_uri}, code_verifier_prefix={code_verifier[:10]}...")
-        response = requests.post(token_url, headers=headers, data=data, timeout=30.0)
+        try:
+            response = requests.post(
+                token_url,
+                headers=headers,
+                data=data,
+                timeout=self._get_request_timeout(),
+            )
+        except requests.Timeout as exc:
+            logger.exception("Wix token exchange request timed out")
+            raise requests.Timeout("Wix token exchange request timed out") from exc
         if response.status_code != 200:
             logger.error(f"Wix token exchange failed: {response.status_code} {response.text}")
         response.raise_for_status()
@@ -62,7 +98,16 @@ class WixAuthService:
             'client_id': self.client_id,
         }
         token_url = f'{self.base_url}/oauth2/token'
-        response = requests.post(token_url, headers=headers, data=data, timeout=30.0)
+        try:
+            response = requests.post(
+                token_url,
+                headers=headers,
+                data=data,
+                timeout=self._get_request_timeout(),
+            )
+        except requests.Timeout as exc:
+            logger.exception("Wix token refresh request timed out")
+            raise requests.Timeout("Wix token refresh request timed out") from exc
         response.raise_for_status()
         return response.json()
 
@@ -73,7 +118,15 @@ class WixAuthService:
         }
         if self.client_id:
             headers['wix-client-id'] = self.client_id
-        response = requests.get(f"{self.base_url}/sites/v1/site", headers=headers, timeout=30.0)
+        try:
+            response = requests.get(
+                f"{self.base_url}/sites/v1/site",
+                headers=headers,
+                timeout=self._get_request_timeout(),
+            )
+        except requests.Timeout as exc:
+            logger.exception("Wix site info request timed out")
+            raise requests.Timeout("Wix site info request timed out") from exc
         if response.status_code == 404:
             # 404 is the normal case for a Wix account that hasn't
             # published a site yet (or whose token doesn't have the
@@ -99,7 +152,15 @@ class WixAuthService:
         }
         if client_id:
             headers['wix-client-id'] = client_id
-        response = requests.get(f"{self.base_url}/members/v1/members/my", headers=headers, timeout=30.0)
+        try:
+            response = requests.get(
+                f"{self.base_url}/members/v1/members/my",
+                headers=headers,
+                timeout=self._get_request_timeout(),
+            )
+        except requests.Timeout as exc:
+            logger.exception("Wix member info request timed out")
+            raise requests.Timeout("Wix member info request timed out") from exc
         response.raise_for_status()
         return response.json()
 

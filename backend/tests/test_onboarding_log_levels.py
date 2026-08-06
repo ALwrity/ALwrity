@@ -140,8 +140,11 @@ class TestWixGetSiteInfoLogLevel:
                 pass
 
         class _FakeRequests:
+            class Timeout(Exception):
+                pass
+
             @staticmethod
-            def get(url, headers=None):
+            def get(url, headers=None, timeout=None):
                 return _FakeResponse()
 
         monkeypatch.setattr(wix_auth, "requests", _FakeRequests)
@@ -171,8 +174,11 @@ class TestWixGetSiteInfoLogLevel:
                 pass
 
         class _FakeRequests:
+            class Timeout(Exception):
+                pass
+
             @staticmethod
-            def get(url, headers=None):
+            def get(url, headers=None, timeout=None):
                 return _FakeResponse()
 
         monkeypatch.setattr(wix_auth, "requests", _FakeRequests)
@@ -189,6 +195,52 @@ class TestWixGetSiteInfoLogLevel:
                 f"Wix 401 (token expired) should log at WARNING so it shows "
                 f"in the console, got {level}"
             )
+
+
+class TestWixRequestTimeouts:
+    def test_wix_requests_use_environment_timeout_configuration(self, monkeypatch):
+        from services.integrations.wix import auth as wix_auth
+
+        recorded = {}
+
+        class _FakeResponse:
+            status_code = 200
+
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {"ok": True}
+
+        class _FakeRequests:
+            class Timeout(Exception):
+                pass
+
+            @staticmethod
+            def post(url, headers=None, data=None, timeout=None):
+                recorded["post_timeout"] = timeout
+                return _FakeResponse()
+
+            @staticmethod
+            def get(url, headers=None, timeout=None):
+                recorded["get_timeout"] = timeout
+                return _FakeResponse()
+
+        monkeypatch.setenv("WIX_HTTP_CONNECT_TIMEOUT", "2.5")
+        monkeypatch.setenv("WIX_HTTP_READ_TIMEOUT", "45.0")
+        monkeypatch.setattr(wix_auth, "requests", _FakeRequests)
+
+        client = wix_auth.WixAuthService(
+            client_id="cid",
+            redirect_uri="https://example.com/callback",
+            base_url="https://api.wix.com",
+        )
+
+        client.exchange_code_for_tokens("code", "verifier")
+        client.get_site_info("tok")
+
+        assert recorded["post_timeout"] == (2.5, 45.0)
+        assert recorded["get_timeout"] == (2.5, 45.0)
 
 
 class TestPlatformAnalyticsLogLevel:
