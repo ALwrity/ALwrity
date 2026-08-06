@@ -719,7 +719,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
 
   return (
     <Box>
-      {showSummary && renderSummaryCard()}
+      {showSummary && React.useMemo(() => renderSummaryCard(), [showSummary, summary, platformStatus, analyticsData, lastUpdated, priorityPlatform, rangeDays, aiLoading, aiError, aiInsights, showLegend, topPagesChart, ctrPositionData])}
       <GscSuggestionsPanel
         suggestions={suggestions}
         rangeDays={rangeDays}
