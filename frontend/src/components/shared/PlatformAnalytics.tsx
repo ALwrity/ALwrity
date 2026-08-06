@@ -29,13 +29,8 @@ import {
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import MouseOutlined from '@mui/icons-material/MouseOutlined';
-import Search from '@mui/icons-material/Search';
-import Web from '@mui/icons-material/Web';
 import Refresh from '@mui/icons-material/Refresh';
 import Info from '@mui/icons-material/Info';
-import CheckCircle from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import Warning from '@mui/icons-material/Warning';
 import TrendingUp from '@mui/icons-material/TrendingUp';
 import { Button } from '@mui/material';
 import { PlatformAnalytics as PlatformAnalyticsType, AnalyticsSummary, PlatformConnectionStatus } from '../../api/analytics';
@@ -59,6 +54,8 @@ import {
   Line,
   ChartLoadingFallback,
 } from '../../utils/lazyRecharts';
+import { getPlatformIcon, getStatusColor, getStatusIcon, isValidHttpUrl, formatNumber } from './PlatformAnalytics.utils';
+import { deriveSummaryDisplay } from './deriveSummaryDisplay';
 
 interface CannibalizationPage {
   page: string;
@@ -628,145 +625,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     }
   }, [forceRefresh]);
 
-  const getPlatformIcon = (platform: string) => {
-    switch (platform.toLowerCase()) {
-      case 'gsc':
-        return <Search color="primary" />;
-      case 'wix':
-        return <Web color="secondary" />;
-      case 'wordpress':
-        return <Web color="info" />;
-      case 'bing':
-        return <Search color="primary" />;
-      default:
-        return <Web />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success':
-        return 'success';
-      case 'error':
-        return 'error';
-      case 'partial':
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle color="success" fontSize="small" />;
-      case 'error':
-        return <ErrorIcon color="error" fontSize="small" />;
-      case 'partial':
-        return <Warning color="warning" fontSize="small" />;
-      default:
-        return <Info fontSize="small" />;
-    }
-  };
-
-  const isValidHttpUrl = (value: string) => {
-    try {
-      const u = new URL(value);
-      return u.protocol === 'http:' || u.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
-
   // Compute summary display based on priority and available platform data
-  const computedSummary = React.useMemo(() => {
-    const gsc = analyticsData['gsc'];
-    const bing = analyticsData['bing'];
-    const isGscOk = gsc && (gsc.status === 'success' || gsc.status === 'partial');
-    const isBingOk = bing && (bing.status === 'success' || bing.status === 'partial');
-    const anyPlatformOk = isGscOk || isBingOk;
-    const sumFromTopPages = (metrics?: any) => {
-      const pages = Array.isArray(metrics?.top_pages) ? metrics.top_pages : [];
-      if (!pages.length) {
-        return { clicks: 0, impressions: 0 };
-      }
-      let clicks = 0;
-      let impressions = 0;
-      for (const row of pages) {
-        clicks += Number(row?.clicks || 0);
-        impressions += Number(row?.impressions || 0);
-      }
-      return { clicks, impressions };
-    };
-    const pick = (m?: any) => ({
-      clicks: Number(m?.total_clicks || 0),
-      impressions: Number(m?.total_impressions || 0),
-    });
-
-    if (priorityPlatform === 'auto') {
-      if (isGscOk) {
-        let g = pick(gsc.metrics);
-        if (g.clicks === 0) {
-          const fromPages = sumFromTopPages(gsc.metrics);
-          if (fromPages.clicks > 0) {
-            g = {
-              clicks: fromPages.clicks,
-              impressions: g.impressions || fromPages.impressions,
-            };
-          }
-        }
-        return {
-          clicks: g.clicks,
-          impressions: g.impressions,
-          label: 'GSC (Auto)',
-          na: false,
-        };
-      }
-      if (summary) {
-        const clicks = Number(summary.total_clicks || 0);
-        const impressions = Number(summary.total_impressions || 0);
-        return {
-          clicks,
-          impressions,
-          label: 'Combined',
-          na: !anyPlatformOk && clicks === 0 && impressions === 0,
-        };
-      }
-      return { clicks: 0, impressions: 0, label: 'Combined', na: !anyPlatformOk };
-    }
-
-    if (priorityPlatform === 'gsc') {
-      if (isGscOk) {
-        let g = pick(gsc.metrics);
-        if (g.clicks === 0) {
-          const fromPages = sumFromTopPages(gsc.metrics);
-          if (fromPages.clicks > 0) {
-            g = {
-              clicks: fromPages.clicks,
-              impressions: g.impressions || fromPages.impressions,
-            };
-          }
-        }
-        return { ...g, label: 'GSC', na: false };
-      }
-      return { clicks: 0, impressions: 0, label: 'GSC', na: !gsc };
-    }
-    if (priorityPlatform === 'bing') {
-      if (isBingOk) return { ...pick(bing.metrics), label: 'Bing', na: false };
-      return { clicks: 0, impressions: 0, label: 'Bing', na: !bing };
-    }
-
-    return { clicks: 0, impressions: 0, label: 'N/A', na: true };
-  }, [analyticsData, priorityPlatform, summary]);
+  const computedSummary = React.useMemo(
+    () => deriveSummaryDisplay(analyticsData, priorityPlatform, summary),
+    [analyticsData, priorityPlatform, summary]
+  );
 
   const renderMetricsCard = (platform: string, data: PlatformAnalyticsType) => {
     const metrics = data.metrics;
