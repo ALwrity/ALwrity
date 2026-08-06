@@ -17,6 +17,7 @@ import {
   RateReview as RateReviewIcon,
   Save as SaveIcon,
 } from "@mui/icons-material";
+import { EngagementBoosterLaunchButton } from "../dashboard/EngagementBoosterLaunchButton";
 
 export type EditorSaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -149,6 +150,12 @@ export const EditorChromeShared: React.FC<EditorChromeSharedProps> = ({
           Quality
         </Button>
       </Tooltip>
+
+      <EngagementBoosterLaunchButton
+        variant="toolbar"
+        content={draft}
+        disabled={!draft.trim()}
+      />
 
       {hasResearch && (
         <>

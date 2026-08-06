@@ -1051,8 +1051,14 @@ export function useLinkedInWriter() {
       const src =
         typeof event.detail?.src === "string" ? event.detail.src : draft || "";
       if (!target) return;
-      setPendingEdit({ src, target });
+
+      if (src && src !== draft) {
+        setDraft(src);
+      }
+
+      setPendingEdit({ src: src || draft || "", target });
       setIsPreviewing(true);
+      setShowEditor(true);
 
       // Use diff highlighting for professional content changes
       try {

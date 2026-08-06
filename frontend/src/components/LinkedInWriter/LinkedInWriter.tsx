@@ -8,6 +8,7 @@ import React, {
 import { useLocation } from "react-router-dom";
 import { Snackbar, Alert } from "@mui/material";
 import { QualityCheckModal } from "./components/dashboard/PublishWedgeModals";
+import { EngagementBoosterHost } from "./components/dashboard/EngagementBoosterHost";
 import {
   linkedInWriterApi,
   saveLinkedInToAssetLibrary,
@@ -752,6 +753,8 @@ Always use the most appropriate tool for the user's request.`.trim();
         contextHint={context || undefined}
         qualityMetrics={qualityMetrics}
       />
+
+      <EngagementBoosterHost />
 
       {/* ── Share a Link Modal ── */}
       {showShareLinkModal && (

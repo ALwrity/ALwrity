@@ -19,6 +19,7 @@ import {
 } from "../../../../services/linkedInGrowthApi";
 import { linkedInWriterApi } from "../../../../services/linkedInWriterApi";
 import type { ConsolidatedGrowthResponse } from "../../../../services/linkedInGrowthApi";
+import { ContentCoachFullRewriteBanner } from "./ContentCoachFullRewriteBanner";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared constants & helpers
@@ -541,6 +542,8 @@ export const ContentCoachModal: React.FC<ContentCoachModalProps> = ({
               );
             })}
           </div>
+
+          <ContentCoachFullRewriteBanner draft={draft} onBeforeOpen={onClose} />
         </>
       )}
     </DashboardActionModal>

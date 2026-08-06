@@ -13,7 +13,6 @@ import {
   EngagementTrendsModal,
 } from "./analysisWedgeModalExports";
 import {
-  EngagementBoosterModal,
   CommentAssistantModal,
   OpportunitiesModal,
   PostPulseModal,
@@ -43,7 +42,7 @@ import { isAnalysisWedgeFeatureLocked } from "../../utils/linkedInAnalysisWedgeL
 
 type AnalysisSub = "trends" | null;
 type EngagementSub =
-  "booster" | "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
+  "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
 type RemarkSub =
   "repurpose" | "transformer" | "refresh" | "reviver" | "perf_plan" | null;
 type PublishSub = "drafts" | null;
@@ -361,16 +360,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           }}
         >
           <DashboardToolTile
-            title="Engagement Booster"
-            description="AI rewrites your draft for maximum engagement — shows before/after score"
-            icon="⚡"
-            accent="#f59e0b"
-            onClick={() => {
-              onClose();
-              setEngagementSub("booster");
-            }}
-          />
-          <DashboardToolTile
             title="Comment Assistant"
             description="Draft the perfect reply with ALwrity to any comment, in your voice"
             icon="💬"
@@ -436,11 +425,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         </div>
       </DashboardActionModal>
 
-      <EngagementBoosterModal
-        open={engagementSub === "booster"}
-        onClose={() => setEngagementSub(null)}
-        connected={connected}
-      />
       <CommentAssistantModal
         open={engagementSub === "comment"}
         onClose={() => setEngagementSub(null)}

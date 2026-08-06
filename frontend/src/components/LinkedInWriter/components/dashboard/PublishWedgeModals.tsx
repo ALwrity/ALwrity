@@ -7,7 +7,7 @@
  * F3  ScheduleQuickModal     — calendar quick-add
  * F5  PublishNowModal        — direct LinkedIn publish with pre-flight (see PublishNowModal.tsx)
  */
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardActionModal } from "./DashboardActionModal";
 import { PreviewScoreCard } from "../GrowthEngine/PreviewScoreCard";
@@ -15,7 +15,6 @@ import { apiClient } from "../../../../api/client";
 import { linkedInGrowthApi } from "../../../../services/linkedInGrowthApi";
 import type { PostPreviewScoreResponse } from "../../../../services/linkedInGrowthApi";
 import { contentPlanningApi } from "../../../../services/contentPlanningApi";
-import { formatDraftForPublish } from "../../utils/linkedInPublishFormatters";
 import { LinkedInPublishChecklist } from "../LinkedInPublishChecklist";
 import {
   filterCompleteLinkedInDrafts,
@@ -27,6 +26,7 @@ import {
   PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT,
 } from "../../utils/linkedInPublishWedgeLockedUi";
 import { ConnectLockIcon } from "./ConnectLockIcon";
+import { EngagementBoosterLaunchButton } from "./EngagementBoosterLaunchButton";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -221,7 +221,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
               Saved Drafts
             </div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 1 }}>
-              Your last 5 LinkedIn drafts — open, score, or check timing
+              Your last 5 LinkedIn drafts — open, score, optimise, or check timing
             </div>
           </div>
         </div>
@@ -273,30 +273,32 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {drafts.map((asset) => (
-            <div
-              key={asset.id}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "#cbd5e1";
-                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.06)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "#e2e8f0";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-              style={{
-                background: "#ffffff",
-                borderRadius: 12,
-                border: "1.5px solid #e2e8f0",
-                padding: "14px 16px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
-                transition: "border-color 0.15s, box-shadow 0.15s",
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
+          {drafts.map((asset) => {
+            const assetContent = getAssetContent(asset);
+            return (
+              <div
+                key={asset.id}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "#cbd5e1";
+                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.06)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "#e2e8f0";
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+                style={{
+                  background: "#ffffff",
+                  borderRadius: 12,
+                  border: "1.5px solid #e2e8f0",
+                  padding: "14px 16px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  transition: "border-color 0.15s, box-shadow 0.15s",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
               {/* Left accent bar */}
               <div
                 style={{
@@ -360,7 +362,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
                 </div>
               </div>
               {(() => {
-                const content = getAssetContent(asset);
+                const content = assetContent;
                 const isShort = content.length < 60 && content === asset.title;
                 return (
                   <div
@@ -401,6 +403,11 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
                 >
                   📊 Quality Check
                 </button>
+                <EngagementBoosterLaunchButton
+                  variant="inline"
+                  content={assetContent}
+                  disabled={!assetContent.trim()}
+                />
                 <button
                   type="button"
                   style={{
@@ -438,8 +445,9 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
                   ⏰ Best Time
                 </button>
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
 
         <div
@@ -719,10 +727,14 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
               onApply={handleImproveInStudio}
               onDismiss={() => setScoreResult(null)}
             />
-            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <button style={panelBtn(true)} onClick={handleImproveInStudio}>
                 ✍️ Improve in Studio
               </button>
+              <EngagementBoosterLaunchButton
+                content={content}
+                disabled={!content.trim()}
+              />
               <button style={panelBtn()} onClick={() => setScoreResult(null)}>
                 ← Re-score
               </button>
