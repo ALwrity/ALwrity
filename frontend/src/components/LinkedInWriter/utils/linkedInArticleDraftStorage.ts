@@ -4,6 +4,7 @@
 
 import type { LinkedInArticleDraftState } from "./linkedInArticleDraftUtils";
 import { normalizeArticleDraftState } from "./linkedInArticleIntroUtils";
+import { normalizeArticleImages } from "./linkedInArticleImageUtils";
 
 export const ARTICLE_DRAFT_STATE_SESSION_KEY = "li_article_draft_state";
 
@@ -39,7 +40,7 @@ export function loadArticleDraftState(): LinkedInArticleDraftState | null {
       title: parsed.title,
       sectionCount: parsed.sections.length,
     });
-    return normalizeArticleDraftState(parsed);
+    return normalizeArticleImages(normalizeArticleDraftState(parsed));
   } catch (error) {
     console.warn(`${LOG_PREFIX} failed to load article state`, {
       error: error instanceof Error ? error.message : String(error),

@@ -24,9 +24,9 @@ import {
 } from "../utils/linkedInEditorDraftUtils";
 import { LINKEDIN_PUBLISH_ACCEPTED_IMAGE_EXTENSIONS } from "../utils/linkedInPublishMediaConstants";
 import {
-  needsLinkedInPostSpacingNormalization,
-  normalizeLinkedInPostSpacing,
-} from "../utils/linkedInPostSpacing";
+  buildAssistiveEditorSnapshotFromDraft,
+  type AssistiveEditorSnapshot,
+} from "../utils/linkedInAssistiveEditorSnapshot";
 import type { AssistiveTextHighlightRange } from "../utils/linkedInAssistiveHighlightUtils";
 
 const LOG_PREFIX = "[LinkedInAssistiveEditor]";
@@ -34,27 +34,6 @@ const LOG_PREFIX = "[LinkedInAssistiveEditor]";
 export interface LinkedInAssistiveEditorHandle {
   /** Flush pending edits and return the merged draft markdown. */
   flushDraft: () => string;
-}
-
-/** Snapshot stored in undo/redo history (text + attached images). */
-type AssistiveEditorSnapshot = {
-  text: string;
-  images: LinkedInEditorImageBlock[];
-};
-
-/** Normalize dense AI text once on load; never rewrite user line breaks afterward. */
-function normalizeAssistiveTextOnLoad(text: string): string {
-  const raw = (text || "").replace(/\r\n/g, "\n");
-  if (!needsLinkedInPostSpacingNormalization(raw)) return raw;
-  return normalizeLinkedInPostSpacing(raw);
-}
-
-function buildInitialSnapshot(draft: string): AssistiveEditorSnapshot {
-  const parsed = splitDraftForAssistiveEditor(draft);
-  return {
-    text: normalizeAssistiveTextOnLoad(parsed.textContent),
-    images: parsed.images,
-  };
 }
 
 interface LinkedInAssistiveEditorProps {
@@ -81,6 +60,9 @@ export const LinkedInAssistiveEditor = forwardRef<
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastEmittedDraftRef = useRef<string>(draft);
+  const snapshotRef = useRef<AssistiveEditorSnapshot>(
+    buildAssistiveEditorSnapshotFromDraft(draft),
+  );
   const [isDragOver, setIsDragOver] = useState(false);
 
   const {
@@ -91,13 +73,17 @@ export const LinkedInAssistiveEditor = forwardRef<
     canUndo,
     canRedo,
     reset: resetHistory,
-  } = useUndoRedo<AssistiveEditorSnapshot>(buildInitialSnapshot(draft), {
+  } = useUndoRedo<AssistiveEditorSnapshot>(
+    buildAssistiveEditorSnapshotFromDraft(draft),
+    {
     limit: 30,
     enableKeyboardShortcuts: false,
   });
 
   const textContent = snapshot.text;
   const images = snapshot.images;
+
+  snapshotRef.current = snapshot;
 
   const { isUploading, uploadError, uploadImageFile, clearUploadError } =
     useLinkedInEditorImageUpload();
@@ -135,23 +121,29 @@ export const LinkedInAssistiveEditor = forwardRef<
     [setSnapshot, emitDraft],
   );
 
+  const flushPendingDraft = useCallback(() => {
+    const merged = mergeAssistiveEditorDraft(textContent, images);
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    if (merged !== lastEmittedDraftRef.current) {
+      lastEmittedDraftRef.current = merged;
+      onDraftChange(merged);
+      console.log(`${LOG_PREFIX} flushed pending draft`, {
+        textLength: textContent.length,
+        imageCount: images.length,
+      });
+    }
+    return merged;
+  }, [textContent, images, onDraftChange]);
+
   useImperativeHandle(
     ref,
     () => ({
-      flushDraft: () => {
-        const merged = mergeAssistiveEditorDraft(textContent, images);
-        if (saveTimerRef.current) {
-          clearTimeout(saveTimerRef.current);
-          saveTimerRef.current = null;
-        }
-        if (merged !== lastEmittedDraftRef.current) {
-          lastEmittedDraftRef.current = merged;
-          onDraftChange(merged);
-        }
-        return merged;
-      },
+      flushDraft: () => flushPendingDraft(),
     }),
-    [textContent, images, onDraftChange],
+    [flushPendingDraft],
   );
 
   useLayoutEffect(() => {
@@ -166,41 +158,17 @@ export const LinkedInAssistiveEditor = forwardRef<
 
     const parsed = splitDraftForAssistiveEditor(draft);
     const raw = parsed.textContent.replace(/\r\n/g, "\n");
-    const nextText = needsLinkedInPostSpacingNormalization(raw)
-      ? normalizeLinkedInPostSpacing(raw)
-      : raw;
     const next: AssistiveEditorSnapshot = {
-      text: nextText,
+      text: raw,
       images: parsed.images,
     };
     resetHistory(next);
+    lastEmittedDraftRef.current = draft;
     console.log(`${LOG_PREFIX} history reset from external draft`, {
-      textLength: nextText.length,
+      textLength: raw.length,
       imageCount: parsed.images.length,
-      autoSpaced: nextText !== raw,
     });
-
-    if (nextText !== raw) {
-      emitDraft(nextText, parsed.images, true);
-    } else {
-      lastEmittedDraftRef.current = draft;
-    }
-  }, [draft, emitDraft, resetHistory]);
-
-  // One-shot: persist initial auto-spacing for dense AI drafts to parent state.
-  useEffect(() => {
-    const parsed = splitDraftForAssistiveEditor(draft);
-    const raw = parsed.textContent.replace(/\r\n/g, "\n");
-    const normalized = normalizeAssistiveTextOnLoad(raw);
-    if (normalized !== raw) {
-      emitDraft(normalized, parsed.images, true);
-      console.log(`${LOG_PREFIX} initial dense draft spacing normalized`, {
-        rawLength: raw.length,
-        normalizedLength: normalized.length,
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only sync
-  }, []);
+  }, [draft, resetHistory]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -211,9 +179,22 @@ export const LinkedInAssistiveEditor = forwardRef<
 
   useEffect(() => {
     return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+      const { text, images: imgs } = snapshotRef.current;
+      const merged = mergeAssistiveEditorDraft(text, imgs);
+      if (merged !== lastEmittedDraftRef.current) {
+        lastEmittedDraftRef.current = merged;
+        onDraftChange(merged);
+        console.log(`${LOG_PREFIX} flushed draft on unmount`, {
+          textLength: text.length,
+          imageCount: imgs.length,
+        });
+      }
     };
-  }, []);
+  }, [onDraftChange]);
 
   const handleFormat = useCallback(
     (type: MarkdownFormatType) => {
@@ -398,6 +379,9 @@ export const LinkedInAssistiveEditor = forwardRef<
 
           const caretIndex = event.target.selectionStart ?? value.length;
           onTypingChange?.(value, caretIndex);
+        }}
+        onBlur={() => {
+          flushPendingDraft();
         }}
         onMouseUp={handleTextareaSelectionEvent}
         onKeyUp={handleTextareaSelectionEvent}

@@ -74,6 +74,8 @@ export const LinkedInEditorShell: React.FC<LinkedInEditorShellProps> = (
       <ArticleEditorShell
         {...sharedProps}
         draftContentType={draftContentType}
+        previewMode={previewMode}
+        onPreviewModeChange={onPreviewModeChange}
         getDraftForPublish={getDraftForPublish}
         onInsertImageIntoDraft={onInsertImageIntoDraft}
         topic={topic}

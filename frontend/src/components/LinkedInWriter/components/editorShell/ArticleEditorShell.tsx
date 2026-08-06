@@ -1,19 +1,23 @@
 /**
- * Article editor chrome — structured layout toolbar (PR6).
+ * Article editor chrome — structured layout toolbar with preview toggle.
  */
 
 import React from "react";
 import { Chip, ThemeProvider } from "@mui/material";
 import PublishLinkedInPanel from "../PublishLinkedInPanel";
 import type { LinkedInDraftContentType } from "../../utils/linkedInDraftLibraryUtils";
+import type { LinkedInPreviewMode } from "../LinkedInPreviewModeToggle";
 import {
   EditorChromeShared,
   type EditorChromeSharedProps,
 } from "./EditorChromeShared";
+import { EditorPreviewModeToggle } from "./EditorPreviewModeToggle";
 import { editorShellTheme, editorShellToolbarStyle } from "./editorShellTheme";
 
 export interface ArticleEditorShellProps extends EditorChromeSharedProps {
   draftContentType?: LinkedInDraftContentType;
+  previewMode: LinkedInPreviewMode;
+  onPreviewModeChange: (mode: LinkedInPreviewMode) => void;
   getDraftForPublish?: () => string;
   onInsertImageIntoDraft?: (imageUrl: string) => void;
   topic?: string;
@@ -22,6 +26,8 @@ export interface ArticleEditorShellProps extends EditorChromeSharedProps {
 export const ArticleEditorShell: React.FC<ArticleEditorShellProps> = ({
   draft,
   draftContentType = "article",
+  previewMode,
+  onPreviewModeChange,
   getDraftForPublish,
   onInsertImageIntoDraft,
   topic,
@@ -43,6 +49,12 @@ export const ArticleEditorShell: React.FC<ArticleEditorShellProps> = ({
               color: "#047857",
               border: "1px solid #6ee7b7",
             }}
+          />
+
+          <EditorPreviewModeToggle
+            previewMode={previewMode}
+            onPreviewModeChange={onPreviewModeChange}
+            testId="article-preview-mode-toggle"
           />
 
           <PublishLinkedInPanel

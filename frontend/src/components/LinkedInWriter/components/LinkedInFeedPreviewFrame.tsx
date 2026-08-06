@@ -12,12 +12,14 @@ interface LinkedInFeedPreviewFrameProps {
   device: LinkedInFeedDevice;
   onDeviceChange: (device: LinkedInFeedDevice) => void;
   children: React.ReactNode;
+  caption?: string;
 }
 
 export const LinkedInFeedPreviewFrame: React.FC<LinkedInFeedPreviewFrameProps> = ({
   device,
   onDeviceChange,
   children,
+  caption = "Feed preview — how your post appears before “see more”",
 }) => {
   const frameWidth = getFeedFrameWidth(device);
   const isMobile = device === "mobile";
@@ -57,7 +59,7 @@ export const LinkedInFeedPreviewFrame: React.FC<LinkedInFeedPreviewFrameProps> =
         }}
       >
         <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
-          Feed preview — how your post appears before “see more”
+          {caption}
         </Typography>
         <ToggleButtonGroup
           size="small"

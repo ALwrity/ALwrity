@@ -17,6 +17,7 @@ import {
   saveArticleDraftState,
 } from "../utils/linkedInArticleDraftStorage";
 import { normalizeArticleDraftState } from "../utils/linkedInArticleIntroUtils";
+import { normalizeArticleImages } from "../utils/linkedInArticleImageUtils";
 
 const LOG_PREFIX = "[useLinkedInArticleDraft]";
 
@@ -38,7 +39,9 @@ export function useLinkedInArticleDraft({
   const applyGenerationResult = useCallback(
     (data: ArticleContent): string => {
       const { state } = buildArticleDraftUpdate(data);
-      const normalized = normalizeArticleDraftState(state);
+      const normalized = normalizeArticleImages(
+        normalizeArticleDraftState(state),
+      );
       const markdown = articleStateToMarkdown(normalized);
       skipHydrateRef.current = true;
       setArticleDraftState(normalized);
@@ -68,7 +71,9 @@ export function useLinkedInArticleDraft({
           typeof updater === "function"
             ? (updater as (p: LinkedInArticleDraftState) => LinkedInArticleDraftState)(base)
             : updater;
-        const normalized = normalizeArticleDraftState(next);
+        const normalized = normalizeArticleImages(
+          normalizeArticleDraftState(next),
+        );
         const markdown = articleStateToMarkdown(normalized);
         skipHydrateRef.current = true;
         saveArticleDraftState(normalized);
@@ -112,7 +117,9 @@ export function useLinkedInArticleDraft({
         console.warn(`${LOG_PREFIX} ignored invalid updateArticleDraft event`);
         return;
       }
-      const normalized = normalizeArticleDraftState(state);
+      const normalized = normalizeArticleImages(
+        normalizeArticleDraftState(state),
+      );
       skipHydrateRef.current = true;
       setArticleDraftState(normalized);
       saveArticleDraftState(normalized);

@@ -12,28 +12,23 @@ import {
   normalizeArticleDraftState,
   shouldSerializeSectionAsIntro,
 } from "./linkedInArticleIntroUtils";
+import {
+  mergeAssistiveEditorDraft,
+  splitDraftForAssistiveEditor,
+} from "./linkedInEditorDraftUtils";
+import { normalizeArticleImages } from "./linkedInArticleImageUtils";
+import type {
+  LinkedInArticleDraftState,
+  LinkedInArticleSection,
+} from "./linkedInArticleDraftTypes";
+import {
+  createArticleSectionId,
+} from "./linkedInArticleDraftTypes";
 
 const LOG_PREFIX = "[LinkedInArticleDraft]";
 
-export interface LinkedInArticleSection {
-  id: string;
-  heading: string;
-  body: string;
-}
-
-export interface LinkedInArticleDraftState {
-  title: string;
-  intro?: string;
-  sections: LinkedInArticleSection[];
-  coverImageUrl?: string;
-  imageSuggestions: ImageSuggestion[];
-  readingTime?: number;
-  seoMetadata?: Record<string, unknown>;
-}
-
-export function createArticleSectionId(): string {
-  return `sec_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-}
+export type { LinkedInArticleDraftState, LinkedInArticleSection } from "./linkedInArticleDraftTypes";
+export { createArticleSectionId } from "./linkedInArticleDraftTypes";
 
 function normalizeApiSection(
   raw: Record<string, string>,
@@ -115,29 +110,33 @@ export function articleResponseToDraftState(
 }
 
 export function articleStateToMarkdown(state: LinkedInArticleDraftState): string {
+  const normalized = normalizeArticleImages(
+    normalizeArticleDraftState(state),
+  );
   const parts: string[] = [];
-  parts.push(`# ${state.title.trim() || "Untitled Article"}`);
+  parts.push(`# ${normalized.title.trim() || "Untitled Article"}`);
 
-  if (state.coverImageUrl?.trim()) {
-    parts.push(`![Cover image](${state.coverImageUrl.trim()})`);
-  }
-
-  state.sections.forEach((section, index) => {
+  normalized.sections.forEach((section, index) => {
     const heading = section.heading.trim() || "Section";
-    const body = section.body.trim();
+    const body = section.body;
 
     if (shouldSerializeSectionAsIntro(section, index)) {
-      if (body) parts.push(body);
+      if (body.trim()) parts.push(body);
       return;
     }
 
-    parts.push(body ? `## ${heading}\n\n${body}` : `## ${heading}`);
+    parts.push(body.trim() ? `## ${heading}\n\n${body}` : `## ${heading}`);
   });
 
-  const markdown = parts.join("\n\n");
+  const textMarkdown = parts.join("\n\n");
+  const markdown = mergeAssistiveEditorDraft(
+    textMarkdown,
+    normalized.images || [],
+  );
   console.debug(`${LOG_PREFIX} merged state to markdown`, {
     length: markdown.length,
-    sectionCount: state.sections.length,
+    sectionCount: normalized.sections.length,
+    imageCount: normalized.images?.length ?? 0,
   });
   return markdown;
 }
@@ -148,7 +147,6 @@ export function parseMarkdownToArticleDraft(
 ): LinkedInArticleDraftState {
   let text = (markdown || "").trim();
   let title = "Untitled Article";
-  let coverImageUrl: string | undefined;
 
   if (text.startsWith("# ")) {
     const lineBreak = text.indexOf("\n");
@@ -159,29 +157,26 @@ export function parseMarkdownToArticleDraft(
     text = lineBreak === -1 ? "" : text.slice(lineBreak + 1).trim();
   }
 
-  const coverMatch = text.match(/^!\[[^\]]*\]\(([^)]+)\)\s*/);
-  if (coverMatch) {
-    coverImageUrl = coverMatch[1];
-    text = text.slice(coverMatch[0].length).trim();
-  }
+  const parsed = splitDraftForAssistiveEditor(text);
+  const sections = splitMarkdownIntoSections(parsed.textContent);
 
-  const sections = splitMarkdownIntoSections(text);
-
-  const state: LinkedInArticleDraftState = normalizeArticleDraftState({
-    title: title || "Untitled Article",
-    sections:
-      sections.length > 0
-        ? sections
-        : [
-            {
-              id: createArticleSectionId(),
-              heading: "Introduction",
-              body: text,
-            },
-          ],
-    coverImageUrl,
-    imageSuggestions: [],
-  });
+  const state: LinkedInArticleDraftState = normalizeArticleImages(
+    normalizeArticleDraftState({
+      title: title || "Untitled Article",
+      sections:
+        sections.length > 0
+          ? sections
+          : [
+              {
+                id: createArticleSectionId(),
+                heading: "Introduction",
+                body: parsed.textContent,
+              },
+            ],
+      images: parsed.images,
+      imageSuggestions: [],
+    }),
+  );
 
   console.log(`${LOG_PREFIX} parsed markdown to state`, {
     title: state.title,

@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { Box } from "@mui/material";
 import {
   CitationHoverHandler,
   DiffPreviewModal,
@@ -23,8 +22,14 @@ import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
 import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
 import type { LinkedInDraftContentType } from '../utils/linkedInDraftLibraryUtils';
 import { resolveEditorShellMode } from '../utils/linkedInEditorShellUtils';
-import { ArticleEditorLayout } from './ArticleEditor';
+import { ArticleEditorContentArea } from './ArticleEditor/ArticleEditorContentArea';
 import type { LinkedInArticleDraftState } from '../utils/linkedInArticleDraftUtils';
+import { articleStateToMarkdown, parseMarkdownToArticleDraft } from '../utils/linkedInArticleDraftUtils';
+import {
+  appendImageToArticleDraftState,
+  createArticleImageBlockFromUrl,
+} from '../utils/linkedInArticleImageUtils';
+import { buildToolbarImageSeedFromDraft } from '../utils/linkedInToolbarImageSeed';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
@@ -48,7 +53,11 @@ interface ContentEditorProps {
   previewMode?: LinkedInPreviewMode;
   onPreviewModeChange?: (mode: LinkedInPreviewMode) => void;
   articleDraftState?: LinkedInArticleDraftState | null;
-  onArticleDraftChange?: (state: LinkedInArticleDraftState) => void;
+  onArticleDraftChange?: (
+    updater:
+      | LinkedInArticleDraftState
+      | ((prev: LinkedInArticleDraftState) => LinkedInArticleDraftState),
+  ) => void;
 }
 
 const ContentEditor: React.FC<ContentEditorProps> = ({
@@ -75,10 +84,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   onArticleDraftChange,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
-  const articleImageTargetRef = useRef<"cover" | "section">("cover");
-  const [activeArticleSectionId, setActiveArticleSectionId] = useState<
-    string | null
-  >(null);
   const [assistantOn, setAssistantOn] = useState(false);
   const [assistiveHighlightRange, setAssistiveHighlightRange] =
     useState<AssistiveTextHighlightRange | null>(null);
@@ -96,9 +101,15 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   const previewModeFromState = onPreviewModeChange
     ? (externalPreviewMode ?? "linkedin")
     : previewMode;
-  const effectivePreviewMode: LinkedInPreviewMode =
-    shellMode === "article" ? "studio" : previewModeFromState;
+  const effectivePreviewMode: LinkedInPreviewMode = previewModeFromState;
   const effectiveSetPreviewMode = onPreviewModeChange || setPreviewMode;
+
+  const articleMarkdown =
+    shellMode === "article" && articleDraftState
+      ? articleStateToMarkdown(articleDraftState)
+      : draft;
+
+  const headerDraft = shellMode === "article" ? articleMarkdown : draft;
 
   useEffect(() => {
     console.log("[ContentEditor] editor shell mode", {
@@ -126,10 +137,11 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const handleAssistantToggle = useCallback(
     (enabled: boolean) => {
-      if (!enabled && assistantOn) {
+      if (assistantOn) {
         flushAssistiveDraft();
       }
       setAssistantOn(enabled);
+      console.log("[ContentEditor] assistive writing toggled", { enabled });
     },
     [assistantOn, flushAssistiveDraft],
   );
@@ -213,12 +225,38 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     }
   }, [isPreviewing]);
 
+  const handleDraftChangeForAssistive = useCallback(
+    (value: string) => {
+      if (shellMode === "article" && onArticleDraftChange) {
+        try {
+          const parsed = parseMarkdownToArticleDraft(value);
+          if (parsed) {
+            onArticleDraftChange(parsed);
+            console.log("[ContentEditor] synced assistive draft to article state", {
+              titleLength: parsed.title.length,
+              sectionCount: parsed.sections.length,
+            });
+          }
+        } catch (error) {
+          console.error("[ContentEditor] failed to parse assistive draft for article", {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+        return;
+      }
+      onDraftChange(value);
+    },
+    [shellMode, onArticleDraftChange, onDraftChange],
+  );
+
+  const assistiveDraft = shellMode === "article" ? articleMarkdown : draft;
+
   const assistiveWriting = useLinkedInAssistiveWriting({
     enabled: assistantOn,
-    draft,
+    draft: assistiveDraft,
     getTextarea,
-    onDraftChange,
-    onInsertWithPreview: handleInsertAtCaret,
+    onDraftChange: handleDraftChangeForAssistive,
+    onInsertWithPreview: shellMode === "post" ? handleInsertAtCaret : undefined,
     researchSources,
   });
 
@@ -226,41 +264,18 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     (imageUrl: string) => {
       if (shellMode === "article" && articleDraftState && onArticleDraftChange) {
         try {
-          if (
-            articleImageTargetRef.current === "section" &&
-            activeArticleSectionId
-          ) {
-            const targetSection = articleDraftState.sections.find(
-              (section) => section.id === activeArticleSectionId,
-            );
-            if (targetSection) {
-              const imageMarkdown = `\n\n![Image](${imageUrl})\n`;
-              const nextBody = targetSection.body.trim()
-                ? `${targetSection.body}${imageMarkdown}`
-                : `![Image](${imageUrl})\n`;
-              onArticleDraftChange({
-                ...articleDraftState,
-                sections: articleDraftState.sections.map((section) =>
-                  section.id === activeArticleSectionId
-                    ? { ...section, body: nextBody }
-                    : section,
-                ),
-              });
-              console.log("[ContentEditor] inserted image into article section", {
-                sectionId: activeArticleSectionId,
-                imageUrl: imageUrl.substring(0, 80),
-              });
-            }
-            articleImageTargetRef.current = "cover";
-            return;
-          }
-
-          onArticleDraftChange({ ...articleDraftState, coverImageUrl: imageUrl });
-          console.log("[ContentEditor] set article cover image", {
+          const block = createArticleImageBlockFromUrl(imageUrl, "Article image");
+          onArticleDraftChange((prev) =>
+            appendImageToArticleDraftState(prev, block),
+          );
+          console.log("[ContentEditor] appended image to article draft strip", {
             imageUrl: imageUrl.substring(0, 80),
+            imageCount: (articleDraftState.images?.length ?? 0) + 1,
           });
         } catch (error) {
-          console.error("[ContentEditor] failed to set article cover", error);
+          console.error("[ContentEditor] failed to append article image", {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
         return;
       }
@@ -293,7 +308,6 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
       shellMode,
       articleDraftState,
       onArticleDraftChange,
-      activeArticleSectionId,
     ],
   );
 
@@ -303,6 +317,24 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
     industry: prefs.industry,
     onInsertImage: insertGeneratedImage,
   });
+
+  const handleOpenArticleImageGenerator = useCallback(() => {
+    try {
+      const { seedText, prompt } = buildToolbarImageSeedFromDraft(
+        articleMarkdown,
+        topic,
+        prefs.industry,
+      );
+      console.log("[ContentEditor] opening article image generator", {
+        seedLength: seedText.length,
+      });
+      selectionImage.openForDraft(seedText, prompt);
+    } catch (error) {
+      console.error("[ContentEditor] failed to open article image generator", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, [articleMarkdown, topic, prefs.industry, selectionImage]);
 
   const selectionVideo = useLinkedInSelectionVideo({
     topic,
@@ -391,7 +423,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               citations={citations}
               searchQueries={searchQueries}
               qualityMetrics={qualityMetrics}
-              draft={draft}
+              draft={headerDraft}
               previewMode={effectivePreviewMode}
               onPreviewModeChange={handlePreviewModeChange}
               assistantOn={assistantOn}
@@ -405,28 +437,33 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
             />
 
             {shellMode === "article" && articleDraftState && onArticleDraftChange ? (
-              <Box sx={{ p: 2 }}>
-                <ArticleEditorLayout
-                  state={articleDraftState}
-                  onChange={onArticleDraftChange}
-                  onActiveSectionChange={setActiveArticleSectionId}
-                  onGenerateCover={() => {
-                    articleImageTargetRef.current = "cover";
-                    selectionImage.openForDraft(
-                      articleDraftState.title || topic || "LinkedIn article",
-                      articleDraftState.imageSuggestions[0]?.description,
-                    );
-                  }}
-                  onUploadSectionImage={() => {
-                    articleImageTargetRef.current = "section";
-                    selectionImage.openForDraft(
-                      articleDraftState.title || topic || "LinkedIn article",
-                      articleDraftState.imageSuggestions[0]?.description,
-                    );
-                  }}
-                  disabled={isGenerating}
-                />
-              </Box>
+              <ArticleEditorContentArea
+                contentRef={contentRef}
+                articleDraftState={articleDraftState}
+                onArticleDraftChange={onArticleDraftChange}
+                previewMode={effectivePreviewMode}
+                draftMarkdown={articleMarkdown}
+                citations={citations}
+                researchSources={researchSources}
+                isGenerating={isGenerating}
+                loadingMessage={loadingMessage}
+                assistantOn={assistantOn}
+                assistiveWriting={{
+                  suggestion: assistiveWriting.suggestion,
+                  error: assistiveWriting.error,
+                  isGenerating: assistiveWriting.isGenerating,
+                  showContinuePrompt: assistiveWriting.showContinuePrompt,
+                  suggestionIndex: assistiveWriting.suggestionIndex,
+                  totalSuggestions: assistiveWriting.allSuggestions.length,
+                  onAccept: assistiveWriting.handleAcceptSuggestion,
+                  onReject: assistiveWriting.handleRejectSuggestion,
+                  onNext: assistiveWriting.handleNextSuggestion,
+                  onContinueWriting: assistiveWriting.handleContinueWriting,
+                  onDismiss: assistiveWriting.dismissSuggestion,
+                }}
+                onGenerateImage={handleOpenArticleImageGenerator}
+                renderSelectionMenu={textSelectionHandler.renderSelectionMenu}
+              />
             ) : (
             <ContentDisplayArea
               contentRef={contentRef}

@@ -25,6 +25,8 @@ interface LinkedInEditorToolbarProps {
   canRedo?: boolean;
   isUploading?: boolean;
   disabled?: boolean;
+  /** When set, replaces the default upload image icon (e.g. article popover menu). */
+  renderImageAction?: () => React.ReactNode;
 }
 
 const toolBtnSx = {
@@ -57,6 +59,7 @@ export const LinkedInEditorToolbar: React.FC<LinkedInEditorToolbarProps> = ({
   canRedo = false,
   isUploading = false,
   disabled = false,
+  renderImageAction,
 }) => {
   return (
     <Box
@@ -134,23 +137,27 @@ export const LinkedInEditorToolbar: React.FC<LinkedInEditorToolbarProps> = ({
           )}
         </Box>
 
-        <Tooltip title="Add photo" arrow>
-          <span>
-            <IconButton
-              size="small"
-              sx={toolBtnSx}
-              onClick={onUploadImage}
-              disabled={disabled || isUploading}
-              aria-label="Upload image"
-            >
-              {isUploading ? (
-                <CircularProgress size={16} sx={{ color: "#0A66C2" }} />
-              ) : (
-                <ImageIcon sx={{ fontSize: 18 }} />
-              )}
-            </IconButton>
-          </span>
-        </Tooltip>
+        {renderImageAction ? (
+          renderImageAction()
+        ) : (
+          <Tooltip title="Add photo" arrow>
+            <span>
+              <IconButton
+                size="small"
+                sx={toolBtnSx}
+                onClick={onUploadImage}
+                disabled={disabled || isUploading}
+                aria-label="Upload image"
+              >
+                {isUploading ? (
+                  <CircularProgress size={16} sx={{ color: "#0A66C2" }} />
+                ) : (
+                  <ImageIcon sx={{ fontSize: 18 }} />
+                )}
+              </IconButton>
+            </span>
+          </Tooltip>
+        )}
       </Box>
       <Typography
         variant="caption"

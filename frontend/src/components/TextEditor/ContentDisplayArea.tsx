@@ -125,24 +125,29 @@ const ContentDisplayArea: React.FC<ContentDisplayAreaProps> = ({
       <div style={{ opacity: isGenerating ? 0.3 : 1, transition: 'opacity 0.3s ease' }}>
         {draft ? (
           <div>
-            {assistantOn ? (
-              <>
-                <LinkedInAssistiveEditor
-                  ref={assistiveEditorRef}
-                  draft={draft}
-                  onDraftChange={onDraftChange}
-                  onTypingChange={onTypingChange}
-                  onTextareaSelection={onTextareaSelection}
-                  highlightRange={assistiveHighlightRange}
-                  onHighlightClear={onAssistiveHighlightClear}
-                />
-                {previewMode === 'linkedin' && (
-                  <Box sx={{ mt: 2 }}>
-                    <LinkedInFeedLivePreview draft={draft} />
-                  </Box>
-                )}
-              </>
-            ) : (
+            <Box
+              sx={{ display: assistantOn ? 'block' : 'none' }}
+              aria-hidden={!assistantOn}
+              data-testid="post-assistive-editor-shell"
+            >
+              <LinkedInAssistiveEditor
+                ref={assistiveEditorRef}
+                draft={draft}
+                onDraftChange={onDraftChange}
+                onTypingChange={onTypingChange}
+                onTextareaSelection={onTextareaSelection}
+                highlightRange={assistiveHighlightRange}
+                onHighlightClear={onAssistiveHighlightClear}
+              />
+            </Box>
+
+            {assistantOn && previewMode === 'linkedin' && (
+              <Box sx={{ mt: 2 }}>
+                <LinkedInFeedLivePreview draft={draft} />
+              </Box>
+            )}
+
+            {!assistantOn && (
               previewMode === 'studio' ? (
                 <LinkedInDraftPreview draft={draft} citations={citations} researchSources={researchSources} />
               ) : (

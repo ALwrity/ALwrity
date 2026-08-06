@@ -5,20 +5,27 @@
 import React from "react";
 import { LinkedInEditorToolbar } from "../LinkedInEditorToolbar";
 import type { MarkdownFormatType } from "../../../TextEditor/markdownFormatting";
+import { ArticleEditorImageMenu } from "./ArticleEditorImageMenu";
 
 export interface ArticleEditorToolbarProps {
   onFormat: (type: MarkdownFormatType) => void;
   onUploadImage?: () => void;
+  onGenerateImage?: () => void;
   onInsertEmoji?: (emoji: string) => void;
   disabled?: boolean;
+  isUploading?: boolean;
+  hasImages?: boolean;
   sectionHeading?: string;
 }
 
 export const ArticleEditorToolbar: React.FC<ArticleEditorToolbarProps> = ({
   onFormat,
   onUploadImage,
+  onGenerateImage,
   onInsertEmoji,
   disabled = false,
+  isUploading = false,
+  hasImages = false,
   sectionHeading,
 }) => (
   <div data-testid="article-editor-toolbar">
@@ -27,6 +34,16 @@ export const ArticleEditorToolbar: React.FC<ArticleEditorToolbarProps> = ({
       onUploadImage={onUploadImage ?? (() => undefined)}
       onInsertEmoji={onInsertEmoji}
       disabled={disabled}
+      isUploading={isUploading}
+      renderImageAction={() => (
+        <ArticleEditorImageMenu
+          onUploadImage={onUploadImage ?? (() => undefined)}
+          onGenerateImage={onGenerateImage}
+          isUploading={isUploading}
+          disabled={disabled}
+          hasImages={hasImages}
+        />
+      )}
     />
     <p
       style={{
