@@ -116,6 +116,7 @@ class PlatformAnalyticsService:
                 logger.error(f"Failed to get analytics for {platform_name}: {e}")
                 analytics_data[platform_name] = self._create_error_response(platform_name, str(e))
         
+        self._persist_to_db(user_id, analytics_data, target_url)
         return analytics_data
     
     async def get_platform_connection_status(self, user_id: str) -> Dict[str, Dict[str, Any]]:
@@ -202,3 +203,31 @@ class PlatformAnalyticsService:
             status='error',
             error_message=error_message
         )
+    
+    def _persist_to_db(self, user_id: str, analytics_data: dict, target_url: str = None):
+        try:
+            from services.database import get_session_for_user
+            from services.platform_analytics_persistence import PlatformAnalyticsPersistence
+            
+            db = get_session_for_user(user_id)
+            if not db:
+                return
+            
+            persistence = PlatformAnalyticsPersistence(db)
+            for platform, data in analytics_data.items():
+                if not data or data.status == 'error':
+                    continue
+                try:
+                    persistence.save_analytics(
+                        user_id=user_id,
+                        platform=platform,
+                        metrics=data.metrics,
+                        summary={"status": data.status, "last_updated": data.last_updated},
+                        site_url=target_url,
+                        status=data.status,
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to persist analytics for {platform}: {e}")
+            db.close()
+        except Exception as e:
+            logger.warning(f"Failed to persist analytics to DB: {e}")

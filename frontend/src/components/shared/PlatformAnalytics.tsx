@@ -124,16 +124,39 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       }
       const bingSitesResp: any[] = (statusResponse.platforms?.['bing']?.sites || []);
 
-      // Load analytics data
+      // Load analytics data — try DB cache first
       const end = new Date();
       const start = new Date(end);
       const rDays = rangeDaysRef.current;
       start.setDate(end.getDate() - (rDays - 1));
       const fmt = (d: Date) => d.toISOString().slice(0, 10);
-      const analyticsResponse = await cachedAnalyticsAPI.getAnalyticsData(activePlatforms, false, {
-        start_date: fmt(start),
-        end_date: fmt(end),
-      });
+
+      let analyticsResponse;
+      let usedDBCache = false;
+      if (activePlatforms.length > 0) {
+        try {
+          const firstPlatform = activePlatforms[0];
+          const siteUrl = siteUrlRef.current || '';
+          const existing = await cachedAnalyticsAPI.checkExistingAnalytics(firstPlatform, siteUrl);
+          if (existing.exists && existing.analysis_id) {
+            const dbData = await cachedAnalyticsAPI.loadAnalyticsFromDB(existing.analysis_id);
+            if (dbData?.data) {
+              analyticsResponse = dbData;
+              usedDBCache = true;
+              console.log('📦 PlatformAnalytics: Loaded from DB cache');
+            }
+          }
+        } catch (e) {
+          console.debug('PlatformAnalytics: DB cache miss, fetching fresh', e);
+        }
+      }
+
+      if (!analyticsResponse) {
+        analyticsResponse = await cachedAnalyticsAPI.getAnalyticsData(activePlatforms, false, {
+          start_date: fmt(start),
+          end_date: fmt(end),
+        });
+      }
       const newData = analyticsResponse.data as Record<string, PlatformAnalyticsType>;
       if (!shallowEqual(analyticsDataRef.current, newData)) {
         analyticsDataRef.current = newData;

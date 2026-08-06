@@ -48,6 +48,29 @@ class CachedAnalyticsAPI {
   };
 
   /**
+   * Check if existing analytics data exists in the database
+   */
+  async checkExistingAnalytics(platform: string, siteUrl?: string): Promise<{
+    exists: boolean;
+    analysis_id?: number;
+    analysis_date?: string;
+    status?: string;
+    summary?: any;
+  }> {
+    const params = siteUrl ? { site_url: siteUrl } : undefined;
+    const response = await apiClient.get(`/api/analytics/check-existing/${platform}`, { params });
+    return response.data;
+  }
+
+  /**
+   * Load full analytics data from the database by analysis ID
+   */
+  async loadAnalyticsFromDB(analysisId: number): Promise<any> {
+    const response = await apiClient.get(`/api/analytics/db/${analysisId}`);
+    return response.data;
+  }
+
+  /**
    * Get platform connection status with caching
    */
   async getPlatformStatus(): Promise<{ platforms: Record<string, PlatformConnectionStatus> }> {
