@@ -32,6 +32,7 @@ describe("LinkedInEditorShell", () => {
     expect(screen.getByTestId("post-editor-shell")).toBeTruthy();
     expect(screen.getByTestId("post-preview-mode-toggle")).toBeTruthy();
     expect(screen.getByTestId("publish-linkedin-panel")).toBeTruthy();
+    expect(screen.getByTestId("engagement-booster-toolbar-btn")).toBeTruthy();
     expect(screen.queryByTestId("article-editor-shell")).toBeNull();
   });
 
@@ -43,6 +44,7 @@ describe("LinkedInEditorShell", () => {
     expect(screen.getByTestId("article-editor-shell")).toBeTruthy();
     expect(screen.queryByTestId("post-preview-mode-toggle")).toBeNull();
     expect(screen.getByTestId("publish-linkedin-panel")).toBeTruthy();
+    expect(screen.getByTestId("engagement-booster-toolbar-btn")).toBeTruthy();
     expect(screen.queryByTestId("article-editor-placeholder")).toBeNull();
   });
 

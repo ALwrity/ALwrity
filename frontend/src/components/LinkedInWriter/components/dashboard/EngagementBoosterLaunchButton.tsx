@@ -31,14 +31,15 @@ const PANEL_STYLE: React.CSSProperties = {
 const TOOLBAR_SX = {
   textTransform: "none" as const,
   fontSize: 12.5,
-  fontWeight: 500,
-  color: "text.secondary",
+  fontWeight: 600,
+  color: "#b45309",
   px: 1.2,
   py: 0.4,
   minWidth: "auto",
   minHeight: 30,
   borderRadius: 1.5,
-  "&:hover": { bgcolor: "action.hover", color: "text.primary" },
+  flexShrink: 0,
+  "&:hover": { bgcolor: "#fffbeb", color: "#92400e" },
 };
 
 export const EngagementBoosterLaunchButton: React.FC<
@@ -61,13 +62,14 @@ export const EngagementBoosterLaunchButton: React.FC<
 
   if (variant === "toolbar") {
     return (
-      <Tooltip title="Rewrite draft for maximum engagement" arrow>
-        <span>
+      <Tooltip title="Optimise for Engagement — rewrite draft for maximum engagement" arrow>
+        <span style={{ display: "inline-flex", flexShrink: 0 }}>
           <Button
             type="button"
             variant="text"
             size="small"
-            startIcon={<BoltIcon fontSize="small" />}
+            data-testid="engagement-booster-toolbar-btn"
+            startIcon={<BoltIcon fontSize="small" sx={{ color: "#f59e0b" }} />}
             onClick={handleClick}
             disabled={disabled}
             sx={TOOLBAR_SX}

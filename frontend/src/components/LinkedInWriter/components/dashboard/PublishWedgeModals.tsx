@@ -27,6 +27,7 @@ import {
 } from "../../utils/linkedInPublishWedgeLockedUi";
 import { ConnectLockIcon } from "./ConnectLockIcon";
 import { EngagementBoosterLaunchButton } from "./EngagementBoosterLaunchButton";
+import { QualityCheckEngagementActions } from "./QualityCheckEngagementActions";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -699,7 +700,7 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
                 {error}
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+            <div style={{ display: "flex", gap: 10, marginTop: 16, flexWrap: "wrap" }}>
               <button
                 style={panelBtn(true)}
                 onClick={handleScore}
@@ -714,6 +715,7 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
                 )}
               </button>
             </div>
+            <QualityCheckEngagementActions content={content} />
           </>
         )}
 
@@ -727,14 +729,14 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
               onApply={handleImproveInStudio}
               onDismiss={() => setScoreResult(null)}
             />
+            <QualityCheckEngagementActions
+              content={content}
+              overallScore={scoreResult.overall_score}
+            />
             <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
               <button style={panelBtn(true)} onClick={handleImproveInStudio}>
                 ✍️ Improve in Studio
               </button>
-              <EngagementBoosterLaunchButton
-                content={content}
-                disabled={!content.trim()}
-              />
               <button style={panelBtn()} onClick={() => setScoreResult(null)}>
                 ← Re-score
               </button>

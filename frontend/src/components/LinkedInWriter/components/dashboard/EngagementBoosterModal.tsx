@@ -85,6 +85,7 @@ export const EngagementBoosterModal: React.FC<EngagementBoosterModalProps> = ({
       onClose={onClose}
       maxWidth={620}
       maxHeight="min(92vh, 800px)"
+      elevated
     >
       <p
         style={{
