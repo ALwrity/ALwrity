@@ -187,7 +187,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
       };
       
       // Debounce the check to avoid too many API calls
-      const timeoutId = setTimeout(checkExisting, 1000);
+      const timeoutId = setTimeout(checkExisting, 300);
       return () => clearTimeout(timeoutId);
     }
   }, [website, hasCheckedExisting]);
