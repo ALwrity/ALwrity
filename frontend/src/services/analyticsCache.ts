@@ -51,19 +51,30 @@ class AnalyticsCacheService {
     const key = this.generateKey(endpoint, params);
     const entry = this.cache.get(key);
 
-    if (!entry) {
-      return null;
-    }
-
-    // Check if cache entry is still valid
-    const now = Date.now();
-    if (now - entry.timestamp > entry.ttl) {
+    if (entry) {
+      const now = Date.now();
+      if (now - entry.timestamp <= entry.ttl) {
+        console.log(`📦 Analytics Cache HIT (memory): ${key}`);
+        return entry.data;
+      }
       this.cache.delete(key);
-      return null;
     }
 
-    console.log(`📦 Analytics Cache HIT: ${key}`);
-    return entry.data;
+    // Fallback: check sessionStorage for cross-refresh persistence
+    try {
+      const raw = sessionStorage.getItem(`analytics:${key}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Date.now() < parsed.expiresAt) {
+          this.cache.set(key, { data: parsed.data, timestamp: parsed.timestamp, ttl: parsed.ttl });
+          console.log(`📦 Analytics Cache HIT (sessionStorage): ${key}`);
+          return parsed.data as T;
+        }
+        sessionStorage.removeItem(`analytics:${key}`);
+      }
+    } catch { /* sessionStorage may be unavailable */ }
+
+    return null;
   }
 
   /**
@@ -84,6 +95,16 @@ class AnalyticsCacheService {
       ttl: ttl || this.config.defaultTTL
     });
 
+    // Persist to sessionStorage so cache survives page refresh
+    try {
+      sessionStorage.setItem(`analytics:${key}`, JSON.stringify({
+        data,
+        timestamp: now,
+        ttl: ttl || this.config.defaultTTL,
+        expiresAt: now + (ttl || this.config.defaultTTL),
+      }));
+    } catch { /* sessionStorage may be full or unavailable */ }
+
     console.log(`💾 Analytics Cache SET: ${key} (TTL: ${ttl || this.config.defaultTTL}ms)`);
   }
 
@@ -102,6 +123,11 @@ class AnalyticsCacheService {
   invalidate(pattern?: string): void {
     if (!pattern) {
       this.cache.clear();
+      try {
+        for (const key of Object.keys(sessionStorage)) {
+          if (key.startsWith('analytics:')) sessionStorage.removeItem(key);
+        }
+      } catch {}
       console.log('🗑️ Analytics Cache CLEARED: All entries');
       return;
     }
@@ -114,6 +140,13 @@ class AnalyticsCacheService {
     }
 
     keysToDelete.forEach(key => this.cache.delete(key));
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith('analytics:') && key.includes(pattern)) {
+          sessionStorage.removeItem(key);
+        }
+      }
+    } catch {}
     console.log(`🗑️ Analytics Cache INVALIDATED: ${keysToDelete.length} entries matching "${pattern}"`);
   }
 

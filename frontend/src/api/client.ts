@@ -123,6 +123,7 @@ export const getAuthTokenGetter = (): (() => Promise<string | null>) | null => {
 
 // Get API URL using shared utility that handles localhost vs ngrok detection
 export const getApiUrl = getApiBaseUrl;
+export { dedupedGet };
 
 // Create a shared axios instance for all API calls
 const apiBaseUrl = getApiUrl();
@@ -261,7 +262,24 @@ export const noteBackendRecovered = (): void => {
   clearBackendCooldown();
 };
 
-// Add request interceptor for logging and authentication
+// In-flight request deduplication — maps "METHOD:path" → Promise
+const _inflightRequests = new Map<string, Promise<any>>();
+
+// Retrieve or create a deduped request.  Multiple callers requesting the
+// same endpoint within the same tick share one underlying HTTP call.
+const dedupedGet = (url: string, config?: any) => {
+  const key = `GET:${url}`;
+  const existing = _inflightRequests.get(key);
+  if (existing) {
+    console.debug(`[apiClient] 🔁 Reusing in-flight request for ${key}`);
+    return existing;
+  }
+  const promise = apiClient.get(url, config).finally(() => {
+    _inflightRequests.delete(key);
+  });
+  _inflightRequests.set(key, promise);
+  return promise;
+};
 apiClient.interceptors.request.use(
   async (config) => {
     const safeUrl = sanitizeUrlForLogging(config.url);
