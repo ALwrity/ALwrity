@@ -16,6 +16,9 @@ import {
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   joinHashtagSuggestions,
 } from "./utils/linkedInPostAssembly";
+import { dispatchLinkedInDraftUpdate } from "./utils/linkedInDraftContentTypeStorage";
+import { buildArticleDraftUpdate } from "./utils/linkedInArticleDraftUtils";
+import { saveArticleDraftState } from "./utils/linkedInArticleDraftStorage";
 import { apiClient } from "../../api/client";
 import { useCopilotActionTyped } from "../../hooks/useCopilotActionTyped";
 
@@ -278,6 +281,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "post",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -454,11 +458,7 @@ const RegisterLinkedInActions: React.FC = () => {
           fullContent?.length,
         );
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", {
-            detail: fullContent,
-          }),
-        );
+        dispatchLinkedInDraftUpdate(fullContent, "post");
 
         window.dispatchEvent(
           new CustomEvent("linkedinwriter:progressStep", {
@@ -542,6 +542,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "article",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -663,7 +664,14 @@ const RegisterLinkedInActions: React.FC = () => {
           }),
         );
 
-        const content = `# ${res.data.title}\n\n${res.data.content}`;
+        const { state: articleState, markdown: content } =
+          buildArticleDraftUpdate(res.data);
+        saveArticleDraftState(articleState);
+        window.dispatchEvent(
+          new CustomEvent("linkedinwriter:updateArticleDraft", {
+            detail: articleState,
+          }),
+        );
 
         // Debug: Log the full response structure
         console.log("[LinkedIn Writer] Full API response:", res);
@@ -694,9 +702,7 @@ const RegisterLinkedInActions: React.FC = () => {
           }),
         );
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
-        );
+        dispatchLinkedInDraftUpdate(content, "article");
 
         window.dispatchEvent(
           new CustomEvent("linkedinwriter:progressStep", {
@@ -768,6 +774,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "carousel",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -888,19 +895,7 @@ const RegisterLinkedInActions: React.FC = () => {
           content += `## Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
         });
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
-        );
-
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:progressStep", {
-            detail: {
-              id: "finalize",
-              status: "completed",
-              message: "Carousel finalized and optimized",
-            },
-          }),
-        );
+        dispatchLinkedInDraftUpdate(content, "carousel");
 
         window.dispatchEvent(
           new CustomEvent("linkedinwriter:progressComplete"),
@@ -938,6 +933,7 @@ const RegisterLinkedInActions: React.FC = () => {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "video_script",
             steps: [
               { id: "personalize", label: "Personalizing topic & context" },
               { id: "prepare_queries", label: "Preparing research queries" },
@@ -1064,9 +1060,7 @@ const RegisterLinkedInActions: React.FC = () => {
           content += `## Captions\n${res.data.captions.join("\n")}\n\n`;
         }
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
-        );
+        dispatchLinkedInDraftUpdate(content, "video_script");
 
         window.dispatchEvent(
           new CustomEvent("linkedinwriter:progressStep", {

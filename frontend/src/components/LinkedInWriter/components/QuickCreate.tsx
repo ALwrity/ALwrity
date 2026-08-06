@@ -19,6 +19,7 @@ import {
 } from '../utils/linkedInConnectLockedUi';
 import { CreateWedgeComingSoonTile } from './dashboard/CreateWedgeComingSoonTile';
 import { useCreateWedgeNotify } from '../hooks/useCreateWedgeNotify';
+import { dispatchLinkedInDraftUpdate } from '../utils/linkedInDraftContentTypeStorage';
 import { PostTodayModal } from './dashboard/analysisWedgeModalExports';
 
 
@@ -674,9 +675,13 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   };
 
   const handleUseVariation = useCallback((content: string) => {
-    window.dispatchEvent(new CustomEvent('linkedinwriter:updateDraft', { detail: content }));
+    if (selectedType) {
+      dispatchLinkedInDraftUpdate(content, selectedType);
+    } else {
+      dispatchLinkedInDraftUpdate(content);
+    }
     closeModal();
-  }, [closeModal]);
+  }, [closeModal, selectedType]);
 
   const setField = useCallback((field: string, value: any) => {
     if (field === 'topic') setTopicError(null);

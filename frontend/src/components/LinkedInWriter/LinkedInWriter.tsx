@@ -6,14 +6,7 @@ import React, {
   useState,
 } from "react";
 import { useLocation } from "react-router-dom";
-import { Button, Snackbar, Alert, CircularProgress, Tooltip, Popover, Chip, Typography, ToggleButtonGroup, ToggleButton } from "@mui/material";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import {
-  Save as SaveIcon,
-  RateReview as RateReviewIcon,
-  ArrowBack as ArrowBackIcon,
-  Check as CheckIcon,
-} from "@mui/icons-material";
+import { Snackbar, Alert } from "@mui/material";
 import { QualityCheckModal } from "./components/dashboard/PublishWedgeModals";
 import {
   linkedInWriterApi,
@@ -34,11 +27,12 @@ import {
   type ProgressStep,
 } from './components';
 import OutlineEditor from './components/OutlineEditor';
-import PublishLinkedInPanel from './components/PublishLinkedInPanel';
+import { LinkedInEditorShell } from './components/editorShell/LinkedInEditorShell';
 import { insertImageIntoLinkedInDraft } from './utils/linkedInDraftImageInsert';
 import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssistiveEditor';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
+import { countArticleWords } from './utils/linkedInArticleDraftUtils';
 import { resolvePersonaTone } from './utils/storageUtils';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
@@ -101,6 +95,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     showPreferencesModal,
     // showContextModal,
     justGeneratedContent,
+    draftContentType,
+    progressContentType,
 
     // Grounding data
     researchSources,
@@ -148,13 +144,20 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     isGeneratingOutline,
     generateOutline,
     refineOutline,
+
+    articleDraftState,
+    updateArticleDraftState,
+    getArticleMarkdown,
   } = useLinkedInWriter();
 
   const assistiveEditorRef = useRef<LinkedInAssistiveEditorHandle | null>(null);
 
   const getDraftForPublish = useCallback(() => {
+    if (draftContentType === "article") {
+      return getArticleMarkdown();
+    }
     return assistiveEditorRef.current?.flushDraft() ?? draft;
-  }, [draft]);
+  }, [draft, draftContentType, getArticleMarkdown]);
 
   const handleInsertImageIntoDraft = useCallback(
     (imageUrl: string) => {
@@ -202,20 +205,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
   // Quality Check state
   const [qualityCheckOpen, setQualityCheckOpen] = useState(false);
 
-  // Research popover state
-  const [researchAnchor, setResearchAnchor] = useState<HTMLElement | null>(null);
-  const researchOpen = Boolean(researchAnchor);
-
   // Preview mode (linkedin / studio)
   const [previewMode, setPreviewMode] = useState<'linkedin' | 'studio'>('studio');
-
-  const editorTheme = useMemo(() => createTheme({
-    palette: {
-      mode: 'light',
-      primary: { main: '#0a66c2' },
-      text: { primary: '#1e293b', secondary: '#64748b' },
-    },
-  }), []);
 
   // Read calendar topic from navigation state (e.g. from Calendar tab)
   const location = useLocation();
@@ -334,15 +325,24 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
             .split("\n")[0]
             .trim()
         : undefined;
-      const title = draftToSave.split("\n")[0].substring(0, 100) || "LinkedIn Post";
+      const isArticle = draftContentType === "article";
+      const title =
+        (isArticle && articleDraftState?.title) ||
+        draftToSave.split("\n")[0].replace(/^#\s*/, "").substring(0, 100) ||
+        (isArticle ? "LinkedIn Article" : "LinkedIn Post");
+      const wordCount = isArticle && articleDraftState
+        ? countArticleWords(articleDraftState)
+        : draftToSave.split(/\s+/).length;
 
       const result = await saveLinkedInToAssetLibrary({
         title,
         content: draftToSave,
         topic,
-        tags: ["linkedin_post", "social_media"],
+        tags: isArticle
+          ? ["linkedin_article", "social_media"]
+          : ["linkedin_post", "social_media"],
         assetMetadata: {
-          word_count: draftToSave.split(/\s+/).length,
+          word_count: wordCount,
           source: locationState?.calendarTopic ? "calendar" : "manual",
         },
       });
@@ -350,6 +350,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
       console.log(
         "[LinkedInWriter] Saved to Asset Library, assetId:",
         result.assetId,
+        "contentType:",
+        draftContentType,
       );
 
       setSaveStatus("saved");
@@ -641,249 +643,26 @@ Always use the most appropriate tool for the user's request.`.trim();
         {(showEditor && draft) || isGenerating ? (
           <>
             {draft && !isGenerating && (
-              <ThemeProvider theme={editorTheme}>
-              <div
-                style={{
-                  padding: "6px 14px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  flexShrink: 0,
-                  borderBottom: "1px solid #e8ecf1",
-                  background: "#fafbfc",
-                  minHeight: 42,
-                }}
-              >
-                <Button
-                  type="button"
-                  variant="contained"
-                  onClick={() => setShowEditor(false)}
-                  startIcon={<ArrowBackIcon fontSize="small" />}
-                  sx={{
-                    fontWeight: 600,
-                    bgcolor: "#0a66c2",
-                    "&:hover": { bgcolor: "#004182" },
-                    textTransform: "none",
-                    fontSize: 12.5,
-                    px: 1.8,
-                    py: 0.4,
-                    boxShadow: "none",
-                    borderRadius: 1.5,
-                    lineHeight: 1.6,
-                    minHeight: 30,
-                  }}
-                >
-                  Dashboard
-                </Button>
-
-                <div style={{ flex: 1 }} />
-
-                <Tooltip title={saveStatus === "saved" ? "Saved to Asset Library" : "Save draft to Asset Library"} arrow>
-                  <span>
-                  <Button
-                    type="button"
-                    variant="text"
-                    size="small"
-                    startIcon={
-                      saveStatus === "saving" ? (
-                        <CircularProgress size={16} />
-                      ) : saveStatus === "saved" ? (
-                        <CheckIcon fontSize="small" />
-                      ) : (
-                        <SaveIcon fontSize="small" />
-                      )
-                    }
-                    onClick={handleSaveToAssetLibrary}
-                    disabled={saveStatus === "saving" || saveStatus === "saved"}
-                    sx={{
-                      textTransform: "none",
-                      fontSize: 12.5,
-                      fontWeight: 500,
-                      color: "text.secondary",
-                      px: 1.2,
-                      py: 0.4,
-                      minWidth: "auto",
-                      minHeight: 30,
-                      borderRadius: 1.5,
-                      "&:hover": { bgcolor: "action.hover", color: "text.primary" },
-                      "&.Mui-disabled": { color: saveStatus === "saved" ? "success.main" : "text.disabled" },
-                    }}
-                  >
-                    {saveStatus === "saving"
-                      ? "Saving..."
-                      : saveStatus === "saved"
-                        ? "Saved"
-                        : "Save"}
-                  </Button>
-                  </span>
-                </Tooltip>
-
-                <Tooltip title="Run pre-publish quality check" arrow>
-                  <Button
-                    type="button"
-                    variant="text"
-                    size="small"
-                    startIcon={<RateReviewIcon fontSize="small" />}
-                    onClick={() => setQualityCheckOpen(true)}
-                    disabled={!draft}
-                    sx={{
-                      textTransform: "none",
-                      fontSize: 12.5,
-                      fontWeight: 500,
-                      color: "text.secondary",
-                      px: 1.2,
-                      py: 0.4,
-                      minWidth: "auto",
-                      minHeight: 30,
-                      borderRadius: 1.5,
-                      "&:hover": { bgcolor: "action.hover", color: "text.primary" },
-                    }}
-                  >
-                    Quality
-                  </Button>
-                </Tooltip>
-
-                {/* Research chip with popover */}
-                {((researchSources && researchSources.length > 0) ||
-                  (citations && citations.length > 0) ||
-                  (searchQueries && searchQueries.length > 0)) && (
-                  <>
-                    <Chip
-                      label="Research"
-                      size="small"
-                      onClick={(e) => setResearchAnchor(e.currentTarget)}
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: 11,
-                        bgcolor: '#e0f2fe',
-                        color: '#0369a1',
-                        border: '1px solid #7dd3fc',
-                        cursor: 'pointer',
-                        '&:hover': { bgcolor: '#bae6fd' },
-                      }}
-                    />
-                    <Popover
-                      open={researchOpen}
-                      anchorEl={researchAnchor}
-                      onClose={() => setResearchAnchor(null)}
-                      anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                      transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                      sx={{ mt: 1 }}
-                      slotProps={{ paper: { sx: { borderRadius: 2, p: 2, minWidth: 220 } } }}
-                    >
-                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#0a66c2', mb: 1.5, fontSize: 13 }}>
-                        Research Data
-                      </Typography>
-                      {researchSources && researchSources.length > 0 && (
-                        <Chip
-                          label={`Sources: ${researchSources.length}`}
-                          size="small"
-                          onClick={() => { setResearchAnchor(null); window.dispatchEvent(new CustomEvent('showResearchSourcesModal', { detail: 'sources' })); }}
-                          sx={{
-                            fontWeight: 600, fontSize: 11, mr: 1, mb: 1,
-                            bgcolor: '#f0f9ff', border: '1px solid #0ea5e9', color: '#0369a1',
-                            '&:hover': { bgcolor: '#e0f2fe' },
-                          }}
-                        />
-                      )}
-                      {citations && citations.length > 0 && (
-                        <Chip
-                          label={`Citations: ${citations.length}`}
-                          size="small"
-                          onClick={() => { setResearchAnchor(null); window.dispatchEvent(new CustomEvent('showCitationsModal', { detail: 'citations' })); }}
-                          sx={{
-                            fontWeight: 600, fontSize: 11, mr: 1, mb: 1,
-                            bgcolor: '#fef3c7', border: '1px solid #f59e0b', color: '#92400e',
-                            '&:hover': { bgcolor: '#fde68a' },
-                          }}
-                        />
-                      )}
-                      {searchQueries && searchQueries.length > 0 && (
-                        <Chip
-                          label={`Queries: ${searchQueries.length}`}
-                          size="small"
-                          onClick={() => { setResearchAnchor(null); window.dispatchEvent(new CustomEvent('showSearchQueriesModal', { detail: 'queries' })); }}
-                          sx={{
-                            fontWeight: 600, fontSize: 11,
-                            bgcolor: '#f3e8ff', border: '1px solid #8b5cf6', color: '#6b21a8',
-                            '&:hover': { bgcolor: '#e9d5ff' },
-                          }}
-                        />
-                      )}
-                    </Popover>
-                  </>
-                )}
-
-                {/* Preview mode toggle */}
-                <ToggleButtonGroup
-                  size="small"
-                  exclusive
-                  value={previewMode}
-                  onChange={(_, next) => { if (next) setPreviewMode(next); }}
-                  aria-label="Preview mode"
-                  sx={{
-                    bgcolor: '#f1f5f9',
-                    borderRadius: 2,
-                    p: 0.3,
-                    gap: 0.3,
-                    '& .MuiToggleButtonGroup-grouped': {
-                      border: 'none',
-                      borderRadius: 1.5,
-                      mx: 0,
-                    },
-                  }}
-                >
-                  <ToggleButton
-                    value="linkedin"
-                    sx={{
-                      textTransform: 'none',
-                      px: 1.8,
-                      py: 0.4,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: previewMode === 'linkedin' ? '#0a66c2' : '#64748b',
-                      bgcolor: previewMode === 'linkedin' ? '#fff' : 'transparent',
-                      boxShadow: previewMode === 'linkedin' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
-                      '&:hover': {
-                        bgcolor: previewMode === 'linkedin' ? '#fff' : '#e2e8f0',
-                      },
-                    }}
-                  >
-                    LinkedIn
-                  </ToggleButton>
-                  <ToggleButton
-                    value="studio"
-                    sx={{
-                      textTransform: 'none',
-                      px: 1.8,
-                      py: 0.4,
-                      fontSize: 12,
-                      fontWeight: 600,
-                      color: previewMode === 'studio' ? '#6366f1' : '#64748b',
-                      bgcolor: previewMode === 'studio' ? '#fff' : 'transparent',
-                      boxShadow: previewMode === 'studio' ? '0 1px 3px rgba(0,0,0,0.12)' : 'none',
-                      '&:hover': {
-                        bgcolor: previewMode === 'studio' ? '#fff' : '#e2e8f0',
-                      },
-                    }}
-                  >
-                    Citations
-                  </ToggleButton>
-                </ToggleButtonGroup>
-
-                <PublishLinkedInPanel
-                  draft={draft}
-                  getDraftForPublish={getDraftForPublish}
-                  onInsertImageIntoDraft={handleInsertImageIntoDraft}
-                  topic={
-                    context
-                      ? context.split("\n")[0].substring(0, 50)
-                      : undefined
-                  }
-                  compact
-                />
-              </div>
-              </ThemeProvider>
+              <LinkedInEditorShell
+                draft={draft}
+                draftContentType={draftContentType}
+                onBackToDashboard={() => setShowEditor(false)}
+                saveStatus={saveStatus}
+                onSave={handleSaveToAssetLibrary}
+                onOpenQualityCheck={() => setQualityCheckOpen(true)}
+                researchSources={researchSources}
+                citations={citations}
+                searchQueries={searchQueries}
+                previewMode={previewMode}
+                onPreviewModeChange={setPreviewMode}
+                getDraftForPublish={getDraftForPublish}
+                onInsertImageIntoDraft={handleInsertImageIntoDraft}
+                topic={
+                  context
+                    ? context.split("\n")[0].substring(0, 50)
+                    : undefined
+                }
+              />
             )}
 
             <ContentEditor
@@ -891,6 +670,7 @@ Always use the most appropriate tool for the user's request.`.trim();
               pendingEdit={pendingEdit}
               livePreviewHtml={livePreviewHtml}
               draft={draft}
+              draftContentType={draftContentType}
               isGenerating={isGenerating}
               loadingMessage={loadingMessage}
               // Grounding data
@@ -908,6 +688,8 @@ Always use the most appropriate tool for the user's request.`.trim();
                 context ? context.split("\n")[0].substring(0, 50) : undefined
               }
               assistiveEditorRef={assistiveEditorRef}
+              articleDraftState={articleDraftState}
+              onArticleDraftChange={updateArticleDraftState}
             />
           </>
         ) : /* Outline Editor - Show when planning sections */
@@ -1199,6 +981,7 @@ Always use the most appropriate tool for the user's request.`.trim();
       <ProgressTracker
         steps={progressSteps as ProgressStep[]}
         active={progressActive}
+        contentType={progressContentType ?? draftContentType}
       />
     </div>
   );

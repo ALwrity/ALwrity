@@ -1,6 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { StudioModalCloseButton } from "./dashboard/StudioModalCloseButton";
+import type { LinkedInDraftContentType } from "../utils/linkedInDraftLibraryUtils";
+import {
+  DEFAULT_PROGRESS_CONTENT_TYPE,
+  getProgressActiveFooterTip,
+  getProgressCompletionFooter,
+  getProgressHeaderSubtitle,
+  getProgressHeaderTitle,
+  getProgressStepEducation,
+  resolveProgressContentType,
+} from "../utils/linkedInProgressCopy";
 
 type ProgressStatus = "pending" | "active" | "completed" | "error";
 
@@ -16,39 +26,14 @@ export interface ProgressStep {
 interface ProgressTrackerProps {
   steps: ProgressStep[];
   active: boolean;
+  /** Effective session content type for progress copy (post vs article). */
+  contentType?: LinkedInDraftContentType;
 }
-
-/* User-friendly descriptions shown beneath each active step */
-const STEP_EDUCATION: Record<string, string> = {
-  personalize:
-    "Analyzing your topic, industry, and audience to craft a personalized content strategy that resonates with your LinkedIn network.",
-  prepare_queries:
-    "Building intelligent research queries to surface the most relevant, authoritative sources for your content.",
-  research:
-    "Searching trusted sources for statistics, trends, case studies, and real-world insights to make your content credible and data-backed.",
-  grounding:
-    "Cross-referencing every claim and data point against original sources — ensuring your post is accurate and authoritative.",
-  content_generation:
-    "Writing your LinkedIn post with a strong hook, scannable formatting, professional tone, and engagement-driving elements tailored to your voice.",
-  citations:
-    "Adding visible source citations to factual claims — building transparency and credibility with your professional audience.",
-  quality_analysis:
-    "Reviewing your content for engagement potential, readability, LinkedIn best practices, and alignment with your chosen tone and persona.",
-  finalize:
-    "Applying final formatting, hashtag suggestions, and platform-specific optimizations — your content is almost ready!",
-};
-
-/* Friendly labels for the overall header subtitle */
-const HEADER_SUBTITLE_ACTIVE =
-  "AI is researching, writing, and optimizing your content with source-backed citations.";
-const HEADER_SUBTITLE_DONE =
-  "Content generation complete — your post is ready below.";
-const HEADER_SUBTITLE_ERROR =
-  "Something went wrong during generation. Please try again.";
 
 export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
   steps,
   active,
+  contentType: contentTypeProp,
 }) => {
   const [mounted, setMounted] = useState(false);
   const [userDismissed, setUserDismissed] = useState(false);
@@ -96,12 +81,22 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
   ).length;
   const progressPercentage = Math.round((completedSteps / steps.length) * 100);
   const hasError = steps.some((step) => step.status === "error");
+  const contentType = resolveProgressContentType(
+    contentTypeProp ?? DEFAULT_PROGRESS_CONTENT_TYPE,
+  );
 
-  const subtitle = hasError
-    ? HEADER_SUBTITLE_ERROR
-    : active
-      ? HEADER_SUBTITLE_ACTIVE
-      : HEADER_SUBTITLE_DONE;
+  const subtitle = getProgressHeaderSubtitle({
+    active,
+    hasError,
+    contentType,
+  });
+  const headerTitle = getProgressHeaderTitle({
+    active,
+    hasError,
+    contentType,
+  });
+  const completionFooter = getProgressCompletionFooter(contentType);
+  const activeFooterTip = getProgressActiveFooterTip(contentType);
 
   const modal = (
     <div
@@ -180,11 +175,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                 </div>
               )}
               <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-                {hasError
-                  ? "Generation Failed"
-                  : active
-                    ? "Generating Your Post"
-                    : "Content Ready"}
+                {headerTitle}
               </div>
             </div>
             <div style={{ fontSize: 12.5, color: "#64748b", lineHeight: 1.5 }}>
@@ -413,7 +404,9 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                         lineHeight: 1.55,
                       }}
                     >
-                      {STEP_EDUCATION[step.id] || step.message || ""}
+                      {getProgressStepEducation(step.id, contentType) ||
+                        step.message ||
+                        ""}
                     </div>
                   )}
 
@@ -489,9 +482,8 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                   flex: 1,
                 }}
               >
-                <strong style={{ color: "#0a66c2" }}>Good to know:</strong> Each
-                step uses AI research with real source citations — your audience
-                gets data-backed, trustworthy content.
+                <strong style={{ color: "#0a66c2" }}>Good to know:</strong>{" "}
+                {activeFooterTip}
               </div>
             </div>
           )}
@@ -534,7 +526,7 @@ export const ProgressTracker: React.FC<ProgressTrackerProps> = ({
                   padding: "4px 0",
                 }}
               >
-                ✓ Your LinkedIn post is ready — check it out below
+                {completionFooter}
               </div>
               <button
                 type="button"

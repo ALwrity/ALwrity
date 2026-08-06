@@ -15,6 +15,9 @@ import {
   VALID_INDUSTRIES,
   VALID_SEARCH_ENGINES,
 } from "../utils/linkedInWriterUtils";
+import { dispatchLinkedInDraftUpdate } from "../utils/linkedInDraftContentTypeStorage";
+import { buildArticleDraftUpdate } from "../utils/linkedInArticleDraftUtils";
+import { saveArticleDraftState } from "../utils/linkedInArticleDraftStorage";
 import { CustomToneSelect } from "./CustomToneSelect";
 import { isCustomToneSelection } from "../utils/storageUtils";
 
@@ -104,18 +107,21 @@ const ArticleHITL: React.FC<ArticleHITLProps> = ({ args, respond }) => {
 
       // Update draft content
       if (res.data) {
-        const content = `# ${res.data.title}\n\n${res.data.content}`;
+        const { state: articleState, markdown: content } =
+          buildArticleDraftUpdate(res.data);
+        saveArticleDraftState(articleState);
+        window.dispatchEvent(
+          new CustomEvent("linkedinwriter:updateArticleDraft", {
+            detail: articleState,
+          }),
+        );
 
         // Emit loading end event
         window.dispatchEvent(
           new CustomEvent("linkedinwriter:loadingEnd", { detail: {} }),
         );
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", {
-            detail: content,
-          }),
-        );
+        dispatchLinkedInDraftUpdate(content, "article");
 
         respond({
           success: true,

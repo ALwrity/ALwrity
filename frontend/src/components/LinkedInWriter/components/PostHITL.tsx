@@ -22,6 +22,7 @@ import {
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   joinHashtagSuggestions,
 } from "../utils/linkedInPostAssembly";
+import { dispatchLinkedInDraftUpdate } from "../utils/linkedInDraftContentTypeStorage";
 import { CustomToneSelect } from "./CustomToneSelect";
 import { isCustomToneSelection } from "../utils/storageUtils";
 
@@ -115,11 +116,7 @@ const PostHITL: React.FC<PostHITLProps> = ({ args, respond }) => {
           new CustomEvent("linkedinwriter:loadingEnd", { detail: {} }),
         );
 
-        window.dispatchEvent(
-          new CustomEvent("linkedinwriter:updateDraft", {
-            detail: fullContent,
-          }),
-        );
+        dispatchLinkedInDraftUpdate(fullContent, "post");
         logAssistant(fullContent);
         respond({ success: true, content: fullContent });
       } else {

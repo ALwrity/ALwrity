@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import { Box } from "@mui/material";
 import {
   CitationHoverHandler,
   DiffPreviewModal,
@@ -20,12 +21,18 @@ import { LinkedInConfirmedEditHighlight } from "./LinkedInConfirmedEditHighlight
 import { LinkedInSelectionImageModal } from "./LinkedInSelectionImageModal";
 import { LinkedInSelectionVideoModal } from "./LinkedInSelectionVideoModal";
 import { type LinkedInPreviewMode } from './LinkedInPreviewModeToggle';
+import type { LinkedInDraftContentType } from '../utils/linkedInDraftLibraryUtils';
+import { resolveEditorShellMode } from '../utils/linkedInEditorShellUtils';
+import { ArticleEditorLayout } from './ArticleEditor';
+import type { LinkedInArticleDraftState } from '../utils/linkedInArticleDraftUtils';
 
 interface ContentEditorProps {
   isPreviewing: boolean;
   pendingEdit: { src: string; target: string } | null;
   livePreviewHtml: string;
   draft: string;
+  /** Session content type — drives editor shell mode (PR3+). */
+  draftContentType?: LinkedInDraftContentType;
   isGenerating: boolean;
   loadingMessage: string;
   researchSources?: any[];
@@ -40,6 +47,8 @@ interface ContentEditorProps {
   assistiveEditorRef?: React.Ref<LinkedInAssistiveEditorHandle>;
   previewMode?: LinkedInPreviewMode;
   onPreviewModeChange?: (mode: LinkedInPreviewMode) => void;
+  articleDraftState?: LinkedInArticleDraftState | null;
+  onArticleDraftChange?: (state: LinkedInArticleDraftState) => void;
 }
 
 const ContentEditor: React.FC<ContentEditorProps> = ({
@@ -47,6 +56,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   pendingEdit,
   livePreviewHtml,
   draft,
+  draftContentType,
   isGenerating,
   loadingMessage,
   researchSources,
@@ -61,8 +71,14 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   assistiveEditorRef,
   previewMode: externalPreviewMode,
   onPreviewModeChange,
+  articleDraftState = null,
+  onArticleDraftChange,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
+  const articleImageTargetRef = useRef<"cover" | "section">("cover");
+  const [activeArticleSectionId, setActiveArticleSectionId] = useState<
+    string | null
+  >(null);
   const [assistantOn, setAssistantOn] = useState(false);
   const [assistiveHighlightRange, setAssistiveHighlightRange] =
     useState<AssistiveTextHighlightRange | null>(null);
@@ -76,8 +92,21 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   );
 
   // Sync external preview mode when controlled
-  const effectivePreviewMode = onPreviewModeChange ? (externalPreviewMode ?? 'linkedin') : previewMode;
+  const shellMode = resolveEditorShellMode(draftContentType);
+  const previewModeFromState = onPreviewModeChange
+    ? (externalPreviewMode ?? "linkedin")
+    : previewMode;
+  const effectivePreviewMode: LinkedInPreviewMode =
+    shellMode === "article" ? "studio" : previewModeFromState;
   const effectiveSetPreviewMode = onPreviewModeChange || setPreviewMode;
+
+  useEffect(() => {
+    console.log("[ContentEditor] editor shell mode", {
+      shellMode,
+      draftContentType,
+      effectivePreviewMode,
+    });
+  }, [shellMode, draftContentType, effectivePreviewMode]);
 
   const getTextarea = useCallback(
     () => contentRef.current?.querySelector("textarea") ?? null,
@@ -195,6 +224,46 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
 
   const insertGeneratedImage = useCallback(
     (imageUrl: string) => {
+      if (shellMode === "article" && articleDraftState && onArticleDraftChange) {
+        try {
+          if (
+            articleImageTargetRef.current === "section" &&
+            activeArticleSectionId
+          ) {
+            const targetSection = articleDraftState.sections.find(
+              (section) => section.id === activeArticleSectionId,
+            );
+            if (targetSection) {
+              const imageMarkdown = `\n\n![Image](${imageUrl})\n`;
+              const nextBody = targetSection.body.trim()
+                ? `${targetSection.body}${imageMarkdown}`
+                : `![Image](${imageUrl})\n`;
+              onArticleDraftChange({
+                ...articleDraftState,
+                sections: articleDraftState.sections.map((section) =>
+                  section.id === activeArticleSectionId
+                    ? { ...section, body: nextBody }
+                    : section,
+                ),
+              });
+              console.log("[ContentEditor] inserted image into article section", {
+                sectionId: activeArticleSectionId,
+                imageUrl: imageUrl.substring(0, 80),
+              });
+            }
+            articleImageTargetRef.current = "cover";
+            return;
+          }
+
+          onArticleDraftChange({ ...articleDraftState, coverImageUrl: imageUrl });
+          console.log("[ContentEditor] set article cover image", {
+            imageUrl: imageUrl.substring(0, 80),
+          });
+        } catch (error) {
+          console.error("[ContentEditor] failed to set article cover", error);
+        }
+        return;
+      }
       try {
         const newDraft = insertImageIntoLinkedInDraft(draft, imageUrl, {
           flushDraft: () => {
@@ -217,7 +286,15 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
         });
       }
     },
-    [draft, onDraftChange, assistiveEditorRef],
+    [
+      draft,
+      onDraftChange,
+      assistiveEditorRef,
+      shellMode,
+      articleDraftState,
+      onArticleDraftChange,
+      activeArticleSectionId,
+    ],
   );
 
   const prefs = readPrefs();
@@ -287,7 +364,11 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
   }, [draft, onDraftChange]);
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+    <div
+      data-testid="linkedin-content-editor"
+      data-editor-mode={shellMode}
+      style={{ flex: 1, display: "flex", flexDirection: "column" }}
+    >
       <DiffPreviewModal
         isPreviewing={isPreviewing}
         pendingEdit={pendingEdit}
@@ -323,6 +404,30 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               onDismiss={clearConfirmedEditHighlight}
             />
 
+            {shellMode === "article" && articleDraftState && onArticleDraftChange ? (
+              <Box sx={{ p: 2 }}>
+                <ArticleEditorLayout
+                  state={articleDraftState}
+                  onChange={onArticleDraftChange}
+                  onActiveSectionChange={setActiveArticleSectionId}
+                  onGenerateCover={() => {
+                    articleImageTargetRef.current = "cover";
+                    selectionImage.openForDraft(
+                      articleDraftState.title || topic || "LinkedIn article",
+                      articleDraftState.imageSuggestions[0]?.description,
+                    );
+                  }}
+                  onUploadSectionImage={() => {
+                    articleImageTargetRef.current = "section";
+                    selectionImage.openForDraft(
+                      articleDraftState.title || topic || "LinkedIn article",
+                      articleDraftState.imageSuggestions[0]?.description,
+                    );
+                  }}
+                  disabled={isGenerating}
+                />
+              </Box>
+            ) : (
             <ContentDisplayArea
               contentRef={contentRef}
               draft={draft}
@@ -354,6 +459,7 @@ const ContentEditor: React.FC<ContentEditorProps> = ({
               assistiveHighlightRange={assistiveHighlightRange}
               onAssistiveHighlightClear={clearAssistiveHighlight}
             />
+            )}
 
             <GroundingDataDisplay
               researchSources={researchSources || []}

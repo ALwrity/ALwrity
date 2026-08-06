@@ -31,15 +31,16 @@ import {
   DEFAULT_LINKEDIN_POST_MAX_LENGTH,
   joinHashtagSuggestions,
 } from "../utils/linkedInPostAssembly";
-
-function normalizeDraftDetail(detail: unknown): string {
-  if (typeof detail === "string") return detail;
-  if (detail && typeof detail === "object" && "content" in detail) {
-    const content = (detail as { content?: unknown }).content;
-    return typeof content === "string" ? content : "";
-  }
-  return "";
-}
+import { useLinkedInDraftContentType } from "./useLinkedInDraftContentType";
+import { useLinkedInArticleDraft } from "./useLinkedInArticleDraft";
+import {
+  contentTypeFromWriterAction,
+  parseUpdateDraftDetail,
+} from "../utils/linkedInDraftContentTypeStorage";
+import {
+  resolveProgressContentType,
+} from "../utils/linkedInProgressCopy";
+import type { LinkedInDraftContentType } from "../utils/linkedInDraftLibraryUtils";
 
 export function useLinkedInWriter() {
   // Core state — restore draft from sessionStorage to survive dev HMR reloads
@@ -82,6 +83,8 @@ export function useLinkedInWriter() {
   };
   const [progressSteps, setProgressSteps] = useState<ProgressStep[]>([]);
   const [progressActive, setProgressActive] = useState<boolean>(false);
+  const [progressContentType, setProgressContentType] =
+    useState<LinkedInDraftContentType | null>(null);
 
   // Outline state (Phase 2)
   const [outlineSections, setOutlineSections] = useState<
@@ -115,6 +118,21 @@ export function useLinkedInWriter() {
   const [showContextModal, setShowContextModal] = useState(false);
   const [justGeneratedContent, setJustGeneratedContent] = useState(false);
 
+  const { draftContentType, setDraftContentType, clearDraftContentType } =
+    useLinkedInDraftContentType();
+
+  const {
+    articleDraftState,
+    applyGenerationResult,
+    updateArticleDraftState,
+    getArticleMarkdown,
+    clearArticleDraft,
+  } = useLinkedInArticleDraft({
+    draft,
+    draftContentType,
+    setDraft,
+  });
+
   // Track action usage and update preferences
   const trackActionUsage = useCallback((actionName: string) => {
     const currentPrefs = getPreferences();
@@ -145,6 +163,7 @@ export function useLinkedInWriter() {
 
   // ── Direct generation methods (UI-driven, no CopilotKit dependency) ──────────
   const generatePost = useCallback(async (params?: any) => {
+    setDraftContentType("post", "generatePost");
     const prefs = readPrefs();
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:loadingStart", {
@@ -157,6 +176,7 @@ export function useLinkedInWriter() {
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:progressInit", {
         detail: {
+          contentType: "post",
           steps: [
             { id: "personalize", label: "Analyzing topic & audience" },
             { id: "prepare_queries", label: "Preparing research strategy" },
@@ -303,10 +323,11 @@ export function useLinkedInWriter() {
       );
       return { success: false, error: error.message || "Generation failed" };
     }
-  }, []);
+  }, [setDraftContentType]);
 
   const generateArticle = useCallback(
     async (params?: any) => {
+      setDraftContentType("article", "generateArticle");
       const prefs = readPrefs();
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:loadingStart", {
@@ -319,6 +340,7 @@ export function useLinkedInWriter() {
       window.dispatchEvent(
         new CustomEvent("linkedinwriter:progressInit", {
           detail: {
+            contentType: "article",
             steps: [
               { id: "personalize", label: "Analyzing topic & audience" },
               { id: "prepare_queries", label: "Preparing research strategy" },
@@ -338,7 +360,7 @@ export function useLinkedInWriter() {
             id: "personalize",
             status: "active",
             message:
-              "Analyzing topic, industry, and target audience — tailoring the content for LinkedIn engagement...",
+              "Analyzing topic, industry, and target audience — shaping your article structure and thought-leadership angle...",
           },
         }),
       );
@@ -401,7 +423,7 @@ export function useLinkedInWriter() {
             );
             stepIndex++;
           }
-          const content = `# ${res.data.title}\n\n${res.data.content}`;
+          const content = applyGenerationResult(res.data);
           window.dispatchEvent(
             new CustomEvent("linkedinwriter:updateGroundingData", {
               detail: {
@@ -414,7 +436,9 @@ export function useLinkedInWriter() {
             }),
           );
           window.dispatchEvent(
-            new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
+            new CustomEvent("linkedinwriter:updateDraft", {
+              detail: { content, contentType: "article" as const },
+            }),
           );
           window.dispatchEvent(
             new CustomEvent("linkedinwriter:progressStep", {
@@ -451,10 +475,11 @@ export function useLinkedInWriter() {
         return { success: false, error: error.message || "Generation failed" };
       }
     },
-    [outlineSections],
+    [outlineSections, setDraftContentType, applyGenerationResult],
   );
 
   const generateCarousel = useCallback(async (params?: any) => {
+    setDraftContentType("carousel", "generateCarousel");
     const prefs = readPrefs();
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:loadingStart", {
@@ -581,9 +606,10 @@ export function useLinkedInWriter() {
       );
       return { success: false, error: error.message || "Generation failed" };
     }
-  }, []);
+  }, [setDraftContentType]);
 
   const generateVideoScript = useCallback(async (params?: any) => {
+    setDraftContentType("video_script", "generateVideoScript");
     const prefs = readPrefs();
     window.dispatchEvent(
       new CustomEvent("linkedinwriter:loadingStart", {
@@ -714,7 +740,7 @@ export function useLinkedInWriter() {
       );
       return { success: false, error: error.message || "Generation failed" };
     }
-  }, []);
+  }, [setDraftContentType]);
 
   // Initialize chat history, preferences, and grounding data from localStorage
   useEffect(() => {
@@ -764,6 +790,21 @@ export function useLinkedInWriter() {
     const handleProgressInit = (event: CustomEvent) => {
       const steps: Array<{ id: string; label: string; message?: string }> =
         event.detail?.steps || [];
+      const resolvedType = resolveProgressContentType(
+        event.detail?.contentType,
+      );
+      if (!event.detail?.contentType) {
+        console.debug(
+          "[LinkedInProgress] progressInit missing contentType, defaulting to post",
+          { stepCount: steps.length },
+        );
+      } else {
+        console.debug("[LinkedInProgress] progressInit", {
+          contentType: resolvedType,
+          stepCount: steps.length,
+        });
+      }
+      setProgressContentType(resolvedType);
       const initialized: ProgressStep[] = steps.map((s, index) => ({
         id: s.id,
         label: s.label,
@@ -825,6 +866,7 @@ export function useLinkedInWriter() {
       setTimeout(() => {
         console.log("[LinkedIn Writer] Hiding progress steps after delay");
         setProgressSteps([]);
+        setProgressContentType(null);
       }, 1500);
     };
 
@@ -843,6 +885,7 @@ export function useLinkedInWriter() {
         ),
       );
       setProgressActive(false);
+      setProgressContentType(null);
     };
 
     window.addEventListener(
@@ -946,8 +989,15 @@ export function useLinkedInWriter() {
   // Handle draft updates from CopilotKit actions
   useEffect(() => {
     const handleUpdateDraft = (event: CustomEvent) => {
-      const rawContent = normalizeDraftDetail(event.detail);
-      const cleanedContent = stripSourceCitations(rawContent);
+      const parsed = parseUpdateDraftDetail(event.detail);
+      const cleanedContent = stripSourceCitations(parsed.content);
+      const resolvedContentType =
+        parsed.contentType ??
+        contentTypeFromWriterAction(currentAction) ??
+        undefined;
+      if (resolvedContentType) {
+        setDraftContentType(resolvedContentType, "updateDraftEvent");
+      }
       console.log(
         "[LinkedIn Writer] Draft updated:",
         cleanedContent?.substring(0, 100) + "...",
@@ -1066,7 +1116,7 @@ export function useLinkedInWriter() {
         handleLoadingEnd as EventListener,
       );
     };
-  }, [draft]);
+  }, [draft, currentAction, setDraftContentType]);
 
   // Event handlers
   const handleDraftChange = useCallback((value: string) => {
@@ -1083,12 +1133,14 @@ export function useLinkedInWriter() {
     setOutlineSections([]);
     setOutlineTitleSuggestions([]);
     setOutlineMode(false);
+    clearDraftContentType();
+    clearArticleDraft();
     try {
       sessionStorage.removeItem("li_draft");
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [clearDraftContentType, clearArticleDraft]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -1142,6 +1194,7 @@ export function useLinkedInWriter() {
         setOutlineSections(res.outline);
         setOutlineTitleSuggestions(res.title_suggestions || []);
         setOutlineMode(true);
+        setDraftContentType("article", "generateOutline");
         window.dispatchEvent(new CustomEvent("linkedinwriter:loadingEnd"));
         return { success: true, outline: res.outline };
       }
@@ -1159,7 +1212,7 @@ export function useLinkedInWriter() {
     } finally {
       setIsGeneratingOutline(false);
     }
-  }, []);
+  }, [setDraftContentType]);
 
   const refineOutline = useCallback(
     async (operation: string, sectionId?: string, payload?: any) => {
@@ -1205,6 +1258,8 @@ export function useLinkedInWriter() {
     showPreferencesModal,
     showContextModal,
     justGeneratedContent,
+    draftContentType,
+    progressContentType,
 
     // Setters
     setDraft,
@@ -1223,6 +1278,7 @@ export function useLinkedInWriter() {
     setShowPreferencesModal,
     setShowContextModal,
     setJustGeneratedContent: setJustGeneratedContent,
+    setDraftContentType,
 
     // Handlers
     handleDraftChange,
@@ -1264,6 +1320,11 @@ export function useLinkedInWriter() {
     isGeneratingOutline,
     generateOutline,
     refineOutline,
+
+    // Structured article draft (PR6)
+    articleDraftState,
+    updateArticleDraftState,
+    getArticleMarkdown,
 
     // Progress (exposed to UI)
     progressSteps,
