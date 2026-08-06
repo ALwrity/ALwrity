@@ -82,4 +82,4 @@ const CtrPositionChart: React.FC<CtrPositionChartProps> = ({ data }) => {
   );
 };
 
-export default CtrPositionChart;
+export default React.memo(CtrPositionChart);
