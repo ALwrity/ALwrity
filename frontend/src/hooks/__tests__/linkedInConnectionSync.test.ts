@@ -9,30 +9,23 @@ import {
   subscribeLinkedInStatusSync,
 } from '../linkedInConnectionEvents';
 
+const TAB_ID_SESSION_KEY = 'alwrity_linkedin_tab_id';
+
 describe('linkedInConnectionEvents sync', () => {
-  const storage: Record<string, string> = {};
-
   beforeEach(() => {
-    jest.clearAllMocks();
-    Object.keys(storage).forEach((k) => delete storage[k]);
-
-    jest.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => {
-      storage[key] = value;
-    });
-    jest.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => storage[key] ?? null);
-
-    jest.spyOn(sessionStorage, 'getItem').mockReturnValue('tab-test-1');
-    jest.spyOn(sessionStorage, 'setItem').mockImplementation(() => undefined);
+    localStorage.clear();
+    sessionStorage.setItem(TAB_ID_SESSION_KEY, 'tab-test-1');
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    localStorage.clear();
+    sessionStorage.removeItem(TAB_ID_SESSION_KEY);
   });
 
   it('broadcastLinkedInStatusChanged writes localStorage payload', () => {
     broadcastLinkedInStatusChanged('disconnected');
 
-    const raw = storage[LINKEDIN_STATUS_CHANGED_STORAGE_KEY];
+    const raw = localStorage.getItem(LINKEDIN_STATUS_CHANGED_STORAGE_KEY);
     expect(raw).toBeTruthy();
     const payload = JSON.parse(raw!);
     expect(payload.reason).toBe('disconnected');

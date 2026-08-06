@@ -23,6 +23,8 @@ import { invalidateSharedConnectionStatus } from '../../../hooks/linkedInConnect
 describe('Connection Status Caching — regression', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    invalidateLinkedInConnectionStatusCache();
+    invalidateSharedConnectionStatus();
   });
 
   it('getLinkedInConnectionStatus is a function', () => {
