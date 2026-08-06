@@ -700,7 +700,7 @@ class GSCService:
     def revoke_user_access(self, user_id: str) -> bool:
         """Revoke user's GSC access."""
         try:
-            self._init_db(user_id)
+            self._init_gsc_tables(user_id)
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return True
@@ -729,7 +729,7 @@ class GSCService:
     def clear_incomplete_credentials(self, user_id: str) -> bool:
         """Clear incomplete GSC credentials that are missing required fields."""
         try:
-            self._init_db(user_id)
+            self._init_gsc_tables(user_id)
             db_path = self._get_db_path(user_id)
             if not os.path.exists(db_path):
                 return True
