@@ -1,3 +1,7 @@
+# Copy this file to .env before running the frontend.
+# Replace REACT_APP_CLERK_PUBLISHABLE_KEY with your Clerk publishable key.
+# See https://clerk.com/docs for creating a development application.
+
 # Clerk Authentication
 REACT_APP_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key_here
 REACT_APP_CLERK_JWT_TEMPLATE=
