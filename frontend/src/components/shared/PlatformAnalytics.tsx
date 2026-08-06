@@ -35,6 +35,7 @@ import CtrPositionChart from './CtrPositionChart';
 import CannibalizationAlertsPanel from './CannibalizationAlertsPanel';
 import PlatformMetricCard from './PlatformMetricCard';
 import AiInsightsPanel from './AiInsightsPanel';
+import { useRefreshQueue } from './useRefreshQueue';
 
 interface PlatformAnalyticsComponentProps {
   platforms?: string[];
@@ -66,16 +67,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   const [priorityPlatform, setPriorityPlatform] = useState<'auto' | 'gsc' | 'bing'>('auto');
   const [rangeDays, setRangeDays] = useState<number>(30);
   const [suggestions, setSuggestions] = useState<Array<{ query: string; impressions: number; ctr: number; position: number }>>([]);
-  const [refreshQueue, setRefreshQueue] = useState<{
-    risingQueries: Array<{ query: string; deltaClicks: number; deltaImpressions: number }>;
-    decliningQueries: Array<{ query: string; deltaClicks: number; deltaImpressions: number }>;
-  }>({ risingQueries: [], decliningQueries: [] });
-  const [loadingQueue, setLoadingQueue] = useState<boolean>(false);
+  const [aiInsights, setAiInsights] = useState<any | null>(null);
   const [briefOpen, setBriefOpen] = useState<boolean>(false);
   const [briefData, setBriefData] = useState<{ page: string; queries: Array<{ query: string; clicks: number; impressions: number; ctr: number }> } | null>(null);
   const [aiLoading, setAiLoading] = useState<boolean>(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [aiInsights, setAiInsights] = useState<any | null>(null);
   const [resyncAttempted, setResyncAttempted] = useState<boolean>(false);
   const [bingCollecting, setBingCollecting] = useState<boolean>(false);
   const [bingCollectMsg, setBingCollectMsg] = useState<string | null>(null);
@@ -271,101 +267,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     }
   }, [platformStatus, analyticsData, resyncAttempted, loadData]);
 
-  const computeRefreshQueue = useCallback(async () => {
-    try {
-      setLoadingQueue(true);
-      const end = new Date();
-      const start = new Date(end);
-      start.setDate(end.getDate() - (rangeDays - 1));
-      const prevEnd = new Date(start);
-      prevEnd.setDate(start.getDate() - 1);
-      const prevStart = new Date(prevEnd);
-      prevStart.setDate(prevEnd.getDate() - (rangeDays - 1));
-      const fmt = (d: Date) => d.toISOString().slice(0, 10);
-      let currentGSC = (analyticsData['gsc'] as PlatformAnalyticsType | undefined);
-      if (!currentGSC) {
-        const currentResp = await cachedAnalyticsAPI.getAnalyticsData(['gsc'], false, {
-          start_date: fmt(start),
-          end_date: fmt(end),
-        });
-        currentGSC = (currentResp.data as any)['gsc'] as PlatformAnalyticsType | undefined;
-      }
-      const prevResp = await cachedAnalyticsAPI.getAnalyticsData(['gsc'], false, {
-        start_date: fmt(prevStart),
-        end_date: fmt(prevEnd),
-      });
-      const prevGSC = (prevResp.data as any)['gsc'] as PlatformAnalyticsType | undefined;
-      const currQueries = (currentGSC?.metrics as any)?.top_queries || [];
-      const prevQueries = (prevGSC?.metrics as any)?.top_queries || [];
-      const prevMap: Record<string, { clicks: number; impressions: number }> = {};
-      prevQueries.forEach((q: any) => {
-        const key = String(q.query || '').toLowerCase();
-        prevMap[key] = { clicks: Number(q.clicks || 0), impressions: Number(q.impressions || 0) };
-      });
-      const rising: Array<{ query: string; deltaClicks: number; deltaImpressions: number }> = [];
-      const declining: Array<{ query: string; deltaClicks: number; deltaImpressions: number }> = [];
-      const riseClicksThresh = rangeDays <= 7 ? 5 : rangeDays <= 30 ? 20 : 40;
-      const riseImprThresh = rangeDays <= 7 ? 50 : rangeDays <= 30 ? 200 : 500;
-      const dropClicksThresh = -riseClicksThresh;
-      const dropImprThresh = -riseImprThresh;
-      currQueries.forEach((q: any) => {
-        const key = String(q.query || '').toLowerCase();
-        const prev = prevMap[key] || { clicks: 0, impressions: 0 };
-        const deltaClicks = Number(q.clicks || 0) - prev.clicks;
-        const deltaImpressions = Number(q.impressions || 0) - prev.impressions;
-        if (deltaClicks > 0 && deltaImpressions > 0 && (deltaClicks >= riseClicksThresh || deltaImpressions >= riseImprThresh)) {
-          rising.push({ query: String(q.query || ''), deltaClicks, deltaImpressions });
-        }
-        if (deltaClicks < 0 && deltaImpressions <= 0 && (deltaClicks <= dropClicksThresh || deltaImpressions <= dropImprThresh)) {
-          declining.push({ query: String(q.query || ''), deltaClicks, deltaImpressions });
-        }
-      });
-      rising.sort((a, b) => (b.deltaClicks + b.deltaImpressions) - (a.deltaClicks + a.deltaImpressions));
-      declining.sort((a, b) => (a.deltaClicks + a.deltaImpressions) - (b.deltaClicks + b.deltaImpressions));
-      // Fallback: if none meet thresholds, show the most changed queries by absolute delta
-      if (rising.length === 0 && declining.length === 0) {
-        const deltas: Array<{ query: string; deltaClicks: number; deltaImpressions: number; score: number }> = [];
-        currQueries.forEach((q: any) => {
-          const key = String(q.query || '').toLowerCase();
-          const prev = prevMap[key] || { clicks: 0, impressions: 0 };
-          const dC = Number(q.clicks || 0) - prev.clicks;
-          const dI = Number(q.impressions || 0) - prev.impressions;
-          const score = Math.abs(dC) + Math.abs(dI);
-          if (score > 0) {
-            deltas.push({ query: String(q.query || ''), deltaClicks: dC, deltaImpressions: dI, score });
-          }
-        });
-        deltas.sort((a, b) => b.score - a.score);
-        const top = deltas.slice(0, 10);
-        if (top.length === 0 && Array.isArray(currQueries) && currQueries.length > 0) {
-          const topByClicks = [...currQueries]
-            .sort((a: any, b: any) => Number(b.clicks || 0) - Number(a.clicks || 0))
-            .slice(0, 10);
-          setRefreshQueue({
-            risingQueries: topByClicks.map((q: any) => ({
-              query: String(q.query || ''),
-              deltaClicks: Number(q.clicks || 0),
-              deltaImpressions: Number(q.impressions || 0),
-            })),
-            decliningQueries: [],
-          });
-        } else {
-          setRefreshQueue({
-            risingQueries: top.filter(d => d.deltaClicks > 0 || d.deltaImpressions > 0).map(({ score, ...rest }) => rest),
-            decliningQueries: top.filter(d => d.deltaClicks < 0 || d.deltaImpressions < 0).map(({ score, ...rest }) => rest),
-          });
-        }
-      } else {
-        setRefreshQueue({ risingQueries: rising.slice(0, 10), decliningQueries: declining.slice(0, 10) });
-      }
-    } catch (e) {
-      console.error('Error computing refresh queue:', e);
-      setError('Failed to compute query refresh trends');
-      setRefreshQueue({ risingQueries: [], decliningQueries: [] });
-    } finally {
-      setLoadingQueue(false);
-    }
-  }, [rangeDays, analyticsData]);
+  const { refreshQueue, loadingQueue, computeRefreshQueue } = useRefreshQueue({ analyticsData, rangeDays });
 
   // One-run guard to prevent duplicate calls in StrictMode
   const dataLoadedRef = useRef(false);
