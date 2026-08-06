@@ -26,6 +26,8 @@ interface ApiKeyStepProps {
 
 const ApiKeyStep: React.FC<ApiKeyStepProps> = ({ onContinue, updateHeaderContent, onValidationChange }) => {
   const [focusedProvider, setFocusedProvider] = useState<any>(null);
+  const [errorDismissed, setErrorDismissed] = useState(false);
+  const [successDismissed, setSuccessDismissed] = useState(false);
   
   const {
     loading,
@@ -66,13 +68,20 @@ const ApiKeyStep: React.FC<ApiKeyStepProps> = ({ onContinue, updateHeaderContent
 
   // Notify parent of validation changes
   useEffect(() => {
-    console.log('ApiKeyStep: isValid changed to:', isValid);
-    console.log('ApiKeyStep: onValidationChange exists:', !!onValidationChange);
     if (onValidationChange) {
-      console.log('ApiKeyStep: Calling onValidationChange with:', isValid);
       onValidationChange(isValid);
     }
   }, [isValid, onValidationChange]);
+
+  // Reset dismissed state whenever a new error/success message comes in,
+  // so a fresh message is always shown even if the previous one was dismissed.
+  useEffect(() => {
+    if (error) setErrorDismissed(false);
+  }, [error]);
+
+  useEffect(() => {
+    if (success) setSuccessDismissed(false);
+  }, [success]);
 
   return (
     <>
@@ -125,9 +134,14 @@ const ApiKeyStep: React.FC<ApiKeyStepProps> = ({ onContinue, updateHeaderContent
 
         {/* Alerts */}
         <Box sx={{ mt: 3 }}>
-          {error && (
+          {error && !errorDismissed && (
             <Fade in={true}>
-              <Alert severity="error" sx={{ 
+              <Alert
+                severity="error"
+                role="alert"
+                aria-live="assertive"
+                onClose={() => setErrorDismissed(true)}
+                sx={{ 
                 mb: 2, 
                 borderRadius: 2,
                 fontFamily: 'Inter, system-ui, sans-serif'
@@ -137,9 +151,14 @@ const ApiKeyStep: React.FC<ApiKeyStepProps> = ({ onContinue, updateHeaderContent
             </Fade>
           )}
           
-          {success && (
+          {success && !successDismissed && (
             <Fade in={true}>
-              <Alert severity="success" sx={{ 
+              <Alert
+                severity="success"
+                role="status"
+                aria-live="polite"
+                onClose={() => setSuccessDismissed(true)}
+                sx={{ 
                 mb: 2, 
                 borderRadius: 2,
                 fontFamily: 'Inter, system-ui, sans-serif'
@@ -213,4 +232,4 @@ const ApiKeyStep: React.FC<ApiKeyStepProps> = ({ onContinue, updateHeaderContent
   );
 };
 
-export default ApiKeyStep; 
+export default ApiKeyStep;  
