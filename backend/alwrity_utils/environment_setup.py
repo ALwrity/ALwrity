@@ -126,6 +126,22 @@ DEBUG=true
 
 # Logging
 LOG_LEVEL=INFO
+# Stripe Subscription Configuration
+
+# Stripe mode selector (test or live).
+# STRIPE_MODE=test
+
+# JSON mapping for test mode price IDs.
+# Example:
+# STRIPE_PLAN_PRICE_MAPPING_TEST={"basic":{"monthly":"price_basic_monthly"},"pro":{"monthly":"price_pro_monthly"}}
+
+# JSON mapping for live mode price IDs.
+# Example:
+# STRIPE_PLAN_PRICE_MAPPING_LIVE={"basic":{"monthly":"price_live_basic_monthly"},"pro":{"monthly":"price_live_pro_monthly"}}
+
+# Optional fallback JSON mapping used when mode-specific variable is not provided.
+# Example:
+# STRIPE_PLAN_PRICE_MAPPING={"basic":{"monthly":"price_basic_monthly"},"pro":{"monthly":"price_pro_monthly"}}
 """
         
         try:
