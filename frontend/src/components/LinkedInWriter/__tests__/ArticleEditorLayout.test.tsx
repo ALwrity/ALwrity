@@ -28,7 +28,7 @@ const sampleState: LinkedInArticleDraftState = {
 };
 
 describe("ArticleEditorLayout", () => {
-  test("renders title field, cover block, and section panel", () => {
+  test("renders title field and section panel without cover block", () => {
     render(
       <ArticleEditorLayout
         state={sampleState}
@@ -38,7 +38,7 @@ describe("ArticleEditorLayout", () => {
 
     expect(screen.getByTestId("article-editor-layout")).toBeTruthy();
     expect(screen.getByTestId("article-title-field")).toBeTruthy();
-    expect(screen.getByTestId("article-cover-block")).toBeTruthy();
+    expect(screen.queryByTestId("article-cover-block")).toBeNull();
     expect(screen.getByTestId("article-section-panel")).toBeTruthy();
     expect(screen.getByTestId("article-section-body-editor")).toBeTruthy();
     expect(screen.getByTestId("article-editor-toolbar")).toBeTruthy();
@@ -63,7 +63,14 @@ describe("ArticleEditorLayout", () => {
       screen.queryByPlaceholderText(/Optional opening paragraph/i),
     ).toBeNull();
     expect(onChange).toHaveBeenCalled();
-    const normalized = onChange.mock.calls[0][0];
+    const updater = onChange.mock.calls[0][0];
+    const normalized =
+      typeof updater === "function"
+        ? updater({
+            ...sampleState,
+            intro: "Legacy intro paragraph that should merge into sections.",
+          })
+        : updater;
     expect(normalized.intro).toBeUndefined();
     expect(normalized.sections[0].body).toContain(
       "Legacy intro paragraph that should merge into sections.",
@@ -82,5 +89,18 @@ describe("ArticleEditorLayout", () => {
       "data-section-kind",
     )).toBe("introduction");
     expect(screen.getByText(/Hook your readers/i)).toBeTruthy();
+  });
+
+  test("shows image menu trigger when onGenerateImage is provided", () => {
+    render(
+      <ArticleEditorLayout
+        state={sampleState}
+        onChange={jest.fn()}
+        onGenerateImage={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("article-editor-image-menu-trigger")).toBeTruthy();
+    expect(screen.queryByTestId("article-editor-image-actions")).toBeNull();
   });
 });

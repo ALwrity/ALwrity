@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Box,
   Card,
@@ -6,7 +6,6 @@ import {
   Typography,
   Grid,
   Chip,
-  LinearProgress,
   Alert,
   CircularProgress,
   IconButton,
@@ -14,28 +13,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  Tooltip,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  Stack,
 } from '@mui/material';
 import Visibility from '@mui/icons-material/Visibility';
 import MouseOutlined from '@mui/icons-material/MouseOutlined';
-import Search from '@mui/icons-material/Search';
-import Web from '@mui/icons-material/Web';
 import Refresh from '@mui/icons-material/Refresh';
-import Info from '@mui/icons-material/Info';
-import CheckCircle from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
-import Warning from '@mui/icons-material/Warning';
 import TrendingUp from '@mui/icons-material/TrendingUp';
 import { Button } from '@mui/material';
 import { PlatformAnalytics as PlatformAnalyticsType, AnalyticsSummary, PlatformConnectionStatus } from '../../api/analytics';
@@ -46,182 +27,15 @@ import TopPagesInsightsPanel from './TopPagesInsightsPanel';
 import GscSuggestionsPanel from './GscSuggestionsPanel';
 import RefreshQueuePanel from './RefreshQueuePanel';
 import ChipLegend from './ChipLegend';
-import { apiClient } from '../../api/client';
-import {
-  LazyBarChart,
-  LazyLineChart,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Bar,
-  Line,
-  ChartLoadingFallback,
-} from '../../utils/lazyRecharts';
-
-interface CannibalizationPage {
-  page: string;
-  clicks: number;
-  impressions: number;
-  ctr: number;
-}
-
-interface CannibalizationAlert {
-  query: string;
-  total_clicks: number;
-  recommended_target_page?: string;
-  pages?: CannibalizationPage[];
-}
-
-interface CannibalizationAlertsPanelProps {
-  alerts: CannibalizationAlert[];
-  formatNumber: (n: number) => string;
-  isValidHttpUrl: (url: string) => boolean;
-  onOpenBrief: (page: string, query: string, totalClicks: number) => void;
-}
-
-const CannibalizationAlertsPanel: React.FC<CannibalizationAlertsPanelProps> = ({
-  alerts,
-  formatNumber,
-  isValidHttpUrl,
-  onOpenBrief,
-}) => {
-  return (
-    <Card sx={{ mt: 2, bgcolor: '#ffffff !important', color: '#1f2937 !important', border: '1px solid #e5e7eb !important', boxShadow: '0 1px 3px 0 rgba(0,0,0,0.1) !important' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="subtitle1">Cannibalization Alerts</Typography>
-            <Tooltip title="The same search query points to multiple pages on your site, splitting clicks. Choose one target page and consolidate overlapping pages or add internal links.">
-              <Info fontSize="small" color="action" />
-            </Tooltip>
-          </Box>
-          <Typography variant="caption" color="text.secondary">Queries competing across pages</Typography>
-        </Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          “No cannibalization” is normal for tightly targeted sites or low‑traffic windows. For demos we can relax sensitivity.
-        </Typography>
-        <ChipLegend
-          items={[
-            {
-              label: 'Competing page',
-              icon: <MouseOutlined fontSize="small" />,
-              tooltip: 'Each chip is a page that shares the same query. Text shows URL • clicks • impressions • CTR.',
-              sx: {
-                backgroundImage: 'linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%)',
-                color: '#0f172a',
-                border: '1px solid #cbd5e1',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                fontWeight: 700,
-              },
-            },
-            {
-              label: 'Higher CTR',
-              tooltip: 'Greener backgrounds mean this page converts searchers relatively well.',
-              sx: {
-                backgroundImage: 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)',
-                color: '#065f46',
-                border: '1px solid #86efac',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                fontWeight: 700,
-              },
-            },
-            {
-              label: 'Weaker CTR',
-              tooltip: 'Redder backgrounds flag pages that may need consolidation or updates.',
-              sx: {
-                backgroundImage: 'linear-gradient(135deg, #fee2e2 0%, #fff1f2 100%)',
-                color: '#7f1d1d',
-                border: '1px solid #fecdd3',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-                fontWeight: 700,
-              },
-            },
-          ]}
-        />
-        {(!alerts || alerts.length === 0) ? (
-          <Alert severity="info">No cannibalization detected for this window.</Alert>
-        ) : (
-          <List dense>
-            {alerts.slice(0, 10).map((a, idx) => (
-              <ListItem key={`${a.query}-${idx}`} sx={{ px: 0, alignItems: 'flex-start' }}>
-                <ListItemText
-                  primary={a.query}
-                  secondary={
-                    <Box sx={{ mt: 0.5 }}>
-                      <Typography variant="caption" sx={{ color: '#6b7280', display: 'block', mb: 0.5 }}>
-                        Total clicks: {formatNumber(a.total_clicks || 0)} • Target: {a.recommended_target_page || 'N/A'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {(a.pages || []).map((p, i) => {
-                          const clicks = Number(p.clicks || 0);
-                          const impressions = Number(p.impressions || 0);
-                          const ctr = Number(p.ctr || 0);
-                          const ctrColor = ctr >= 3 ? '#065f46' : ctr >= 1 ? '#92400e' : '#7f1d1d';
-                          const ctrBg = ctr >= 3
-                            ? 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)'
-                            : ctr >= 1
-                            ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)'
-                            : 'linear-gradient(135deg, #fee2e2 0%, #fff1f2 100%)';
-                          const label = `${String(p.page || '').replace(/^https?:\/\//, '').slice(0, 40)} • ${formatNumber(clicks)}c/${formatNumber(impressions)}i • ${ctr.toFixed(1)}%`;
-                          return (
-                            <Tooltip
-                              key={`${p.page}-${i}`}
-                              title={`Clicks ${clicks}, impressions ${impressions}, CTR ${ctr.toFixed(1)}% for this page`}
-                            >
-                              <Chip
-                                label={label}
-                                size="small"
-                                sx={{
-                                  backgroundImage: ctrBg,
-                                  color: ctrColor,
-                                  border: '1px solid rgba(0,0,0,0.06)',
-                                  boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-                                  fontWeight: 700,
-                                  maxWidth: 260,
-                                }}
-                              />
-                            </Tooltip>
-                          );
-                        })}
-                      </Box>
-                    </Box>
-                  }
-                  primaryTypographyProps={{ variant: 'body2' }}
-                />
-                <Button
-                  size="small"
-                  variant="outlined"
-                  sx={{ mr: 1, textTransform: 'none' }}
-                  disabled={!a.recommended_target_page || !isValidHttpUrl(String(a.recommended_target_page))}
-                  onClick={() => {
-                    if (a.recommended_target_page && isValidHttpUrl(String(a.recommended_target_page))) {
-                      window.open(String(a.recommended_target_page), '_blank');
-                    }
-                  }}
-                >
-                  Open Target Page
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  sx={{ textTransform: 'none' }}
-                  onClick={() => {
-                    const page = String(a.recommended_target_page || '');
-                    onOpenBrief(page, a.query, a.total_clicks || 0);
-                  }}
-                >
-                  Create Brief
-                </Button>
-              </ListItem>
-            ))}
-          </List>
-        )}
-      </CardContent>
-    </Card>
-  );
-};
+import { isValidHttpUrl, formatNumber } from './PlatformAnalytics.utils';
+import { deriveSummaryDisplay } from './deriveSummaryDisplay';
+import BriefDialog from './BriefDialog';
+import TopPagesBarChart from './TopPagesBarChart';
+import CtrPositionChart from './CtrPositionChart';
+import CannibalizationAlertsPanel from './CannibalizationAlertsPanel';
+import PlatformMetricCard from './PlatformMetricCard';
+import AiInsightsPanel from './AiInsightsPanel';
+import { useRefreshQueue } from './useRefreshQueue';
 
 interface PlatformAnalyticsComponentProps {
   platforms?: string[];
@@ -253,16 +67,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   const [priorityPlatform, setPriorityPlatform] = useState<'auto' | 'gsc' | 'bing'>('auto');
   const [rangeDays, setRangeDays] = useState<number>(30);
   const [suggestions, setSuggestions] = useState<Array<{ query: string; impressions: number; ctr: number; position: number }>>([]);
-  const [refreshQueue, setRefreshQueue] = useState<{
-    risingQueries: Array<{ query: string; deltaClicks: number; deltaImpressions: number }>;
-    decliningQueries: Array<{ query: string; deltaClicks: number; deltaImpressions: number }>;
-  }>({ risingQueries: [], decliningQueries: [] });
-  const [loadingQueue, setLoadingQueue] = useState<boolean>(false);
+  const [aiInsights, setAiInsights] = useState<any | null>(null);
   const [briefOpen, setBriefOpen] = useState<boolean>(false);
   const [briefData, setBriefData] = useState<{ page: string; queries: Array<{ query: string; clicks: number; impressions: number; ctr: number }> } | null>(null);
   const [aiLoading, setAiLoading] = useState<boolean>(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  const [aiInsights, setAiInsights] = useState<any | null>(null);
   const [resyncAttempted, setResyncAttempted] = useState<boolean>(false);
   const [bingCollecting, setBingCollecting] = useState<boolean>(false);
   const [bingCollectMsg, setBingCollectMsg] = useState<string | null>(null);
@@ -276,6 +85,10 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   const siteUrlRef = useRef(siteUrl);
   siteUrlRef.current = siteUrl;
 
+  const loadingRef = useRef(false);
+  const analyticsDataRef = useRef<Record<string, PlatformAnalyticsType>>({});
+  const platformStatusRef = useRef<Record<string, PlatformConnectionStatus>>({});
+
   const onDataLoadedRef = useRef<typeof onDataLoaded>();
   const onRefreshReadyRef = useRef<typeof onRefreshReady>();
 
@@ -287,7 +100,16 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     onRefreshReadyRef.current = onRefreshReady;
   }, [onRefreshReady]);
 
+  const shallowEqual = (a: Record<string, any>, b: Record<string, any>) => {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every(k => b.hasOwnProperty(k) && a[k]?.status === b[k]?.status);
+  };
+
   const loadData = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -296,7 +118,10 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
 
       // Load platform connection status
       const statusResponse = await cachedAnalyticsAPI.getPlatformStatus();
-      setPlatformStatus(statusResponse.platforms);
+      if (!shallowEqual(platformStatusRef.current, statusResponse.platforms)) {
+        platformStatusRef.current = statusResponse.platforms;
+        setPlatformStatus(statusResponse.platforms);
+      }
       const bingSitesResp: any[] = (statusResponse.platforms?.['bing']?.sites || []);
 
       // Load analytics data
@@ -309,7 +134,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         start_date: fmt(start),
         end_date: fmt(end),
       });
-      setAnalyticsData(analyticsResponse.data as Record<string, PlatformAnalyticsType>);
+      const newData = analyticsResponse.data as Record<string, PlatformAnalyticsType>;
+      if (!shallowEqual(analyticsDataRef.current, newData)) {
+        analyticsDataRef.current = newData;
+        setAnalyticsData({ ...newData });
+      }
       setSummary(analyticsResponse.summary);
       setLastUpdated(new Date());
 
@@ -386,6 +215,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       setError(errorMessage);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
@@ -437,101 +267,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     }
   }, [platformStatus, analyticsData, resyncAttempted, loadData]);
 
-  const computeRefreshQueue = useCallback(async () => {
-    try {
-      setLoadingQueue(true);
-      const end = new Date();
-      const start = new Date(end);
-      start.setDate(end.getDate() - (rangeDays - 1));
-      const prevEnd = new Date(start);
-      prevEnd.setDate(start.getDate() - 1);
-      const prevStart = new Date(prevEnd);
-      prevStart.setDate(prevEnd.getDate() - (rangeDays - 1));
-      const fmt = (d: Date) => d.toISOString().slice(0, 10);
-      let currentGSC = (analyticsData['gsc'] as PlatformAnalyticsType | undefined);
-      if (!currentGSC) {
-        const currentResp = await cachedAnalyticsAPI.getAnalyticsData(['gsc'], false, {
-          start_date: fmt(start),
-          end_date: fmt(end),
-        });
-        currentGSC = (currentResp.data as any)['gsc'] as PlatformAnalyticsType | undefined;
-      }
-      const prevResp = await cachedAnalyticsAPI.getAnalyticsData(['gsc'], false, {
-        start_date: fmt(prevStart),
-        end_date: fmt(prevEnd),
-      });
-      const prevGSC = (prevResp.data as any)['gsc'] as PlatformAnalyticsType | undefined;
-      const currQueries = (currentGSC?.metrics as any)?.top_queries || [];
-      const prevQueries = (prevGSC?.metrics as any)?.top_queries || [];
-      const prevMap: Record<string, { clicks: number; impressions: number }> = {};
-      prevQueries.forEach((q: any) => {
-        const key = String(q.query || '').toLowerCase();
-        prevMap[key] = { clicks: Number(q.clicks || 0), impressions: Number(q.impressions || 0) };
-      });
-      const rising: Array<{ query: string; deltaClicks: number; deltaImpressions: number }> = [];
-      const declining: Array<{ query: string; deltaClicks: number; deltaImpressions: number }> = [];
-      const riseClicksThresh = rangeDays <= 7 ? 5 : rangeDays <= 30 ? 20 : 40;
-      const riseImprThresh = rangeDays <= 7 ? 50 : rangeDays <= 30 ? 200 : 500;
-      const dropClicksThresh = -riseClicksThresh;
-      const dropImprThresh = -riseImprThresh;
-      currQueries.forEach((q: any) => {
-        const key = String(q.query || '').toLowerCase();
-        const prev = prevMap[key] || { clicks: 0, impressions: 0 };
-        const deltaClicks = Number(q.clicks || 0) - prev.clicks;
-        const deltaImpressions = Number(q.impressions || 0) - prev.impressions;
-        if (deltaClicks > 0 && deltaImpressions > 0 && (deltaClicks >= riseClicksThresh || deltaImpressions >= riseImprThresh)) {
-          rising.push({ query: String(q.query || ''), deltaClicks, deltaImpressions });
-        }
-        if (deltaClicks < 0 && deltaImpressions <= 0 && (deltaClicks <= dropClicksThresh || deltaImpressions <= dropImprThresh)) {
-          declining.push({ query: String(q.query || ''), deltaClicks, deltaImpressions });
-        }
-      });
-      rising.sort((a, b) => (b.deltaClicks + b.deltaImpressions) - (a.deltaClicks + a.deltaImpressions));
-      declining.sort((a, b) => (a.deltaClicks + a.deltaImpressions) - (b.deltaClicks + b.deltaImpressions));
-      // Fallback: if none meet thresholds, show the most changed queries by absolute delta
-      if (rising.length === 0 && declining.length === 0) {
-        const deltas: Array<{ query: string; deltaClicks: number; deltaImpressions: number; score: number }> = [];
-        currQueries.forEach((q: any) => {
-          const key = String(q.query || '').toLowerCase();
-          const prev = prevMap[key] || { clicks: 0, impressions: 0 };
-          const dC = Number(q.clicks || 0) - prev.clicks;
-          const dI = Number(q.impressions || 0) - prev.impressions;
-          const score = Math.abs(dC) + Math.abs(dI);
-          if (score > 0) {
-            deltas.push({ query: String(q.query || ''), deltaClicks: dC, deltaImpressions: dI, score });
-          }
-        });
-        deltas.sort((a, b) => b.score - a.score);
-        const top = deltas.slice(0, 10);
-        if (top.length === 0 && Array.isArray(currQueries) && currQueries.length > 0) {
-          const topByClicks = [...currQueries]
-            .sort((a: any, b: any) => Number(b.clicks || 0) - Number(a.clicks || 0))
-            .slice(0, 10);
-          setRefreshQueue({
-            risingQueries: topByClicks.map((q: any) => ({
-              query: String(q.query || ''),
-              deltaClicks: Number(q.clicks || 0),
-              deltaImpressions: Number(q.impressions || 0),
-            })),
-            decliningQueries: [],
-          });
-        } else {
-          setRefreshQueue({
-            risingQueries: top.filter(d => d.deltaClicks > 0 || d.deltaImpressions > 0).map(({ score, ...rest }) => rest),
-            decliningQueries: top.filter(d => d.deltaClicks < 0 || d.deltaImpressions < 0).map(({ score, ...rest }) => rest),
-          });
-        }
-      } else {
-        setRefreshQueue({ risingQueries: rising.slice(0, 10), decliningQueries: declining.slice(0, 10) });
-      }
-    } catch (e) {
-      console.error('Error computing refresh queue:', e);
-      setError('Failed to compute query refresh trends');
-      setRefreshQueue({ risingQueries: [], decliningQueries: [] });
-    } finally {
-      setLoadingQueue(false);
-    }
-  }, [rangeDays, analyticsData]);
+  const { refreshQueue, loadingQueue, computeRefreshQueue } = useRefreshQueue({ analyticsData, rangeDays });
 
   // One-run guard to prevent duplicate calls in StrictMode
   const dataLoadedRef = useRef(false);
@@ -607,407 +343,16 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     }
   }, [forceRefresh]);
 
-  const getPlatformIcon = (platform: string) => {
-    switch (platform.toLowerCase()) {
-      case 'gsc':
-        return <Search color="primary" />;
-      case 'wix':
-        return <Web color="secondary" />;
-      case 'wordpress':
-        return <Web color="info" />;
-      case 'bing':
-        return <Search color="primary" />;
-      default:
-        return <Web />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success':
-        return 'success';
-      case 'error':
-        return 'error';
-      case 'partial':
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success':
-        return <CheckCircle color="success" fontSize="small" />;
-      case 'error':
-        return <ErrorIcon color="error" fontSize="small" />;
-      case 'partial':
-        return <Warning color="warning" fontSize="small" />;
-      default:
-        return <Info fontSize="small" />;
-    }
-  };
-
-  const isValidHttpUrl = (value: string) => {
-    try {
-      const u = new URL(value);
-      return u.protocol === 'http:' || u.protocol === 'https:';
-    } catch {
-      return false;
-    }
-  };
-
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
-
   // Compute summary display based on priority and available platform data
-  const computedSummary = React.useMemo(() => {
-    const gsc = analyticsData['gsc'];
-    const bing = analyticsData['bing'];
-    const isGscOk = gsc && (gsc.status === 'success' || gsc.status === 'partial');
-    const isBingOk = bing && (bing.status === 'success' || bing.status === 'partial');
-    const anyPlatformOk = isGscOk || isBingOk;
-    const sumFromTopPages = (metrics?: any) => {
-      const pages = Array.isArray(metrics?.top_pages) ? metrics.top_pages : [];
-      if (!pages.length) {
-        return { clicks: 0, impressions: 0 };
-      }
-      let clicks = 0;
-      let impressions = 0;
-      for (const row of pages) {
-        clicks += Number(row?.clicks || 0);
-        impressions += Number(row?.impressions || 0);
-      }
-      return { clicks, impressions };
-    };
-    const pick = (m?: any) => ({
-      clicks: Number(m?.total_clicks || 0),
-      impressions: Number(m?.total_impressions || 0),
-    });
+  const computedSummary = React.useMemo(
+    () => deriveSummaryDisplay(analyticsData, priorityPlatform, summary),
+    [analyticsData, priorityPlatform, summary]
+  );
 
-    if (priorityPlatform === 'auto') {
-      if (isGscOk) {
-        let g = pick(gsc.metrics);
-        if (g.clicks === 0) {
-          const fromPages = sumFromTopPages(gsc.metrics);
-          if (fromPages.clicks > 0) {
-            g = {
-              clicks: fromPages.clicks,
-              impressions: g.impressions || fromPages.impressions,
-            };
-          }
-        }
-        return {
-          clicks: g.clicks,
-          impressions: g.impressions,
-          label: 'GSC (Auto)',
-          na: false,
-        };
-      }
-      if (summary) {
-        const clicks = Number(summary.total_clicks || 0);
-        const impressions = Number(summary.total_impressions || 0);
-        return {
-          clicks,
-          impressions,
-          label: 'Combined',
-          na: !anyPlatformOk && clicks === 0 && impressions === 0,
-        };
-      }
-      return { clicks: 0, impressions: 0, label: 'Combined', na: !anyPlatformOk };
-    }
-
-    if (priorityPlatform === 'gsc') {
-      if (isGscOk) {
-        let g = pick(gsc.metrics);
-        if (g.clicks === 0) {
-          const fromPages = sumFromTopPages(gsc.metrics);
-          if (fromPages.clicks > 0) {
-            g = {
-              clicks: fromPages.clicks,
-              impressions: g.impressions || fromPages.impressions,
-            };
-          }
-        }
-        return { ...g, label: 'GSC', na: false };
-      }
-      return { clicks: 0, impressions: 0, label: 'GSC', na: !gsc };
-    }
-    if (priorityPlatform === 'bing') {
-      if (isBingOk) return { ...pick(bing.metrics), label: 'Bing', na: false };
-      return { clicks: 0, impressions: 0, label: 'Bing', na: !bing };
-    }
-
-    return { clicks: 0, impressions: 0, label: 'N/A', na: true };
-  }, [analyticsData, priorityPlatform, summary]);
-
-  const renderMetricsCard = (platform: string, data: PlatformAnalyticsType) => {
-    const metrics = data.metrics;
-    
-    return (
-      <Card key={platform} sx={{ height: '100%', bgcolor: '#ffffff', color: '#1f2937', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)' }}>
-        <CardContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {getPlatformIcon(platform)}
-              <Typography variant="h6" component="div">
-                {platform.toUpperCase()}
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              {getStatusIcon(data.status)}
-              <Chip 
-                label={data.status} 
-                color={getStatusColor(data.status) as any}
-                size="small"
-              />
-              {platform === 'bing' && (
-                <>
-                  <TextField
-                    size="small"
-                    placeholder="https://www.example.com/"
-                    value={bingSiteUrl}
-                    onChange={(e) => setBingSiteUrl(e.target.value)}
-                    sx={{ minWidth: 280 }}
-                    label="Bing Site URL"
-                  />
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={bingCollecting}
-                  onClick={async () => {
-                    try {
-                      setBingCollectMsg(null);
-                      setBingCollecting(true);
-                      // Derive a site URL from platform status first, then metrics fallback
-                      const bingStatus = platformStatus?.['bing'];
-                      const statusSites: any[] = Array.isArray(bingStatus?.sites) ? bingStatus!.sites : [];
-                      const metricsSites: any[] = Array.isArray((data as any)?.metrics?.sites) ? (data as any).metrics.sites : [];
-                      const candidates = [...statusSites, ...metricsSites];
-                      let siteUrl: string =
-                        (candidates.find(s => typeof s?.Url === 'string')?.Url) ||
-                        (candidates.find(s => typeof s?.url === 'string')?.url) ||
-                        '';
-                      // If user entered a site URL, prefer it
-                      if (bingSiteUrl && typeof bingSiteUrl === 'string') {
-                        siteUrl = bingSiteUrl.trim();
-                      }
-                      if (!siteUrl) {
-                        setBingCollectMsg('No Bing site found to collect.');
-                        return;
-                      }
-                      await apiClient.post('/bing-analytics/collect-data', null, {
-                        params: { site_url: siteUrl, days_back: Math.max(7, Math.min(90, rangeDays)) }
-                      });
-                      setBingCollectMsg('Bing storage refresh started…');
-                      // Soft refresh after a short delay to reflect any quick writes
-                      setTimeout(() => {
-                        forceRefresh().catch(() => {});
-                      }, 3500);
-                    } catch (e: any) {
-                      setBingCollectMsg(e?.message || 'Failed to start Bing collection');
-                    } finally {
-                      setBingCollecting(false);
-                    }
-                  }}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {bingCollecting ? 'Refreshing…' : 'Refresh Bing Storage'}
-                </Button>
-                </>
-              )}
-            </Box>
-          </Box>
-
-          {data.status === 'success' && (
-            <>
-              <Grid container spacing={2}>
-                {metrics.total_clicks !== undefined && (
-                  <Grid item xs={6}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <MouseOutlined color="primary" sx={{ fontSize: 32, mb: 1 }} />
-                      <Typography variant="h4" color="primary">
-                        {formatNumber(metrics.total_clicks)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                        Clicks
-                      </Typography>
-                    </Box>
-                  </Grid>
-                )}
-                
-                {metrics.total_impressions !== undefined && (
-                  <Grid item xs={6}>
-                    <Box sx={{ textAlign: 'center' }}>
-                      <Visibility color="secondary" sx={{ fontSize: 32, mb: 1 }} />
-                      <Typography variant="h4" color="secondary">
-                        {formatNumber(metrics.total_impressions)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                        Impressions
-                      </Typography>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-
-              {metrics.avg_ctr !== undefined && (
-                <Box sx={{ mt: 2 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">CTR</Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {metrics.avg_ctr}%
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={Math.min(metrics.avg_ctr * 10, 100)} 
-                    sx={{ height: 8, borderRadius: 4 }}
-                  />
-                </Box>
-              )}
-
-              {metrics.avg_position !== undefined && (
-                <Box sx={{ mt: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body2">Avg Position</Typography>
-                    <Typography variant="body2" fontWeight="bold">
-                      {metrics.avg_position.toFixed(1)}
-                    </Typography>
-                  </Box>
-                  <LinearProgress 
-                    variant="determinate" 
-                    value={Math.max(0, 100 - (metrics.avg_position - 1) * 5)} 
-                    color="secondary"
-                    sx={{ height: 6, borderRadius: 4 }}
-                  />
-                </Box>
-              )}
-
-              {metrics.top_queries && metrics.top_queries.length > 0 && (
-                <Box sx={{ mt: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Top Queries
-                  </Typography>
-                  <List dense>
-                    {metrics.top_queries.slice(0, 3).map((q: any, index: number) => {
-                      const clicks = Number(q.clicks || 0);
-                      const impressions = Number(q.impressions || 0);
-                      const ctr = Number(q.ctr || 0);
-                      const ctrColor = ctr >= 3 ? '#065f46' : ctr >= 1 ? '#92400e' : '#7f1d1d';
-                      const ctrBg = ctr >= 3 ? 'linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%)' : ctr >= 1 ? 'linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)' : 'linear-gradient(135deg, #fee2e2 0%, #fff1f2 100%)';
-                      const risingSet = new Set((refreshQueue?.risingQueries || []).map(r => String(r.query || '').toLowerCase()));
-                      const isTrending = risingSet.has(String(q.query || '').toLowerCase());
-                      return (
-                        <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
-                          <Paper elevation={0} sx={{ px: 1, py: 0.75, width: '100%', borderRadius: 2, border: '1px solid #e5e7eb', background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)' }}>
-                          <ListItemIcon sx={{ minWidth: 28 }}>
-                            <Typography variant="caption" sx={{ color: '#6b7280' }}>
-                              {index + 1}
-                            </Typography>
-                          </ListItemIcon>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, width: '100%', justifyContent: 'space-between' }}>
-                            <Box sx={{ minWidth: 0, flex: 1 }}>
-                              <Tooltip title={`${q.query}`}>
-                                <Typography variant="body2" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {q.query}
-                                </Typography>
-                              </Tooltip>
-                              {isTrending && (
-                                <Chip
-                                  icon={<TrendingUp fontSize="small" />}
-                                  label="Trending"
-                                  size="small"
-                                  sx={{ mt: 0.5, backgroundImage: 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)', color: '#065f46', border: '1px solid #a7f3d0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)', fontWeight: 700 }}
-                                />
-                              )}
-                            </Box>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.2, flexShrink: 0 }}>
-                              <Tooltip title="Total clicks across the selected date range. Higher is better.">
-                                <Chip icon={<MouseOutlined fontSize="small" />} label={`${formatNumber(clicks)}`} size="small" sx={{ backgroundImage: 'linear-gradient(135deg, #dbeafe 0%, #eef2ff 100%)', color: '#1e3a8a', border: '1px solid #c7d2fe', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', fontWeight: 700 }} />
-                              </Tooltip>
-                              <Tooltip title="Total impressions across the selected date range. Indicates visibility in search results.">
-                                <Chip icon={<Visibility fontSize="small" />} label={`${formatNumber(impressions)}`} size="small" sx={{ backgroundImage: 'linear-gradient(135deg, #e2e8f0 0%, #f8fafc 100%)', color: '#0f172a', border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', fontWeight: 700 }} />
-                              </Tooltip>
-                              <Tooltip title="Click-through rate. Higher indicates titles/meta attract clicks for given impressions.">
-                                <Chip label={`${ctr.toFixed(1)}%`} size="small" sx={{ backgroundImage: ctrBg, color: ctrColor, border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 2px rgba(0,0,0,0.04)', fontWeight: 700 }} />
-                              </Tooltip>
-                            </Box>
-                          </Box>
-                          </Paper>
-                        </ListItem>
-                      );
-                    })}
-                  </List>
-                </Box>
-              )}
-            </>
-          )}
-
-          {data.status === 'error' && (
-            <Box sx={{ mt: 1 }}>
-              <Alert severity="error" sx={{ mb: 2 }}>
-                {data.error_message || 'Failed to load analytics data'}
-              </Alert>
-              {platform === 'bing' && bingCollectMsg && (
-                <Alert severity="info" sx={{ mb: 2 }}>{bingCollectMsg}</Alert>
-              )}
-              {onReconnect && (
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="small"
-                  onClick={() => onReconnect(platform)}
-                  sx={{ 
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderColor: '#f44336',
-                    color: '#f44336',
-                    '&:hover': {
-                      borderColor: '#d32f2f',
-                      backgroundColor: 'rgba(244, 67, 54, 0.04)'
-                    }
-                  }}
-                >
-                  Reconnect {platform.toUpperCase()}
-                </Button>
-              )}
-            </Box>
-          )}
-
-          {data.status === 'partial' && (
-            <Alert severity="warning" sx={{ mt: 1 }}>
-              {data.error_message || 'Limited analytics data available'}
-            </Alert>
-          )}
-
-          <Typography variant="caption" sx={{ display: 'block', mt: 1, color: '#6b7280' }}>
-            Last updated: {data.last_updated ? new Date(data.last_updated).toLocaleString() : 'Never'}
-          </Typography>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const renderSummaryCard = () => {
-    if (!summary) return null;
-
-    const totalClicks = computedSummary.clicks || 0;
-    const totalImpressions = computedSummary.impressions || 0;
-    const connectedCount = Object.values(platformStatus).filter(s => s.connected).length;
-    const ctrDisplay = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 'N/A';
-    const bingStatus = platformStatus['bing'];
-    const bingConnected = !!bingStatus?.connected;
-    const bingLastSync = (analyticsData['bing']?.last_updated) ? new Date(analyticsData['bing']!.last_updated).toLocaleString() : (bingStatus as any)?.last_sync || null;
+  const topPagesChart = React.useMemo(() => {
     const gscMetrics: any = (analyticsData['gsc'] as any)?.metrics || {};
     const topPagesRaw: any[] = Array.isArray(gscMetrics.top_pages) ? gscMetrics.top_pages : [];
-    const topPagesChart = topPagesRaw
+    return topPagesRaw
       .slice()
       .sort((a, b) => Number(b?.clicks || 0) - Number(a?.clicks || 0))
       .slice(0, 5)
@@ -1021,8 +366,12 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         ctr: Number(p?.ctr || 0),
         fullUrl: String(p?.page || ''),
       }));
+  }, [analyticsData]);
+
+  const ctrPositionData = React.useMemo(() => {
+    const gscMetrics: any = (analyticsData['gsc'] as any)?.metrics || {};
     const topQueriesRaw: any[] = Array.isArray(gscMetrics.top_queries) ? gscMetrics.top_queries : [];
-    const ctrPositionData = topQueriesRaw
+    return topQueriesRaw
       .filter((q) => typeof q?.position !== 'undefined' && typeof q?.ctr !== 'undefined')
       .slice(0, 40)
       .map((q) => ({
@@ -1030,6 +379,18 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         position: Number(q?.position || 0),
         ctr: Number(q?.ctr || 0),
       }));
+  }, [analyticsData]);
+
+  const renderSummaryCard = () => {
+    if (!summary) return null;
+
+    const totalClicks = computedSummary.clicks || 0;
+    const totalImpressions = computedSummary.impressions || 0;
+    const connectedCount = Object.values(platformStatus).filter(s => s.connected).length;
+    const ctrDisplay = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 'N/A';
+    const bingStatus = platformStatus['bing'];
+    const bingConnected = !!bingStatus?.connected;
+    const bingLastSync = (analyticsData['bing']?.last_updated) ? new Date(analyticsData['bing']!.last_updated).toLocaleString() : (bingStatus as any)?.last_sync || null;
 
     return (
       <Card sx={{ mb: 3 }}>
@@ -1154,115 +515,10 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
             <Box sx={{ mt: 2.5 }}>
               <Grid container spacing={2}>
                 {topPagesChart.length > 0 && (
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.25 }}>Top pages impact</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                      Where most of your clicks are concentrated in this window.
-                    </Typography>
-                    <Box sx={{ height: 180, bgcolor: '#020617', borderRadius: 2, p: 1.5, border: '1px solid rgba(148, 163, 184, 0.4)' }}>
-                      <Suspense fallback={<ChartLoadingFallback />}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LazyBarChart
-                            data={topPagesChart}
-                            layout="vertical"
-                            margin={{ top: 8, right: 12, bottom: 8, left: 0 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.25} />
-                            <XAxis type="number" hide />
-                            <YAxis
-                              type="category"
-                              dataKey="label"
-                              width={130}
-                              tick={{ fill: '#e5e7eb', fontSize: 11 }}
-                            />
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: '#020617',
-                                borderRadius: 8,
-                                border: '1px solid #4b5563',
-                                padding: 8,
-                              }}
-                              formatter={(value: any, name: any, props: any) => {
-                                if (name === 'clicks') {
-                                  return [formatNumber(Number(value || 0)), 'Clicks'];
-                                }
-                                if (name === 'impressions') {
-                                  return [formatNumber(Number(value || 0)), 'Impressions'];
-                                }
-                                if (name === 'ctr') {
-                                  return [`${Number(value || 0).toFixed(2)}%`, 'CTR'];
-                                }
-                                return [value, name];
-                              }}
-                              labelFormatter={(label: any, payload: any) => {
-                                const full = payload && payload[0] && (payload[0].payload as any)?.fullUrl;
-                                return full || String(label || '');
-                              }}
-                            />
-                            <Bar dataKey="clicks" fill="#38bdf8" radius={[0, 6, 6, 0]} />
-                          </LazyBarChart>
-                        </ResponsiveContainer>
-                      </Suspense>
-                    </Box>
-                  </Grid>
+                  <TopPagesBarChart data={topPagesChart} />
                 )}
                 {ctrPositionData.length > 0 && (
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.25 }}>CTR vs average position</Typography>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                      How click‑through rate changes as your queries move up and down.
-                    </Typography>
-                    <Box sx={{ height: 180, bgcolor: '#020617', borderRadius: 2, p: 1.5, border: '1px solid rgba(148, 163, 184, 0.4)' }}>
-                      <Suspense fallback={<ChartLoadingFallback />}>
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LazyLineChart
-                            data={ctrPositionData}
-                            margin={{ top: 8, right: 12, bottom: 8, left: -10 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.25} />
-                            <XAxis
-                              type="number"
-                              dataKey="position"
-                              domain={[1, 'dataMax']}
-                              tick={{ fill: '#e5e7eb', fontSize: 11 }}
-                              tickLine={false}
-                            />
-                            <YAxis
-                              tick={{ fill: '#e5e7eb', fontSize: 11 }}
-                              tickFormatter={(v) => `${v}%`}
-                              tickLine={false}
-                            />
-                            <RechartsTooltip
-                              contentStyle={{
-                                backgroundColor: '#020617',
-                                borderRadius: 8,
-                                border: '1px solid #4b5563',
-                                padding: 8,
-                              }}
-                              formatter={(value: any, name: any, props: any) => {
-                                if (name === 'ctr') {
-                                  return [`${Number(value || 0).toFixed(2)}%`, 'CTR'];
-                                }
-                                return [value, name];
-                              }}
-                              labelFormatter={(label: any, payload: any) => {
-                                const q = payload && payload[0] && (payload[0].payload as any)?.query;
-                                return `Position ${label}${q ? ` • ${q}` : ''}`;
-                              }}
-                            />
-                            <Line
-                              type="monotone"
-                              dataKey="ctr"
-                              stroke="#a855f7"
-                              strokeWidth={2.2}
-                              dot={{ r: 3, fill: '#a855f7', strokeWidth: 0 }}
-                              activeDot={{ r: 5 }}
-                            />
-                          </LazyLineChart>
-                        </ResponsiveContainer>
-                      </Suspense>
-                    </Box>
-                  </Grid>
+                  <CtrPositionChart data={ctrPositionData} />
                 )}
               </Grid>
             </Box>
@@ -1413,44 +669,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
             </Box>
           )}
 
-          {(aiError || aiInsights) && (
-            <Box sx={{ mt: 2.5 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                <Typography variant="subtitle2">AI Insights</Typography>
-                <Tooltip title="Summarizes all panels into simple recommendations for creators.">
-                  <Info fontSize="small" color="action" />
-                </Tooltip>
-              </Box>
-              {aiError && <Alert severity="error" sx={{ mb: 1 }}>{aiError}</Alert>}
-              {aiInsights && (
-                <Box>
-                  <Typography variant="body2" sx={{ mb: 1 }}>{aiInsights.quick_summary}</Typography>
-                  {Array.isArray(aiInsights.prioritized_findings) && aiInsights.prioritized_findings.length > 0 && (
-                    <List dense>
-                      {aiInsights.prioritized_findings.slice(0, 3).map((f: any, i: number) => (
-                        <ListItem key={`ai-find-${i}`} sx={{ px: 0, alignItems: 'flex-start' }}>
-                          <ListItemText
-                            primary={f.title}
-                            secondary={
-                              <Box sx={{ mt: 0.5 }}>
-                                <Typography variant="caption" sx={{ color: '#6b7280', display: 'block' }}>{f.evidence}</Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
-                                  {(f.actions || []).slice(0, 2).map((a: string, idx: number) => (
-                                    <Chip key={`act-${idx}`} label={a} size="small" />
-                                  ))}
-                                </Box>
-                              </Box>
-                            }
-                            primaryTypographyProps={{ variant: 'body2' }}
-                          />
-                        </ListItem>
-                      ))}
-                    </List>
-                  )}
-                </Box>
-              )}
-            </Box>
-          )}
+          <AiInsightsPanel aiError={aiError} aiInsights={aiInsights} />
         </CardContent>
       </Card>
     );
@@ -1509,57 +728,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         );
       })()}
 
-      <Dialog open={briefOpen} onClose={() => setBriefOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Create Content Brief</DialogTitle>
-        <DialogContent dividers>
-          <Stack spacing={2}>
-            <TextField
-              label="Page URL"
-              value={briefData?.page || ''}
-              InputProps={{ readOnly: true }}
-              fullWidth
-              size="small"
-            />
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>Recent queries pointing to this page</Typography>
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                {(briefData?.queries || []).slice(0, 10).map((q, i) => (
-                  <Chip
-                    key={`${q.query}-${i}`}
-                    label={`${q.query} • ${q.clicks}c/${q.impressions}i • ${q.ctr.toFixed(1)}%`}
-                    size="small"
-                  />
-                ))}
-                {(briefData?.queries || []).length === 0 && (
-                  <Typography variant="caption" color="text.secondary">No query mappings available for this window.</Typography>
-                )}
-              </Box>
-            </Box>
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setBriefOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={() => {
-              try {
-                const prefill = {
-                  page: briefData?.page || '',
-                  queries: briefData?.queries || [],
-                  created_at: new Date().toISOString(),
-                  source: 'platform_analytics_top_pages',
-                };
-                localStorage.setItem('alwrity_brief_prefill', JSON.stringify(prefill));
-              } catch {}
-              setBriefOpen(false);
-              // Optional: navigate to writer; keeping simple and non-disruptive
-              // window.location.href = '/blog-writer';
-            }}
-          >
-            Start Brief
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <BriefDialog
+        open={briefOpen}
+        briefData={briefData}
+        onClose={() => setBriefOpen(false)}
+      />
 
       {showBackgroundJobs && (
         <RefreshQueuePanel
@@ -1573,10 +746,25 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
 
       <Grid container spacing={3}>
         {Object.entries(analyticsData)
-          .filter(([platform]) => platform.toLowerCase() !== 'wordpress') // Exclude WordPress analytics
+          .filter(([platform]) => platform.toLowerCase() !== 'wordpress')
           .map(([platform, data]) => (
             <Grid item xs={12} sm={6} lg={4} key={platform}>
-              {renderMetricsCard(platform, data)}
+              <PlatformMetricCard
+                platform={platform}
+                data={data}
+                bingSiteUrl={bingSiteUrl}
+                bingCollecting={bingCollecting}
+                bingCollectMsg={bingCollectMsg}
+                platformStatus={platformStatus}
+                rangeDays={rangeDays}
+                refreshQueue={refreshQueue}
+                onBingSiteUrlChange={setBingSiteUrl}
+                onBingCollectStart={() => setBingCollecting(true)}
+                onBingCollectMsg={setBingCollectMsg}
+                onBingCollectEnd={() => setBingCollecting(false)}
+                onRefresh={forceRefresh}
+                onReconnect={onReconnect}
+              />
             </Grid>
           ))}
       </Grid>

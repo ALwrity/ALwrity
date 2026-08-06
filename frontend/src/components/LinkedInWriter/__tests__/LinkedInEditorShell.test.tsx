@@ -36,12 +36,13 @@ describe("LinkedInEditorShell", () => {
     expect(screen.queryByTestId("article-editor-shell")).toBeNull();
   });
 
-  test("renders article shell with gated publish panel", () => {
+  test("renders article shell with preview toggle and gated publish panel", () => {
     render(
       <LinkedInEditorShell {...baseProps} draftContentType="article" />,
     );
 
     expect(screen.getByTestId("article-editor-shell")).toBeTruthy();
+    expect(screen.getByTestId("article-preview-mode-toggle")).toBeTruthy();
     expect(screen.queryByTestId("post-preview-mode-toggle")).toBeNull();
     expect(screen.getByTestId("publish-linkedin-panel")).toBeTruthy();
     expect(screen.getByTestId("engagement-booster-toolbar-btn")).toBeTruthy();

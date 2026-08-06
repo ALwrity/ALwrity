@@ -34,6 +34,10 @@ import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssisti
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
 import { countArticleWords } from './utils/linkedInArticleDraftUtils';
+import {
+  appendImageToArticleDraftState,
+  createArticleImageBlockFromUrl,
+} from './utils/linkedInArticleImageUtils';
 import { resolvePersonaTone } from './utils/storageUtils';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
@@ -163,6 +167,17 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
   const handleInsertImageIntoDraft = useCallback(
     (imageUrl: string) => {
       try {
+        if (draftContentType === "article" && articleDraftState) {
+          const block = createArticleImageBlockFromUrl(imageUrl, "Article image");
+          updateArticleDraftState(
+            appendImageToArticleDraftState(articleDraftState, block),
+          );
+          console.log("[LinkedInWriter] appended image to article draft", {
+            imageUrl: imageUrl.substring(0, 80),
+          });
+          return;
+        }
+
         const newDraft = insertImageIntoLinkedInDraft(draft, imageUrl, {
           flushDraft: getDraftForPublish,
         });
@@ -173,7 +188,14 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
         });
       }
     },
-    [draft, getDraftForPublish, handleDraftChange],
+    [
+      draft,
+      draftContentType,
+      articleDraftState,
+      updateArticleDraftState,
+      getDraftForPublish,
+      handleDraftChange,
+    ],
   );
 
   // Get persona context for enhanced AI assistance
