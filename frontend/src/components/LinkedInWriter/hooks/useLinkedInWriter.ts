@@ -32,6 +32,7 @@ import {
   joinHashtagSuggestions,
 } from "../utils/linkedInPostAssembly";
 import { useLinkedInDraftContentType } from "./useLinkedInDraftContentType";
+import { useLinkedInArticleDraft } from "./useLinkedInArticleDraft";
 import {
   contentTypeFromWriterAction,
   parseUpdateDraftDetail,
@@ -119,6 +120,18 @@ export function useLinkedInWriter() {
 
   const { draftContentType, setDraftContentType, clearDraftContentType } =
     useLinkedInDraftContentType();
+
+  const {
+    articleDraftState,
+    applyGenerationResult,
+    updateArticleDraftState,
+    getArticleMarkdown,
+    clearArticleDraft,
+  } = useLinkedInArticleDraft({
+    draft,
+    draftContentType,
+    setDraft,
+  });
 
   // Track action usage and update preferences
   const trackActionUsage = useCallback((actionName: string) => {
@@ -410,7 +423,7 @@ export function useLinkedInWriter() {
             );
             stepIndex++;
           }
-          const content = `# ${res.data.title}\n\n${res.data.content}`;
+          const content = applyGenerationResult(res.data);
           window.dispatchEvent(
             new CustomEvent("linkedinwriter:updateGroundingData", {
               detail: {
@@ -423,7 +436,9 @@ export function useLinkedInWriter() {
             }),
           );
           window.dispatchEvent(
-            new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
+            new CustomEvent("linkedinwriter:updateDraft", {
+              detail: { content, contentType: "article" as const },
+            }),
           );
           window.dispatchEvent(
             new CustomEvent("linkedinwriter:progressStep", {
@@ -460,7 +475,7 @@ export function useLinkedInWriter() {
         return { success: false, error: error.message || "Generation failed" };
       }
     },
-    [outlineSections, setDraftContentType],
+    [outlineSections, setDraftContentType, applyGenerationResult],
   );
 
   const generateCarousel = useCallback(async (params?: any) => {
@@ -1119,12 +1134,13 @@ export function useLinkedInWriter() {
     setOutlineTitleSuggestions([]);
     setOutlineMode(false);
     clearDraftContentType();
+    clearArticleDraft();
     try {
       sessionStorage.removeItem("li_draft");
     } catch {
       /* ignore */
     }
-  }, [clearDraftContentType]);
+  }, [clearDraftContentType, clearArticleDraft]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -1304,6 +1320,11 @@ export function useLinkedInWriter() {
     isGeneratingOutline,
     generateOutline,
     refineOutline,
+
+    // Structured article draft (PR6)
+    articleDraftState,
+    updateArticleDraftState,
+    getArticleMarkdown,
 
     // Progress (exposed to UI)
     progressSteps,

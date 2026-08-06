@@ -17,6 +17,8 @@ import {
   joinHashtagSuggestions,
 } from "./utils/linkedInPostAssembly";
 import { dispatchLinkedInDraftUpdate } from "./utils/linkedInDraftContentTypeStorage";
+import { buildArticleDraftUpdate } from "./utils/linkedInArticleDraftUtils";
+import { saveArticleDraftState } from "./utils/linkedInArticleDraftStorage";
 import { apiClient } from "../../api/client";
 import { useCopilotActionTyped } from "../../hooks/useCopilotActionTyped";
 
@@ -662,7 +664,14 @@ const RegisterLinkedInActions: React.FC = () => {
           }),
         );
 
-        const content = `# ${res.data.title}\n\n${res.data.content}`;
+        const { state: articleState, markdown: content } =
+          buildArticleDraftUpdate(res.data);
+        saveArticleDraftState(articleState);
+        window.dispatchEvent(
+          new CustomEvent("linkedinwriter:updateArticleDraft", {
+            detail: articleState,
+          }),
+        );
 
         // Debug: Log the full response structure
         console.log("[LinkedIn Writer] Full API response:", res);

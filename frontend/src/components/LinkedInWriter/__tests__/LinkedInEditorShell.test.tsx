@@ -41,9 +41,9 @@ describe("LinkedInEditorShell", () => {
     );
 
     expect(screen.getByTestId("article-editor-shell")).toBeTruthy();
-    expect(screen.getByTestId("article-editor-placeholder")).toBeTruthy();
     expect(screen.queryByTestId("post-preview-mode-toggle")).toBeNull();
     expect(screen.getByTestId("publish-linkedin-panel")).toBeTruthy();
+    expect(screen.queryByTestId("article-editor-placeholder")).toBeNull();
   });
 
   test("defaults to post shell for carousel content type", () => {

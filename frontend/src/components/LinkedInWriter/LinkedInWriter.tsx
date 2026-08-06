@@ -32,6 +32,7 @@ import { insertImageIntoLinkedInDraft } from './utils/linkedInDraftImageInsert';
 import type { LinkedInAssistiveEditorHandle } from './components/LinkedInAssistiveEditor';
 import { useCopilotActions } from './components/CopilotActions';
 import { useLinkedInWriter } from './hooks/useLinkedInWriter';
+import { countArticleWords } from './utils/linkedInArticleDraftUtils';
 import { resolvePersonaTone } from './utils/storageUtils';
 import { useCopilotPersistence } from './utils/enhancedPersistence';
 import { PlatformPersonaProvider, usePlatformPersonaContext } from '../shared/PersonaContext/PlatformPersonaProvider';
@@ -143,13 +144,20 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
     isGeneratingOutline,
     generateOutline,
     refineOutline,
+
+    articleDraftState,
+    updateArticleDraftState,
+    getArticleMarkdown,
   } = useLinkedInWriter();
 
   const assistiveEditorRef = useRef<LinkedInAssistiveEditorHandle | null>(null);
 
   const getDraftForPublish = useCallback(() => {
+    if (draftContentType === "article") {
+      return getArticleMarkdown();
+    }
     return assistiveEditorRef.current?.flushDraft() ?? draft;
-  }, [draft]);
+  }, [draft, draftContentType, getArticleMarkdown]);
 
   const handleInsertImageIntoDraft = useCallback(
     (imageUrl: string) => {
@@ -317,15 +325,24 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
             .split("\n")[0]
             .trim()
         : undefined;
-      const title = draftToSave.split("\n")[0].substring(0, 100) || "LinkedIn Post";
+      const isArticle = draftContentType === "article";
+      const title =
+        (isArticle && articleDraftState?.title) ||
+        draftToSave.split("\n")[0].replace(/^#\s*/, "").substring(0, 100) ||
+        (isArticle ? "LinkedIn Article" : "LinkedIn Post");
+      const wordCount = isArticle && articleDraftState
+        ? countArticleWords(articleDraftState)
+        : draftToSave.split(/\s+/).length;
 
       const result = await saveLinkedInToAssetLibrary({
         title,
         content: draftToSave,
         topic,
-        tags: ["linkedin_post", "social_media"],
+        tags: isArticle
+          ? ["linkedin_article", "social_media"]
+          : ["linkedin_post", "social_media"],
         assetMetadata: {
-          word_count: draftToSave.split(/\s+/).length,
+          word_count: wordCount,
           source: locationState?.calendarTopic ? "calendar" : "manual",
         },
       });
@@ -671,6 +688,8 @@ Always use the most appropriate tool for the user's request.`.trim();
                 context ? context.split("\n")[0].substring(0, 50) : undefined
               }
               assistiveEditorRef={assistiveEditorRef}
+              articleDraftState={articleDraftState}
+              onArticleDraftChange={updateArticleDraftState}
             />
           </>
         ) : /* Outline Editor - Show when planning sections */
