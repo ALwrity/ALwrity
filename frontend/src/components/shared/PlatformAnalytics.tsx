@@ -276,6 +276,10 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   const siteUrlRef = useRef(siteUrl);
   siteUrlRef.current = siteUrl;
 
+  const loadingRef = useRef(false);
+  const analyticsDataRef = useRef<Record<string, PlatformAnalyticsType>>({});
+  const platformStatusRef = useRef<Record<string, PlatformConnectionStatus>>({});
+
   const onDataLoadedRef = useRef<typeof onDataLoaded>();
   const onRefreshReadyRef = useRef<typeof onRefreshReady>();
 
@@ -287,7 +291,16 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     onRefreshReadyRef.current = onRefreshReady;
   }, [onRefreshReady]);
 
+  const shallowEqual = (a: Record<string, any>, b: Record<string, any>) => {
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every(k => b.hasOwnProperty(k) && a[k]?.status === b[k]?.status);
+  };
+
   const loadData = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -296,7 +309,10 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
 
       // Load platform connection status
       const statusResponse = await cachedAnalyticsAPI.getPlatformStatus();
-      setPlatformStatus(statusResponse.platforms);
+      if (!shallowEqual(platformStatusRef.current, statusResponse.platforms)) {
+        platformStatusRef.current = statusResponse.platforms;
+        setPlatformStatus(statusResponse.platforms);
+      }
       const bingSitesResp: any[] = (statusResponse.platforms?.['bing']?.sites || []);
 
       // Load analytics data
@@ -309,7 +325,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         start_date: fmt(start),
         end_date: fmt(end),
       });
-      setAnalyticsData(analyticsResponse.data as Record<string, PlatformAnalyticsType>);
+      const newData = analyticsResponse.data as Record<string, PlatformAnalyticsType>;
+      if (!shallowEqual(analyticsDataRef.current, newData)) {
+        analyticsDataRef.current = newData;
+        setAnalyticsData({ ...newData });
+      }
       setSummary(analyticsResponse.summary);
       setLastUpdated(new Date());
 
@@ -386,6 +406,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       setError(errorMessage);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
@@ -995,19 +1016,10 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     );
   };
 
-  const renderSummaryCard = () => {
-    if (!summary) return null;
-
-    const totalClicks = computedSummary.clicks || 0;
-    const totalImpressions = computedSummary.impressions || 0;
-    const connectedCount = Object.values(platformStatus).filter(s => s.connected).length;
-    const ctrDisplay = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 'N/A';
-    const bingStatus = platformStatus['bing'];
-    const bingConnected = !!bingStatus?.connected;
-    const bingLastSync = (analyticsData['bing']?.last_updated) ? new Date(analyticsData['bing']!.last_updated).toLocaleString() : (bingStatus as any)?.last_sync || null;
+  const topPagesChart = React.useMemo(() => {
     const gscMetrics: any = (analyticsData['gsc'] as any)?.metrics || {};
     const topPagesRaw: any[] = Array.isArray(gscMetrics.top_pages) ? gscMetrics.top_pages : [];
-    const topPagesChart = topPagesRaw
+    return topPagesRaw
       .slice()
       .sort((a, b) => Number(b?.clicks || 0) - Number(a?.clicks || 0))
       .slice(0, 5)
@@ -1021,8 +1033,12 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         ctr: Number(p?.ctr || 0),
         fullUrl: String(p?.page || ''),
       }));
+  }, [analyticsData]);
+
+  const ctrPositionData = React.useMemo(() => {
+    const gscMetrics: any = (analyticsData['gsc'] as any)?.metrics || {};
     const topQueriesRaw: any[] = Array.isArray(gscMetrics.top_queries) ? gscMetrics.top_queries : [];
-    const ctrPositionData = topQueriesRaw
+    return topQueriesRaw
       .filter((q) => typeof q?.position !== 'undefined' && typeof q?.ctr !== 'undefined')
       .slice(0, 40)
       .map((q) => ({
@@ -1030,6 +1046,18 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         position: Number(q?.position || 0),
         ctr: Number(q?.ctr || 0),
       }));
+  }, [analyticsData]);
+
+  const renderSummaryCard = () => {
+    if (!summary) return null;
+
+    const totalClicks = computedSummary.clicks || 0;
+    const totalImpressions = computedSummary.impressions || 0;
+    const connectedCount = Object.values(platformStatus).filter(s => s.connected).length;
+    const ctrDisplay = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : 'N/A';
+    const bingStatus = platformStatus['bing'];
+    const bingConnected = !!bingStatus?.connected;
+    const bingLastSync = (analyticsData['bing']?.last_updated) ? new Date(analyticsData['bing']!.last_updated).toLocaleString() : (bingStatus as any)?.last_sync || null;
 
     return (
       <Card sx={{ mb: 3 }}>
