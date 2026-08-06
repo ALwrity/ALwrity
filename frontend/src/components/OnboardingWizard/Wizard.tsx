@@ -211,6 +211,10 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       return newState;
     });
   }, []);
+
+  const onStep0Valid = useCallback((v: boolean) => handleStepValidationChange(0, v), [handleStepValidationChange]);
+  const onStep1Valid = useCallback((v: boolean) => handleStepValidationChange(1, v), [handleStepValidationChange]);
+  const onStep2Valid = useCallback((v: boolean) => handleStepValidationChange(2, v), [handleStepValidationChange]);
   
   // Memoize the onDataReady callback to prevent infinite loops
   const handleCompetitorDataReady = useCallback((dataCollector: (() => any) | undefined) => {
@@ -625,7 +629,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         key="linkedin-connect"
         onContinue={handleNext}
         updateHeaderContent={updateHeaderContent}
-        onValidationChange={(isValid) => handleStepValidationChange(0, isValid)}
+        onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
       />
     ) : (
@@ -633,7 +637,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         key="website"
         onContinue={handleNext}
         updateHeaderContent={updateHeaderContent}
-        onValidationChange={(isValid) => handleStepValidationChange(0, isValid)}
+        onValidationChange={onStep0Valid}
         onDataReady={handleWebsiteDataReady}
       />
     );
@@ -646,7 +650,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
           key="linkedin-research"
           onContinue={handleNext}
           updateHeaderContent={updateHeaderContent}
-          onValidationChange={(isValid) => handleStepValidationChange(1, isValid)}
+          onValidationChange={onStep1Valid}
           onDataReady={handleCompetitorDataReady}
         />
       ) : (
@@ -664,7 +668,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         key="personalization" 
         onContinue={handleNext} 
         updateHeaderContent={updateHeaderContent}
-        onValidationChange={(isValid: boolean) => handleStepValidationChange(2, isValid)}
+        onValidationChange={onStep2Valid}
         onDataChange={handleStepDataChange}
         onboardingType={onboardingType}
         onboardingData={personaOnboardingData}
