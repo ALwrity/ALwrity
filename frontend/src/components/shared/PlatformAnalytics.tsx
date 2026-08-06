@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -698,6 +698,11 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     );
   };
 
+  const summaryCardContent = useMemo(
+    () => renderSummaryCard(),
+    [summary, platformStatus, analyticsData, lastUpdated, priorityPlatform, rangeDays, aiLoading, aiError, aiInsights, showLegend, topPagesChart, ctrPositionData]
+  );
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
@@ -719,7 +724,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
 
   return (
     <Box>
-      {showSummary && React.useMemo(() => renderSummaryCard(), [showSummary, summary, platformStatus, analyticsData, lastUpdated, priorityPlatform, rangeDays, aiLoading, aiError, aiInsights, showLegend, topPagesChart, ctrPositionData])}
+      {showSummary && summaryCardContent}
       <GscSuggestionsPanel
         suggestions={suggestions}
         rangeDays={rangeDays}
