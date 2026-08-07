@@ -47,6 +47,8 @@ def llm_text_gen(
     flow_type: Optional[str] = None,
     max_tokens: Optional[int] = None,
     temperature: Optional[float] = None,
+    trace_id: Optional[str] = None,
+    retry_count: int = 0,
 ) -> str:
     """
     Generate text using Language Model (LLM) based on the provided prompt.
@@ -74,10 +76,25 @@ def llm_text_gen(
         
         logger.warning(f"[llm_text_gen][{flow_tag}] Starting text generation")
         logger.debug(f"[llm_text_gen] Prompt length: {len(prompt)} characters")
+
+        # Auto-generate trace_id if not provided
+        if not trace_id:
+            import uuid
+            trace_id = f"alwrity_{resolved_flow_type}_{user_id or 'anon'}_{uuid.uuid4().hex[:8]}"
+
+        def _estimate_tokens(text: str) -> int:
+            if not text:
+                return 1
+            try:
+                import tiktoken
+                enc = tiktoken.get_encoding("o200k_base")
+                return len(enc.encode(text))
+            except Exception:
+                return max(1, len(text) // 4)
         
         # Set default values for LLM parameters
-        gpt_provider = "google"  # Default to Google Gemini
-        model = "gemini-2.0-flash-001"
+        gpt_provider = None
+        model = None
         if temperature is None:
             temperature = 0.7
         top_p = 0.9
@@ -177,6 +194,12 @@ def llm_text_gen(
             f"available_providers={available_providers}, preferred_provider={preferred_provider or 'none'}, "
             f"gpt_provider={gpt_provider}, model={model}"
         )
+
+        if gpt_provider is None:
+            raise RuntimeError(
+                "GPT_PROVIDER environment variable is not configured. "
+                "Please set it to your provider (e.g., GPT_PROVIDER=WAVESPEED, GPT_PROVIDER=GOOGLE, GPT_PROVIDER=OPENAI)."
+            )
 
         if gpt_provider not in available_providers:
             logger.warning(f"[llm_text_gen] Provider {gpt_provider} unavailable for user {user_id}, falling back.")
@@ -434,7 +457,14 @@ def llm_text_gen(
                 except Exception as usage_error:
                     # Non-blocking: log error but don't fail the request
                     logger.error(f"[llm_text_gen] ❌ Failed to track usage: {usage_error}", exc_info=True)
-            
+
+            # Telemetry log — provider-agnostic, for routing/cost analysis
+            logger.info(
+                f"[llm_telemetry] trace={trace_id} user={user_id} provider={gpt_provider} "
+                f"model={model} flow={resolved_flow_type} "
+                f"input_tokens_est={_estimate_tokens(prompt)} output_tokens_est={_estimate_tokens(response_text)} "
+                f"latency_ms={total_ms:.0f} retries={retry_count} success=1"
+            )
             return response_text
         except Exception as provider_error:
             logger.error(f"[llm_text_gen] Provider {gpt_provider} failed: {str(provider_error)}")
@@ -534,7 +564,13 @@ def llm_text_gen(
                             )
                         except Exception as usage_error:
                             logger.error(f"[llm_text_gen] ❌ Failed to track fallback usage: {usage_error}", exc_info=True)
-                    
+
+                    logger.info(
+                        f"[llm_telemetry] trace={trace_id} user={user_id} provider={fallback_provider} "
+                        f"model={fallback_model} flow={resolved_flow_type} "
+                        f"input_tokens_est={_estimate_tokens(prompt)} output_tokens_est={_estimate_tokens(response_text)} "
+                        f"fallback=1 success=1"
+                    )
                     return response_text
                 except Exception as fallback_error:
                     logger.error(f"[llm_text_gen] Fallback provider {fallback_provider} also failed: {str(fallback_error)}")

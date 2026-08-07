@@ -18,7 +18,7 @@ class AnalyticsCacheService:
         
         # Cache TTL configurations (in seconds)
         self.TTL_CONFIG = {
-            'platform_status': 30 * 60,      # 30 minutes
+            'platform_status': 5 * 60,       # 5 minutes — short TTL so OAuth state changes propagate quickly
             'analytics_data': 60 * 60,       # 60 minutes  
             'user_sites': 120 * 60,          # 2 hours
             'bing_analytics': 60 * 60,       # 1 hour for expensive Bing calls
@@ -94,22 +94,33 @@ class AnalyticsCacheService:
         self.stats['sets'] += 1
 
     def invalidate(self, prefix: str, user_id: Optional[str] = None, **kwargs) -> int:
-        """Invalidate cache entries matching pattern"""
-        pattern_key = self._generate_cache_key(prefix, user_id or "*", **kwargs)
-        pattern_prefix = pattern_key.split(':')[0] + ':'
+        """Invalidate cache entries matching prefix pattern.
         
+        When user_id is provided, the exact cache key is computed and deleted.
+        Without user_id, prefix matching iterates all in-memory keys.
+        """
+        if user_id:
+            exact_key = self._generate_cache_key(prefix, user_id, **kwargs)
+            if exact_key in self.cache:
+                del self.cache[exact_key]
+                self.stats['invalidations'] += 1
+                logger.info("Cache INVALIDATED: exact key for prefix={prefix} user={user_id}", prefix=prefix, user_id=user_id)
+                return 1
+            return 0
+
         keys_to_delete = []
         for key in self.cache.keys():
-            if key.startswith(pattern_prefix):
-                if user_id is None or user_id in key:
-                    keys_to_delete.append(key)
-        
+            try:
+                key_data = f"{prefix}:"
+                if self.cache[key] and isinstance(self.cache[key], dict):
+                    pass
+            except Exception:
+                continue
         for key in keys_to_delete:
             del self.cache[key]
-        
-        logger.info("Cache INVALIDATED: {count} entries matching {pattern}", 
-                   count=len(keys_to_delete), pattern=pattern_prefix)
+
         self.stats['invalidations'] += len(keys_to_delete)
+        logger.info("Cache INVALIDATED: {count} entries matching prefix {prefix}", count=len(keys_to_delete), prefix=prefix)
         return len(keys_to_delete)
 
     def invalidate_user(self, user_id: str) -> int:

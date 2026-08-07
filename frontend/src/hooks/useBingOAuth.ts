@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { bingOAuthAPI, BingOAuthStatus, BingOAuthResponse } from '../api/bingOAuth';
+import { cachedAnalyticsAPI } from '../api/cachedAnalytics';
 
 interface UseBingOAuthReturn {
   connected: boolean;
@@ -116,6 +117,7 @@ export const useBingOAuth = (): UseBingOAuthReturn => {
           window.removeEventListener('message', messageHandler);
           if (type === 'BING_OAUTH_SUCCESS') {
             setConnected(true);
+            cachedAnalyticsAPI.invalidatePlatformStatus();
             (async () => {
               try {
                 const status = await bingOAuthAPI.getStatus();

@@ -58,7 +58,44 @@ class StyleDetectionLogic:
         except Exception as e:
             logger.error(f"[StyleDetectionLogic._clean_json_response] Error cleaning response: {str(e)}")
             return ""
-    
+
+    def _generate_json_via_llm(self, prompt: str, user_id: str, max_repairs: int = 2) -> Dict[str, Any]:
+        """Generate JSON from LLM with structured output + repair retry.
+
+        Uses native JSON mode (response_format=json_object) for WaveSpeed
+        to guarantee valid JSON on first attempt. Falls back to repair
+        prompts only if the structured output path itself fails.
+        """
+        last_raw = ""
+        last_error = None
+        json_struct = {"type": "object"}  # triggers native JSON mode
+
+        for attempt in range(max_repairs + 1):
+            if attempt == 0:
+                raw = llm_text_gen(prompt, user_id=user_id, json_struct=json_struct, trace_id=f"alwrity_step1_{user_id}", retry_count=0)
+            else:
+                repair_prompt = (
+                    f"Your previous JSON output could not be parsed: {last_error}\n\n"
+                    f"PREVIOUS RAW OUTPUT:\n{last_raw[:2000]}\n\n"
+                    f"FIX THE PARSE ERROR and return ONLY valid minified JSON matching "
+                    f"the original schema. No markdown, no code fences.\n\n"
+                    f"ORIGINAL TASK:\n{prompt}"
+                )
+                logger.info(f"[style_detection_logic] JSON repair attempt {attempt}/{max_repairs}")
+                raw = llm_text_gen(repair_prompt, user_id=user_id, json_struct=json_struct, trace_id=f"alwrity_step1_{user_id}", retry_count=attempt)
+
+            cleaned = self._clean_json_response(raw)
+            try:
+                return json.loads(cleaned)
+            except json.JSONDecodeError as e:
+                last_raw = raw
+                last_error = str(e)[:300]
+                logger.warning(
+                    f"[style_detection_logic] JSON parse failed (attempt {attempt + 1}/{max_repairs + 1}): {last_error}"
+                )
+
+        raise ValueError(f"JSON generation failed after {max_repairs + 1} attempts: {last_error}")
+
     def analyze_content_style(self, content: Dict[str, Any], user_id: str = None) -> Dict[str, Any]:
         """
         Analyze the style of the provided content using AI with enhanced prompts.
@@ -82,7 +119,16 @@ class StyleDetectionLogic:
             brand_info = content.get('brand_info', {})
             social_media = content.get('social_media', {})
             content_structure = content.get('content_structure', {})
-            
+            exa_summary = content.get('exa_summary', '')
+            exa_highlights = content.get('exa_highlights', [])
+
+            # Build Exa context block if available
+            exa_context = ""
+            if exa_summary:
+                exa_context += f"\n            PAGE SUMMARY (AI-generated):\n            {exa_summary[:500]}\n"
+            if exa_highlights:
+                exa_context += f"\n            KEY POINTS:\n            " + "\n            ".join(f"- {h}" for h in exa_highlights[:6]) + "\n"
+
             # Construct the enhanced analysis prompt (strict JSON, minified, stable keys)
             prompt = f"""Analyze the following website content for comprehensive writing style, tone, and characteristics for personalization and AI generation.
 
@@ -91,7 +137,7 @@ class StyleDetectionLogic:
             - Use EXACTLY the keys and ordering from the schema below. Do not add extra top-level keys.
             - For unknown/unavailable fields use empty string "" or empty array [] and explain in meta.uncertainty.
             - Keep text concise; avoid repeating input text.
-            - Assume token budget; consider only first 5000 chars of main_content and first 10 headings.
+            - Focus analysis on the first 8000 chars of main content and first 15 headings.{exa_context}
 
             WEBSITE INFORMATION:
             - Domain: {domain_info.get('domain_name', 'Unknown')}
@@ -111,8 +157,8 @@ class StyleDetectionLogic:
             CONTENT TO ANALYZE:
             - Title: {title}
             - Description: {description}
-            - Main Content (truncated): {main_content[:5000]}
-            - Key Headings (first 10): {headings[:10]}
+            - Main Content: {main_content[:8000]}
+            - Key Headings (first 15): {headings[:15]}
 
             ANALYSIS REQUIREMENTS:
             1. Analyze the writing style, tone, and voice characteristics
@@ -161,39 +207,24 @@ class StyleDetectionLogic:
             
             logger.debug("[StyleDetectionLogic.analyze_content_style] Sending enhanced prompt to LLM")
             try:
-                analysis_text = llm_text_gen(prompt, user_id=user_id)
-                cleaned_json = self._clean_json_response(analysis_text)
-                analysis_results = json.loads(cleaned_json)
+                analysis_results = self._generate_json_via_llm(prompt, user_id, max_repairs=2)
                 logger.info("[StyleDetectionLogic.analyze_content_style] Successfully parsed enhanced analysis results")
                 return {
                     'success': True,
                     'analysis': analysis_results
                 }
             except Exception as e:
-                logger.warning(f"[StyleDetectionLogic.analyze_content_style] AI analysis failed, using fallback: {str(e)}")
-                fallback_results = self._get_fallback_analysis(content)
+                logger.error(f"[StyleDetectionLogic.analyze_content_style] AI analysis failed after all retries: {str(e)}")
                 return {
-                    'success': True,
-                    'analysis': fallback_results,
-                    'warning': f'AI analysis failed ({str(e)}), used fallback detection'
+                    'success': False,
+                    'error': f'Style analysis failed after {max_repairs + 1} attempts: {str(e)}'
                 }
                 
         except Exception as e:
-            logger.error(f"[StyleDetectionLogic.analyze_content_style] Critical error in enhanced analysis: {str(e)}")
-            # Even in critical error, try to return fallback if we have content
-            if content:
-                try:
-                    return {
-                        'success': True,
-                        'analysis': self._get_fallback_analysis(content),
-                        'warning': f'Critical error ({str(e)}), used fallback detection'
-                    }
-                except:
-                    pass
-            
+            logger.error(f"[StyleDetectionLogic.analyze_content_style] Critical error: {str(e)}")
             return {
                 'success': False,
-                'error': str(e)
+                'error': f'Critical error in style analysis: {str(e)}'
             }
 
     def _determine_website_type(self, domain_info: Dict[str, Any]) -> str:
@@ -211,65 +242,6 @@ class StyleDetectionLogic:
         else:
             return 'General Website'
     
-    def _get_fallback_analysis(self, content: Dict[str, Any]) -> Dict[str, Any]:
-        """Get fallback analysis when LLM analysis fails."""
-        main_content = content.get("main_content", "")
-        title = content.get("title", "")
-        
-        # Simple content analysis based on content characteristics
-        content_length = len(main_content)
-        word_count = len(main_content.split())
-        
-        # Determine tone based on content characteristics
-        if any(word in main_content.lower() for word in ['professional', 'business', 'industry', 'company']):
-            tone = "professional"
-        elif any(word in main_content.lower() for word in ['casual', 'fun', 'enjoy', 'exciting']):
-            tone = "casual"
-        else:
-            tone = "neutral"
-        
-        # Determine complexity based on sentence length and vocabulary
-        avg_sentence_length = word_count / max(len([s for s in main_content.split('.') if s.strip()]), 1)
-        if avg_sentence_length > 20:
-            complexity = "complex"
-        elif avg_sentence_length > 15:
-            complexity = "moderate"
-        else:
-            complexity = "simple"
-        
-        return {
-            "writing_style": {
-                "tone": tone,
-                "voice": "active",
-                "complexity": complexity,
-                "engagement_level": "medium"
-            },
-            "content_characteristics": {
-                "sentence_structure": "standard",
-                "vocabulary_level": "intermediate",
-                "paragraph_organization": "logical",
-                "content_flow": "smooth"
-            },
-            "target_audience": {
-                "demographics": ["general audience"],
-                "expertise_level": "intermediate",
-                "industry_focus": "general",
-                "geographic_focus": "global"
-            },
-            "content_type": {
-                "primary_type": "article",
-                "secondary_types": ["blog", "content"],
-                "purpose": "inform",
-                "call_to_action": "minimal"
-            },
-            "recommended_settings": {
-                "writing_tone": tone,
-                "target_audience": "general audience",
-                "content_type": "article",
-                "creativity_level": "medium",
-                "geographic_location": "global"
-            }
-        }
     
     def analyze_style_patterns(self, content: Dict[str, Any], user_id: str = None) -> Dict[str, Any]:
         """
@@ -295,7 +267,7 @@ class StyleDetectionLogic:
             - If uncertain, set empty values and list field names in meta.uncertainty.fields.
             - Keep responses concise and avoid quoting long input spans.
             
-            Content (truncated to 3000 chars): {main_content[:3000]}
+            Content (truncated to 5000 chars): {main_content[:5000]}
             
             REQUIRED JSON SCHEMA (stable key order):
             {{
@@ -309,20 +281,10 @@ class StyleDetectionLogic:
             }}
             """
             
-            analysis_text = llm_text_gen(prompt, user_id=user_id)
-            cleaned_json = self._clean_json_response(analysis_text)
-            
-            try:
-                pattern_results = json.loads(cleaned_json)
-                return {
+            pattern_results = self._generate_json_via_llm(prompt, user_id, max_repairs=2)
+            return {
                     'success': True,
                     'patterns': pattern_results
-                }
-            except json.JSONDecodeError as e:
-                logger.error(f"[StyleDetectionLogic.analyze_style_patterns] Failed to parse JSON response: {e}")
-                return {
-                    'success': False,
-                    'error': 'Failed to parse pattern analysis response'
                 }
                 
         except Exception as e:
@@ -391,20 +353,10 @@ class StyleDetectionLogic:
             }}
             """
             
-            guidelines_text = llm_text_gen(prompt, user_id=user_id)
-            cleaned_json = self._clean_json_response(guidelines_text)
-            
-            try:
-                guidelines = json.loads(cleaned_json)
-                return {
+            guidelines = self._generate_json_via_llm(prompt, user_id, max_repairs=2)
+            return {
                     'success': True,
                     'guidelines': guidelines
-                }
-            except json.JSONDecodeError as e:
-                logger.error(f"[StyleDetectionLogic.generate_style_guidelines] Failed to parse JSON response: {e}")
-                return {
-                    'success': False,
-                    'error': 'Failed to parse guidelines response'
                 }
                 
         except Exception as e:

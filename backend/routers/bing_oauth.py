@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from loguru import logger
 
 from services.integrations.bing_oauth import BingOAuthService
+from services.analytics_cache_service import analytics_cache
 from middleware.auth_middleware import get_current_user
 
 router = APIRouter(prefix="/bing", tags=["Bing Webmaster OAuth"])
@@ -160,6 +161,8 @@ async def handle_bing_callback(
             """
             return HTMLResponse(content=html_content)
         
+        analytics_cache.invalidate('platform_status', user_id=state.split(':', 1)[0] if ':' in state else None)
+
         # Create Bing insights task immediately after successful connection
         try:
             from services.platform_insights_monitoring_service import create_platform_insights_task
@@ -288,6 +291,7 @@ async def disconnect_bing_site(
                 detail="Bing Webmaster token not found or could not be disconnected."
             )
         
+        analytics_cache.invalidate('platform_status', user_id)
         return {"success": True, "message": f"Bing Webmaster site disconnected successfully."}
         
     except Exception as e:

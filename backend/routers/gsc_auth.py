@@ -9,6 +9,7 @@ import os
 
 from services.gsc_service import GSCService
 from services.gsc_brainstorm_service import GSCBrainstormService
+from services.analytics_cache_service import analytics_cache
 from middleware.auth_middleware import get_current_user
 
 # Initialize router
@@ -89,6 +90,7 @@ async def handle_gsc_callback(
         
         if success:
             logger.info("GSC OAuth callback handled successfully")
+            analytics_cache.invalidate('platform_status', user_id=state.split(':')[0] if ':' in state else None)
             
             # Create GSC insights task immediately after successful connection
             try:

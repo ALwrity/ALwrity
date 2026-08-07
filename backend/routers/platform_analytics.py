@@ -581,6 +581,10 @@ async def check_existing_analytics(
         persistence = PlatformAnalyticsPersistence(db)
         result = persistence.check_existing_analytics(user_id, platform, site_url)
         db.close()
+
+        conn_status = await analytics_service.connection_manager.get_platform_connection_status(user_id)
+        platform_conn = conn_status.get(platform, {})
+        result['connected_via_oauth'] = platform_conn.get('connected', False)
         return result
     except Exception as e:
         logger.error(f"Error checking existing analytics: {e}")

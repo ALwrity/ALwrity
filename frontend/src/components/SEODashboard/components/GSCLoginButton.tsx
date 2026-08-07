@@ -23,6 +23,7 @@ import {
 import { useAuth } from '@clerk/clerk-react';
 import { gscAPI, GSCStatusResponse } from '../../../api/gsc';
 import { apiClient } from '../../../api/client';
+import { cachedAnalyticsAPI } from '../../../api/cachedAnalytics';
 
 interface GSCLoginButtonProps {
   onStatusChange?: (connected: boolean) => void;
@@ -121,6 +122,7 @@ const GSCLoginButton: React.FC<GSCLoginButtonProps> = ({ onStatusChange }) => {
         if (popup.closed) {
           clearInterval(checkClosed);
           console.log('GSC Login Button: OAuth popup closed, checking status');
+          cachedAnalyticsAPI.invalidatePlatformStatus();
           checkGSCStatus();
         }
       }, 1000);
@@ -142,7 +144,7 @@ const GSCLoginButton: React.FC<GSCLoginButtonProps> = ({ onStatusChange }) => {
       await gscAPI.disconnect();
       setShowDisconnectDialog(false);
       
-      // Refresh status
+      cachedAnalyticsAPI.invalidatePlatformStatus();
       await checkGSCStatus();
       
       console.log('GSC Login Button: GSC disconnected successfully');
