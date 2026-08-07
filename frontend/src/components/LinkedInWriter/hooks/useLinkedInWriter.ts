@@ -234,6 +234,9 @@ export function useLinkedInWriter() {
           prefs.target_audience ||
           "Business leaders and professionals",
         key_points: params?.key_points || prefs.key_points || [],
+        ...(params?.reference_context?.trim()
+          ? { reference_context: params.reference_context.trim() }
+          : {}),
         include_hashtags:
           params?.include_hashtags ?? prefs.include_hashtags ?? true,
         include_call_to_action:

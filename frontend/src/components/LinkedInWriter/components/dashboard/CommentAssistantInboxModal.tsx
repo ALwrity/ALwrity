@@ -31,12 +31,13 @@ import { useCommentAssistantInbox } from "./useCommentAssistantInbox";
 export interface CommentAssistantModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   connected?: boolean;
 }
 
 export const CommentAssistantInboxModal: React.FC<
   CommentAssistantModalProps
-> = ({ open, onClose, connected = true }) => {
+> = ({ open, onClose, onBack, connected = true }) => {
   const {
     tab,
     setTab,
@@ -100,6 +101,8 @@ export const CommentAssistantInboxModal: React.FC<
       open={open}
       title={COMMENT_ASSISTANT_TITLE}
       onClose={onClose}
+      onBack={onBack}
+      backLabel="Engagement"
       width="60vw"
       maxWidth="60vw"
       maxHeight="80vh"

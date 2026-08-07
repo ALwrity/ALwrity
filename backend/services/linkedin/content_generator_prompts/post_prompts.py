@@ -64,6 +64,15 @@ class PostPromptBuilder:
             key_points_section = """
         KEY POINTS: Current industry trends, challenges, and opportunities — focus on what the target audience cares about most right now. Use the RESEARCH CONTEXT below to find supporting data and statistics."""
 
+        reference_section = ""
+        reference_context = getattr(request, "reference_context", None)
+        if reference_context and str(reference_context).strip():
+            reference_section = f"""
+        REFERENCE CONTENT (use for message, tone, and engagement patterns — do NOT copy verbatim):
+        {str(reference_context).strip()}
+
+        REFERENCE REQUIREMENT: Treat the reference as inspiration only. Follow the KEY POINTS outline above for structure. Write fresh wording, a new hook, and an original flow."""
+
         prompt = f"""
         You are an expert LinkedIn content strategist with 10+ years of experience in the {request.industry} industry. Create a highly engaging, professional LinkedIn post that drives meaningful engagement and establishes thought leadership.
 
@@ -75,6 +84,7 @@ class PostPromptBuilder:
 
         {persona_block}
 {key_points_section}
+{reference_section}
 
         CONTENT REQUIREMENTS:
         - Start with a strong hook in the first 1–2 lines (front-load before LinkedIn's "see more" fold). "Bold hook" means a strong opening line — NOT markdown bold.

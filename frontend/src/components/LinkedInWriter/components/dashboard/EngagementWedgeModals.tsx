@@ -4,19 +4,15 @@
  * E5  EngagementBoosterModal      — see EngagementBoosterModal.tsx
  * E2  CommentAssistantModal       — extracted to CommentAssistantInboxModal.tsx
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
- * E3  PostPulseModal              — real Unipile post metrics with repurpose CTAs
+ * E3  PostPulseModal              — see PostPulseModal.tsx
  * E4  GrowNetworkModal            — AI Network Advisor + Live PYMK (see GrowNetworkModal.tsx)
  */
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
 import {
   type EngagementOpportunityItem,
 } from "../../../../services/linkedInGrowthApi";
 import { linkedInWriterApi } from "../../../../services/linkedInWriterApi";
-import {
-  postAnalyticsApi,
-  type LinkedInPost,
-} from "../../../../services/postAnalyticsApi";
 import {
   colors,
   rowBase,
@@ -28,19 +24,16 @@ import {
   formatCacheAge,
 } from "./engagementWedgeGrowthCache";
 import { useGrowthCache } from "./useGrowthCache";
+import {
+  ENGAGEMENT_RETURN,
+  openQuickCreateFromWedge,
+} from "./engagementWedgeNavigation";
 
 export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
 export { NetworkAdvisorModal } from "./NetworkAdvisorModal";
 export { GrowNetworkModal } from "./GrowNetworkModal";
-
-function openInCreate(topic: string, keyPoints: string, type = "post") {
-  window.dispatchEvent(
-    new CustomEvent("linkedinwriter:openQuickCreate", {
-      detail: { type, topic, key_points: keyPoints },
-    }),
-  );
-}
+export { PostPulseModal } from "./PostPulseModal";
 
 function formatAge(cachedAt: number): string {
   return formatCacheAge(cachedAt);
@@ -284,12 +277,14 @@ function textareaStyle(minH: number): React.CSSProperties {
 interface OpportunitiesModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   connected?: boolean;
 }
 
 export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
   open,
   onClose,
+  onBack,
   connected = true,
 }) => {
   const { data, loading, error, loadAll } = useGrowthCache(open);
@@ -322,6 +317,8 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
       open={open}
       title="Engagement Opportunities"
       onClose={onClose}
+      onBack={onBack}
+      backLabel="Engagement"
       maxWidth={560}
       maxHeight="min(92vh, 720px)"
     >
@@ -483,7 +480,12 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    openInCreate(item.title, item.suggested_comment);
+                    openQuickCreateFromWedge({
+                      type: "post",
+                      topic: item.title,
+                      key_points: item.suggested_comment,
+                      returnTo: ENGAGEMENT_RETURN.opportunities,
+                    });
                     onClose();
                   }}
                   style={{
@@ -685,421 +687,4 @@ const InlineRefineForm: React.FC<{
     </div>
   );
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// E3 — Post Engagement Pulse
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface PostPulseModalProps {
-  open: boolean;
-  onClose: () => void;
-  connected?: boolean;
-}
-
-export const PostPulseModal: React.FC<PostPulseModalProps> = ({
-  open,
-  onClose,
-  connected = true,
-}) => {
-  const [posts, setPosts] = useState<LinkedInPost[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [boosting, setBoosting] = useState<string | null>(null);
-  const [boosted, setBoosted] = useState<Record<string, string>>({});
-  const [loadedAt, setLoadedAt] = useState<number | null>(null);
-
-  const fetchPosts = useCallback(async (refresh = false) => {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await postAnalyticsApi.fetchStoredAnalytics(refresh);
-      const fetched = res.posts ?? [];
-      setPosts(fetched);
-      if (fetched.length > 0) setLoadedAt(Date.now());
-    } catch {
-      setError("Could not load your posts. Make sure LinkedIn is connected.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // On mount: reset state, auto-load from DB cache
-  useEffect(() => {
-    if (!open) return;
-      setError("");
-      setBoosted({});
-      setPosts([]);
-      setLoadedAt(null);
-      void fetchPosts(false);
-    }, [open, fetchPosts]);
-
-    const sorted = useMemo(
-      () =>
-        [...posts].sort(
-          (a, b) =>
-            (b.engagement?.engagement_rate ?? 0) -
-            (a.engagement?.engagement_rate ?? 0),
-        ),
-      [posts],
-    );
-  const topPosts = sorted.slice(0, 3);
-  const bottomPost = sorted[sorted.length - 1];
-
-  const handleBoost = async (post: LinkedInPost) => {
-    setBoosting(post.id);
-    try {
-      const res = await linkedInWriterApi.editContent({
-        content: post.text,
-        edit_type: "optimize_engagement",
-      });
-      const improved = res.content ?? "";
-      setBoosted((prev) => ({ ...prev, [post.id]: improved }));
-    } catch {
-      setError("Could not boost this post. Please try again.");
-    } finally {
-      setBoosting(null);
-    }
-  };
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Post Engagement Pulse"
-      onClose={onClose}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
-    >
-      <p
-        style={{
-          margin: "0 0 14px",
-          fontSize: 13,
-          color: colors.textSecondary,
-          lineHeight: 1.5,
-        }}
-      >
-        Real engagement metrics from your recent LinkedIn posts. Repurpose
-        winners and boost underperformers.
-      </p>
-
-      {loading && (
-        <LoadingRow message="Loading your post metrics from LinkedIn…" />
-      )}
-      {error && <ErrorBanner msg={error} />}
-
-      {/* No cache + not connected → connect prompt */}
-      {!loading && posts.length === 0 && !connected && !error && (
-        <ConnectPrompt message="Connect your LinkedIn account to view engagement metrics for your published posts." />
-      )}
-
-      {/* No cache + connected → empty state with Load button */}
-      {!loading && posts.length === 0 && connected && !error && (
-        <EmptyPrompt
-          icon="📊"
-          title="No posts loaded yet"
-          desc="Load your recent LinkedIn posts to see engagement metrics."
-          btnLabel="🚀 Load Posts"
-          onLoad={() => void fetchPosts(false)}
-        />
-      )}
-
-      {/* Cached/loaded posts */}
-      {!loading && topPosts.length > 0 && (
-        <>
-          {/* RefreshBar — triggers full sync from Unipile */}
-          {loadedAt && (
-            <RefreshBar
-              cachedAt={loadedAt}
-              onRefresh={() => void fetchPosts(true)}
-              loading={loading}
-            />
-          )}
-
-          <SectionHeader icon="🏆" label="Top Performing Posts" />
-          {topPosts.map((post) => (
-            <PostMetricsRow
-              key={post.id}
-              post={post}
-              boostedVersion={boosted[post.id]}
-              isBoosting={boosting === post.id}
-              onRepurpose={() => {
-                openInCreate(post.title ?? "Post", post.text.slice(0, 200));
-                onClose();
-              }}
-              onWriteMore={() => {
-                openInCreate(
-                  "Write more content like this",
-                  post.text.slice(0, 200),
-                );
-                onClose();
-              }}
-              onBoost={() => void handleBoost(post)}
-              onAcceptBoost={() => {
-                pushDraftToStudio(boosted[post.id]);
-                onClose();
-              }}
-            />
-          ))}
-
-          {bottomPost && !topPosts.includes(bottomPost) && (
-            <>
-              <SectionHeader icon="⬇️" label="Needs a Boost" />
-              <PostMetricsRow
-                post={bottomPost}
-                boostedVersion={boosted[bottomPost.id]}
-                isBoosting={boosting === bottomPost.id}
-                onRepurpose={() => {
-                  openInCreate(
-                    bottomPost.title ?? "Post",
-                    bottomPost.text.slice(0, 200),
-                  );
-                  onClose();
-                }}
-                onWriteMore={() => {
-                  openInCreate(
-                    "Write more content like this",
-                    bottomPost.text.slice(0, 200),
-                  );
-                  onClose();
-                }}
-                onBoost={() => void handleBoost(bottomPost)}
-                onAcceptBoost={() => {
-                  pushDraftToStudio(boosted[bottomPost.id]);
-                  onClose();
-                }}
-                dim
-              />
-            </>
-          )}
-        </>
-      )}
-    </DashboardActionModal>
-  );
-};
-
-const SectionHeader: React.FC<{ icon: string; label: string }> = ({
-  icon,
-  label,
-}) => (
-  <div
-    style={{
-      fontSize: 11,
-      fontWeight: 700,
-      color: colors.textTertiary,
-      textTransform: "uppercase",
-      letterSpacing: 0.6,
-      marginBottom: 8,
-      display: "flex",
-      alignItems: "center",
-      gap: 5,
-    }}
-  >
-    <span style={{ fontSize: 14 }}>{icon}</span>
-    {label}
-  </div>
-);
-
-interface PostMetricsRowProps {
-  post: LinkedInPost;
-  boostedVersion?: string;
-  isBoosting: boolean;
-  onRepurpose: () => void;
-  onWriteMore: () => void;
-  onBoost: () => void;
-  onAcceptBoost: () => void;
-  dim?: boolean;
-}
-
-const PostMetricsRow: React.FC<PostMetricsRowProps> = ({
-  post,
-  boostedVersion,
-  isBoosting,
-  onRepurpose,
-  onWriteMore,
-  onBoost,
-  onAcceptBoost,
-  dim,
-}) => {
-  const m = post.engagement;
-  const rate = m?.engagement_rate ?? 0;
-  const ratePct = (rate * 100).toFixed(1);
-  const rateColor =
-    rate >= 0.05 ? "#166534" : rate >= 0.02 ? "#854d0e" : "#991b1b";
-  const rateBg =
-    rate >= 0.05 ? "#dcfce7" : rate >= 0.02 ? "#fef9c3" : "#fee2e2";
-  const snippet = post.text.slice(0, 100) + (post.text.length > 100 ? "…" : "");
-
-  return (
-    <div style={{ ...rowBase, marginBottom: 10, opacity: dim ? 0.85 : 1 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: 8,
-          marginBottom: 8,
-        }}
-      >
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            color: colors.textDark,
-            flex: 1,
-            lineHeight: 1.4,
-          }}
-        >
-          {snippet}
-        </div>
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 800,
-            background: rateBg,
-            color: rateColor,
-            padding: "2px 7px",
-            borderRadius: 5,
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          {ratePct}% eng.
-        </span>
-      </div>
-      <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
-        <MetricChip icon="❤️" value={m?.reactions ?? 0} label="reactions" />
-        <MetricChip icon="💬" value={m?.comments ?? 0} label="comments" />
-        <MetricChip icon="🔁" value={m?.reposts ?? 0} label="reposts" />
-        <MetricChip icon="👁️" value={m?.impressions ?? 0} label="views" />
-      </div>
-
-      {boostedVersion ? (
-        <div
-          style={{
-            background: "#eff6ff",
-            border: "1px solid #bfdbfe",
-            borderRadius: 7,
-            padding: "8px 10px",
-            marginBottom: 8,
-          }}
-        >
-          <div
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "#1e40af",
-              marginBottom: 4,
-            }}
-          >
-            ⚡ Boosted Version
-          </div>
-          <div
-            style={{
-              fontSize: 12,
-              color: "#1e3a5f",
-              lineHeight: 1.55,
-              whiteSpace: "pre-wrap",
-            }}
-          >
-            {boostedVersion.slice(0, 200)}
-            {boostedVersion.length > 200 ? "…" : ""}
-          </div>
-          <button
-            type="button"
-            onClick={onAcceptBoost}
-            style={{
-              marginTop: 8,
-              padding: "5px 12px",
-              background: colors.primary,
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            ✅ Use in Studio
-          </button>
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button
-            type="button"
-            onClick={onRepurpose}
-            style={{
-              padding: "5px 12px",
-              background: colors.primary,
-              color: "#fff",
-              border: "none",
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
-          >
-            ♻️ Repurpose
-          </button>
-          <button
-            type="button"
-            onClick={onWriteMore}
-            style={{
-              padding: "5px 12px",
-              background: "none",
-              border: `1.5px solid ${colors.primary}`,
-              borderRadius: 6,
-              fontSize: 11,
-              fontWeight: 600,
-              color: colors.primary,
-              cursor: "pointer",
-            }}
-          >
-            ✍️ Write More Like This
-          </button>
-          {dim && (
-            <button
-              type="button"
-              onClick={onBoost}
-              disabled={isBoosting}
-              style={{
-                padding: "5px 12px",
-                background: "#f59e0b",
-                color: "#fff",
-                border: "none",
-                borderRadius: 6,
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              {isBoosting ? (
-                <>
-                  <Spinner /> Boosting…
-                </>
-              ) : (
-                "⚡ Boost Engagement"
-              )}
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const MetricChip: React.FC<{ icon: string; value: number; label: string }> = ({
-  icon,
-  value,
-  label,
-}) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
-    <span style={{ fontSize: 12 }}>{icon}</span>
-    <span style={{ fontSize: 12, fontWeight: 700, color: colors.textDark }}>
-      {value.toLocaleString()}
-    </span>
-    <span style={{ fontSize: 10, color: colors.textTertiary }}>{label}</span>
-  </div>
-);
 

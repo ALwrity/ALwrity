@@ -11,6 +11,8 @@ interface KeyPointsSectionProps {
   targetAudience: string;
   keyPoints: string;
   onChange: (value: string) => void;
+  /** Optional reference post context for AI key-point generation. */
+  referenceContext?: string;
 }
 
 export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
@@ -20,6 +22,7 @@ export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
   targetAudience,
   keyPoints,
   onChange,
+  referenceContext,
 }) => {
   const [phase, setPhase] = useState<"idle" | "generating" | "ready">("idle");
   const [sets, setSets] = useState<KeyPointSet[]>([]);
@@ -34,7 +37,9 @@ export const KeyPointsSection: React.FC<KeyPointsSectionProps> = ({
         industry: industry || undefined,
         tone: tone || undefined,
         target_audience: targetAudience || undefined,
-        brainstorm_context: keyPoints?.trim() || undefined,
+        brainstorm_context: [referenceContext?.trim(), keyPoints?.trim()]
+          .filter(Boolean)
+          .join("\n\n") || undefined,
       };
       const res = await generateKeyPoints(payload);
       if (res.success && res.data?.key_point_sets?.length) {

@@ -21,6 +21,13 @@ import { CreateWedgeComingSoonTile } from './dashboard/CreateWedgeComingSoonTile
 import { useCreateWedgeNotify } from '../hooks/useCreateWedgeNotify';
 import { dispatchLinkedInDraftUpdate } from '../utils/linkedInDraftContentTypeStorage';
 import { PostTodayModal } from './dashboard/analysisWedgeModalExports';
+import {
+  openWorkflowWedge,
+  type QuickCreateReturnTarget,
+} from './dashboard/engagementWedgeNavigation';
+import type { PostPulseCreateMode } from './dashboard/postPulseCreateUtils';
+import { ReferencePostContextBanner } from './dashboard/ReferencePostContextBanner';
+import { DashboardModalBackButton } from './dashboard/DashboardModalBackButton';
 
 
 export type QuickCreateContentType = 'post' | 'article' | 'carousel' | 'video_script';
@@ -343,6 +350,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
   const [myIdeasOpen, setMyIdeasOpen] = useState(false);
   const [postTodayOpen, setPostTodayOpen] = useState(false);
   const [savedCount, setSavedCount] = useState(0);
+  const [returnTo, setReturnTo] = useState<QuickCreateReturnTarget | null>(null);
+  const [referenceContext, setReferenceContext] = useState<string | null>(null);
+  const [referenceMode, setReferenceMode] = useState<PostPulseCreateMode | null>(null);
 
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [usePersona, setUsePersona] = useState(false);
@@ -390,6 +400,8 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setUsePersona(false);
     setIncludeTrending(false);
     setRemarketContent(false);
+    setReferenceContext(null);
+    setReferenceMode(null);
   }, [userPreferences]);
 
   const closeModal = useCallback(() => {
@@ -410,7 +422,21 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     setUsePersona(false);
     setIncludeTrending(false);
     setRemarketContent(false);
+    setReturnTo(null);
+    setReferenceContext(null);
+    setReferenceMode(null);
   }, []);
+
+  const handleBackNavigation = useCallback(() => {
+    const target = returnTo;
+    closeModal();
+    if (target) {
+      openWorkflowWedge({
+        wedge: target.wedge,
+        sub: target.sub,
+      });
+    }
+  }, [returnTo, closeModal]);
 
   useEffect(() => {
     const onOpenQuickCreate = (event: Event) => {
@@ -421,6 +447,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         target_audience?: string;
         industry?: string;
         post_type?: string;
+        returnTo?: QuickCreateReturnTarget;
+        reference_context?: string;
+        reference_mode?: PostPulseCreateMode;
       }>).detail;
       const type = detail?.type;
       if (
@@ -458,6 +487,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         setUsePersona(false);
         setIncludeTrending(false);
         setRemarketContent(false);
+        setReturnTo(detail?.returnTo ?? null);
+        setReferenceContext(detail?.reference_context?.trim() || null);
+        setReferenceMode(detail?.reference_mode ?? null);
       }
     };
     window.addEventListener('linkedinwriter:openQuickCreate', onOpenQuickCreate);
@@ -592,6 +624,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
         key_points: formData.key_points
           ? formData.key_points.split(' / ').map(kp => kp.trim()).filter(Boolean)
           : [],
+        ...(referenceContext ? { reference_context: referenceContext } : {}),
         include_hashtags: true,
         include_call_to_action: true,
         research_enabled: true,
@@ -653,6 +686,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
       key_points: formData.key_points
         ? formData.key_points.split(' / ').map(kp => kp.trim()).filter(Boolean)
         : [],
+      ...(referenceContext ? { reference_context: referenceContext } : {}),
     };
     try {
       const generators = {
@@ -922,6 +956,12 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               onSelect={value => setField('post_type', value)}
             />
             {commonFields}
+            {referenceContext && referenceMode && (
+              <ReferencePostContextBanner
+                mode={referenceMode}
+                referenceContext={referenceContext}
+              />
+            )}
             <KeyPointsSection
               topic={formData.topic}
               industry={formData.industry}
@@ -929,6 +969,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
               targetAudience={formData.target_audience}
               keyPoints={formData.key_points}
               onChange={value => setField('key_points', value)}
+              referenceContext={referenceContext ?? undefined}
             />
           </div>
         );
@@ -1002,7 +1043,7 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
           </div>
         );
     }
-  }, [selectedType, formData, topicError, personaInfo, advancedOpen, setField, closeModal, savedCount, brainstorming, openModal, usePersona, includeTrending, remarketContent, connected]);
+  }, [selectedType, formData, topicError, personaInfo, advancedOpen, setField, closeModal, savedCount, brainstorming, openModal, usePersona, includeTrending, remarketContent, connected, referenceContext, referenceMode]);
 
   const showInlineGrid = variant === 'default';
 
@@ -1091,42 +1132,58 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
 
-            {/* Modal header */}
+            {/* Modal header — title row, then optional back navigation below */}
             <div className="linkedin-quick-create-header">
-              {selectedType === 'post' && variationsPhase === 'idle' ? (
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div
-                  id="linkedin-quick-create-title"
-                  className="linkedin-quick-create-title linkedin-quick-create-title--xl"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    width: '100%',
+                  }}
                 >
-                  <span className="linkedin-quick-create-title__icon" aria-hidden>📝</span>
-                  <span className="linkedin-quick-create-title__text">Post</span>
+                  {selectedType === 'post' && variationsPhase === 'idle' ? (
+                    <div
+                      id="linkedin-quick-create-title"
+                      className="linkedin-quick-create-title linkedin-quick-create-title--xl"
+                    >
+                      <span className="linkedin-quick-create-title__icon" aria-hidden>📝</span>
+                      <span className="linkedin-quick-create-title__text">Post</span>
+                    </div>
+                  ) : selectedType === 'article' && variationsPhase === 'idle' ? (
+                    <div
+                      id="linkedin-quick-create-title"
+                      className="linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
+                    >
+                      <span
+                        className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
+                        aria-hidden
+                      >
+                        📄
+                      </span>
+                      <span className="linkedin-quick-create-title__text">Article</span>
+                    </div>
+                  ) : (
+                    <div
+                      id="linkedin-quick-create-title"
+                      className="linkedin-quick-create-title"
+                    >
+                      {CONTENT_TYPES.find(c => c.type === selectedType)?.icon}{' '}
+                      {variationsPhase !== 'idle'
+                        ? '3 Tone Variations'
+                        : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
+                    </div>
+                  )}
+                  <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" />
                 </div>
-              ) : selectedType === 'article' && variationsPhase === 'idle' ? (
-                <div
-                  id="linkedin-quick-create-title"
-                  className="linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
-                >
-                  <span
-                    className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
-                    aria-hidden
-                  >
-                    📄
-                  </span>
-                  <span className="linkedin-quick-create-title__text">Article</span>
-                </div>
-              ) : (
-                <div
-                  id="linkedin-quick-create-title"
-                  className="linkedin-quick-create-title"
-                >
-                  {CONTENT_TYPES.find(c => c.type === selectedType)?.icon}{' '}
-                  {variationsPhase !== 'idle'
-                    ? '3 Tone Variations'
-                    : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" />
+                {returnTo && (
+                  <DashboardModalBackButton
+                    label={returnTo.label}
+                    onClick={handleBackNavigation}
+                  />
+                )}
               </div>
             </div>
 

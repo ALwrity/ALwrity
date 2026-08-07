@@ -59,6 +59,8 @@ export interface LinkedInPostRequest {
   tone?: LinkedInTone | string;
   target_audience?: string;
   key_points?: string[];
+  /** Source post for repurpose / write-more flows (not shown as Key Points). */
+  reference_context?: string;
   include_hashtags?: boolean;
   include_call_to_action?: boolean;
   research_enabled?: boolean;

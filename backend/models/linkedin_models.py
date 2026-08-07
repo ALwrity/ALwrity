@@ -63,6 +63,11 @@ class LinkedInPostRequest(BaseModel):
     tone: str = Field(default=LinkedInTone.PROFESSIONAL.value, description="Tone of the post (preset or custom label)")
     target_audience: Optional[str] = Field(None, description="Specific target audience", max_length=200)
     key_points: Optional[List[str]] = Field(None, description="Key points to include", max_items=10)
+    reference_context: Optional[str] = Field(
+        None,
+        description="Source/reference post for repurpose or style-matching flows",
+        max_length=8000,
+    )
     include_hashtags: bool = Field(default=True, description="Whether to include hashtags")
     include_call_to_action: bool = Field(default=True, description="Whether to include call to action")
     research_enabled: bool = Field(default=True, description="Whether to include research-backed content")

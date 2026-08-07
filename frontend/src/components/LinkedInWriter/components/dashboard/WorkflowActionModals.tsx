@@ -12,6 +12,11 @@ import {
   type OpenGrowNetworkDetail,
 } from "../../utils/linkedInDashboardEvents";
 import {
+  OPEN_WORKFLOW_WEDGE_EVENT,
+  type OpenWorkflowWedgeDetail,
+  type WorkflowModalId,
+} from "./engagementWedgeNavigation";
+import {
   EngagementTrendsModal,
 } from "./analysisWedgeModalExports";
 import {
@@ -57,12 +62,12 @@ type RemarkSub =
   "repurpose" | "transformer" | "refresh" | "reviver" | "perf_plan" | null;
 type PublishSub = "drafts" | null;
 
-export type WorkflowModalId =
-  "plan" | "create" | "publish" | "analysis" | "engagement" | "remarket";
+export type { WorkflowModalId } from "./engagementWedgeNavigation";
 
 interface WorkflowActionModalsProps {
   activeModal: WorkflowModalId | null;
   onClose: () => void;
+  onOpenWedge?: (wedge: WorkflowModalId) => void;
 }
 
 const CREATE_TILE_TOOLS = [
@@ -99,6 +104,7 @@ const CREATE_TILE_TOOLS = [
 export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   activeModal,
   onClose,
+  onOpenWedge,
 }) => {
   const navigate = useNavigate();
   const [analysisSub, setAnalysisSub] = useState<AnalysisSub>(null);
@@ -176,6 +182,28 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     return () =>
       window.removeEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
   }, []);
+
+  useEffect(() => {
+    const onOpenWorkflowWedge = (event: Event) => {
+      const detail = (event as CustomEvent<OpenWorkflowWedgeDetail>).detail;
+      if (!detail?.wedge) return;
+      onOpenWedge?.(detail.wedge);
+      if (detail.wedge === "engagement" && detail.sub) {
+        setEngagementSub(detail.sub as EngagementSub);
+      }
+    };
+    window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, onOpenWorkflowWedge);
+    return () =>
+      window.removeEventListener(
+        OPEN_WORKFLOW_WEDGE_EVENT,
+        onOpenWorkflowWedge,
+      );
+  }, [onOpenWedge]);
+
+  const backToEngagementGrid = () => {
+    setEngagementSub(null);
+    onOpenWedge?.("engagement");
+  };
 
   const growNetworkOpen =
     engagementSub === "grow_network" ||
@@ -460,21 +488,25 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <CommentAssistantModal
         open={engagementSub === "comment"}
         onClose={() => setEngagementSub(null)}
+        onBack={backToEngagementGrid}
         connected={connected}
       />
       <OpportunitiesModal
         open={engagementSub === "opportunities"}
         onClose={() => setEngagementSub(null)}
+        onBack={backToEngagementGrid}
         connected={connected}
       />
       <PostPulseModal
         open={engagementSub === "pulse"}
         onClose={() => setEngagementSub(null)}
+        onBack={backToEngagementGrid}
         connected={connected}
       />
       <GrowNetworkModal
         open={growNetworkOpen}
         onClose={closeGrowNetwork}
+        onBack={backToEngagementGrid}
         connected={connected}
         scrollToSection={growNetworkScrollTarget}
       />
