@@ -2,13 +2,14 @@ import React from "react";
 import ComponentErrorBoundary from "../../../../components/shared/ComponentErrorBoundary";
 import { DashboardActionModal } from "../dashboard/DashboardActionModal";
 import { PYMK_MODAL_SIZE } from "../dashboard/pymkModalLayout";
-import { PeopleYouMayKnowPanel } from "./PeopleYouMayKnowPanel";
+import { PymkNetworkSection } from "../dashboard/PymkNetworkSection";
 
 interface PeopleYouMayKnowModalProps {
   open: boolean;
   onClose: () => void;
 }
 
+/** Standalone PYMK modal (backward-compatible export). */
 export const PeopleYouMayKnowModal: React.FC<PeopleYouMayKnowModalProps> = ({
   open,
   onClose,
@@ -22,8 +23,8 @@ export const PeopleYouMayKnowModal: React.FC<PeopleYouMayKnowModalProps> = ({
     height={PYMK_MODAL_SIZE.height}
     maxHeight={PYMK_MODAL_SIZE.maxHeight}
   >
-    <ComponentErrorBoundary componentName="PeopleYouMayKnowPanel">
-      <PeopleYouMayKnowPanel />
+    <ComponentErrorBoundary componentName="PymkNetworkSection">
+      <PymkNetworkSection active={open} variant="standalone" onClose={onClose} />
     </ComponentErrorBoundary>
   </DashboardActionModal>
 );

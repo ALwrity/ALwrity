@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardActionModal } from "./DashboardActionModal";
 import { DashboardToolTile } from "./DashboardToolTile";
@@ -8,6 +8,8 @@ import { useLinkedInSocialConnection } from "../../../../hooks/useLinkedInSocial
 import {
   openGrowthEngineModal,
   openPostAnalyticsModal,
+  OPEN_GROW_NETWORK_EVENT,
+  type OpenGrowNetworkDetail,
 } from "../../utils/linkedInDashboardEvents";
 import {
   EngagementTrendsModal,
@@ -16,8 +18,9 @@ import {
   CommentAssistantModal,
   OpportunitiesModal,
   PostPulseModal,
-  NetworkAdvisorModal,
 } from "./EngagementWedgeModals";
+import { GrowNetworkModal } from "./GrowNetworkModal";
+import { GROW_NETWORK_TILE, type GrowNetworkScrollTarget } from "./growNetworkConstants";
 import {
   RepurposeLabModal,
   FormatTransformerModal,
@@ -26,7 +29,6 @@ import {
   PerfToPlanModal,
 } from "./RemarkWedgeModals";
 import { DraftLibraryModal } from "./PublishWedgeModals";
-import { PeopleYouMayKnowModal } from "../PeopleYouMayKnow";
 import { CreateWedgeComingSoonTile } from "./CreateWedgeComingSoonTile";
 import { PublishWedgeComingSoonTile } from "./PublishWedgeComingSoonTile";
 import { AnalysisWedgeComingSoonTile } from "./AnalysisWedgeComingSoonTile";
@@ -42,7 +44,15 @@ import { isAnalysisWedgeFeatureLocked } from "../../utils/linkedInAnalysisWedgeL
 
 type AnalysisSub = "trends" | null;
 type EngagementSub =
-  "comment" | "opportunities" | "pulse" | "network" | "pymk" | null;
+  | "comment"
+  | "opportunities"
+  | "pulse"
+  | "grow_network"
+  /** @deprecated Opens Grow Network (AI section) */
+  | "network"
+  /** @deprecated Opens Grow Network (PYMK section) */
+  | "pymk"
+  | null;
 type RemarkSub =
   "repurpose" | "transformer" | "refresh" | "reviver" | "perf_plan" | null;
 type PublishSub = "drafts" | null;
@@ -93,6 +103,9 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const navigate = useNavigate();
   const [analysisSub, setAnalysisSub] = useState<AnalysisSub>(null);
   const [engagementSub, setEngagementSub] = useState<EngagementSub>(null);
+  const [growNetworkScrollFromEvent, setGrowNetworkScrollFromEvent] = useState<
+    GrowNetworkScrollTarget | undefined
+  >();
   const [remarkSub, setRemarkSub] = useState<RemarkSub>(null);
   const [publishSub, setPublishSub] = useState<PublishSub>(null);
 
@@ -151,6 +164,35 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const openGrowthEngine = () => {
     onClose();
     openGrowthEngineModal();
+  };
+
+  useEffect(() => {
+    const onOpenGrowNetwork = (event: Event) => {
+      const detail = (event as CustomEvent<OpenGrowNetworkDetail>).detail;
+      setEngagementSub("grow_network");
+      setGrowNetworkScrollFromEvent(detail?.scrollToSection);
+    };
+    window.addEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
+    return () =>
+      window.removeEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
+  }, []);
+
+  const growNetworkOpen =
+    engagementSub === "grow_network" ||
+    engagementSub === "network" ||
+    engagementSub === "pymk";
+
+  const growNetworkScrollTarget: GrowNetworkScrollTarget | undefined =
+    growNetworkScrollFromEvent ??
+    (engagementSub === "pymk"
+      ? "live-linkedin"
+      : engagementSub === "network"
+        ? "ai-advisor"
+        : undefined);
+
+  const closeGrowNetwork = () => {
+    setEngagementSub(null);
+    setGrowNetworkScrollFromEvent(undefined);
   };
 
   return (
@@ -396,23 +438,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             }}
           />
           <DashboardToolTile
-            title="Network Advisor"
-            description="AI-suggested connections with personalised outreach notes"
-            icon="🤝"
-            accent="#dc2626"
+            title={GROW_NETWORK_TILE.title}
+            description={GROW_NETWORK_TILE.description}
+            icon={GROW_NETWORK_TILE.icon}
+            accent={GROW_NETWORK_TILE.accent}
             onClick={() => {
               onClose();
-              setEngagementSub("network");
-            }}
-          />
-          <DashboardToolTile
-            title="People You May Know"
-            description="Live LinkedIn network suggestions — discover connections in your industry"
-            icon="👥"
-            accent="#10b981"
-            onClick={() => {
-              onClose();
-              setEngagementSub("pymk");
+              setEngagementSub("grow_network");
             }}
           />
           <DashboardToolTile
@@ -440,14 +472,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={() => setEngagementSub(null)}
         connected={connected}
       />
-      <NetworkAdvisorModal
-        open={engagementSub === "network"}
-        onClose={() => setEngagementSub(null)}
+      <GrowNetworkModal
+        open={growNetworkOpen}
+        onClose={closeGrowNetwork}
         connected={connected}
-      />
-      <PeopleYouMayKnowModal
-        open={engagementSub === "pymk"}
-        onClose={() => setEngagementSub(null)}
+        scrollToSection={growNetworkScrollTarget}
       />
 
       {/* ── Remarket ── */}

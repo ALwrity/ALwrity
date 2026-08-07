@@ -62,6 +62,7 @@ import { PostAnalyticsModal } from "./dashboard/PostAnalyticsModal";
 import { GrowthEngineModal } from "./dashboard/GrowthEngineModal";
 import {
   OPEN_GROWTH_ENGINE_EVENT,
+  OPEN_GROW_NETWORK_EVENT,
   OPEN_POST_ANALYTICS_EVENT,
 } from "../utils/linkedInDashboardEvents";
 
@@ -190,14 +191,17 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   useEffect(() => {
     const onOpenPostAnalytics = () => setPostAnalyticsOpen(true);
     const onOpenGrowthEngine = () => setGrowthEngineOpen(true);
+    const onOpenGrowNetwork = () => setGrowthEngineOpen(false);
     window.addEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
     window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
+    window.addEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
     return () => {
       window.removeEventListener(
         OPEN_POST_ANALYTICS_EVENT,
         onOpenPostAnalytics,
       );
       window.removeEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
+      window.removeEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
     };
   }, []);
 

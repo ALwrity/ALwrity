@@ -1,16 +1,33 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import type { PymkSuggestionItem } from "../../../../services/linkedInPymkApi";
 import { buildAuthenticatedImageUrl } from "../../../../services/linkedInPymkApi";
 import { colors } from "../GrowthEngine/styles";
+import { OutreachNoteDisplay } from "../dashboard/OutreachNoteDisplay";
+import { PymkPersonCardActions } from "./PymkPersonCardActions";
 
-interface PymkPersonCardProps {
+export interface PymkPersonCardProps {
   person: PymkSuggestionItem;
+  /** When set, shows draft outreach actions (Grow Network P1). */
+  enableOutreach?: boolean;
+  draftText?: string;
+  isDrafting?: boolean;
+  onDraftOutreach?: () => void;
+  onClose?: () => void;
 }
 
-export const PymkPersonCard: React.FC<PymkPersonCardProps> = ({ person }) => {
-  const [photoFailed, setPhotoFailed] = useState(false);
-  const [bgFailed, setBgFailed] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
+export const PymkPersonCard: React.FC<PymkPersonCardProps> = ({
+  person,
+  enableOutreach = false,
+  draftText,
+  isDrafting = false,
+  onDraftOutreach,
+  onClose,
+}) => {
+  const [photoFailed, setPhotoFailed] = React.useState(false);
+  const [bgFailed, setBgFailed] = React.useState(false);
+  const [retryCount, setRetryCount] = React.useState(0);
+
+  const hasDraft = Boolean(draftText);
 
   const initials = person.name
     .split(" ")
@@ -19,15 +36,10 @@ export const PymkPersonCard: React.FC<PymkPersonCardProps> = ({ person }) => {
     .map((part) => part[0]?.toUpperCase() ?? "")
     .join("");
 
-  const isPending = person.connection_state === "invitation_pending";
-
-  // Build direct authenticated image URLs with token from API client cache
-  // Retry mechanism: re-build URLs when retryCount changes (triggered by interval)
   const photoUrl = buildAuthenticatedImageUrl(person.photo_url ?? "");
   const bgUrl = buildAuthenticatedImageUrl(person.background_url ?? "");
 
-  // Retry building URLs a few times if token wasn't available initially
-  useEffect(() => {
+  React.useEffect(() => {
     if (
       (person.photo_url || person.background_url) &&
       !photoUrl &&
@@ -35,11 +47,9 @@ export const PymkPersonCard: React.FC<PymkPersonCardProps> = ({ person }) => {
       retryCount < 5
     ) {
       const timer = setTimeout(
-        () => {
-          setRetryCount((c) => c + 1);
-        },
+        () => setRetryCount((c) => c + 1),
         500 * (retryCount + 1),
-      ); // Progressive backoff: 500ms, 1000ms, 1500ms...
+      );
       return () => clearTimeout(timer);
     }
   }, [person.photo_url, person.background_url, photoUrl, bgUrl, retryCount]);
@@ -47,169 +57,75 @@ export const PymkPersonCard: React.FC<PymkPersonCardProps> = ({ person }) => {
   const showPhoto = Boolean(photoUrl) && !photoFailed;
   const showBackground = Boolean(bgUrl) && !bgFailed;
 
-  // Log image loading issues for debugging
-  const handlePhotoError = () => {
-    console.warn("[PYMK] Failed to load profile photo:", {
-      name: person.name,
-      originalUrl: person.photo_url,
-      proxyUrl: photoUrl?.slice(0, 100) + "...",
-    });
-    setPhotoFailed(true);
-  };
-
-  const handleBgError = () => {
-    console.warn("[PYMK] Failed to load background image:", {
-      name: person.name,
-      originalUrl: person.background_url,
-      proxyUrl: bgUrl?.slice(0, 100) + "...",
-    });
-    setBgFailed(true);
-  };
-
   return (
     <article
-      style={{
-        border: "1px solid #d0d7de",
-        borderRadius: 12,
-        background: "#fff",
-        overflow: "hidden",
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 280,
-      }}
+      className="pymk-person-card"
+      data-testid={`pymk-person-card-${person.profile_id}`}
     >
       <div
+        className="pymk-person-card__banner"
         style={{
-          height: 56,
           background: showBackground
             ? `url(${bgUrl}) center/cover no-repeat`
-            : "linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%)",
+            : undefined,
         }}
       >
         {showBackground && (
           <img
             src={bgUrl!}
             alt=""
-            onError={handleBgError}
+            onError={() => setBgFailed(true)}
             style={{ display: "none" }}
           />
         )}
       </div>
 
-      <div style={{ marginTop: -36, padding: "0 16px", textAlign: "center" }}>
+      <div className="pymk-person-card__avatar-wrap">
         {showPhoto ? (
           <img
             src={photoUrl!}
             alt=""
             width={72}
             height={72}
-            onError={handlePhotoError}
-            style={{
-              borderRadius: "50%",
-              objectFit: "cover",
-              border: "2px solid #fff",
-              background: "#fff",
-            }}
+            onError={() => setPhotoFailed(true)}
+            className="pymk-person-card__avatar"
           />
         ) : (
-          <div
-            aria-hidden="true"
-            style={{
-              width: 72,
-              height: 72,
-              margin: "0 auto",
-              borderRadius: "50%",
-              background: "#e8f3ff",
-              color: colors.primary,
-              border: "2px solid #fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontWeight: 700,
-              fontSize: 22,
-            }}
-          >
+          <div aria-hidden="true" className="pymk-person-card__avatar-fallback">
             {initials || "?"}
           </div>
         )}
       </div>
 
-      <div
-        style={{
-          padding: "12px 16px 16px",
-          textAlign: "center",
-          flex: 1,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+      <div className="pymk-person-card__body">
         <a
           href={person.profile_url}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            fontWeight: 600,
-            fontSize: 15,
-            color: colors.textDark,
-            textDecoration: "none",
-            lineHeight: 1.3,
-          }}
+          className="pymk-person-card__name"
         >
           {person.name}
         </a>
 
         {person.headline && (
-          <p
-            style={{
-              margin: "8px 0 0",
-              fontSize: 12,
-              color: colors.textMuted,
-              lineHeight: 1.45,
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              minHeight: 34,
-            }}
-          >
-            {person.headline}
-          </p>
+          <p className="pymk-person-card__headline">{person.headline}</p>
         )}
 
         {person.mutual_connections_text && (
-          <p
-            style={{
-              margin: "8px 0 0",
-              fontSize: 11,
-              color: colors.textSecondary,
-            }}
-          >
-            {person.mutual_connections_text}
-          </p>
+          <p className="pymk-person-card__mutual">{person.mutual_connections_text}</p>
         )}
 
-        <div style={{ marginTop: "auto", paddingTop: 14 }}>
-          <button
-            type="button"
-            disabled
-            aria-disabled="true"
-            title="Connect will be available in a future release"
-            style={{
-              width: "100%",
-              padding: "8px 12px",
-              borderRadius: 20,
-              border: `1px solid ${colors.primary}`,
-              background: "#fff",
-              color: colors.primary,
-              fontWeight: 600,
-              fontSize: 13,
-              cursor: "not-allowed",
-              opacity: isPending ? 0.75 : 0.9,
-            }}
-          >
-            {isPending ? "Pending" : "Connect"}
-          </button>
-        </div>
+        {hasDraft && draftText && (
+          <OutreachNoteDisplay note={draftText} onClose={onClose} compact />
+        )}
+
+        <PymkPersonCardActions
+          person={person}
+          enableOutreach={enableOutreach}
+          hasDraft={hasDraft}
+          isDrafting={isDrafting}
+          onDraftOutreach={onDraftOutreach}
+        />
       </div>
     </article>
   );

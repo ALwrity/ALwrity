@@ -5,15 +5,12 @@
  * E2  CommentAssistantModal       — extracted to CommentAssistantInboxModal.tsx
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
  * E3  PostPulseModal              — real Unipile post metrics with repurpose CTAs
- * E4  NetworkAdvisorModal         — network_suggestions from cache with outreach drafts
+ * E4  GrowNetworkModal            — AI Network Advisor + Live PYMK (see GrowNetworkModal.tsx)
  */
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
 import {
-  linkedInGrowthApi,
   type EngagementOpportunityItem,
-  type NetworkSuggestionItem,
-  type ConsolidatedGrowthResponse,
 } from "../../../../services/linkedInGrowthApi";
 import { linkedInWriterApi } from "../../../../services/linkedInWriterApi";
 import {
@@ -27,40 +24,15 @@ import {
 } from "../GrowthEngine/styles";
 import { openGrowthEngineModal } from "../../utils/linkedInDashboardEvents";
 import { pushDraftToStudio } from "./engagementWedgeDraftUtils";
+import {
+  formatCacheAge,
+} from "./engagementWedgeGrowthCache";
+import { useGrowthCache } from "./useGrowthCache";
 
 export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
-
-// ---------------------------------------------------------------------------
-// Shared helpers (mirror of AnalysisWedgeModals pattern)
-// ---------------------------------------------------------------------------
-
-const CACHE_KEY = "alwrity_growth_engine";
-
-interface GrowthCachePayload {
-  data: ConsolidatedGrowthResponse;
-  cachedAt: number;
-}
-
-function readGrowthCache(): GrowthCachePayload | null {
-  try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
-    return raw ? (JSON.parse(raw) as GrowthCachePayload) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeGrowthCache(data: ConsolidatedGrowthResponse) {
-  try {
-    sessionStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ data, cachedAt: Date.now() }),
-    );
-  } catch {
-    /* full */
-  }
-}
+export { NetworkAdvisorModal } from "./NetworkAdvisorModal";
+export { GrowNetworkModal } from "./GrowNetworkModal";
 
 function openInCreate(topic: string, keyPoints: string, type = "post") {
   window.dispatchEvent(
@@ -71,13 +43,7 @@ function openInCreate(topic: string, keyPoints: string, type = "post") {
 }
 
 function formatAge(cachedAt: number): string {
-  const ms = Date.now() - cachedAt;
-  const min = Math.floor(ms / 60000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min} min ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return `${Math.floor(hr / 24)}d ago`;
+  return formatCacheAge(cachedAt);
 }
 
 const RefreshBar: React.FC<{
@@ -292,42 +258,7 @@ const EmptyPrompt: React.FC<{
   </div>
 );
 
-// Shared hook to load from growth engine cache
-function useGrowthCache(open: boolean) {
-  const [data, setData] = useState<ConsolidatedGrowthResponse | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    const c = readGrowthCache();
-    setData(c ? c.data : null);
-    setError("");
-    setLoading(false);
-  }, [open]);
-
-  const loadAll = useCallback(
-    async (errMsg = "Could not load insights. Please try again.") => {
-      setLoading(true);
-      setError("");
-      try {
-        const result = await linkedInGrowthApi.analyzeAll();
-        writeGrowthCache(result);
-        setData(result);
-        return result;
-      } catch {
-        setError(errMsg);
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
-  return { data, loading, error, loadAll };
-}
-
+// Shared hook — see useGrowthCache.ts
 
 function textareaStyle(minH: number): React.CSSProperties {
   return {
@@ -1172,316 +1103,3 @@ const MetricChip: React.FC<{ icon: string; value: number; label: string }> = ({
   </div>
 );
 
-// ─────────────────────────────────────────────────────────────────────────────
-// E4 — Network Growth Advisor
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface NetworkAdvisorModalProps {
-  open: boolean;
-  onClose: () => void;
-  connected?: boolean;
-}
-
-export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({
-  open,
-  onClose,
-  connected = true,
-}) => {
-  const { data, loading, error, loadAll } = useGrowthCache(open);
-  const [drafting, setDrafting] = useState<number | null>(null);
-  const [drafts, setDrafts] = useState<Record<number, string>>({});
-  const [draftError, setDraftError] = useState("");
-
-  useEffect(() => {
-    if (open) setDrafts({});
-  }, [open]);
-
-  const suggestions: NetworkSuggestionItem[] = useMemo(
-    () => data?.network_suggestions?.suggestions ?? [],
-    [data],
-  );
-
-  const handleDraftOutreach = async (
-    item: NetworkSuggestionItem,
-    idx: number,
-  ) => {
-    setDrafting(idx);
-    setDraftError("");
-    try {
-      const res = await linkedInWriterApi.generateCommentResponse({
-        original_post: `I want to connect with ${item.name}, ${item.title} at ${item.company}.`,
-        comment: `Context: ${item.why_connect}. Their suggested note: "${item.suggested_note}"`,
-        response_type: "professional",
-      });
-      setDrafts((prev) => ({
-        ...prev,
-        [idx]: res.response ?? item.suggested_note,
-      }));
-    } catch {
-      setDrafts((prev) => ({ ...prev, [idx]: item.suggested_note }));
-      setDraftError("AI refinement failed, using suggested note.");
-    } finally {
-      setDrafting(null);
-    }
-  };
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Network Growth Advisor"
-      onClose={onClose}
-      maxWidth={560}
-      maxHeight="min(92vh, 740px)"
-    >
-      <p
-        style={{
-          margin: "0 0 14px",
-          fontSize: 13,
-          color: colors.textSecondary,
-          lineHeight: 1.5,
-        }}
-      >
-        AI-suggested connections to grow your network this week — with
-        personalised outreach messages.
-      </p>
-
-      {!connected && data && <StaleDataNote />}
-
-      {!data && !loading && !connected && (
-        <ConnectPrompt message="Connect your LinkedIn account to get personalised network suggestions based on your profile and activity." />
-      )}
-
-      {!data && !loading && connected && (
-        <EmptyPrompt
-          icon="🤝"
-          title="No network suggestions cached"
-          desc="Load an AI analysis to discover the right people to connect with."
-          btnLabel="🚀 Load Suggestions"
-          onLoad={() => void loadAll()}
-          loading={loading}
-        />
-      )}
-      {loading && (
-        <LoadingRow message="Analysing your network growth opportunities…" />
-      )}
-      {error && <ErrorBanner msg={error} />}
-      {draftError && <ErrorBanner msg={draftError} />}
-
-      {!loading &&
-        suggestions.slice(0, 3).map((item, idx) => {
-          const hasDraft = !!drafts[idx];
-          const isDrafting = drafting === idx;
-          return (
-            <div
-              key={idx}
-              style={{
-                ...rowBase,
-                marginBottom: 10,
-                borderLeft: `3px solid ${idx === 0 ? colors.primary : colors.border}`,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: 6,
-                  gap: 8,
-                }}
-              >
-                <div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: colors.textDark,
-                    }}
-                  >
-                    🤝 {item.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: colors.textSecondary }}>
-                    {item.title} · {item.company}
-                  </div>
-                </div>
-                <ConfPill level={item.confidence} />
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: colors.textMedium,
-                  fontStyle: "italic",
-                  marginBottom: 8,
-                }}
-              >
-                💡 {item.why_connect}
-              </div>
-
-              {hasDraft ? (
-                <div
-                  style={{
-                    background: "#f0fdf4",
-                    border: "1px solid #86efac",
-                    borderRadius: 7,
-                    padding: "8px 11px",
-                    marginBottom: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: 11,
-                      fontWeight: 700,
-                      color: "#166534",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Personalised Outreach Note
-                  </div>
-                  <div
-                    style={{ fontSize: 12, color: "#14532d", lineHeight: 1.55 }}
-                  >
-                    {drafts[idx]}
-                  </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        void navigator.clipboard.writeText(drafts[idx]);
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        background: "#dcfce7",
-                        color: "#166534",
-                        border: "1px solid #86efac",
-                        borderRadius: 5,
-                        fontSize: 11,
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      📋 Copy Note
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        pushDraftToStudio(drafts[idx]);
-                        onClose();
-                      }}
-                      style={{
-                        padding: "4px 10px",
-                        background: "none",
-                        border: `1px solid ${colors.primary}`,
-                        borderRadius: 5,
-                        fontSize: 11,
-                        color: colors.primary,
-                        cursor: "pointer",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Edit in Studio
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: colors.textSecondary,
-                    background: colors.badgeBg,
-                    padding: "6px 10px",
-                    borderRadius: 6,
-                    marginBottom: 8,
-                    fontStyle: "italic",
-                  }}
-                >
-                  "{item.suggested_note}"
-                </div>
-              )}
-
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {!hasDraft && (
-                  <button
-                    type="button"
-                    onClick={() => void handleDraftOutreach(item, idx)}
-                    disabled={isDrafting}
-                    style={{
-                      padding: "5px 12px",
-                      background: colors.primary,
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    {isDrafting ? (
-                      <>
-                        <Spinner /> Drafting…
-                      </>
-                    ) : (
-                      "✉️ Draft Outreach Note"
-                    )}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    openInCreate(
-                      item.name + "'s focus area",
-                      item.why_connect + "\n" + item.suggested_note,
-                    );
-                    onClose();
-                  }}
-                  style={{
-                    padding: "5px 12px",
-                    background: "none",
-                    border: `1px solid ${colors.border}`,
-                    borderRadius: 6,
-                    fontSize: 11,
-                    color: colors.textSecondary,
-                    cursor: "pointer",
-                  }}
-                >
-                  ✍️ Post on Their Topic
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-      {!loading && suggestions.length > 3 && (
-        <div
-          style={{
-            fontSize: 12,
-            color: colors.textTertiary,
-            marginTop: 4,
-            textAlign: "center",
-          }}
-        >
-          + {suggestions.length - 3} more in the{" "}
-          <button
-            type="button"
-            onClick={() => {
-              openGrowthEngineModal();
-              onClose();
-            }}
-            style={{
-              background: "none",
-              border: "none",
-              color: colors.primary,
-              cursor: "pointer",
-              fontSize: 12,
-              fontWeight: 600,
-              padding: 0,
-            }}
-          >
-            Growth Engine →
-          </button>
-        </div>
-      )}
-    </DashboardActionModal>
-  );
-};

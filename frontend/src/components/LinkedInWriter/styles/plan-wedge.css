@@ -405,6 +405,10 @@
   background: rgba(220, 38, 38, 0.12);
 }
 
+.plan-wedge-coming-soon-card__icon--network_advisor {
+  background: rgba(220, 38, 38, 0.12);
+}
+
 /* Create wedge — plan-wedge-style locked tiles (Watchdog pattern) */
 .create-wedge-coming-soon-tile {
   width: 100%;

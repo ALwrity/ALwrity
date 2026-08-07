@@ -1,6 +1,7 @@
 export { GrowthEnginePanel } from "./GrowthEnginePanel";
 export { TrendingTopicCard } from "./TrendingTopicCard";
 export { NetworkSuggestionCard } from "./NetworkSuggestionCard";
+export { GrowNetworkEngineLinkCard } from "./GrowNetworkEngineLinkCard";
 export { EngagementCard } from "./EngagementCard";
 export { PreviewScoreCard } from "./PreviewScoreCard";
 export { ViralAnalysisCard } from "./ViralAnalysisCard";
