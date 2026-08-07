@@ -20,13 +20,16 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  // Tooltip
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Paper,
+  ToggleButtonGroup, ToggleButton,
 } from '@mui/material';
 import {
   Business as BusinessIcon,
   OpenInNew as OpenInNewIcon,
   Delete as DeleteIcon,
-  Add as AddIcon
+  Add as AddIcon,
+  ViewModule as CardViewIcon,
+  ViewList as ListViewIcon,
 } from '@mui/icons-material';
 
 export interface Competitor {
@@ -75,6 +78,7 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
 }) => {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newCompetitorUrl, setNewCompetitorUrl] = useState('');
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   const handleAddSubmit = () => {
     if (!newCompetitorUrl) return;
@@ -117,29 +121,26 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
 
   return (
     <>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography 
-            variant="h6" 
-            fontWeight={600} 
-            sx={{ color: '#1a202c !important' }} // Force dark text
-        >
-            <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#667eea !important' }} />
-            Discovered Competitors ({competitors.length})
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3} flexWrap="wrap" gap={1}>
+        <Typography variant="h6" fontWeight={600} sx={{ color: '#1a202c !important' }}>
+          <BusinessIcon sx={{ mr: 1, verticalAlign: 'middle', color: '#667eea !important' }} />
+          Discovered Competitors ({competitors.length})
         </Typography>
-        {onAddCompetitor && (
-            <Button
-                variant="outlined"
-                size="small"
-                startIcon={<AddIcon />}
-                onClick={() => setOpenAddDialog(true)}
-                sx={{ textTransform: 'none' }}
-            >
-                Add Competitor
-            </Button>
-        )}
+        <Box display="flex" gap={1}>
+          {competitors.length > 0 && (
+            <ToggleButtonGroup value={viewMode} exclusive onChange={(_, v) => v && setViewMode(v)} size="small">
+              <ToggleButton value="card"><CardViewIcon fontSize="small" /></ToggleButton>
+              <ToggleButton value="table"><ListViewIcon fontSize="small" /></ToggleButton>
+            </ToggleButtonGroup>
+          )}
+          {onAddCompetitor && (
+            <Button variant="outlined" size="small" startIcon={<AddIcon />} onClick={() => setOpenAddDialog(true)} sx={{ textTransform: 'none' }}>Add Competitor</Button>
+          )}
+        </Box>
       </Box>
 
-      <Grid container spacing={3}>
+      {viewMode === 'card' ? (
+        <Grid container spacing={3}>
         {competitors.map((competitor, index) => (
           <Grid item xs={12} sm={6} md={4} lg={3} xl={2} key={index}>
             <Card sx={{ 
@@ -174,20 +175,8 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
 
               <CardContent sx={{ flexGrow: 1 }}>
                 <Box display="flex" alignItems="flex-start" gap={2} mb={2}>
-                  <Avatar 
-                    sx={{ 
-                      width: 40, 
-                      height: 40,
-                      backgroundColor: '#f8fafc',
-                      border: '1px solid #e2e8f0'
-                    }}
-                    src={competitor.favicon || getFaviconUrl(competitor.url)}
-                    onError={(e) => {
-                      // Hide the image if it fails to load
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  >
-                    <BusinessIcon sx={{ color: '#667eea' }} />
+                  <Avatar sx={{ width: 40, height: 40, bgcolor: '#eef2ff', color: '#6366f1', fontSize: '1.1rem', fontWeight: 700, border: '1px solid #c7d2fe' }}>
+                    {(competitor.title || '?').charAt(0).toUpperCase()}
                   </Avatar>
                   <Box flex={1} pr={onRemoveCompetitor ? 3 : 0}>
                     <Typography 
@@ -240,13 +229,9 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
               </CardContent>
 
               <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button
-                  size="small"
-                  startIcon={<OpenInNewIcon />}
-                  onClick={() => window.open(competitor.url, '_blank')}
-                >
-                  Visit Website
-                </Button>
+                <Button size="small" startIcon={<OpenInNewIcon />}
+                  onClick={() => competitor.url && window.open(competitor.url, '_blank')}
+                  disabled={!competitor.url}>Visit Website</Button>
                 {competitor.highlights && competitor.highlights.length > 0 && (
                   <Button
                     size="small"
@@ -259,8 +244,52 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
               </CardActions>
             </Card>
           </Grid>
-        ))}
-      </Grid>
+          ))}
+        </Grid>
+      ) : (
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow sx={{ bgcolor: '#f1f5f9' }}>
+                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Company</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Domain</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Match</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Highlights</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem', width: 120 }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {competitors.map((competitor, index) => (
+                <TableRow key={index} sx={{ '&:nth-of-type(even)': { bgcolor: '#f8fafc' } }}>
+                  <TableCell>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      <Avatar sx={{ width: 24, height: 24, bgcolor: '#eef2ff', color: '#6366f1', fontSize: '0.7rem', fontWeight: 700 }}>
+                        {(competitor.title || '?').charAt(0).toUpperCase()}
+                      </Avatar>
+                      <Typography variant="body2" fontWeight={600} sx={{ color: '#1e293b' }}>{competitor.title}</Typography>
+                    </Box>
+                  </TableCell>
+                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', wordBreak: 'break-all', fontSize: '0.8rem' }}>{competitor.domain}</Typography></TableCell>
+                  <TableCell><Chip label={`${Math.round(competitor.relevance_score * 100)}%`} color="primary" size="small" variant="outlined" /></TableCell>
+                  <TableCell>
+                    {competitor.highlights?.length ? competitor.highlights.slice(0, 2).map((h, i) => (
+                      <Typography key={i} variant="caption" sx={{ color: '#475569', lineHeight: 1.3, display: 'block' }}>{h}</Typography>
+                    )) : <Typography variant="caption" sx={{ color: '#94a3b8' }}>—</Typography>}
+                  </TableCell>
+                  <TableCell>
+                    <Box display="flex" gap={0.5}>
+                      <IconButton size="small" onClick={() => competitor.url && window.open(competitor.url, '_blank')} disabled={!competitor.url} title={competitor.url ? 'Visit' : 'No website'}><OpenInNewIcon fontSize="small" /></IconButton>
+                      {competitor.highlights?.length > 0 && <IconButton size="small" onClick={() => onShowHighlights(competitor)} title="Highlights"><BusinessIcon fontSize="small" /></IconButton>}
+                      {onRemoveCompetitor && <IconButton size="small" onClick={() => onRemoveCompetitor(index)} title="Remove" sx={{ color: '#ef4444' }}><DeleteIcon fontSize="small" /></IconButton>}
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+
 
       {/* Add Competitor Dialog */}
       <Dialog open={openAddDialog} onClose={() => setOpenAddDialog(false)}>

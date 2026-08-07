@@ -27,6 +27,7 @@ from .exa_service import ExaService
 from .exa_content_research import ExaContentResearchProvider, get_exa_content_provider
 from .exa_research_provider import ExaResearchProvider
 from .exa_monitors import ExaMonitorClient, get_exa_monitor_client
+from .exa_agent import ExaAgentClient
 from .tavily_service import TavilyService
 
 # Core Research Engine (v2.0)
@@ -57,6 +58,9 @@ __all__ = [
     # Exa Monitors API client (scheduled recurring searches)
     "ExaMonitorClient",
     "get_exa_monitor_client",
+
+    # Exa Agent API
+    "ExaAgentClient",
     
     # Core Research Engine (v2.0)
     "ResearchEngine",
