@@ -158,7 +158,11 @@ Apply the same quality bar to ALL 7 sections.
 # ── Exa search queries per section ──────────────────────────────────────
 SEARCH_QUERIES = {
     "trending": ["{industry} trends insights news {year}"],
-    "network": ["leading {industry} {title} professionals thought leadership", "top voices in {industry} LinkedIn"],
+    "network": [
+        "site:linkedin.com/in {industry} {title} thought leader",
+        "leading {industry} {title} professionals LinkedIn profile",
+        "top voices in {industry} LinkedIn",
+    ],
     "engagement": ["{industry} thought leadership insights", "{industry} debate discussion analysis"],
     "viral": ["viral LinkedIn post {industry} high engagement", "trending LinkedIn content {industry} strategy", "LinkedIn post that went viral {industry}"],
     "content_gaps": ["hot topics {industry} {title} {year}", "underrated LinkedIn topics {industry} professionals should post about"],
@@ -459,7 +463,36 @@ class ConsolidatedGrowthService:
 
     def _parse_network(self, raw: dict, now: datetime) -> NetworkSuggestionsResponse:
         try:
-            items = [NetworkSuggestionItem(**s) for s in raw.get("network_suggestions", [])]
+            items: list[NetworkSuggestionItem] = []
+            for s in raw.get("network_suggestions", []):
+                if not isinstance(s, dict):
+                    continue
+                name = sanitize_llm_text(s.get("name"))
+                title = sanitize_llm_text(s.get("title"))
+                company = sanitize_llm_text(s.get("company"))
+                why_connect = sanitize_llm_text(s.get("why_connect"))
+                suggested_note = sanitize_llm_text(s.get("suggested_note"))
+                confidence = s.get("confidence")
+                if (
+                    not name
+                    or not title
+                    or not company
+                    or not why_connect
+                    or not suggested_note
+                    or confidence not in ("high", "medium", "low")
+                ):
+                    continue
+                items.append(
+                    NetworkSuggestionItem(
+                        name=name,
+                        title=title,
+                        company=company,
+                        why_connect=why_connect,
+                        suggested_note=suggested_note,
+                        data_source_detail=sanitize_llm_text(s.get("data_source_detail")) or "",
+                        confidence=confidence,
+                    )
+                )
             return NetworkSuggestionsResponse(
                 suggestions=items,
                 data_source_summary=raw.get("network_data_source_summary", ""),

@@ -11,7 +11,7 @@ import {
   type BrandScorecardResponse,
 } from "../../../../services/linkedInGrowthApi";
 import { TrendingTopicCard } from "./TrendingTopicCard";
-import { NetworkSuggestionCard } from "./NetworkSuggestionCard";
+import { GrowNetworkEngineLinkCard } from "./GrowNetworkEngineLinkCard";
 import { EngagementCard } from "./EngagementCard";
 import { ViralAnalysisCard } from "./ViralAnalysisCard";
 import { StrategyBriefCard } from "./StrategyBriefCard";
@@ -741,32 +741,27 @@ export const GrowthEnginePanel: React.FC<GrowthEnginePanelProps> = ({
         </ComponentErrorBoundary>
       )}
 
-      {network_suggestions && network_suggestions.suggestions.length > 0 && (
-        <ComponentErrorBoundary componentName="NetworkSuggestionCard">
-          {cardWrapper(
-            "network",
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 4,
-                }}
-              >
-                <span style={{ fontSize: 11, color: colors.textSecondary }}>
-                  Updated {formatTimeAgo(network_suggestions.generated_at)}
-                </span>
-                {cardActionBtn("network", "Refresh", true)}
-              </div>
-              <NetworkSuggestionCard
-                suggestions={network_suggestions.suggestions}
-                dataSourceSummary={network_suggestions.data_source_summary}
-              />
-            </div>,
-          )}
-        </ComponentErrorBoundary>
-      )}
+      <ComponentErrorBoundary componentName="GrowNetworkEngineLinkCard">
+        {cardWrapper(
+          "network",
+          <GrowNetworkEngineLinkCard
+            suggestionCount={network_suggestions?.suggestions?.length ?? 0}
+            dataSourceSummary={network_suggestions?.data_source_summary}
+            updatedLabel={
+              network_suggestions?.generated_at
+                ? formatTimeAgo(network_suggestions.generated_at)
+                : undefined
+            }
+            previewNames={
+              network_suggestions?.suggestions
+                ?.slice(0, 2)
+                .map((s) => s.name) ?? []
+            }
+            onRefresh={() => refreshCard("network")}
+            refreshing={refreshing.has("network")}
+          />,
+        )}
+      </ComponentErrorBoundary>
 
       {engagement_opportunities &&
         engagement_opportunities.opportunities.length > 0 && (

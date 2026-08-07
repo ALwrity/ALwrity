@@ -34,16 +34,18 @@ class NetworkGrowthService:
             self._exa_provider = get_exa_content_provider()
         return self._exa_provider
 
-    def _resolve_profile(self, user_id: str) -> Dict[str, Any]:
-        """Resolve the user's profile context."""
+    def _resolve_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Resolve the user's profile context. Returns None when unavailable."""
         repo = self._get_profile_repo()
         context = repo.get_profile_context(user_id)
         if not context or not isinstance(context, dict):
-            raise ValueError("Could not resolve profile context")
+            logger.warning("[NetworkGrowth] No profile context for user_id={}", user_id)
+            return None
 
         industry = context.get("industry", "").strip()
         if not industry:
-            raise ValueError("Could not resolve user industry from profile context")
+            logger.warning("[NetworkGrowth] Missing industry in profile context user_id={}", user_id)
+            return None
 
         personal = context.get("personal_information", {}) or {}
         professional = context.get("professional_information", {}) or {}
@@ -66,7 +68,8 @@ class NetworkGrowthService:
 
         queries = format_industry_search_queries(
             [
-                "leading {industry} {title} professionals thought leadership {year}",
+                "site:linkedin.com/in {industry} {title} thought leader {year}",
+                "leading {industry} {title} professionals LinkedIn profile {year}",
                 "top voices in {industry} LinkedIn {year}",
             ],
             industry=industry,
@@ -113,6 +116,13 @@ class NetworkGrowthService:
             "You are a LinkedIn network growth strategist. "
             "Based on the user's profile and recent industry content, "
             "suggest 3 people they should connect with on LinkedIn.\n\n"
+            "CRITICAL ANTI-HALLUCINATION RULES:\n"
+            "- ONLY suggest people whose names appear in the provided research data "
+            "(article titles, authors, or snippets).\n"
+            "- NEVER invent names, titles, companies, or statistics.\n"
+            "- If the research data does not contain enough verifiable people, "
+            "return an empty suggestions array.\n"
+            "- Every data_source_detail must cite a specific search result.\n\n"
             "For each suggestion provide:\n"
             "- name: Full name\n"
             "- title: Professional title/role\n"
@@ -203,7 +213,18 @@ class NetworkGrowthService:
         user_id: str,
     ) -> NetworkSuggestionsResponse:
         """Return people the user should connect with this week."""
+        now = datetime.now(timezone.utc)
         profile = await asyncio.to_thread(self._resolve_profile, user_id)
+        if not profile:
+            return NetworkSuggestionsResponse(
+                suggestions=[],
+                data_source_summary=(
+                    "Connect your LinkedIn account and complete profile analysis "
+                    "to get personalized network suggestions grounded in your industry."
+                ),
+                generated_at=now,
+            )
+
         industry = profile["industry"]
         title = profile["title"]
         headline = profile["headline"]
@@ -213,12 +234,25 @@ class NetworkGrowthService:
             logger.warning("[NetworkGrowth] No content found for industry '{}'", industry)
             return NetworkSuggestionsResponse(
                 suggestions=[],
-                data_source_summary="No LinkedIn profile or Exa data available yet. "
-                "Connect your LinkedIn account to get personalized network suggestions.",
-                generated_at=datetime.now(timezone.utc),
+                data_source_summary=(
+                    "Insufficient industry research data to suggest connections. "
+                    "Connect LinkedIn and try again — suggestions only appear when "
+                    "verifiable people can be grounded in search results."
+                ),
+                generated_at=now,
             )
 
         suggestions = await self._llm_generate_suggestions(industry, title, headline, articles, user_id)
+        if not suggestions:
+            return NetworkSuggestionsResponse(
+                suggestions=[],
+                data_source_summary=(
+                    "Research data did not contain enough verifiable people to suggest. "
+                    "We only recommend connections grounded in your profile and industry research."
+                ),
+                generated_at=now,
+            )
+
         data_source_summary = (
             f"Based on your LinkedIn profile ({title} in {industry}) "
             f"+ {len(articles)} industry articles and thought leadership content"
@@ -227,5 +261,5 @@ class NetworkGrowthService:
         return NetworkSuggestionsResponse(
             suggestions=suggestions,
             data_source_summary=data_source_summary,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=now,
         )

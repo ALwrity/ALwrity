@@ -3,7 +3,13 @@ import { ConnectLockBadge } from '../dashboard/ConnectLockIcon';
 
 interface PlanWedgeComingSoonCardProps {
   icon: string;
-  iconVariant: "watchdog" | "weekly" | "calendar" | "carousel" | "video_script";
+  iconVariant:
+    | "watchdog"
+    | "weekly"
+    | "calendar"
+    | "carousel"
+    | "video_script"
+    | "network_advisor";
   title: string;
   description: string;
   notified: boolean;
