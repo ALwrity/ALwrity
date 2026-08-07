@@ -76,6 +76,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   const [bingCollecting, setBingCollecting] = useState<boolean>(false);
   const [bingCollectMsg, setBingCollectMsg] = useState<string | null>(null);
   const [bingSiteUrl, setBingSiteUrl] = useState<string>('');
+  const [selectedGscSite, setSelectedGscSite] = useState<string>('');
   const [showLegend, setShowLegend] = useState<boolean>(false);
 
   const platformsRef = useRef(platforms);
@@ -84,6 +85,8 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
   rangeDaysRef.current = rangeDays;
   const siteUrlRef = useRef(siteUrl);
   siteUrlRef.current = siteUrl;
+  const selectedGscSiteRef = useRef(selectedGscSite);
+  selectedGscSiteRef.current = selectedGscSite;
 
   const loadingRef = useRef(false);
   const analyticsDataRef = useRef<Record<string, PlatformAnalyticsType>>({});
@@ -106,6 +109,13 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     if (aKeys.length !== bKeys.length) return false;
     return aKeys.every(k => b.hasOwnProperty(k) && a[k]?.status === b[k]?.status);
   };
+
+  // When user selects a different GSC site, re-fetch analytics
+  useEffect(() => {
+    if (selectedGscSite) {
+      loadData();
+    }
+  }, [selectedGscSite]);
 
   const loadData = useCallback(async () => {
     if (loadingRef.current) return;
@@ -480,6 +490,25 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
                 </Select>
               </FormControl>
             </Grid>
+            {platformStatus['gsc']?.sites && (platformStatus['gsc']?.sites?.length || 0) > 1 && (
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="gsc-site-label">GSC Site</InputLabel>
+                  <Select
+                    labelId="gsc-site-label"
+                    label="GSC Site"
+                    value={selectedGscSite}
+                    onChange={(e) => setSelectedGscSite(e.target.value)}
+                  >
+                    {platformStatus['gsc'].sites.map((site: any) => (
+                      <MenuItem key={site.siteUrl} value={site.siteUrl}>
+                        {site.siteUrl}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            )}
           </Grid>
 
           <Grid container spacing={3}>
