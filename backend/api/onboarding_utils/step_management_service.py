@@ -589,6 +589,11 @@ class StepManagementService:
                 step_data['social_media_accounts'] = social_media
                 step_data['crawl_social_media'] = crawl_social_media
                 
+                # Include saved sitemap analysis if available
+                seo_audit = website.get('seo_audit', {}) or {}
+                if seo_audit.get('sitemap_analysis'):
+                    step_data['sitemapAnalysis'] = seo_audit['sitemap_analysis']
+                
                 return {
                     "step_number": 2,
                     "title": "Research",

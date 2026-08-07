@@ -769,9 +769,9 @@ async def analyze_sitemap_for_onboarding(
         logger.info(f"Sitemap analysis completed successfully for {request.user_url}")
         logger.info(f"Found {analysis_result.get('structure_analysis', {}).get('total_urls', 0)} URLs")
         
-        # Background task to store analysis results (if needed)
+        # Background task to persist analysis results to DB
         background_tasks.add_task(
-            _log_sitemap_analysis_result,
+            _persist_sitemap_analysis,
             current_user.get('user_id'),
             request.user_url,
             analysis_result
@@ -807,6 +807,45 @@ async def analyze_sitemap_for_onboarding(
             error=str(e)
         )
 
+async def _persist_sitemap_analysis(
+    user_id: str,
+    user_url: str,
+    analysis_result: Dict[str, Any]
+) -> None:
+    """Background task to persist sitemap analysis results to DB."""
+    try:
+        from services.database import get_session_for_user
+        from api.onboarding_utils.step_management_service import StepManagementService
+        db = get_session_for_user(user_id)
+        if not db:
+            return
+        
+        svc = StepManagementService()
+        session = svc._get_or_create_session(user_id, db)
+        
+        from models.onboarding import WebsiteAnalysis
+        analysis = db.query(WebsiteAnalysis).filter(
+            WebsiteAnalysis.session_id == session.id
+        ).first()
+        
+        if analysis:
+            seo_audit = analysis.seo_audit or {}
+            seo_audit["sitemap_analysis"] = {
+                "structure_analysis": analysis_result.get("structure_analysis"),
+                "onboarding_insights": analysis_result.get("sitemap_onboarding_insights"),
+                "analyzed_at": analysis_result.get("timestamp"),
+            }
+            analysis.seo_audit = seo_audit
+            db.commit()
+            logger.info(f"Sitemap analysis persisted for user {user_id}")
+        else:
+            logger.warning(f"No WebsiteAnalysis found for session {session.id}")
+        
+        db.close()
+    except Exception as e:
+        logger.error(f"Error persisting sitemap analysis: {e}")
+
+
 async def _log_sitemap_analysis_result(
     user_id: str,
     user_url: str,
@@ -815,8 +854,6 @@ async def _log_sitemap_analysis_result(
     """Background task to log sitemap analysis results."""
     try:
         logger.info(f"Logging sitemap analysis result for user {user_id}")
-        # Add any logging or storage logic here if needed
-        # For now, just log the completion
         logger.info(f"Sitemap analysis logged for {user_url}")
     except Exception as e:
         logger.error(f"Error logging sitemap analysis result: {e}")
