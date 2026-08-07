@@ -1040,7 +1040,8 @@ async def get_content_types():
 )
 async def edit_linkedin_content(
     request: LinkedInEditContentRequest,
-    current_user: Optional[Dict[str, Any]] = Depends(get_current_user)
+    http_request: Request,
+    current_user: Optional[Dict[str, Any]] = Depends(get_current_user),
 ):
     """Edit LinkedIn content using AI-powered text generation."""
     try:
@@ -1083,6 +1084,12 @@ async def edit_linkedin_content(
             user_prompt += f"Target audience: {request.target_audience}\n"
         if request.parameters:
             user_prompt += f"Additional context: {json.dumps(request.parameters)}\n"
+            content_type = request.parameters.get("content_type")
+            if content_type and request.edit_type == "optimize_engagement":
+                user_prompt += (
+                    f"Content format: {content_type} — optimise for how this "
+                    f"format performs natively on LinkedIn.\n"
+                )
 
         user_prompt += "\nReturn ONLY the edited content without any explanations, labels, or markdown formatting."
 

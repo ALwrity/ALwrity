@@ -1,7 +1,7 @@
 /**
  * Engagement Wedge — 5 AI-first feature modals (priority order)
  *
- * E5  EngagementBoosterModal      — optimize_engagement rewrite + before/after preview score
+ * E5  EngagementBoosterModal      — see EngagementBoosterModal.tsx
  * E2  CommentAssistantModal       — extracted to CommentAssistantInboxModal.tsx
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
  * E3  PostPulseModal              — real Unipile post metrics with repurpose CTAs
@@ -20,25 +20,22 @@ import {
   postAnalyticsApi,
   type LinkedInPost,
 } from "../../../../services/postAnalyticsApi";
-import { PreviewScoreCard } from "../GrowthEngine/PreviewScoreCard";
 import {
   colors,
   rowBase,
   CONFIDENCE_COLORS,
-  scoreColor,
-  scoreBg,
-  barColor,
 } from "../GrowthEngine/styles";
 import { openGrowthEngineModal } from "../../utils/linkedInDashboardEvents";
+import { pushDraftToStudio } from "./engagementWedgeDraftUtils";
 
 export { CommentAssistantModal } from "./CommentAssistantInboxModal";
+export { EngagementBoosterModal } from "./EngagementBoosterModal";
 
 // ---------------------------------------------------------------------------
 // Shared helpers (mirror of AnalysisWedgeModals pattern)
 // ---------------------------------------------------------------------------
 
 const CACHE_KEY = "alwrity_growth_engine";
-const DRAFT_KEY = "alwrity-copilot-draft-content";
 
 interface GrowthCachePayload {
   data: ConsolidatedGrowthResponse;
@@ -65,25 +62,11 @@ function writeGrowthCache(data: ConsolidatedGrowthResponse) {
   }
 }
 
-function readDraft(): string {
-  try {
-    return localStorage.getItem(DRAFT_KEY) ?? "";
-  } catch {
-    return "";
-  }
-}
-
 function openInCreate(topic: string, keyPoints: string, type = "post") {
   window.dispatchEvent(
     new CustomEvent("linkedinwriter:openQuickCreate", {
       detail: { type, topic, key_points: keyPoints },
     }),
-  );
-}
-
-function pushDraftToStudio(text: string) {
-  window.dispatchEvent(
-    new CustomEvent("linkedinwriter:updateDraft", { detail: text }),
   );
 }
 
@@ -345,373 +328,6 @@ function useGrowthCache(open: boolean) {
   return { data, loading, error, loadAll };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// E5 — Engagement Booster Modal
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface EngagementBoosterModalProps {
-  open: boolean;
-  onClose: () => void;
-  connected?: boolean;
-}
-
-export const EngagementBoosterModal: React.FC<EngagementBoosterModalProps> = ({
-  open,
-  onClose,
-  connected = true,
-}) => {
-  const [original, setOriginal] = useState("");
-  const [optimised, setOptimised] = useState("");
-  const [step, setStep] = useState<
-    "input" | "optimising" | "scoring" | "result"
-  >("input");
-  const [error, setError] = useState("");
-  const [origScore, setOrigScore] = useState<any>(null);
-  const [optScore, setOptScore] = useState<any>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const draft = readDraft();
-    setOriginal(draft);
-    setOptimised("");
-    setStep("input");
-    setError("");
-    setOrigScore(null);
-    setOptScore(null);
-  }, [open]);
-
-  const handleOptimise = async () => {
-    if (!original.trim()) {
-      setError("Please paste or write your post first.");
-      return;
-    }
-    setError("");
-    setStep("optimising");
-    try {
-      const res = await linkedInWriterApi.editContent({
-        content: original,
-        edit_type: "optimize_engagement",
-      });
-      const improved = res.content ?? "";
-      setOptimised(improved);
-      setStep("scoring");
-      // Score both versions concurrently
-      const [origRes, optRes] = await Promise.allSettled([
-        linkedInGrowthApi.getPostPreviewScore({ content: original }),
-        linkedInGrowthApi.getPostPreviewScore({ content: improved }),
-      ]);
-      if (origRes.status === "fulfilled") setOrigScore(origRes.value);
-      if (optRes.status === "fulfilled") setOptScore(optRes.value);
-      setStep("result");
-    } catch {
-      setError("Optimisation failed. Please try again.");
-      setStep("input");
-    }
-  };
-
-  const handleAccept = () => {
-    pushDraftToStudio(optimised);
-    onClose();
-  };
-
-  return (
-    <DashboardActionModal
-      open={open}
-      title="Engagement Booster"
-      onClose={onClose}
-      maxWidth={620}
-      maxHeight="min(92vh, 800px)"
-    >
-      <p
-        style={{
-          margin: "0 0 14px",
-          fontSize: 13,
-          color: colors.textSecondary,
-          lineHeight: 1.5,
-        }}
-      >
-        AI rewrites your draft to maximise engagement — stronger hooks, clearer
-        CTAs, better formatting. Shows a before/after score.
-      </p>
-
-      {step === "input" && (
-        <>
-          {!connected && (
-            <div
-              style={{
-                padding: "8px 12px",
-                background: "#eff6ff",
-                borderRadius: 8,
-                color: "#1e40af",
-                fontSize: 12,
-                marginBottom: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <span>ℹ️</span>
-              <span>
-                Connect LinkedIn for accurate engagement scoring on before/after
-                versions.
-              </span>
-            </div>
-          )}
-          {error && <ErrorBanner msg={error} />}
-          <div style={{ marginBottom: 10 }}>
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: colors.textMedium,
-                marginBottom: 6,
-              }}
-            >
-              Your Post Draft
-            </div>
-            <textarea
-              value={original}
-              onChange={(e) => setOriginal(e.target.value)}
-              placeholder="Paste your LinkedIn post here, or open the editor first to auto-fill from your current draft…"
-              style={{
-                width: "100%",
-                minHeight: 140,
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: `1.5px solid ${colors.border}`,
-                fontSize: 13,
-                resize: "vertical",
-                fontFamily: "inherit",
-                lineHeight: 1.6,
-                color: colors.textBody,
-                boxSizing: "border-box",
-              }}
-            />
-            <div
-              style={{ fontSize: 11, color: colors.textTertiary, marginTop: 4 }}
-            >
-              {original.length} characters
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void handleOptimise()}
-            disabled={!original.trim()}
-            style={{
-              width: "100%",
-              padding: "11px",
-              background: colors.primary,
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: original.trim() ? "pointer" : "default",
-              opacity: original.trim() ? 1 : 0.5,
-            }}
-          >
-            ⚡ Optimise for Engagement
-          </button>
-        </>
-      )}
-
-      {(step === "optimising" || step === "scoring") && (
-        <LoadingRow
-          message={
-            step === "optimising"
-              ? "Rewriting for maximum engagement…"
-              : "Scoring both versions…"
-          }
-        />
-      )}
-
-      {step === "result" && (
-        <>
-          {/* Score comparison */}
-          {(origScore || optScore) && (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: 10,
-                marginBottom: 16,
-              }}
-            >
-              <ScoreBadge
-                label="Original"
-                score={origScore?.overall_score ?? null}
-              />
-              <ScoreBadge
-                label="Optimised"
-                score={optScore?.overall_score ?? null}
-                highlight
-              />
-            </div>
-          )}
-
-          {/* Side-by-side diff */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 10,
-              marginBottom: 14,
-            }}
-          >
-            <DraftPane label="Before" content={original} accent="#94a3b8" />
-            <DraftPane
-              label="After (AI)"
-              content={optimised}
-              accent={colors.primary}
-            />
-          </div>
-
-          {optScore && (
-            <div style={{ marginBottom: 14 }}>
-              <PreviewScoreCard
-                overallScore={optScore.overall_score}
-                dimensions={optScore.dimensions ?? []}
-                topImprovement={optScore.top_improvement ?? ""}
-                dataSourceSummary={optScore.data_source_summary ?? ""}
-              />
-            </div>
-          )}
-
-          <div style={{ display: "flex", gap: 10 }}>
-            <button
-              type="button"
-              onClick={handleAccept}
-              style={{
-                flex: 1,
-                padding: "10px",
-                background: colors.primary,
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              ✅ Use Optimised Version
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep("input")}
-              style={{
-                padding: "10px 18px",
-                background: "none",
-                border: `1.5px solid ${colors.border}`,
-                borderRadius: 8,
-                fontSize: 13,
-                color: colors.textSecondary,
-                cursor: "pointer",
-              }}
-            >
-              ↩ Edit Again
-            </button>
-          </div>
-        </>
-      )}
-    </DashboardActionModal>
-  );
-};
-
-const ScoreBadge: React.FC<{
-  label: string;
-  score: number | null;
-  highlight?: boolean;
-}> = ({ label, score, highlight }) => {
-  const bg = score !== null ? scoreBg(score) : "#f1f5f9";
-  const fc = score !== null ? scoreColor(score) : colors.textTertiary;
-  return (
-    <div
-      style={{
-        background: highlight ? "#eff6ff" : "#f8fafc",
-        border: `1.5px solid ${highlight ? "#bfdbfe" : colors.border}`,
-        borderRadius: 10,
-        padding: "12px 14px",
-        textAlign: "center",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: colors.textTertiary,
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-          marginBottom: 6,
-        }}
-      >
-        {label}
-      </div>
-      {score !== null ? (
-        <div
-          style={{
-            width: 52,
-            height: 52,
-            borderRadius: "50%",
-            background: bg,
-            color: fc,
-            fontWeight: 800,
-            fontSize: 20,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto",
-            border: `2px solid ${barColor(score)}44`,
-          }}
-        >
-          {score}
-        </div>
-      ) : (
-        <div style={{ fontSize: 13, color: colors.textTertiary }}>—</div>
-      )}
-    </div>
-  );
-};
-
-const DraftPane: React.FC<{
-  label: string;
-  content: string;
-  accent: string;
-}> = ({ label, content, accent }) => (
-  <div
-    style={{
-      borderLeft: `3px solid ${accent}`,
-      background: colors.rowBg,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 8,
-      padding: "10px 12px",
-    }}
-  >
-    <div
-      style={{
-        fontSize: 10,
-        fontWeight: 700,
-        color: colors.textTertiary,
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 6,
-      }}
-    >
-      {label}
-    </div>
-    <div
-      style={{
-        fontSize: 12,
-        color: colors.textBody,
-        lineHeight: 1.65,
-        whiteSpace: "pre-wrap",
-        maxHeight: 160,
-        overflowY: "auto",
-      }}
-    >
-      {content}
-    </div>
-  </div>
-);
 
 function textareaStyle(minH: number): React.CSSProperties {
   return {
