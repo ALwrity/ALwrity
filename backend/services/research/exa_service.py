@@ -77,6 +77,87 @@ class ExaService:
             self.enabled = False
             self.exa = None
     
+    # ------------------------------------------------------------------
+    # Exa Agent API — competitor + social media discovery schemas
+    # ------------------------------------------------------------------
+
+    COMPETITOR_AGENT_SCHEMA = {
+        "type": "object", "required": ["companies"],
+        "properties": {"companies": {"type": "array", "maxItems": 10, "items": {
+            "type": "object", "required": ["company"],
+            "properties": {
+                "company": {"type": "string"}, "website": {"type": "string", "format": "uri"},
+                "country": {"type": "string"}, "employees": {"type": "integer"},
+                "round": {"type": "string"}, "raised": {"type": "string"},
+                "date": {"type": "string"}, "description": {"type": "string"},
+            }}}}
+    }
+
+    SOCIAL_MEDIA_AGENT_SCHEMA = {
+        "type": "object", "required": ["platforms"],
+        "properties": {"platforms": {"type": "array", "items": {
+            "type": "object", "required": ["platform", "url"],
+            "properties": {
+                "platform": {"type": "string", "enum": ["facebook", "twitter", "instagram", "linkedin", "youtube", "tiktok"]},
+                "url": {"type": "string", "format": "uri"},
+            }}}}
+    }
+
+    async def _discover_competitors_via_agent(self, user_url: str, num_results: int = 10,
+                                              industry_context: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Discover competitors via Exa Agent API (structured JSON). Falls back to legacy on failure."""
+        from services.research.exa_agent import ExaAgentClient
+        try:
+            domain = urlparse(user_url).netloc.replace("www.", "")
+            industry_hint = f" in the {industry_context} space" if industry_context else ""
+            query = (f"Find {num_results} companies that are direct competitors of {domain}{industry_hint}. "
+                     f"Focus on similar products/services. Return company name, website, country, employees, "
+                     f"funding round, amount raised, year, and a brief description.")
+            result = await ExaAgentClient().run(query=query, output_schema=self.COMPETITOR_AGENT_SCHEMA, effort="medium")
+            if not result or not result.get("companies"):
+                return None
+            competitors = []
+            for comp in result["companies"][:num_results]:
+                website = comp.get("website", "")
+                comp_domain = urlparse(website).netloc if website else ""
+                hl = []; fp = []
+                if comp.get("employees"): fp.append(f"👥 {comp['employees']:,} employees")
+                if comp.get("round") and comp.get("raised"): fp.append(f"💰 {comp['round']}: {comp['raised']}")
+                elif comp.get("round"): fp.append(f"💰 {comp['round']}")
+                elif comp.get("raised"): fp.append(f"💰 {comp['raised']}")
+                if comp.get("date"): fp.append(f"📅 {comp['date']}")
+                if fp: hl.append(" · ".join(fp))
+                if comp.get("country"): hl.append(f"📍 {comp['country']}")
+                if comp.get("description"): hl.append(comp["description"])
+                competitors.append({"url": website or "", "domain": comp_domain or comp.get("company", ""),
+                    "title": comp.get("company", ""), "summary": comp.get("description", ""),
+                    "highlights": hl, "relevance_score": 0.85, "favicon": None, "image": None,
+                    "published_date": comp.get("date"), "author": None, "subpages": [],
+                    "competitive_insights": {"business_model": comp.get("description", ""),
+                        "target_audience": f"Based in {comp['country']}" if comp.get("country") else ""},
+                    "content_insights": {"content_focus": "", "content_quality": ""}})
+            return {"competitors": competitors, "total_competitors": len(competitors), "api_cost": 0}
+        except RuntimeError: return None
+        except Exception as e: logger.warning(f"Agent competitor discovery failed: {e}"); return None
+
+    async def _discover_social_media_via_agent(self, user_url: str) -> Optional[Dict[str, Any]]:
+        """Discover social media via Exa Agent API."""
+        from services.research.exa_agent import ExaAgentClient
+        try:
+            domain = urlparse(user_url).netloc.replace("www.", "")
+            result = await ExaAgentClient().run(
+                query=f"Find all social media accounts for {domain}. Return platform name and URL.",
+                output_schema=self.SOCIAL_MEDIA_AGENT_SCHEMA, effort="low")
+            if not result or not result.get("platforms"): return None
+            accounts = {p["platform"]: p["url"] for p in result["platforms"] if p.get("platform") and p.get("url")}
+            return {"success": True, "social_media_accounts": accounts, "citations": [], "api_cost": 0}
+        except RuntimeError: return None
+        except Exception as e: logger.warning(f"Agent social media discovery failed: {e}"); return None
+
+    # ------------------------------------------------------------------
+    # Competitor discovery
+    # ------------------------------------------------------------------
+
     async def discover_competitors(
         self,
         user_url: str,
@@ -106,6 +187,13 @@ class ExaService:
                 raise ValueError("Exa Service is not enabled - API key missing")
             
             logger.info(f"Starting competitor discovery for: {user_url}")
+
+            # Try Exa Agent API first
+            agent_result = await self._discover_competitors_via_agent(
+                user_url=user_url, num_results=num_results, industry_context=industry_context)
+            if agent_result and agent_result.get("competitors"):
+                logger.info(f"Using Exa Agent results: {len(agent_result['competitors'])} competitors")
+                return {"success": True, **agent_result}
             
             # Extract user domain for exclusion — add both www and non-www variants
             user_domain = urlparse(user_url).netloc
@@ -494,6 +582,12 @@ class ExaService:
                 raise ValueError("Exa Service is not enabled - API key missing")
             
             logger.info(f"Starting social media discovery for: {user_url}")
+
+            # Try Exa Agent API first
+            agent_result = await self._discover_social_media_via_agent(user_url)
+            if agent_result and agent_result.get("success"):
+                logger.info(f"Using Exa Agent social media results: {len(agent_result.get('social_media_accounts', {}))} accounts")
+                return agent_result
             
             # Extract domain from URL for better targeting
             domain = urlparse(user_url).netloc.replace('www.', '')
