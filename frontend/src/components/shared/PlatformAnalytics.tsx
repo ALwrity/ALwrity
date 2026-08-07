@@ -107,7 +107,14 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     const aKeys = Object.keys(a);
     const bKeys = Object.keys(b);
     if (aKeys.length !== bKeys.length) return false;
-    return aKeys.every(k => b.hasOwnProperty(k) && a[k]?.status === b[k]?.status);
+    return aKeys.every(k => {
+      if (!(k in b)) return false;
+      const aVal = a[k];
+      const bVal = b[k];
+      return aVal?.status === bVal?.status
+        && aVal?.metrics?.total_clicks === bVal?.metrics?.total_clicks
+        && aVal?.metrics?.total_impressions === bVal?.metrics?.total_impressions;
+    });
   };
 
   // When user selects a different GSC site, re-fetch analytics
@@ -382,6 +389,16 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
     [analyticsData, priorityPlatform, summary]
   );
 
+  const isPriorityPlatformDisconnected = React.useMemo(() => {
+    if (priorityPlatform === 'auto') {
+      const platforms = Object.values(platformStatus);
+      if (platforms.length === 0) return true;
+      return platforms.every((s: any) => !s.connected);
+    }
+    const status = platformStatus[priorityPlatform];
+    return !status || !status.connected;
+  }, [priorityPlatform, platformStatus]);
+
   const topPagesChart = React.useMemo(() => {
     const gscMetrics: any = (analyticsData['gsc'] as any)?.metrics || {};
     const topPagesRaw: any[] = Array.isArray(gscMetrics.top_pages) ? gscMetrics.top_pages : [];
@@ -557,7 +574,15 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
             </Grid>
           </Grid>
 
-          {(totalClicks === 0 && totalImpressions === 0) && (
+          {isPriorityPlatformDisconnected && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              {priorityPlatform === 'auto'
+                ? 'No platforms connected. Analytics charts will populate once you connect GSC or Bing.'
+                : `${priorityPlatform.toUpperCase()} is not connected. Charts and metrics will populate once connected.`}
+            </Alert>
+          )}
+
+          {!isPriorityPlatformDisconnected && totalClicks === 0 && totalImpressions === 0 && (
             <Alert severity="info" sx={{ mt: 2 }}>
               {computedSummary.na ? 'Failed to fetch analytics for selected view.' : 'No recent search traffic detected.'}
             </Alert>
@@ -753,27 +778,45 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
 
   return (
     <Box>
+      {isPriorityPlatformDisconnected && (
+        <Alert severity="warning" sx={{ mb: 2 }} action={
+          priorityPlatform !== 'auto' && onReconnect ? (
+            <Button color="inherit" size="small" onClick={() => onReconnect(priorityPlatform)}>
+              Connect
+            </Button>
+          ) : undefined
+        }>
+          {priorityPlatform === 'auto'
+            ? 'No analytics platforms are connected. Connect Google Search Console or Bing to see real data.'
+            : `${priorityPlatform.toUpperCase()} is not connected. Connect it to see real analytics data.`}
+        </Alert>
+      )}
       {showSummary && summaryCardContent}
-      <GscSuggestionsPanel
-        suggestions={suggestions}
-        rangeDays={rangeDays}
-        formatNumber={formatNumber}
-      />
+      {(!isPriorityPlatformDisconnected || priorityPlatform === 'bing') && (
+        <GscSuggestionsPanel
+          suggestions={suggestions}
+          rangeDays={rangeDays}
+          formatNumber={formatNumber}
+        />
+      )}
 
-      <CannibalizationAlertsPanel
-        alerts={((analyticsData['gsc']?.metrics as any)?.cannibalization || []) as any}
-        formatNumber={formatNumber}
-        isValidHttpUrl={isValidHttpUrl}
-        onOpenBrief={(page: string, query: string, totalClicks: number) => {
-          const queries = [{ query, clicks: totalClicks, impressions: 0, ctr: 0 }];
-          setBriefData({ page, queries });
-          setBriefOpen(true);
-        }}
-      />
+      {(!isPriorityPlatformDisconnected || priorityPlatform === 'bing') && (
+        <CannibalizationAlertsPanel
+          alerts={((analyticsData['gsc']?.metrics as any)?.cannibalization || []) as any}
+          formatNumber={formatNumber}
+          isValidHttpUrl={isValidHttpUrl}
+          onOpenBrief={(page: string, query: string, totalClicks: number) => {
+            const queries = [{ query, clicks: totalClicks, impressions: 0, ctr: 0 }];
+            setBriefData({ page, queries });
+            setBriefOpen(true);
+          }}
+        />
+      )}
 
-      {(() => {
-        const gsc = analyticsData['gsc'];
-        const pages = (gsc?.metrics as any)?.top_pages || [];
+      {(!isPriorityPlatformDisconnected || priorityPlatform === 'bing') && (
+        (() => {
+          const gsc = analyticsData['gsc'];
+          const pages = (gsc?.metrics as any)?.top_pages || [];
         return (
           <TopPagesInsightsPanel
             pages={pages}
@@ -791,7 +834,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         onClose={() => setBriefOpen(false)}
       />
 
-      {showBackgroundJobs && (
+      {showBackgroundJobs && !isPriorityPlatformDisconnected && (
         <RefreshQueuePanel
           risingQueries={refreshQueue.risingQueries}
           decliningQueries={refreshQueue.decliningQueries}
@@ -827,7 +870,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
       </Grid>
 
       {/* Background Job Manager - render only when explicitly enabled */}
-      {showBackgroundJobs && (
+      {showBackgroundJobs && !isPriorityPlatformDisconnected && (
         <Box sx={{ mt: 3 }}>
           <BackgroundJobManager
             siteUrl={bingSiteUrl}

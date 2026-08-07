@@ -786,12 +786,7 @@ class SitemapService:
             
         except Exception as e:
             logger.error(f"Error generating AI insights: {e}")
-            return {
-                "summary": "AI analysis unavailable",
-                "content_strategy": [],
-                "seo_opportunities": [],
-                "technical_recommendations": []
-            }
+            return {"success": False, "error": f"AI analysis failed: {str(e)}"}
     
     def _build_ai_analysis_prompt(
         self,

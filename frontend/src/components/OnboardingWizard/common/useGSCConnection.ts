@@ -112,6 +112,7 @@ export const useGSCConnection = () => {
                 if (status.connected && status.sites) setGscSites(status.sites);
 
                 // Force refresh analytics to ensure we have data for the newly connected account
+                cachedAnalyticsAPI.invalidatePlatformStatus();
                 cachedAnalyticsAPI.forceRefreshAnalyticsData(['gsc']).catch(console.error);
               } catch {}
             })();

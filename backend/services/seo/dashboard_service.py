@@ -17,6 +17,7 @@ from services.gsc_service import GSCService
 from services.integrations.bing_oauth import BingOAuthService
 from services.bing_analytics_storage_service import BingAnalyticsStorageService
 from services.analytics_cache_service import AnalyticsCacheService
+from services.analytics.connection_manager import PlatformConnectionManager
 from api.content_planning.services.content_strategy.onboarding.data_integration import OnboardingDataIntegrationService
 from .analytics_aggregator import AnalyticsAggregator
 from .competitive_analyzer import CompetitiveAnalyzer
@@ -64,6 +65,7 @@ class SEODashboardService:
         self.integration_service = OnboardingDataIntegrationService()
         self.analytics_aggregator = AnalyticsAggregator()
         self.competitive_analyzer = CompetitiveAnalyzer(db)
+        self.connection_manager = PlatformConnectionManager()
         
     def _get_bing_storage(self, user_id: str) -> BingAnalyticsStorageService:
         """Get Bing storage service for user."""
@@ -73,35 +75,34 @@ class SEODashboardService:
         return BingAnalyticsStorageService(db_url)
         
     async def get_platform_status(self, user_id: str) -> Dict[str, Any]:
-        """Get connection status for GSC and Bing platforms."""
+        """Get connection status for GSC and Bing platforms.
+
+        Uses PlatformConnectionManager to perform real OAuth verification
+        (token refresh + Google API sites().list() call for GSC, token check for Bing)
+        instead of merely checking credential file existence.
+        """
         try:
-            # Check GSC connection
-            gsc_credentials = self.gsc_service.load_user_credentials(user_id)
-            gsc_connected = gsc_credentials is not None
+            conn_status = await self.connection_manager.get_platform_connection_status(user_id)
+            gsc_status = conn_status.get('gsc', {})
+            bing_conn = conn_status.get('bing', {})
+            gsc_connected = gsc_status.get('connected', False)
+            bing_connected = bing_conn.get('connected', False)
             
-            # Check Bing connection with detailed status
-            bing_token_status = self.bing_oauth.get_user_token_status(user_id)
-            bing_connected = bing_token_status.get('has_active_tokens', False)
-            
-            # Get cached data for last sync info
             gsc_data = self.analytics_cache.get('gsc_analytics', user_id)
             bing_data = self.analytics_cache.get('bing_analytics', user_id)
             
             return {
                 "gsc": {
                     "connected": gsc_connected,
-                    "sites": self._get_gsc_sites(user_id) if gsc_connected else [],
+                    "sites": gsc_status.get('sites', []) if gsc_connected else [],
                     "last_sync": gsc_data.get('last_updated') if gsc_data else None,
                     "status": "connected" if gsc_connected else "disconnected"
                 },
                 "bing": {
                     "connected": bing_connected,
-                    "sites": self._get_bing_sites(user_id) if bing_connected else [],
+                    "sites": bing_conn.get('sites', []) if bing_connected else [],
                     "last_sync": bing_data.get('last_updated') if bing_data else None,
-                    "status": "connected" if bing_connected else ("expired" if bing_token_status.get('has_expired_tokens') else "disconnected"),
-                    "has_expired_tokens": bing_token_status.get('has_expired_tokens', False),
-                    "last_token_date": bing_token_status.get('last_token_date'),
-                    "total_tokens": bing_token_status.get('total_tokens', 0)
+                    "status": "connected" if bing_connected else "disconnected",
                 }
             }
             

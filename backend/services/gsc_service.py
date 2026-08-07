@@ -13,6 +13,7 @@ from googleapiclient.discovery import build
 from loguru import logger
 
 from services.database import get_user_db_path
+from services.analytics_cache_service import analytics_cache
 
 from dotenv import load_dotenv
 
@@ -720,6 +721,7 @@ class GSCService:
                 conn.commit()
             
             logger.info(f"GSC access revoked for user: {user_id}")
+            analytics_cache.invalidate('platform_status', user_id)
             return True
             
         except Exception as e:
@@ -742,6 +744,7 @@ class GSCService:
                 conn.commit()
             
             logger.info(f"Cleared incomplete GSC credentials for user: {user_id}")
+            analytics_cache.invalidate('platform_status', user_id)
             return True
             
         except Exception as e:

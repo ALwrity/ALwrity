@@ -106,6 +106,7 @@ export const useGSCBrainstormConnection = (): UseGSCBrainstormConnectionReturn =
           if (connected) {
             console.log(`[GSC] Connection resolved via ${completionSource || 'unknown'}`);
             checkConnection().then(() => {
+              cachedAnalyticsAPI.invalidatePlatformStatus();
               cachedAnalyticsAPI.forceRefreshAnalyticsData(['gsc']).catch(console.error);
               resolve();
             });
