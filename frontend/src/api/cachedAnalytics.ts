@@ -96,8 +96,9 @@ class CachedAnalyticsAPI {
   /**
    * Get analytics data with caching
    */
-  async getAnalyticsData(platforms?: string[], bypassCache: boolean = false, opts?: { start_date?: string; end_date?: string }): Promise<AnalyticsResponse> {
+  async getAnalyticsData(platforms?: string[], bypassCache: boolean = false, opts?: { start_date?: string; end_date?: string; site_url?: string }): Promise<AnalyticsResponse> {
     const baseParams: any = platforms ? { platforms: platforms.join(',') } : {};
+    if (opts?.site_url) baseParams.site_url = opts.site_url;
     const endpoint = '/api/analytics/data';
     
     // If bypassing cache, add timestamp to force fresh request

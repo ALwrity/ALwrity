@@ -97,6 +97,7 @@ async def get_analytics_data(
     platforms: Optional[str] = Query(None, description="Comma-separated list of platforms (gsc,bing,wix,wordpress)"),
     start_date: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    site_url: Optional[str] = Query(None, description="Target site URL for GSC property matching"),
     current_user: dict = Depends(get_current_user)
 ) -> AnalyticsResponse:
     """
@@ -121,7 +122,7 @@ async def get_analytics_data(
         
         logger.info(f"Getting analytics data for user: {user_id}, platforms: {platform_list}, start_date: {start_date}, end_date: {end_date}")
 
-        analytics_data = await analytics_service.get_comprehensive_analytics(user_id, platform_list, start_date=start_date, end_date=end_date)
+        analytics_data = await analytics_service.get_comprehensive_analytics(user_id, platform_list, start_date=start_date, end_date=end_date, site_url=site_url)
         summary = analytics_service.get_analytics_summary(analytics_data)
 
         # The "summary" and per-platform "snapshot" log lines are
