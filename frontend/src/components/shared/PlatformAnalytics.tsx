@@ -826,7 +826,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
             formatNumber={formatNumber}
           />
         );
-      })()}
+      })())}
 
       <BriefDialog
         open={briefOpen}
