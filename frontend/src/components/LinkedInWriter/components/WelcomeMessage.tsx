@@ -556,6 +556,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
         <WorkflowActionModals
           activeModal={workflowModal}
           onClose={() => setWorkflowModal(null)}
+          onOpenWedge={setWorkflowModal}
         />
 
         <InfoModals

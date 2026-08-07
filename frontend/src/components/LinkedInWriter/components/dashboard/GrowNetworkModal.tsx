@@ -19,6 +19,7 @@ export type { GrowNetworkScrollTarget };
 export interface GrowNetworkModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   connected?: boolean;
   scrollToSection?: GrowNetworkScrollTarget;
 }
@@ -26,6 +27,7 @@ export interface GrowNetworkModalProps {
 export const GrowNetworkModal: React.FC<GrowNetworkModalProps> = ({
   open,
   onClose,
+  onBack,
   connected = true,
   scrollToSection,
 }) => {
@@ -42,6 +44,8 @@ export const GrowNetworkModal: React.FC<GrowNetworkModalProps> = ({
       open={open}
       title={GROW_NETWORK_MODAL_TITLE}
       onClose={onClose}
+      onBack={onBack}
+      backLabel="Engagement"
       titleSize="xl"
       modalClassName="linkedin-grow-network-wedge-modal"
       width={GROW_NETWORK_MODAL_SIZE.width}
