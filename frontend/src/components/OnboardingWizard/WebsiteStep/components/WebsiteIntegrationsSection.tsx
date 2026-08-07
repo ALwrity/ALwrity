@@ -72,16 +72,6 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
 
   const [primarySite, setPrimarySite] = useState<string>('');
 
-  // Refresh Bing status on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        await refreshBingStatus();
-      } catch (e) {
-        console.error('Failed to refresh Bing status:', e);
-      }
-    })();
-  }, [refreshBingStatus]);
 
   // Use ref for connectedPlatforms to avoid re-running effect when we update it
   const connectedRef = useRef(connectedPlatforms);

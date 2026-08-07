@@ -76,4 +76,4 @@ const TopPagesBarChart: React.FC<TopPagesBarChartProps> = ({ data }) => {
   );
 };
 
-export default TopPagesBarChart;
+export default React.memo(TopPagesBarChart);

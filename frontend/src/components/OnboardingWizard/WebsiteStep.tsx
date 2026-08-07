@@ -89,6 +89,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin'>('website');
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+  const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
 
@@ -142,6 +143,7 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
         if (result.success) {
           if (result.website) {
             setWebsite(result.website);
+            urlWasPreFilledRef.current = true;
           }
           if (result.analysis) {
             setAnalysis(result.analysis);
@@ -182,12 +184,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             console.warn('WebsiteStep: Failed to check existing analysis', err);
           } finally {
             setHasCheckedExisting(true);
+            urlWasPreFilledRef.current = false;
           }
         }
       };
       
-      // Debounce the check to avoid too many API calls
-      const timeoutId = setTimeout(checkExisting, 1000);
+      // Debounce: 300ms for user typing; 0ms for pre-filled URL
+      const isPreFilled = urlWasPreFilledRef.current;
+      const timeoutId = setTimeout(checkExisting, isPreFilled ? 0 : 300);
       return () => clearTimeout(timeoutId);
     }
   }, [website, hasCheckedExisting]);
@@ -631,12 +635,14 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             </>
           )}
 
-          <WebsiteIntegrationsSection
-            websiteUrl={website}
-            onIntegrationChange={handleIntegrationChange}
-            connectedPlatforms={connectedPlatforms}
-            setConnectedPlatforms={setConnectedPlatforms}
-          />
+          {website && analysis && (
+            <WebsiteIntegrationsSection
+              websiteUrl={website}
+              onIntegrationChange={handleIntegrationChange}
+              connectedPlatforms={connectedPlatforms}
+              setConnectedPlatforms={setConnectedPlatforms}
+            />
+          )}
 
           {(connectedPlatforms.includes('gsc') || connectedPlatforms.includes('bing')) && (
             <Box sx={{ mt: 3 }}>
