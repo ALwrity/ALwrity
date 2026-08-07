@@ -153,6 +153,7 @@ const SEODashboard: React.FC = () => {
   // PlatformAnalytics refresh handle
   const platformRefreshRef = useRef<(() => Promise<void>) | null>(null);
   const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
+  const [websiteUrl, setWebsiteUrl] = useState<string>('');
 
   // Sync dashboard analysis to Copilot store so readables have URL/context
   const setCopilotAnalysisData = useSEOCopilotStore(state => state.setAnalysisData);
@@ -276,6 +277,7 @@ const SEODashboard: React.FC = () => {
         setOnboardingTaskHealth(onboardingTaskHealthResponse.data);
         
         websiteUrl = userData?.website_url || 'https://alwrity.com';
+        setWebsiteUrl(websiteUrl);
         
         // Fetch real data from backend using authenticated API client
         console.log('Fetching SEO dashboard overview...');
@@ -879,6 +881,7 @@ const SEODashboard: React.FC = () => {
                   platforms={analyticsPlatforms}
                   showSummary={true}
                   refreshInterval={0}
+                  siteUrl={websiteUrl || undefined}
                   onDataLoaded={() => {}}
                   onRefreshReady={(fn) => { platformRefreshRef.current = fn; }}
                   onReconnect={(platform) => {

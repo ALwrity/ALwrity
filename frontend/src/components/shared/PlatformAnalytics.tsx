@@ -172,6 +172,7 @@ const PlatformAnalytics: React.FC<PlatformAnalyticsComponentProps> = ({
         analyticsResponse = await cachedAnalyticsAPI.getAnalyticsData(activePlatforms, false, {
           start_date: fmt(start),
           end_date: fmt(end),
+          site_url: siteUrlRef.current || undefined,
         });
       }
       const newData = analyticsResponse.data as Record<string, PlatformAnalyticsType>;
