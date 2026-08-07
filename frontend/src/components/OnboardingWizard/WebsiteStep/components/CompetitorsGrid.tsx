@@ -279,7 +279,7 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
                   <TableCell>
                     <Box display="flex" gap={0.5}>
                       <IconButton size="small" onClick={() => competitor.url && window.open(competitor.url, '_blank')} disabled={!competitor.url} title={competitor.url ? 'Visit' : 'No website'}><OpenInNewIcon fontSize="small" /></IconButton>
-                      {competitor.highlights?.length > 0 && <IconButton size="small" onClick={() => onShowHighlights(competitor)} title="Highlights"><BusinessIcon fontSize="small" /></IconButton>}
+                      {competitor.highlights && competitor.highlights.length > 0 && <IconButton size="small" onClick={() => onShowHighlights(competitor)} title="Highlights"><BusinessIcon fontSize="small" /></IconButton>}
                       {onRemoveCompetitor && <IconButton size="small" onClick={() => onRemoveCompetitor(index)} title="Remove" sx={{ color: '#ef4444' }}><DeleteIcon fontSize="small" /></IconButton>}
                     </Box>
                   </TableCell>
