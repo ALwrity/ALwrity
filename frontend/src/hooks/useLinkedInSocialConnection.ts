@@ -33,13 +33,12 @@ import {
 } from '../components/LinkedInWriter/utils/linkedInProfileSummary';
 import { connectWithLinkedInOAuth } from '../utils/linkedInOAuthConnect';
 import {
-  useLinkedInConnectionFromContext,
-} from '../contexts/LinkedInConnectionContext';
-import {
-  LINKEDIN_DISCONNECTED_EVENT,
-  LINKEDIN_OAUTH_SUCCESS_EVENT,
-  dispatchLinkedInDisconnected,
-} from './linkedInConnectionEvents';
+  executeLinkedInDisconnectFlow,
+  captureConnectionSnapshot,
+} from './linkedInConnectionDisconnectFlow';
+import type { LinkedInCheckStatusOptions } from './linkedInConnectionCheckStatusOptions';
+import { setupLinkedInConnectionSyncListeners } from './linkedInConnectionSyncListeners';
+import { useLinkedInConnectionFromContext } from '../contexts/LinkedInConnectionContext';
 import {
   statusAccountsToLinkedInAccounts,
   statusOrganizationsToLinkedInOrganizations,
@@ -110,14 +109,19 @@ const useLinkedInSocialConnectionStandalone = () => {
     }
   }, []);
 
-  const checkStatus = useCallback(async () => {
-    setIsLoading(true);
+  const checkStatus = useCallback(async (options?: LinkedInCheckStatusOptions) => {
+    const forceRefresh = options?.forceRefresh ?? false;
+    const skipLoadingGate = options?.skipLoadingGate ?? false;
+
+    if (!skipLoadingGate) {
+      setIsLoading(true);
+    }
     setError(null);
     setProfileLoadWarning(null);
 
     let connectionStatus: LinkedInConnectionStatus;
 
-    const cached = getCachedConnectionStatus();
+    const cached = forceRefresh ? null : getCachedConnectionStatus();
     if (cached) {
       connectionStatus = cached;
       setStatus(connectionStatus);
@@ -126,7 +130,13 @@ const useLinkedInSocialConnectionStandalone = () => {
       });
     } else {
       try {
-        connectionStatus = await getOrCreateSharedStatusPromise(getLinkedInConnectionStatus);
+        const fetchStatus = () =>
+          getLinkedInConnectionStatus(forceRefresh ? { bypassCache: true } : undefined);
+
+        connectionStatus = forceRefresh
+          ? await fetchStatus()
+          : await getOrCreateSharedStatusPromise(fetchStatus);
+
         const wasAlreadyCached = !!getCachedConnectionStatus();
         cacheSharedConnectionStatus(connectionStatus);
         setStatus(connectionStatus);
@@ -138,6 +148,7 @@ const useLinkedInSocialConnectionStandalone = () => {
           console.info('[LinkedInConnect] status loaded (fresh)', {
             connected: connectionStatus.connected,
             provider: connectionStatus.provider,
+            forceRefresh,
           });
         }
       } catch (e: unknown) {
@@ -275,27 +286,6 @@ const useLinkedInSocialConnectionStandalone = () => {
     setCachedAvatarUrl(null);
   }, [uid]);
 
-  const setDisconnected = useCallback(() => {
-    invalidateSharedConnectionStatus();
-    setStatus({
-      connected: false,
-      provider: 'unipile',
-      has_per_user_token: false,
-      accounts: [],
-    });
-    setAccounts([]);
-    setOrganizations([]);
-    setError(null);
-    setProfileLoadWarning(null);
-    setIsLoading(false);
-    setIsProfileLoading(false);
-  }, []);
-
-  const applyDisconnectedLocally = useCallback(() => {
-    clearLocalConnectionSession();
-    setDisconnected();
-  }, [clearLocalConnectionSession, setDisconnected]);
-
   useEffect(() => {
     void checkStatus().catch((err) => {
       console.error('[LinkedInConnect] unexpected checkStatus failure:', {
@@ -312,37 +302,12 @@ const useLinkedInSocialConnectionStandalone = () => {
   }, [uid]);
 
   useEffect(() => {
-    const onOAuthSuccess = () => {
-      console.info('[LinkedInConnect] received', LINKEDIN_OAUTH_SUCCESS_EVENT);
-      void checkStatus().catch((err) => {
-        console.error(
-          '[LinkedInConnect] unexpected checkStatus failure after OAuth success:',
-          {
-            detail: getLinkedInSocialErrorMessage(err),
-            error: err,
-          }
-        );
-      });
-    };
-
-    const onDisconnected = () => {
-      console.info('[LinkedInConnect] received', LINKEDIN_DISCONNECTED_EVENT);
-      clearLocalConnectionSession();
-      invalidateSharedConnectionStatus();
-      void checkStatus().catch((err) => {
-        console.error('[LinkedInConnect] status refresh after disconnect failed:', {
-          detail: getLinkedInSocialErrorMessage(err),
-          error: err,
-        });
-      });
-    };
-
-    window.addEventListener(LINKEDIN_OAUTH_SUCCESS_EVENT, onOAuthSuccess);
-    window.addEventListener(LINKEDIN_DISCONNECTED_EVENT, onDisconnected);
-    return () => {
-      window.removeEventListener(LINKEDIN_OAUTH_SUCCESS_EVENT, onOAuthSuccess);
-      window.removeEventListener(LINKEDIN_DISCONNECTED_EVENT, onDisconnected);
-    };
+    return setupLinkedInConnectionSyncListeners({
+      clearLocalConnectionSession,
+      refreshStatus: () =>
+        checkStatus({ forceRefresh: true, skipLoadingGate: true }),
+      logContext: 'LinkedInConnectStandalone',
+    });
   }, [checkStatus, clearLocalConnectionSession]);
 
   const handleAccountChange = useCallback(
@@ -371,40 +336,49 @@ const useLinkedInSocialConnectionStandalone = () => {
   );
 
   const disconnect = useCallback(async (): Promise<boolean> => {
-    setDisconnectError(null);
-    console.info('[LinkedInConnect] starting disconnect');
+    const snapshot = captureConnectionSnapshot({
+      status,
+      accounts,
+      organizations,
+      cachedAvatarUrl,
+      selectedAccountId,
+      selectedTarget,
+      selectedOrgId,
+    });
 
-    try {
-      const result = await disconnectLinkedIn();
-      clearLocalConnectionSession();
-      invalidateSharedConnectionStatus();
-      await checkStatus();
-      dispatchLinkedInDisconnected();
-      console.info('[LinkedInConnect] disconnect succeeded', {
-        success: result.success,
-        needsReconnect: result.needs_reconnect,
-      });
-      return result.success;
-    } catch (err: unknown) {
-      const statusCode = (err as { response?: { status?: number } })?.response?.status;
-      const msg = getLinkedInSocialErrorMessage(err);
-      if (statusCode === 404) {
-        console.debug(
-          '[LinkedInConnect] disconnect endpoint not mounted (404); syncing local disconnected state'
-        );
-        applyDisconnectedLocally();
-        dispatchLinkedInDisconnected();
-        return true;
-      }
-      console.error('[LinkedInConnect] disconnect failed:', {
-        statusCode,
-        detail: msg,
-        error: err,
-      });
-      setDisconnectError(msg);
-      return false;
-    }
-  }, [checkStatus, clearLocalConnectionSession, applyDisconnectedLocally]);
+    return executeLinkedInDisconnectFlow({
+      snapshot,
+      setters: {
+        setStatus,
+        setAccounts,
+        setOrganizations,
+        setCachedAvatarUrl,
+        setSelectedAccountId,
+        setSelectedTarget,
+        setSelectedOrgId,
+        setError,
+        setProfileLoadWarning,
+        setIsLoading,
+        setIsProfileLoading,
+        setDisconnectError,
+      },
+      clearLocalConnectionSession,
+      disconnectApi: disconnectLinkedIn,
+      refreshStatus: () =>
+        checkStatus({ forceRefresh: true, skipLoadingGate: true }),
+      getErrorMessage: getLinkedInSocialErrorMessage,
+    });
+  }, [
+    status,
+    accounts,
+    organizations,
+    cachedAvatarUrl,
+    selectedAccountId,
+    selectedTarget,
+    selectedOrgId,
+    clearLocalConnectionSession,
+    checkStatus,
+  ]);
 
   const connectWithOAuth = useCallback(async (): Promise<boolean> => {
     setIsConnecting(true);
@@ -416,7 +390,9 @@ const useLinkedInSocialConnectionStandalone = () => {
       await connectWithLinkedInOAuth({
         verifyConnected: async () => {
           try {
-            const connectionStatus = await getLinkedInConnectionStatus();
+            const connectionStatus = await getLinkedInConnectionStatus({
+              bypassCache: true,
+            });
             return connectionStatus.connected;
           } catch (verifyErr: unknown) {
             const statusCode = (verifyErr as { response?: { status?: number } })
@@ -440,7 +416,7 @@ const useLinkedInSocialConnectionStandalone = () => {
 
       console.info('[LinkedInConnect] OAuth connect succeeded');
       invalidateSharedConnectionStatus();
-      await checkStatus();
+      await checkStatus({ forceRefresh: true, skipLoadingGate: true });
       return true;
     } catch (err) {
       const msg = getLinkedInSocialErrorMessage(err);

@@ -6,7 +6,10 @@
  * Logic moved from useLinkedInSocialConnection.ts (connection resilience).
  */
 
-import type { LinkedInConnectionStatus } from '../api/linkedinSocial';
+import {
+  invalidateLinkedInConnectionStatusCache,
+  type LinkedInConnectionStatus,
+} from '../api/linkedinSocial';
 
 const SHARED_CACHE_TTL_MS = 30_000;
 
@@ -23,6 +26,7 @@ export function invalidateSharedConnectionStatus(): void {
   sharedStatusCache = null;
   sharedStatusTimestamp = 0;
   sharedStatusPromise = null;
+  invalidateLinkedInConnectionStatusCache();
 }
 
 export function getCachedConnectionStatus(): LinkedInConnectionStatus | null {
