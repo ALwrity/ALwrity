@@ -400,10 +400,29 @@ let statusPromiseCache: Promise<LinkedInConnectionStatus> | null = null;
 let statusCacheExpiry = 0;
 const STATUS_CACHE_TTL = 30_000; // 30 seconds — shared across all hook mounts
 
-export async function getLinkedInConnectionStatus(): Promise<LinkedInConnectionStatus> {
-  if (statusPromiseCache && Date.now() < statusCacheExpiry) {
+export interface GetLinkedInConnectionStatusOptions {
+  /** When true, skip TTL cache and always fetch fresh from the server. */
+  bypassCache?: boolean;
+}
+
+/** Clear the API-layer connection status cache (used after connect/disconnect). */
+export function invalidateLinkedInConnectionStatusCache(): void {
+  statusPromiseCache = null;
+  statusCacheExpiry = 0;
+  console.debug('[LinkedInConnect] API connection status cache invalidated');
+}
+
+export async function getLinkedInConnectionStatus(
+  options?: GetLinkedInConnectionStatusOptions
+): Promise<LinkedInConnectionStatus> {
+  const bypassCache = options?.bypassCache ?? false;
+
+  if (bypassCache) {
+    invalidateLinkedInConnectionStatusCache();
+  } else if (statusPromiseCache && Date.now() < statusCacheExpiry) {
     return statusPromiseCache;
   }
+
   const promise = apiClient
     .get(`${BASE}/connection/status`)
     .then((r) => r.data)

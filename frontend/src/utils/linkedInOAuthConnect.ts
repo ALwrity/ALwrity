@@ -4,6 +4,7 @@
  */
 
 import { getLinkedInAuthUrl } from '../api/linkedinSocial';
+import { broadcastLinkedInStatusChanged } from '../hooks/linkedInConnectionEvents';
 import { getWixTrustedOrigins } from '../config/wixConfig';
 import { getApiBaseUrl } from './apiUrl';
 
@@ -123,7 +124,7 @@ export function connectWithLinkedInOAuth(
         source,
         oauthSuccessSignalReceived,
       });
-      window.dispatchEvent(new CustomEvent('linkedin-oauth-success'));
+      broadcastLinkedInStatusChanged('connected');
       resolve();
     };
 

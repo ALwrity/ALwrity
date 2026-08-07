@@ -72,10 +72,6 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
 
   const [primarySite, setPrimarySite] = useState<string>('');
 
-  const invalidateAnalyticsCache = useCallback(() => {
-    cachedAnalyticsAPI.invalidateAll();
-  }, []);
-
   // Refresh Bing status on mount
   useEffect(() => {
     (async () => {
@@ -115,13 +111,13 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
 
     if (changed) {
       setConnectedPlatforms(updated);
-      invalidateAnalyticsCache();
+      cachedAnalyticsAPI.invalidatePlatformStatus();
     }
   }, [
     wordpressConnected, wordpressSites,
     bingConnected, bingSites,
     gscInternalPlatforms,
-    setConnectedPlatforms, invalidateAnalyticsCache,
+    setConnectedPlatforms,
   ]);
 
   useEffect(() => {

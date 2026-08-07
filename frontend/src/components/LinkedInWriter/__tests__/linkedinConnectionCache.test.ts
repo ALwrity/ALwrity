@@ -13,11 +13,18 @@ jest.mock('../../../api/client', () => ({
 }));
 
 import { apiClient } from '../../../api/client';
-import { getLinkedInConnectionStatus, listLinkedInAccounts } from '../../../api/linkedinSocial';
+import {
+  getLinkedInConnectionStatus,
+  invalidateLinkedInConnectionStatusCache,
+  listLinkedInAccounts,
+} from '../../../api/linkedinSocial';
+import { invalidateSharedConnectionStatus } from '../../../hooks/linkedInConnectionStatusCache';
 
 describe('Connection Status Caching — regression', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    invalidateLinkedInConnectionStatusCache();
+    invalidateSharedConnectionStatus();
   });
 
   it('getLinkedInConnectionStatus is a function', () => {
@@ -45,6 +52,45 @@ describe('Connection Status Caching — regression', () => {
     expect(r3).toEqual(mockData);
     // 14 components mounting simultaneously → only 1 HTTP call
     expect(mockGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidateLinkedInConnectionStatusCache forces next fetch to hit network', async () => {
+    const mockGet = apiClient.get as jest.Mock;
+    const connected = linkedinStatusResult(true);
+    const disconnected = linkedinStatusResult(false);
+
+    mockGet
+      .mockReturnValueOnce(Promise.resolve({ data: connected }))
+      .mockReturnValueOnce(Promise.resolve({ data: disconnected }));
+
+    await getLinkedInConnectionStatus();
+    expect(mockGet).toHaveBeenCalledTimes(1);
+
+    invalidateLinkedInConnectionStatusCache();
+    const fresh = await getLinkedInConnectionStatus();
+    expect(mockGet).toHaveBeenCalledTimes(2);
+    expect(fresh.connected).toBe(false);
+  });
+
+  it('bypassCache skips TTL and always fetches fresh', async () => {
+    const mockGet = apiClient.get as jest.Mock;
+    mockGet.mockResolvedValue({ data: linkedinStatusResult(true) });
+
+    await getLinkedInConnectionStatus();
+    await getLinkedInConnectionStatus({ bypassCache: true });
+
+    expect(mockGet).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalidateSharedConnectionStatus clears API-layer cache too', async () => {
+    const mockGet = apiClient.get as jest.Mock;
+    mockGet.mockResolvedValue({ data: linkedinStatusResult(true) });
+
+    await getLinkedInConnectionStatus();
+    invalidateSharedConnectionStatus();
+    await getLinkedInConnectionStatus();
+
+    expect(mockGet).toHaveBeenCalledTimes(2);
   });
 });
 

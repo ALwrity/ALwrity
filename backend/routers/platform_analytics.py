@@ -560,3 +560,62 @@ async def clear_analytics_cache(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/check-existing/{platform}")
+async def check_existing_analytics(
+    platform: str,
+    site_url: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user.get("sub") or current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    try:
+        from services.database import get_session_for_user
+        from services.platform_analytics_persistence import PlatformAnalyticsPersistence
+
+        db = get_session_for_user(user_id)
+        if not db:
+            return {"exists": False}
+
+        persistence = PlatformAnalyticsPersistence(db)
+        result = persistence.check_existing_analytics(user_id, platform, site_url)
+        db.close()
+        return result
+    except Exception as e:
+        logger.error(f"Error checking existing analytics: {e}")
+        return {"exists": False}
+
+
+@router.get("/db/{analysis_id}")
+async def get_analytics_from_db(
+    analysis_id: int,
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    user_id = current_user.get("sub") or current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="User not authenticated")
+
+    try:
+        from services.database import get_session_for_user
+        from services.platform_analytics_persistence import PlatformAnalyticsPersistence
+
+        db = get_session_for_user(user_id)
+        if not db:
+            raise HTTPException(status_code=500, detail="Database unavailable")
+
+        persistence = PlatformAnalyticsPersistence(db)
+        result = persistence.get_analytics(analysis_id)
+        db.close()
+
+        if not result:
+            raise HTTPException(status_code=404, detail="Analytics not found")
+        if result["user_id"] != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error loading analytics from DB: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
