@@ -590,15 +590,9 @@ class SEODashboardService:
     def _get_gsc_sites(self, user_id: str) -> List[str]:
         """Get GSC sites for user."""
         try:
-            credentials = self.gsc_service.load_user_credentials(user_id)
-            if not credentials:
-                return []
-            
-            # This would need to be implemented in GSCService
-            # For now, return empty list
-            return []
+            return self.gsc_service.get_site_list(user_id)
         except Exception as e:
-            logger.error(f"Error getting GSC sites for user {user_id}: {e}")
+            logger.warning(f"Error getting GSC sites for user {user_id}: {e}")
             return []
     
     def _get_bing_sites(self, user_id: str) -> List[str]:

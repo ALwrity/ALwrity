@@ -555,23 +555,33 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                     textTransform: 'none',
                     px: 2.5,
                     py: 0,
-                    background: 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
+                    background: analysis
+                      ? 'linear-gradient(135deg, #F59E0B 0%, #D97706 100%)'
+                      : 'linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)',
                     color: '#FFFFFF',
                     fontWeight: 600,
                     fontSize: '0.875rem',
-                    boxShadow: '0 2px 8px rgba(59, 130, 246, 0.3)',
+                    boxShadow: analysis
+                      ? '0 2px 8px rgba(245, 158, 11, 0.3)'
+                      : '0 2px 8px rgba(59, 130, 246, 0.3)',
                     zIndex: 1,
                     '&:hover': {
-                      background: 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
-                      boxShadow: '0 4px 12px rgba(59, 130, 246, 0.4)',
+                      background: analysis
+                        ? 'linear-gradient(135deg, #D97706 0%, #B45309 100%)'
+                        : 'linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)',
+                      boxShadow: analysis
+                        ? '0 4px 12px rgba(245, 158, 11, 0.4)'
+                        : '0 4px 12px rgba(59, 130, 246, 0.4)',
                     },
                     '&.Mui-disabled': {
-                      background: 'rgba(59, 130, 246, 0.3)',
+                      background: analysis
+                        ? 'rgba(245, 158, 11, 0.3)'
+                        : 'rgba(59, 130, 246, 0.3)',
                       color: 'rgba(255,255,255,0.5)',
                     },
                   }}
               >
-                {loading ? 'Analyzing...' : 'Analyze'}
+                {loading ? 'Analyzing...' : analysis ? 'Re-Analyze' : 'Analyze'}
               </Button>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mt: 1.5, pt: 1.5, borderTop: '1px solid #CBD5E1' }}>

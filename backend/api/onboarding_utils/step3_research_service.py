@@ -17,6 +17,7 @@ Last Updated: January 2025
 
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+import asyncio
 import traceback
 from loguru import logger
 from services.research.exa_service import ExaService
@@ -78,28 +79,20 @@ class Step3ResearchService:
                 actual_session_id = str(session.id)  # Convert to string for consistency
                 logger.info(f"Found onboarding session {actual_session_id} for user {user_id}")
 
-            # Step 1: Discover social media accounts
-            logger.info("Step 1: Discovering social media accounts...")
-            social_media_results = await self.exa_service.discover_social_media_accounts(user_url)
-            
-            if not social_media_results["success"]:
-                logger.warning(f"Social media discovery failed: {social_media_results.get('error')}")
-                # Continue with competitor discovery even if social media fails
-                social_media_results = {"success": False, "social_media_accounts": {}, "citations": []}
-            
-            # Step 2: Discover competitors using Exa API
-            logger.info("Step 2: Discovering competitors...")
-            competitor_results = await self.exa_service.discover_competitors(
-                user_url=user_url,
-                num_results=num_results,
-                exclude_domains=None,  # Let ExaService handle domain exclusion
-                industry_context=industry_context,
-                website_analysis_data=website_analysis_data
-            )
-            
-            if not competitor_results["success"]:
-                logger.error(f"Competitor discovery failed: {competitor_results.get('error')}")
+            # Step 1 & 2: Discover competitors AND social media in parallel
+            logger.info("Running competitor + social media discovery in parallel...")
+            competitor_task = self.exa_service.discover_competitors(
+                user_url=user_url, num_results=num_results, exclude_domains=None,
+                industry_context=industry_context, website_analysis_data=website_analysis_data)
+            social_media_task = self.exa_service.discover_social_media_accounts(user_url)
+            competitor_results, social_media_results = await asyncio.gather(
+                competitor_task, social_media_task, return_exceptions=True)
+            if isinstance(competitor_results, Exception):
+                return {"success": False, "error": str(competitor_results)}
+            if not competitor_results.get("success"):
                 return competitor_results
+            if isinstance(social_media_results, Exception) or not social_media_results.get("success"):
+                social_media_results = {"success": False, "social_media_accounts": {}, "citations": []}
             
             # Process and enhance competitor data
             enhanced_competitors = await self._enhance_competitor_data(
@@ -108,18 +101,18 @@ class Step3ResearchService:
                 industry_context
             )
             
-            # Store research data in database - DEPRECATED in favor of delayed persistence in StepManagementService
-            # await self._store_research_data(
-            #     session_id=actual_session_id,
-            #     user_id=user_id,
-            #     user_url=user_url,
-            #     competitors=enhanced_competitors,
-            #     industry_context=industry_context,
-            #     analysis_metadata={
-            #         **competitor_results,
-            #         "social_media_data": social_media_results
-            #     }
-            # )
+            # Persist to DB immediately so results survive refresh
+            try:
+                from services.database import get_session_for_user
+                from api.onboarding_utils.step_management_service import StepManagementService
+                db = get_session_for_user(user_id)
+                if db:
+                    svc = StepManagementService()
+                    svc._save_competitor_analysis(user_id, enhanced_competitors, industry_context, db)
+                    db.close()
+                    logger.info(f"Competitor analysis persisted for user {user_id}")
+            except Exception as persist_err:
+                logger.warning(f"Failed to persist competitor analysis for user {user_id}: {persist_err}")
             
             # Generate research summary
             research_summary = self._generate_research_summary(

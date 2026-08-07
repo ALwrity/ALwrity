@@ -64,21 +64,38 @@ class GSCAnalyticsHandler(BaseAnalyticsHandler):
                 logger.warning(f"No GSC sites found for user {user_id} — failing fast")
                 return self.create_error_response("No Google Search Console sites found for this account. Add a property in Google Search Console first.")
             
-            # Select site: Prefer target_url match, otherwise first site
-            selected_site = sites[0]
+            # Select site: Prefer target_url match, otherwise first site if only one,
+            # otherwise signal the frontend that we need user input
+            selected_site = sites[0] if len(sites) == 1 else None
+            
             if target_url:
                 logger.info(f"Attempting to match target URL: {target_url}")
-                # Normalize target URL (remove protocol, trailing slash)
-                normalized_target = target_url.replace('https://', '').replace('http://', '').rstrip('/')
+                normalized_target = (
+                    target_url.replace('https://', '').replace('http://', '')
+                    .replace('www.', '').rstrip('/')
+                )
                 
                 for site in sites:
                     site_url = site['siteUrl']
-                    normalized_site = site_url.replace('https://', '').replace('http://', '').rstrip('/')
+                    normalized_site = (
+                        site_url.replace('https://', '').replace('http://', '')
+                        .replace('sc_origin:', '').replace('sc_domain:', '')
+                        .replace('www.', '').rstrip('/')
+                    )
                     
                     if normalized_target in normalized_site or normalized_site in normalized_target:
                         selected_site = site
                         logger.info(f"Found matching GSC site: {site_url}")
                         break
+            
+            if not selected_site and len(sites) > 1:
+                logger.warning(
+                    f"Multiple GSC sites for user {user_id} but no match for target_url='{target_url}'. "
+                    f"Sites: {[s['siteUrl'] for s in sites]}"
+                )
+                return self.create_error_response(
+                    f"No matching site found. Available sites: {', '.join(s['siteUrl'] for s in sites)}"
+                )
             
             site_url = selected_site['siteUrl']
             logger.info(f"Using GSC site URL: {site_url}")
@@ -126,7 +143,7 @@ class GSCAnalyticsHandler(BaseAnalyticsHandler):
             return {
                 'connected': len(sites) > 0,
                 'sites_count': len(sites),
-                'sites': sites[:3] if sites else [],  # Show first 3 sites
+                'sites': sites,  # Show all sites for selection
                 'error': None
             }
         except Exception as e:
