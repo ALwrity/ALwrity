@@ -74,9 +74,9 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
   const {
     structure_analysis,
     content_trends,
-    // publishing_patterns,
+    publishing_patterns,
     ai_insights,
-    // seo_recommendations
+    seo_recommendations
   } = sitemapAnalysis;
 
   return (
@@ -242,6 +242,29 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                         ))}
                     </List>
                 </Grid>
+                {publishing_patterns && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>Publishing Patterns</Typography>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                      {publishing_patterns.priority_distribution && Object.entries(publishing_patterns.priority_distribution).map(([k, v]) => (
+                        <Chip key={k} size="small" label={`${k}: ${v}`} variant="outlined" />
+                      ))}
+                    </Box>
+                  </Grid>
+                )}
+                {seo_recommendations && seo_recommendations.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.5 }}>SEO Recommendations</Typography>
+                    <List dense>
+                      {seo_recommendations.map((rec: string, idx: number) => (
+                        <ListItem key={idx}>
+                          <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
+                          <ListItemText primary={rec} />
+                        </ListItem>
+                      ))}
+                    </List>
+                  </Grid>
+                )}
             </Grid>
         </TabPanel>
       </Paper>

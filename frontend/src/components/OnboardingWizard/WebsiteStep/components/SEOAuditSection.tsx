@@ -118,6 +118,7 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
 }) => {
   const [tabValue, setTabValue] = useState(0);
   const [expandedIssues, setExpandedIssues] = useState(true);
+  const [expandedWarnings, setExpandedWarnings] = useState(false);
   const [selectedUrl, setSelectedUrl] = useState('');
   const [analyzing, setAnalyzing] = useState(false);
   const [localAuditData, setLocalAuditData] = useState<any>(null);
@@ -426,7 +427,44 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
                              {displayValue}
                          </Typography>
                     )}
+         </Box>
+         
+         {/* Warnings Summary */}
+         {displayAudit.summary?.warnings && displayAudit.summary.warnings.length > 0 && (
+           <Box sx={{ p: 2, bgcolor: '#FFFBEB', borderBottom: '1px solid #FDE68A' }}>
+              <Box 
+                display="flex" 
+                justifyContent="space-between" 
+                alignItems="center" 
+                onClick={() => setExpandedWarnings(!expandedWarnings)}
+                sx={{ cursor: 'pointer' }}
+              >
+                <Box display="flex" alignItems="center" gap={1}>
+                   <WarningIcon color="warning" fontSize="small" />
+                   <Typography variant="subtitle2" fontWeight="bold" color="#92400E">
+                     {displayAudit.summary.warnings.length} Warnings
+                   </Typography>
                 </Box>
+                {expandedWarnings ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+              </Box>
+              
+              <Collapse in={expandedWarnings}>
+                <List dense sx={{ mt: 1 }}>
+                  {displayAudit.summary.warnings.map((warning: any, i: number) => (
+                    <ListItem key={i} disablePadding sx={{ py: 0.5 }}>
+                      <ListItemIcon sx={{ minWidth: 24 }}>
+                        <WarningIcon fontSize="small" color="warning" />
+                      </ListItemIcon>
+                      <ListItemText 
+                        primary={typeof warning === 'string' ? warning : warning.message}
+                        primaryTypographyProps={{ variant: 'body2', color: '#78350F' }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Collapse>
+           </Box>
+         )}
               </Box>
             </Tooltip>
           );

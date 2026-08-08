@@ -48,6 +48,7 @@ interface KeyInsightsGridProps {
   writing_style?: WritingStyle;
   target_audience?: TargetAudience;
   content_type?: ContentType;
+  confidence?: number;
 }
 
 interface InsightRow {
@@ -95,7 +96,8 @@ const chipColors: Record<string, 'primary' | 'secondary' | 'info' | 'success' | 
 const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
   writing_style,
   target_audience,
-  content_type
+  content_type,
+  confidence,
 }) => {
   const data = rows(writing_style, target_audience, content_type);
   if (data.length === 0) return null;
@@ -163,6 +165,17 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
         </TableBody>
       </Table>
     </TableContainer>
+    {typeof confidence === 'number' && (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5, px: 1 }}>
+        <Typography variant="caption" color="text.secondary">Analysis Confidence:</Typography>
+        <Chip
+          size="small"
+          label={`${(confidence * 100).toFixed(0)}%`}
+          color={confidence >= 0.7 ? 'success' : confidence >= 0.4 ? 'warning' : 'error'}
+          variant="outlined"
+        />
+      </Box>
+    )}
   );
 };
 

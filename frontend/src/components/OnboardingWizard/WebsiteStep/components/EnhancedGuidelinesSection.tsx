@@ -38,11 +38,15 @@ interface Guidelines {
 interface EnhancedGuidelinesSectionProps {
   guidelines?: Guidelines | null;
   domainName: string;
+  bestPractices?: string[];
+  avoidElements?: string[];
 }
 
 const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
   guidelines,
-  domainName
+  domainName,
+  bestPractices,
+  avoidElements,
 }) => {
   const styles = useOnboardingStyles();
 
@@ -142,6 +146,28 @@ const EnhancedGuidelinesSection: React.FC<EnhancedGuidelinesSectionProps> = ({
               guidelines.audience_considerations,
               <GroupIcon />,
               'info'
+            )}
+          </Grid>
+        )}
+        
+        {bestPractices && bestPractices.length > 0 && (
+          <Grid item xs={12} md={6}>
+            {renderGuidelinesCard(
+              'Best Practices',
+              bestPractices,
+              <LightbulbIcon />,
+              'success'
+            )}
+          </Grid>
+        )}
+        
+        {avoidElements && avoidElements.length > 0 && (
+          <Grid item xs={12} md={6}>
+            {renderGuidelinesCard(
+              'What to Avoid',
+              avoidElements,
+              <TrendingUpIcon />,
+              'warning'
             )}
           </Grid>
         )}

@@ -15,7 +15,8 @@ import {
   Alert,
   Paper,
   Switch,
-  Button
+  Button,
+  Chip,
 } from '@mui/material';
 import {
   AutoAwesome as AutoAwesomeIcon,
@@ -338,7 +339,41 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
             writing_style={analysis.writing_style}
             target_audience={analysis.target_audience}
             content_type={analysis.content_type}
+            confidence={analysis.meta?.confidence}
           />
+
+          {analysis.recommended_settings && (
+            <Box sx={{ mt: 1, mb: 2 }}>
+              <Paper variant="outlined" sx={{ p: 1.5 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                  AI Generation Settings
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {analysis.recommended_settings.writing_tone && (
+                    <Chip size="small" label={`Tone: ${analysis.recommended_settings.writing_tone}`} variant="outlined" />
+                  )}
+                  {analysis.recommended_settings.target_audience && (
+                    <Chip size="small" label={`Audience: ${analysis.recommended_settings.target_audience}`} variant="outlined" />
+                  )}
+                  {analysis.recommended_settings.content_type && (
+                    <Chip size="small" label={`Type: ${analysis.recommended_settings.content_type}`} variant="outlined" />
+                  )}
+                  {analysis.recommended_settings.creativity_level && (
+                    <Chip size="small" label={`Creativity: ${analysis.recommended_settings.creativity_level}`} variant="outlined" />
+                  )}
+                  {analysis.recommended_settings.geographic_location && (
+                    <Chip size="small" label={`Location: ${analysis.recommended_settings.geographic_location}`} variant="outlined" />
+                  )}
+                  {analysis.recommended_settings.industry_context && (
+                    <Chip size="small" label={`Industry: ${analysis.recommended_settings.industry_context}`} variant="outlined" />
+                  )}
+                  {analysis.recommended_settings.brand_alignment && (
+                    <Chip size="small" label={`Brand: ${analysis.recommended_settings.brand_alignment}`} variant="outlined" />
+                  )}
+                </Box>
+              </Paper>
+            </Box>
+          )}
 
           {/* Brand Analysis Section — shown via CombinedAnalysisSection tab */}
 
@@ -357,6 +392,8 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
                 <EnhancedGuidelinesSection 
                   guidelines={analysis.guidelines}
                   domainName={domainName}
+                  bestPractices={analysis.best_practices}
+                  avoidElements={analysis.avoid_elements}
                 />
               )}
             </Box>
