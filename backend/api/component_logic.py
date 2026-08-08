@@ -737,14 +737,20 @@ async def complete_style_detection(
         # Step 4: Generate guidelines (depends on style_analysis, must run after)
         style_guidelines = None
         guidelines_result = None
+        guidelines_warning = None
         if request.include_guidelines:
-            loop = asyncio.get_event_loop()
-            guidelines_result = await loop.run_in_executor(
-                None, 
-                partial(style_logic.generate_style_guidelines, style_analysis.get('analysis', {}), user_id=user_id)
-            )
-            if guidelines_result and guidelines_result.get('success'):
-                style_guidelines = guidelines_result.get('guidelines')
+            analysis_confidence = style_analysis.get('analysis', {}).get('meta', {}).get('confidence', 1.0)
+            if analysis_confidence < 0.3:
+                logger.warning(f"[complete_style_detection] Skipping guidelines — style analysis confidence too low ({analysis_confidence})")
+                guidelines_warning = f"Content guidelines were not generated — style analysis confidence was too low ({analysis_confidence:.0%})"
+            else:
+                loop = asyncio.get_event_loop()
+                guidelines_result = await loop.run_in_executor(
+                    None, 
+                    partial(style_logic.generate_style_guidelines, style_analysis.get('analysis', {}), user_id=user_id)
+                )
+                if guidelines_result and guidelines_result.get('success'):
+                    style_guidelines = guidelines_result.get('guidelines')
         
         warning_parts = []
         if crawl_warning:
@@ -755,6 +761,8 @@ async def complete_style_detection(
             warning_parts.append(patterns_warning)
         if seo_audit_warning:
             warning_parts.append(seo_audit_warning)
+        if guidelines_warning:
+            warning_parts.append(guidelines_warning)
         if request.include_guidelines and guidelines_result and not guidelines_result.get('success') and guidelines_result.get('error'):
             warning_parts.append(f"Guidelines generation failed: {guidelines_result.get('error')}")
         if sitemap_warning:
