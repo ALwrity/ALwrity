@@ -197,6 +197,7 @@ export const performAnalysis = async (
 }> => {
   try {
     updateProgress(1, 'URL validated — connection established', 'Your website is reachable. Starting analysis pipeline...');
+    updateProgress(2, 'Crawling your website pages', 'Scanning public pages to understand your content architecture and navigation');
 
     const requestData = {
       url: fixedUrl,
@@ -204,26 +205,24 @@ export const performAnalysis = async (
       include_guidelines: true
     };
 
-    updateProgress(2, 'Crawling your website pages', 'Scanning public pages to understand your content architecture and navigation');
-
-    // Show progressive updates while backend processes the analysis
-    const progressTimers = [
-      setTimeout(() => updateProgress(3, 'Extracting content & SEO metadata', 'Analyzing page titles, headings, body text, and meta descriptions'), 8000),
-      setTimeout(() => updateProgress(4, 'Analyzing brand voice & tone', 'Identifying your unique writing patterns, vocabulary, and emotional resonance'), 25000),
-      setTimeout(() => updateProgress(5, 'Evaluating content characteristics', 'Measuring readability, sentence structure, and content variety'), 55000),
-      setTimeout(() => updateProgress(6, 'Identifying target audience signals', 'Detecting audience expertise level, pain points, and content preferences'), 100000),
-    ];
+    const startTime = Date.now();
+    const elapsedUpdater = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000);
+      const mins = Math.floor(elapsed / 60);
+      const secs = elapsed % 60;
+      const elapsedStr = `${mins}:${secs.toString().padStart(2, '0')}`;
+      updateProgress(3, 'Analyzing your content', `Brand voice, tone, audience signals, SEO audit, and content strategy (${elapsedStr} elapsed)`);
+    }, 1000);
 
     const response = await longRunningApiClient.post('/api/onboarding/style-detection/complete', requestData);
 
-    // Cancel pending timers — real results are here
-    progressTimers.forEach(clearTimeout);
+    clearInterval(elapsedUpdater);
 
-    updateProgress(3, 'Content extracted successfully', 'Page titles, headings, body text, and metadata have been collected');
-    updateProgress(4, 'Brand voice & tone analyzed', 'Detected tone patterns, vocabulary richness, and emotional resonance across your content');
-    updateProgress(5, 'Content characteristics evaluated', 'Readability, sentence complexity, and content format variety assessed');
-    updateProgress(6, 'Target audience identified', 'Audience expertise level, interests, and content preferences mapped from your material');
-    updateProgress(7, 'AI brand playbook generated', 'Custom guidelines packaged for your AI content generation');
+    updateProgress(3, 'Brand voice, tone & style analyzed', 'Detected tone patterns, vocabulary richness, emotional resonance and readability');
+    updateProgress(4, 'Content characteristics & SEO evaluated', 'Readability, sentence complexity, page structure, and SEO health assessed');
+    updateProgress(5, 'Target audience identified', 'Audience expertise level, interests, pain points, and content preferences mapped');
+    updateProgress(6, 'Sitemap & content strategy processed', 'URL structure, publishing patterns, and strategic opportunities analyzed');
+    updateProgress(7, 'AI brand playbook generated', 'Custom content guidelines and recommendations packaged for AI generation');
 
     const result = response.data;
 
