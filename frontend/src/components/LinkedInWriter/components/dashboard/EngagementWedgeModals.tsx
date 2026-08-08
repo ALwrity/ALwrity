@@ -6,7 +6,7 @@
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
  * E4  GrowNetworkModal            — AI Network Advisor + Live PYMK (see GrowNetworkModal.tsx)
  *
- * Performance Pulse (PostPulseModal) lives in Remarket wedge — see remarkWedgeModalExports.ts
+ * Performance Pulse — see performancePulse/ module and remarkWedgeModalExports.ts
  */
 import React, { useEffect, useState, useMemo } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";

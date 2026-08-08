@@ -1,4 +1,8 @@
 /**
  * Remarket wedge modal exports (Performance Pulse lives in Remarket wedge).
  */
-export { PostPulseModal } from "./PostPulseModal";
+export {
+  PerformancePulseModal,
+  PerformancePulseModal as PostPulseModal,
+} from "./performancePulse";
+export type { PerformancePulseModalProps as PostPulseModalProps } from "./performancePulse";
