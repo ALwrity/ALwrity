@@ -196,6 +196,7 @@ class WebCrawlerLogic:
                 'content_structure': content_structure,
                 'exa_summary': exa_summary,
                 'exa_highlights': exa_highlights,
+                'metadata_degraded': soup is None,
             }
 
             logger.debug(f"[WebCrawlerLogic.crawl_website] Extracted {len(content['links'])} links, {len(content['images'])} images, and {len(social_media)} social media links")

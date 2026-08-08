@@ -449,6 +449,8 @@ class StyleDetectionLogic:
         
         if not html_content:
             logger.warning("No HTML content available for SEO audit")
+            audit_results['html_unavailable'] = True
+            audit_results['warning'] = 'SEO audit unavailable — could not fetch page HTML for analysis'
             return audit_results
             
         soup = BeautifulSoup(html_content, 'html.parser')

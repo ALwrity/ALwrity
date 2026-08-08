@@ -623,6 +623,10 @@ async def complete_style_detection(
                 error=f"Insufficient content extracted from the website (received {len(main_content)} characters). The page may be a login wall, JavaScript-rendered, or too short for meaningful style analysis.",
                 timestamp=datetime.now().isoformat()
             )
+        
+        crawl_warning = None
+        if crawl_result.get('content', {}).get('metadata_degraded'):
+            crawl_warning = "Page metadata (headings, brand info, social links) was unavailable — analysis based on content text only"
 
         # Step 2-4: Parallelize AI API calls for performance (3 calls → 1 parallel batch)
         import asyncio
@@ -743,6 +747,8 @@ async def complete_style_detection(
                 style_guidelines = guidelines_result.get('guidelines')
         
         warning_parts = []
+        if crawl_warning:
+            warning_parts.append(crawl_warning)
         if style_analysis and 'warning' in style_analysis:
             warning_parts.append(style_analysis['warning'])
         if patterns_warning:
