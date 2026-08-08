@@ -6,7 +6,7 @@
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
  * E4  GrowNetworkModal            — AI Network Advisor + Live PYMK (see GrowNetworkModal.tsx)
  *
- * Performance Pulse (PostPulseModal) lives in Remarket wedge — see remarkWedgeModalExports.ts
+ * Performance Pulse — see performancePulse/ module and remarkWedgeModalExports.ts
  */
 import React, { useEffect, useState, useMemo } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
@@ -21,9 +21,6 @@ import {
 } from "../GrowthEngine/styles";
 import { openGrowthEngineModal } from "../../utils/linkedInDashboardEvents";
 import { pushDraftToStudio } from "./engagementWedgeDraftUtils";
-import {
-  formatCacheAge,
-} from "./engagementWedgeGrowthCache";
 import { useGrowthCache } from "./useGrowthCache";
 import {
   ENGAGEMENT_RETURN,
@@ -34,46 +31,6 @@ export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
 export { NetworkAdvisorModal } from "./NetworkAdvisorModal";
 export { GrowNetworkModal } from "./GrowNetworkModal";
-function formatAge(cachedAt: number): string {
-  return formatCacheAge(cachedAt);
-}
-
-const RefreshBar: React.FC<{
-  cachedAt: number;
-  onRefresh: () => void;
-  loading?: boolean;
-}> = ({ cachedAt, onRefresh, loading }) => (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 14,
-      fontSize: 11,
-      color: colors.textTertiary,
-    }}
-  >
-    <span>Last refreshed {formatAge(cachedAt)}</span>
-    <button
-      type="button"
-      onClick={onRefresh}
-      disabled={loading}
-      style={{
-        background: "none",
-        border: `1px solid ${colors.border}`,
-        borderRadius: 5,
-        padding: "2px 8px",
-        fontSize: 11,
-        color: colors.textSecondary,
-        cursor: loading ? "default" : "pointer",
-        fontWeight: 600,
-        opacity: loading ? 0.5 : 1,
-      }}
-    >
-      {loading ? "Loading…" : "↻ Refresh"}
-    </button>
-  </div>
-);
 
 const ConnectPrompt: React.FC<{ message: string }> = ({ message }) => (
   <div style={{ textAlign: "center", padding: "30px 0" }}>

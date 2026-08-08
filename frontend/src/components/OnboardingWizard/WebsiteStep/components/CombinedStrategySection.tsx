@@ -113,7 +113,7 @@ const CombinedStrategySection: React.FC<CombinedStrategySectionProps> = ({
                 contentCalendarSuggestions={contentCalendarSuggestions}
                 aiGenerationTips={aiGenerationTips}
                 isEditable={isEditable}
-                onUpdate={(field, value) => onUpdate(field, field, value)} // Strategic section often updates top-level fields
+                onUpdate={(field, value) => onUpdate('strategic_insights', field, value)}
                 hideHeader={true}
               />
             </Box>
