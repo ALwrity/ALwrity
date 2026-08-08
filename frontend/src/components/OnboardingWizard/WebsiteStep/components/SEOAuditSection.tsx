@@ -22,7 +22,8 @@ import {
   Select, 
   MenuItem, 
   Button, 
-  CircularProgress 
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   CheckCircle as CheckCircleIcon,
@@ -145,6 +146,8 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
   };
 
   if (!seoAudit) return null;
+
+  const isAuditDegraded = displayAudit?.html_unavailable;
 
   const getScoreColor = (score: number) => {
     if (score >= 90) return 'success';
@@ -451,9 +454,20 @@ const SEOAuditSection: React.FC<SEOAuditSectionProps> = ({
           color={getScoreColor(displayAudit.overall_score || seoAudit.overall_score)}
           sx={{ fontWeight: 'bold' }}
         />
+        {isAuditDegraded && (
+          <Typography variant="caption" color="warning.main" sx={{ fontStyle: 'italic' }}>
+            (Limited — page HTML was unavailable for full audit)
+          </Typography>
+        )}
       </Box>
 
       <CardContent sx={{ p: 0 }}>
+        {isAuditDegraded && (
+          <Alert severity="warning" sx={{ m: 1 }}>
+            SEO audit ran with limited data — the page HTML could not be fetched.
+            Scores and checks may be incomplete. Consider re-running the analysis.
+          </Alert>
+        )}
         {/* Issues Summary */}
         <Box sx={{ p: 2, bgcolor: '#FEF2F2', borderBottom: '1px solid #FEE2E2' }}>
            <Box 

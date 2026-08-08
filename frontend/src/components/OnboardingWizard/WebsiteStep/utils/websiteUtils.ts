@@ -235,7 +235,7 @@ export const performAnalysis = async (
         id: result.analysis_id,
         ...result.style_analysis,
         seo_audit: result.seo_audit,
-        sitemap_analysis: result.crawl_result?.sitemap_analysis,
+        sitemap_analysis: result.sitemap_analysis,
         guidelines: result.style_guidelines?.guidelines,
         best_practices: result.style_guidelines?.best_practices,
         avoid_elements: result.style_guidelines?.avoid_elements,
