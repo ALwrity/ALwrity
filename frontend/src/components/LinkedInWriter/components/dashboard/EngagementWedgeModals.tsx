@@ -4,8 +4,9 @@
  * E5  EngagementBoosterModal      — see EngagementBoosterModal.tsx
  * E2  CommentAssistantModal       — extracted to CommentAssistantInboxModal.tsx
  * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
- * E3  PostPulseModal              — see PostPulseModal.tsx
  * E4  GrowNetworkModal            — AI Network Advisor + Live PYMK (see GrowNetworkModal.tsx)
+ *
+ * Performance Pulse (PostPulseModal) lives in Remarket wedge — see remarkWedgeModalExports.ts
  */
 import React, { useEffect, useState, useMemo } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
@@ -33,8 +34,6 @@ export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
 export { NetworkAdvisorModal } from "./NetworkAdvisorModal";
 export { GrowNetworkModal } from "./GrowNetworkModal";
-export { PostPulseModal } from "./PostPulseModal";
-
 function formatAge(cachedAt: number): string {
   return formatCacheAge(cachedAt);
 }
