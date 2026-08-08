@@ -6,7 +6,8 @@ import {
   Chip,
   Link,
   IconButton,
-  Tooltip
+  Tooltip,
+  Alert
 } from '@mui/material';
 import {
   Language as GlobeIcon,
@@ -61,9 +62,15 @@ const CrawlResultSections: React.FC<CrawlResultSectionsProps> = ({ crawlResult }
   if (!crawlResult) return null;
 
   const { domain_info, social_media, brand_info } = crawlResult;
+  const metadataDegraded = crawlResult.content?.metadata_degraded;
 
   return (
     <Box sx={{ mt: 4 }}>
+      {metadataDegraded && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Page metadata (headings, brand info, social links) is limited — analysis used content text only.
+        </Alert>
+      )}
       {/* Domain Info */}
       {domain_info && (
         <Box sx={{ mb: 4 }}>
