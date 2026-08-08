@@ -614,6 +614,16 @@ async def complete_style_detection(
                 timestamp=datetime.now().isoformat()
             )
         
+        main_content = crawl_result.get('content', {}).get('main_content', '')
+        if len(main_content) < 200:
+            logger.warning(f"[complete_style_detection] Insufficient content: {len(main_content)} chars extracted from {request.url}")
+            analysis_service.save_error_analysis(session.id, request.url, f"Insufficient content ({len(main_content)} chars)")
+            return StyleDetectionResponse(
+                success=False,
+                error=f"Insufficient content extracted from the website (received {len(main_content)} characters). The page may be a login wall, JavaScript-rendered, or too short for meaningful style analysis.",
+                timestamp=datetime.now().isoformat()
+            )
+
         # Step 2-4: Parallelize AI API calls for performance (3 calls → 1 parallel batch)
         import asyncio
         from functools import partial
@@ -692,16 +702,23 @@ async def complete_style_detection(
         
         # Process patterns result
         style_patterns = None
+        patterns_warning = None
         if request.include_patterns and patterns_result and not isinstance(patterns_result, Exception):
             if patterns_result.get('success'):
                 style_patterns = patterns_result.get('patterns')
+            else:
+                patterns_warning = f"Style patterns analysis failed: {patterns_result.get('error', 'Unknown error')}"
+        elif request.include_patterns:
+            patterns_warning = "Style patterns analysis was unavailable"
         
         # Process SEO audit result
         seo_audit = None
+        seo_audit_warning = None
         if seo_audit_result and not isinstance(seo_audit_result, Exception):
             seo_audit = seo_audit_result
         elif isinstance(seo_audit_result, Exception):
             logger.warning(f"SEO audit failed: {seo_audit_result}")
+            seo_audit_warning = "SEO audit was unavailable"
 
         sitemap_analysis = None
         sitemap_warning = None
@@ -710,6 +727,8 @@ async def complete_style_detection(
         elif isinstance(sitemap_result, Exception):
             logger.warning(f"Sitemap analysis failed: {sitemap_result}")
             sitemap_warning = f"Sitemap analysis failed: {sitemap_result}"
+        elif request.url:
+            sitemap_warning = "No sitemap found for this domain"
 
         # Step 4: Generate guidelines (depends on style_analysis, must run after)
         style_guidelines = None
@@ -726,6 +745,10 @@ async def complete_style_detection(
         warning_parts = []
         if style_analysis and 'warning' in style_analysis:
             warning_parts.append(style_analysis['warning'])
+        if patterns_warning:
+            warning_parts.append(patterns_warning)
+        if seo_audit_warning:
+            warning_parts.append(seo_audit_warning)
         if request.include_guidelines and guidelines_result and not guidelines_result.get('success') and guidelines_result.get('error'):
             warning_parts.append(f"Guidelines generation failed: {guidelines_result.get('error')}")
         if sitemap_warning:
