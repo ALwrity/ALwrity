@@ -458,10 +458,10 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
           {/* Combined Strategy Section (Legacy Support) */}
           <Box sx={{ mt: 4 }}>
              <CombinedStrategySection 
-               contentStrategy={analysis.strategic_insights?.content_strategy}
-               competitiveAdvantages={analysis.strategic_insights?.competitive_advantages}
-               contentCalendarSuggestions={analysis.strategic_insights?.content_calendar_suggestions}
-               aiGenerationTips={analysis.strategic_insights?.ai_generation_tips}
+                contentStrategy={analysis.content_strategy}
+                competitiveAdvantages={analysis.competitive_advantages}
+                contentCalendarSuggestions={analysis.content_calendar_suggestions}
+                aiGenerationTips={analysis.ai_generation_tips}
                stylePatterns={analysis.style_patterns}
                domainName={domainName}
                isEditable={isEditable}
