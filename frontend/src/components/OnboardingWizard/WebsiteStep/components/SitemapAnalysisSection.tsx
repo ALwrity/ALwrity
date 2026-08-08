@@ -28,6 +28,61 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 
+const renderMarkdown = (md: string): React.ReactNode[] => {
+  const lines = md.split('\n');
+  const nodes: React.ReactNode[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) { i++; continue; }
+    // Headers
+    if (line.startsWith('## ')) {
+      nodes.push(<Typography key={i} variant="subtitle2" sx={{ fontWeight: 600, mt: 1, mb: 0.5 }}>{line.replace(/^## /, '')}</Typography>);
+      i++; continue;
+    }
+    // Table: header row followed by separator then data rows
+    if (line.startsWith('|') && i + 2 < lines.length && lines[i + 1]?.trim().startsWith('|')) {
+      const headerRow = line.split('|').filter(c => c.trim());
+      const dataRows: string[][] = [];
+      let j = i + 2;
+      while (j < lines.length && lines[j].trim().startsWith('|')) {
+        dataRows.push(lines[j].split('|').filter(c => c.trim()));
+        j++;
+      }
+      nodes.push(
+        <Box key={i} className="md-table" sx={{ mb: 1 }}>
+          <Box className="md-table-header">
+            {headerRow.map((h, hi) => (
+              <Box key={hi} className="md-cell">{(h || '').replace(/\*\*(.+?)\*\*/g, '$1')}</Box>
+            ))}
+          </Box>
+          {dataRows.map((row, ri) => (
+            <Box key={ri} className="md-table-row">
+              {row.map((cell, ci) => (
+                <Box key={ci} className="md-cell">{(cell || '').replace(/\*\*(.+?)\*\*/g, '$1')}</Box>
+              ))}
+            </Box>
+          ))}
+        </Box>
+      );
+      i = j;
+      continue;
+    }
+    // Regular text with bold
+    nodes.push(
+      <Typography key={i} variant="body2" sx={{ mb: 0.25 }}>
+        {line.split(/(\*\*[^*]+\*\*)/g).map((part, pi) =>
+          part.startsWith('**') && part.endsWith('**')
+            ? <strong key={pi}>{part.slice(2, -2)}</strong>
+            : part
+        )}
+      </Typography>
+    );
+    i++;
+  }
+  return nodes;
+};
+
 interface SitemapAnalysisSectionProps {
   sitemapAnalysis: any;
   domainName: string;
@@ -100,12 +155,22 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
       {/* AI Insights Summary */}
       {ai_insights?.summary && (
         <Alert icon={<LightbulbIcon />} severity="info" sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" gutterBottom>
+          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
             AI Insight
           </Typography>
-          <Typography variant="body2">
-            {ai_insights.summary}
-          </Typography>
+          <Box sx={{ 
+            fontSize: '0.8125rem', lineHeight: 1.6,
+            maxHeight: '450px', overflowY: 'auto',
+            '& .md-table': { border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', mb: 0.5 },
+            '& .md-table-header': { display: 'flex', bgcolor: '#f0f4f8', borderBottom: '2px solid #cbd5e1', px: 1, py: 0.75, fontWeight: 700, fontSize: '0.75rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em' },
+            '& .md-table-row': { display: 'flex', px: 1, py: 0.6, borderBottom: '1px solid #f1f5f9', fontSize: '0.78125rem' },
+            '& .md-table-row:last-child': { borderBottom: 'none' },
+            '& .md-table-row:nth-of-type(odd)': { bgcolor: '#f8fafc' },
+            '& .md-cell': { flex: 1, px: 0.75 },
+            '& .md-cell:first-child': { fontWeight: 600 },
+          }}>
+            {renderMarkdown(ai_insights.summary)}
+          </Box>
         </Alert>
       )}
 
