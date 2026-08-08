@@ -1,7 +1,7 @@
 /**
- * @deprecated Import from ./performancePulse — kept for backward compatibility.
+ * @deprecated Import from ./performancePulse/modalExports — kept for backward compatibility.
  */
 export {
   PerformancePulseModal as PostPulseModal,
   type PerformancePulseModalProps as PostPulseModalProps,
-} from "./performancePulse";
+} from "./performancePulse/modalExports";

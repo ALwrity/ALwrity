@@ -1,5 +1,11 @@
-export { PerformancePulseModal } from "./PerformancePulseModal";
-export type { PerformancePulseModalProps } from "./PerformancePulseModal";
+export {
+  PerformancePulseModal,
+  PerformancePulseModal as PostPulseModal,
+} from "./PerformancePulseModal";
+export type {
+  PerformancePulseModalProps,
+  PerformancePulseModalProps as PostPulseModalProps,
+} from "./PerformancePulseModal";
 export { inferPerformanceContentType, toPerformancePulseItem } from "./inferContentType";
 export { boostPerformanceContent } from "./boostPerformanceContent";
 export type {

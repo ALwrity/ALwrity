@@ -4,5 +4,5 @@
 export {
   PerformancePulseModal,
   PerformancePulseModal as PostPulseModal,
-} from "./performancePulse";
-export type { PerformancePulseModalProps as PostPulseModalProps } from "./performancePulse";
+} from "./performancePulse/modalExports";
+export type { PerformancePulseModalProps as PostPulseModalProps } from "./performancePulse/modalExports";
