@@ -19,6 +19,11 @@ import {
   type LinkedInEditContentRequest,
 } from "../../../../services/linkedInWriterApi";
 import { colors, rowBase } from "../GrowthEngine/styles";
+import {
+  WEDGE_BACK_LABELS,
+  wedgeSubModalClassName,
+  wedgeSubModalShellProps,
+} from "./wedgeModalUi";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Shared constants & helpers
@@ -308,6 +313,7 @@ function usePosts(open: boolean, limit = 10) {
 interface RepurposeLabModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 const REPURPOSE_ACTIONS = [
@@ -325,6 +331,7 @@ const REPURPOSE_ACTIONS = [
 export const RepurposeLabModal: React.FC<RepurposeLabModalProps> = ({
   open,
   onClose,
+  onBack,
 }) => {
   const { posts, loading, error, reload } = usePosts(open);
   const topPosts = useMemo(
@@ -340,6 +347,9 @@ export const RepurposeLabModal: React.FC<RepurposeLabModalProps> = ({
       open={open}
       title="Top Performers Repurpose Lab"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={600}
       maxHeight="min(92vh, 740px)"
     >
@@ -554,11 +564,13 @@ type FormatType = (typeof FORMAT_OPTIONS)[number]["type"];
 interface FormatTransformerModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 export const FormatTransformerModal: React.FC<FormatTransformerModalProps> = ({
   open,
   onClose,
+  onBack,
 }) => {
   const [draft, setDraft] = useState("");
   const [generating, setGenerating] = useState<FormatType | null>(null);
@@ -667,6 +679,9 @@ export const FormatTransformerModal: React.FC<FormatTransformerModalProps> = ({
       open={open}
       title="Format Transformer"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={600}
       maxHeight="min(92vh, 780px)"
     >
@@ -923,11 +938,13 @@ const EDIT_ACTIONS: {
 interface ContentRefreshModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 export const ContentRefreshModal: React.FC<ContentRefreshModalProps> = ({
   open,
   onClose,
+  onBack,
 }) => {
   const { posts, loading, error, reload } = usePosts(open, 5);
   const [activePost, setActivePost] = useState<string | null>(null);
@@ -990,6 +1007,9 @@ export const ContentRefreshModal: React.FC<ContentRefreshModalProps> = ({
       open={open}
       title="Content Refresh Studio"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={620}
       maxHeight="min(92vh, 780px)"
     >
@@ -1250,11 +1270,13 @@ export const ContentRefreshModal: React.FC<ContentRefreshModalProps> = ({
 interface StaleReviverModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 export const StaleReviverModal: React.FC<StaleReviverModalProps> = ({
   open,
   onClose,
+  onBack,
 }) => {
   const { posts, loading, error, reload } = usePosts(open, 20);
   const [reviving, setReviving] = useState<string | null>(null);
@@ -1306,6 +1328,9 @@ export const StaleReviverModal: React.FC<StaleReviverModalProps> = ({
       open={open}
       title="Stale Content Reviver"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={580}
       maxHeight="min(92vh, 720px)"
     >
@@ -1584,11 +1609,13 @@ const REMIX_ANGLES = [
 interface PerfToPlanModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 export const PerfToPlanModal: React.FC<PerfToPlanModalProps> = ({
   open,
   onClose,
+  onBack,
 }) => {
   const { posts, loading, error, reload } = usePosts(open, 10);
   const [ideas, setIdeas] = useState<RemixIdea[]>([]);
@@ -1619,6 +1646,9 @@ export const PerfToPlanModal: React.FC<PerfToPlanModalProps> = ({
       open={open}
       title="Performance-to-Plan Bridge"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={580}
       maxHeight="min(92vh, 740px)"
     >

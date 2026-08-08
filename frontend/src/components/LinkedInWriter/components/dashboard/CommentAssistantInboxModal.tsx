@@ -27,6 +27,10 @@ import {
 import { CommentAssistantPriorityTabs } from "./commentAssistantPriorityTabs";
 import { formatLocalizedRelativeTime } from "./engagementTrendsLocaleFormat";
 import { useCommentAssistantInbox } from "./useCommentAssistantInbox";
+import {
+  engagementSubModalClassName,
+  engagementSubModalShellProps,
+} from "./engagementWedgeModalUi";
 
 export interface CommentAssistantModalProps {
   open: boolean;
@@ -102,7 +106,8 @@ export const CommentAssistantInboxModal: React.FC<
       title={COMMENT_ASSISTANT_TITLE}
       onClose={onClose}
       onBack={onBack}
-      backLabel="Engagement"
+      {...engagementSubModalShellProps}
+      modalClassName={engagementSubModalClassName()}
       width="60vw"
       maxWidth="60vw"
       maxHeight="80vh"

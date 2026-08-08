@@ -1,23 +1,23 @@
 /**
- * MySavedIdeas — small modal showing the user's saved Brainstorm ideas.
- *
- * Sourced from the per-user /api/brainstorm/saved-ideas endpoints. Each
- * idea card shows the prompt + rationale, with Copy and Delete actions.
- *
- * This is the "library" half of Feature #2 (Save-to-Library for Brainstorm).
- * Without it, the Save button in BrainstormFlow has nowhere to surface the
- * saved items.
+ * My Saved Ideas — saved brainstorm library (Plan wedge drill-down + Create stack).
  */
-
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { apiClient } from "../../../../api/client";
+import { DashboardActionModal } from "../dashboard/DashboardActionModal";
 import { StudioModalCloseButton } from "../dashboard/StudioModalCloseButton";
+import {
+  WEDGE_BACK_LABELS,
+  wedgeSubModalClassName,
+  wedgeSubModalShellProps,
+} from "../dashboard/wedgeModalUi";
+import type { QuickCreateReturnTarget } from "../dashboard/workflowWedgeNavigation";
 import {
   CREATE_WEDGE_NESTED_BACKDROP,
   CREATE_WEDGE_NESTED_MODAL_SIZE,
   nestedModalZIndex,
 } from "../../utils/createWedgeNestedModalLayout";
+import { MySavedIdeasBody } from "./MySavedIdeasBody";
 
 export interface SavedBrainstormIdea {
   id: string;
@@ -34,7 +34,12 @@ interface MySavedIdeasProps {
   onClose: () => void;
   onAfterDelete?: () => void;
   onUseInCopilot?: (prompt: string) => void;
-  /** Stack above Quick Create Post — Brainstorm Ideas window size + elevated z-index. */
+  /** Return to parent wedge (e.g. Plan grid). */
+  onBack?: () => void;
+  backLabel?: string;
+  /** Passed to Quick Create when user taps Create Post from a saved idea. */
+  quickCreateReturnTo?: QuickCreateReturnTarget;
+  /** Stack above Quick Create — keeps legacy nested layout. */
   stacked?: boolean;
 }
 
@@ -63,52 +68,13 @@ const STACKED_PANEL_STYLE: React.CSSProperties = {
   flexDirection: "column",
 };
 
-const HEADER_STYLE: React.CSSProperties = {
+const LEGACY_HEADER_STYLE: React.CSSProperties = {
   padding: "14px 18px",
   background: "#0a66c2",
   color: "#ffffff",
   display: "flex",
   justifyContent: "space-between",
   alignItems: "center",
-};
-
-const ITEM_STYLE: React.CSSProperties = {
-  padding: "14px 16px",
-  border: "1px solid #e2e8f0",
-  borderRadius: 10,
-  background: "#ffffff",
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-
-const ACTION_BTN_STYLE: React.CSSProperties = {
-  padding: "6px 12px",
-  borderRadius: 8,
-  fontSize: 12,
-  fontWeight: 600,
-  cursor: "pointer",
-};
-
-const PRIMARY_BTN_STYLE: React.CSSProperties = {
-  ...ACTION_BTN_STYLE,
-  background: "#0a66c2",
-  color: "#ffffff",
-  border: "none",
-};
-
-const SECONDARY_BTN_STYLE: React.CSSProperties = {
-  ...ACTION_BTN_STYLE,
-  background: "#ffffff",
-  color: "#475569",
-  border: "1px solid #cbd5e1",
-};
-
-const DANGER_BTN_STYLE: React.CSSProperties = {
-  ...ACTION_BTN_STYLE,
-  background: "#ffffff",
-  color: "#b91c1c",
-  border: "1px solid #fecaca",
 };
 
 async function loadSavedIdeas(): Promise<{
@@ -150,8 +116,19 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
   onClose,
   onAfterDelete,
   onUseInCopilot,
+  onBack,
+  backLabel = WEDGE_BACK_LABELS.plan,
+  quickCreateReturnTo,
   stacked = false,
 }) => {
+  const useWedgeShell = Boolean(onBack && !stacked);
+  const [ideas, setIdeas] = useState<SavedBrainstormIdea[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   const panelStyle = useMemo(
     () => (stacked ? STACKED_PANEL_STYLE : DEFAULT_PANEL_STYLE),
     [stacked],
@@ -177,12 +154,6 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
     }),
     [stacked],
   );
-  const [ideas, setIdeas] = useState<SavedBrainstormIdea[]>([]);
-  const [total, setTotal] = useState<number>(0);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -201,9 +172,7 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
   }, []);
 
   useEffect(() => {
-    if (open) {
-      void refresh();
-    }
+    if (open) void refresh();
   }, [open, refresh]);
 
   const handleCopy = useCallback(async (idea: SavedBrainstormIdea) => {
@@ -241,29 +210,69 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
     [refresh, onAfterDelete],
   );
 
+  const body = (
+    <MySavedIdeasBody
+      ideas={ideas}
+      loading={loading}
+      error={error}
+      copiedId={copiedId}
+      deletingId={deletingId}
+      onUseInCopilot={onUseInCopilot}
+      onClose={onClose}
+      onCopy={handleCopy}
+      onDelete={handleDelete}
+      quickCreateReturnTo={quickCreateReturnTo}
+      formatRelative={formatRelative}
+    />
+  );
+
+  const countLabel = loading
+    ? "Loading…"
+    : `${total} saved idea${total === 1 ? "" : "s"}`;
+
   if (!open) return null;
 
+  if (useWedgeShell) {
+    return (
+      <DashboardActionModal
+        open={open}
+        title="My Saved Ideas"
+        onClose={onClose}
+        onBack={onBack}
+        {...wedgeSubModalShellProps(backLabel)}
+        modalClassName={wedgeSubModalClassName("linkedin-plan-saved-ideas-modal")}
+        maxWidth={720}
+        maxHeight="min(90vh, 720px)"
+      >
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: "#64748b",
+            lineHeight: 1.45,
+          }}
+        >
+          {countLabel} — copy, create a post, or open in Co-Pilot.
+        </p>
+        {body}
+      </DashboardActionModal>
+    );
+  }
+
   return createPortal(
-    <div
-      style={backdropStyle}
-      onClick={onClose}
-    >
+    <div style={backdropStyle} onClick={onClose}>
       <div
         style={panelStyle}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label="My Saved Brainstorm Ideas"
       >
-        <div style={HEADER_STYLE}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>
+        <div style={LEGACY_HEADER_STYLE}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 24, fontWeight: 800, lineHeight: 1.2 }}>
               📚 My Saved Ideas
             </div>
-            <div style={{ fontSize: 12, opacity: 0.9 }}>
-              {loading
-                ? "Loading…"
-                : `${total} saved idea${total === 1 ? "" : "s"}`}
-            </div>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>{countLabel}</div>
           </div>
           <StudioModalCloseButton
             onClick={onClose}
@@ -271,7 +280,6 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
             variant="dark"
           />
         </div>
-
         <div
           style={{
             flex: 1,
@@ -280,149 +288,7 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
             background: "#f8fafc",
           }}
         >
-          {error && (
-            <div
-              style={{
-                padding: 12,
-                borderRadius: 8,
-                background: "#fef2f2",
-                color: "#b91c1c",
-                border: "1px solid #fecaca",
-                fontSize: 13,
-                marginBottom: 12,
-              }}
-            >
-              {error}
-            </div>
-          )}
-
-          {loading && ideas.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: "#64748b" }}>
-              Loading your saved ideas…
-            </div>
-          )}
-
-          {!loading && !error && ideas.length === 0 && (
-            <div
-              style={{
-                padding: 32,
-                textAlign: "center",
-                color: "#64748b",
-                background: "#ffffff",
-                border: "1px dashed #cbd5e1",
-                borderRadius: 12,
-              }}
-            >
-              <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
-                No saved ideas yet
-              </div>
-              <div style={{ fontSize: 12 }}>
-                Run a brainstorm and tap the bookmark on any idea to keep it.
-              </div>
-            </div>
-          )}
-
-          {ideas.length > 0 && (
-            <div style={{ display: "grid", gap: 10 }}>
-              {ideas.map((idea) => (
-                <div key={idea.id} style={ITEM_STYLE}>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "#0f172a",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {idea.prompt}
-                  </div>
-                  {idea.rationale && (
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#64748b",
-                        lineHeight: 1.45,
-                      }}
-                    >
-                      {idea.rationale}
-                    </div>
-                  )}
-                  {idea.source_seed && (
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                      <span style={{ fontWeight: 600 }}>From seed:</span>{" "}
-                      {idea.source_seed}
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 8,
-                      marginTop: 4,
-                    }}
-                  >
-                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                      Saved {formatRelative(idea.created_at)}
-                    </div>
-                    <div style={{ display: "flex", gap: 6 }}>
-                      {onUseInCopilot && (
-                        <button
-                          type="button"
-                          onClick={() => onUseInCopilot(idea.prompt)}
-                          style={SECONDARY_BTN_STYLE}
-                        >
-                          Use in Copilot
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          window.dispatchEvent(
-                            new CustomEvent("linkedinwriter:openQuickCreate", {
-                              detail: {
-                                type: "post",
-                                topic: idea.prompt,
-                                ...(idea.rationale
-                                  ? { key_points: idea.rationale }
-                                  : {}),
-                              },
-                            }),
-                          );
-                          onClose();
-                        }}
-                        style={{
-                          ...ACTION_BTN_STYLE,
-                          background: "#ec4899",
-                          color: "#ffffff",
-                          border: "none",
-                        }}
-                        title="Open this idea in the Post creator"
-                      >
-                        ✍️ Create Post
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleCopy(idea)}
-                        style={PRIMARY_BTN_STYLE}
-                      >
-                        {copiedId === idea.id ? "Copied ✓" : "Copy"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(idea)}
-                        disabled={deletingId === idea.id}
-                        style={DANGER_BTN_STYLE}
-                      >
-                        {deletingId === idea.id ? "Deleting…" : "Delete"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {body}
         </div>
       </div>
     </div>,

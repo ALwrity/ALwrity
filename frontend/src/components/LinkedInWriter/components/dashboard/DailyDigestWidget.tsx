@@ -233,7 +233,7 @@ export const DailyDigestWidget: React.FC<DailyDigestWidgetProps> = ({
           </div>
           <button
             type="button"
-            onClick={openGrowthEngineModal}
+            onClick={() => openGrowthEngineModal()}
             style={{
               fontSize: 9,
               fontWeight: 700,

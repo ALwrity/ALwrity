@@ -28,6 +28,12 @@ import {
 import { ConnectLockIcon } from "./ConnectLockIcon";
 import { EngagementBoosterLaunchButton } from "./EngagementBoosterLaunchButton";
 import { QualityCheckEngagementActions } from "./QualityCheckEngagementActions";
+import {
+  WEDGE_BACK_LABELS,
+  WEDGE_NESTED_BACK_LABELS,
+  wedgeSubModalClassName,
+  wedgeSubModalShellProps,
+} from "./wedgeModalUi";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -120,11 +126,13 @@ const DRAFT_DISPLAY_LIMIT = 5;
 interface DraftLibraryModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
 }
 
 export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
   open,
   onClose,
+  onBack,
 }) => {
   const navigate = useNavigate();
   const [drafts, setDrafts] = useState<LinkedInDraftAsset[]>([]);
@@ -184,14 +192,19 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
     setQualityCheckAsset(null);
   };
 
+  const nestedPublishOpen =
+    !!qualityCheckAsset || showTiming || !!scheduleAsset;
+
   return (
+    <>
     <DashboardActionModal
-      open={open}
+      open={open && !nestedPublishOpen}
       title="My Drafts"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.publish)}
+      modalClassName={wedgeSubModalClassName("linkedin-my-drafts-modal")}
       maxWidth="80vw"
-      titleSize="xl"
-      modalClassName="linkedin-my-drafts-modal"
     >
       <div>
         <div
@@ -489,11 +502,13 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
           </button>
         </div>
       </div>
+    </DashboardActionModal>
 
       {/* Quality Check sub-modal for selected draft */}
       <QualityCheckModal
         open={!!qualityCheckAsset}
         onClose={handleCloseQualityCheck}
+        onBack={handleCloseQualityCheck}
         initialContent={
           qualityCheckAsset ? getAssetContent(qualityCheckAsset) : undefined
         }
@@ -504,6 +519,10 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
       <TimingAdvisorModal
         open={showTiming}
         onClose={() => {
+          setShowTiming(false);
+          setTimingForAsset(null);
+        }}
+        onBack={() => {
           setShowTiming(false);
           setTimingForAsset(null);
         }}
@@ -531,6 +550,11 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
           setSchedulePrefillDate("");
           setSchedulePrefillTime("");
         }}
+        onBack={() => {
+          setScheduleAsset(null);
+          setSchedulePrefillDate("");
+          setSchedulePrefillTime("");
+        }}
         prefillDate={schedulePrefillDate}
         prefillTime={schedulePrefillTime}
         initialContent={
@@ -538,7 +562,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
         }
         initialTopic={scheduleAsset?.title ?? undefined}
       />
-    </DashboardActionModal>
+    </>
   );
 };
 
@@ -549,6 +573,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
 interface QualityCheckModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   /** When provided, scores this content instead of the localStorage draft */
   initialContent?: string;
   /** Optional topic/context hint passed to the scoring API */
@@ -559,6 +584,7 @@ interface QualityCheckModalProps {
 export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
   open,
   onClose,
+  onBack,
   initialContent,
   contextHint,
   qualityMetrics,
@@ -613,6 +639,9 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
       open={open}
       title="Pre-Publish Quality Check"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={560}
       maxHeight="min(92vh, 700px)"
     >
@@ -759,6 +788,7 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
 interface TimingAdvisorModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   onScheduleSlot?: (date: string, time: string) => void;
   scheduleLocked?: boolean;
 }
@@ -834,6 +864,7 @@ const INDUSTRIES = ["Technology", "Finance", "Healthcare", "Marketing"];
 export const TimingAdvisorModal: React.FC<TimingAdvisorModalProps> = ({
   open,
   onClose,
+  onBack,
   onScheduleSlot,
   scheduleLocked = false,
 }) => {
@@ -877,6 +908,9 @@ export const TimingAdvisorModal: React.FC<TimingAdvisorModalProps> = ({
       open={open}
       title="Best Time to Post"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={600}
     >
       <div>
@@ -1104,6 +1138,7 @@ export const TimingAdvisorModal: React.FC<TimingAdvisorModalProps> = ({
 interface ScheduleQuickModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   /** Pre-fill from timing advisor */
   prefillDate?: string;
   prefillTime?: string;
@@ -1122,6 +1157,7 @@ const FORMAT_OPTIONS = [
 export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
   open,
   onClose,
+  onBack,
   prefillDate = "",
   prefillTime = "",
   initialContent,
@@ -1196,6 +1232,9 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
         open={open}
         title="Post Scheduled"
         onClose={onClose}
+        onBack={onBack}
+        backLabel="My Drafts"
+        titleSize="xl"
         maxWidth={440}
       >
         <div style={{ textAlign: "center", padding: "16px 0" }}>
@@ -1255,6 +1294,9 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
       open={open}
       title="Schedule Post"
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={480}
     >
       <div>

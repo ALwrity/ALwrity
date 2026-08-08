@@ -10,6 +10,12 @@ import { useLinkedInSocialConnection } from '../../../../hooks/useLinkedInSocial
 import { usePlanWedgeBrainstorm } from '../../hooks/usePlanWedgeBrainstorm';
 import { showToastNotification } from '../../../../utils/toastNotifications';
 import { apiClient } from '../../../../api/client';
+import { WEDGE_BACK_LABELS } from '../dashboard/wedgeModalUi';
+import {
+  openQuickCreateFromWedge,
+  OPEN_PLAN_SAVED_IDEAS_EVENT,
+  PLAN_RETURN,
+} from '../dashboard/planWedgeNavigation';
 
 const NOTIFY_KEYS = {
   watchdog: 'linkedin_plan_watchdog_notify_requested',
@@ -96,12 +102,21 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    const onOpenSavedIdeas = () => {
+      if (open) setMyIdeasOpen(true);
+    };
+    window.addEventListener(OPEN_PLAN_SAVED_IDEAS_EVENT, onOpenSavedIdeas);
+    return () =>
+      window.removeEventListener(OPEN_PLAN_SAVED_IDEAS_EVENT, onOpenSavedIdeas);
+  }, [open]);
+
   const handleGeneratePost = (prompt: string, contentType: string = 'post') => {
-    window.dispatchEvent(
-      new CustomEvent('linkedinwriter:openQuickCreate', {
-        detail: { type: contentType, topic: prompt },
-      })
-    );
+    openQuickCreateFromWedge({
+      type: contentType,
+      topic: prompt,
+      returnTo: PLAN_RETURN.wedge,
+    });
     onClose();
   };
 
@@ -151,7 +166,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
   return (
     <>
     <DashboardActionModal
-      open={open}
+      open={open && !myIdeasOpen}
       title="Plan"
       onClose={onClose}
       modalClassName="linkedin-plan-wedge-modal"
@@ -281,6 +296,9 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
     <MySavedIdeas
       open={myIdeasOpen}
       onClose={() => setMyIdeasOpen(false)}
+      onBack={() => setMyIdeasOpen(false)}
+      backLabel={WEDGE_BACK_LABELS.plan}
+      quickCreateReturnTo={PLAN_RETURN.savedIdeas}
       onAfterDelete={() => void refreshSavedCount()}
       onUseInCopilot={(prompt: string) => {
         window.dispatchEvent(new CustomEvent('linkedinwriter:copilotSeedFromPrompt', { detail: { prompt } }));

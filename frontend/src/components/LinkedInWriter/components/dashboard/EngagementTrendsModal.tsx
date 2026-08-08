@@ -35,6 +35,12 @@ import {
   ENGAGEMENT_SINCE_SUBTITLE,
   ENGAGEMENT_SINCE_TITLE,
 } from "./engagementTrendsCopy";
+import {
+  WEDGE_BACK_LABELS,
+  WEDGE_NESTED_BACK_LABELS,
+  wedgeSubModalClassName,
+  wedgeSubModalShellProps,
+} from "./wedgeModalUi";
 import { extractEngagementTrendsErrorMessage } from "./engagementTrendsErrors";
 import {
   insufficientHistoryMessage,
@@ -174,12 +180,14 @@ const NoChangesEmptyState: React.FC = () => (
 export interface EngagementTrendsModalProps {
   open: boolean;
   onClose: () => void;
+  onBack?: () => void;
   connected?: boolean;
 }
 
 export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   open,
   onClose,
+  onBack,
   connected,
 }) => {
   const [data, setData] = useState<PostAnalyticsHistoryResponse | null>(null);
@@ -300,11 +308,17 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
     };
   }, [data]);
 
+  const commentsOpen = !!commentsPost;
+
   return (
+    <>
     <DashboardActionModal
-      open={open}
+      open={open && !commentsOpen}
       title={ENGAGEMENT_SINCE_TITLE}
       onClose={onClose}
+      onBack={onBack}
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.analysis)}
+      modalClassName={wedgeSubModalClassName()}
       {...ENGAGEMENT_TRENDS_MODAL_SIZE}
     >
       <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
@@ -518,12 +532,15 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
           </>
         )}
       </div>
+    </DashboardActionModal>
       <PostCommentsModal
-        open={!!commentsPost}
+        open={commentsOpen}
         post={commentsPost}
         connected={connected}
         onClose={() => setCommentsPost(null)}
+        onBack={() => setCommentsPost(null)}
+        backLabel="Engagement Trends"
       />
-    </DashboardActionModal>
+    </>
   );
 };

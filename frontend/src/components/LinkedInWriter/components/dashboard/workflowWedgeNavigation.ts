@@ -26,6 +26,8 @@ export interface QuickCreateReturnTarget {
   wedge: WorkflowModalId;
   sub?: WorkflowSubModal;
   label: string;
+  /** Plan wedge: reopen My Saved Ideas drill-down after Quick Create back. */
+  reopenPlanSavedIdeas?: boolean;
 }
 
 export interface OpenWorkflowWedgeDetail {

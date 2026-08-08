@@ -193,7 +193,7 @@ export const BrandScoreSummaryCard: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={openGrowthEngineModal}
+          onClick={() => openGrowthEngineModal()}
           style={{
             padding: "8px 14px",
             background: "#0a66c2",
@@ -237,7 +237,7 @@ export const BrandScoreSummaryCard: React.FC = () => {
         </div>
         <button
           type="button"
-          onClick={openGrowthEngineModal}
+          onClick={() => openGrowthEngineModal()}
           style={{
             padding: "5px 10px",
             background: "#eff6ff",

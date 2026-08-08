@@ -13,6 +13,10 @@ import {
   type GrowNetworkScrollTarget,
 } from "./growNetworkConstants";
 import { GROW_NETWORK_MODAL_SIZE } from "./growNetworkModalLayout";
+import {
+  engagementSubModalClassName,
+  engagementSubModalShellProps,
+} from "./engagementWedgeModalUi";
 
 export type { GrowNetworkScrollTarget };
 
@@ -45,9 +49,10 @@ export const GrowNetworkModal: React.FC<GrowNetworkModalProps> = ({
       title={GROW_NETWORK_MODAL_TITLE}
       onClose={onClose}
       onBack={onBack}
-      backLabel="Engagement"
-      titleSize="xl"
-      modalClassName="linkedin-grow-network-wedge-modal"
+      {...engagementSubModalShellProps}
+      modalClassName={engagementSubModalClassName(
+        "linkedin-grow-network-wedge-modal",
+      )}
       width={GROW_NETWORK_MODAL_SIZE.width}
       maxWidth={GROW_NETWORK_MODAL_SIZE.maxWidth}
       height={GROW_NETWORK_MODAL_SIZE.height}
