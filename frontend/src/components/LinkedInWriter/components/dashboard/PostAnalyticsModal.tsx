@@ -1,6 +1,7 @@
 import React, { useCallback } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
 import { PostAnalyticsPanel } from "../PostAnalytics/PostAnalyticsPanel";
+import { openPerformancePulse } from "./workflowWedgeNavigation";
 
 interface PostAnalyticsModalProps {
   open: boolean;
@@ -21,10 +22,15 @@ export const PostAnalyticsModal: React.FC<PostAnalyticsModalProps> = ({
     [onClose, onGenerateSimilarPost],
   );
 
+  const handleOpenPerformancePulse = useCallback(() => {
+    onClose();
+    openPerformancePulse();
+  }, [onClose]);
+
   return (
     <DashboardActionModal
       open={open}
-      title="Post Analytics"
+      title="Content Analytics"
       onClose={onClose}
       maxWidth={960}
       maxHeight="min(92vh, 900px)"
@@ -33,6 +39,7 @@ export const PostAnalyticsModal: React.FC<PostAnalyticsModalProps> = ({
         open={open}
         embedded
         onGenerateSimilarPost={handleGenerateSimilarPost}
+        onOpenPerformancePulse={handleOpenPerformancePulse}
       />
     </DashboardActionModal>
   );

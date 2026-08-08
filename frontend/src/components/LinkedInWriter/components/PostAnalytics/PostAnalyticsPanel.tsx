@@ -10,6 +10,7 @@ import { EngagementSummary } from "./EngagementSummary";
 import { PostTimelineChart } from "./PostTimelineChart";
 import { BrandScoreSummaryCard } from "./BrandScoreSummaryCard";
 import { colors, panelContainer, primaryBtn, secondaryBtn } from "./styles";
+import { PerformancePulseCrossLink } from "../dashboard/PerformancePulseCrossLink";
 
 export interface PostAnalyticsPanelProps {
   /** When true, fetches and renders post analytics content. */
@@ -17,12 +18,15 @@ export interface PostAnalyticsPanelProps {
   /** When true, omits page-level chrome (used inside dashboard modal). */
   embedded?: boolean;
   onGenerateSimilarPost?: (prompt: string) => void;
+  /** When set, shows cross-link to Performance Pulse (Remarket wedge). */
+  onOpenPerformancePulse?: () => void;
 }
 
 export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
   open,
   embedded = false,
   onGenerateSimilarPost,
+  onOpenPerformancePulse,
 }) => {
   const { connected } = useLinkedInSocialConnection();
   const {
@@ -179,6 +183,12 @@ Create a new post that captures the same essence but with different examples, up
 
       {data && panelState !== "idle" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {onOpenPerformancePulse && data.posts.length > 0 && (
+            <PerformancePulseCrossLink
+              onBeforeNavigate={onOpenPerformancePulse}
+            />
+          )}
+
           <BrandScoreSummaryCard />
 
           {data.posts.length >= 3 && <PostTimelineChart posts={data.posts} />}

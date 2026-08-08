@@ -13,7 +13,8 @@ import {
 } from "../../utils/linkedInDashboardEvents";
 import {
   OPEN_WORKFLOW_WEDGE_EVENT,
-  type OpenWorkflowWedgeDetail,
+  resolveWorkflowWedgeDetail,
+  type OpenWorkflowWedgeDetailInput,
   type WorkflowModalId,
 } from "./engagementWedgeNavigation";
 import {
@@ -22,8 +23,12 @@ import {
 import {
   CommentAssistantModal,
   OpportunitiesModal,
-  PostPulseModal,
 } from "./EngagementWedgeModals";
+import { PostPulseModal } from "./remarkWedgeModalExports";
+import {
+  getPerformancePulseTileDescription,
+  PERFORMANCE_PULSE_TILE,
+} from "./performancePulseTileConfig";
 import { GrowNetworkModal } from "./GrowNetworkModal";
 import { GROW_NETWORK_TILE, type GrowNetworkScrollTarget } from "./growNetworkConstants";
 import {
@@ -51,7 +56,6 @@ type AnalysisSub = "trends" | null;
 type EngagementSub =
   | "comment"
   | "opportunities"
-  | "pulse"
   | "grow_network"
   /** @deprecated Opens Grow Network (AI section) */
   | "network"
@@ -59,7 +63,13 @@ type EngagementSub =
   | "pymk"
   | null;
 type RemarkSub =
-  "repurpose" | "transformer" | "refresh" | "reviver" | "perf_plan" | null;
+  | "repurpose"
+  | "transformer"
+  | "refresh"
+  | "reviver"
+  | "perf_plan"
+  | "pulse"
+  | null;
 type PublishSub = "drafts" | null;
 
 export type { WorkflowModalId } from "./engagementWedgeNavigation";
@@ -185,11 +195,15 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
   useEffect(() => {
     const onOpenWorkflowWedge = (event: Event) => {
-      const detail = (event as CustomEvent<OpenWorkflowWedgeDetail>).detail;
-      if (!detail?.wedge) return;
+      const raw = (event as CustomEvent<OpenWorkflowWedgeDetailInput>).detail;
+      if (!raw?.wedge) return;
+      const detail = resolveWorkflowWedgeDetail(raw);
       onOpenWedge?.(detail.wedge);
       if (detail.wedge === "engagement" && detail.sub) {
         setEngagementSub(detail.sub as EngagementSub);
+      }
+      if (detail.wedge === "remarket" && detail.sub) {
+        setRemarkSub(detail.sub as RemarkSub);
       }
     };
     window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, onOpenWorkflowWedge);
@@ -203,6 +217,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const backToEngagementGrid = () => {
     setEngagementSub(null);
     onOpenWedge?.("engagement");
+  };
+
+  const backToRemarketGrid = () => {
+    setRemarkSub(null);
+    onOpenWedge?.("remarket");
   };
 
   const growNetworkOpen =
@@ -450,22 +469,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             }}
           />
           <DashboardToolTile
-            title="Post Pulse"
-            description={
-              connected
-                ? "Real engagement metrics — repurpose winners, boost underperformers"
-                : "Connect LinkedIn to view your post engagement metrics"
-            }
-            icon="📊"
-            accent="#8b5cf6"
-            disabled={!connected}
-            disabledReason="Connect your LinkedIn account to view post engagement metrics"
-            onClick={() => {
-              onClose();
-              setEngagementSub("pulse");
-            }}
-          />
-          <DashboardToolTile
             title={GROW_NETWORK_TILE.title}
             description={GROW_NETWORK_TILE.description}
             icon={GROW_NETWORK_TILE.icon}
@@ -497,12 +500,6 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onBack={backToEngagementGrid}
         connected={connected}
       />
-      <PostPulseModal
-        open={engagementSub === "pulse"}
-        onClose={() => setEngagementSub(null)}
-        onBack={backToEngagementGrid}
-        connected={connected}
-      />
       <GrowNetworkModal
         open={growNetworkOpen}
         onClose={closeGrowNetwork}
@@ -526,6 +523,18 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             gap: 12,
           }}
         >
+          <DashboardToolTile
+            title={PERFORMANCE_PULSE_TILE.title}
+            description={getPerformancePulseTileDescription(connected)}
+            icon={PERFORMANCE_PULSE_TILE.icon}
+            accent={PERFORMANCE_PULSE_TILE.accent}
+            disabled={!connected}
+            disabledReason={PERFORMANCE_PULSE_TILE.disabledReason}
+            onClick={() => {
+              onClose();
+              setRemarkSub("pulse");
+            }}
+          />
           <DashboardToolTile
             title="Repurpose Lab"
             description="Top 3 posts by engagement — instantly repurpose into any format"
@@ -576,16 +585,15 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
               setRemarkSub("perf_plan");
             }}
           />
-          <DashboardToolTile
-            title="Post Analytics"
-            description="Full post performance dashboard with engagement breakdown"
-            icon="📊"
-            accent="#6366f1"
-            onClick={openContentAnalytics}
-          />
         </div>
       </DashboardActionModal>
 
+      <PostPulseModal
+        open={remarkSub === "pulse"}
+        onClose={() => setRemarkSub(null)}
+        onBack={backToRemarketGrid}
+        connected={connected}
+      />
       <RepurposeLabModal
         open={remarkSub === "repurpose"}
         onClose={() => setRemarkSub(null)}

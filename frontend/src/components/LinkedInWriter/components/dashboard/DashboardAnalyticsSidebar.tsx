@@ -111,7 +111,6 @@ export const DashboardAnalyticsSidebar: React.FC<
   }, [panelState, posts.length]);
 
   const isError = panelState === "error";
-  const isLoaded = panelState === "loaded";
 
   const lastRefreshedLabel = useMemo(() => {
     const syncedAt = data?.last_synced_at;
@@ -191,7 +190,7 @@ export const DashboardAnalyticsSidebar: React.FC<
           </h3>
           {!connected && <ConnectLockBadge size={10} />}
         </div>
-        {onViewAll && connected && (
+        {onViewAll && connected ? (
           <button
             type="button"
             className="linkedin-analytics-panel-link"
@@ -199,7 +198,7 @@ export const DashboardAnalyticsSidebar: React.FC<
           >
             View all posts
           </button>
-        )}
+        ) : null}
       </div>
 
       {!connected ? (

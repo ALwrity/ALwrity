@@ -1,5 +1,5 @@
 /**
- * Compact banner when Quick Create is pre-filled from a Post Pulse reference post.
+ * Compact banner when Quick Create is pre-filled from a Performance Pulse reference post.
  */
 import React, { useState } from "react";
 import type { PostPulseCreateMode } from "./postPulseCreateUtils";

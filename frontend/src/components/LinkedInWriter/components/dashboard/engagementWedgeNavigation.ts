@@ -1,61 +1,27 @@
 /**
  * Navigation helpers for Engagement wedge → Quick Create flows (back buttons).
  */
+import { REMARKET_RETURN } from "./remarketWedgeNavigation";
 
-export type WorkflowModalId =
-  | "plan"
-  | "create"
-  | "publish"
-  | "analysis"
-  | "engagement"
-  | "remarket";
+export type {
+  WorkflowModalId,
+  EngagementSubModal,
+  RemarkSubModal,
+  WorkflowSubModal,
+  QuickCreateReturnTarget,
+  OpenWorkflowWedgeDetail,
+  OpenWorkflowWedgeDetailInput,
+  LegacyEngagementPulseDetail,
+  OpenQuickCreateFromWedgeDetail,
+} from "./workflowWedgeNavigation";
 
-export type EngagementSubModal =
-  | "comment"
-  | "opportunities"
-  | "pulse"
-  | "grow_network";
-
-export interface QuickCreateReturnTarget {
-  wedge: WorkflowModalId;
-  sub?: EngagementSubModal;
-  label: string;
-}
-
-export const OPEN_WORKFLOW_WEDGE_EVENT = "linkedinwriter:openWorkflowWedge";
-
-export interface OpenWorkflowWedgeDetail {
-  wedge: WorkflowModalId;
-  sub?: EngagementSubModal;
-}
-
-export interface OpenQuickCreateFromWedgeDetail {
-  type?: string;
-  topic?: string;
-  key_points?: string;
-  reference_context?: string;
-  reference_mode?: "repurpose" | "write_more";
-  target_audience?: string;
-  industry?: string;
-  post_type?: string;
-  returnTo?: QuickCreateReturnTarget;
-}
-
-export function openWorkflowWedge(detail: OpenWorkflowWedgeDetail): void {
-  window.dispatchEvent(
-    new CustomEvent<OpenWorkflowWedgeDetail>(OPEN_WORKFLOW_WEDGE_EVENT, {
-      detail,
-    }),
-  );
-}
-
-export function openQuickCreateFromWedge(
-  detail: OpenQuickCreateFromWedgeDetail,
-): void {
-  window.dispatchEvent(
-    new CustomEvent("linkedinwriter:openQuickCreate", { detail }),
-  );
-}
+export {
+  OPEN_WORKFLOW_WEDGE_EVENT,
+  openWorkflowWedge,
+  openQuickCreateFromWedge,
+  openPerformancePulse,
+  resolveWorkflowWedgeDetail,
+} from "./workflowWedgeNavigation";
 
 export const ENGAGEMENT_RETURN = {
   comment: {
@@ -68,14 +34,16 @@ export const ENGAGEMENT_RETURN = {
     sub: "opportunities" as const,
     label: "Opportunities",
   },
-  pulse: {
-    wedge: "engagement" as const,
-    sub: "pulse" as const,
-    label: "Post Pulse",
-  },
   grow_network: {
     wedge: "engagement" as const,
     sub: "grow_network" as const,
     label: "Grow Network",
   },
+  /**
+   * @deprecated Performance Pulse moved to Remarket wedge — use REMARKET_RETURN.pulse.
+   * Kept so legacy deep links and return targets still resolve correctly.
+   */
+  pulse: REMARKET_RETURN.pulse,
 };
+
+export { REMARKET_RETURN } from "./remarketWedgeNavigation";

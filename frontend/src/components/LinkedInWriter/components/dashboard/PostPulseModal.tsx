@@ -1,5 +1,5 @@
 /**
- * E3 — Post Engagement Pulse (Engagement wedge).
+ * Performance Pulse — Remarket wedge (performance snapshot + action CTAs).
  */
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
@@ -18,10 +18,8 @@ import {
   EngagementRefreshBar,
   EngagementSpinner,
 } from "./engagementWedgeSharedUi";
-import {
-  ENGAGEMENT_RETURN,
-  openQuickCreateFromWedge,
-} from "./engagementWedgeNavigation";
+import { openQuickCreateFromWedge } from "./engagementWedgeNavigation";
+import { REMARKET_RETURN } from "./remarketWedgeNavigation";
 import {
   buildPostPulseCreatePayload,
 } from "./postPulseCreateUtils";
@@ -92,7 +90,7 @@ export const PostPulseModal: React.FC<PostPulseModalProps> = ({
         key_points: payload.key_points,
         reference_context: payload.reference_context,
         reference_mode: payload.reference_mode,
-        returnTo: ENGAGEMENT_RETURN.pulse,
+        returnTo: REMARKET_RETURN.pulse,
       });
       onClose();
     },
@@ -118,10 +116,10 @@ export const PostPulseModal: React.FC<PostPulseModalProps> = ({
   return (
     <DashboardActionModal
       open={open}
-      title="Post Engagement Pulse"
+      title="Performance Pulse"
       onClose={onClose}
       onBack={onBack}
-      backLabel="Engagement"
+      backLabel="Remarket"
       titleSize="xl"
       maxWidth={580}
       maxHeight="min(92vh, 740px)"
