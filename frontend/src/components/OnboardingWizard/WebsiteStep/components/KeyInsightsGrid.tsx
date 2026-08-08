@@ -170,8 +170,8 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
         <Typography variant="caption" color="text.secondary">Analysis Confidence:</Typography>
         <Chip
           size="small"
-          label={`${(confidence * 100).toFixed(0)}%`}
-          color={confidence >= 0.7 ? 'success' : confidence >= 0.4 ? 'warning' : 'error'}
+          label={`${(confidence! * 100).toFixed(0)}%`}
+          color={confidence! >= 0.7 ? 'success' : confidence! >= 0.4 ? 'warning' : 'error'}
           variant="outlined"
         />
       </Box>

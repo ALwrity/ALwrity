@@ -112,6 +112,20 @@ export interface StyleAnalysis {
   sitemap_analysis?: any;
   best_practices?: string[];
   avoid_elements?: string[];
+  meta?: {
+    confidence?: number;
+    notes?: string;
+    uncertainty?: any;
+  };
+  recommended_settings?: {
+    writing_tone?: string;
+    target_audience?: string;
+    content_type?: string;
+    creativity_level?: string;
+    geographic_location?: string;
+    industry_context?: string;
+    brand_alignment?: string;
+  };
 }
 
 interface AnalysisResultsDisplayProps {
