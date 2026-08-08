@@ -47,6 +47,8 @@ class StyleDetectionLogic:
             str: Cleaned JSON string
         """
         try:
+            if not isinstance(text, str):
+                text = str(text)
             # Remove markdown code block markers
             cleaned_string = text.replace("```json", "").replace("```", "").strip()
             
@@ -74,9 +76,10 @@ class StyleDetectionLogic:
             if attempt == 0:
                 raw = llm_text_gen(prompt, user_id=user_id, json_struct=json_struct, trace_id=f"alwrity_step1_{user_id}", retry_count=0)
             else:
+                raw_display = str(last_raw)[:2000] if not isinstance(last_raw, str) else last_raw[:2000]
                 repair_prompt = (
                     f"Your previous JSON output could not be parsed: {last_error}\n\n"
-                    f"PREVIOUS RAW OUTPUT:\n{last_raw[:2000]}\n\n"
+                    f"PREVIOUS RAW OUTPUT:\n{raw_display}\n\n"
                     f"FIX THE PARSE ERROR and return ONLY valid minified JSON matching "
                     f"the original schema. No markdown, no code fences.\n\n"
                     f"ORIGINAL TASK:\n{prompt}"
@@ -206,8 +209,9 @@ class StyleDetectionLogic:
             """
             
             logger.debug("[StyleDetectionLogic.analyze_content_style] Sending enhanced prompt to LLM")
+            max_repairs = 2
             try:
-                analysis_results = self._generate_json_via_llm(prompt, user_id, max_repairs=2)
+                analysis_results = self._generate_json_via_llm(prompt, user_id, max_repairs=max_repairs)
                 logger.info("[StyleDetectionLogic.analyze_content_style] Successfully parsed enhanced analysis results")
                 return {
                     'success': True,

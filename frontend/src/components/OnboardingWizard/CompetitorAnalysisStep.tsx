@@ -556,7 +556,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
 
   useEffect(() => {
-    if (!competitors.length) return;
+    if (!competitors.length || isAnalyzing) return;
     let cancelled = false;
     setBenchmarkLoading(true);
     aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
@@ -564,29 +564,31 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         if (!cancelled) setBenchmarkReport(resp.data || resp.data?.benchmark);
       })
       .catch(() => {
-        if (!cancelled) setBenchmarkReport(null); // 404 = not yet generated, OK
+        if (!cancelled) setBenchmarkReport(null);
       })
       .finally(() => {
         if (!cancelled) setBenchmarkLoading(false);
       });
     return () => { cancelled = true; };
-  }, [competitors.length]);
+  }, [competitors.length, isAnalyzing]);
 
   // Data collection function for global Continue button
+  const gsd = React.useRef(false);
   const getResearchData = useCallback(() => {
-    // Auto-schedule sitemap benchmark if proceeding to next step
-    // We fire-and-forget this call to ensure it runs in background
-    const validCompetitors = competitors
-        .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
-        .map(c => c.url);
-
-    longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', { 
-      max_competitors: 5,
-      competitors: validCompetitors.slice(0, 5)
-    })
-      .then(() => console.log('CompetitorAnalysisStep: Auto-scheduled sitemap benchmark'))
-      .catch(err => console.warn('CompetitorAnalysisStep: Failed to auto-schedule benchmark (may be running)', err));
-
+    // Deduplicate — Wizard calls this multiple times, fire benchmark only once
+    if (!gsd.current) {
+      gsd.current = true;
+      const validCompetitors = competitors
+          .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
+          .map(c => c.url);
+      if (validCompetitors.length > 0) {
+        longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', { 
+          max_competitors: 5,
+          competitors: validCompetitors.slice(0, 5)
+        }).then(() => console.log('CompetitorAnalysisStep: Auto-scheduled sitemap benchmark'))
+          .catch(err => console.warn('CompetitorAnalysisStep: Failed to auto-schedule benchmark (may be running)', err));
+      }
+    }
     return {
       competitors,
       social_media_accounts: socialMediaAccounts,
