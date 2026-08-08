@@ -176,17 +176,6 @@ const KeyInsightsGrid: React.FC<KeyInsightsGridProps> = ({
         </Box>
       )}
     </TableContainer>
-    {typeof confidence === 'number' && (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2.5, px: 1 }}>
-        <Typography variant="caption" color="text.secondary">Analysis Confidence:</Typography>
-        <Chip
-          size="small"
-          label={`${(confidence! * 100).toFixed(0)}%`}
-          color={confidence! >= 0.7 ? 'success' : confidence! >= 0.4 ? 'warning' : 'error'}
-          variant="outlined"
-        />
-      </Box>
-    )}
   );
 };
 
