@@ -31,8 +31,8 @@ import {
 } from "./performancePulseTileConfig";
 import { GrowNetworkModal } from "./GrowNetworkModal";
 import { GROW_NETWORK_TILE, type GrowNetworkScrollTarget } from "./growNetworkConstants";
+import { RepurposeLabModal } from "./repurposeLab";
 import {
-  RepurposeLabModal,
   FormatTransformerModal,
   ContentRefreshModal,
   StaleReviverModal,
@@ -597,6 +597,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <RepurposeLabModal
         open={remarkSub === "repurpose"}
         onClose={() => setRemarkSub(null)}
+        onBack={backToRemarketGrid}
       />
       <FormatTransformerModal
         open={remarkSub === "transformer"}
