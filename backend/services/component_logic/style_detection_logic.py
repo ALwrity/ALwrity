@@ -91,17 +91,30 @@ class StyleDetectionLogic:
             try:
                 return json.loads(cleaned)
             except json.JSONDecodeError as e:
-                # Fallback: some models return Python dict syntax (single quotes)
+                # Fallback 1: Python dict syntax (single quotes)
                 try:
                     import ast
                     parsed = ast.literal_eval(cleaned)
                     return parsed if isinstance(parsed, dict) else json.loads(cleaned)
                 except (ValueError, SyntaxError):
                     pass
+                # Fallback 2: extract JSON/dict from surrounding text
+                import re
+                match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+                if match:
+                    extracted = match.group(0)
+                    try:
+                        return json.loads(extracted)
+                    except json.JSONDecodeError:
+                        try:
+                            import ast
+                            return ast.literal_eval(extracted)
+                        except (ValueError, SyntaxError):
+                            pass
                 last_raw = raw
                 last_error = str(e)[:300]
                 logger.warning(
-                    f"[style_detection_logic] JSON parse failed (attempt {attempt + 1}/{max_repairs + 1}): {last_error}"
+                    f"[style_detection_logic] JSON parse failed (attempt {attempt + 1}/{max_repairs + 1}): {last_error} | cleaned[:150]={cleaned[:150]}"
                 )
 
         raise ValueError(f"JSON generation failed after {max_repairs + 1} attempts: {last_error}")
