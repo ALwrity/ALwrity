@@ -49,6 +49,7 @@ interface WebsiteStepProps {
   updateHeaderContent: (content: { title: string; description: string }) => void;
   onValidationChange?: (isValid: boolean) => void;
   onDataReady?: (getData: () => any) => void;
+  initialData?: any;
 }
 
 interface AnalysisProgress {
@@ -74,7 +75,7 @@ interface ExistingAnalysis {
 // MAIN COMPONENT
 // =============================================================================
 
-const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataReady }) => {
+const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderContent, onValidationChange, onDataReady, initialData }) => {
   const [website, setWebsite] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
