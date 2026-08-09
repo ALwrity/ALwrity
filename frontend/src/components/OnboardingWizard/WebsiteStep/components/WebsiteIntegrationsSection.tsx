@@ -64,7 +64,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   const { connected: bingConnected, sites: bingSites, connect: connectBing } = useBingOAuth();
   const { connected: wixConnected, sites: wixSites } = useWixConnection();
 
-  const [primarySite, setPrimarySite] = useState<string>('');
+  const [primarySite, setPrimarySite] = useState<string>(websiteUrl || '');
 
 
   // Use ref for connectedPlatforms to avoid re-running effect when we update it
@@ -298,15 +298,11 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
           </Box>
         </AccordionSummary>
         <AccordionDetails sx={{ p: 2.5 }}>
-          <Typography variant="body2" sx={{ color: '#64748B', mb: 2 }}>
-            Connect your website and analytics platforms to enable AI-powered content publishing and insights — all connections are optional.
-          </Typography>
-
           <Fade in timeout={800}>
             <div>
               <PlatformSection
-                title="Website & Content Platforms"
-                description="WordPress, Wix, and content management"
+                title="Website & Content Platforms — WordPress, Wix, and content management"
+                description="Connect your website and analytics platforms to enable AI-powered content publishing and insights — all connections are optional."
                 platforms={websitePlatforms}
                 connectedPlatforms={connectedPlatforms}
                 gscSites={null}
