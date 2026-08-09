@@ -141,57 +141,58 @@ export const ContentAuditSummaryCard: React.FC<ContentAuditSummaryCardProps> = (
     <Paper
       elevation={0}
       sx={{
-        mt: 3,
-        borderRadius: 3,
-        border: "1px solid #E2E8F0",
-        bgcolor: "#F8FAFC",
+        mt: 1.5,
+        borderRadius: 2,
+        border: "1px solid #e0e0e0",
+        bgcolor: "#fff",
         overflow: "hidden",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       }}
     >
       {/* Header */}
       <Box
         sx={{
-          px: 2.5,
-          py: 1.5,
+          px: 2,
+          py: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           cursor: "pointer",
-          "&:hover": { bgcolor: "rgba(59,130,246,0.03)" },
+          borderBottom: expanded ? "1px solid #f0f0f0" : "none",
         }}
         onClick={() => setExpanded(!expanded)}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <TopicIcon sx={{ color: "#6366f1", fontSize: 20 }} />
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          <TopicIcon sx={{ color: "#6366f1", fontSize: 18 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#334155" }}>
             Content Audit Results
           </Typography>
           <Chip
             label={`${themeCount} themes`}
             size="small"
             sx={{
-              height: 20,
-              fontSize: "0.7rem",
-              bgcolor: "rgba(99,102,241,0.1)",
+              height: 18,
+              fontSize: "0.65rem",
+              bgcolor: "rgba(99,102,241,0.08)",
               color: "#6366f1",
               fontWeight: 500,
             }}
           />
           {lastAudit && (
-            <Typography variant="caption" sx={{ color: "rgba(0,0,0,0.4)", ml: 1 }}>
+            <Typography variant="caption" sx={{ color: "#94a3b8", ml: 1 }}>
               {formatTimeAgo(lastAudit)}
             </Typography>
           )}
         </Box>
         <IconButton size="small" sx={{ p: 0 }}>
-          {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          {expanded ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
       </Box>
 
       <Collapse in={expanded}>
-        <Box sx={{ px: 2.5, pb: 2 }}>
+        <Box sx={{ px: 2, pb: 1.5, pt: 1 }}>
           {/* Quick metrics row */}
-          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+          <Grid container spacing={1} sx={{ mb: 1.5 }}>
             {linkData?.total_links_found ? (
               <Grid item xs={4}>
                 <MetricBox
