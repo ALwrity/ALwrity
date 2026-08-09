@@ -191,7 +191,7 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
         setLastRunResult({ audit: brandAnalysis });
       }
       if (seoAudit && !lastHealthRun) {
-        setLastHealthRun({ site_health: seoAudit });
+        setLastHealthRun({ site_health: seoAudit?.site_health || seoAudit });
       }
     }
   }, [advStatus?.has_results, brandAnalysis, seoAudit, lastRunResult, lastHealthRun]);
