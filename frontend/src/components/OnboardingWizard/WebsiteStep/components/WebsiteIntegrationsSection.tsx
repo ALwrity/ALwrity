@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -15,7 +15,6 @@ import {
   FormControl,
   Card,
   CardContent,
-  Alert,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -66,7 +65,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   const { gscSites, connectedPlatforms: gscInternalPlatforms, handleGSCConnect } = useGSCConnection();
   const { isLoading, showToast, setShowToast, toastMessage, handleConnect } = usePlatformConnections();
   const { connected: wordpressConnected, sites: wordpressSites } = useWordPressOAuth();
-  const { connected: bingConnected, sites: bingSites, connect: connectBing, refreshStatus: refreshBingStatus } = useBingOAuth();
+  const { connected: bingConnected, sites: bingSites, connect: connectBing } = useBingOAuth();
   const { connected: wixConnected, sites: wixSites } = useWixConnection();
 
   const [primarySite, setPrimarySite] = useState<string>('');
