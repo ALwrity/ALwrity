@@ -756,30 +756,27 @@ class SitemapService:
         sitemap_url: str,
         user_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Generate AI-powered insights for sitemap analysis"""
+        """Generate AI-powered insights for sitemap analysis — structured JSON."""
         
         try:
-            # Build prompt with analysis data
             prompt = self._build_ai_analysis_prompt(
                 structure_analysis, content_trends, publishing_patterns, sitemap_url
             )
             
-            # Generate AI insights
             ai_response = llm_text_gen(
                 prompt=prompt,
                 system_prompt=self._get_system_prompt(),
-                user_id=user_id
+                user_id=user_id,
+                json_struct={"type": "object"},
             )
             
-            # Parse and structure insights
-            insights = self._parse_ai_insights(ai_response)
-            
-            # Log AI analysis
+            insights = self._parse_structured_insights(ai_response)
+
             await seo_logger.log_ai_analysis(
                 tool_name=self.service_name,
                 prompt=prompt,
                 response=ai_response,
-                model_used="gemini-2.0-flash-001"
+                model_used="openai/gpt-oss-120b"
             )
             
             return insights
@@ -787,6 +784,43 @@ class SitemapService:
         except Exception as e:
             logger.error(f"Error generating AI insights: {e}")
             return {"success": False, "error": f"AI analysis failed: {str(e)}"}
+
+    def _parse_structured_insights(self, ai_response: str) -> Dict[str, Any]:
+        """Parse structured JSON AI response with fallback."""
+        import json, ast, re
+
+        if not isinstance(ai_response, str):
+            ai_response = str(ai_response)
+
+        cleaned = ai_response.replace("```json", "").replace("```", "").strip()
+
+        try:
+            return json.loads(cleaned)
+        except json.JSONDecodeError:
+            try:
+                parsed = ast.literal_eval(cleaned)
+                return parsed if isinstance(parsed, dict) else json.loads(cleaned)
+            except (ValueError, SyntaxError):
+                match = re.search(r'\{.*\}', cleaned, re.DOTALL)
+                if match:
+                    try:
+                        return json.loads(match.group(0))
+                    except json.JSONDecodeError:
+                        try:
+                            return ast.literal_eval(match.group(0))
+                        except (ValueError, SyntaxError):
+                            pass
+
+        # Fallback: wrap raw text as summary
+        logger.warning("[sitemap_service] Failed to parse structured AI response, using raw text")
+        return {
+            "summary": cleaned[:500],
+            "content_strategy": [],
+            "content_gaps": [],
+            "seo_opportunities": [],
+            "growth_recommendations": [],
+            "meta": {"confidence": 0.0, "notes": "Parse failed — raw text used"}
+        }
     
     def _build_ai_analysis_prompt(
         self,
@@ -795,124 +829,78 @@ class SitemapService:
         publishing_patterns: Dict[str, Any],
         sitemap_url: str
     ) -> str:
-        """Build AI prompt for sitemap analysis"""
-        
+        """Build structured AI prompt for sitemap analysis — returns JSON."""
+
         total_urls = structure_analysis.get("total_urls", 0)
         url_patterns = structure_analysis.get("url_patterns", {})
         avg_depth = structure_analysis.get("average_path_depth", 0)
-        
+        keyword_clusters = structure_analysis.get("keyword_clusters", {})
+        strategic_pillars = structure_analysis.get("strategic_pillars", [])
         publishing_velocity = content_trends.get("publishing_velocity", 0)
         date_range = content_trends.get("date_range", {})
-        
-        prompt = f"""
-Analyze this website sitemap data and provide strategic insights for content creators and digital marketers:
+        monthly_distribution = content_trends.get("monthly_distribution", {})
+        priority_dist = publishing_patterns.get("priority_distribution", {})
 
-Sitemap URL: {sitemap_url}
-Total URLs: {total_urls}
-Average Path Depth: {avg_depth}
-Publishing Velocity: {publishing_velocity} posts/day
+        pattern_lines = "\n".join([f"- {cat}: {cnt} URLs" for cat, cnt in list(url_patterns.items())[:10]]) if url_patterns else "- No URL patterns detected"
+        cluster_lines = "\n".join([f"- {kw}: {cnt} URLs" for kw, cnt in list(keyword_clusters.items())[:8]]) if keyword_clusters else "- No keyword clusters detected"
+        pillar_lines = "\n".join([f"- {p}" for p in strategic_pillars[:5]]) if strategic_pillars else "- No strategic pillars detected"
 
-URL Patterns (top categories):
-{chr(10).join([f"- {category}: {count} URLs" for category, count in list(url_patterns.items())[:5]])}
+        prompt = f"""Analyze this website sitemap data and return a SINGLE minified JSON object with actionable insights.
 
-Content Timeline:
+SITEMAP DATA:
+- Total URLs: {total_urls}
+- Average Path Depth: {avg_depth}
+- Publishing Velocity: {publishing_velocity:.2f} pages/day
 - Date Range: {date_range.get('span_days', 0)} days
-- Publishing Rate: {publishing_velocity:.2f} pages per day
 
-Please provide:
-1. Content Strategy Insights (opportunities for new content categories)
-2. SEO Structure Assessment (how well the site is organized for search engines)
-3. Publishing Pattern Analysis (content frequency and consistency)
-4. Growth Recommendations (specific actions for content expansion)
-5. Technical SEO Opportunities (sitemap optimization suggestions)
+URL Categories:
+{pattern_lines}
 
-Focus on actionable insights for content creators and digital marketing professionals.
-"""
-        
+Keyword Clusters:
+{cluster_lines}
+
+Strategic Pillars:
+{pillar_lines}
+
+Priority Distribution: {priority_dist}
+Monthly Distribution: {monthly_distribution}
+
+RETURN ONLY this JSON schema (minified, no markdown):
+{{
+  "summary": "2-3 sentence strategic overview of the site's content health",
+  "content_gaps": [
+    {{"topic": "", "keywords": "", "priority": "high|medium|low", "action": "", "impact": ""}}
+  ],
+  "cannibalization": [
+    {{"keyword": "", "overlapping_pages": 0, "urls": [], "recommendation": ""}}
+  ],
+  "decay_alerts": [
+    {{"signal": "", "category": "", "action": "", "urgency": "high|medium|low"}}
+  ],
+  "internal_linking": [
+    {{"from_section": "", "to_section": "", "anchor_label": "", "reason": ""}}
+  ],
+  "publishing_calendar": [
+    {{"week": 1, "topic": "", "keywords": "", "content_type": "", "priority": "high|medium|low"}}
+  ],
+  "seo_opportunities": [
+    {{"type": "schema|speed|mobile|indexing|backlinks|content", "finding": "", "action": "", "impact": "high|medium|low"}}
+  ],
+  "growth_recommendations": [
+    "One specific action to grow organic traffic"
+  ],
+  "content_strategy": [
+    "One strategic insight about content direction"
+  ],
+  "meta": {{"confidence": 0.0, "notes": ""}}
+}}"""
+
         return prompt
     
     def _get_system_prompt(self) -> str:
-        """Get system prompt for AI analysis"""
-        return """You are an SEO and content strategy expert specializing in website structure analysis.
-        Your audience includes content creators, digital marketers, and solopreneurs who need to understand how their site structure impacts SEO and content performance.
-        
-        Provide practical, actionable insights that help users:
-        - Optimize their content strategy
-        - Improve site structure for SEO
-        - Identify content gaps and opportunities
-        - Plan future content development
-        
-        Always explain the business impact of your recommendations.
-        """
-    
-    def _parse_ai_insights(self, ai_response: str) -> Dict[str, Any]:
-        """Parse AI response into structured insights"""
-        
-        insights = {
-            "summary": "",
-            "content_strategy": [],
-            "seo_opportunities": [],
-            "technical_recommendations": [],
-            "growth_recommendations": []
-        }
-        
-        try:
-            # Split into sections and parse
-            sections = ai_response.split('\n\n')
-            
-            for section in sections:
-                section = section.strip()
-                if not section:
-                    continue
-                
-                if 'content strategy' in section.lower():
-                    insights["content_strategy"] = self._extract_list_items(section)
-                elif 'seo' in section.lower() and 'opportunities' in section.lower():
-                    insights["seo_opportunities"] = self._extract_list_items(section)
-                elif 'technical' in section.lower():
-                    insights["technical_recommendations"] = self._extract_list_items(section)
-                elif 'growth' in section.lower() or 'recommendations' in section.lower():
-                    insights["growth_recommendations"] = self._extract_list_items(section)
-                elif 'analysis' in section.lower() or 'assessment' in section.lower():
-                    insights["summary"] = self._extract_content(section)
-            
-            # Fallback
-            if not any(insights.values()):
-                insights["summary"] = ai_response[:300] + "..." if len(ai_response) > 300 else ai_response
-                
-        except Exception as e:
-            logger.error(f"Error parsing AI insights: {e}")
-            insights["summary"] = "AI analysis completed but parsing failed"
-        
-        return insights
-    
-    def _extract_content(self, section: str) -> str:
-        """Extract content from a section"""
-        lines = section.split('\n')
-        content_lines = []
-        
-        for line in lines:
-            line = line.strip()
-            if line and not line.endswith(':') and not line.startswith('#'):
-                content_lines.append(line)
-        
-        return ' '.join(content_lines)
-    
-    def _extract_list_items(self, section: str) -> List[str]:
-        """Extract list items from a section"""
-        items = []
-        lines = section.split('\n')
-        
-        for line in lines:
-            line = line.strip()
-            if line and (line.startswith('-') or line.startswith('*') or 
-                        (line[0].isdigit() and '.' in line[:3])):
-                clean_line = line.lstrip('-*0123456789. ').strip()
-                if clean_line:
-                    items.append(clean_line)
-        
-        return items[:5]
-    
+        """Get system prompt for AI analysis."""
+        return """You are an SEO content strategist. Analyze sitemap data and return ONLY a valid minified JSON object matching the exact schema requested. No markdown, no code fences, no prose outside the JSON. Be specific and actionable — every recommendation must include a concrete next step. Use the keyword clusters and URL patterns to identify real content gaps. Detect cannibalization where multiple URLs target the same keyword. Flag content decay where categories haven't been updated recently. Suggest internal linking based on URL structure analysis."""
+
     def _assess_structure_quality(self, url_patterns: Dict[str, int], avg_depth: float) -> str:
         """Assess the quality of site structure"""
         

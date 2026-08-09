@@ -152,26 +152,105 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
         </Tooltip>
       </Box>
 
-      {/* AI Insights Summary */}
-      {ai_insights?.summary && (
-        <Alert icon={<LightbulbIcon />} severity="info" sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-            AI Insight
+      {/* AI Insights — structured cards */}
+      {ai_insights && (
+        <Paper variant="outlined" sx={{ mb: 3, p: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <LightbulbIcon color="primary" fontSize="small" /> AI Insights
           </Typography>
-          <Box sx={{ 
-            fontSize: '0.8125rem', lineHeight: 1.6,
-            maxHeight: '450px', overflowY: 'auto',
-            '& .md-table': { border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', mb: 0.5 },
-            '& .md-table-header': { display: 'flex', bgcolor: '#f0f4f8', borderBottom: '2px solid #cbd5e1', px: 1, py: 0.75, fontWeight: 700, fontSize: '0.75rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em' },
-            '& .md-table-row': { display: 'flex', px: 1, py: 0.6, borderBottom: '1px solid #f1f5f9', fontSize: '0.78125rem' },
-            '& .md-table-row:last-child': { borderBottom: 'none' },
-            '& .md-table-row:nth-of-type(odd)': { bgcolor: '#f8fafc' },
-            '& .md-cell': { flex: 1, px: 0.75 },
-            '& .md-cell:first-child': { fontWeight: 600 },
-          }}>
-            {renderMarkdown(ai_insights.summary)}
-          </Box>
-        </Alert>
+          {ai_insights.summary && (
+            <Typography variant="body2" sx={{ mb: 1.5, color: 'text.secondary', fontStyle: 'italic' }}>
+              {ai_insights.summary.replace(/\*\*/g, '').replace(/## /g, '')}
+            </Typography>
+          )}
+          <Grid container spacing={1.5}>
+            {ai_insights.content_gaps && ai_insights.content_gaps.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content Gaps</Typography>
+                {ai_insights.content_gaps.slice(0, 3).map((g: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#faf5ff', borderRadius: 1, border: '1px solid #e9d5ff' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{g.topic || g.action}</Typography>
+                      <Chip size="small" label={g.priority || 'medium'} color={g.priority === 'high' ? 'error' : g.priority === 'low' ? 'default' : 'warning'} variant="outlined" />
+                    </Box>
+                    {g.keywords && <Typography variant="caption" color="text.secondary">Keywords: {g.keywords}</Typography>}
+                    {g.impact && <Typography variant="caption" color="text.secondary">Impact: {g.impact}</Typography>}
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.cannibalization && ai_insights.cannibalization.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cannibalization</Typography>
+                {ai_insights.cannibalization.slice(0, 3).map((c: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#fef2f2', borderRadius: 1, border: '1px solid #fecaca' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{c.keyword}</Typography>
+                    <Typography variant="caption" color="text.secondary">{c.overlapping_pages} overlapping pages — {c.recommendation}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.decay_alerts && ai_insights.decay_alerts.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content Decay</Typography>
+                {ai_insights.decay_alerts.slice(0, 3).map((d: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#fffbeb', borderRadius: 1, border: '1px solid #fde68a' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{d.signal || d.category}</Typography>
+                    <Typography variant="caption" color="text.secondary">{d.action}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.publishing_calendar && ai_insights.publishing_calendar.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Publishing Calendar</Typography>
+                <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {ai_insights.publishing_calendar.slice(0, 6).map((pc: any, i: number) => (
+                    <Chip key={i} size="small" label={`W${pc.week}: ${pc.topic || pc.content_type}`} variant="outlined" color={pc.priority === 'high' ? 'success' : 'default'} />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+            {ai_insights.seo_opportunities && ai_insights.seo_opportunities.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO Opportunities</Typography>
+                {ai_insights.seo_opportunities.slice(0, 3).map((s: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#eff6ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip size="small" label={s.type} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+                      <Chip size="small" label={s.impact} color={s.impact === 'high' ? 'error' : 'default'} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+                    </Box>
+                    <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 600 }}>{s.finding || s.action}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.internal_linking && ai_insights.internal_linking.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal Linking</Typography>
+                {ai_insights.internal_linking.slice(0, 3).map((l: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#ecfeff', borderRadius: 1, border: '1px solid #a5f3fc' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{l.from_section} → {l.to_section}</Typography>
+                    <Typography variant="caption" color="text.secondary">Anchor: "{l.anchor_label}" — {l.reason}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {(ai_insights.growth_recommendations?.length > 0 || ai_insights.content_strategy?.length > 0) && (
+              <Grid item xs={12}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recommendations</Typography>
+                <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  {ai_insights.growth_recommendations?.slice(0, 3).map((r: string, i: number) => (
+                    <Typography key={`g${i}`} variant="caption">• {r}</Typography>
+                  ))}
+                  {ai_insights.content_strategy?.slice(0, 3).map((r: string, i: number) => (
+                    <Typography key={`c${i}`} variant="caption">• {r}</Typography>
+                  ))}
+                </Box>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
       )}
 
       <Paper variant="outlined" sx={{ mb: 2 }}>
