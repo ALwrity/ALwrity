@@ -148,7 +148,7 @@ const TrendChip: React.FC<{ trend?: string }> = ({ trend }) => {
 };
 
 export const SiteHealthSummaryCard: React.FC<SiteHealthSummaryCardProps> = ({ seoAudit }) => {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const data = (seoAudit || {}) as SEOAudit;
   const sh = data.site_health;
 
@@ -164,29 +164,30 @@ export const SiteHealthSummaryCard: React.FC<SiteHealthSummaryCardProps> = ({ se
     <Paper
       elevation={0}
       sx={{
-        mt: 3,
-        borderRadius: 3,
-        border: "1px solid #E2E8F0",
-        bgcolor: "#F8FAFC",
+        mt: 1.5,
+        borderRadius: 2,
+        border: "1px solid #e0e0e0",
+        bgcolor: "#fff",
         overflow: "hidden",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
       }}
     >
       {/* Header */}
       <Box
         sx={{
-          px: 2.5,
-          py: 1.5,
+          px: 2,
+          py: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           cursor: "pointer",
-          "&:hover": { bgcolor: "rgba(16,185,129,0.04)" },
+          borderBottom: expanded ? "1px solid #f0f0f0" : "none",
         }}
         onClick={() => setExpanded(!expanded)}
       >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <HealthIcon sx={{ color: "#10b981", fontSize: 20 }} />
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          <HealthIcon sx={{ color: "#10b981", fontSize: 18 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#334155" }}>
             Site Health Results
           </Typography>
           {sh?.freshness_score !== undefined && (
@@ -194,8 +195,8 @@ export const SiteHealthSummaryCard: React.FC<SiteHealthSummaryCardProps> = ({ se
               label={`${sh.freshness_score} freshness`}
               size="small"
               sx={{
-                height: 20,
-                fontSize: "0.7rem",
+                height: 18,
+                fontSize: "0.65rem",
                 bgcolor:
                   sh.freshness_score >= 80
                     ? "rgba(16,185,129,0.1)"
@@ -224,9 +225,9 @@ export const SiteHealthSummaryCard: React.FC<SiteHealthSummaryCardProps> = ({ se
       </Box>
 
       <Collapse in={expanded}>
-        <Box sx={{ px: 2.5, pb: 2 }}>
+        <Box sx={{ px: 2, pb: 1.5, pt: 1 }}>
           {/* Quick metrics row */}
-          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+          <Grid container spacing={1} sx={{ mb: 1.5 }}>
             {sh?.total_urls ? (
               <Grid item xs={4}>
                 <MetricBox
