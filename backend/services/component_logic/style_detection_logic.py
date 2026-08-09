@@ -211,6 +211,12 @@ class StyleDetectionLogic:
                 "writing_tone": "", "target_audience": "", "content_type": "", "creativity_level": "",
                 "geographic_location": "", "industry_context": "", "brand_alignment": ""
               }},
+              "patterns": {{
+                "sentence_length": "", "vocabulary_patterns": [], "rhetorical_devices": [],
+                "paragraph_structure": "", "transition_phrases": []
+              }},
+              "style_consistency": "",
+              "unique_elements": [],
               "meta": {{"schema_version": "1.1", "confidence": 0.0, "notes": "", "uncertainty": {{"fields": []}}}}
             }}
             """
