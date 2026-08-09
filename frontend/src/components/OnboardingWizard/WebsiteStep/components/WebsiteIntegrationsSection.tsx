@@ -364,7 +364,8 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
           )}
         </AccordionDetails>
       </Accordion>
-    </Box>
+
+      <Snackbar
         open={showToast}
         autoHideDuration={4000}
         onClose={() => setShowToast(false)}
