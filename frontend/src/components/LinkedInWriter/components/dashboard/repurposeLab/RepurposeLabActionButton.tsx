@@ -1,10 +1,6 @@
 import React from "react";
-import { ConnectLockIcon } from "../ConnectLockIcon";
-import {
-  REPURPOSE_LAB_LOCKED_HINT,
-  type RepurposeLabFormat,
-} from "./repurposeLabFormats";
-import { getRepurposeLabButtonStyle } from "./repurposeLabButtonStyles";
+import { FormatActionButton } from "../performancePulse/FormatActionButton";
+import { REPURPOSE_LAB_LOCKED_HINT, type RepurposeLabFormat } from "./repurposeLabFormats";
 import type { PerformanceContentType } from "../performancePulse/types";
 
 export interface RepurposeLabActionButtonProps {
@@ -14,23 +10,13 @@ export interface RepurposeLabActionButtonProps {
 
 export const RepurposeLabActionButton: React.FC<
   RepurposeLabActionButtonProps
-> = ({ format, onSelect }) => {
-  const locked = Boolean(format.locked);
-
-  return (
-    <button
-      key={format.type}
-      type="button"
-      disabled={locked}
-      aria-disabled={locked}
-      title={locked ? REPURPOSE_LAB_LOCKED_HINT : undefined}
-      onClick={() => {
-        if (!locked) onSelect(format.type);
-      }}
-      style={getRepurposeLabButtonStyle(format)}
-    >
-      {format.icon} {format.label}
-      {locked && <ConnectLockIcon size={11} />}
-    </button>
-  );
-};
+> = ({ format, onSelect }) => (
+  <FormatActionButton
+    icon={format.icon}
+    label={format.label}
+    colors={{ bg: format.bg, border: format.border, text: format.text }}
+    locked={Boolean(format.locked)}
+    lockedHint={REPURPOSE_LAB_LOCKED_HINT}
+    onClick={() => onSelect(format.type)}
+  />
+);

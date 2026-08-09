@@ -7,6 +7,13 @@ export type {
   PerformancePulseModalProps as PostPulseModalProps,
 } from "./PerformancePulseModal";
 export { inferPerformanceContentType, toPerformancePulseItem } from "./inferContentType";
+export { resolvePerformanceContentType } from "./resolvePerformanceContentType";
+export { FormatActionButton } from "./FormatActionButton";
+export {
+  FORMAT_TONAL_PALETTE,
+  getFormatActionButtonStyle,
+  getFormatTonalColors,
+} from "./formatTonalPalette";
 export { boostPerformanceContent } from "./boostPerformanceContent";
 export type {
   PerformanceContentType,

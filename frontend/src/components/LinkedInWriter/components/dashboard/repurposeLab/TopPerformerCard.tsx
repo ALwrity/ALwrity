@@ -3,6 +3,8 @@ import type { LinkedInPost } from "../../../../../services/postAnalyticsApi";
 import { colors, rowBase } from "../../GrowthEngine/styles";
 import { formatRate, postSnippet } from "../remarkWedgeShared/postMetrics";
 import { RemarkWedgeMetricPill } from "../remarkWedgeShared/remarkWedgeSharedUi";
+import { PerformancePulseContentTypeBadge } from "../performancePulse/PerformancePulseContentTypeBadge";
+import { resolvePerformanceContentType } from "../performancePulse/resolvePerformanceContentType";
 import type { PerformanceContentType } from "../performancePulse/types";
 import { RepurposeLabActionButton } from "./RepurposeLabActionButton";
 import { REPURPOSE_LAB_FORMATS } from "./repurposeLabFormats";
@@ -26,6 +28,7 @@ export const TopPerformerCard: React.FC<TopPerformerCardProps> = ({
 }) => {
   const rankStyle = RANK_COLORS[rank - 1] ?? RANK_COLORS[2];
   const metrics = post.engagement;
+  const sourceType = resolvePerformanceContentType(post);
 
   return (
     <div
@@ -79,20 +82,30 @@ export const TopPerformerCard: React.FC<TopPerformerCardProps> = ({
             {postSnippet(post.text, 90)}
           </div>
         </div>
-        <span
+        <div
           style={{
-            fontSize: 11,
-            fontWeight: 800,
-            background: "#dcfce7",
-            color: "#166534",
-            padding: "2px 8px",
-            borderRadius: 5,
-            whiteSpace: "nowrap",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 4,
             flexShrink: 0,
           }}
         >
-          {formatRate(metrics.engagement_rate ?? 0)}
-        </span>
+          <PerformancePulseContentTypeBadge contentType={sourceType} />
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              background: "#dcfce7",
+              color: "#166534",
+              padding: "2px 8px",
+              borderRadius: 5,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {formatRate(metrics.engagement_rate ?? 0)}
+          </span>
+        </div>
       </div>
 
       <div

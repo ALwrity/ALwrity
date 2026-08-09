@@ -6,6 +6,7 @@ import type { LinkedInDraftContentType } from "../../../utils/linkedInDraftLibra
 import { pushDraftToStudio } from "../engagementWedgeDraftUtils";
 import { REMARKET_RETURN } from "../remarketWedgeNavigation";
 import { boostPerformanceContent } from "./boostPerformanceContent";
+import { isPerformancePulseTransformLocked } from "./performancePulseTransformFormats";
 import { openPerformanceContentInQuickCreate } from "./openPerformanceContentInQuickCreate";
 import type { PerformancePulseCreateMode } from "./payload";
 import type {
@@ -81,6 +82,7 @@ export function usePerformancePulseActions({
 
   const openItemTransformTo = useCallback(
     (item: PerformancePulseItem, targetType: PerformanceContentType) => {
+      if (isPerformancePulseTransformLocked(targetType)) return;
       openQuickCreateWithPayload(item, "repurpose", targetType);
     },
     [openQuickCreateWithPayload],
