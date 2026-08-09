@@ -833,10 +833,20 @@ class SitemapService:
 
         total_urls = structure_analysis.get("total_urls", 0)
         url_patterns = structure_analysis.get("url_patterns", {})
-        avg_depth = structure_analysis.get("average_path_depth", 0)
+        if not isinstance(url_patterns, dict):
+            url_patterns = {}
         keyword_clusters = structure_analysis.get("keyword_clusters", {})
+        if not isinstance(keyword_clusters, dict):
+            keyword_clusters = {}
         strategic_pillars = structure_analysis.get("strategic_pillars", [])
+        if not isinstance(strategic_pillars, (list, tuple)):
+            strategic_pillars = list(strategic_pillars) if strategic_pillars else []
         publishing_velocity = content_trends.get("publishing_velocity", 0)
+        if not isinstance(publishing_velocity, (int, float)):
+            try:
+                publishing_velocity = float(publishing_velocity)
+            except (ValueError, TypeError):
+                publishing_velocity = 0
         date_range = content_trends.get("date_range", {})
         monthly_distribution = content_trends.get("monthly_distribution", {})
         priority_dist = publishing_patterns.get("priority_distribution", {})
