@@ -182,8 +182,19 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
         if (!cancelled) setError("Could not load task preferences");
       });
     return () => { cancelled = true; };
-    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hydrate results from persisted DB data on mount
+  useEffect(() => {
+    if (advStatus?.has_results) {
+      if (brandAnalysis && !lastRunResult) {
+        setLastRunResult({ audit: brandAnalysis });
+      }
+      if (seoAudit && !lastHealthRun) {
+        setLastHealthRun({ site_health: seoAudit });
+      }
+    }
+  }, [advStatus?.has_results, brandAnalysis, seoAudit, lastRunResult, lastHealthRun]);
 
   // Save preferences on toggle
   const savePreferences = useCallback(async (updated: Record<string, TaskConfig>) => {
