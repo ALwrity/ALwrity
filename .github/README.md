@@ -11,7 +11,7 @@
 **Core claim:
  ALwrity is a contextual content OS: it understands your brand, website, competitors, and channels, then uses that understanding to drive every story, video, podcast, and campaign, with memory and analytics in one place.**
 
-[🌐 Live Demo](https://www.alwrity.com) • [📚 Docs Site](https://ajaysi.github.io/ALwrity/) • [📖 Wiki](https://github.com/AJaySi/AI-Writer/wiki) • [💬 Discussions](https://github.com/AJaySi/AI-Writer/discussions) • [🐛 Issues](https://github.com/AJaySi/AI-Writer/issues)
+[🌐 Live Demo](https://www.alwrity.com) • [📚 Docs Site](https://alwrity.github.io/ALwrity/) • [📖 Wiki](https://github.com/AJaySi/AI-Writer/wiki) • [💬 Discussions](https://github.com/AJaySi/AI-Writer/discussions) • [🐛 Issues](https://github.com/AJaySi/AI-Writer/issues)
 
 </div>
 
