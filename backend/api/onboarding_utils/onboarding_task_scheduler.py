@@ -274,6 +274,22 @@ def schedule_step3_tasks(
         db.rollback()
         logger.warning(f"[onboarding_step3] Non-blocking: failed to schedule deep competitor analysis: {e}")
 
+    # 2. Record sitemap benchmark as a scheduled task (user-triggered via UI buttons)
+    try:
+        valid_competitors = [
+            c.get("url") for c in competitors
+            if isinstance(c, dict) and c.get("url", "").startswith("http")
+        ][:5]
+        if valid_competitors:
+            _record_task_in_session(db, user_id, "sitemap_benchmark", step=3, details={
+                "website_url": website_url,
+                "competitor_count": len(valid_competitors),
+                "competitors": valid_competitors,
+            })
+            logger.info(f"[onboarding_step3] Recorded sitemap benchmark task for {user_id} ({len(valid_competitors)} competitors)")
+    except Exception as e:
+        logger.warning(f"[onboarding_step3] Non-blocking: failed to record sitemap benchmark: {e}")
+
 
 def schedule_step4_tasks(user_id: str, db: Optional[Session] = None):
     """Schedule background tasks after Step 4 (Persona) completes.

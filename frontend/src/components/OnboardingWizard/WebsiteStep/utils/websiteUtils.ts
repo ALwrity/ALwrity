@@ -214,9 +214,12 @@ export const performAnalysis = async (
       updateProgress(3, 'Analyzing your content', `Brand voice, tone, audience signals, SEO audit, and content strategy (${elapsedStr} elapsed)`);
     }, 1000);
 
-    const response = await longRunningApiClient.post('/api/onboarding/style-detection/complete', requestData);
-
-    clearInterval(elapsedUpdater);
+    let response;
+    try {
+      response = await longRunningApiClient.post('/api/onboarding/style-detection/complete', requestData);
+    } finally {
+      clearInterval(elapsedUpdater);
+    }
 
     updateProgress(3, 'Brand voice, tone & style analyzed', 'Detected tone patterns, vocabulary richness, emotional resonance and readability');
     updateProgress(4, 'Content characteristics & SEO evaluated', 'Readability, sentence complexity, page structure, and SEO health assessed');
