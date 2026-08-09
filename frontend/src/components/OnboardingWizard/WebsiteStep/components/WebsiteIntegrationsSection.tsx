@@ -308,6 +308,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
             <div>
               <PlatformSection
                 title="Website & Content Platforms"
+                description="WordPress, Wix, and content management"
                 platforms={websitePlatforms}
                 connectedPlatforms={connectedPlatforms}
                 gscSites={null}

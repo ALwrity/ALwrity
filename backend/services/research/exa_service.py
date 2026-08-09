@@ -173,6 +173,56 @@ class ExaService:
             return None
 
     # ------------------------------------------------------------------
+    # Exa Agent API — content pillar discovery
+    # ------------------------------------------------------------------
+
+    CONTENT_PILLARS_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "competitors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "website": {"type": "string"},
+                        "company_name": {"type": "string"},
+                        "content_pillars": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            },
+            "target_company": {
+                "type": "object",
+                "properties": {
+                    "domain": {"type": "string"},
+                    "content_pillars": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    }
+
+    async def _discover_content_pillars_via_agent(self, user_url: str) -> Optional[Dict[str, Any]]:
+        """Discover content topic pillars via Exa Agent API."""
+        from services.research.exa_agent import ExaAgentClient
+        try:
+            domain = urlparse(user_url).netloc.replace("www.", "")
+            query = (
+                f"Identify the primary content topic pillars for {domain} and its top 5 direct market competitors. "
+                f"For each, analyze their blogs, documentation, and resource hubs to extract 3 to 5 core topic pillars "
+                f"and keyword clusters they actively target."
+            )
+            result = await ExaAgentClient().run(
+                query=query,
+                output_schema=self.CONTENT_PILLARS_SCHEMA,
+                effort="medium",
+            )
+            return result
+        except RuntimeError:
+            return None
+        except Exception as e:
+            logger.warning(f"Agent content pillar discovery failed: {e}")
+            return None
+
+    # ------------------------------------------------------------------
     # Competitor discovery
     # ------------------------------------------------------------------
 

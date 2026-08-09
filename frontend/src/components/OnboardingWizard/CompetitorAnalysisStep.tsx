@@ -38,6 +38,7 @@ import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';
 import type { Competitor } from './WebsiteStep/components';
 import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
+import { ContentPillarsSection, type ContentPillarData } from './CompetitorAnalysisStep/ContentPillarsSection';
 
 
 // Light theme constants matching requirements
@@ -88,6 +89,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [socialMediaAccounts, setSocialMediaAccounts] = useState<any>({});
   const [, setSocialMediaCitations] = useState<any[]>([]);
   const [researchSummary, setResearchSummary] = useState<ResearchSummary | null>(null);
+  const [contentPillars, setContentPillars] = useState<ContentPillarData | null>(null);
+  const [isLoadingPillars, setIsLoadingPillars] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showProgressModal, setShowProgressModal] = useState(false);
   const [showHighlightsModal, setShowHighlightsModal] = useState(false);
@@ -860,6 +863,9 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
           </Button>
         </Box>
       )}
+
+      {/* Content Pillars Section */}
+      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} />
 
       {/* Competitor Sitemap Analysis — results */}
       {benchmarkReport && (
