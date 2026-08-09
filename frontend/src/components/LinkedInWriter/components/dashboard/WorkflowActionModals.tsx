@@ -171,7 +171,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   };
   const openContentAnalytics = () => {
     onClose();
-    openPostAnalyticsModal();
+    openPostAnalyticsModal({ fromAnalysisWedge: true });
   };
   const openSeoAnalytics = () => {
     onClose();
@@ -179,7 +179,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   };
   const openGrowthEngine = () => {
     onClose();
-    openGrowthEngineModal();
+    openGrowthEngineModal({ fromEngagementWedge: true });
   };
 
   useEffect(() => {
@@ -199,11 +199,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       if (!raw?.wedge) return;
       const detail = resolveWorkflowWedgeDetail(raw);
       onOpenWedge?.(detail.wedge);
-      if (detail.wedge === "engagement" && detail.sub) {
-        setEngagementSub(detail.sub as EngagementSub);
-      }
       if (detail.wedge === "remarket" && detail.sub) {
         setRemarkSub(detail.sub as RemarkSub);
+      }
+      if (detail.wedge === "engagement" && detail.sub) {
+        setEngagementSub(detail.sub as EngagementSub);
       }
     };
     window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, onOpenWorkflowWedge);
@@ -219,6 +219,16 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     onOpenWedge?.("engagement");
   };
 
+  const backToPublishGrid = () => {
+    setPublishSub(null);
+    onOpenWedge?.("publish");
+  };
+
+  const backToAnalysisGrid = () => {
+    setAnalysisSub(null);
+    onOpenWedge?.("analysis");
+  };
+
   const backToRemarketGrid = () => {
     setRemarkSub(null);
     onOpenWedge?.("remarket");
@@ -228,6 +238,11 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     engagementSub === "grow_network" ||
     engagementSub === "network" ||
     engagementSub === "pymk";
+
+  const engagementDrillDownOpen = engagementSub !== null;
+  const publishDrillDownOpen = publishSub !== null;
+  const analysisDrillDownOpen = analysisSub !== null;
+  const remarkDrillDownOpen = remarkSub !== null;
 
   const growNetworkScrollTarget: GrowNetworkScrollTarget | undefined =
     growNetworkScrollFromEvent ??
@@ -306,7 +321,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
       {/* ── Publish ── */}
       <DashboardActionModal
-        open={activeModal === "publish"}
+        open={activeModal === "publish" && !publishDrillDownOpen}
         title="Publish"
         onClose={onClose}
         maxWidth={720}
@@ -361,11 +376,12 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <DraftLibraryModal
         open={publishSub === "drafts"}
         onClose={() => setPublishSub(null)}
+        onBack={backToPublishGrid}
       />
 
       {/* ── Analysis ── */}
       <DashboardActionModal
-        open={activeModal === "analysis"}
+        open={activeModal === "analysis" && !analysisDrillDownOpen}
         title="Analysis"
         onClose={onClose}
         maxWidth={720}
@@ -430,16 +446,18 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <EngagementTrendsModal
         open={analysisSub === "trends"}
         onClose={() => setAnalysisSub(null)}
+        onBack={backToAnalysisGrid}
         connected={connected}
       />
 
       {/* ── Engagement ── */}
       <DashboardActionModal
-        open={activeModal === "engagement"}
+        open={activeModal === "engagement" && !engagementDrillDownOpen}
         title="Engagement"
         onClose={onClose}
         maxWidth={680}
         titleSize="xl"
+        modalClassName="linkedin-engagement-wedge-modal"
       >
         <div
           style={{
@@ -510,11 +528,12 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
       {/* ── Remarket ── */}
       <DashboardActionModal
-        open={activeModal === "remarket"}
+        open={activeModal === "remarket" && !remarkDrillDownOpen}
         title="Remarket"
         onClose={onClose}
         maxWidth={680}
         titleSize="xl"
+        modalClassName="linkedin-remarket-wedge-modal"
       >
         <div
           style={{
@@ -602,18 +621,22 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       <FormatTransformerModal
         open={remarkSub === "transformer"}
         onClose={() => setRemarkSub(null)}
+        onBack={backToRemarketGrid}
       />
       <ContentRefreshModal
         open={remarkSub === "refresh"}
         onClose={() => setRemarkSub(null)}
+        onBack={backToRemarketGrid}
       />
       <StaleReviverModal
         open={remarkSub === "reviver"}
         onClose={() => setRemarkSub(null)}
+        onBack={backToRemarketGrid}
       />
       <PerfToPlanModal
         open={remarkSub === "perf_plan"}
         onClose={() => setRemarkSub(null)}
+        onBack={backToRemarketGrid}
       />
     </>
   );

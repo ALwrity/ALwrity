@@ -7,6 +7,16 @@ export const OPEN_GROWTH_ENGINE_EVENT = "linkedinwriter:openGrowthEngine";
 export const OPEN_GROW_NETWORK_EVENT = "linkedinwriter:openGrowNetwork";
 export const OPEN_ENGAGEMENT_BOOSTER_EVENT = "linkedinwriter:openEngagementBooster";
 
+export interface OpenPostAnalyticsDetail {
+  /** When true, show Analysis wedge back nav (back above title → Analysis grid). */
+  fromAnalysisWedge?: boolean;
+}
+
+export interface OpenGrowthEngineDetail {
+  /** When true, show Engagement wedge back nav (back above title → Engagement grid). */
+  fromEngagementWedge?: boolean;
+}
+
 export interface OpenGrowNetworkDetail {
   scrollToSection?: GrowNetworkScrollTarget;
 }
@@ -16,12 +26,20 @@ export interface OpenEngagementBoosterDetail {
   initialContent?: string;
 }
 
-export function openPostAnalyticsModal(): void {
-  window.dispatchEvent(new CustomEvent(OPEN_POST_ANALYTICS_EVENT));
+export function openPostAnalyticsModal(detail?: OpenPostAnalyticsDetail): void {
+  window.dispatchEvent(
+    new CustomEvent<OpenPostAnalyticsDetail>(OPEN_POST_ANALYTICS_EVENT, {
+      detail: detail ?? {},
+    }),
+  );
 }
 
-export function openGrowthEngineModal(): void {
-  window.dispatchEvent(new CustomEvent(OPEN_GROWTH_ENGINE_EVENT));
+export function openGrowthEngineModal(detail?: OpenGrowthEngineDetail): void {
+  window.dispatchEvent(
+    new CustomEvent<OpenGrowthEngineDetail>(OPEN_GROWTH_ENGINE_EVENT, {
+      detail: detail ?? {},
+    }),
+  );
 }
 
 export function openGrowNetworkModal(

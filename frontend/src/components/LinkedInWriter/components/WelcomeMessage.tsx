@@ -64,6 +64,8 @@ import {
   OPEN_GROWTH_ENGINE_EVENT,
   OPEN_GROW_NETWORK_EVENT,
   OPEN_POST_ANALYTICS_EVENT,
+  type OpenGrowthEngineDetail,
+  type OpenPostAnalyticsDetail,
 } from "../utils/linkedInDashboardEvents";
 
 interface WelcomeMessageProps {
@@ -116,7 +118,11 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
     null,
   );
   const [postAnalyticsOpen, setPostAnalyticsOpen] = useState(false);
+  const [postAnalyticsFromAnalysisWedge, setPostAnalyticsFromAnalysisWedge] =
+    useState(false);
   const [growthEngineOpen, setGrowthEngineOpen] = useState(false);
+  const [growthEngineFromEngagementWedge, setGrowthEngineFromEngagementWedge] =
+    useState(false);
   const [watchdogOpen, setWatchdogOpen] = useState(false);
   const [copilotError, setCopilotError] = useState<string | null>(null);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -189,9 +195,22 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
   }, []);
 
   useEffect(() => {
-    const onOpenPostAnalytics = () => setPostAnalyticsOpen(true);
-    const onOpenGrowthEngine = () => setGrowthEngineOpen(true);
-    const onOpenGrowNetwork = () => setGrowthEngineOpen(false);
+    const onOpenPostAnalytics = (event: Event) => {
+      const detail = (event as CustomEvent<OpenPostAnalyticsDetail>).detail;
+      setPostAnalyticsFromAnalysisWedge(Boolean(detail?.fromAnalysisWedge));
+      setPostAnalyticsOpen(true);
+    };
+    const onOpenGrowthEngine = (event: Event) => {
+      const detail = (event as CustomEvent<OpenGrowthEngineDetail>).detail;
+      setGrowthEngineFromEngagementWedge(
+        Boolean(detail?.fromEngagementWedge),
+      );
+      setGrowthEngineOpen(true);
+    };
+    const onOpenGrowNetwork = () => {
+      setGrowthEngineOpen(false);
+      setGrowthEngineFromEngagementWedge(false);
+    };
     window.addEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
     window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
     window.addEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
@@ -395,6 +414,7 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       openConnectGate();
       return;
     }
+    setPostAnalyticsFromAnalysisWedge(false);
     setPostAnalyticsOpen(true);
   };
 
@@ -647,13 +667,39 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
 
       <PostAnalyticsModal
         open={postAnalyticsOpen}
-        onClose={() => setPostAnalyticsOpen(false)}
+        onClose={() => {
+          setPostAnalyticsOpen(false);
+          setPostAnalyticsFromAnalysisWedge(false);
+        }}
+        analysisWedgeNav={postAnalyticsFromAnalysisWedge}
+        onBack={
+          postAnalyticsFromAnalysisWedge
+            ? () => {
+                setPostAnalyticsOpen(false);
+                setPostAnalyticsFromAnalysisWedge(false);
+                setWorkflowModal("analysis");
+              }
+            : undefined
+        }
         onGenerateSimilarPost={onGenerateSimilarPost}
       />
 
       <GrowthEngineModal
         open={growthEngineOpen}
-        onClose={() => setGrowthEngineOpen(false)}
+        onClose={() => {
+          setGrowthEngineOpen(false);
+          setGrowthEngineFromEngagementWedge(false);
+        }}
+        engagementWedgeNav={growthEngineFromEngagementWedge}
+        onBack={
+          growthEngineFromEngagementWedge
+            ? () => {
+                setGrowthEngineOpen(false);
+                setGrowthEngineFromEngagementWedge(false);
+                setWorkflowModal("engagement");
+              }
+            : undefined
+        }
         generatePost={onGeneratePost}
         userPreferences={userPreferences}
       />

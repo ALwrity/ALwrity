@@ -26,6 +26,10 @@ import {
   ENGAGEMENT_RETURN,
   openQuickCreateFromWedge,
 } from "./engagementWedgeNavigation";
+import {
+  engagementSubModalClassName,
+  engagementSubModalShellProps,
+} from "./engagementWedgeModalUi";
 
 export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
@@ -274,7 +278,8 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
       title="Engagement Opportunities"
       onClose={onClose}
       onBack={onBack}
-      backLabel="Engagement"
+      {...engagementSubModalShellProps}
+      modalClassName={engagementSubModalClassName()}
       maxWidth={560}
       maxHeight="min(92vh, 720px)"
     >
@@ -502,7 +507,7 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
           <button
             type="button"
             onClick={() => {
-              openGrowthEngineModal();
+              openGrowthEngineModal({ fromEngagementWedge: true });
               onClose();
             }}
             style={{

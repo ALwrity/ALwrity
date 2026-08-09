@@ -4,6 +4,11 @@
 import React, { useMemo } from "react";
 import { DashboardActionModal } from "../DashboardActionModal";
 import { colors } from "../../GrowthEngine/styles";
+import {
+  WEDGE_BACK_LABELS,
+  wedgeSubModalClassName,
+  wedgeSubModalShellProps,
+} from "../wedgeModalUi";
 import { openRepurposeLabInQuickCreate } from "../performancePulse/openPerformanceContentInQuickCreate";
 import { REMARKET_RETURN } from "../remarketWedgeNavigation";
 import { engagementScore } from "../remarkWedgeShared/postMetrics";
@@ -42,7 +47,8 @@ export const RepurposeLabModal: React.FC<RepurposeLabModalProps> = ({
       title="Top Performers Repurpose Lab"
       onClose={onClose}
       onBack={onBack}
-      backLabel="Remarket"
+      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgeSubModalClassName()}
       maxWidth={600}
       maxHeight="min(92vh, 740px)"
     >

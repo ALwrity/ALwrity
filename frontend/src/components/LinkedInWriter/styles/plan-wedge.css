@@ -619,6 +619,55 @@
   flex-shrink: 0;
 }
 
+/* ── All LinkedIn dashboard wedge modals: 24px titles + visible back nav ── */
+.linkedin-dashboard-action-modal-header h2,
+.linkedin-dashboard-action-modal-title--xl,
+.linkedin-dashboard-action-modal-title--lg,
+.linkedin-dashboard-action-modal-title--default {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+.linkedin-dashboard-modal-back-btn {
+  display: inline-flex !important;
+  align-items: center;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  min-height: 24px;
+  padding: 2px 0 4px !important;
+}
+
+.linkedin-engagement-wedge-modal .linkedin-dashboard-action-modal-header,
+.linkedin-plan-wedge-modal .linkedin-dashboard-action-modal-header,
+.linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-header,
+.linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-header,
+.linkedin-remarket-wedge-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 10px 20px 6px !important;
+}
+
+/* Wedge drill-down modals — back above title, 24px titles, comfortable back hit area */
+.linkedin-wedge-sub-modal .linkedin-dashboard-action-modal-header {
+  border-bottom: none !important;
+  padding: 12px 20px 10px !important;
+}
+
+.linkedin-wedge-sub-modal .linkedin-dashboard-action-modal-header h2 {
+  font-size: 24px !important;
+  line-height: 1.2 !important;
+}
+
+.linkedin-wedge-sub-modal .linkedin-dashboard-modal-back-btn {
+  font-size: 13px !important;
+  min-height: 44px;
+}
+
+.linkedin-plan-saved-ideas-modal .linkedin-dashboard-modal-back-btn {
+  font-size: 13px !important;
+  min-height: 44px;
+}
+
 /* Plan wedge modal — wide canvas like Optimise Profile */
 .linkedin-plan-wedge-modal {
   width: min(97vw, 1200px) !important;

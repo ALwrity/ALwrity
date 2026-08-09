@@ -36,6 +36,8 @@ interface DashboardActionModalProps {
   onBack?: () => void;
   /** Short label for back button — defaults to "Back". */
   backLabel?: string;
+  /** Engagement pilot: back row above title; default keeps back below title. */
+  backPlacement?: "aboveTitle" | "belowTitle";
 }
 
 export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
@@ -59,6 +61,7 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
   scrollBody = true,
   onBack,
   backLabel = "Back",
+  backPlacement = "belowTitle",
 }) => {
   if (!open) return null;
 
@@ -70,6 +73,67 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
 
   const titleFontSize =
     titleSize === "xl" ? 24 : titleSize === "lg" ? 18 : 15;
+
+  const backAboveTitle = Boolean(onBack && backPlacement === "aboveTitle");
+  const backButtonSize = backAboveTitle ? "comfortable" : "default";
+
+  const closeControl =
+    !disableClose &&
+    (closeLabel ? (
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label={closeLabel ?? "Close"}
+        style={{
+          background: "transparent",
+          border: "none",
+          fontSize: 13,
+          lineHeight: 1.2,
+          cursor: "pointer",
+          color: "#64748b",
+          padding: "6px 10px",
+          borderRadius: 6,
+          fontWeight: 600,
+          transition: "background 0.15s, color 0.15s",
+          whiteSpace: "nowrap",
+          flexShrink: 0,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "#f3f4f6";
+          e.currentTarget.style.color = "#0a66c2";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
+          e.currentTarget.style.color = "#64748b";
+        }}
+      >
+        {closeLabel}
+      </button>
+    ) : (
+      <StudioModalCloseButton onClick={onClose} ariaLabel="Close" />
+    ));
+
+  const titleNode = (
+    <h2
+      id="dashboard-action-modal-title"
+      className={`linkedin-dashboard-action-modal-title linkedin-dashboard-action-modal-title--${titleSize}`}
+      style={{
+        margin: 0,
+        fontSize: titleFontSize,
+        fontWeight: 700,
+        color: "#0a66c2",
+        letterSpacing: "-0.01em",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        minWidth: 0,
+        flex: backAboveTitle ? undefined : 1,
+        width: backAboveTitle ? "100%" : undefined,
+      }}
+    >
+      {title}
+    </h2>
+  );
 
   return createPortal(
     <div
@@ -117,75 +181,59 @@ export const DashboardActionModal: React.FC<DashboardActionModalProps> = ({
         <div
           className="linkedin-dashboard-action-modal-header"
           style={{
-            padding: onBack ? "14px 20px 10px" : "14px 20px",
+            padding: onBack
+              ? backAboveTitle
+                ? "12px 20px 10px"
+                : "14px 20px 10px"
+              : "14px 20px",
             background: "#ffffff",
             flexShrink: 0,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 12,
-            }}
-          >
-            <h2
-              id="dashboard-action-modal-title"
-              style={{
-                margin: 0,
-                fontSize: titleFontSize,
-                fontWeight: 700,
-                color: "#0a66c2",
-                letterSpacing: "-0.01em",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                minWidth: 0,
-                flex: 1,
-              }}
-            >
-              {title}
-            </h2>
-            {!disableClose &&
-              (closeLabel ? (
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label={closeLabel ?? "Close"}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    fontSize: 13,
-                    lineHeight: 1.2,
-                    cursor: "pointer",
-                    color: "#64748b",
-                    padding: "6px 10px",
-                    borderRadius: 6,
-                    fontWeight: 600,
-                    transition: "background 0.15s, color 0.15s",
-                    whiteSpace: "nowrap",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#f3f4f6";
-                    e.currentTarget.style.color = "#0a66c2";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "#64748b";
-                  }}
-                >
-                  {closeLabel}
-                </button>
-              ) : (
-                <StudioModalCloseButton onClick={onClose} ariaLabel="Close" />
-              ))}
-          </div>
-          {onBack && (
-            <div style={{ marginTop: 8 }}>
-              <DashboardModalBackButton label={backLabel} onClick={onBack} />
-            </div>
+          {backAboveTitle ? (
+            <>
+              <nav
+                aria-label="Modal navigation"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  marginBottom: 6,
+                }}
+              >
+                <DashboardModalBackButton
+                  label={backLabel}
+                  onClick={onBack!}
+                  size={backButtonSize}
+                />
+                {closeControl}
+              </nav>
+              {titleNode}
+            </>
+          ) : (
+            <>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                {titleNode}
+                {closeControl}
+              </div>
+              {onBack && (
+                <div style={{ marginTop: 8 }}>
+                  <DashboardModalBackButton
+                    label={backLabel}
+                    onClick={onBack}
+                    size={backButtonSize}
+                  />
+                </div>
+              )}
+            </>
           )}
         </div>
         <div

@@ -14,12 +14,19 @@ import {
   POST_COMMENTS_MODAL_Z_INDEX,
 } from "./postCommentsModalLayout";
 import { usePostCommentsModal } from "./usePostCommentsModal";
+import {
+  wedgeSubModalClassName,
+  wedgeSubModalShellProps,
+  WEDGE_NESTED_BACK_LABELS,
+} from "./wedgeModalUi";
 
 export interface PostCommentsModalProps {
   open: boolean;
   post: PostDelta | null;
   connected?: boolean;
   onClose: () => void;
+  onBack?: () => void;
+  backLabel?: string;
 }
 
 const actionButtonStyle = (enabled: boolean): React.CSSProperties => ({
@@ -39,6 +46,8 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
   post,
   connected = true,
   onClose,
+  onBack,
+  backLabel = WEDGE_NESTED_BACK_LABELS.engagementTrends,
 }) => {
   const {
     comments,
@@ -77,6 +86,13 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
       open={open}
       title="Post Comments"
       onClose={onClose}
+      onBack={onBack}
+      {...(onBack
+        ? {
+            ...wedgeSubModalShellProps(backLabel),
+            modalClassName: wedgeSubModalClassName(),
+          }
+        : { titleSize: "xl" as const })}
       zIndex={POST_COMMENTS_MODAL_Z_INDEX}
       {...POST_COMMENTS_MODAL_SIZE}
     >

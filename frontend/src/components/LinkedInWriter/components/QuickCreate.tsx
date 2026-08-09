@@ -7,6 +7,7 @@ import { mapTone, mapPostType, mapIndustry, mapSearchEngine } from '../utils/lin
 import { apiClient } from '../../../api/client';
 import DataSourceSelector from './Brainstorm/DataSourceSelector';
 import MySavedIdeas from './Brainstorm/MySavedIdeas';
+import { signalReopenPlanSavedIdeas } from './dashboard/planWedgeNavigation';
 import { useLinkedInSocialConnection } from '../../../hooks/useLinkedInSocialConnection';
 import { KeyPointsSection } from './KeyPointsSection';
 import { VariationPicker, assembleFullContent, type VariationResult } from './VariationPicker';
@@ -431,6 +432,9 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
     const target = returnTo;
     closeModal();
     if (target) {
+      if (target.reopenPlanSavedIdeas) {
+        signalReopenPlanSavedIdeas();
+      }
       openWorkflowWedge({
         wedge: target.wedge,
         sub: target.sub,
