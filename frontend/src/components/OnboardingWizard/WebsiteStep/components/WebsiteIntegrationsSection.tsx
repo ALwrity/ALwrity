@@ -21,7 +21,6 @@ import {
   ExpandMore as ExpandMoreIcon,
   Google as GoogleIcon,
   Analytics as AnalyticsIcon,
-  LinkedIn as LinkedInIcon,
   Web as WordPressIcon,
   Web as WixIcon,
   CheckCircle as CheckCircleIcon,
@@ -136,10 +135,6 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
       } catch (error) {
         console.error('Bing connection failed:', error);
       }
-    } else if (platformId === 'linkedin') {
-      // LinkedInPlatformCard manages its own OAuth internally — no-op here
-      console.log('LinkedIn connection handled by card component');
-    } else {
       await handleConnect(platformId);
     }
   };
@@ -190,18 +185,6 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
       features: ['Bing search performance', 'SEO insights', 'Index status monitoring'],
       benefits: ['Bing search analytics', 'SEO optimization insights', 'Search engine visibility tracking'],
       oauthUrl: '/bing/auth/url',
-      isEnabled: true,
-    },
-    {
-      id: 'linkedin',
-      name: 'LinkedIn',
-      description: 'Connect LinkedIn for professional content publishing',
-      icon: <LinkedInIcon />,
-      category: 'analytics' as const,
-      status: 'available' as const,
-      features: ['Professional publishing', 'Company pages', 'Audience targeting'],
-      benefits: ['Post to LinkedIn directly', 'Manage company pages', 'Target professional audience'],
-      oauthUrl: '/api/linkedin/connect',
       isEnabled: true,
     },
   ], []);
@@ -271,7 +254,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
   return (
     <Box sx={{ mt: 3, animation: 'fadeIn 0.6s ease-out' }}>
       <Accordion
-        defaultExpanded={false}
+        defaultExpanded={true}
         sx={{
           borderRadius: 3,
           border: '1px solid #CBD5E1',
@@ -318,15 +301,13 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
         </AccordionSummary>
         <AccordionDetails sx={{ p: 2.5 }}>
           <Typography variant="body2" sx={{ color: '#64748B', mb: 2 }}>
-            Connect your website and analytics platforms to enable AI-powered content publishing and insights.
-            All connections are optional.
+            Connect your website and analytics platforms to enable AI-powered content publishing and insights — all connections are optional.
           </Typography>
 
           <Fade in timeout={800}>
             <div>
               <PlatformSection
-                title="Website Platforms"
-                description="Connect your website for automated content publishing"
+                title="Website & Content Platforms"
                 platforms={websitePlatforms}
                 connectedPlatforms={connectedPlatforms}
                 gscSites={null}
