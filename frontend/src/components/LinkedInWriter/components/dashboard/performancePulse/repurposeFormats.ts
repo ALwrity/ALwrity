@@ -1,5 +1,5 @@
 /**
- * Cross-format transform options for Performance Pulse rows (Phase 2.3).
+ * Cross-format transform options for Performance Pulse and Repurpose Lab.
  */
 import { getPerformanceContentTypeMeta } from "./contentTypeLabels";
 import type { PerformanceContentType } from "./types";
@@ -37,6 +37,13 @@ export const PERFORMANCE_TRANSFORM_FORMATS: PerformanceTransformFormat[] = [
     accent: "#0a66c2",
   },
 ];
+
+/** Repurpose Lab row actions — ordered formats with frontend lock flags. */
+export {
+  REPURPOSE_LAB_FORMATS,
+  isRepurposeLabFormatLocked,
+} from "../repurposeLab/repurposeLabFormats";
+export type { RepurposeLabFormat } from "../repurposeLab/repurposeLabFormats";
 
 export function getTransformFormatsForSource(
   sourceType: PerformanceContentType,

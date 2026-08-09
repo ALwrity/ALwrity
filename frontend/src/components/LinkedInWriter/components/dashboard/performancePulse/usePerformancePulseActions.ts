@@ -4,13 +4,10 @@
 import { useCallback, useState } from "react";
 import type { LinkedInDraftContentType } from "../../../utils/linkedInDraftLibraryUtils";
 import { pushDraftToStudio } from "../engagementWedgeDraftUtils";
-import { openQuickCreateFromWedge } from "../engagementWedgeNavigation";
 import { REMARKET_RETURN } from "../remarketWedgeNavigation";
 import { boostPerformanceContent } from "./boostPerformanceContent";
-import {
-  buildPerformancePulseCreatePayload,
-  type PerformancePulseCreateMode,
-} from "./payload";
+import { openPerformanceContentInQuickCreate } from "./openPerformanceContentInQuickCreate";
+import type { PerformancePulseCreateMode } from "./payload";
 import type {
   PerformanceContentType,
   PerformancePulseItem,
@@ -64,20 +61,12 @@ export function usePerformancePulseActions({
       mode: PerformancePulseCreateMode,
       targetType: PerformanceContentType,
     ) => {
-      const payload = buildPerformancePulseCreatePayload(
+      openPerformanceContentInQuickCreate(
         item.post,
         mode,
         targetType,
+        REMARKET_RETURN.pulse,
       );
-
-      openQuickCreateFromWedge({
-        type: targetType,
-        topic: payload.topic,
-        key_points: payload.key_points,
-        reference_context: payload.reference_context,
-        reference_mode: payload.reference_mode,
-        returnTo: REMARKET_RETURN.pulse,
-      });
       onClose();
     },
     [onClose],
