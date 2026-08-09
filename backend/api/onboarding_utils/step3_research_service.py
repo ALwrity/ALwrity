@@ -79,20 +79,23 @@ class Step3ResearchService:
                 actual_session_id = str(session.id)  # Convert to string for consistency
                 logger.info(f"Found onboarding session {actual_session_id} for user {user_id}")
 
-            # Step 1 & 2: Discover competitors AND social media in parallel
-            logger.info("Running competitor + social media discovery in parallel...")
+            # Step 1, 2 & 3: Discover competitors, social media, and content pillars in parallel
+            logger.info("Running competitor + social media + content pillars discovery in parallel...")
             competitor_task = self.exa_service.discover_competitors(
                 user_url=user_url, num_results=num_results, exclude_domains=None,
                 industry_context=industry_context, website_analysis_data=website_analysis_data)
             social_media_task = self.exa_service.discover_social_media_accounts(user_url)
-            competitor_results, social_media_results = await asyncio.gather(
-                competitor_task, social_media_task, return_exceptions=True)
+            pillars_task = self.exa_service._discover_content_pillars_via_agent(user_url)
+            competitor_results, social_media_results, pillars_results = await asyncio.gather(
+                competitor_task, social_media_task, pillars_task, return_exceptions=True)
             if isinstance(competitor_results, Exception):
                 return {"success": False, "error": str(competitor_results)}
             if not competitor_results.get("success"):
                 return competitor_results
             if isinstance(social_media_results, Exception) or not social_media_results.get("success"):
                 social_media_results = {"success": False, "social_media_accounts": {}, "citations": []}
+            if isinstance(pillars_results, Exception) or not pillars_results:
+                pillars_results = None
             
             # Process and enhance competitor data
             enhanced_competitors = await self._enhance_competitor_data(
@@ -129,6 +132,7 @@ class Step3ResearchService:
                 "competitors": enhanced_competitors,
                 "social_media_accounts": social_media_results.get("social_media_accounts", {}),
                 "social_media_citations": social_media_results.get("citations", []),
+                "content_pillars": pillars_results,
                 "research_summary": research_summary,
                 "total_competitors": len(enhanced_competitors),
                 "industry_context": industry_context,

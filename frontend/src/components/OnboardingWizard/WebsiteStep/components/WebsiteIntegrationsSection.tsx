@@ -8,13 +8,10 @@ import {
   Snackbar,
   Fade,
   Chip,
-  Paper,
   Radio,
   RadioGroup,
   FormControlLabel,
   FormControl,
-  Card,
-  CardContent,
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -23,7 +20,6 @@ import {
   Web as WordPressIcon,
   Web as WixIcon,
   CheckCircle as CheckCircleIcon,
-  Lightbulb as LightbulbIcon,
 } from '@mui/icons-material';
 import PlatformSection from '../../common/PlatformSection';
 import { usePlatformConnections } from '../../common/usePlatformConnections';
@@ -280,6 +276,9 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
             <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1E293B' }}>
               Connect Website Platforms
             </Typography>
+            {primarySite && (
+              <Chip size="small" label={primarySite.replace(/^https?:\/\//, '')} variant="outlined" color="success" sx={{ fontWeight: 600 }} />
+            )}
             {connectedPlatforms.length > 0 && (
               <Chip
                 icon={<CheckCircleIcon sx={{ fontSize: 18, color: '#FFFFFF' }} />}
@@ -334,117 +333,38 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
               />
             </div>
           </Fade>
-        </AccordionDetails>
-      </Accordion>
 
-      {/* Primary Site Selection */}
-      {availableSites.length > 0 && (
-        <Fade in timeout={900}>
-          <Box sx={{ mt: 3 }}>
-            <Paper 
-              elevation={2} 
-              sx={{ 
-                p: 3, 
-                borderRadius: 2,
-                background: 'linear-gradient(135deg, #f8fafc 0%, #ffffff 100%)',
-                border: '1px solid',
-                borderColor: primarySite ? '#86efac' : '#e2e8f0'
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Box 
-                    sx={{ 
-                      width: 40, 
-                      height: 40, 
-                      borderRadius: '50%', 
-                      bgcolor: primarySite ? '#dcfce7' : '#f1f5f9',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      mr: 2
-                    }}
-                  >
-                    <LightbulbIcon sx={{ color: primarySite ? '#22c55e' : '#94a3b8' }} />
-                  </Box>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#1e293b' }}>
-                      Primary Website Selection
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#64748b' }}>
-                      Select your primary website for content publishing
-                    </Typography>
-                  </Box>
-                </Box>
-                
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box
-                    sx={{
-                      width: 12,
-                      height: 12,
-                      borderRadius: '50%',
-                      bgcolor: primarySite ? '#22c55e' : '#ef4444',
-                      boxShadow: primarySite ? '0 0 0 4px #dcfce7' : '0 0 0 4px #fee2e2'
-                    }}
-                  />
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: primarySite ? '#15803d' : '#b91c1c' }}>
-                    {primarySite ? 'Primary Set' : 'Selection Required'}
-                  </Typography>
-                </Box>
-              </Box>
-
-              <FormControl component="fieldset" sx={{ width: '100%', mt: 1 }}>
-                <RadioGroup
-                  value={primarySite}
-                  onChange={(e) => setPrimarySite(e.target.value)}
-                >
+          {/* Primary Site Selection */}
+          {availableSites.length > 0 && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: '#334155' }}>
+                Primary Site for Content Publishing
+              </Typography>
+              <FormControl component="fieldset" sx={{ width: '100%' }}>
+                <RadioGroup value={primarySite} onChange={(e) => setPrimarySite(e.target.value)}>
                   {availableSites.map((site, index) => (
-                    <Card 
-                      key={index} 
-                      variant="outlined" 
-                      sx={{ 
-                        mb: 1.5, 
-                        borderColor: primarySite === site.url ? '#22c55e' : '#e2e8f0',
-                        bgcolor: primarySite === site.url ? '#f0fdf4' : '#ffffff',
-                        transition: 'all 0.2s',
-                        '&:hover': { borderColor: '#22c55e' }
-                      }}
-                    >
-                      <CardContent sx={{ p: '12px !important', '&:last-child': { pb: '12px !important' } }}>
-                        <FormControlLabel
-                          value={site.url}
-                          control={<Radio size="small" sx={{ color: primarySite === site.url ? '#22c55e' : undefined, '&.Mui-checked': { color: '#22c55e' } }} />}
-                          label={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                              <Typography variant="body2" sx={{ fontWeight: 600, color: '#334155' }}>
-                                {site.url ? site.url.replace(/^https?:\/\//, '') : 'No URL'}
-                              </Typography>
-                              <Chip 
-                                label={site.source} 
-                                size="small" 
-                                sx={{ 
-                                  height: 20, 
-                                  fontSize: '0.65rem', 
-                                  fontWeight: 600,
-                                  bgcolor: site.source === 'Wix' ? '#000000' : '#21759b',
-                                  color: '#ffffff'
-                                }} 
-                              />
-                            </Box>
-                          }
-                          sx={{ width: '100%', m: 0 }}
-                        />
-                      </CardContent>
-                    </Card>
+                    <FormControlLabel
+                      key={index}
+                      value={site.url}
+                      control={<Radio size="small" sx={{ '&.Mui-checked': { color: '#22c55e' } }} />}
+                      label={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: primarySite === site.url ? 600 : 400 }}>
+                            {site.url ? site.url.replace(/^https?:\/\//, '') : 'No URL'}
+                          </Typography>
+                          <Chip label={site.source} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: site.source === 'Wix' ? '#000' : '#21759b', color: '#fff' }} />
+                        </Box>
+                      }
+                      sx={{ m: 0, p: 0.25, borderRadius: 1, bgcolor: primarySite === site.url ? '#f0fdf4' : undefined, '&:hover': { bgcolor: '#f8fafc' } }}
+                    />
                   ))}
                 </RadioGroup>
               </FormControl>
-            </Paper>
-          </Box>
-        </Fade>
-      )}
-
-      <Snackbar
+            </Box>
+          )}
+        </AccordionDetails>
+      </Accordion>
+    </Box>
         open={showToast}
         autoHideDuration={4000}
         onClose={() => setShowToast(false)}

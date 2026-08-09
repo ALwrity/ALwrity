@@ -247,9 +247,10 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       return;
     }
 
-    setIsAnalyzing(true);
-    setShowProgressModal(true);
-    setError(null);
+      setIsAnalyzing(true);
+      setShowProgressModal(true);
+      setIsLoadingPillars(true);
+      setError(null);
     setAnalysisProgress(0);
     setAnalysisStep('Initializing competitor discovery...');
     setUsingCachedData(false);
@@ -344,6 +345,9 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         setSocialMediaAccounts(mergedAccounts);
         setSocialMediaCitations(analysisData.social_media_citations);
         setResearchSummary(analysisData.research_summary);
+        if (result.content_pillars) {
+          setContentPillars(result.content_pillars);
+        }
         
         // Cache the analysis results with merged data
         try {
@@ -357,6 +361,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         
         setShowProgressModal(false);
         setIsAnalyzing(false);
+        setIsLoadingPillars(false);
       } else {
         throw new Error(result.error || 'Competitor discovery failed');
       }
@@ -364,6 +369,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       console.error('Competitor discovery error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setIsAnalyzing(false);
+      setIsLoadingPillars(false);
       setShowProgressModal(false);
     }
   }, [userUrl, industryContext, loadCachedAnalysis]);  // sessionId removed from dependencies
