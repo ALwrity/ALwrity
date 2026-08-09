@@ -91,6 +91,13 @@ class StyleDetectionLogic:
             try:
                 return json.loads(cleaned)
             except json.JSONDecodeError as e:
+                # Fallback: some models return Python dict syntax (single quotes)
+                try:
+                    import ast
+                    parsed = ast.literal_eval(cleaned)
+                    return parsed if isinstance(parsed, dict) else json.loads(cleaned)
+                except (ValueError, SyntaxError):
+                    pass
                 last_raw = raw
                 last_error = str(e)[:300]
                 logger.warning(
