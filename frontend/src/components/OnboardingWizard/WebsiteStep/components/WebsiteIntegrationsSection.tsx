@@ -195,6 +195,10 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     if (wordpressConnected && wordpressSites.length > 0) {
       sites.push(...wordpressSites.map(s => ({ url: s.blog_url, source: 'WordPress', name: 'WordPress Site' })));
     }
+    // Always include the website URL from Analyze input as a primary site option
+    if (websiteUrl && !sites.find(s => s.url === websiteUrl)) {
+      sites.push({ url: websiteUrl, source: 'Website', name: 'Your Website' });
+    }
     return sites;
   }, [wixConnected, wixSites, wordpressConnected, wordpressSites]);
 

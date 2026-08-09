@@ -309,14 +309,14 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   const enabledCount = taskIds.filter((id) => prefs[id].enabled).length;
 
   return (
-    <Paper sx={{ p: 0, mt: 3, border: "1px solid #e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+    <Paper sx={{ p: 0, mt: 3, border: "1px solid #e0e0e0", borderRadius: 2, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
       {/* Header */}
       <Box
         sx={{
           px: 3,
           py: 2,
-          bgcolor: "#f8fafc",
-          borderBottom: "1px solid #e2e8f0",
+          bgcolor: "#fafafa",
+          borderBottom: "1px solid #eee",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -352,7 +352,8 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
             sx={{
               px: 3,
               py: 2,
-              borderBottom: "1px solid #f1f5f9",
+              borderBottom: "1px solid #f0f0f0",
+              bgcolor: "#fff",
               "&:last-child": { borderBottom: "none" },
             }}
           >
