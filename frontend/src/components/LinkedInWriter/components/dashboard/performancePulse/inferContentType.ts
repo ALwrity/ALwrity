@@ -4,6 +4,7 @@
  */
 import type { LinkedInPost, PostAttachment } from "../../../../../services/postAnalyticsApi";
 import type { PerformanceContentType, PerformancePulseItem } from "./types";
+import { resolvePerformanceContentType } from "./resolvePerformanceContentType";
 
 const VIDEO_TYPES = new Set(["video", "vid"]);
 const DOCUMENT_TYPES = new Set(["file", "document", "doc", "pdf"]);
@@ -66,6 +67,6 @@ export function inferPerformanceContentType(
 export function toPerformancePulseItem(post: LinkedInPost): PerformancePulseItem {
   return {
     post,
-    contentType: inferPerformanceContentType(post),
+    contentType: resolvePerformanceContentType(post),
   };
 }

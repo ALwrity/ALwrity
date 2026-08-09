@@ -554,6 +554,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   // Fetch sitemap benchmark results (runs in background after competitor discovery)
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
   const [benchmarkLoading, setBenchmarkLoading] = useState(false);
+  const [isRunningBenchmark, setIsRunningBenchmark] = useState(false);
 
   useEffect(() => {
     if (!competitors.length || isAnalyzing) return;
@@ -572,23 +573,37 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     return () => { cancelled = true; };
   }, [competitors.length, isAnalyzing]);
 
-  // Data collection function for global Continue button
-  const gsd = React.useRef(false);
-  const getResearchData = useCallback(() => {
-    // Deduplicate — Wizard calls this multiple times, fire benchmark only once
-    if (!gsd.current) {
-      gsd.current = true;
-      const validCompetitors = competitors
-          .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
-          .map(c => c.url);
-      if (validCompetitors.length > 0) {
-        longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', { 
-          max_competitors: 5,
-          competitors: validCompetitors.slice(0, 5)
-        }).then(() => console.log('CompetitorAnalysisStep: Auto-scheduled sitemap benchmark'))
-          .catch(err => console.warn('CompetitorAnalysisStep: Failed to auto-schedule benchmark (may be running)', err));
-      }
+  const runSitemapBenchmark = async () => {
+    const validCompetitors = competitors
+      .filter(c => c.url && (c.url.startsWith('http') || c.url.startsWith('https')))
+      .map(c => c.url);
+    if (!validCompetitors.length) return;
+    setIsRunningBenchmark(true);
+    try {
+      await longRunningApiClient.post('/api/seo/competitive-sitemap-benchmarking/run', {
+        max_competitors: 5,
+        competitors: validCompetitors.slice(0, 5)
+      });
+    } catch (err) {
+      console.warn('Sitemap benchmark run failed (may already be running):', err);
     }
+    setIsRunningBenchmark(false);
+  };
+
+  const fetchSitemapReport = async () => {
+    setBenchmarkLoading(true);
+    try {
+      const resp = await aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report');
+      setBenchmarkReport(resp.data || resp.data?.benchmark);
+    } catch {
+      setBenchmarkReport(null);
+    } finally {
+      setBenchmarkLoading(false);
+    }
+  };
+
+  // Data collection function for global Continue button (no side effects)
+  const getResearchData = useCallback(() => {
     return {
       competitors,
       social_media_accounts: socialMediaAccounts,
@@ -820,7 +835,33 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         onAddCompetitor={handleAddCompetitor}
       />
 
-      {/* Competitor Analysis Status — benchmark results from background analysis */}
+      {/* Sitemap Benchmark Actions — user-triggered */}
+      {competitors.length > 0 && (
+        <Box mt={3} display="flex" gap={2} flexWrap="wrap">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={isRunningBenchmark ? <CircularProgress size={14} /> : <RefreshIcon />}
+            onClick={runSitemapBenchmark}
+            disabled={isRunningBenchmark}
+            sx={{ textTransform: 'none' }}
+          >
+            {isRunningBenchmark ? 'Scheduling...' : 'Run Sitemap Benchmark'}
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={benchmarkLoading ? <CircularProgress size={14} /> : <AssessmentIcon />}
+            onClick={fetchSitemapReport}
+            disabled={benchmarkLoading}
+            sx={{ textTransform: 'none' }}
+          >
+            {benchmarkLoading ? 'Loading...' : 'View Sitemap Report'}
+          </Button>
+        </Box>
+      )}
+
+      {/* Competitor Sitemap Analysis — results */}
       {benchmarkReport && (
         <Box mt={4} mb={3}>
           <Paper sx={{ p: 3, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 2 }}>

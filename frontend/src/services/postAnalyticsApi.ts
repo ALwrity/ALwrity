@@ -34,6 +34,12 @@ export interface PostAuthor {
   public_identifier?: string | null;
 }
 
+export type PerformanceContentType =
+  | "post"
+  | "article"
+  | "carousel"
+  | "video_script";
+
 export interface LinkedInPost {
   id: string;
   social_id?: string | null;
@@ -47,6 +53,8 @@ export interface LinkedInPost {
   is_company_post: boolean;
   user_reacted?: string | null;
   attachments?: PostAttachment[];
+  /** Persisted at sync time — prefer over client inference when present. */
+  content_type?: PerformanceContentType | null;
 }
 
 export interface PostListResponse {

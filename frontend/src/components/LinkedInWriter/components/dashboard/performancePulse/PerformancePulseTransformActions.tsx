@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { colors } from "../../GrowthEngine/styles";
-import { getTransformFormatsForSource } from "./repurposeFormats";
+import { FormatActionButton } from "./FormatActionButton";
+import { getPerformancePulseTransformFormats } from "./performancePulseTransformFormats";
 import type { PerformanceContentType } from "./types";
 
 export interface PerformancePulseTransformActionsProps {
@@ -12,7 +13,7 @@ export const PerformancePulseTransformActions: React.FC<
   PerformancePulseTransformActionsProps
 > = ({ sourceType, onTransform }) => {
   const [expanded, setExpanded] = useState(false);
-  const targets = getTransformFormatsForSource(sourceType);
+  const targets = getPerformancePulseTransformFormats(sourceType);
 
   if (targets.length === 0) return null;
 
@@ -45,27 +46,17 @@ export const PerformancePulseTransformActions: React.FC<
           }}
         >
           {targets.map((format) => (
-            <button
+            <FormatActionButton
               key={format.type}
-              type="button"
-              onClick={() => onTransform(format.type)}
-              style={{
-                padding: "4px 10px",
-                background:
-                  format.type === "post" ? "none" : format.accent,
-                color: format.type === "post" ? format.accent : "#fff",
-                border: `1.5px solid ${format.accent}`,
-                borderRadius: 6,
-                fontSize: 10,
-                fontWeight: 700,
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
+              icon={format.icon}
+              label={format.label}
+              colors={{ bg: format.bg, border: format.border, text: format.text }}
+              locked={Boolean(format.locked)}
+              compact
+              onClick={() => {
+                if (!format.locked) onTransform(format.type);
               }}
-            >
-              {format.icon} {format.label}
-            </button>
+            />
           ))}
         </div>
       )}
