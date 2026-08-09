@@ -8,6 +8,7 @@ Docs: https://developer.unipile.com/docs/account-lifecycle
 from __future__ import annotations
 
 import sqlite3
+import uuid
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from loguru import logger
@@ -21,6 +22,9 @@ from services.integrations.linkedin.linkedin_oauth_unipile_status import (
     set_unipile_sync_status,
 )
 from services.integrations.linkedin.unipile_client import UnipileAPIError, UnipileClient
+from services.integrations.linkedin.unipile_reconnect_guardrails import (
+    preflight_reconnect_account_id,
+)
 from services.workspace_paths import get_workspace_root
 
 if TYPE_CHECKING:
@@ -102,40 +106,52 @@ class UnipileAccountLifecycleService:
         redirect_urls = self._oauth._get_unipile_redirect_urls(user_id, callback_base)
         client = UnipileClient()
         stored_id = get_reconnect_unipile_account_id(self._oauth, user_id)
+        trace_id = uuid.uuid4().hex[:12]
+        logger.info(
+            f"{LOG_PREFIX} connect-or-reconnect start user_id={user_id} "
+            f"stored_account_id={stored_id or 'none'} trace_id={trace_id}"
+        )
 
         if stored_id:
+            stored_id = await preflight_reconnect_account_id(
+                self._oauth,
+                user_id,
+                stored_id,
+                client=client,
+                trace_id=trace_id,
+            )
             try:
-                result = await client.reconnect_account(
-                    account_id=stored_id,
-                    success_redirect_url=redirect_urls["success"],
-                    failure_redirect_url=redirect_urls["failure"],
-                    notify_url=redirect_urls["notify"],
-                )
-                logger.info(
-                    f"{LOG_PREFIX} reconnect link created user_id={user_id} "
-                    f"account_id={stored_id}"
-                )
-                return {
-                    "auth_url": result.auth_url,
-                    "state": user_id,
-                    "provider": "unipile",
-                    "purpose": "reconnect",
-                }
+                if stored_id:
+                    result = await client.reconnect_account(
+                        account_id=stored_id,
+                        success_redirect_url=redirect_urls["success"],
+                        failure_redirect_url=redirect_urls["failure"],
+                        notify_url=redirect_urls["notify"],
+                    )
+                    logger.info(
+                        f"{LOG_PREFIX} reconnect link created user_id={user_id} "
+                        f"account_id={stored_id} trace_id={trace_id}"
+                    )
+                    return {
+                        "auth_url": result.auth_url,
+                        "state": user_id,
+                        "provider": "unipile",
+                        "purpose": "reconnect",
+                    }
             except UnipileAPIError as exc:
-                if exc.status_code == 404:
+                if exc.status_code == 404 and stored_id:
                     logger.warning(
-                        f"{LOG_PREFIX} stored account missing on Unipile — "
+                        f"{LOG_PREFIX} reconnect target missing on Unipile — "
                         f"clearing stale id and falling back to create "
-                        f"user_id={user_id} account_id={stored_id}"
+                        f"user_id={user_id} account_id={stored_id} trace_id={trace_id}"
                     )
-                    clear_stale_unipile_account_id(
-                        self._oauth, user_id, account_id=stored_id
-                    )
+                    clear_stale_unipile_account_id(self._oauth, user_id, account_id=stored_id)
                     stored_id = None
                 else:
                     logger.warning(
                         f"{LOG_PREFIX} reconnect link failed user_id={user_id} "
-                        f"account_id={stored_id}: {exc}; falling back to create"
+                        f"account_id={stored_id} trace_id={trace_id}: {exc}; "
+                        "falling back to create"
                     )
 
         result = await client.create_hosted_auth_link(
@@ -147,7 +163,7 @@ class UnipileAccountLifecycleService:
         )
         logger.info(
             f"{LOG_PREFIX} create link generated user_id={user_id} "
-            f"had_stored_id={bool(stored_id)}"
+            f"had_stored_id={bool(stored_id)} trace_id={trace_id}"
         )
         return {
             "auth_url": result.auth_url,

@@ -316,3 +316,69 @@ class TestLinkedInOAuthServiceKeyResolution:
         ):
             os.environ.pop("LINKEDIN_TOKEN_ENCRYPTION_KEY", None)
             assert resolve_encryption_key("linkedin") == "shared-key"
+
+
+class TestLinkedInUnipileCredentialUpsert:
+    def test_store_unipile_credentials_updates_existing_row_without_duplicates(
+        self, patch_user_db_path, monkeypatch
+    ):
+        from cryptography.fernet import Fernet
+        from services.integrations.linkedin_oauth import LinkedInOAuthService
+
+        valid = Fernet.generate_key().decode("utf-8")
+        monkeypatch.setenv("LINKEDIN_TOKEN_ENCRYPTION_KEY", valid)
+        monkeypatch.delenv("OAUTH_TOKEN_ENCRYPTION_KEY", raising=False)
+
+        with patch_user_db_path("user_unipile_upsert") as ctx:
+            svc = LinkedInOAuthService()
+            svc._init_db(ctx.user_id)
+
+            with sqlite3.connect(ctx.db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO linkedin_oauth_tokens (
+                        user_id, provider_mode, unipile_account_id,
+                        unipile_org_account_id, account_name, profile_urn, is_active
+                    ) VALUES (?, 'unipile', ?, ?, ?, ?, 0)
+                    """,
+                    (
+                        ctx.user_id,
+                        "uni-account-1",
+                        "org-old",
+                        "Old Name",
+                        "urn:old",
+                    ),
+                )
+                conn.commit()
+
+            stored = svc.store_unipile_credentials(
+                user_id=ctx.user_id,
+                unipile_account_id="uni-account-1",
+                unipile_org_account_id="org-new",
+                account_name="New Name",
+                profile_urn="urn:new",
+            )
+            assert stored is True
+
+            with sqlite3.connect(ctx.db_path) as conn:
+                row_count = conn.execute(
+                    """
+                    SELECT COUNT(*) FROM linkedin_oauth_tokens
+                    WHERE user_id = ? AND unipile_account_id = ?
+                    """,
+                    (ctx.user_id, "uni-account-1"),
+                ).fetchone()[0]
+                row = conn.execute(
+                    """
+                    SELECT is_active, unipile_org_account_id, account_name, profile_urn
+                    FROM linkedin_oauth_tokens
+                    WHERE user_id = ? AND unipile_account_id = ?
+                    """,
+                    (ctx.user_id, "uni-account-1"),
+                ).fetchone()
+
+        assert row_count == 1
+        assert row[0] == 1
+        assert row[1] == "org-new"
+        assert row[2] == "New Name"
+        assert row[3] == "urn:new"
