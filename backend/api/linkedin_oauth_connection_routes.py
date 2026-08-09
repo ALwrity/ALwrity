@@ -10,7 +10,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials
 from loguru import logger
@@ -227,6 +227,7 @@ async def sync_linkedin_accounts(
 @router.get("/callback")
 async def handle_oauth_callback_get(
     request: Request,
+    background_tasks: BackgroundTasks,
     code: Optional[str] = None,
     state: Optional[str] = None,
     connected: Optional[str] = None,
@@ -313,6 +314,9 @@ async def handle_oauth_callback_get(
             except Exception as e:
                 logger.warning(f"[LinkedInConnect] Failed to create monitoring task: {e}")
 
+            # Trigger profile analysis in background
+            background_tasks.add_task(_fetch_profile_background, user_id)
+
             payload = {
                 "type": "LINKEDIN_OAUTH_SUCCESS",
                 "success": True,
@@ -378,6 +382,7 @@ async def handle_oauth_callback_get(
 @router.post("/auth/callback")
 async def handle_oauth_callback_post(
     body: LinkedInAuthCallbackRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """SPA fallback for native LinkedIn OAuth code exchange."""
@@ -389,6 +394,7 @@ async def handle_oauth_callback_post(
     )
     if not token_result:
         raise HTTPException(status_code=400, detail="LinkedIn OAuth token exchange failed")
+    background_tasks.add_task(_fetch_profile_background, user_id)
     status = _oauth_service.get_connection_status(user_id)
     return {"success": True, "connected": status.get("connected", False)}
 
@@ -419,3 +425,32 @@ async def disconnect_linkedin(
     except Exception as e:
         logger.exception(f"[LinkedInConnect] disconnect failed user_id={user_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+async def _fetch_profile_background(user_id: str):
+    """Background task: run Phases 1-3 of profile pipeline after connect."""
+    try:
+        logger.info(f"[LinkedInConnect] Starting background profile fetch for user_id={user_id}")
+        from services.integrations.linkedin.profile_service import get_or_fetch_profile
+        from services.integrations.linkedin.profile_context_service import get_or_build_profile_context
+        from services.integrations.linkedin.profile_validation_service import get_or_validate_profile_context
+        from services.integrations.linkedin.profile_repository import ProfileRepository
+
+        profile, meta = await get_or_fetch_profile(user_id, refresh=True, oauth=_oauth_service)
+        logger.info(f"[LinkedInConnect] Profile fetched user_id={user_id} source={meta.get('source')}")
+
+        repository = ProfileRepository(oauth=_oauth_service)
+        profile_context, _ = get_or_build_profile_context(
+            user_id, profile, meta.get("profile_content_hash"), repository=repository
+        )
+        logger.info(f"[LinkedInConnect] Profile context built user_id={user_id}")
+
+        validation, _ = get_or_validate_profile_context(
+            user_id, profile_context, repository=repository
+        )
+        logger.info(
+            f"[LinkedInConnect] Profile validated user_id={user_id} "
+            f"complete={validation.is_profile_complete if validation else 'N/A'}"
+        )
+    except Exception as e:
+        logger.warning(f"[LinkedInConnect] Background profile fetch failed for user_id={user_id}: {e}")
