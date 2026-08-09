@@ -59,7 +59,6 @@ const TASK_DEFAULTS: Record<string, TaskConfig> = {
   sif_indexing: { enabled: true, delay_mins: 10, label: "SIF Indexing", description: "Strategic Intelligence Framework — index your content for AI-driven insights" },
   market_trends: { enabled: true, delay_mins: 15, label: "Market Trends", description: "Track your industry's shifting topics, keywords, and content opportunities" },
 };
-};
 
 function formatDelay(mins: number): string {
   if (mins === 0) return "Now";
