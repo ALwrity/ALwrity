@@ -37,61 +37,6 @@ const safeStr = (val: any): string => {
   return String(val);
 };
 
-const renderMarkdown = (md: string): React.ReactNode[] => {
-  const lines = md.split('\n');
-  const nodes: React.ReactNode[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (!line.trim()) { i++; continue; }
-    // Headers
-    if (line.startsWith('## ')) {
-      nodes.push(<Typography key={i} variant="subtitle2" sx={{ fontWeight: 600, mt: 1, mb: 0.5 }}>{line.replace(/^## /, '')}</Typography>);
-      i++; continue;
-    }
-    // Table: header row followed by separator then data rows
-    if (line.startsWith('|') && i + 2 < lines.length && lines[i + 1]?.trim().startsWith('|')) {
-      const headerRow = line.split('|').filter(c => c.trim());
-      const dataRows: string[][] = [];
-      let j = i + 2;
-      while (j < lines.length && lines[j].trim().startsWith('|')) {
-        dataRows.push(lines[j].split('|').filter(c => c.trim()));
-        j++;
-      }
-      nodes.push(
-        <Box key={i} className="md-table" sx={{ mb: 1 }}>
-          <Box className="md-table-header">
-            {headerRow.map((h, hi) => (
-              <Box key={hi} className="md-cell">{(h || '').replace(/\*\*(.+?)\*\*/g, '$1')}</Box>
-            ))}
-          </Box>
-          {dataRows.map((row, ri) => (
-            <Box key={ri} className="md-table-row">
-              {row.map((cell, ci) => (
-                <Box key={ci} className="md-cell">{(cell || '').replace(/\*\*(.+?)\*\*/g, '$1')}</Box>
-              ))}
-            </Box>
-          ))}
-        </Box>
-      );
-      i = j;
-      continue;
-    }
-    // Regular text with bold
-    nodes.push(
-      <Typography key={i} variant="body2" sx={{ mb: 0.25 }}>
-        {line.split(/(\*\*[^*]+\*\*)/g).map((part, pi) =>
-          part.startsWith('**') && part.endsWith('**')
-            ? <strong key={pi}>{part.slice(2, -2)}</strong>
-            : part
-        )}
-      </Typography>
-    );
-    i++;
-  }
-  return nodes;
-};
-
 interface SitemapAnalysisSectionProps {
   sitemapAnalysis: any;
   domainName: string;

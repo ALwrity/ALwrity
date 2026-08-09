@@ -200,7 +200,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
       sites.push({ url: websiteUrl, source: 'Website', name: 'Your Website' });
     }
     return sites;
-  }, [wixConnected, wixSites, wordpressConnected, wordpressSites]);
+  }, [wixConnected, wixSites, wordpressConnected, wordpressSites, websiteUrl]);
 
   // Default to first site
   useEffect(() => {

@@ -238,9 +238,10 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
                     {/* Issues list */}
                     {topIssues.map((issue, j) => {
                       const category = typeof issue.category === 'string' ? issue.category : String(issue.category || 'issue');
-                      const issueText = typeof issue.issue === 'string' ? issue.issue
-                        : typeof issue.issue === 'object' ? (issue.issue.issue || issue.issue.message || JSON.stringify(issue.issue).slice(0, 200))
-                        : String(issue.issue || '');
+                      const rawIssue: any = (issue as any).issue;
+                      const issueText = typeof rawIssue === 'string' ? rawIssue
+                        : typeof rawIssue === 'object' ? (rawIssue.issue || rawIssue.message || JSON.stringify(rawIssue).slice(0, 200))
+                        : String(rawIssue || '');
                       return (
                       <Box key={j} sx={{ mt: 1.5, pl: 1, borderLeft: `3px solid ${category?.includes("critical") ? "#ef4444" : "#f59e0b"}` }}>
                         <Typography variant="caption" sx={{ fontWeight: 600, color: category?.includes("critical") ? "#ef4444" : "#92400e" }}>

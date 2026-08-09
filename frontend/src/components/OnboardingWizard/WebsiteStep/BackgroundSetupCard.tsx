@@ -24,11 +24,6 @@ interface TaskConfig {
   description: string;
 }
 
-interface TaskPreferences {
-  success: boolean;
-  tasks: Record<string, TaskConfig>;
-}
-
 interface AdvertoolsTaskStatus {
   status: "not_created" | "scheduled" | "running" | "completed" | "failed" | "paused";
   last_executed: string | null;
@@ -139,7 +134,6 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   onConfigChange,
 }) => {
   const [prefs, setPrefs] = useState<Record<string, TaskConfig>>(TASK_DEFAULTS);
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSeoPreview, setShowSeoPreview] = useState(false);
