@@ -24,11 +24,11 @@ import threading
 # enforces an extended pause after any observed 429 so the origin can cool
 # down before we touch it again.
 _RETRYABLE_HTTP = frozenset({429, 500, 502, 503, 504})
-_MAX_RETRY_SLEEP = 10.0        # cap per backoff sleep so one URL can't stall a batch
+_MAX_RETRY_SLEEP = 30.0        # cap per backoff sleep (increased for 429 rate limits)
 _BATCH_DEADLINE_SECS = 120.0   # wall-clock budget for a whole (recursive) sitemap fetch
 _429_ACTIVE_WINDOW = 20.0      # a 429 inside this window => the origin is throttling
-_PACING_MIN = 1.0
-_PACING_MAX = 3.0
+_PACING_MIN = 2.0
+_PACING_MAX = 5.0
 
 _DOMAIN_SEMAPHORES: Dict[str, asyncio.Semaphore] = {}
 _DOMAIN_LAST_REQUEST: Dict[str, float] = {}
@@ -210,7 +210,7 @@ class AdvertoolsService:
                 # sub-sitemap; otherwise use normal pacing between requests.
                 cooldown = _domain_429_cooldown(domain)
                 if cooldown > 0:
-                    _time.sleep(min(cooldown, 8.0))
+                    _time.sleep(min(cooldown, 15.0))
                 else:
                     _time.sleep(_PACING_MIN + random.random() * (_PACING_MAX - _PACING_MIN))
             if frames:
