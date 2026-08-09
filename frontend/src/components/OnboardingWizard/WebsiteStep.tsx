@@ -666,8 +666,6 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
                 />
               </Box>
               <BackgroundSetupCard websiteUrl={website} brandAnalysis={analysis.brand_analysis} seoAudit={analysis.seo_audit} />
-              <ContentAuditSummaryCard brandAnalysis={analysis.brand_analysis} />
-              <SiteHealthSummaryCard seoAudit={analysis.seo_audit} />
             </>
           )}
 

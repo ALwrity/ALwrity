@@ -1,7 +1,7 @@
 /**
  * SEO Preview Card — rich 3-page audit results with metrics and fix instructions.
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -59,6 +59,7 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
   const [result, setResult] = useState<SeoPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set());
+  const [autoLoaded, setAutoLoaded] = useState(false);
 
   const runPreview = async () => {
     setLoading(true);
@@ -73,6 +74,13 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoLoaded && websiteUrl) {
+      setAutoLoaded(true);
+      runPreview();
+    }
+  }, [websiteUrl, autoLoaded]);
 
   const togglePage = (i: number) => {
     setExpandedPages((prev) => {
