@@ -168,7 +168,6 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   // Load preferences + status on mount
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     Promise.all([
       apiClient.get("/api/onboarding/step2/task-preferences"),
       fetchAdvStatus(),
@@ -181,10 +180,8 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
       })
       .catch(() => {
         if (!cancelled) setError("Could not load task preferences");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
+    return () => { cancelled = true; };
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
