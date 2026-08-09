@@ -835,6 +835,7 @@ class SitemapService:
         url_patterns = structure_analysis.get("url_patterns", {})
         if not isinstance(url_patterns, dict):
             url_patterns = {}
+        avg_depth = structure_analysis.get("average_path_depth", 0)
         keyword_clusters = structure_analysis.get("keyword_clusters", {})
         if not isinstance(keyword_clusters, dict):
             keyword_clusters = {}
