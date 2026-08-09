@@ -32,7 +32,7 @@ export const ENGAGEMENT_RETURN = {
   opportunities: {
     wedge: "engagement" as const,
     sub: "opportunities" as const,
-    label: "Opportunities",
+    label: "Conversations to Join",
   },
   grow_network: {
     wedge: "engagement" as const,

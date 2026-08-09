@@ -32,8 +32,10 @@ export const COMMENT_ASSISTANT_EMPTY = {
 /** Shown when post analytics has never been synced (not “caught up”). */
 export const COMMENT_ASSISTANT_EMPTY_NO_ANALYTICS = {
   title: "Load your posts first",
-  desc: "Comment Assistant needs your recent LinkedIn posts. Open Remarket → Performance Pulse or Sync analytics, then come back here.",
+  desc: "Sync your recent LinkedIn posts here to load comments — no need to leave Comment Assistant.",
 } as const;
+
+export const COMMENT_ASSISTANT_SYNC_POSTS = "Sync posts";
 
 /** Posts exist but none have comments yet. */
 export const COMMENT_ASSISTANT_EMPTY_NO_CANDIDATES = {

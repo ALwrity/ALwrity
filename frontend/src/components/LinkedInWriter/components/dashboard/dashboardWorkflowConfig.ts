@@ -5,6 +5,7 @@ import AutorenewIcon from "@mui/icons-material/Autorenew";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import PublishIcon from "@mui/icons-material/Publish";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import { ENGAGEMENT_WEDGE_RING_DESCRIPTION } from "./engagementWedgeCopy";
 
 export type DashboardWorkflowCardId =
   "plan" | "create" | "publish" | "analysis" | "engagement" | "remarket";
@@ -85,7 +86,7 @@ const CARD_DEFS: Omit<DashboardWorkflowCard, "startAngle" | "endAngle">[] = [
   {
     id: "engagement",
     title: "Engagement",
-    description: "Growth engine to enhance reach and interaction",
+    description: ENGAGEMENT_WEDGE_RING_DESCRIPTION,
     icon: "engagement",
     accent: "#10b981",
   },
