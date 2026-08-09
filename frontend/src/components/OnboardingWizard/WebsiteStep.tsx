@@ -7,6 +7,7 @@ import {
   Typography,
   Alert,
   CircularProgress,
+  Chip,
   Paper,
   Dialog,
   DialogTitle,
@@ -89,12 +90,36 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
   const [activeTab, setActiveTab] = useState<'website' | 'linkedin'>('website');
   const [integrationData, setIntegrationData] = useState<any>(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState<string[]>([]);
+  const [linkedinProfile, setLinkedinProfile] = useState<any>(null);
   const urlWasPreFilledRef = useRef(false);
   const { user } = useUser();
   const [email, setEmail] = useState<string>('');
 
   const linkedinConnected = connectedPlatforms.includes('linkedin');
   const analyticsPlatforms = useMemo(() => ['gsc', 'bing'], []);
+
+  // Fetch LinkedIn profile summary when connected or from initialData
+  useEffect(() => {
+    if (initialData?.linkedin_profile) {
+      setLinkedinProfile(initialData.linkedin_profile);
+      return;
+    }
+    if (!linkedinConnected) return;
+    let cancelled = false;
+    const fetchProfile = async () => {
+      try {
+        const { apiClient } = await import('../../api/client');
+        const resp = await apiClient.get('/api/linkedin-social/profile/summary');
+        if (!cancelled && resp.data?.analyzed) {
+          setLinkedinProfile(resp.data);
+        }
+      } catch (e) {
+        console.debug('LinkedIn profile summary not yet available');
+      }
+    };
+    const timer = setTimeout(fetchProfile, 3000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [linkedinConnected, initialData?.linkedin_profile]);
   const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
   const [progress, setProgress] = useState<AnalysisProgress[]>([
     { step: 1, message: 'Validating website URL & connection', subMessage: 'Ensuring your site is accessible and ready for analysis', completed: false },
@@ -702,6 +727,35 @@ const WebsiteStep: React.FC<WebsiteStepProps> = ({ onContinue, updateHeaderConte
             onConnect={() => {}}
             setConnectedPlatforms={setConnectedPlatforms}
           />
+          {linkedinProfile && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: '#FFFFFF', borderRadius: 2, border: '1px solid #E2E8F0' }}>
+              <Typography variant="subtitle2" sx={{ color: '#0A66C2', fontWeight: 600, mb: 1 }}>
+                LinkedIn Profile Analyzed
+              </Typography>
+              {linkedinProfile.headline && (
+                <Typography variant="body2" sx={{ color: '#334155', mb: 0.5 }}>
+                  {linkedinProfile.headline}
+                </Typography>
+              )}
+              {linkedinProfile.industry && (
+                <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 0.5 }}>
+                  Industry: {linkedinProfile.industry}
+                </Typography>
+              )}
+              {linkedinProfile.skills?.length > 0 && (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                  {linkedinProfile.skills.map((skill: string) => (
+                    <Chip
+                      key={skill}
+                      label={skill}
+                      size="small"
+                      sx={{ bgcolor: '#EFF6FF', color: '#0A66C2', fontSize: '0.7rem', height: 22 }}
+                    />
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
         </Paper>
       )}
 
