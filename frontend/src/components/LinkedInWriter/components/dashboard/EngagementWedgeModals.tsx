@@ -3,7 +3,7 @@
  *
  * E5  EngagementBoosterModal      — see EngagementBoosterModal.tsx
  * E2  CommentAssistantModal       — extracted to CommentAssistantInboxModal.tsx
- * E1  OpportunitiesModal          — top 3 AI engagement opportunities from growth cache
+ * E1  OpportunitiesModal          — Conversations to Join quick-view (top 3 from growth cache)
  * E4  GrowNetworkModal            — AI Network Advisor + Live PYMK (see GrowNetworkModal.tsx)
  *
  * Performance Pulse — see performancePulse/ module and remarkWedgeModalExports.ts
@@ -30,6 +30,7 @@ import {
   engagementSubModalClassName,
   engagementSubModalShellProps,
 } from "./engagementWedgeModalUi";
+import { CONVERSATIONS_TO_JOIN_MODAL } from "./engagementWedgeCopy";
 
 export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
@@ -231,7 +232,7 @@ function textareaStyle(minH: number): React.CSSProperties {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// E1 — Engagement Opportunities Quick-View
+// E1 — Conversations to Join Quick-View
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface OpportunitiesModalProps {
@@ -275,7 +276,7 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
   return (
     <DashboardActionModal
       open={open}
-      title="Engagement Opportunities"
+      title={CONVERSATIONS_TO_JOIN_MODAL.title}
       onClose={onClose}
       onBack={onBack}
       {...engagementSubModalShellProps}
@@ -291,8 +292,7 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
           lineHeight: 1.5,
         }}
       >
-        AI-identified conversations to engage with now — copy a comment, refine
-        it, or create a post on the topic.
+        {CONVERSATIONS_TO_JOIN_MODAL.intro}
       </p>
 
       {!connected && data && <StaleDataNote />}
@@ -304,9 +304,9 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
       {!data && !loading && connected && (
         <EmptyPrompt
           icon="💬"
-          title="No opportunities cached"
-          desc="Load AI analysis to find the top engagement opportunities in your industry."
-          btnLabel="🚀 Load Opportunities"
+          title={CONVERSATIONS_TO_JOIN_MODAL.emptyTitle}
+          desc={CONVERSATIONS_TO_JOIN_MODAL.emptyDesc}
+          btnLabel={CONVERSATIONS_TO_JOIN_MODAL.loadButton}
           onLoad={() => void loadAll()}
           loading={loading}
         />
@@ -503,7 +503,9 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
             textAlign: "center",
           }}
         >
-          {opportunities.length - 3} more in the{" "}
+          {CONVERSATIONS_TO_JOIN_MODAL.moreInGrowthEngine(
+            opportunities.length - 3,
+          )}{" "}
           <button
             type="button"
             onClick={() => {

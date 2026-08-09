@@ -16,6 +16,7 @@ import {
   COMMENT_ASSISTANT_LOADING,
   COMMENT_ASSISTANT_NOT_CONNECTED,
   COMMENT_ASSISTANT_SYNC,
+  COMMENT_ASSISTANT_SYNC_POSTS,
   COMMENT_ASSISTANT_SYNCING,
   COMMENT_ASSISTANT_TITLE,
 } from "./commentAssistantCopy";
@@ -383,6 +384,27 @@ export const CommentAssistantInboxModal: React.FC<
               >
                 {emptyCopy.desc}
               </div>
+              {emptyReason === "no_analytics" && (
+                <button
+                  type="button"
+                  disabled={syncDisabled}
+                  onClick={handleSync}
+                  style={{
+                    marginBottom: 10,
+                    padding: "8px 16px",
+                    background: colors.primary,
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 7,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: syncDisabled ? "default" : "pointer",
+                    opacity: syncDisabled ? 0.55 : 1,
+                  }}
+                >
+                  {COMMENT_ASSISTANT_SYNC_POSTS}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setTab("manual")}

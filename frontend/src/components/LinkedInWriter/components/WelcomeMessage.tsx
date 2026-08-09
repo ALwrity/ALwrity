@@ -60,6 +60,7 @@ import {
 } from "./dashboard/KnowledgeCenterModals";
 import { PostAnalyticsModal } from "./dashboard/PostAnalyticsModal";
 import { GrowthEngineModal } from "./dashboard/GrowthEngineModal";
+import { CLOSE_GROWTH_ENGINE_FOR_QUICK_VIEW_EVENT } from "./dashboard/openConversationsToJoinQuickView";
 import {
   OPEN_GROWTH_ENGINE_EVENT,
   OPEN_GROW_NETWORK_EVENT,
@@ -211,9 +212,18 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       setGrowthEngineOpen(false);
       setGrowthEngineFromEngagementWedge(false);
     };
+    const onCloseGrowthEngineForQuickView = () => {
+      setGrowthEngineOpen(false);
+      setGrowthEngineFromEngagementWedge(false);
+      setWorkflowModal("engagement");
+    };
     window.addEventListener(OPEN_POST_ANALYTICS_EVENT, onOpenPostAnalytics);
     window.addEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
     window.addEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
+    window.addEventListener(
+      CLOSE_GROWTH_ENGINE_FOR_QUICK_VIEW_EVENT,
+      onCloseGrowthEngineForQuickView,
+    );
     return () => {
       window.removeEventListener(
         OPEN_POST_ANALYTICS_EVENT,
@@ -221,6 +231,10 @@ export const WelcomeMessage: React.FC<WelcomeMessageProps> = ({
       );
       window.removeEventListener(OPEN_GROWTH_ENGINE_EVENT, onOpenGrowthEngine);
       window.removeEventListener(OPEN_GROW_NETWORK_EVENT, onOpenGrowNetwork);
+      window.removeEventListener(
+        CLOSE_GROWTH_ENGINE_FOR_QUICK_VIEW_EVENT,
+        onCloseGrowthEngineForQuickView,
+      );
     };
   }, []);
 

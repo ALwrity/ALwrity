@@ -31,6 +31,11 @@ import {
 } from "./performancePulseTileConfig";
 import { GrowNetworkModal } from "./GrowNetworkModal";
 import { GROW_NETWORK_TILE, type GrowNetworkScrollTarget } from "./growNetworkConstants";
+import {
+  CONVERSATIONS_TO_JOIN_TILE,
+  ENGAGEMENT_WEDGE_MODAL_INTRO,
+  GROWTH_ENGINE_ENGAGEMENT_TILE,
+} from "./engagementWedgeCopy";
 import { RepurposeLabModal } from "./repurposeLab";
 import {
   FormatTransformerModal,
@@ -459,6 +464,16 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         titleSize="xl"
         modalClassName="linkedin-engagement-wedge-modal"
       >
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: "#64748b",
+            lineHeight: 1.5,
+          }}
+        >
+          {ENGAGEMENT_WEDGE_MODAL_INTRO}
+        </p>
         <div
           style={{
             display: "grid",
@@ -477,10 +492,10 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             }}
           />
           <DashboardToolTile
-            title="Opportunities"
-            description="Top 3 AI-identified conversations to engage with now"
-            icon="🎯"
-            accent="#059669"
+            title={CONVERSATIONS_TO_JOIN_TILE.title}
+            description={CONVERSATIONS_TO_JOIN_TILE.description}
+            icon={CONVERSATIONS_TO_JOIN_TILE.icon}
+            accent={CONVERSATIONS_TO_JOIN_TILE.accent}
             onClick={() => {
               onClose();
               setEngagementSub("opportunities");
@@ -497,10 +512,10 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             }}
           />
           <DashboardToolTile
-            title="Growth Engine"
-            description="Full growth engine with all 7 AI-powered insight cards"
-            icon="🚀"
-            accent="#6366f1"
+            title={GROWTH_ENGINE_ENGAGEMENT_TILE.title}
+            description={GROWTH_ENGINE_ENGAGEMENT_TILE.description}
+            icon={GROWTH_ENGINE_ENGAGEMENT_TILE.icon}
+            accent={GROWTH_ENGINE_ENGAGEMENT_TILE.accent}
             onClick={openGrowthEngine}
           />
         </div>

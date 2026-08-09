@@ -2,6 +2,8 @@ import React, { useCallback, useState } from "react";
 import type { EngagementOpportunityItem } from "../../../../services/linkedInGrowthApi";
 import { DataSourceBadge } from "./DataSourceBadge";
 import { EmptyState } from "./EmptyState";
+import { ENGAGEMENT_CARD_ALL_CONVERSATIONS } from "../dashboard/engagementWedgeCopy";
+import { openConversationsToJoinQuickView } from "../dashboard/openConversationsToJoinQuickView";
 import {
   cardBase,
   headerRow,
@@ -58,7 +60,7 @@ export const EngagementCard: React.FC<EngagementCardProps> = React.memo(
       return (
         <EmptyState
           icon="💬"
-          message="No engagement opportunities found. Check back later for posts to engage with."
+          message="No conversations found. Check back later for posts to engage with."
         />
       );
     }
@@ -70,10 +72,22 @@ export const EngagementCard: React.FC<EngagementCardProps> = React.memo(
             <span style={{ fontSize: 20 }} aria-hidden="true">
               💬
             </span>
-            <div
-              style={{ fontWeight: 700, fontSize: 15, color: colors.textDark }}
-            >
-              Engagement Opportunities
+            <div>
+              <div
+                style={{ fontWeight: 700, fontSize: 15, color: colors.textDark }}
+              >
+                {ENGAGEMENT_CARD_ALL_CONVERSATIONS.title}
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: colors.textSecondary,
+                  marginTop: 2,
+                  lineHeight: 1.45,
+                }}
+              >
+                {ENGAGEMENT_CARD_ALL_CONVERSATIONS.subtitle}
+              </div>
             </div>
           </div>
         </div>
@@ -103,6 +117,18 @@ export const EngagementCard: React.FC<EngagementCardProps> = React.memo(
         </div>
 
         <div style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={openConversationsToJoinQuickView}
+            style={{
+              ...secondaryBtn,
+              width: "100%",
+              justifyContent: "center",
+              marginBottom: 10,
+            }}
+          >
+            {ENGAGEMENT_CARD_ALL_CONVERSATIONS.dailyQuickViewCta}
+          </button>
           <DataSourceBadge label="Growth Engine" detail={dataSourceSummary} />
         </div>
       </div>
