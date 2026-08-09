@@ -19,7 +19,7 @@ import {
   Close as CloseIcon,
   Refresh as RefreshIcon,
 } from '@mui/icons-material';
-import { longRunningApiClient } from '../../../api/client';
+import { longRunningApiClient, apiClient } from '../../../api/client';
 import { seoDashboardAPI } from '../../../api/seoDashboard';
 import type { OnboardingScheduledTaskHealthResponse, OnboardingScheduledTaskHealthItem } from '../../../api/seoDashboard';
 
@@ -100,7 +100,7 @@ const ResearchStepBackgroundSetupModal: React.FC<Props> = ({ open, onClose }) =>
     try {
       const [healthRes, prefsRes] = await Promise.allSettled([
         seoDashboardAPI.getOnboardingTaskHealth(),
-        longRunningApiClient.get('/api/onboarding/step2/task-preferences'),
+        apiClient.get('/api/onboarding/step2/task-preferences'),
       ]);
       let errParts: string[] = [];
       if (healthRes.status === 'fulfilled') {

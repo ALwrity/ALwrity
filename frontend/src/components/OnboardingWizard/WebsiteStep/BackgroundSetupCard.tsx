@@ -54,6 +54,13 @@ const TASK_ICONS: Record<string, string> = {
   website_analysis_tasks: "🔄",
 };
 
+const TASK_DEFAULTS: Record<string, TaskConfig> = {
+  deep_competitor: { enabled: true, delay_mins: 5, label: "Deep Competitor Analysis", description: "Full competitive intelligence scan with keyword and content gap analysis" },
+  sif_indexing: { enabled: true, delay_mins: 10, label: "SIF Indexing", description: "Strategic Intelligence Framework — index your content for AI-driven insights" },
+  market_trends: { enabled: true, delay_mins: 15, label: "Market Trends", description: "Track your industry's shifting topics, keywords, and content opportunities" },
+};
+};
+
 function formatDelay(mins: number): string {
   if (mins === 0) return "Now";
   if (mins < 60) return `${mins}m`;
@@ -132,8 +139,8 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   seoAudit,
   onConfigChange,
 }) => {
-  const [prefs, setPrefs] = useState<Record<string, TaskConfig> | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [prefs, setPrefs] = useState<Record<string, TaskConfig>>(TASK_DEFAULTS);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSeoPreview, setShowSeoPreview] = useState(false);
@@ -290,23 +297,16 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
     };
   }, [seoAudit, lastHealthRun]);
 
-  if (loading) {
+  if (error) {
     return (
       <Paper sx={{ p: 3, mt: 2, border: "1px solid #e2e8f0", borderRadius: 2 }}>
-        <CircularProgress size={24} />
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Smart Background Setup</Typography>
+        <Typography variant="body2" color="error">{error}</Typography>
       </Paper>
     );
   }
 
-  if (error || !prefs) {
-    return (
-      <Paper sx={{ p: 3, mt: 2, border: "1px solid #e2e8f0", borderRadius: 2 }}>
-        <Typography variant="body2" color="error">{error || "Failed to load"}</Typography>
-      </Paper>
-    );
-  }
-
-  const taskIds = Object.keys(prefs);
+  const taskIds = Object.keys(prefs || {});
   const enabledCount = taskIds.filter((id) => prefs[id].enabled).length;
 
   return (
