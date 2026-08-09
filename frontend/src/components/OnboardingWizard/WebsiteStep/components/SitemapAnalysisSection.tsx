@@ -28,6 +28,15 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 
+const safeStr = (val: any): string => {
+  if (val == null) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) return val.map(safeStr).join(', ');
+  if (typeof val === 'object') return val.name || val.title || val.label || JSON.stringify(val).slice(0, 80);
+  return String(val);
+};
+
 const renderMarkdown = (md: string): React.ReactNode[] => {
   const lines = md.split('\n');
   const nodes: React.ReactNode[] = [];
@@ -170,11 +179,11 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 {ai_insights.content_gaps.slice(0, 3).map((g: any, i: number) => (
                   <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#faf5ff', borderRadius: 1, border: '1px solid #e9d5ff' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{g.topic || g.action}</Typography>
-                      <Chip size="small" label={g.priority || 'medium'} color={g.priority === 'high' ? 'error' : g.priority === 'low' ? 'default' : 'warning'} variant="outlined" />
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(g.topic || g.action)}</Typography>
+                      <Chip size="small" label={safeStr(g.priority || 'medium')} color={g.priority === 'high' ? 'error' : g.priority === 'low' ? 'default' : 'warning'} variant="outlined" />
                     </Box>
-                    {g.keywords && <Typography variant="caption" color="text.secondary">Keywords: {g.keywords}</Typography>}
-                    {g.impact && <Typography variant="caption" color="text.secondary">Impact: {g.impact}</Typography>}
+                    {g.keywords && <Typography variant="caption" color="text.secondary">Keywords: {safeStr(g.keywords)}</Typography>}
+                    {g.impact && <Typography variant="caption" color="text.secondary">Impact: {safeStr(g.impact)}</Typography>}
                   </Box>
                 ))}
               </Grid>
@@ -184,8 +193,8 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cannibalization</Typography>
                 {ai_insights.cannibalization.slice(0, 3).map((c: any, i: number) => (
                   <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#fef2f2', borderRadius: 1, border: '1px solid #fecaca' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{c.keyword}</Typography>
-                    <Typography variant="caption" color="text.secondary">{c.overlapping_pages} overlapping pages — {c.recommendation}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(c.keyword)}</Typography>
+                    <Typography variant="caption" color="text.secondary">{safeStr(c.overlapping_pages)} overlapping pages — {safeStr(c.recommendation)}</Typography>
                   </Box>
                 ))}
               </Grid>
@@ -195,8 +204,8 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content Decay</Typography>
                 {ai_insights.decay_alerts.slice(0, 3).map((d: any, i: number) => (
                   <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#fffbeb', borderRadius: 1, border: '1px solid #fde68a' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{d.signal || d.category}</Typography>
-                    <Typography variant="caption" color="text.secondary">{d.action}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(d.signal || d.category)}</Typography>
+                    <Typography variant="caption" color="text.secondary">{safeStr(d.action)}</Typography>
                   </Box>
                 ))}
               </Grid>
@@ -206,7 +215,7 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Publishing Calendar</Typography>
                 <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {ai_insights.publishing_calendar.slice(0, 6).map((pc: any, i: number) => (
-                    <Chip key={i} size="small" label={`W${pc.week}: ${pc.topic || pc.content_type}`} variant="outlined" color={pc.priority === 'high' ? 'success' : 'default'} />
+                    <Chip key={i} size="small" label={`W${safeStr(pc.week)}: ${safeStr(pc.topic || pc.content_type)}`} variant="outlined" color={pc.priority === 'high' ? 'success' : 'default'} />
                   ))}
                 </Box>
               </Grid>
@@ -217,10 +226,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 {ai_insights.seo_opportunities.slice(0, 3).map((s: any, i: number) => (
                   <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#eff6ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Chip size="small" label={s.type} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
-                      <Chip size="small" label={s.impact} color={s.impact === 'high' ? 'error' : 'default'} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+                      <Chip size="small" label={safeStr(s.type)} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+                      <Chip size="small" label={safeStr(s.impact)} color={s.impact === 'high' ? 'error' : 'default'} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
                     </Box>
-                    <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 600 }}>{s.finding || s.action}</Typography>
+                    <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 600 }}>{safeStr(s.finding || s.action)}</Typography>
                   </Box>
                 ))}
               </Grid>
@@ -230,8 +239,8 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                 <Typography variant="caption" sx={{ fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal Linking</Typography>
                 {ai_insights.internal_linking.slice(0, 3).map((l: any, i: number) => (
                   <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#ecfeff', borderRadius: 1, border: '1px solid #a5f3fc' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{l.from_section} → {l.to_section}</Typography>
-                    <Typography variant="caption" color="text.secondary">Anchor: "{l.anchor_label}" — {l.reason}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(l.from_section)} → {safeStr(l.to_section)}</Typography>
+                    <Typography variant="caption" color="text.secondary">Anchor: "{safeStr(l.anchor_label)}" — {safeStr(l.reason)}</Typography>
                   </Box>
                 ))}
               </Grid>
