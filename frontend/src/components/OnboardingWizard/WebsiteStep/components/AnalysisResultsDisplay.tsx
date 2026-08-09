@@ -22,7 +22,6 @@ import {
   AutoAwesome as AutoAwesomeIcon,
   Verified as VerifiedIcon,
   Analytics as AnalyticsIcon,
-  Info as InfoIcon,
   Link as LinkIcon,
   Save as SaveIcon
 } from '@mui/icons-material';
@@ -112,6 +111,10 @@ export interface StyleAnalysis {
   sitemap_analysis?: any;
   best_practices?: string[];
   avoid_elements?: string[];
+  content_strategy?: string;
+  competitive_advantages?: string[];
+  content_calendar_suggestions?: string[];
+  ai_generation_tips?: string[];
   meta?: {
     confidence?: number;
     notes?: string;

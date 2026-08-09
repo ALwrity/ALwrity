@@ -182,18 +182,19 @@ class ExaService:
         """
         try:
             # Ensure we pick up any per-request injected key
-            self._try_initialize()
-            if not self.enabled:
-                raise ValueError("Exa Service is not enabled - API key missing")
-            
-            logger.info(f"Starting competitor discovery for: {user_url}")
-
-            # Try Exa Agent API first
+            # Try Exa Agent API first (reads key independently, doesn't need ExaService initialized)
             agent_result = await self._discover_competitors_via_agent(
                 user_url=user_url, num_results=num_results, industry_context=industry_context)
             if agent_result and agent_result.get("competitors"):
                 logger.info(f"Using Exa Agent results: {len(agent_result['competitors'])} competitors")
                 return {"success": True, **agent_result}
+
+            # Agent failed or unavailable — fall back to legacy
+            self._try_initialize()
+            if not self.enabled:
+                raise ValueError("Exa Service is not enabled - API key missing")
+            
+            logger.info(f"Starting legacy competitor discovery for: {user_url}")
             
             # Extract user domain for exclusion — add both www and non-www variants
             user_domain = urlparse(user_url).netloc
@@ -576,18 +577,18 @@ class ExaService:
             Dictionary containing social media discovery results
         """
         try:
-            # Ensure we pick up any per-request injected key
-            self._try_initialize()
-            if not self.enabled:
-                raise ValueError("Exa Service is not enabled - API key missing")
-            
-            logger.info(f"Starting social media discovery for: {user_url}")
-
-            # Try Exa Agent API first
+            # Try Exa Agent API first (reads key independently)
             agent_result = await self._discover_social_media_via_agent(user_url)
             if agent_result and agent_result.get("success"):
                 logger.info(f"Using Exa Agent social media results: {len(agent_result.get('social_media_accounts', {}))} accounts")
                 return agent_result
+
+            # Agent failed or unavailable — fall back to legacy
+            self._try_initialize()
+            if not self.enabled:
+                raise ValueError("Exa Service is not enabled - API key missing")
+            
+            logger.info(f"Starting legacy social media discovery for: {user_url}")
             
             # Extract domain from URL for better targeting
             domain = urlparse(user_url).netloc.replace('www.', '')
