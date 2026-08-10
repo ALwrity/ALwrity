@@ -1,16 +1,14 @@
 /**
  * Viewport-relative layout for the Engagement Trends modal.
- * Desktop ~50% viewport; mobile uses full usable width via min().
+ * Aligned with Quick Create Post modal canvas size.
  */
 import type { CSSProperties } from "react";
+import { POST_WEDGE_MODAL_SIZE } from "./wedgeModalLayout";
 
 export const ENGAGEMENT_TRENDS_MODAL_SIZE = {
-  width: "min(100vw - 24px, 50vw)",
-  maxWidth: "min(100vw - 24px, 720px)",
-  minWidth: "min(400px, calc(100vw - 24px))",
-  height: "min(85dvh, 50vh)",
-  maxHeight: "min(85dvh, 640px)",
-  minHeight: "min(380px, 70dvh)",
+  width: POST_WEDGE_MODAL_SIZE.width,
+  maxWidth: POST_WEDGE_MODAL_SIZE.maxWidth,
+  maxHeight: POST_WEDGE_MODAL_SIZE.maxHeight,
 } as const;
 
 export const ENGAGEMENT_TRENDS_BODY_STYLE: CSSProperties = {

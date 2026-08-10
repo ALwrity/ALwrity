@@ -6,6 +6,7 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DashboardActionModal } from "./DashboardActionModal";
+import { POST_WEDGE_MODAL_SIZE, POST_WEDGE_MODAL_SIZE_CLASS } from "./wedgeModalLayout";
 import { useLinkedInPublishCampaignData } from "../../hooks/useLinkedInPublishCampaignData";
 import {
   findCampaignItemById,
@@ -199,10 +200,9 @@ export const PublishCampaignModal: React.FC<PublishCampaignModalProps> = ({
         open={open}
         title="Publish Campaign"
         onClose={onClose}
-        maxWidth={720}
-        maxHeight="min(92vh, 820px)"
+        {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
-        modalClassName="linkedin-publish-campaign-modal"
+        modalClassName={`linkedin-publish-campaign-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <div>
           <p

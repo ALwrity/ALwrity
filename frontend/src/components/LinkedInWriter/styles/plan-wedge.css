@@ -629,6 +629,33 @@
   line-height: 1.2 !important;
 }
 
+/* Post-modal canvas — matches Quick Create Post (.linkedin-quick-create-dialog--plan-size) */
+.linkedin-wedge-modal--post-size {
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
+  max-height: min(98dvh, calc(100dvh - 8px)) !important;
+}
+
+/* Shared 4-column wedge tile grid (Publish wedge My Drafts reference) */
+.linkedin-wedge-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+@media (max-width: 640px) {
+  .linkedin-wedge-tile-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .linkedin-wedge-tile-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .linkedin-dashboard-modal-back-btn {
   display: inline-flex !important;
   align-items: center;
@@ -639,6 +666,7 @@
 }
 
 .linkedin-engagement-wedge-modal .linkedin-dashboard-action-modal-header,
+.linkedin-create-wedge-modal .linkedin-dashboard-action-modal-header,
 .linkedin-plan-wedge-modal .linkedin-dashboard-action-modal-header,
 .linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-header,
 .linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-header,
@@ -661,6 +689,7 @@
 .linkedin-wedge-sub-modal .linkedin-dashboard-modal-back-btn {
   font-size: 13px !important;
   min-height: 44px;
+  padding: 10px 4px 10px 0 !important;
 }
 
 .linkedin-plan-saved-ideas-modal .linkedin-dashboard-modal-back-btn {
@@ -697,10 +726,10 @@
   gap: 12px;
 }
 
-/* Create wedge tile modal — original width, no header divider */
+/* Create wedge tile modal — Post modal canvas */
 .linkedin-create-wedge-modal {
-  width: min(820px, 100%) !important;
-  max-width: min(820px, 100%) !important;
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
 }
 
 .linkedin-create-wedge-modal .linkedin-dashboard-action-modal-header {
@@ -712,13 +741,37 @@
   padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
 }
 
-/* Publish wedge tile modal — no header divider, seamless title → tiles */
-.linkedin-publish-wedge-modal {
-  width: min(720px, 100%) !important;
-  max-width: min(720px, 100%) !important;
+.linkedin-create-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-create-wedge-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: stretch;
 }
 
-.linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-publish-wedge-tiles {
+.linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-analysis-wedge-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.linkedin-engagement-wedge-modal .linkedin-dashboard-action-modal-body {
+  padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
+}
+
+.linkedin-remarket-wedge-modal .linkedin-dashboard-action-modal-body {
+  padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
+}
+
+/* Publish wedge tile modal — Post modal canvas */
+.linkedin-publish-wedge-modal {
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
+}
+
+.linkedin-publish-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-publish-wedge-tiles,
+.linkedin-engagement-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-engagement-wedge-tiles,
+.linkedin-remarket-wedge-modal .linkedin-dashboard-action-modal-body .linkedin-remarket-wedge-tiles {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
@@ -740,8 +793,8 @@
 }
 
 .linkedin-publish-campaign-modal {
-  width: min(720px, 100%) !important;
-  max-width: min(720px, 100%) !important;
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
 }
 
 .linkedin-publish-campaign-modal .linkedin-dashboard-action-modal-header {
@@ -767,10 +820,10 @@
   padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
 }
 
-/* Analysis wedge tile modal — no header divider, seamless title → tiles */
+/* Analysis wedge tile modal — Post modal canvas */
 .linkedin-analysis-wedge-modal {
-  width: min(720px, 100%) !important;
-  max-width: min(720px, 100%) !important;
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
 }
 
 .linkedin-analysis-wedge-modal .linkedin-dashboard-action-modal-header {
@@ -1112,10 +1165,10 @@
   }
 }
 
-/* My Drafts sub-modal — no header divider, 24px title */
+/* My Drafts sub-modal — Post modal canvas */
 .linkedin-my-drafts-modal {
-  width: min(80vw, 720px) !important;
-  max-width: min(80vw, 720px) !important;
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
 }
 
 .linkedin-my-drafts-modal .linkedin-dashboard-action-modal-header {
@@ -1131,10 +1184,11 @@
   padding: 8px clamp(14px, 2vw, 20px) clamp(14px, 2vw, 20px) !important;
 }
 
-/* Topic ideas modal — wider canvas, no header divider, 24px title */
+/* Topic ideas modal — Post modal canvas, no header divider, 24px title */
 .linkedin-topic-ideas-modal {
-  width: min(896px, 97vw) !important;
-  max-width: min(896px, 97vw) !important;
+  width: min(77.6vw, 960px) !important;
+  max-width: min(77.6vw, 960px) !important;
+  max-height: min(98dvh, calc(100dvh - 8px)) !important;
 }
 
 .linkedin-topic-ideas-modal .linkedin-dashboard-action-modal-header {

@@ -56,6 +56,16 @@ import {
 } from "../../utils/linkedInConnectLockedUi";
 import { isPublishWedgeFeatureLocked } from "../../utils/linkedInPublishWedgeLockedUi";
 import { isAnalysisWedgeFeatureLocked } from "../../utils/linkedInAnalysisWedgeLockedUi";
+import {
+  POST_WEDGE_MODAL_SIZE,
+  POST_WEDGE_MODAL_SIZE_CLASS,
+  WEDGE_TILE_GRID_CLASS,
+  WEDGE_TILE_GRID_STYLE,
+} from "./wedgeModalLayout";
+import {
+  CREATE_RETURN,
+  openQuickCreateFromWedge,
+} from "./createWedgeNavigation";
 
 type AnalysisSub = "trends" | null;
 type EngagementSub =
@@ -149,14 +159,23 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
   const openTopicIdeas = () => {
     onClose();
     if (connected) {
-      dispatch("linkedinwriter:getTopicIdeas");
+      dispatch("linkedinwriter:getTopicIdeas", {
+        returnTo: CREATE_RETURN.wedge,
+      });
     } else {
       dispatch("linkedinwriter:openBrainstorm");
     }
   };
   const openQuickCreate = (type: string) => {
     onClose();
-    const detail: Record<string, unknown> = { type };
+    const detail: {
+      type: string;
+      returnTo: typeof CREATE_RETURN.wedge;
+      topic?: string;
+    } = {
+      type,
+      returnTo: CREATE_RETURN.wedge,
+    };
     try {
       const ctx = sessionStorage.getItem("growth_task_context");
       if (ctx) {
@@ -168,7 +187,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     } catch {
       /* ignore */
     }
-    dispatch("linkedinwriter:openQuickCreate", detail);
+    openQuickCreateFromWedge(detail);
   };
   const openProfileAnalytics = () => {
     onClose();
@@ -272,55 +291,48 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "create"}
         title="Quick Create"
         onClose={onClose}
-        maxWidth={820}
-        modalClassName="linkedin-create-wedge-modal"
+        {...POST_WEDGE_MODAL_SIZE}
+        modalClassName={`linkedin-create-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
         titleSize="xl"
       >
         <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "stretch",
-            gap: 12,
-            justifyContent: "center",
-          }}
+          className={`linkedin-create-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
+          style={WEDGE_TILE_GRID_STYLE}
         >
-          <div style={{ width: 140, flexShrink: 0 }}>
-            <DashboardToolTile
-              title="Get Topic Ideas"
-              description="AI-powered topic suggestions based on your profile"
-              icon="💡"
-              accent="#0a66c2"
-              onClick={openTopicIdeas}
-            />
-          </div>
-          {CREATE_TILE_TOOLS.map((tool) => (
-            <div key={tool.id} style={{ width: 140, flexShrink: 0 }}>
-              {isCreateWedgeContentTypeLocked(tool.id) ? (
-                <CreateWedgeComingSoonTile
-                  contentType={tool.id as CreateWedgeLockedContentType}
-                  icon={tool.icon}
-                  title={tool.title}
-                  description={tool.description}
-                  notified={notifyRequested[tool.id as CreateWedgeLockedContentType]}
-                  onNotify={() =>
-                    handleNotify(
-                      tool.id as CreateWedgeLockedContentType,
-                      tool.title,
-                    )
-                  }
-                />
-              ) : (
-                <DashboardToolTile
-                  title={tool.title}
-                  description={tool.description}
-                  icon={tool.icon}
-                  accent={tool.accent}
-                  onClick={() => openQuickCreate(tool.id)}
-                />
-              )}
-            </div>
-          ))}
+          <DashboardToolTile
+            title="Get Topic Ideas"
+            description="AI-powered topic suggestions based on your profile"
+            icon="💡"
+            accent="#0a66c2"
+            onClick={openTopicIdeas}
+          />
+          {CREATE_TILE_TOOLS.map((tool) =>
+            isCreateWedgeContentTypeLocked(tool.id) ? (
+              <CreateWedgeComingSoonTile
+                key={tool.id}
+                contentType={tool.id as CreateWedgeLockedContentType}
+                icon={tool.icon}
+                title={tool.title}
+                description={tool.description}
+                notified={notifyRequested[tool.id as CreateWedgeLockedContentType]}
+                onNotify={() =>
+                  handleNotify(
+                    tool.id as CreateWedgeLockedContentType,
+                    tool.title,
+                  )
+                }
+              />
+            ) : (
+              <DashboardToolTile
+                key={tool.id}
+                title={tool.title}
+                description={tool.description}
+                icon={tool.icon}
+                accent={tool.accent}
+                onClick={() => openQuickCreate(tool.id)}
+              />
+            ),
+          )}
         </div>
       </DashboardActionModal>
 
@@ -329,17 +341,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "publish" && !publishDrillDownOpen}
         title="Publish"
         onClose={onClose}
-        maxWidth={720}
+        {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
-        modalClassName="linkedin-publish-wedge-modal"
+        modalClassName={`linkedin-publish-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 12,
-          }}
-          className="linkedin-publish-wedge-tiles"
+          className={`linkedin-publish-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
+          style={WEDGE_TILE_GRID_STYLE}
         >
           <DashboardToolTile
             title="My Drafts"
@@ -389,17 +397,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "analysis" && !analysisDrillDownOpen}
         title="Analysis"
         onClose={onClose}
-        maxWidth={720}
+        {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
-        modalClassName="linkedin-analysis-wedge-modal"
+        modalClassName={`linkedin-analysis-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 12,
-          }}
-          className="linkedin-analysis-wedge-tiles"
+          className={`linkedin-analysis-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
+          style={WEDGE_TILE_GRID_STYLE}
         >
           <DashboardToolTile
             title="Content Analytics"
@@ -460,9 +464,9 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "engagement" && !engagementDrillDownOpen}
         title="Engagement"
         onClose={onClose}
-        maxWidth={680}
+        {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
-        modalClassName="linkedin-engagement-wedge-modal"
+        modalClassName={`linkedin-engagement-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <p
           style={{
@@ -475,11 +479,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
           {ENGAGEMENT_WEDGE_MODAL_INTRO}
         </p>
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 12,
-          }}
+          className={`linkedin-engagement-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
+          style={WEDGE_TILE_GRID_STYLE}
         >
           <DashboardToolTile
             title="Comment Assistant"
@@ -546,16 +547,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         open={activeModal === "remarket" && !remarkDrillDownOpen}
         title="Remarket"
         onClose={onClose}
-        maxWidth={680}
+        {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
-        modalClassName="linkedin-remarket-wedge-modal"
+        modalClassName={`linkedin-remarket-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: 12,
-          }}
+          className={`linkedin-remarket-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
+          style={WEDGE_TILE_GRID_STYLE}
         >
           <DashboardToolTile
             title={PERFORMANCE_PULSE_TILE.title}

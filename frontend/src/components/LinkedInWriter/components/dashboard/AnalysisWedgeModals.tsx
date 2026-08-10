@@ -7,6 +7,7 @@
  */
 import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
+import { POST_WEDGE_MODAL_SIZE, POST_WEDGE_MODAL_SIZE_CLASS } from "./wedgeModalLayout";
 import {
   linkedInGrowthApi,
   type ConsolidatedGrowthResponse,
@@ -506,8 +507,8 @@ export const WeeklyPlanModal: React.FC<WeeklyPlanModalProps> = ({
       open={open}
       title="Weekly Content Plan"
       onClose={onClose}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
+      {...POST_WEDGE_MODAL_SIZE}
+      modalClassName={POST_WEDGE_MODAL_SIZE_CLASS}
     >
       <div>
         <p

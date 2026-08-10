@@ -18,10 +18,7 @@ import {
   type PostDelta,
 } from "../../../../services/postAnalyticsApi";
 import { colors } from "../GrowthEngine/styles";
-import {
-  ENGAGEMENT_TRENDS_BODY_STYLE,
-  ENGAGEMENT_TRENDS_MODAL_SIZE,
-} from "./engagementTrendsModalLayout";
+import { ENGAGEMENT_TRENDS_BODY_STYLE } from "./engagementTrendsModalLayout";
 import { shouldShowContributionBadges } from "./engagementTrendsGrowthUtils";
 import { PostCommentsModal } from "./PostCommentsModal";
 import { EngagementGrowthDriversSection } from "./EngagementGrowthDriversSection";
@@ -38,8 +35,8 @@ import {
 import {
   WEDGE_BACK_LABELS,
   WEDGE_NESTED_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "./wedgeModalUi";
 import { extractEngagementTrendsErrorMessage } from "./engagementTrendsErrors";
 import {
@@ -317,9 +314,8 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
       title={ENGAGEMENT_SINCE_TITLE}
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.analysis)}
-      modalClassName={wedgeSubModalClassName()}
-      {...ENGAGEMENT_TRENDS_MODAL_SIZE}
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.analysis)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
         <p
