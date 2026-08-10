@@ -156,25 +156,31 @@ def _create_user_subscription(
     active: bool = True,
 ):
     """Create (or upsert) a UserSubscription row for the given user."""
+    from datetime import datetime, timedelta
     from models.subscription_models import UserSubscription, SubscriptionPlan
 
     plan = db.query(SubscriptionPlan).filter(SubscriptionPlan.name == plan_name).first()
     if not plan:
         raise ValueError(f"Plan '{plan_name}' not found in DB — seed plans first")
 
+    now = datetime.utcnow()
+    period_end = now + timedelta(days=30)
+
     existing = db.query(UserSubscription).filter(
         UserSubscription.user_id == user_id
     ).first()
     if existing:
         existing.plan_id = plan.id
-        existing.tier = plan.tier
-        existing.active = active
+        existing.is_active = active
+        existing.current_period_start = now
+        existing.current_period_end = period_end
     else:
         db.add(UserSubscription(
             user_id=user_id,
             plan_id=plan.id,
-            tier=plan.tier,
-            active=active,
+            current_period_start=now,
+            current_period_end=period_end,
+            is_active=active,
         ))
     db.commit()
 
