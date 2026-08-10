@@ -695,7 +695,7 @@ class StepManagementService:
                 already_completed = False
 
             if not already_completed:
-                progress_service.update_step(user_id, step_number)
+                progress_service.update_step(user_id, step_number + 1)
                 try:
                     progress_pct = min(100.0, round((step_number / 4) * 100))
                     progress_service.update_progress(user_id, float(progress_pct))
