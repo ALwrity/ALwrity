@@ -1,5 +1,6 @@
 import {
   getPricingRoute,
+  getDefaultLandingRoute,
   isPricingPath,
   MAIN_PRICING_ROUTE,
   LINKEDIN_PRICING_ROUTE,
@@ -38,6 +39,13 @@ describe('demoMode pricing routes', () => {
     resetEnabledFeaturesCacheForTests();
 
     expect(getPricingRoute()).toBe(MAIN_PRICING_ROUTE);
+  });
+
+  it('returns youtube creator as default landing route in youtube-only mode', () => {
+    process.env.REACT_APP_ENABLED_FEATURES = 'youtube';
+    resetEnabledFeaturesCacheForTests();
+
+    expect(getDefaultLandingRoute()).toBe('/youtube-creator');
   });
 
   it('detects both main and LinkedIn pricing paths', () => {

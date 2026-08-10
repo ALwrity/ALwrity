@@ -126,6 +126,7 @@ export function getSingleFeature(): string | null {
  */
 const FEATURE_ROUTE_PRIORITY: [string, string][] = [
   ['podcast', '/podcast-maker'],
+  ['youtube', '/youtube-creator'],
   ['blog_writer', '/blog-writer'],
   ['backlinking', '/backlink-outreach'],
   ['linkedin', '/linkedin-studio'],

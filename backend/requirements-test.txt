@@ -30,6 +30,9 @@ python-multipart>=0.0.6
 # Logging
 loguru>=0.7.0
 
+# Config parsing for subscription pricing seed fixtures
+PyYAML>=6.0.0
+
 # Project-specific dependencies needed at import time
 python-dotenv>=1.0.0
 aiohttp>=3.9.0
