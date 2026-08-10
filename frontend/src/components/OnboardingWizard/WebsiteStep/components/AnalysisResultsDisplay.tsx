@@ -115,6 +115,10 @@ export interface StyleAnalysis {
   competitive_advantages?: string[];
   content_calendar_suggestions?: string[];
   ai_generation_tips?: string[];
+  content_templates?: Array<{type: string; headline: string; structure: string[]; tone_notes: string}>;
+  headline_formulas?: Array<{pattern: string; example: string; category: string}>;
+  content_briefs?: Array<{topic: string; target_keyword: string; target_audience: string; word_count: number; suggested_sections: string[]}>;
+  competitive_angles?: Array<{angle: string; differentiator: string; headline_example: string}>;
   meta?: {
     confidence?: number;
     notes?: string;
@@ -411,6 +415,10 @@ const AnalysisResultsDisplay: React.FC<AnalysisResultsDisplayProps> = ({
                   domainName={domainName}
                   bestPractices={analysis.best_practices}
                   avoidElements={analysis.avoid_elements}
+                  contentTemplates={analysis.content_templates}
+                  headlineFormulas={analysis.headline_formulas}
+                  contentBriefs={analysis.content_briefs}
+                  competitiveAngles={analysis.competitive_angles}
                 />
               )}
             </Box>

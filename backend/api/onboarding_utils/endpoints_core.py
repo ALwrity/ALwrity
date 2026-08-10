@@ -36,6 +36,22 @@ async def initialize_onboarding(current_user: Dict[str, Any] = Depends(get_curre
                 step_completed = bool(website.get('website_url') or website.get('writing_style'))
                 if step_completed:
                     step_data = website
+                    # Include LinkedIn profile analysis if available
+                    try:
+                        from services.integrations.linkedin.profile_repository import ProfileRepository
+                        from api.linkedin_oauth_connection_routes import _oauth_service
+                        import json
+                        repo = ProfileRepository(oauth=_oauth_service)
+                        row = repo.get_analysis_row(user_id)
+                        if row:
+                            profile = json.loads(row.get("normalized_profile_json", "{}")) if row.get("normalized_profile_json") else {}
+                            step_data["linkedin_profile"] = {
+                                "headline": profile.get("headline") or "",
+                                "industry": profile.get("industry") or "",
+                                "skills": (profile.get("skills") or [])[:5],
+                            }
+                    except Exception:
+                        pass
             elif step_num == 2:  # Research
                 research = completion_data.get('research_preferences') or {}
                 step_completed = bool(research.get('research_depth') or research.get('content_types'))

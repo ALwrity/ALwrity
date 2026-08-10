@@ -246,6 +246,10 @@ export const performAnalysis = async (
         ai_generation_tips: result.style_guidelines?.ai_generation_tips,
         competitive_advantages: result.style_guidelines?.competitive_advantages,
         content_calendar_suggestions: result.style_guidelines?.content_calendar_suggestions,
+        content_templates: result.style_guidelines?.content_templates,
+        headline_formulas: result.style_guidelines?.headline_formulas,
+        content_briefs: result.style_guidelines?.content_briefs,
+        competitive_angles: result.style_guidelines?.competitive_angles,
         style_patterns: result.style_patterns,
         style_consistency: result.style_patterns?.style_consistency,
         unique_elements: result.style_patterns?.unique_elements

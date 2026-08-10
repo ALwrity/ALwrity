@@ -1270,3 +1270,36 @@ async def get_linkedin_profile(
         profile_optimization_debug=profile_optimization_debug,
     )
 
+
+@router.get("/profile/summary")
+async def get_profile_summary(
+    current_user: dict = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """Return a lightweight LinkedIn profile summary for onboarding.
+
+    Called by the frontend on Step 1 reload to check if LinkedIn
+    profile analysis exists from a previous connection.
+    """
+    user_id = _user_id(current_user)
+    try:
+        from services.integrations.linkedin.profile_repository import ProfileRepository
+
+        repository = ProfileRepository(oauth=_oauth_service)
+        row = repository.get_analysis_row(user_id)
+        if not row:
+            return {"analyzed": False}
+
+        import json
+        profile = json.loads(row.get("normalized_profile_json", "{}")) if row.get("normalized_profile_json") else {}
+        return {
+            "analyzed": bool(profile),
+            "headline": profile.get("headline") or "",
+            "industry": profile.get("industry") or "",
+            "skills": (profile.get("skills") or [])[:5],
+            "followers": profile.get("followers") or 0,
+            "connections": profile.get("connections") or 0,
+        }
+    except Exception as e:
+        logger.warning(f"[LinkedInSummary] Failed to get profile summary for user_id={user_id}: {e}")
+        return {"analyzed": False}
+

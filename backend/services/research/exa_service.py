@@ -93,14 +93,18 @@ class ExaService:
             }}}}
     }
 
-    SOCIAL_MEDIA_AGENT_SCHEMA = {
-        "type": "object", "required": ["platforms"],
-        "properties": {"platforms": {"type": "array", "items": {
-            "type": "object", "required": ["platform", "url"],
-            "properties": {
-                "platform": {"type": "string", "enum": ["facebook", "twitter", "instagram", "linkedin", "youtube", "tiktok"]},
-                "url": {"type": "string", "format": "uri"},
-            }}}}
+    SOCIAL_MEDIA_ANSWER_SCHEMA = {
+        "type": "object", "required": ["website", "x", "instagram", "facebook", "youtube", "linkedin", "github"],
+        "additionalProperties": False,
+        "properties": {
+            "website":   {"type": "string", "description": "Official website URL"},
+            "x":         {"type": "string", "description": "X (formerly Twitter) profile URL"},
+            "instagram": {"type": "string", "description": "Instagram profile URL"},
+            "facebook":  {"type": "string", "description": "Facebook page URL"},
+            "youtube":   {"type": "string", "description": "YouTube channel URL"},
+            "linkedin":  {"type": "string", "description": "LinkedIn page URL"},
+            "github":    {"type": "string", "description": "GitHub organization or repository URL"},
+        },
     }
 
     async def _discover_competitors_via_agent(self, user_url: str, num_results: int = 10,
@@ -140,19 +144,83 @@ class ExaService:
         except RuntimeError: return None
         except Exception as e: logger.warning(f"Agent competitor discovery failed: {e}"); return None
 
-    async def _discover_social_media_via_agent(self, user_url: str) -> Optional[Dict[str, Any]]:
-        """Discover social media via Exa Agent API."""
+    async def _discover_social_media_via_answer(self, user_url: str) -> Optional[Dict[str, Any]]:
+        """Discover social media via Exa Answer API with structured output_schema."""
+        try:
+            self._try_initialize()
+            if not self.exa:
+                return None
+            domain = urlparse(user_url).netloc.replace("www.", "")
+            logger.info(f"[exa answer] Social media discovery for {domain}")
+            result = await self._run_sync_with_timeout(
+                self.exa.answer,
+                f"{domain} social media accounts and their links like X, instagram, facebook, youtube, website, linkedin, github",
+                output_schema=self.SOCIAL_MEDIA_ANSWER_SCHEMA,
+            )
+            if not result or not getattr(result, 'answer', None):
+                return None
+            answer = result.answer
+            if isinstance(answer, str):
+                import json
+                answer = json.loads(answer)
+            if not isinstance(answer, dict):
+                return None
+            accounts = {k: v for k, v in answer.items() if v and isinstance(v, str) and v.strip()}
+            logger.info(f"[exa answer] Found {len(accounts)} social media accounts for {domain}")
+            return {"success": True, "social_media_accounts": accounts, "citations": [], "api_cost": 0}
+        except Exception as e:
+            logger.warning(f"[exa answer] Social media discovery failed: {e}")
+            return None
+
+    # ------------------------------------------------------------------
+    # Exa Agent API — content pillar discovery
+    # ------------------------------------------------------------------
+
+    CONTENT_PILLARS_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "competitors": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "website": {"type": "string"},
+                        "company_name": {"type": "string"},
+                        "content_pillars": {"type": "array", "items": {"type": "string"}},
+                    },
+                },
+            },
+            "target_company": {
+                "type": "object",
+                "properties": {
+                    "domain": {"type": "string"},
+                    "content_pillars": {"type": "array", "items": {"type": "string"}},
+                },
+            },
+        },
+    }
+
+    async def _discover_content_pillars_via_agent(self, user_url: str) -> Optional[Dict[str, Any]]:
+        """Discover content topic pillars via Exa Agent API."""
         from services.research.exa_agent import ExaAgentClient
         try:
             domain = urlparse(user_url).netloc.replace("www.", "")
+            query = (
+                f"Identify the primary content topic pillars for {domain} and its top 5 direct market competitors. "
+                f"For each, analyze their blogs, documentation, and resource hubs to extract 3 to 5 core topic pillars "
+                f"and keyword clusters they actively target."
+            )
             result = await ExaAgentClient().run(
-                query=f"Find all social media accounts for {domain}. Return platform name and URL.",
-                output_schema=self.SOCIAL_MEDIA_AGENT_SCHEMA, effort="low")
-            if not result or not result.get("platforms"): return None
-            accounts = {p["platform"]: p["url"] for p in result["platforms"] if p.get("platform") and p.get("url")}
-            return {"success": True, "social_media_accounts": accounts, "citations": [], "api_cost": 0}
-        except RuntimeError: return None
-        except Exception as e: logger.warning(f"Agent social media discovery failed: {e}"); return None
+                query=query,
+                output_schema=self.CONTENT_PILLARS_SCHEMA,
+                effort="medium",
+            )
+            return result
+        except RuntimeError:
+            return None
+        except Exception as e:
+            logger.warning(f"Agent content pillar discovery failed: {e}")
+            return None
 
     # ------------------------------------------------------------------
     # Competitor discovery
@@ -577,8 +645,8 @@ class ExaService:
             Dictionary containing social media discovery results
         """
         try:
-            # Try Exa Agent API first (reads key independently)
-            agent_result = await self._discover_social_media_via_agent(user_url)
+            # Try Exa Answer API first (structured output, fast)
+            agent_result = await self._discover_social_media_via_answer(user_url)
             if agent_result and agent_result.get("success"):
                 logger.info(f"Using Exa Agent social media results: {len(agent_result.get('social_media_accounts', {}))} accounts")
                 return agent_result

@@ -67,6 +67,7 @@ class OnboardingDataIntegrationService:
             persona_data = self._get_persona_data(user_id, db)
             competitor_analysis = self._get_competitor_analysis(user_id, db)
             deep_competitor_analysis = self._get_deep_competitor_analysis(user_id, db)
+            linkedin_profile = self._get_linkedin_profile_info(user_id)
             
             # Skip async sources
             gsc_analytics = {}
@@ -85,7 +86,8 @@ class OnboardingDataIntegrationService:
                     persona_data,
                     onboarding_session,
                     competitor_analysis,
-                    deep_competitor_analysis
+                    deep_competitor_analysis,
+                    linkedin_profile,
                 )
 
             platform_integrations = self._get_platform_integrations(user_id, db)
@@ -100,6 +102,7 @@ class OnboardingDataIntegrationService:
                 'persona_data': persona_data,
                 'competitor_analysis': competitor_analysis,
                 'deep_competitor_analysis': deep_competitor_analysis,
+                'linkedin_profile': linkedin_profile,
                 'platform_integrations': platform_integrations,
                 'gsc_analytics': gsc_analytics,
                 'bing_analytics': bing_analytics,
@@ -282,13 +285,15 @@ class OnboardingDataIntegrationService:
             logger.info(f"  - GSC Analytics: {'✅ Found' if gsc_analytics else '❌ Missing'}")
             logger.info(f"  - Bing Analytics: {'✅ Found' if bing_analytics else '❌ Missing'}")
 
+            linkedin_profile = self._get_linkedin_profile_info(user_id)
             canonical_profile = self._build_canonical_profile(
                 website_analysis,
                 research_preferences,
                 persona_data,
                 onboarding_session,
                 competitor_analysis,
-                deep_competitor_analysis
+                deep_competitor_analysis,
+                linkedin_profile,
             )
 
             integrated_data = {
@@ -299,6 +304,7 @@ class OnboardingDataIntegrationService:
                 'persona_data': persona_data,
                 'competitor_analysis': competitor_analysis,
                 'deep_competitor_analysis': deep_competitor_analysis,
+                'linkedin_profile': linkedin_profile,
                 'gsc_analytics': gsc_analytics,
                 'bing_analytics': bing_analytics,
                 'canonical_profile': canonical_profile,
@@ -500,7 +506,8 @@ class OnboardingDataIntegrationService:
         persona_data: Dict[str, Any],
         onboarding_session: Dict[str, Any],
         competitor_analysis: List[Dict[str, Any]],
-        deep_competitor_analysis: Dict[str, Any]
+        deep_competitor_analysis: Dict[str, Any],
+        linkedin_profile: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         try:
             core_persona = None
@@ -692,6 +699,8 @@ class OnboardingDataIntegrationService:
                 sources['industry'] = 'website_analysis'
             elif research_target.get('industry_focus'):
                 sources['industry'] = 'research_preferences'
+            elif linkedin_profile and linkedin_profile.get('industry'):
+                sources['industry'] = 'linkedin_profile'
 
             competitive_sitemap_benchmarking = {}
             try:
@@ -1262,3 +1271,27 @@ class OnboardingDataIntegrationService:
         except Exception as e:
             logger.error(f"Error getting integrated data for user {user_id}: {str(e)}")
             return None 
+
+    def _get_linkedin_profile_info(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Extract key LinkedIn profile fields for persona generation."""
+        try:
+            from api.linkedin_oauth_connection_routes import _oauth_service
+            from services.integrations.linkedin.profile_repository import ProfileRepository
+            import json
+
+            repo = ProfileRepository(oauth=_oauth_service)
+            row = repo.get_analysis_row(user_id)
+            if not row:
+                return None
+            profile = json.loads(row.get("normalized_profile_json", "{}")) if row.get("normalized_profile_json") else {}
+            if not profile:
+                return None
+            return {
+                "headline": profile.get("headline"),
+                "industry": profile.get("industry"),
+                "skills": profile.get("skills", []),
+                "followers": profile.get("followers", 0),
+                "connections": profile.get("connections", 0),
+            }
+        except Exception:
+            return None

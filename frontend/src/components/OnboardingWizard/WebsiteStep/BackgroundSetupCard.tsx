@@ -24,11 +24,6 @@ interface TaskConfig {
   description: string;
 }
 
-interface TaskPreferences {
-  success: boolean;
-  tasks: Record<string, TaskConfig>;
-}
-
 interface AdvertoolsTaskStatus {
   status: "not_created" | "scheduled" | "running" | "completed" | "failed" | "paused";
   last_executed: string | null;
@@ -52,6 +47,12 @@ const TASK_ICONS: Record<string, string> = {
   advertools_content: "📊",
   advertools_health: "🔧",
   website_analysis_tasks: "🔄",
+};
+
+const TASK_DEFAULTS: Record<string, TaskConfig> = {
+  deep_competitor: { enabled: true, delay_mins: 5, label: "Deep Competitor Analysis", description: "Full competitive intelligence scan with keyword and content gap analysis" },
+  sif_indexing: { enabled: true, delay_mins: 10, label: "SIF Indexing", description: "Strategic Intelligence Framework — index your content for AI-driven insights" },
+  market_trends: { enabled: true, delay_mins: 15, label: "Market Trends", description: "Track your industry's shifting topics, keywords, and content opportunities" },
 };
 
 function formatDelay(mins: number): string {
@@ -132,8 +133,7 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   seoAudit,
   onConfigChange,
 }) => {
-  const [prefs, setPrefs] = useState<Record<string, TaskConfig> | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [prefs, setPrefs] = useState<Record<string, TaskConfig>>(TASK_DEFAULTS);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSeoPreview, setShowSeoPreview] = useState(false);
@@ -168,7 +168,6 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
   // Load preferences + status on mount
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     Promise.all([
       apiClient.get("/api/onboarding/step2/task-preferences"),
       fetchAdvStatus(),
@@ -181,12 +180,21 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
       })
       .catch(() => {
         if (!cancelled) setError("Could not load task preferences");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
       });
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hydrate results from persisted DB data on mount
+  useEffect(() => {
+    if (advStatus?.has_results) {
+      if (brandAnalysis && !lastRunResult) {
+        setLastRunResult({ audit: brandAnalysis });
+      }
+      if (seoAudit && !lastHealthRun) {
+        setLastHealthRun({ site_health: seoAudit?.site_health || seoAudit });
+      }
+    }
+  }, [advStatus?.has_results, brandAnalysis, seoAudit, lastRunResult, lastHealthRun]);
 
   // Save preferences on toggle
   const savePreferences = useCallback(async (updated: Record<string, TaskConfig>) => {
@@ -290,34 +298,27 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
     };
   }, [seoAudit, lastHealthRun]);
 
-  if (loading) {
+  if (error) {
     return (
       <Paper sx={{ p: 3, mt: 2, border: "1px solid #e2e8f0", borderRadius: 2 }}>
-        <CircularProgress size={24} />
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>Smart Background Setup</Typography>
+        <Typography variant="body2" color="error">{error}</Typography>
       </Paper>
     );
   }
 
-  if (error || !prefs) {
-    return (
-      <Paper sx={{ p: 3, mt: 2, border: "1px solid #e2e8f0", borderRadius: 2 }}>
-        <Typography variant="body2" color="error">{error || "Failed to load"}</Typography>
-      </Paper>
-    );
-  }
-
-  const taskIds = Object.keys(prefs);
+  const taskIds = Object.keys(prefs || {});
   const enabledCount = taskIds.filter((id) => prefs[id].enabled).length;
 
   return (
-    <Paper sx={{ p: 0, mt: 3, border: "1px solid #e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+    <Paper sx={{ p: 0, mt: 3, border: "1px solid #e0e0e0", borderRadius: 2, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
       {/* Header */}
       <Box
         sx={{
           px: 3,
           py: 2,
-          bgcolor: "#f8fafc",
-          borderBottom: "1px solid #e2e8f0",
+          bgcolor: "#fafafa",
+          borderBottom: "1px solid #eee",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
@@ -353,7 +354,8 @@ export const BackgroundSetupCard: React.FC<BackgroundSetupCardProps> = ({
             sx={{
               px: 3,
               py: 2,
-              borderBottom: "1px solid #f1f5f9",
+              borderBottom: "1px solid #f0f0f0",
+              bgcolor: "#fff",
               "&:last-child": { borderBottom: "none" },
             }}
           >

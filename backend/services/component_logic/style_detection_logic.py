@@ -211,6 +211,12 @@ class StyleDetectionLogic:
                 "writing_tone": "", "target_audience": "", "content_type": "", "creativity_level": "",
                 "geographic_location": "", "industry_context": "", "brand_alignment": ""
               }},
+              "patterns": {{
+                "sentence_length": "", "vocabulary_patterns": [], "rhetorical_devices": [],
+                "paragraph_structure": "", "transition_phrases": []
+              }},
+              "style_consistency": "",
+              "unique_elements": [],
               "meta": {{"schema_version": "1.1", "confidence": 0.0, "notes": "", "uncertainty": {{"fields": []}}}}
             }}
             """
@@ -325,24 +331,35 @@ class StyleDetectionLogic:
             target_audience = analysis_results.get('target_audience', {})
             brand_analysis = analysis_results.get('brand_analysis', {})
             content_strategy_insights = analysis_results.get('content_strategy_insights', {})
-            
-            prompt = f"""Generate actionable content creation guidelines based on the style analysis.
+            recommended_settings = analysis_results.get('recommended_settings', {})
+            patterns = analysis_results.get('patterns', {})
+            strengths = content_strategy_insights.get('strengths', [])[:3]
+            weaknesses = content_strategy_insights.get('weaknesses', [])[:3]
+
+            prompt = f"""Generate actionable content creation guidelines based on this style analysis.
 
             ANALYSIS DATA:
-            Writing Style: {writing_style}
-            Content Characteristics: {content_characteristics}
-            Target Audience: {target_audience}
-            Brand Analysis: {brand_analysis}
-            Content Strategy Insights: {content_strategy_insights}
+            - Tone: {writing_style.get('tone', 'neutral')}
+            - Voice: {writing_style.get('voice', 'active')}
+            - Complexity: {writing_style.get('complexity', 'moderate')}
+            - Brand Personality: {writing_style.get('brand_personality', '')}
+            - Formality: {writing_style.get('formality_level', '')}
+            - Audience: {target_audience.get('expertise_level', 'general')} level, {target_audience.get('industry_focus', '')}
+            - Content Type: {analysis_results.get('content_type', {}).get('primary_type', 'blog')}
+            - Brand Voice: {brand_analysis.get('brand_voice', '')}
+            - Strengths: {strengths}
+            - Weaknesses: {weaknesses}
+            - Recommended Tone: {recommended_settings.get('writing_tone', '')}
+            - Recommended Content: {recommended_settings.get('content_type', '')}
 
             REQUIREMENTS:
             - Return ONE single-line MINIFIED JSON object only. No markdown, code fences, comments, or prose.
             - Use EXACTLY the keys and ordering from the schema below. No extra top-level keys.
-            - Provide concise, implementation-ready bullets with an example for key items (e.g., tone and CTA examples).
-            - Include negative guidance (what to avoid) tied to brand constraints where applicable.
-            - If uncertain, set empty values and list field names in meta.uncertainty.fields.
+            - All existing guideline fields (tone_recommendations through conversion_optimization) must be filled with at least 3 items each.
+            - The 4 NEW operational fields below must be specific, practical, and ready to use.
+            - For headline_formulas: create exact patterns the user can fill in (e.g. "How [Audience] Can [Achieve Result] in [Timeframe]").
 
-            IMPORTANT: REQUIRED JSON SCHEMA (stable key order):
+            REQUIRED JSON SCHEMA:
             {{
               "guidelines": {{
                 "tone_recommendations": [],
@@ -360,7 +377,19 @@ class StyleDetectionLogic:
               "ai_generation_tips": [],
               "competitive_advantages": [],
               "content_calendar_suggestions": [],
-              "meta": {{"schema_version": "1.1", "confidence": 0.0, "notes": "", "uncertainty": {{"fields": []}}}}
+              "content_templates": [
+                {{"type": "", "headline": "", "structure": [], "tone_notes": ""}}
+              ],
+              "headline_formulas": [
+                {{"pattern": "", "example": "", "category": ""}}
+              ],
+              "content_briefs": [
+                {{"topic": "", "target_keyword": "", "target_audience": "", "word_count": 0, "suggested_sections": []}}
+              ],
+              "competitive_angles": [
+                {{"angle": "", "differentiator": "", "headline_example": ""}}
+              ],
+              "meta": {{"schema_version": "1.2", "confidence": 0.0, "notes": "", "uncertainty": {{"fields": []}}}}
             }}
             """
             

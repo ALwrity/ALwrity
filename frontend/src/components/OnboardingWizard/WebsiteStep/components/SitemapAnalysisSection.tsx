@@ -28,59 +28,13 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 
-const renderMarkdown = (md: string): React.ReactNode[] => {
-  const lines = md.split('\n');
-  const nodes: React.ReactNode[] = [];
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (!line.trim()) { i++; continue; }
-    // Headers
-    if (line.startsWith('## ')) {
-      nodes.push(<Typography key={i} variant="subtitle2" sx={{ fontWeight: 600, mt: 1, mb: 0.5 }}>{line.replace(/^## /, '')}</Typography>);
-      i++; continue;
-    }
-    // Table: header row followed by separator then data rows
-    if (line.startsWith('|') && i + 2 < lines.length && lines[i + 1]?.trim().startsWith('|')) {
-      const headerRow = line.split('|').filter(c => c.trim());
-      const dataRows: string[][] = [];
-      let j = i + 2;
-      while (j < lines.length && lines[j].trim().startsWith('|')) {
-        dataRows.push(lines[j].split('|').filter(c => c.trim()));
-        j++;
-      }
-      nodes.push(
-        <Box key={i} className="md-table" sx={{ mb: 1 }}>
-          <Box className="md-table-header">
-            {headerRow.map((h, hi) => (
-              <Box key={hi} className="md-cell">{(h || '').replace(/\*\*(.+?)\*\*/g, '$1')}</Box>
-            ))}
-          </Box>
-          {dataRows.map((row, ri) => (
-            <Box key={ri} className="md-table-row">
-              {row.map((cell, ci) => (
-                <Box key={ci} className="md-cell">{(cell || '').replace(/\*\*(.+?)\*\*/g, '$1')}</Box>
-              ))}
-            </Box>
-          ))}
-        </Box>
-      );
-      i = j;
-      continue;
-    }
-    // Regular text with bold
-    nodes.push(
-      <Typography key={i} variant="body2" sx={{ mb: 0.25 }}>
-        {line.split(/(\*\*[^*]+\*\*)/g).map((part, pi) =>
-          part.startsWith('**') && part.endsWith('**')
-            ? <strong key={pi}>{part.slice(2, -2)}</strong>
-            : part
-        )}
-      </Typography>
-    );
-    i++;
-  }
-  return nodes;
+const safeStr = (val: any): string => {
+  if (val == null) return '';
+  if (typeof val === 'string') return val;
+  if (typeof val === 'number' || typeof val === 'boolean') return String(val);
+  if (Array.isArray(val)) return val.map(safeStr).join(', ');
+  if (typeof val === 'object') return val.name || val.title || val.label || JSON.stringify(val).slice(0, 80);
+  return String(val);
 };
 
 interface SitemapAnalysisSectionProps {
@@ -152,26 +106,105 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
         </Tooltip>
       </Box>
 
-      {/* AI Insights Summary */}
-      {ai_insights?.summary && (
-        <Alert icon={<LightbulbIcon />} severity="info" sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 600 }}>
-            AI Insight
+      {/* AI Insights — structured cards */}
+      {ai_insights && (
+        <Paper variant="outlined" sx={{ mb: 3, p: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <LightbulbIcon color="primary" fontSize="small" /> AI Insights
           </Typography>
-          <Box sx={{ 
-            fontSize: '0.8125rem', lineHeight: 1.6,
-            maxHeight: '450px', overflowY: 'auto',
-            '& .md-table': { border: '1px solid #e0e0e0', borderRadius: '6px', overflow: 'hidden', mb: 0.5 },
-            '& .md-table-header': { display: 'flex', bgcolor: '#f0f4f8', borderBottom: '2px solid #cbd5e1', px: 1, py: 0.75, fontWeight: 700, fontSize: '0.75rem', color: '#334155', textTransform: 'uppercase', letterSpacing: '0.03em' },
-            '& .md-table-row': { display: 'flex', px: 1, py: 0.6, borderBottom: '1px solid #f1f5f9', fontSize: '0.78125rem' },
-            '& .md-table-row:last-child': { borderBottom: 'none' },
-            '& .md-table-row:nth-of-type(odd)': { bgcolor: '#f8fafc' },
-            '& .md-cell': { flex: 1, px: 0.75 },
-            '& .md-cell:first-child': { fontWeight: 600 },
-          }}>
-            {renderMarkdown(ai_insights.summary)}
-          </Box>
-        </Alert>
+          {ai_insights.summary && (
+            <Typography variant="body2" sx={{ mb: 1.5, color: 'text.secondary', fontStyle: 'italic' }}>
+              {ai_insights.summary.replace(/\*\*/g, '').replace(/## /g, '')}
+            </Typography>
+          )}
+          <Grid container spacing={1.5}>
+            {ai_insights.content_gaps && ai_insights.content_gaps.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content Gaps</Typography>
+                {ai_insights.content_gaps.slice(0, 3).map((g: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#faf5ff', borderRadius: 1, border: '1px solid #e9d5ff' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(g.topic || g.action)}</Typography>
+                      <Chip size="small" label={safeStr(g.priority || 'medium')} color={g.priority === 'high' ? 'error' : g.priority === 'low' ? 'default' : 'warning'} variant="outlined" />
+                    </Box>
+                    {g.keywords && <Typography variant="caption" color="text.secondary">Keywords: {safeStr(g.keywords)}</Typography>}
+                    {g.impact && <Typography variant="caption" color="text.secondary">Impact: {safeStr(g.impact)}</Typography>}
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.cannibalization && ai_insights.cannibalization.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cannibalization</Typography>
+                {ai_insights.cannibalization.slice(0, 3).map((c: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#fef2f2', borderRadius: 1, border: '1px solid #fecaca' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(c.keyword)}</Typography>
+                    <Typography variant="caption" color="text.secondary">{safeStr(c.overlapping_pages)} overlapping pages — {safeStr(c.recommendation)}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.decay_alerts && ai_insights.decay_alerts.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Content Decay</Typography>
+                {ai_insights.decay_alerts.slice(0, 3).map((d: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#fffbeb', borderRadius: 1, border: '1px solid #fde68a' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(d.signal || d.category)}</Typography>
+                    <Typography variant="caption" color="text.secondary">{safeStr(d.action)}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.publishing_calendar && ai_insights.publishing_calendar.length > 0 && (
+              <Grid item xs={12}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Publishing Calendar</Typography>
+                <Box sx={{ mt: 0.5, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                  {ai_insights.publishing_calendar.slice(0, 6).map((pc: any, i: number) => (
+                    <Chip key={i} size="small" label={`W${safeStr(pc.week)}: ${safeStr(pc.topic || pc.content_type)}`} variant="outlined" color={pc.priority === 'high' ? 'success' : 'default'} />
+                  ))}
+                </Box>
+              </Grid>
+            )}
+            {ai_insights.seo_opportunities && ai_insights.seo_opportunities.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>SEO Opportunities</Typography>
+                {ai_insights.seo_opportunities.slice(0, 3).map((s: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#eff6ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Chip size="small" label={safeStr(s.type)} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+                      <Chip size="small" label={safeStr(s.impact)} color={s.impact === 'high' ? 'error' : 'default'} variant="outlined" sx={{ fontSize: '0.65rem', height: 18 }} />
+                    </Box>
+                    <Typography variant="body2" sx={{ mt: 0.25, fontWeight: 600 }}>{safeStr(s.finding || s.action)}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {ai_insights.internal_linking && ai_insights.internal_linking.length > 0 && (
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#0891b2', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Internal Linking</Typography>
+                {ai_insights.internal_linking.slice(0, 3).map((l: any, i: number) => (
+                  <Box key={i} sx={{ mt: 0.5, p: 0.75, bgcolor: '#ecfeff', borderRadius: 1, border: '1px solid #a5f3fc' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>{safeStr(l.from_section)} → {safeStr(l.to_section)}</Typography>
+                    <Typography variant="caption" color="text.secondary">Anchor: "{safeStr(l.anchor_label)}" — {safeStr(l.reason)}</Typography>
+                  </Box>
+                ))}
+              </Grid>
+            )}
+            {(ai_insights.growth_recommendations?.length > 0 || ai_insights.content_strategy?.length > 0) && (
+              <Grid item xs={12}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: '#15803d', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Recommendations</Typography>
+                <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                  {ai_insights.growth_recommendations?.slice(0, 3).map((r: string, i: number) => (
+                    <Typography key={`g${i}`} variant="caption">• {r}</Typography>
+                  ))}
+                  {ai_insights.content_strategy?.slice(0, 3).map((r: string, i: number) => (
+                    <Typography key={`c${i}`} variant="caption">• {r}</Typography>
+                  ))}
+                </Box>
+              </Grid>
+            )}
+          </Grid>
+        </Paper>
       )}
 
       <Paper variant="outlined" sx={{ mb: 2 }}>
@@ -271,10 +304,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                     </Tooltip>
                 </Box>
                 <List dense>
-                    {ai_insights?.content_gaps?.map((gap: string, idx: number) => (
+                    {ai_insights?.content_gaps?.map((gap: any, idx: number) => (
                         <ListItem key={idx}>
                             <ListItemIcon><WarningIcon color="warning" fontSize="small" /></ListItemIcon>
-                            <ListItemText primary={gap} />
+                            <ListItemText primary={safeStr(gap)} />
                         </ListItem>
                     ))}
                 </List>
@@ -299,10 +332,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                         </Tooltip>
                     </Box>
                     <List dense>
-                        {ai_insights?.strategic_recommendations?.map((rec: string, idx: number) => (
+                        {ai_insights?.strategic_recommendations?.map((rec: any, idx: number) => (
                             <ListItem key={idx}>
                                 <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
-                                <ListItemText primary={rec} />
+                                <ListItemText primary={safeStr(rec)} />
                             </ListItem>
                         ))}
                     </List>
@@ -321,10 +354,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>SEO Recommendations</Typography>
                     <List dense>
-                      {seo_recommendations.map((rec: string, idx: number) => (
+                      {seo_recommendations.map((rec: any, idx: number) => (
                         <ListItem key={idx}>
                           <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
-                          <ListItemText primary={rec} />
+                          <ListItemText primary={safeStr(rec)} />
                         </ListItem>
                       ))}
                     </List>

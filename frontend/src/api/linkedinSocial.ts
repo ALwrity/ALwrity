@@ -334,7 +334,7 @@ export interface LinkedInPublishPostResponse {
 const BASE = '/api/linkedin-social';
 
 /** Profile Phases 5–7 can run multiple LLM calls in one GET /profile request. */
-const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 120_000; // 2 minutes
+const LINKEDIN_PROFILE_AI_TIMEOUT_MS = 300_000; // 5 minutes
 
 // ── Profile foundation cache (localStorage, 24 hour TTL) ──────────────────
 // Profile data rarely changes — users optimize once, may not return for weeks.

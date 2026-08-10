@@ -1,7 +1,7 @@
 /**
  * SEO Preview Card — rich 3-page audit results with metrics and fix instructions.
  */
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Typography,
@@ -59,6 +59,7 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
   const [result, setResult] = useState<SeoPreviewResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedPages, setExpandedPages] = useState<Set<number>>(new Set());
+  const [autoLoaded, setAutoLoaded] = useState(false);
 
   const runPreview = async () => {
     setLoading(true);
@@ -73,6 +74,13 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!autoLoaded && websiteUrl) {
+      setAutoLoaded(true);
+      runPreview();
+    }
+  }, [websiteUrl, autoLoaded]);
 
   const togglePage = (i: number) => {
     setExpandedPages((prev) => {
@@ -101,7 +109,7 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
   }
 
   return (
-    <Paper sx={{ p: 2.5, mt: 2, border: "1px solid #e2e8f0", borderRadius: 2 }}>
+    <Paper sx={{ p: 2.5, mt: 2, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
       {/* Header */}
       <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: result ? 2 : 0 }}>
         <Box>
@@ -236,13 +244,19 @@ export const SeoPreviewCard: React.FC<SeoPreviewCardProps> = ({ websiteUrl }) =>
                 <Collapse in={isOpen}>
                   <Box sx={{ px: 2, pb: 2, bgcolor: "#fafafa", borderTop: "1px solid #f1f5f9" }}>
                     {/* Issues list */}
-                    {topIssues.map((issue, j) => (
-                      <Box key={j} sx={{ mt: 1.5, pl: 1, borderLeft: `3px solid ${issue.category?.includes("critical") ? "#ef4444" : "#f59e0b"}` }}>
-                        <Typography variant="caption" sx={{ fontWeight: 600, color: issue.category?.includes("critical") ? "#ef4444" : "#92400e" }}>
-                          [{issue.category}] {issue.issue}
+                    {topIssues.map((issue, j) => {
+                      const category = typeof issue.category === 'string' ? issue.category : String(issue.category || 'issue');
+                      const rawIssue: any = (issue as any).issue;
+                      const issueText = typeof rawIssue === 'string' ? rawIssue
+                        : typeof rawIssue === 'object' ? (rawIssue.issue || rawIssue.message || JSON.stringify(rawIssue).slice(0, 200))
+                        : String(rawIssue || '');
+                      return (
+                      <Box key={j} sx={{ mt: 1.5, pl: 1, borderLeft: `3px solid ${category?.includes("critical") ? "#ef4444" : "#f59e0b"}` }}>
+                        <Typography variant="caption" sx={{ fontWeight: 600, color: category?.includes("critical") ? "#ef4444" : "#92400e" }}>
+                          [{category}] {issueText}
                         </Typography>
                       </Box>
-                    ))}
+                    )})}
                     {topIssues.length === 0 && (
                       <Typography variant="caption" sx={{ color: "#10b981", mt: 1, display: "block" }}>
                         No issues found — this page looks good!

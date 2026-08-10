@@ -636,16 +636,9 @@ async def complete_style_detection(
         logger.info("[complete_style_detection] Starting parallel AI analysis...")
         
         async def run_style_analysis():
-            """Run style analysis in executor"""
+            """Run style analysis in executor (includes patterns now merged)"""
             loop = asyncio.get_event_loop()
             return await loop.run_in_executor(None, partial(style_logic.analyze_content_style, crawl_result['content'], user_id=user_id))
-        
-        async def run_patterns_analysis():
-            """Run patterns analysis in executor (if requested)"""
-            if not request.include_patterns:
-                return None
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(None, partial(style_logic.analyze_style_patterns, crawl_result['content'], user_id=user_id))
         
         async def run_seo_audit():
             """Run SEO audit in executor"""
@@ -668,10 +661,9 @@ async def complete_style_detection(
                 )
             return None
 
-        # Execute style, patterns, SEO analysis and sitemap analysis in parallel
-        style_analysis, patterns_result, seo_audit_result, sitemap_result = await asyncio.gather(
+        # Execute style, SEO analysis and sitemap analysis in parallel
+        style_analysis, seo_audit_result, sitemap_result = await asyncio.gather(
             run_style_analysis(),
-            run_patterns_analysis(),
             run_seo_audit(),
             run_sitemap_analysis(),
             return_exceptions=True
@@ -704,17 +696,20 @@ async def complete_style_detection(
                     timestamp=datetime.now().isoformat()
                 )
         
-        # Process patterns result
+        # Process patterns from merged style analysis
         style_patterns = None
         patterns_warning = None
-        if request.include_patterns and patterns_result and not isinstance(patterns_result, Exception):
-            if patterns_result.get('success'):
-                style_patterns = patterns_result.get('patterns')
+        if request.include_patterns and style_analysis and style_analysis.get('success'):
+            merged = style_analysis.get('analysis', {})
+            if merged.get('patterns') or merged.get('style_consistency') or merged.get('unique_elements'):
+                style_patterns = {
+                    'patterns': merged.get('patterns', {}),
+                    'style_consistency': merged.get('style_consistency', ''),
+                    'unique_elements': merged.get('unique_elements', []),
+                }
             else:
-                patterns_warning = f"Style patterns analysis failed: {patterns_result.get('error', 'Unknown error')}"
-        elif request.include_patterns:
-            patterns_warning = "Style patterns analysis was unavailable"
-        
+                patterns_warning = "Style patterns not available in merged analysis"
+
         # Process SEO audit result
         seo_audit = None
         seo_audit_warning = None
