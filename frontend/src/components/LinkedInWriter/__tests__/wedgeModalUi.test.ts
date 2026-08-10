@@ -2,9 +2,12 @@ import {
   WEDGE_BACK_LABELS,
   WEDGE_NESTED_BACK_LABELS,
   WEDGE_SUB_MODAL_CLASS,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
   wedgeSubModalClassName,
   wedgeSubModalShellProps,
 } from "../components/dashboard/wedgeModalUi";
+import { POST_WEDGE_MODAL_SIZE_CLASS } from "../components/dashboard/wedgeModalLayout";
 
 describe("wedgeModalUi", () => {
   it("defines back labels for every workflow wedge", () => {
@@ -36,5 +39,25 @@ describe("wedgeModalUi", () => {
     expect(wedgeSubModalClassName("linkedin-plan-saved-ideas-modal")).toBe(
       `${WEDGE_SUB_MODAL_CLASS} linkedin-plan-saved-ideas-modal`,
     );
+  });
+
+  it("wedgePostSizeModalClassName includes post-size shell class", () => {
+    expect(wedgePostSizeModalClassName()).toBe(
+      `${WEDGE_SUB_MODAL_CLASS} ${POST_WEDGE_MODAL_SIZE_CLASS}`,
+    );
+    expect(wedgePostSizeModalClassName("linkedin-my-drafts-modal")).toBe(
+      `${WEDGE_SUB_MODAL_CLASS} ${POST_WEDGE_MODAL_SIZE_CLASS} linkedin-my-drafts-modal`,
+    );
+  });
+
+  it("wedgePostSizeSubModalProps merges shell props with post-modal size", () => {
+    expect(wedgePostSizeSubModalProps("Quick Create")).toEqual({
+      backLabel: "Quick Create",
+      backPlacement: "aboveTitle",
+      titleSize: "xl",
+      width: "min(77.6vw, 960px)",
+      maxWidth: "min(77.6vw, 960px)",
+      maxHeight: "min(98dvh, calc(100dvh - 8px))",
+    });
   });
 });

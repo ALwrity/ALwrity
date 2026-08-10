@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
+import { POST_WEDGE_MODAL_SIZE, POST_WEDGE_MODAL_SIZE_CLASS } from "./wedgeModalLayout";
 import { getLinkedInPublishErrorMessage } from "../../../../api/linkedinSocial";
 import { useLinkedInSocialConnection } from "../../../../hooks/useLinkedInSocialConnection";
 import { formatDraftForPublish } from "../../utils/linkedInPublishFormatters";
@@ -308,8 +309,8 @@ export const PublishNowModal: React.FC<PublishNowModalProps> = ({
       open={open}
       title="Publish to LinkedIn"
       onClose={onClose}
-      maxWidth={540}
-      maxHeight="min(92vh, 760px)"
+      {...POST_WEDGE_MODAL_SIZE}
+      modalClassName={POST_WEDGE_MODAL_SIZE_CLASS}
     >
       <div>
         <div

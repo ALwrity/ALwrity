@@ -31,8 +31,8 @@ import { QualityCheckEngagementActions } from "./QualityCheckEngagementActions";
 import {
   WEDGE_BACK_LABELS,
   WEDGE_NESTED_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "./wedgeModalUi";
 
 export { PublishNowModal } from "./PublishNowModal";
@@ -202,9 +202,8 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
       title="My Drafts"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.publish)}
-      modalClassName={wedgeSubModalClassName("linkedin-my-drafts-modal")}
-      maxWidth="80vw"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.publish)}
+      modalClassName={wedgePostSizeModalClassName("linkedin-my-drafts-modal")}
     >
       <div>
         <div
@@ -640,10 +639,8 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
       title="Pre-Publish Quality Check"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={560}
-      maxHeight="min(92vh, 700px)"
+      {...wedgePostSizeSubModalProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <div>
         {!scoreResult && (
@@ -909,9 +906,8 @@ export const TimingAdvisorModal: React.FC<TimingAdvisorModalProps> = ({
       title="Best Time to Post"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={600}
+      {...wedgePostSizeSubModalProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <div>
         <p
@@ -1233,9 +1229,8 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
         title="Post Scheduled"
         onClose={onClose}
         onBack={onBack}
-        backLabel="My Drafts"
-        titleSize="xl"
-        maxWidth={440}
+        {...wedgePostSizeSubModalProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+        modalClassName={wedgePostSizeModalClassName()}
       >
         <div style={{ textAlign: "center", padding: "16px 0" }}>
           <div style={{ fontSize: 40, marginBottom: 12 }}>🎉</div>
@@ -1295,9 +1290,8 @@ export const ScheduleQuickModal: React.FC<ScheduleQuickModalProps> = ({
       title="Schedule Post"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={480}
+      {...wedgePostSizeSubModalProps(WEDGE_NESTED_BACK_LABELS.myDrafts)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <div>
         <p

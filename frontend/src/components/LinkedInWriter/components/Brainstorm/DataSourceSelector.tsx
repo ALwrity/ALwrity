@@ -42,7 +42,7 @@ const CHECKBOXES: CheckboxDef[] = [
   },
   {
     key: "remarketContent",
-    label: "Remarket",
+    label: "Repurpose",
     icon: "🔄",
     tooltip: "Repurpose your existing content & saved ideas",
     requiresConnected: false,

@@ -3,6 +3,10 @@
  */
 import React, { useCallback } from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
+import {
+  POST_WEDGE_MODAL_SIZE,
+} from "./wedgeModalLayout";
+import { wedgePostSizeModalClassName } from "./wedgeModalUi";
 import { colors } from "../GrowthEngine/styles";
 import { showToastNotification } from "../../../../utils/toastNotifications";
 import { EngagementBoosterInputStep } from "./EngagementBoosterInputStep";
@@ -83,8 +87,9 @@ export const EngagementBoosterModal: React.FC<EngagementBoosterModalProps> = ({
       open={open}
       title="Engagement Booster"
       onClose={onClose}
-      maxWidth={620}
-      maxHeight="min(92vh, 800px)"
+      {...POST_WEDGE_MODAL_SIZE}
+      titleSize="xl"
+      modalClassName={wedgePostSizeModalClassName()}
       elevated
     >
       <p

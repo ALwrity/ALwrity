@@ -6,8 +6,8 @@ import { DashboardActionModal } from "../DashboardActionModal";
 import { colors } from "../../GrowthEngine/styles";
 import {
   WEDGE_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "../wedgeModalUi";
 import { openRepurposeLabInQuickCreate } from "../performancePulse/openPerformanceContentInQuickCreate";
 import { REMARKET_RETURN } from "../remarketWedgeNavigation";
@@ -47,10 +47,8 @@ export const RepurposeLabModal: React.FC<RepurposeLabModalProps> = ({
       title="Top Performers Repurpose Lab"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={600}
-      maxHeight="min(92vh, 740px)"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <p
         style={{

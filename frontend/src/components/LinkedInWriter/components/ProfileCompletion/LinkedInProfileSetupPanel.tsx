@@ -28,6 +28,15 @@ import { DashboardErrorModal } from "../dashboard/DashboardErrorModal";
 import { DashboardActionModal } from "../dashboard/DashboardActionModal";
 import { buildDashboardErrorConfig } from "../dashboard/dashboardErrorConfig";
 import { useModalFocusTrap } from "../../hooks/useModalFocusTrap";
+import {
+  openWorkflowWedge,
+  type QuickCreateReturnTarget,
+} from "../dashboard/workflowWedgeNavigation";
+import {
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
+} from "../dashboard/wedgeModalUi";
+import { POST_WEDGE_MODAL_SIZE } from "../dashboard/wedgeModalLayout";
 
 const ANALYSIS_MODAL_DISMISSED_KEY =
   "linkedin_profile_analysis_modal_dismissed_v2";
@@ -216,6 +225,9 @@ export const LinkedInProfileSetupPanel: React.FC<
     isDismissalValid(),
   );
   const [isTopicPanelOpen, setIsTopicPanelOpen] = useState(false);
+  const [topicReturnTo, setTopicReturnTo] = useState<QuickCreateReturnTarget | null>(
+    null,
+  );
   const optimizationDialogRef = useRef<HTMLDivElement>(null);
 
   useModalFocusTrap(optimizationDialogRef, centered && isOptimizationOpen, () =>
@@ -307,7 +319,16 @@ export const LinkedInProfileSetupPanel: React.FC<
 
   const closeTopicPanel = () => {
     setIsTopicPanelOpen(false);
+    setTopicReturnTo(null);
     collapseRecommendations();
+  };
+
+  const handleTopicBack = () => {
+    const target = topicReturnTo;
+    closeTopicPanel();
+    if (target) {
+      openWorkflowWedge({ wedge: target.wedge, sub: target.sub });
+    }
   };
 
   const showTopicModal =
@@ -372,7 +393,10 @@ export const LinkedInProfileSetupPanel: React.FC<
   }, [topicState]);
 
   useEffect(() => {
-    const onGetTopicIdeas = () => {
+    const onGetTopicIdeas = (event: Event) => {
+      const detail = (event as CustomEvent<{ returnTo?: QuickCreateReturnTarget }>)
+        .detail;
+      setTopicReturnTo(detail?.returnTo ?? null);
       setIsTopicPanelOpen(true);
       void runTopicAnalysis(false);
     };
@@ -708,10 +732,16 @@ export const LinkedInProfileSetupPanel: React.FC<
           open
           title={isAnalyzing ? "Generating Topic Ideas…" : "Topic Ideas"}
           onClose={closeTopicPanel}
-          maxWidth={896}
-          maxHeight="min(90vh, 720px)"
-          modalClassName="linkedin-topic-ideas-modal"
-          titleSize="xl"
+          onBack={topicReturnTo ? handleTopicBack : undefined}
+          {...(topicReturnTo
+            ? wedgePostSizeSubModalProps(topicReturnTo.label)
+            : POST_WEDGE_MODAL_SIZE)}
+          modalClassName={
+            topicReturnTo
+              ? wedgePostSizeModalClassName("linkedin-topic-ideas-modal")
+              : "linkedin-topic-ideas-modal"
+          }
+          titleSize={topicReturnTo ? undefined : "xl"}
           zIndex={12100}
         >
           <TopicRecommendationsPanel

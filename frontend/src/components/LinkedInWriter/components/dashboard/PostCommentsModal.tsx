@@ -15,8 +15,8 @@ import {
 } from "./postCommentsModalLayout";
 import { usePostCommentsModal } from "./usePostCommentsModal";
 import {
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
   WEDGE_NESTED_BACK_LABELS,
 } from "./wedgeModalUi";
 
@@ -89,8 +89,8 @@ export const PostCommentsModal: React.FC<PostCommentsModalProps> = ({
       onBack={onBack}
       {...(onBack
         ? {
-            ...wedgeSubModalShellProps(backLabel),
-            modalClassName: wedgeSubModalClassName(),
+            ...wedgePostSizeSubModalProps(backLabel),
+            modalClassName: wedgePostSizeModalClassName(),
           }
         : { titleSize: "xl" as const })}
       zIndex={POST_COMMENTS_MODAL_Z_INDEX}

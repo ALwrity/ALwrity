@@ -22,8 +22,8 @@ import { usePerformancePulseView } from "./usePerformancePulseView";
 import type { PerformancePulseFilter } from "./types";
 import {
   WEDGE_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "../wedgeModalUi";
 
 export interface PerformancePulseModalProps {
@@ -76,10 +76,8 @@ export const PerformancePulseModal: React.FC<PerformancePulseModalProps> = ({
       title="Performance Pulse"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <p
         style={{

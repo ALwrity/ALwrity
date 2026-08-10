@@ -4,9 +4,10 @@ import { GrowthEnginePanel } from "../GrowthEngine/GrowthEnginePanel";
 import { type LinkedInPreferences } from "../../utils/storageUtils";
 import {
   WEDGE_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "./wedgeModalUi";
+import { POST_WEDGE_MODAL_SIZE } from "./wedgeModalLayout";
 
 interface GrowthEngineModalProps {
   open: boolean;
@@ -37,13 +38,10 @@ export const GrowthEngineModal: React.FC<GrowthEngineModalProps> = ({
       onClose={onClose}
       onBack={onBack}
       {...(wedgeNav
-        ? {
-            ...wedgeSubModalShellProps(WEDGE_BACK_LABELS.engagement),
-            modalClassName: wedgeSubModalClassName(),
-          }
-        : { titleSize: "xl" as const })}
-      maxWidth={900}
-      maxHeight="min(92vh, 900px)"
+        ? wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.engagement)
+        : POST_WEDGE_MODAL_SIZE)}
+      titleSize="xl"
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <GrowthEnginePanel
         open={open}

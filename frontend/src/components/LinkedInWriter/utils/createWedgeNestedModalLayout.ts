@@ -1,11 +1,12 @@
 import { LI_Z_ELEVATED_MODAL, LI_Z_MODAL } from "./linkedInStudioZIndex";
+import { POST_WEDGE_MODAL_SIZE } from "../components/dashboard/wedgeModalLayout";
 
-/** Matches BrainstormFlow / Brainstorm Ideas window dimensions. */
+/** Matches Quick Create Post modal canvas size. */
 export const CREATE_WEDGE_NESTED_MODAL_SIZE = {
-  width: 800,
-  maxWidth: "100%",
-  height: "90vh",
-  maxHeight: "90vh",
+  width: POST_WEDGE_MODAL_SIZE.width,
+  maxWidth: POST_WEDGE_MODAL_SIZE.maxWidth,
+  height: POST_WEDGE_MODAL_SIZE.maxHeight,
+  maxHeight: POST_WEDGE_MODAL_SIZE.maxHeight,
   borderRadius: 16,
   backdropPadding: 20,
 } as const;

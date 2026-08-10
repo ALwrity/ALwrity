@@ -18,8 +18,8 @@ import {
 import { colors, rowBase } from "../GrowthEngine/styles";
 import {
   WEDGE_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "./wedgeModalUi";
 import {
   ageInDays,
@@ -232,10 +232,8 @@ export const FormatTransformerModal: React.FC<FormatTransformerModalProps> = ({
       title="Format Transformer"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={600}
-      maxHeight="min(92vh, 780px)"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <p
         style={{
@@ -560,10 +558,8 @@ export const ContentRefreshModal: React.FC<ContentRefreshModalProps> = ({
       title="Content Refresh Studio"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={620}
-      maxHeight="min(92vh, 780px)"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <p
         style={{
@@ -881,10 +877,8 @@ export const StaleReviverModal: React.FC<StaleReviverModalProps> = ({
       title="Stale Content Reviver"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={580}
-      maxHeight="min(92vh, 720px)"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <p
         style={{
@@ -1199,10 +1193,8 @@ export const PerfToPlanModal: React.FC<PerfToPlanModalProps> = ({
       title="Performance-to-Plan Bridge"
       onClose={onClose}
       onBack={onBack}
-      {...wedgeSubModalShellProps(WEDGE_BACK_LABELS.remarket)}
-      modalClassName={wedgeSubModalClassName()}
-      maxWidth={580}
-      maxHeight="min(92vh, 740px)"
+      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      modalClassName={wedgePostSizeModalClassName()}
     >
       <p
         style={{

@@ -3,6 +3,7 @@
  */
 import React from "react";
 import { DashboardActionModal } from "./DashboardActionModal";
+import { POST_WEDGE_MODAL_SIZE, POST_WEDGE_MODAL_SIZE_CLASS } from "./wedgeModalLayout";
 import { colors } from "../GrowthEngine/styles";
 import { NetworkAdvisorSection } from "./NetworkAdvisorSection";
 
@@ -21,8 +22,8 @@ export const NetworkAdvisorModal: React.FC<NetworkAdvisorModalProps> = ({
     open={open}
     title="Network Advisor"
     onClose={onClose}
-    maxWidth={560}
-    maxHeight="min(92vh, 740px)"
+    {...POST_WEDGE_MODAL_SIZE}
+    modalClassName={POST_WEDGE_MODAL_SIZE_CLASS}
   >
     <p
       style={{

@@ -27,8 +27,8 @@ import {
   openQuickCreateFromWedge,
 } from "./engagementWedgeNavigation";
 import {
-  engagementSubModalClassName,
-  engagementSubModalShellProps,
+  engagementPostSizeModalClassName,
+  engagementPostSizeSubModalProps,
 } from "./engagementWedgeModalUi";
 import { CONVERSATIONS_TO_JOIN_MODAL } from "./engagementWedgeCopy";
 
@@ -279,10 +279,8 @@ export const OpportunitiesModal: React.FC<OpportunitiesModalProps> = ({
       title={CONVERSATIONS_TO_JOIN_MODAL.title}
       onClose={onClose}
       onBack={onBack}
-      {...engagementSubModalShellProps}
-      modalClassName={engagementSubModalClassName()}
-      maxWidth={560}
-      maxHeight="min(92vh, 720px)"
+      {...engagementPostSizeSubModalProps}
+      modalClassName={engagementPostSizeModalClassName()}
     >
       <p
         style={{

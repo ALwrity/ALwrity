@@ -1,12 +1,14 @@
 /**
  * Viewport layout for the Post Comments nested modal (inside Engagement Trends).
- * Comments list gets most of the vertical space; reply composer stays compact.
+ * Aligned with Quick Create Post modal canvas size.
  */
+import { POST_WEDGE_MODAL_SIZE } from "./wedgeModalLayout";
+
 export const POST_COMMENTS_MODAL_SIZE = {
-  width: "min(100vw - 24px, 70vw)",
-  maxWidth: "min(100vw - 24px, 720px)",
-  height: "min(85dvh, 85vh)",
-  maxHeight: "min(85dvh, 85vh)",
+  width: POST_WEDGE_MODAL_SIZE.width,
+  maxWidth: POST_WEDGE_MODAL_SIZE.maxWidth,
+  height: POST_WEDGE_MODAL_SIZE.maxHeight,
+  maxHeight: POST_WEDGE_MODAL_SIZE.maxHeight,
 } as const;
 
 /** Minimum height for the scrollable comments list so several cards are visible. */

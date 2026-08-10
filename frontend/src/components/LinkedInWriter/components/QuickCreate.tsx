@@ -1131,64 +1131,151 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
             className={[
               'linkedin-quick-create-dialog',
               variationsPhase !== 'idle' ? 'linkedin-quick-create-dialog--variations' : '',
-              selectedType === 'post' ? 'linkedin-quick-create-dialog--plan-size' : '',
-            ].filter(Boolean).join(' ')}
+              variationsPhase === 'idle' &&
+              (selectedType === 'post' || selectedType === 'article')
+                ? 'linkedin-quick-create-dialog--plan-size'
+                : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
             onClick={(e) => e.stopPropagation()}
           >
 
-            {/* Modal header — title row, then optional back navigation below */}
+            {/* Modal header — back above title when opened from a wedge */}
             <div className="linkedin-quick-create-header">
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {returnTo ? (
+                <>
+                  <nav
+                    aria-label="Modal navigation"
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      marginBottom: 6,
+                    }}
+                  >
+                    <DashboardModalBackButton
+                      label={returnTo.label}
+                      onClick={handleBackNavigation}
+                      size="comfortable"
+                    />
+                    <StudioModalCloseButton
+                      onClick={closeModal}
+                      ariaLabel="Close quick create"
+                    />
+                  </nav>
+                  <div
+                    id="linkedin-quick-create-title"
+                    className={
+                      selectedType === "post"
+                        ? "linkedin-quick-create-title linkedin-quick-create-title--xl"
+                        : selectedType === "article"
+                          ? "linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
+                          : "linkedin-quick-create-title"
+                    }
+                  >
+                    {selectedType === "post" ? (
+                      <>
+                        <span
+                          className="linkedin-quick-create-title__icon"
+                          aria-hidden
+                        >
+                          📝
+                        </span>
+                        <span className="linkedin-quick-create-title__text">
+                          Post
+                        </span>
+                      </>
+                    ) : selectedType === "article" ? (
+                      <>
+                        <span
+                          className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
+                          aria-hidden
+                        >
+                          📄
+                        </span>
+                        <span className="linkedin-quick-create-title__text">
+                          Article
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        {CONTENT_TYPES.find((c) => c.type === selectedType)?.icon}{" "}
+                        {variationsPhase !== "idle"
+                          ? "3 Tone Variations"
+                          : CONTENT_TYPES.find((c) => c.type === selectedType)?.label}
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
                 <div
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    width: '100%',
+                    flex: 1,
+                    minWidth: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
                   }}
                 >
-                  {selectedType === 'post' && variationsPhase === 'idle' ? (
-                    <div
-                      id="linkedin-quick-create-title"
-                      className="linkedin-quick-create-title linkedin-quick-create-title--xl"
-                    >
-                      <span className="linkedin-quick-create-title__icon" aria-hidden>📝</span>
-                      <span className="linkedin-quick-create-title__text">Post</span>
-                    </div>
-                  ) : selectedType === 'article' && variationsPhase === 'idle' ? (
-                    <div
-                      id="linkedin-quick-create-title"
-                      className="linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
-                    >
-                      <span
-                        className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
-                        aria-hidden
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      width: "100%",
+                    }}
+                  >
+                    {selectedType === "post" && variationsPhase === "idle" ? (
+                      <div
+                        id="linkedin-quick-create-title"
+                        className="linkedin-quick-create-title linkedin-quick-create-title--xl"
                       >
-                        📄
-                      </span>
-                      <span className="linkedin-quick-create-title__text">Article</span>
-                    </div>
-                  ) : (
-                    <div
-                      id="linkedin-quick-create-title"
-                      className="linkedin-quick-create-title"
-                    >
-                      {CONTENT_TYPES.find(c => c.type === selectedType)?.icon}{' '}
-                      {variationsPhase !== 'idle'
-                        ? '3 Tone Variations'
-                        : CONTENT_TYPES.find(c => c.type === selectedType)?.label}
-                    </div>
-                  )}
-                  <StudioModalCloseButton onClick={closeModal} ariaLabel="Close quick create" />
+                        <span
+                          className="linkedin-quick-create-title__icon"
+                          aria-hidden
+                        >
+                          📝
+                        </span>
+                        <span className="linkedin-quick-create-title__text">
+                          Post
+                        </span>
+                      </div>
+                    ) : selectedType === "article" && variationsPhase === "idle" ? (
+                      <div
+                        id="linkedin-quick-create-title"
+                        className="linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
+                      >
+                        <span
+                          className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
+                          aria-hidden
+                        >
+                          📄
+                        </span>
+                        <span className="linkedin-quick-create-title__text">
+                          Article
+                        </span>
+                      </div>
+                    ) : (
+                      <div
+                        id="linkedin-quick-create-title"
+                        className="linkedin-quick-create-title"
+                      >
+                        {CONTENT_TYPES.find((c) => c.type === selectedType)?.icon}{" "}
+                        {variationsPhase !== "idle"
+                          ? "3 Tone Variations"
+                          : CONTENT_TYPES.find((c) => c.type === selectedType)?.label}
+                      </div>
+                    )}
+                    <StudioModalCloseButton
+                      onClick={closeModal}
+                      ariaLabel="Close quick create"
+                    />
+                  </div>
                 </div>
-                {returnTo && (
-                  <DashboardModalBackButton
-                    label={returnTo.label}
-                    onClick={handleBackNavigation}
-                  />
-                )}
-              </div>
+              )}
             </div>
 
             {/* Modal body — swaps to VariationPicker when in variations phase */}
