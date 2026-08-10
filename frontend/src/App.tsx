@@ -12,7 +12,7 @@ import { ConditionalCopilotKit, AuthenticatedCopilotWrapper } from './components
 import Landing from './components/Landing/Landing';
 import LazyLoadingFallback from './components/shared/LazyLoadingFallback';
 import FeatureRoute from './components/shared/FeatureRoute';
-import PricingPage from './components/Pricing/PricingPage';
+import MainPricingRoute from './components/Pricing/MainPricingRoute';
 import ContactPage from './components/Landing/ContactPage';
 import { GifMakerFloatingPanel } from './components/GifMaker/GifMakerFloatingPanel';
 const LinkedInPricingPage = React.lazy(() => import('./components/Pricing/LinkedInPricingPage'));
@@ -280,7 +280,7 @@ const App: React.FC = () => {
                     <Route path="/approvals" element={<ProtectedRoute><ApprovalsPage /></ProtectedRoute>} />
                     <Route path="/team-activity" element={<ProtectedRoute><TeamActivityPage /></ProtectedRoute>} />
                     <Route path="/stripe-disputes" element={<ProtectedRoute><StripeDisputesDashboard /></ProtectedRoute>} />
-                    <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/pricing" element={<MainPricingRoute />} />
                     <Route path="/privacy" element={<PrivacyPolicyPage />} />
                     <Route path="/terms" element={<TermsOfServicePage />} />
                     <Route path="/code-of-conduct" element={<CodeOfConductPage />} />

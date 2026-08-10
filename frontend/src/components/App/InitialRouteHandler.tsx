@@ -4,7 +4,7 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useOAuthTokenAlerts } from '../../hooks/useOAuthTokenAlerts';
-import { shouldSkipOnboarding, getDefaultLandingRoute, getEnabledFeatures } from '../../utils/demoMode';
+import { shouldSkipOnboarding, getDefaultLandingRoute, getPricingRoute } from '../../utils/demoMode';
 import { restoreNavigationState } from '../../utils/navigationState';
 import ConnectionErrorPage from '../shared/ConnectionErrorPage';
 
@@ -169,7 +169,7 @@ const InitialRouteHandler: React.FC = () => {
     if (shouldSkipOnboarding()) {
       return navigateAndLog(getDefaultLandingRoute());
     }
-    return <Navigate to="/pricing" replace />;
+    return <Navigate to={getPricingRoute()} replace />;
   }
 
   if (connectionError.hasError) {
@@ -301,10 +301,7 @@ const InitialRouteHandler: React.FC = () => {
     }
 
     console.log('InitialRouteHandler: No subscription data after check → Pricing page');
-    const pricingRoute = shouldSkipOnboarding() && getEnabledFeatures().has('linkedin')
-      ? '/linkedin-studio/pricing'
-      : '/pricing';
-    return navigateAndLog(pricingRoute);
+    return navigateAndLog(getPricingRoute());
   }
 
   const isNewUser = !subscription || subscription.plan === 'none' || subscription.plan === 'free';
@@ -312,9 +309,7 @@ const InitialRouteHandler: React.FC = () => {
   if (isNewUser || !subscription.active) {
     console.log('InitialRouteHandler: No active subscription - modal will be shown by SubscriptionContext');
     if (isNewUser) {
-      const pricingRoute = shouldSkipOnboarding() && getEnabledFeatures().has('linkedin')
-        ? '/linkedin-studio/pricing'
-        : '/pricing';
+      const pricingRoute = getPricingRoute();
       console.log(`InitialRouteHandler: New user (no subscription) → ${pricingRoute}`);
       return <Navigate to={pricingRoute} replace />;
     }

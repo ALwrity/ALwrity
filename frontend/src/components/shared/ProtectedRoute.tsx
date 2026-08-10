@@ -5,7 +5,13 @@ import { Box, CircularProgress, Typography, Alert, Button } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
-import { shouldSkipOnboarding, isFeatureOnlyAllowedPath, getDefaultLandingRoute } from '../../utils/demoMode';
+import {
+  shouldSkipOnboarding,
+  isFeatureOnlyAllowedPath,
+  getDefaultLandingRoute,
+  getPricingRoute,
+  isPricingPath,
+} from '../../utils/demoMode';
 import { useLocation } from 'react-router-dom';
 
 interface ProtectedRouteProps {
@@ -158,21 +164,23 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
       );
     }
 
-    // Subscription loaded but not active - redirect to pricing
+    if (subscription.active) {
+      sessionStorage.removeItem('pricing_redirect');
+    }
+
+    // Subscription loaded but not active - redirect to feature-aware pricing page
     if (!subscription.active) {
-      if (window.location.pathname === '/pricing') {
-        return null;
-      }
-      const alreadyRedirected = sessionStorage.getItem('pricing_redirect');
-      if (alreadyRedirected) {
+      const pricingRoute = getPricingRoute();
+      if (isPricingPath(pathname)) {
         return null;
       }
       console.log('ProtectedRoute: No active subscription, redirecting to pricing', {
         active: subscription.active,
-        subError
+        pricingRoute,
+        subError,
       });
       sessionStorage.setItem('pricing_redirect', '1');
-      return <Navigate to="/pricing" replace />;
+      return <Navigate to={pricingRoute} replace />;
     }
   }
 

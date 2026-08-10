@@ -152,6 +152,32 @@ export function getDefaultLandingRoute(): string {
   return '/dashboard';
 }
 
+export const MAIN_PRICING_ROUTE = '/pricing';
+export const LINKEDIN_PRICING_ROUTE = '/linkedin-studio/pricing';
+
+/**
+ * Resolve the pricing page route for the current feature mode.
+ * LinkedIn-only deployments use the dedicated LinkedIn Studio pricing page.
+ */
+export function getPricingRoute(): string {
+  const enabled = getEnabledFeatures();
+  if (!enabled.has('all') && enabled.has(FEATURE_KEYS.LINKEDIN)) {
+    return LINKEDIN_PRICING_ROUTE;
+  }
+  return MAIN_PRICING_ROUTE;
+}
+
+/** Whether the pathname is any supported pricing page (main or feature-specific). */
+export function isPricingPath(pathname: string): boolean {
+  if (!pathname) return false;
+  return pathname === MAIN_PRICING_ROUTE || pathname === LINKEDIN_PRICING_ROUTE;
+}
+
+/** Test helper — clears cached feature flags between Jest cases. */
+export function resetEnabledFeaturesCacheForTests(): void {
+  cachedFeatures = null;
+}
+
 /**
  * Check if the app should skip onboarding.
  * Returns true in feature-only mode EXCEPT for linkedin, which now has

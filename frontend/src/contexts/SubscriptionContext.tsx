@@ -7,6 +7,7 @@ import {
 } from '../api/client';
 import SubscriptionExpiredModal from '../components/SubscriptionExpiredModal';
 import { saveNavigationState, getCurrentPhaseForTool } from '../utils/navigationState';
+import { getPricingRoute } from '../utils/demoMode';
 import { showSubscriptionExpiredToast, showUsageLimitToast, showSubscriptionToast } from '../utils/toastNotifications';
 
 export interface SubscriptionLimits {
@@ -415,12 +416,14 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     // Save navigation state (path, phase, tool)
     saveNavigationState(currentPath, phase || undefined, tool);
     
+    const pricingRoute = getPricingRoute();
     console.log('SubscriptionContext: Navigating to pricing page, saved navigation state:', {
       path: currentPath,
       phase,
-      tool
+      tool,
+      pricingRoute,
     });
-    window.location.href = '/pricing';
+    window.location.href = pricingRoute;
   }, []);
 
   // Global subscription error handler for API client
