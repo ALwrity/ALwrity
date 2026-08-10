@@ -172,6 +172,94 @@ class UsageTrackingService:
     def get_usage_trends(self, user_id: str, months: int = 6) -> Dict[str, Any]:
         """Get usage trends over time with self-healing from logs."""
         return get_usage_trends(user_id, months, self.db)
+
+    async def reset_current_billing_period(self, user_id: str) -> Dict[str, Any]:
+        """Reset usage counters for the user's current authoritative billing period.
+
+        This method is called by subscription upgrade/downgrade flows so that new
+        plan limits take effect immediately in the active billing period.
+        """
+        start_time = time.time()
+
+        if not user_id:
+            logger.error("[UsageTracking] reset_current_billing_period called without user_id")
+            return {
+                "reset": False,
+                "reason": "missing_user_id",
+            }
+
+        try:
+            period_keys = self._get_authoritative_billing_period_keys(user_id)
+            billing_period = period_keys.get("billing_period")
+
+            if not billing_period:
+                logger.error(
+                    f"[UsageTracking] Could not resolve billing period for user {user_id}"
+                )
+                return {
+                    "reset": False,
+                    "reason": "billing_period_unresolved",
+                }
+
+            summary = self.db.query(UsageSummary).filter(
+                UsageSummary.user_id == user_id,
+                UsageSummary.billing_period == billing_period,
+            ).first()
+
+            created = False
+            if not summary:
+                summary = UsageSummary(
+                    user_id=user_id,
+                    billing_period=billing_period,
+                    usage_status=UsageStatus.ACTIVE,
+                    total_calls=0,
+                    total_tokens=0,
+                    total_cost=0.0,
+                )
+                self.db.add(summary)
+                created = True
+                logger.info(
+                    f"[UsageTracking] Created usage summary for reset user={user_id} period={billing_period}"
+                )
+            else:
+                logger.info(
+                    f"[UsageTracking] Resetting usage summary user={user_id} period={billing_period}"
+                )
+
+            # Reuse centralized helper so field-level reset behavior stays consistent.
+            reset_usage_summary_counters(summary)
+
+            # Flush so caller sees DB-persistable state before its own commit.
+            self.db.flush()
+
+            # Keep UI cache coherent after plan change/reset.
+            try:
+                _clear_dashboard_cache_for_user(user_id)
+            except Exception as cache_err:
+                logger.warning(
+                    f"[UsageTracking] Cache clear failed after usage reset user={user_id}: {cache_err}"
+                )
+
+            duration_ms = int((time.time() - start_time) * 1000)
+            logger.info(
+                f"[UsageTracking] Usage reset complete user={user_id} period={billing_period} "
+                f"created={created} duration_ms={duration_ms}"
+            )
+
+            return {
+                "reset": True,
+                "billing_period": billing_period,
+                "created": created,
+            }
+        except Exception as exc:
+            logger.error(
+                f"[UsageTracking] Failed to reset current billing period for user {user_id}: {exc}",
+                exc_info=True,
+            )
+            return {
+                "reset": False,
+                "reason": str(exc),
+            }
     
     async def enforce_usage_limits(self, user_id: str, provider: APIProvider,
                                   tokens_requested: int = 0) -> Tuple[bool, str, Dict[str, Any]]:
