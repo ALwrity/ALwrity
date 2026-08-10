@@ -26,6 +26,13 @@ from services.integrations.linkedin.oauth_schema_migrations import (
     existing_token_encryption_columns,
     normalize_unipile_provider_mode,
 )
+from services.integrations.linkedin.linkedin_oauth_token_store import (
+    upsert_unipile_credentials_row,
+)
+from services.integrations.linkedin.unipile_reconnect_guardrails import (
+    extract_unipile_owner_name,
+    should_enforce_owner_match,
+)
 from services.integrations.linkedin.types import (
     LinkedInCredentials,
     LinkedInNotConnectedError,
@@ -359,33 +366,19 @@ class LinkedInOAuthService(OAuthProviderBase):
         try:
             self._init_db(user_id)
             db_path = self._get_db_path(user_id)
-            with sqlite3.connect(db_path) as conn:
-                cursor = conn.cursor()
-                # Deactivate existing tokens
-                cursor.execute(
-                    "UPDATE linkedin_oauth_tokens SET is_active = 0 WHERE user_id = ?",
-                    (user_id,),
-                )
-                # Insert new Unipile credentials
-                cursor.execute(
-                    """
-                    INSERT INTO linkedin_oauth_tokens (
-                        user_id, provider_mode, unipile_account_id,
-                        unipile_org_account_id, account_name, profile_urn, is_active
-                    ) VALUES (?, 'unipile', ?, ?, ?, ?, 1)
-                    """,
-                    (
-                        user_id,
-                        unipile_account_id,
-                        unipile_org_account_id,
-                        account_name,
-                        profile_urn,
-                    ),
-                )
-                conn.commit()
+            stored, action = upsert_unipile_credentials_row(
+                db_path=db_path,
+                user_id=user_id,
+                unipile_account_id=unipile_account_id,
+                unipile_org_account_id=unipile_org_account_id,
+                account_name=account_name,
+                profile_urn=profile_urn,
+            )
+            if not stored:
+                return False
             logger.info(
                 f"[LinkedInConnect] Stored Unipile credentials for user={user_id}, "
-                f"account_id={unipile_account_id}"
+                f"account_id={unipile_account_id} action={action}"
             )
             return True
         except Exception as e:
@@ -1268,6 +1261,7 @@ class LinkedInOAuthService(OAuthProviderBase):
         account_id: str,
         status: str,
         error_message: Optional[str] = None,
+        trace_id: Optional[str] = None,
     ) -> bool:
         """
         Handle Unipile OAuth callback and store credentials.
@@ -1287,12 +1281,16 @@ class LinkedInOAuthService(OAuthProviderBase):
         """
         if status != "success":
             logger.error(
-                f"[LinkedInConnect] Unipile callback failed for user={user_id}: {error_message}"
+                f"[LinkedInConnect] Unipile callback failed for user={user_id} "
+                f"trace_id={trace_id or 'na'}: {error_message}"
             )
             return False
 
         if not account_id:
-            logger.error(f"[LinkedInConnect] Unipile callback missing account_id for user={user_id}")
+            logger.error(
+                f"[LinkedInConnect] Unipile callback missing account_id for user={user_id} "
+                f"trace_id={trace_id or 'na'}"
+            )
             return False
 
         from services.integrations.linkedin.unipile_account_lifecycle import (
@@ -1311,6 +1309,20 @@ class LinkedInOAuthService(OAuthProviderBase):
 
         try:
             account_data = await client.get_account(account_id)
+            owner = extract_unipile_owner_name(account_data)
+            if should_enforce_owner_match(owner) and owner != user_id:
+                logger.error(
+                    f"[LinkedInConnect] Unipile callback ownership mismatch "
+                    f"user_id={user_id} account_id={account_id} owner={owner} "
+                    f"trace_id={trace_id or 'na'}"
+                )
+                return False
+            if owner and not should_enforce_owner_match(owner):
+                logger.info(
+                    f"[LinkedInConnect] callback owner is display label; "
+                    f"skipping strict match user_id={user_id} account_id={account_id} "
+                    f"owner={owner} trace_id={trace_id or 'na'}"
+                )
             from services.integrations.linkedin.unipile_provider import (
                 unipile_display_name_from_item,
             )
@@ -1322,7 +1334,7 @@ class LinkedInOAuthService(OAuthProviderBase):
             profile_urn = account_data.get("profile_urn") or account_data.get("urn")
             logger.info(
                 f"[LinkedInConnect] Fetched Unipile account details for user={user_id}, "
-                f"account_name={account_name}"
+                f"account_name={account_name} trace_id={trace_id or 'na'}"
             )
         except Exception as e:
             logger.warning(
@@ -1345,10 +1357,14 @@ class LinkedInOAuthService(OAuthProviderBase):
 
             set_unipile_sync_status(self, user_id, "OK")
             logger.info(
-                f"[LinkedInConnect] Unipile callback succeeded for user={user_id}, account_id={account_id}"
+                f"[LinkedInConnect] Unipile callback succeeded for user={user_id}, "
+                f"account_id={account_id} trace_id={trace_id or 'na'}"
             )
         else:
-            logger.error(f"[LinkedInConnect] Failed to store Unipile credentials for user={user_id}")
+            logger.error(
+                f"[LinkedInConnect] Failed to store Unipile credentials for user={user_id} "
+                f"trace_id={trace_id or 'na'}"
+            )
 
         return stored
 

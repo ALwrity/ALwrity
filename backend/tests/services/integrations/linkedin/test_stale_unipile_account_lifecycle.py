@@ -189,3 +189,51 @@ class TestReconnectUrlClearsStaleOn404:
             assert payload["auth_url"].startswith("https://unipile.example/")
             assert get_reconnect_unipile_account_id(svc, ctx.user_id) is None
             mock_client.create_hosted_auth_link.assert_awaited_once()
+
+    @pytest.mark.anyio
+    async def test_reconnect_preflight_clears_internal_owner_mismatch_and_falls_back_create(
+        self, patch_user_db_path, monkeypatch
+    ):
+        from cryptography.fernet import Fernet
+
+        monkeypatch.setenv(
+            "LINKEDIN_TOKEN_ENCRYPTION_KEY", Fernet.generate_key().decode("utf-8")
+        )
+        monkeypatch.setenv("UNIPILE_API_KEY", "test-key")
+        monkeypatch.setenv("UNIPILE_DSN", "https://api.unipile.test")
+
+        with patch_user_db_path("user_owner_mismatch") as ctx:
+            svc = LinkedInOAuthService()
+            svc._init_db(ctx.user_id)
+            _insert_soft_disconnected_row(ctx.db_path, ctx.user_id, "uni-mismatch-id")
+
+            lifecycle = UnipileAccountLifecycleService(svc)
+            mock_client = MagicMock()
+            mock_client.get_account = AsyncMock(
+                return_value={"id": "uni-mismatch-id", "name": "user_other"}
+            )
+            mock_client.reconnect_account = AsyncMock()
+            mock_client.create_hosted_auth_link = AsyncMock(
+                return_value=SimpleNamespace(
+                    auth_url="https://unipile.example/hosted/new"
+                )
+            )
+
+            with patch.object(
+                svc,
+                "_get_unipile_redirect_urls",
+                return_value={
+                    "success": "http://localhost/ok",
+                    "failure": "http://localhost/fail",
+                    "notify": "http://localhost/notify",
+                },
+            ), patch(
+                "services.integrations.linkedin.unipile_account_lifecycle.UnipileClient",
+                return_value=mock_client,
+            ):
+                payload = await lifecycle.generate_connect_or_reconnect_url(ctx.user_id)
+
+            assert payload["purpose"] == "connect"
+            assert get_reconnect_unipile_account_id(svc, ctx.user_id) is None
+            mock_client.reconnect_account.assert_not_called()
+            mock_client.create_hosted_auth_link.assert_awaited_once()

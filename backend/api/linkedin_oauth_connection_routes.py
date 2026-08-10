@@ -248,13 +248,15 @@ async def handle_oauth_callback_get(
     """
     try:
         resolved_account_id = accountId or account_id
+        callback_trace_id = request.headers.get("x-request-id") or uuid.uuid4().hex[:12]
 
         # Detect Unipile callback
         is_unipile_redirect = provider == "unipile"
         if is_unipile_redirect:
             logger.info(
                 f"[LinkedInConnect] Unipile callback user_id={user_id} "
-                f"status={status} account_id_present={bool(resolved_account_id)}"
+                f"status={status} account_id_present={bool(resolved_account_id)} "
+                f"trace_id={callback_trace_id}"
             )
 
             if status == "error":
@@ -279,6 +281,7 @@ async def handle_oauth_callback_get(
                     user_id=user_id,
                     account_id=resolved_account_id,
                     status="success",
+                    trace_id=callback_trace_id,
                 )
                 if not ok:
                     raise HTTPException(
@@ -287,7 +290,8 @@ async def handle_oauth_callback_get(
             else:
                 logger.warning(
                     f"[LinkedInConnect] Unipile callback missing account_id user_id={user_id}; "
-                    "attempting account sync (notify_url may have already stored credentials)"
+                    "attempting account sync (notify_url may have already stored credentials) "
+                    f"trace_id={callback_trace_id}"
                 )
                 await _oauth_service.try_sync_unipile_accounts(user_id)
 
@@ -295,10 +299,14 @@ async def handle_oauth_callback_get(
             if not status_after.get("connected"):
                 logger.warning(
                     f"[LinkedInConnect] Unipile browser callback complete but not connected yet "
-                    f"user_id={user_id}; client will poll status or wait for webhook"
+                    f"user_id={user_id}; client will poll status or wait for webhook "
+                    f"trace_id={callback_trace_id}"
                 )
 
-            logger.info(f"[LinkedInConnect] Unipile callback succeeded user_id={user_id}")
+            logger.info(
+                f"[LinkedInConnect] Unipile callback succeeded user_id={user_id} "
+                f"trace_id={callback_trace_id}"
+            )
 
             try:
                 # Lazy import: monitoring must not block LinkedIn Connect mount

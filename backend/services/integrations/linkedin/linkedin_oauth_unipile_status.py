@@ -277,11 +277,22 @@ def needs_unipile_reconnect(oauth: "LinkedInOAuthService", user_id: str) -> bool
     """True when a preserved account_id exists and the user is not connected."""
     reconnect_id = get_reconnect_unipile_account_id(oauth, user_id)
     if not reconnect_id:
+        logger.debug(
+            f"{LOG_PREFIX} reconnect check user_id={user_id} has_preserved_account=False"
+        )
         return False
     try:
         oauth.resolve_credentials(user_id)
+        logger.debug(
+            f"{LOG_PREFIX} reconnect check user_id={user_id} "
+            f"account_id={reconnect_id} connected=True"
+        )
         return False
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            f"{LOG_PREFIX} reconnect check user_id={user_id} "
+            f"account_id={reconnect_id} connected=False reason={exc}"
+        )
         return True
 
 

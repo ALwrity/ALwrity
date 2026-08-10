@@ -7,6 +7,7 @@ Docs: https://developer.unipile.com/docs/account-lifecycle
 
 from __future__ import annotations
 
+import uuid
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Request
@@ -27,6 +28,15 @@ from services.database import get_session_for_user
 router = APIRouter(prefix="/api/unipile", tags=["Unipile"])
 _oauth_service = LinkedInOAuthService()
 _lifecycle = UnipileAccountLifecycleService(_oauth_service)
+
+
+def _webhook_trace_id(payload: Dict[str, Any]) -> str:
+    """Build stable trace id for webhook logs."""
+    for key in ("event_id", "eventId", "request_id", "requestId", "id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return uuid.uuid4().hex[:12]
 
 
 def _extract_webhook_fields(payload: Dict[str, Any]) -> tuple[Optional[str], Optional[str], Optional[str]]:
@@ -88,20 +98,32 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
         logger.warning("[UnipileWebhook] Payload is not a JSON object")
         return {"ok": True}
 
+    trace_id = _webhook_trace_id(payload)
     account_id, user_id, status = _extract_webhook_fields(payload)
     normalized_status = normalize_unipile_status(status)
 
     logger.info(
         f"[UnipileWebhook] Received notification account_id={account_id} "
-        f"user_id={user_id} status={normalized_status} keys={list(payload.keys())}"
+        f"user_id={user_id} status={normalized_status} trace_id={trace_id} "
+        f"keys={list(payload.keys())}"
     )
 
     if not account_id:
-        logger.warning("[UnipileWebhook] Missing account_id; skipping")
+        logger.warning(f"[UnipileWebhook] Missing account_id; skipping trace_id={trace_id}")
         return {"ok": True}
 
     if not user_id:
         user_id = find_user_id_by_unipile_account_id(account_id)
+        if user_id:
+            logger.info(
+                f"[UnipileWebhook] resolved user from account_id account_id={account_id} "
+                f"user_id={user_id} trace_id={trace_id}"
+            )
+        else:
+            logger.warning(
+                f"[UnipileWebhook] could not resolve user for account_id={account_id} "
+                f"trace_id={trace_id}"
+            )
 
     if user_id and normalized_status:
         await _lifecycle.handle_account_status(
@@ -124,7 +146,7 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
     if not should_store_credentials:
         logger.info(
             f"[UnipileWebhook] Skipping credential storage account_id={account_id} "
-            f"status={normalized_status}"
+            f"status={normalized_status} trace_id={trace_id}"
         )
         return {"ok": True}
 
@@ -132,10 +154,11 @@ async def handle_unipile_webhook(request: Request) -> Dict[str, bool]:
         user_id=user_id,
         account_id=account_id,
         status="success",
+        trace_id=trace_id,
     )
     logger.info(
         f"[UnipileWebhook] Credential storage user_id={user_id} "
-        f"account_id={account_id} stored={stored}"
+        f"account_id={account_id} stored={stored} trace_id={trace_id}"
     )
 
     if stored:
