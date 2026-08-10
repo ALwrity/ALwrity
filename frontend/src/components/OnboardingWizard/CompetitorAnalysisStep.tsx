@@ -1013,16 +1013,18 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
                         ];
                         return growthMoves.length > 0 ? (
                           <List dense disablePadding>
-                            {growthMoves.map((move: string, i: number) => (
+                            {growthMoves.map((move: any, i: number) => {
+                              const text = typeof move === 'string' ? move : (move?.action || move?.finding || move?.type || JSON.stringify(move));
+                              return (
                               <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
                                 <ListItemIcon sx={{ minWidth: 28 }}>
                                   <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#22c55e', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
                                     {i + 1}
                                   </Box>
                                 </ListItemIcon>
-                                <ListItemText primary={`${ACTION_VERBS[i % ACTION_VERBS.length]} ${move}`} primaryTypographyProps={{ variant: 'body2', color: '#166534' }} />
+                                <ListItemText primary={`${ACTION_VERBS[i % ACTION_VERBS.length]} ${text}`} primaryTypographyProps={{ variant: 'body2', color: '#166534' }} />
                               </ListItem>
-                            ))}
+                            )})}
                           </List>
                         ) : (
                           <Typography variant="caption" fontStyle="italic" color="#6b7280">Generating recommendations...</Typography>

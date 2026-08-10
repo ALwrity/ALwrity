@@ -304,10 +304,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                     </Tooltip>
                 </Box>
                 <List dense>
-                    {ai_insights?.content_gaps?.map((gap: string, idx: number) => (
+                    {ai_insights?.content_gaps?.map((gap: any, idx: number) => (
                         <ListItem key={idx}>
                             <ListItemIcon><WarningIcon color="warning" fontSize="small" /></ListItemIcon>
-                            <ListItemText primary={gap} />
+                            <ListItemText primary={safeStr(gap)} />
                         </ListItem>
                     ))}
                 </List>
@@ -332,10 +332,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                         </Tooltip>
                     </Box>
                     <List dense>
-                        {ai_insights?.strategic_recommendations?.map((rec: string, idx: number) => (
+                        {ai_insights?.strategic_recommendations?.map((rec: any, idx: number) => (
                             <ListItem key={idx}>
                                 <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
-                                <ListItemText primary={rec} />
+                                <ListItemText primary={safeStr(rec)} />
                             </ListItem>
                         ))}
                     </List>
@@ -354,10 +354,10 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
                   <Grid item xs={12}>
                     <Typography variant="subtitle2" sx={{ mb: 0.5 }}>SEO Recommendations</Typography>
                     <List dense>
-                      {seo_recommendations.map((rec: string, idx: number) => (
+                      {seo_recommendations.map((rec: any, idx: number) => (
                         <ListItem key={idx}>
                           <ListItemIcon><CheckCircleIcon color="success" fontSize="small" /></ListItemIcon>
-                          <ListItemText primary={rec} />
+                          <ListItemText primary={safeStr(rec)} />
                         </ListItem>
                       ))}
                     </List>
