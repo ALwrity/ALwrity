@@ -773,7 +773,6 @@ class ProfileRepository:
             context_hash[:12] if context_hash else None,
         )
         self._clear_topic_recommendations(user_id, db_path=db_path, updated_at=now)
-        self._clear_profile_optimization(user_id, db_path=db_path, updated_at=now)
         return now
 
     def get_topic_recommendations(
@@ -1210,11 +1209,9 @@ class ProfileRepository:
                     user_completion_json = NULL,
                     ai_profile_intelligence_json = NULL,
                     topic_recommendations_json = NULL,
-                    profile_optimization_json = NULL,
                     profile_context_updated_at = NULL,
                     ai_intelligence_updated_at = NULL,
                     recommendations_updated_at = NULL,
-                    profile_optimization_updated_at = NULL,
                     updated_at = ?
                 WHERE user_id = ?
                 """,
