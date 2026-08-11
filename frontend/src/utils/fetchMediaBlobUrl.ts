@@ -12,6 +12,30 @@ export const setMediaAuthTokenGetter = (getter: (() => Promise<string | null>) |
 };
 
 // Clear cache for specific URL or all URLs
+/**
+ * Appends the current auth token as a ?token= query parameter.
+ * Use this for <img> / <video> / <audio> src attributes on internal API endpoints
+ * that support get_current_user_with_query_token (can't send Authorization headers).
+ * Falls back to the original URL if no token is available.
+ */
+export async function appendAuthTokenToUrl(pathOrUrl: string): Promise<string> {
+  const isAbsolute = /^https?:\/\//i.test(pathOrUrl);
+  const url = isAbsolute ? pathOrUrl : pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+
+  if (!authTokenGetter) return url;
+
+  try {
+    const token = await authTokenGetter();
+    if (token) {
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}token=${encodeURIComponent(token)}`;
+    }
+  } catch (err) {
+    console.warn('[appendAuthTokenToUrl] Failed to get auth token:', err);
+  }
+  return url;
+}
+
 export const clearMediaCache = (url?: string) => {
   if (url) {
     blobUrlCache.delete(url);

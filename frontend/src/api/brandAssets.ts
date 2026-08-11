@@ -1,5 +1,7 @@
 import { apiClient, aiApiClient } from './client';
 
+const ONBOARDING_ASSET_QUERY_BASE = '/api/onboarding/assets';
+
 export interface AssetResponse {
   success: boolean;
   image_url?: string;
@@ -24,13 +26,16 @@ export interface VoiceCloneResponse {
 
 export const getLatestBrandAvatar = async (): Promise<AssetResponse> => {
   try {
-    const response = await apiClient.get('/onboarding/assets/latest-avatar');
-    return response.data;
-  } catch (error: any) {
-    // 404 is expected if no avatar exists
-    if (error.response?.status === 404) {
+    // validateStatus prevents axios from throwing on 404, so the global error
+    // interceptor in client.ts never fires for the expected "no avatar yet" case.
+    const response = await apiClient.get(`${ONBOARDING_ASSET_QUERY_BASE}/latest-avatar`, {
+      validateStatus: (status) => status < 500,
+    });
+    if (response.status === 404) {
       return { success: false, message: 'No avatar found' };
     }
+    return response.data;
+  } catch (error: any) {
     console.error('Failed to fetch latest avatar:', error);
     return {
       success: false,
@@ -148,7 +153,7 @@ export const setBrandAvatar = async (
 
 export const getLatestVoiceClone = async (): Promise<VoiceCloneResponse> => {
   try {
-    const response = await apiClient.get('/onboarding/assets/latest-voice-clone');
+    const response = await apiClient.get(`${ONBOARDING_ASSET_QUERY_BASE}/latest-voice-clone`);
     return response.data;
   } catch (error: any) {
     if (error.response?.status === 404) {

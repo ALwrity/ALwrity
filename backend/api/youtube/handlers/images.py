@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from middleware.auth_middleware import get_current_user
+from middleware.auth_middleware import get_current_user, get_current_user_with_query_token
 from services.database import get_db
 from services.subscription import PricingService
 from services.subscription.preflight_validator import validate_image_generation_operations
@@ -419,11 +419,12 @@ async def get_image_generation_status(
 async def serve_youtube_image(
     category: str,
     filename: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user_with_query_token),
 ):
     """
     Serve stored YouTube images (avatars or scenes).
-    Unified endpoint for both avatar and scene images.
+    Supports authentication via Authorization header or ?token= query parameter.
+    Query parameter is required for <img> tags which cannot send custom headers.
     """
     require_authenticated_user(current_user)
 
