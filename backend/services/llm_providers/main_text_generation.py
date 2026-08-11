@@ -494,7 +494,7 @@ def llm_text_gen(
                     logger.error(f"[llm_text_gen] ❌ Failed to track usage: {usage_error}", exc_info=True)
 
             # Telemetry log — provider-agnostic, for routing/cost analysis
-            logger.info(
+            logger.warning(
                 f"[llm_telemetry] trace={trace_id} user={user_id} provider={gpt_provider} "
                 f"model={model} flow={resolved_flow_type} "
                 f"input_tokens_est={_estimate_tokens(prompt)} output_tokens_est={_estimate_tokens(response_text)} "

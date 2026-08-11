@@ -737,7 +737,7 @@ class SitemapService:
             parse_took = (_time.time() - parse_t0) * 1000
 
             pydantic_result = self._validate_with_pydantic(insights)
-            logger.info(
+            logger.warning(
                 f"[onboarding_insights_telemetry] trace={trace_id} "
                 f"api_latency_ms={api_took:.0f} parse_ms={parse_took:.0f} "
                 f"pydantic_valid={pydantic_result['valid']} "

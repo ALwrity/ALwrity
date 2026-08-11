@@ -307,7 +307,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     if (!competitors.length || isAnalyzing) return;
     let cancelled = false;
     setBenchmarkLoading(true);
-    aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
+    longRunningApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
       .then((resp) => {
         if (!cancelled) setBenchmarkReport(resp.data || resp.data?.benchmark);
       })
