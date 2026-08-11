@@ -30,9 +30,10 @@ _429_ACTIVE_WINDOW = 20.0      # a 429 inside this window => the origin is throt
 _PACING_MIN = 2.0
 _PACING_MAX = 5.0
 
-_DOMAIN_SEMAPHORES: Dict[str, asyncio.Semaphore] = {}
+_DOMAIN_SEMAPHORES: Dict[str, threading.Lock] = {}
 _DOMAIN_LAST_REQUEST: Dict[str, float] = {}
 _DOMAIN_LAST_429: Dict[str, float] = {}
+_DOMAIN_429_LOCK = threading.Lock()
 _DOMAIN_429_LOCK = threading.Lock()
 
 
@@ -55,19 +56,17 @@ def _domain_429_cooldown(domain: str) -> float:
     return max(last + _429_ACTIVE_WINDOW - _time.monotonic(), 0.0)
 
 
-async def _throttle_domain(domain: str) -> None:
-    """Acquire a per-domain semaphore and enforce a cooldown between requests."""
+def _throttle_domain_sync(domain: str) -> None:
+    """Acquire per-domain lock + enforce cooldown between requests."""
     if domain not in _DOMAIN_SEMAPHORES:
-        _DOMAIN_SEMAPHORES[domain] = asyncio.Semaphore(1)
-    sem = _DOMAIN_SEMAPHORES[domain]
+        _DOMAIN_SEMAPHORES[domain] = threading.Lock()
+    lock = _DOMAIN_SEMAPHORES[domain]
 
-    async with sem:
-        # Enforce 1s cooldown between requests to the same origin, plus any
-        # remaining post-429 pause so a throttled origin can recover.
+    with lock:
         pause = 1.0 - (_time.monotonic() - _DOMAIN_LAST_REQUEST.get(domain, 0.0))
         pause = max(pause, _domain_429_cooldown(domain))
         if pause > 0:
-            await asyncio.sleep(pause)
+            _time.sleep(pause)
         _DOMAIN_LAST_REQUEST[domain] = _time.monotonic()
 
 class AdvertoolsService:
@@ -151,6 +150,8 @@ class AdvertoolsService:
                     logger.warning(f"sitemap_to_df batch deadline reached for {url}, giving up")
                     break
                 try:
+                    if attempt == 0:
+                        _throttle_domain_sync(domain)
                     df = adv.sitemap_to_df(url, recursive=False)
                 except urllib.error.HTTPError as e:
                     if e.code not in _RETRYABLE_HTTP:
@@ -830,7 +831,7 @@ class AdvertoolsService:
                         f"earlier in this run; not re-fetching it. Trying fallbacks only."
                     )
                 else:
-                    await _throttle_domain(_extract_domain(sitemap_url))
+                    _throttle_domain_sync(_extract_domain(sitemap_url))
                     sitemap_df = await loop.run_in_executor(
                         None, lambda: self._sitemap_to_df_with_retry(sitemap_url)
                     )
@@ -840,7 +841,7 @@ class AdvertoolsService:
                         if not fb or fb == sitemap_url:
                             continue
                         self.logger.info(f"Primary sitemap failed, trying fallback: {fb}")
-                        await _throttle_domain(_extract_domain(fb))
+                        _throttle_domain_sync(_extract_domain(fb))
                         sitemap_df = await loop.run_in_executor(None, lambda u=fb: self._sitemap_to_df_with_retry(u))
                         if sitemap_df is not None and not sitemap_df.empty:
                             break
@@ -946,8 +947,8 @@ class AdvertoolsService:
             self.logger.info(f"Comparing sitemaps: {sitemap_a} vs {sitemap_b}")
             loop = asyncio.get_event_loop()
 
-            await _throttle_domain(_extract_domain(sitemap_a))
-            await _throttle_domain(_extract_domain(sitemap_b))
+            _throttle_domain_sync(_extract_domain(sitemap_a))
+            _throttle_domain_sync(_extract_domain(sitemap_b))
             df_a = await loop.run_in_executor(
                 None, lambda: self._sitemap_to_df_with_retry(sitemap_a)
             )

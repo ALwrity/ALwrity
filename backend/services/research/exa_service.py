@@ -184,9 +184,41 @@ class ExaService:
             logger.warning(f"[exa answer] Social media discovery failed: {type(e).__name__}: {e}", exc_info=True)
             return None
 
-    # ------------------------------------------------------------------
-    # Exa Agent API — content pillar discovery
-    # ------------------------------------------------------------------
+    async def _discover_content_pillars_via_answer(self, user_url: str) -> Optional[Dict[str, Any]]:
+        """Fallback: discover content pillars via Exa Answer API."""
+        try:
+            self._try_initialize()
+            if not self.exa:
+                return None
+            domain = urlparse(user_url).netloc.replace("www.", "")
+            logger.info(f"[pillars answer] Content pillar discovery for {domain}")
+            query = (
+                f"Identify the primary content topic pillars for {domain} and its top 5 direct market competitors. "
+                f"For each, extract 3 to 5 core topic pillars and keyword clusters they actively target "
+                f"based on their official blogs, documentation, and resource hubs."
+            )
+            loop = asyncio.get_event_loop()
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.exa.answer(
+                    query,
+                    system_prompt=query,
+                    output_schema=self.CONTENT_PILLARS_SCHEMA,
+                )),
+                timeout=120,
+            )
+            if not result or not getattr(result, 'answer', None):
+                return None
+            answer = result.answer
+            if isinstance(answer, str):
+                import json
+                answer = json.loads(answer)
+            if not isinstance(answer, dict):
+                return None
+            logger.info(f"[pillars answer] Got structured pillars: {list(answer.keys())}")
+            return answer
+        except Exception as e:
+            logger.warning(f"[pillars answer] Fallback failed: {type(e).__name__}: {e}")
+            return None
 
     CONTENT_PILLARS_SCHEMA = {
         "type": "object",
@@ -217,6 +249,7 @@ class ExaService:
         from services.research.exa_agent import ExaAgentClient
         try:
             domain = urlparse(user_url).netloc.replace("www.", "")
+            logger.info(f"[content pillars] Starting agent discovery for {domain}")
             query = (
                 f"Identify the primary content topic pillars for {domain} and its top 5 direct market competitors "
                 f"in its specific industry.\n\n"
@@ -229,11 +262,13 @@ class ExaService:
                 query=query,
                 output_schema=self.CONTENT_PILLARS_SCHEMA,
             )
+            logger.info(f"[content pillars] Agent returned: {type(result).__name__}")
             return result
-        except RuntimeError:
+        except RuntimeError as e:
+            logger.warning(f"[content pillars] Agent unavailable (RuntimeError): {e}")
             return None
         except Exception as e:
-            logger.warning(f"Agent content pillar discovery failed: {e}")
+            logger.warning(f"[content pillars] Agent discovery failed: {type(e).__name__}: {e}")
             return None
 
     # ------------------------------------------------------------------

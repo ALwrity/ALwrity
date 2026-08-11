@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper, Chip, CircularProgress, Collapse, IconButton } from '@mui/material';
-import { Lightbulb as LightbulbIcon, Business as BusinessIcon, ExpandMore, ExpandLess } from '@mui/icons-material';
+import { Lightbulb as LightbulbIcon, Business as BusinessIcon, ExpandMore, ExpandLess, Error as ErrorIcon } from '@mui/icons-material';
 
 export interface ContentPillarData {
   target_company?: {
@@ -17,9 +17,10 @@ export interface ContentPillarData {
 interface ContentPillarsSectionProps {
   data: ContentPillarData | null;
   isLoading: boolean;
+  error?: string | null;
 }
 
-export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ data, isLoading }) => {
+export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ data, isLoading, error }) => {
   const [compExpanded, setCompExpanded] = React.useState(true);
 
   if (isLoading) {
@@ -31,11 +32,57 @@ export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ da
     );
   }
 
-  if (!data) return null;
+  if (error && !data) {
+    const isCreditExhausted = error.toLowerCase().includes('credit') || error.toLowerCase().includes('402');
+    return (
+      <Box mt={4} mb={3}>
+        <Typography variant="h5" fontWeight={600} sx={{ color: '#1a202c', display: 'flex', alignItems: 'center', mb: 2 }}>
+          <LightbulbIcon sx={{ mr: 1, color: '#f59e0b' }} />
+          Content Pillars
+        </Typography>
+        <Paper sx={{ p: 2.5, borderRadius: 2, bgcolor: '#fef2f2', border: '1px solid #fecaca', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <ErrorIcon sx={{ color: '#ef4444', fontSize: 20, flexShrink: 0 }} />
+          <Typography variant="body2" sx={{ color: '#991b1b' }}>
+            {isCreditExhausted
+              ? 'Exa API credits exhausted — top up at dashboard.exa.ai to enable content pillar discovery.'
+              : `Content pillar discovery failed: ${error}`}
+          </Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
-  const { target_company, competitors } = data;
-  const hasPillars = target_company?.content_pillars?.length || competitors?.some(c => c.content_pillars?.length);
-  if (!hasPillars) return null;
+  if (!data) {
+    return (
+      <Box mt={4} mb={3}>
+        <Typography variant="h5" fontWeight={600} sx={{ color: '#1a202c', display: 'flex', alignItems: 'center', mb: 2 }}>
+          <LightbulbIcon sx={{ mr: 1, color: '#f59e0b' }} />
+          Content Pillars
+        </Typography>
+        <Paper sx={{ p: 2.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+          <Typography variant="body2" sx={{ color: '#94a3b8' }}>Content pillar discovery pending — analysis in progress...</Typography>
+        </Paper>
+      </Box>
+    );
+  }
+
+  const hasTarget = target_company?.content_pillars?.length;
+  const hasCompetitorPillars = competitors?.some(c => c.content_pillars?.length);
+  const hasPillars = hasTarget || hasCompetitorPillars;
+  
+  if (!hasPillars) {
+    return (
+      <Box mt={4} mb={3}>
+        <Typography variant="h5" fontWeight={600} sx={{ color: '#1a202c', display: 'flex', alignItems: 'center', mb: 2 }}>
+          <LightbulbIcon sx={{ mr: 1, color: '#f59e0b' }} />
+          Content Pillars
+        </Typography>
+        <Paper sx={{ p: 2.5, borderRadius: 2, bgcolor: '#fefce8', border: '1px solid #fde68a', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 80 }}>
+          <Typography variant="body2" sx={{ color: '#92400e' }}>Content pillars not yet discovered. AI is analyzing competitors and your website — results will appear here.</Typography>
+        </Paper>
+      </Box>
+    );
+  }
 
   return (
     <Box mt={4} mb={3}>

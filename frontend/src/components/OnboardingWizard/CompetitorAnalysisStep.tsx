@@ -361,7 +361,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
           social_media_accounts: result.social_media_accounts || {},
           social_media_citations: result.social_media_citations || [],
           research_summary: result.research_summary || null,
-          sitemap_analysis: null // Will be updated when sitemap analysis completes
+          // Preserve existing sitemap_analysis — API response doesn't include it
+          sitemap_analysis: sitemapAnalysis || null
         };
 
         setCompetitors(analysisData.competitors);
@@ -889,7 +890,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       )}
 
       {/* Content Pillars Section */}
-      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} />
+      <ContentPillarsSection data={contentPillars} isLoading={isLoadingPillars} error={error} />
 
       {/* Competitor Sitemap Analysis — results */}
       {benchmarkReport && (
