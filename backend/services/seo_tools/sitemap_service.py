@@ -719,25 +719,35 @@ class SitemapService:
             }
 
             # Generate AI insights
+            import time as _time
+            t0 = _time.time()
+            trace_id = f"alwrity_onboarding_sitemap_{user_id}"
             ai_response = llm_text_gen(
                 prompt=prompt,
                 system_prompt=self._get_onboarding_system_prompt(),
                 json_struct=json_struct,
-                user_id=user_id
+                user_id=user_id,
+                trace_id=trace_id,
             )
-            
+            api_took = (_time.time() - t0) * 1000
+
             # Parse and structure insights
+            parse_t0 = _time.time()
             insights = self._parse_onboarding_insights(ai_response)
+            parse_took = (_time.time() - parse_t0) * 1000
 
             pydantic_result = self._validate_with_pydantic(insights)
             logger.info(
-                f"[onboarding_insights_telemetry] pydantic_valid={pydantic_result['valid']} "
-                f"fields_ok={pydantic_result['fields_ok']} total_fields={pydantic_result['total_fields']} "
-                f"errors={pydantic_result.get('errors', '')}"
+                f"[onboarding_insights_telemetry] trace={trace_id} "
+                f"api_latency_ms={api_took:.0f} parse_ms={parse_took:.0f} "
+                f"pydantic_valid={pydantic_result['valid']} "
+                f"fields_ok={pydantic_result['fields_ok']}/{pydantic_result['total_fields']} "
+                f"parse_source={'direct_dict' if isinstance(ai_response, dict) else 'json_string'}"
             )
             if not pydantic_result['valid']:
                 logger.warning(
-                    f"[onboarding_insights_telemetry] Pydantic validation errors: {pydantic_result.get('errors', '')}"
+                    f"[onboarding_insights_telemetry] trace={trace_id} "
+                    f"Pydantic errors: {pydantic_result.get('errors', '')}"
                 )
             
             # Log AI analysis
@@ -1124,7 +1134,7 @@ Key focus areas:
 
 Provide practical, data-driven insights that help content creators make informed decisions about their content strategy and competitive positioning.
 
-Format your response as structured insights that can be easily parsed and displayed in a user interface."""
+IMPORTANT: Your response MUST be a single valid minified JSON object. No markdown, no code fences, no prose outside JSON."""
 
     def _parse_onboarding_insights(self, ai_response: Any) -> Dict[str, Any]:
         """Parse AI response for onboarding-specific insights"""
