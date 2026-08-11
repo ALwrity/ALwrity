@@ -173,7 +173,6 @@ class AdvertoolsService:
                 from services.analytics_cache_service import analytics_cache
                 cached_json = analytics_cache.get('sitemap_df', 'shared', url=url)
                 if cached_json:
-                    import pandas as pd
                     restored_df = pd.read_json(cached_json)
                     if restored_df is not None and not restored_df.empty:
                         with _SITEMAP_CACHE_LOCK:
