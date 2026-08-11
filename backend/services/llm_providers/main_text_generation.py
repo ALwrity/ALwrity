@@ -252,6 +252,9 @@ def llm_text_gen(
         elif gpt_provider == "openai":
             provider_enum = APIProvider.OPENAI
             actual_provider_name = "openai"
+        elif gpt_provider == "novarouteai":
+            provider_enum = APIProvider.WAVESPEED  # NovaRouteAI uses same billing structure
+            actual_provider_name = "novarouteai"
         
         if not provider_enum:
             # For unknown providers, try to proceed without subscription tracking
