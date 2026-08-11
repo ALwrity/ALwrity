@@ -139,68 +139,6 @@ class Step3ResearchService:
             
             logger.info(f"Successfully discovered {len(enhanced_competitors)} competitors for user {user_id}")
 
-            # Step 4: Auto-trigger sitemap analysis for strategic content opportunities (runs after competitor discovery)
-            sitemap_result = None
-            try:
-                from services.seo_tools.sitemap_service import SitemapService
-                sitemap_svc = SitemapService()
-                discovered_url = await sitemap_svc.discover_sitemap_url(user_url)
-                sitemap_url = discovered_url or f"{user_url.rstrip('/')}/sitemap.xml"
-                competitor_domains = [c.get("domain", "") for c in enhanced_competitors if c.get("domain")]
-                logger.info(f"[research] Auto-triggering sitemap analysis for {sitemap_url} with {len(competitor_domains)} competitors")
-                raw = await asyncio.wait_for(
-                    sitemap_svc.analyze_sitemap_for_onboarding(
-                        sitemap_url=sitemap_url,
-                        user_url=user_url,
-                        competitors=competitor_domains,
-                        industry_context=industry_context,
-                        analyze_content_trends=True,
-                        analyze_publishing_patterns=True,
-                        user_id=user_id,
-                    ),
-                    timeout=90,
-                )
-                sitemap_result = {
-                    "success": True,
-                    "user_url": user_url,
-                    "sitemap_url": sitemap_url,
-                    "analysis_data": {
-                        "total_urls": raw.get("total_urls", 0),
-                        "onboarding_insights": raw.get("onboarding_insights", {}),
-                    },
-                }
-                logger.info(f"[research] Sitemap analysis complete — {raw.get('total_urls', 0)} URLs processed")
-                
-                # Persist sitemap analysis to DB
-                try:
-                    from services.database import get_session_for_user
-                    from api.onboarding_utils.step_management_service import StepManagementService
-                    from models.onboarding import WebsiteAnalysis
-                    db = get_session_for_user(user_id)
-                    if db:
-                        svc = StepManagementService()
-                        session = svc._get_or_create_session(user_id, db)
-                        analysis = db.query(WebsiteAnalysis).filter(
-                            WebsiteAnalysis.session_id == session.id
-                        ).first()
-                        if analysis:
-                            seo_audit = analysis.seo_audit or {}
-                            seo_audit["sitemap_analysis"] = {
-                                "structure_analysis": raw.get("structure_analysis"),
-                                "onboarding_insights": raw.get("onboarding_insights"),
-                                "analyzed_at": raw.get("timestamp", datetime.utcnow().isoformat()),
-                            }
-                            analysis.seo_audit = seo_audit
-                            db.commit()
-                            logger.info(f"[research] Sitemap analysis persisted to DB for user {user_id}")
-                        db.close()
-                except Exception as p_err:
-                    logger.warning(f"[research] Failed to persist sitemap analysis: {p_err}")
-            except asyncio.TimeoutError:
-                logger.warning(f"[research] Sitemap analysis timed out after 90s — returning without it")
-            except Exception as sa_err:
-                logger.warning(f"[research] Sitemap analysis failed: {type(sa_err).__name__}: {sa_err}")
-
             # Trigger SIF indexing now that Exa Agent calls are complete (non-blocking)
             try:
                 from api.onboarding_utils.onboarding_task_scheduler import _run_sif_now
@@ -219,7 +157,6 @@ class Step3ResearchService:
                 "social_media_citations": social_media_results.get("citations", []),
                 "content_pillars": pillars_results,
                 "research_summary": research_summary,
-                "sitemap_analysis": sitemap_result,  # Auto-triggered sitemap analysis with strategic insights
                 "total_competitors": len(enhanced_competitors),
                 "industry_context": industry_context,
                 "analysis_timestamp": datetime.utcnow().isoformat(),

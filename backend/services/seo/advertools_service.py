@@ -40,6 +40,7 @@ _DOMAIN_429_LOCK = threading.Lock()
 _SITEMAP_CACHE: Dict[str, Tuple[pd.DataFrame, float]] = {}
 _SITEMAP_CACHE_LOCK = threading.Lock()
 _SITEMAP_CACHE_TTL = 600  # 10 minutes
+_DOMAIN_LOCK_TIMEOUT = 60.0  # max wait to acquire per-domain lock
 
 
 def _extract_domain(url: str) -> str:
@@ -67,12 +68,18 @@ def _throttle_domain_sync(domain: str) -> None:
         _DOMAIN_SEMAPHORES[domain] = threading.Lock()
     lock = _DOMAIN_SEMAPHORES[domain]
 
-    with lock:
+    acquired = lock.acquire(timeout=_DOMAIN_LOCK_TIMEOUT)
+    if not acquired:
+        logger.warning(f"Could not acquire domain lock for {domain} within {_DOMAIN_LOCK_TIMEOUT}s — proceeding without throttle")
+        return
+    try:
         pause = 1.0 - (_time.monotonic() - _DOMAIN_LAST_REQUEST.get(domain, 0.0))
         pause = max(pause, _domain_429_cooldown(domain))
         if pause > 0:
             _time.sleep(pause)
         _DOMAIN_LAST_REQUEST[domain] = _time.monotonic()
+    finally:
+        lock.release()
 
 class AdvertoolsService:
     """
