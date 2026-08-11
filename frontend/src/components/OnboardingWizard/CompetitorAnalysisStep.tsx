@@ -361,8 +361,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
           social_media_accounts: result.social_media_accounts || {},
           social_media_citations: result.social_media_citations || [],
           research_summary: result.research_summary || null,
-          // Preserve existing sitemap_analysis — API response doesn't include it
-          sitemap_analysis: sitemapAnalysis || null
+          // Use auto-triggered sitemap analysis if available, else preserve existing
+          sitemap_analysis: result.sitemap_analysis || sitemapAnalysis || null
         };
 
         setCompetitors(analysisData.competitors);
@@ -372,6 +372,9 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         setResearchSummary(analysisData.research_summary);
         if (result.content_pillars) {
           setContentPillars(result.content_pillars);
+        }
+        if (result.sitemap_analysis) {
+          setSitemapAnalysis(result.sitemap_analysis);
         }
         
         // Cache the analysis results with merged data

@@ -173,9 +173,27 @@ class Step3ResearchService:
                 
                 # Persist sitemap analysis to DB
                 try:
-                    from api.onboarding_utils.step3_routes import _persist_sitemap_analysis
-                    await _persist_sitemap_analysis(user_id, user_url, raw)
-                    logger.info(f"[research] Sitemap analysis persisted to DB for user {user_id}")
+                    from services.database import get_session_for_user
+                    from api.onboarding_utils.step_management_service import StepManagementService
+                    from models.onboarding import WebsiteAnalysis
+                    db = get_session_for_user(user_id)
+                    if db:
+                        svc = StepManagementService()
+                        session = svc._get_or_create_session(user_id, db)
+                        analysis = db.query(WebsiteAnalysis).filter(
+                            WebsiteAnalysis.session_id == session.id
+                        ).first()
+                        if analysis:
+                            seo_audit = analysis.seo_audit or {}
+                            seo_audit["sitemap_analysis"] = {
+                                "structure_analysis": raw.get("structure_analysis"),
+                                "onboarding_insights": raw.get("onboarding_insights"),
+                                "analyzed_at": raw.get("timestamp", datetime.utcnow().isoformat()),
+                            }
+                            analysis.seo_audit = seo_audit
+                            db.commit()
+                            logger.info(f"[research] Sitemap analysis persisted to DB for user {user_id}")
+                        db.close()
                 except Exception as p_err:
                     logger.warning(f"[research] Failed to persist sitemap analysis: {p_err}")
             except asyncio.TimeoutError:
@@ -201,6 +219,7 @@ class Step3ResearchService:
                 "social_media_citations": social_media_results.get("citations", []),
                 "content_pillars": pillars_results,
                 "research_summary": research_summary,
+                "sitemap_analysis": sitemap_result,  # Auto-triggered sitemap analysis with strategic insights
                 "total_competitors": len(enhanced_competitors),
                 "industry_context": industry_context,
                 "analysis_timestamp": datetime.utcnow().isoformat(),

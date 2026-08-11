@@ -150,7 +150,7 @@ class AdvertoolsService:
             domain = _extract_domain(url)
             df = pd.DataFrame()
 
-            # Check cache first
+            # Check cache first (in-memory)
             with _SITEMAP_CACHE_LOCK:
                 cached = _SITEMAP_CACHE.get(url)
                 if cached is not None:
@@ -160,6 +160,21 @@ class AdvertoolsService:
                         return cached_df.copy()
                     else:
                         del _SITEMAP_CACHE[url]
+
+            # Check persisted cache (survives restarts)
+            try:
+                from services.analytics_cache_service import analytics_cache
+                cached_json = analytics_cache.get('sitemap_df', 'shared', url=url)
+                if cached_json:
+                    import pandas as pd
+                    restored_df = pd.read_json(cached_json)
+                    if restored_df is not None and not restored_df.empty:
+                        with _SITEMAP_CACHE_LOCK:
+                            _SITEMAP_CACHE[url] = (restored_df, _time.monotonic())
+                        logger.debug(f"advertools cache HIT from DB for {url}")
+                        return restored_df
+            except Exception:
+                pass
 
             for attempt in range(retries + 1):
                 sleep_secs = 0.0
@@ -195,6 +210,12 @@ class AdvertoolsService:
                 if df is not None and not df.empty:
                     with _SITEMAP_CACHE_LOCK:
                         _SITEMAP_CACHE[url] = (df.copy(), _time.monotonic())
+                    # Persist to analytics cache so cache survives restarts
+                    try:
+                        from services.analytics_cache_service import analytics_cache
+                        analytics_cache.set('sitemap_df', 'shared', df.to_json(), url=url)
+                    except Exception:
+                        pass
                     return df
                 if attempt < retries:
                     if sleep_secs <= 0:
