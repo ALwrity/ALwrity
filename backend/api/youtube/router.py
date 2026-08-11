@@ -24,13 +24,12 @@ from utils.logger_utils import get_service_logger
 from utils.asset_tracker import save_asset_to_library
 from services.story_writer.video_generation_service import StoryVideoGenerationService
 from services.user_workspace_manager import UserWorkspaceManager
-from .planning_executor import execute_video_plan_task
-from .task_manager import task_manager
 from .handlers import avatar as avatar_handlers
 from .handlers import images as image_handlers
 from .handlers import audio as audio_handlers
 from .oauth_router import router as youtube_oauth_router
 from .publish_router import router as youtube_publish_router
+from services.youtube.planner import YouTubePlannerService
 
 router = APIRouter(prefix="/youtube", tags=["youtube"])
 logger = get_service_logger("api.youtube")
@@ -103,13 +102,6 @@ class VideoPlanResponse(BaseModel):
     """Response model for video plan."""
     success: bool
     plan: Optional[Dict[str, Any]] = None
-    message: str
-
-
-class VideoPlanTaskResponse(BaseModel):
-    """Response model for asynchronous video plan task creation."""
-    success: bool
-    task_id: Optional[str] = None
     message: str
 
 
@@ -223,85 +215,49 @@ def require_authenticated_user(current_user: Dict[str, Any]) -> str:
     return str(user_id)
 
 
-@router.post("/plan", response_model=VideoPlanTaskResponse)
+@router.post("/plan", response_model=VideoPlanResponse)
 async def create_video_plan(
     request: VideoPlanRequest,
-    background_tasks: BackgroundTasks,
     current_user: Dict[str, Any] = Depends(get_current_user),
-) -> VideoPlanTaskResponse:
+) -> VideoPlanResponse:
     """
-    Create an asynchronous video planning task from user input.
+    Create a video planning from user input.
     """
     try:
         user_id = require_authenticated_user(current_user)
 
         logger.info(
-            f"[YouTubeAPI] Creating plan task: idea={request.user_idea[:50]}..., "
+            f"[YouTubeAPI] Creating plan: idea={request.user_idea[:50]}..., "
             f"duration={request.duration_type}, user={user_id}"
         )
 
-        task_id = task_manager.create_task(
-            "youtube_video_plan",
-            metadata={
-                "owner_user_id": user_id,
-                "duration_type": request.duration_type,
-                "has_avatar_input": bool(request.avatar_url),
-            },
+        planner = YouTubePlannerService()
+        plan = await planner.generate_plan(
+            user_idea=request.user_idea,
+            duration_type=request.duration_type,
+            video_type=request.video_type,
+            target_audience=request.target_audience,
+            video_goal=request.video_goal,
+            brand_style=request.brand_style,
+            reference_image_description=request.reference_image_description,
             user_id=user_id,
-        )
-        initial_status = task_manager.get_task_status(task_id, requester_user_id=user_id)
-        if not initial_status:
-            logger.error(f"[YouTubeAPI] Failed to create plan task {task_id} for user {user_id}")
-            return VideoPlanTaskResponse(
-                success=False,
-                message="Failed to create planning task. Please try again.",
-            )
-
-        background_tasks.add_task(
-            execute_video_plan_task,
-            task_id=task_id,
-            request_data=request.model_dump(),
-            user_id=user_id,
+            avatar_url=request.avatar_url,
+            enable_research=request.enable_research,
         )
 
-        return VideoPlanTaskResponse(
+        return VideoPlanResponse(
             success=True,
-            task_id=task_id,
-            message="Video plan generation started"
+            plan=plan,
+            message="Video plan generated successfully"
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[YouTubeAPI] Error creating plan task: {e}", exc_info=True)
-        return VideoPlanTaskResponse(
+        logger.error(f"[YouTubeAPI] Error creating plan: {e}", exc_info=True)
+        return VideoPlanResponse(
             success=False,
-            message=f"Failed to start video plan generation: {str(e)}"
-        )
-
-
-@router.get("/plan/{task_id}")
-async def get_video_plan_status(
-    task_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user),
-) -> Optional[Dict[str, Any]]:
-    """
-    Get asynchronous YouTube plan task status.
-    """
-    try:
-        user_id = require_authenticated_user(current_user)
-        logger.debug(f"[YouTubeAPI] Getting plan status for task: {task_id}, user={user_id}")
-        task_status = task_manager.get_task_status(task_id, requester_user_id=user_id)
-        if not task_status:
-            return None
-        return task_status
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"[YouTubeAPI] Error getting plan status: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to get plan status: {str(e)}",
+            message=f"Failed to create video plan: {str(e)}"
         )
 
 

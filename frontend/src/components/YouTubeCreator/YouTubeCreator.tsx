@@ -29,7 +29,6 @@ import { RenderStep } from './components/RenderStep';
 import { useRenderPolling } from './hooks/useRenderPolling';
 import { useCostEstimate } from './hooks/useCostEstimate';
 import { useImageGenerationPolling } from './hooks/useImageGenerationPolling';
-import { usePlanPolling } from './hooks/usePlanPolling';
 import HeaderControls from '../shared/HeaderControls';
 import { useYouTubeCreatorState } from '../../hooks/useYouTubeCreatorState';
 import { ContentAsset } from '../../hooks/useContentAssets';
@@ -67,7 +66,6 @@ const YouTubeCreator: React.FC = () => {
   // Local UI state (not persisted)
   const [activeStep, setActiveStep] = useState(persistedActiveStep);
   const [loading, setLoading] = useState(false);
-  const [planTaskId, setPlanTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -78,36 +76,6 @@ const YouTubeCreator: React.FC = () => {
   
   // Robust polling hook for image generation
   const { startPolling: startImagePolling, stopPolling: stopImagePolling } = useImageGenerationPolling();
-
-  const handlePlanSuccess = useCallback((generatedPlan: VideoPlan) => {
-    const updates: any = { videoPlan: generatedPlan };
-    if (generatedPlan.auto_generated_avatar_url) {
-      updates.avatarUrl = generatedPlan.auto_generated_avatar_url;
-      setSuccess('Video plan generated! Avatar auto-generated based on your plan.');
-    } else {
-      setSuccess('Video plan generated successfully!');
-    }
-    updateState(updates);
-    setPlanTaskId(null);
-    setLoading(false);
-    setTimeout(() => {
-      setActiveStep(1);
-      setSuccess(null);
-    }, 1000);
-  }, [updateState]);
-
-  const handlePlanError = useCallback((planError: string) => {
-    setError(planError || 'Failed to generate video plan');
-    setPlanTaskId(null);
-    setLoading(false);
-  }, []);
-
-  const {
-    planStatus,
-    planProgress,
-    planMessage,
-    error: planPollingError,
-  } = usePlanPolling(planTaskId, handlePlanSuccess, handlePlanError);
 
   // Sync activeStep with persisted state on mount
   useEffect(() => {
@@ -143,26 +111,6 @@ const YouTubeCreator: React.FC = () => {
     }
   }, [polledStatus, polledProgress, pollingError, updateState]);
 
-  useEffect(() => {
-    if (!planTaskId) {
-      return;
-    }
-    if (planPollingError) {
-      setError(planPollingError);
-    }
-  }, [planTaskId, planPollingError]);
-
-  useEffect(() => {
-    if (!planTaskId) {
-      return;
-    }
-    if (planStatus?.status === 'processing' || planStatus?.status === 'pending') {
-      const progressText = Math.round(planProgress || 0);
-      const detail = planMessage ? ` ${planMessage}` : '';
-      setSuccess(`Generating your video plan... ${progressText}%${detail}`);
-    }
-  }, [planTaskId, planStatus?.status, planProgress, planMessage]);
-
   const { costEstimate, loadingCostEstimate } = useCostEstimate({
     activeStep,
     scenes,
@@ -189,7 +137,7 @@ const YouTubeCreator: React.FC = () => {
     setSuccess(null);
 
     try {
-      const response = await youtubeApi.createPlanTask({
+      const response = await youtubeApi.createPlan({
         user_idea: userIdea,
         duration_type: durationType,
         video_type: videoType || undefined,
@@ -200,19 +148,28 @@ const YouTubeCreator: React.FC = () => {
         avatar_url: avatarUrl || undefined,
       });
 
-      if (!response.success || !response.task_id) {
+      if (response.success && response.plan) {
+        const updates: any = { videoPlan: response.plan };
+        if (response.plan.auto_generated_avatar_url) {
+          updates.avatarUrl = response.plan.auto_generated_avatar_url;
+          setSuccess('Video plan generated! Avatar auto-generated based on your plan.');
+        } else {
+          setSuccess('Video plan generated successfully!');
+        }
+        updateState(updates);
+        setTimeout(() => {
+          setActiveStep(1);
+          setSuccess(null);
+        }, 2000);
+      } else {
         setError(response.message || 'Failed to generate plan');
-        setLoading(false);
-        return;
       }
-
-      setPlanTaskId(response.task_id);
-      setSuccess('Generating your video plan... this can take up to 2 minutes.');
     } catch (err: any) {
       setError(err.message || 'Failed to generate video plan');
+    } finally {
       setLoading(false);
     }
-  }, [userIdea, durationType, videoType, targetAudience, videoGoal, brandStyle, referenceImage, avatarUrl]);
+  }, [userIdea, durationType, videoType, targetAudience, videoGoal, brandStyle, referenceImage, avatarUrl, updateState]);
 
   const handleAvatarUpload = useCallback(async (file: File) => {
     setUploadingAvatar(true);
