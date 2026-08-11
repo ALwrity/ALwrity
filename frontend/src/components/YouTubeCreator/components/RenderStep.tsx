@@ -5,7 +5,7 @@
  * Orchestrates scene overview, settings, cost estimation, and render status.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Paper,
   Typography,
@@ -20,7 +20,6 @@ import {
 } from '@mui/material';
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import CheckCircle from '@mui/icons-material/CheckCircle';
-import Warning from '@mui/icons-material/Warning';
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import Visibility from '@mui/icons-material/Visibility';
 import ImageIcon from '@mui/icons-material/Image';
@@ -34,6 +33,7 @@ import { RenderSettings } from './RenderSettings';
 import { RenderStatusDisplay } from './RenderStatusDisplay';
 import { ScenePreviewModal } from './ScenePreviewModal';
 import { useYouTubeRenderQueue } from '../hooks/useYouTubeRenderQueue';
+import { YouTubePublishPanel } from './YouTubePublishPanel';
 import Snackbar from '@mui/material/Snackbar';
 import MuiAlert, { AlertColor } from '@mui/material/Alert';
 
@@ -116,7 +116,8 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
     onInfo: (msg) => showSnackbar(msg, 'info'),
   });
 
-  const canStartRender = enabledScenesCount > 0 && !loading;
+  const resolvedVideoUrl = finalVideoUrl || getVideoUrl();
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -492,6 +493,12 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
           audioUrl={previewScene.audioUrl}
         />
       )}
+
+      <YouTubePublishPanel
+        videoUrl={resolvedVideoUrl}
+        scenes={scenes}
+        videoPlan={videoPlan}
+      />
     </motion.div>
   );
 });

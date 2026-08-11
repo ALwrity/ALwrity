@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 from datetime import datetime, timedelta
@@ -16,7 +17,7 @@ if str(_BACKEND_ROOT) not in sys.path:
 os.environ.setdefault("HUGGINGFACE_INPUT_TOKEN_COST", "1.00")
 os.environ.setdefault("HUGGINGFACE_OUTPUT_TOKEN_COST", "3.00")
 
-pytestmark = [pytest.mark.subscription_sanity, pytest.mark.regression, pytest.mark.asyncio]
+pytestmark = [pytest.mark.subscription_sanity, pytest.mark.regression]
 
 
 def _upsert_user_subscription(db, user_id: str, plan_name: str = "Free") -> str:
@@ -79,13 +80,13 @@ def _seed_usage_summary(db, user_id: str, billing_period: str, **kwargs):
 class TestUsageTrackingResetMethod:
     """Service-level coverage for the Start for Free usage reset path."""
 
-    async def test_reset_method_exists_on_service(self):
+    def test_reset_method_exists_on_service(self):
         from services.subscription.usage_tracking_service import UsageTrackingService
 
         assert hasattr(UsageTrackingService, "reset_current_billing_period")
         assert callable(getattr(UsageTrackingService, "reset_current_billing_period"))
 
-    async def test_reset_current_billing_period_resets_existing_summary(
+    def test_reset_current_billing_period_resets_existing_summary(
         self, subscription_db_session, _seeded_subscription_db
     ):
         from models.subscription_models import UsageSummary, UsageStatus
@@ -96,7 +97,7 @@ class TestUsageTrackingResetMethod:
         _seed_usage_summary(subscription_db_session, user_id, billing_period)
 
         service = UsageTrackingService(subscription_db_session)
-        result = await service.reset_current_billing_period(user_id)
+        result = asyncio.run(service.reset_current_billing_period(user_id))
 
         assert result["reset"] is True
         assert result["billing_period"] == billing_period
@@ -113,7 +114,7 @@ class TestUsageTrackingResetMethod:
         assert summary.gemini_tokens == 0
         assert summary.usage_status == UsageStatus.ACTIVE
 
-    async def test_reset_current_billing_period_creates_summary_when_missing(
+    def test_reset_current_billing_period_creates_summary_when_missing(
         self, subscription_db_session, _seeded_subscription_db
     ):
         from models.subscription_models import UsageSummary
@@ -123,7 +124,7 @@ class TestUsageTrackingResetMethod:
         billing_period = _upsert_user_subscription(subscription_db_session, user_id)
 
         service = UsageTrackingService(subscription_db_session)
-        result = await service.reset_current_billing_period(user_id)
+        result = asyncio.run(service.reset_current_billing_period(user_id))
 
         assert result["reset"] is True
         assert result["billing_period"] == billing_period
@@ -136,13 +137,13 @@ class TestUsageTrackingResetMethod:
         assert summary.total_calls == 0
         assert summary.total_tokens == 0
 
-    async def test_reset_current_billing_period_missing_user_id(
+    def test_reset_current_billing_period_missing_user_id(
         self, subscription_db_session, _seeded_subscription_db
     ):
         from services.subscription.usage_tracking_service import UsageTrackingService
 
         service = UsageTrackingService(subscription_db_session)
-        result = await service.reset_current_billing_period("")
+        result = asyncio.run(service.reset_current_billing_period(""))
 
         assert result["reset"] is False
         assert result["reason"] == "missing_user_id"
@@ -151,7 +152,7 @@ class TestUsageTrackingResetMethod:
 class TestSubscribeUsageResetIntegration:
     """Route-level regression: subscribe must invoke reset without attribute errors."""
 
-    async def test_subscribe_resets_usage_counters(
+    def test_subscribe_resets_usage_counters(
         self,
         subscription_client_with_db,
         subscription_db_session,
