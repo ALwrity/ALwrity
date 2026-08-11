@@ -8,7 +8,7 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
-import { apiClient } from '../../api/client';
+import { apiClient, longRunningApiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import WebsiteStep from './WebsiteStep';
 import LinkedInConnectStep from './LinkedInConnectStep';
@@ -95,7 +95,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     if (activeStep < 1) return;
     const fetchTasks = async () => {
       try {
-        const res = await apiClient.get('/api/onboarding/tasks/status');
+        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
         if (res.data.tasks) {
           setBackgroundTasks(res.data);
         }
@@ -288,8 +288,9 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
     setActiveStep(computedStep);
-    // Keep localStorage in sync with the authoritative source for next load
-    localStorage.setItem('onboarding_active_step', String(computedStep));
+    if (onboarding.steps) {
+      localStorage.setItem('onboarding_active_step', String(computedStep));
+    }
   }, [data, currentStep, steps.length]);
 
   const handleNext = useCallback(async (rawStepData?: any) => {

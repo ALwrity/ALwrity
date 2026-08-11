@@ -94,16 +94,20 @@ class ExaService:
     }
 
     SOCIAL_MEDIA_ANSWER_SCHEMA = {
-        "type": "object", "required": ["website", "x", "instagram", "facebook", "youtube", "linkedin", "github"],
+        "type": "object",
+        "required": ["website"],
         "additionalProperties": False,
+        "description": "Schema describing social media accounts and their links for the target website",
         "properties": {
             "website":   {"type": "string", "description": "Official website URL"},
+            "facebook":  {"type": "string", "description": "Facebook page URL"},
             "x":         {"type": "string", "description": "X (formerly Twitter) profile URL"},
             "instagram": {"type": "string", "description": "Instagram profile URL"},
-            "facebook":  {"type": "string", "description": "Facebook page URL"},
             "youtube":   {"type": "string", "description": "YouTube channel URL"},
-            "linkedin":  {"type": "string", "description": "LinkedIn page URL"},
+            "linkedin":  {"type": "string", "description": "LinkedIn company page URL"},
             "github":    {"type": "string", "description": "GitHub organization or repository URL"},
+            "pinterest": {"type": "string", "description": "Pinterest profile URL"},
+            "tiktok":    {"type": "string", "description": "TikTok profile URL"},
         },
     }
 
@@ -117,7 +121,7 @@ class ExaService:
             query = (f"Find {num_results} companies that are direct competitors of {domain}{industry_hint}. "
                      f"Focus on similar products/services. Return company name, website, country, employees, "
                      f"funding round, amount raised, year, and a brief description.")
-            result = await ExaAgentClient().run(query=query, output_schema=self.COMPETITOR_AGENT_SCHEMA, effort="medium")
+            result = await ExaAgentClient().run(query=query, output_schema=self.COMPETITOR_AGENT_SCHEMA)
             if not result or not result.get("companies"):
                 return None
             competitors = []
@@ -152,10 +156,15 @@ class ExaService:
                 return None
             domain = urlparse(user_url).netloc.replace("www.", "")
             logger.info(f"[exa answer] Social media discovery for {domain}")
-            result = await self._run_sync_with_timeout(
-                self.exa.answer,
-                f"{domain} social media accounts and their links like X, instagram, facebook, youtube, website, linkedin, github",
-                output_schema=self.SOCIAL_MEDIA_ANSWER_SCHEMA,
+            query = f"{domain} social media accounts and their links like X, instagram, facebook, youtube, website, linkedin, github, pinterest, tiktok"
+            loop = asyncio.get_event_loop()
+            result = await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: self.exa.answer(
+                    query,
+                    system_prompt=query,
+                    output_schema=self.SOCIAL_MEDIA_ANSWER_SCHEMA,
+                )),
+                timeout=120,
             )
             if not result or not getattr(result, 'answer', None):
                 return None
@@ -165,11 +174,14 @@ class ExaService:
                 answer = json.loads(answer)
             if not isinstance(answer, dict):
                 return None
-            accounts = {k: v for k, v in answer.items() if v and isinstance(v, str) and v.strip()}
+            accounts = {k: v for k, v in answer.items() if v and isinstance(v, str) and v.strip() and k != "website"}
+            # Normalize "x" → "twitter" for frontend/legacy compatibility
+            if "x" in accounts:
+                accounts["twitter"] = accounts.pop("x")
             logger.info(f"[exa answer] Found {len(accounts)} social media accounts for {domain}")
             return {"success": True, "social_media_accounts": accounts, "citations": [], "api_cost": 0}
         except Exception as e:
-            logger.warning(f"[exa answer] Social media discovery failed: {e}")
+            logger.warning(f"[exa answer] Social media discovery failed: {type(e).__name__}: {e}", exc_info=True)
             return None
 
     # ------------------------------------------------------------------
@@ -206,14 +218,16 @@ class ExaService:
         try:
             domain = urlparse(user_url).netloc.replace("www.", "")
             query = (
-                f"Identify the primary content topic pillars for {domain} and its top 5 direct market competitors. "
-                f"For each, analyze their blogs, documentation, and resource hubs to extract 3 to 5 core topic pillars "
-                f"and keyword clusters they actively target."
+                f"Identify the primary content topic pillars for {domain} and its top 5 direct market competitors "
+                f"in its specific industry.\n\n"
+                f"If competitor domains are not specified, automatically determine the top 5 direct competitors "
+                f"based on product category overlap.\n\n"
+                f"For {domain} and each competitor, analyze their official blogs, documentation, and resource hubs "
+                f"to extract 3 to 5 core topic pillars and keyword clusters they actively target."
             )
             result = await ExaAgentClient().run(
                 query=query,
                 output_schema=self.CONTENT_PILLARS_SCHEMA,
-                effort="medium",
             )
             return result
         except RuntimeError:

@@ -199,7 +199,7 @@ const WebsiteIntegrationsSection: React.FC<WebsiteIntegrationsSectionProps> = ({
     if (websiteUrl && !sites.find(s => s.url === websiteUrl)) {
       sites.push({ url: websiteUrl, source: 'Website', name: 'Your Website' });
     }
-    return sites;
+    return sites.filter(s => s.url);
   }, [wixConnected, wixSites, wordpressConnected, wordpressSites, websiteUrl]);
 
   // Default to first site

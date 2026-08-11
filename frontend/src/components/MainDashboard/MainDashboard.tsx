@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import AskAlwrityIcon from '../../assets/images/AskAlwrity-min.ico';
 import { SubscriptionGuard } from '../SubscriptionGuard';
-import { apiClient } from '../../api/client';
+import { apiClient, longRunningApiClient } from '../../api/client';
 
 // Shared components
 import DashboardHeader from '../shared/DashboardHeader';
@@ -177,7 +177,7 @@ const MainDashboard: React.FC = () => {
   React.useEffect(() => {
     const fetchOnboardingTasks = async () => {
       try {
-        const res = await apiClient.get('/api/onboarding/tasks/status');
+        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
         if (res.data.tasks) {
           setOnboardingTasks(res.data);
           if (res.data.all_done) return;

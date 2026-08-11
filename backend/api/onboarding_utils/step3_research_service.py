@@ -125,6 +125,15 @@ class Step3ResearchService:
             
             logger.info(f"Successfully discovered {len(enhanced_competitors)} competitors for user {user_id}")
 
+            # Trigger SIF indexing now that Exa Agent calls are complete (non-blocking)
+            try:
+                from api.onboarding_utils.onboarding_task_scheduler import _run_sif_now
+                website_url = user_url
+                asyncio.ensure_future(_run_sif_now(user_id, website_url))
+                logger.info(f"Triggered SIF indexing after Exa discovery for {user_id}")
+            except Exception as sif_err:
+                logger.warning(f"Could not trigger SIF after discovery: {sif_err}")
+
             return {
                 "success": True,
                 "session_id": actual_session_id,

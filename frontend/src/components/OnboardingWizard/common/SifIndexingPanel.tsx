@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress } from '@mui/material';
 import { CloudDone as CloudDoneIcon, HourglassEmpty as HourglassEmptyIcon } from '@mui/icons-material';
-import { apiClient } from '../../../api/client';
+import { apiClient, longRunningApiClient } from '../../../api/client';
 
 const PHASE_MAP: Record<string, string> = {
   'harvesting': 'Harvesting website pages...',
@@ -38,7 +38,7 @@ export const SifIndexingPanel: React.FC = () => {
   useEffect(() => {
     const poll = async () => {
       try {
-        const res = await apiClient.get('/api/onboarding/tasks/status');
+        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
         const sifTask = res?.data?.tasks?.sif_indexing;
         if (!sifTask) return;
 
