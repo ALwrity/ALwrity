@@ -193,7 +193,7 @@ def llm_text_gen(
             available_providers.append("huggingface")
         if api_key_manager.get_api_key("wavespeed"):
             available_providers.append("wavespeed")
-        if api_key_manager.get_api_key("novarouteai"):
+        if api_key_manager.get_api_key("novaroute"):
             available_providers.append("novarouteai")
         
         logger.warning(
