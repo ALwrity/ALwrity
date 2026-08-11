@@ -248,11 +248,12 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     }
 
     // Check backend DB for existing competitor data (survives cache expiry)
+    // Pre-populate competitors but continue to API for fresh social media + pillars
     if (!force) {
       try {
         const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
         if (dbResult?.data?.competitors?.length > 0) {
-          console.log('CompetitorAnalysisStep: Using DB competitor data');
+          console.log('CompetitorAnalysisStep: Pre-populating competitors from DB');
           const comps = dbResult.data.competitors.map((c: any) => ({
             url: c.url || '', domain: c.domain || '', title: c.url || '',
             summary: '', relevance_score: 0.8,
@@ -261,9 +262,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
             content_insights: { content_focus: '', content_quality: '' },
           }));
           setCompetitors(comps);
-          setIsAnalyzing(false);
-          setShowProgressModal(false);
-          return;
+          setUsingCachedData(true);
+          // Continue to API call below for fresh social media + pillars
         }
       } catch {
         // DB check failed — proceed with fresh API call

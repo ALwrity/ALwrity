@@ -210,9 +210,12 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     console.log('OnboardingContext: Clerk loaded, isSignedIn:', isSignedIn);
     
     if (isSignedIn) {
-      console.log('OnboardingContext: User signed in, but waiting for subscription check...');
-      // Don't automatically fetch onboarding data - let InitialRouteHandler handle the flow
-      setLoading(false);
+      console.log('OnboardingContext: User signed in, fetching onboarding data...');
+      if (!shouldSkipOnboarding()) {
+        fetchOnboardingData();
+      } else {
+        setLoading(false);
+      }
     } else {
       console.log('OnboardingContext: User not signed in, skipping data fetch');
       setLoading(false);
