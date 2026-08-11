@@ -33,10 +33,21 @@ def test_build_linkedin_app_collects_routes(linkedin_app):
     """All LinkedIn routers should mount their own routes on the test app."""
     from fastapi.routing import APIRoute
 
-    routes = [
-        r for r in linkedin_app.routes
-        if isinstance(r, APIRoute)
-    ]
+    def _collect_api_routes(route_items):
+        collected = []
+        for route in route_items:
+            if isinstance(route, APIRoute):
+                collected.append(route)
+                continue
+            nested_router = getattr(route, "router", None)
+            if nested_router is None:
+                nested_router = getattr(route, "original_router", None)
+            nested_routes = getattr(nested_router, "routes", None)
+            if nested_routes:
+                collected.extend(_collect_api_routes(nested_routes))
+        return collected
+
+    routes = _collect_api_routes(linkedin_app.routes)
     # 57 routes total registered across all 16 LinkedIn router files.
     # Sanity bound — if releases drop below this, a router probably
     # failed to import (likely missing stub).

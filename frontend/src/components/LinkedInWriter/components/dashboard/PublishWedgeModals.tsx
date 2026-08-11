@@ -23,7 +23,9 @@ import {
 } from "../../utils/linkedInDraftLibraryUtils";
 import {
   isPublishWedgeScheduleLocked,
+  isPublishWedgeTimingLocked,
   PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT,
+  PUBLISH_WEDGE_TIMING_LOCKED_HINT,
 } from "../../utils/linkedInPublishWedgeLockedUi";
 import { ConnectLockIcon } from "./ConnectLockIcon";
 import { EngagementBoosterLaunchButton } from "./EngagementBoosterLaunchButton";
@@ -147,6 +149,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
   const [schedulePrefillTime, setSchedulePrefillTime] = useState("");
   const [scheduleAsset, setScheduleAsset] = useState<LinkedInDraftAsset | null>(null);
   const scheduleLocked = isPublishWedgeScheduleLocked();
+  const timingLocked = isPublishWedgeTimingLocked();
 
   useEffect(() => {
     if (!open) return;
@@ -445,17 +448,30 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
                   {scheduleLocked && <ConnectLockIcon size={12} />}
                 </button>
                 <button
+                  type="button"
                   style={{
-                    ...panelBtn(),
-                    borderColor: "#0ea5e9",
-                    color: "#0ea5e9",
+                    ...panelBtn(false, false, timingLocked),
+                    borderColor: timingLocked ? "#d1d5db" : "#0ea5e9",
+                    color: timingLocked ? "#9ca3af" : "#0ea5e9",
                   }}
+                  disabled={timingLocked}
+                  title={
+                    timingLocked ? PUBLISH_WEDGE_TIMING_LOCKED_HINT : undefined
+                  }
+                  aria-label={
+                    timingLocked
+                      ? "Best Time — coming soon"
+                      : "Find the best time to post this draft"
+                  }
                   onClick={() => {
-                    setTimingForAsset(asset);
-                    setShowTiming(true);
+                    if (!timingLocked) {
+                      setTimingForAsset(asset);
+                      setShowTiming(true);
+                    }
                   }}
                 >
                   ⏰ Best Time
+                  {timingLocked && <ConnectLockIcon size={12} />}
                 </button>
               </div>
               </div>

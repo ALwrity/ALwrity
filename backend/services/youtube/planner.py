@@ -99,7 +99,7 @@ class YouTubePlannerService:
         """Initialize the planner service."""
         logger.info("[YouTubePlanner] Service initialized")
     
-    async def generate_video_plan(
+    async def generate_plan(
         self,
         user_idea: str,
         duration_type: str,  # "shorts", "medium", "long"
@@ -112,6 +112,7 @@ class YouTubePlannerService:
         source_content_id: Optional[str] = None,  # For blog/story conversion
         source_content_type: Optional[str] = None,  # "blog", "story"
         user_id: str = None,
+        avatar_url: Optional[str] = None,
         include_scenes: bool = False,  # For shorts: combine plan + scenes in one call
         enable_research: bool = True,  # Always enable research by default for enhanced plans
     ) -> Dict[str, Any]:
@@ -710,11 +711,19 @@ Add a "scenes" field with the complete scene breakdown, and include "avatar_reco
         try:
             # Pre-flight validation for Exa search only (not full blog writer workflow)
             # We only need to validate Exa API calls, not LLM operations
-            from services.database import get_db
+            from services.database import get_session_for_user
             from services.subscription import PricingService
             from models.subscription_models import APIProvider
-            
-            db = next(get_db())
+
+            db = get_session_for_user(user_id)
+            if not db:
+                logger.warning(
+                    f"[YouTubePlanner] Unable to open DB session for user {user_id} during Exa preflight"
+                )
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database temporarily unavailable for research validation",
+                )
             try:
                 pricing_service = PricingService(db)
                 # Only validate Exa API call, not the full research workflow

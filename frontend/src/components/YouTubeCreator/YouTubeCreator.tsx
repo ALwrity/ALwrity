@@ -149,23 +149,18 @@ const YouTubeCreator: React.FC = () => {
       });
 
       if (response.success && response.plan) {
-        // Update persisted state
         const updates: any = { videoPlan: response.plan };
-        
-        // If avatar was auto-generated, set it
         if (response.plan.auto_generated_avatar_url) {
           updates.avatarUrl = response.plan.auto_generated_avatar_url;
           setSuccess('Video plan generated! Avatar auto-generated based on your plan.');
         } else {
           setSuccess('Video plan generated successfully!');
         }
-        
         updateState(updates);
-        
         setTimeout(() => {
           setActiveStep(1);
           setSuccess(null);
-        }, 1000);
+        }, 2000);
       } else {
         setError(response.message || 'Failed to generate plan');
       }
@@ -174,7 +169,7 @@ const YouTubeCreator: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [userIdea, durationType, videoType, targetAudience, videoGoal, brandStyle, referenceImage, avatarUrl]);
+  }, [userIdea, durationType, videoType, targetAudience, videoGoal, brandStyle, referenceImage, avatarUrl, updateState]);
 
   const handleAvatarUpload = useCallback(async (file: File) => {
     setUploadingAvatar(true);

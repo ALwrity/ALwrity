@@ -36,9 +36,10 @@ import {
   ENGAGEMENT_WEDGE_MODAL_INTRO,
   GROWTH_ENGINE_ENGAGEMENT_TILE,
 } from "./engagementWedgeCopy";
+import { PUBLISH_WEDGE_MODAL_INTRO } from "./publishWedgeCopy";
 import { RepurposeLabModal } from "./repurposeLab";
+import { FormatTransformerModal } from "./formatTransformer";
 import {
-  FormatTransformerModal,
   ContentRefreshModal,
   StaleReviverModal,
   PerfToPlanModal,
@@ -99,7 +100,7 @@ const CREATE_TILE_TOOLS = [
   {
     id: "post",
     title: "Post",
-    description: "Professional LinkedIn post with engagement hooks",
+    description: "Share your take and build authority in seconds",
     icon: "📝",
     accent: "#0a66c2",
   },
@@ -113,14 +114,16 @@ const CREATE_TILE_TOOLS = [
   {
     id: "video_script",
     title: "Video Script",
-    description: "Engaging video script with hook & scenes",
+    description:
+      "Turn your expertise into a script that positions you as the go-to voice",
     icon: "🎬",
     accent: "#dc2626",
   },
   {
     id: "carousel",
     title: "Carousel",
-    description: "Multi-slide carousel for visual storytelling",
+    description:
+      "Break down your expertise into a visual story people save and share",
     icon: "🎠",
     accent: "#8b5cf6",
   },
@@ -301,7 +304,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         >
           <DashboardToolTile
             title="Get Topic Ideas"
-            description="AI-powered topic suggestions based on your profile"
+            description="Quick idea, right now — matched to your voice"
             icon="💡"
             accent="#0a66c2"
             onClick={openTopicIdeas}
@@ -345,6 +348,16 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         titleSize="xl"
         modalClassName={`linkedin-publish-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: "#64748b",
+            lineHeight: 1.5,
+          }}
+        >
+          {PUBLISH_WEDGE_MODAL_INTRO}
+        </p>
         <div
           className={`linkedin-publish-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
           style={WEDGE_TILE_GRID_STYLE}

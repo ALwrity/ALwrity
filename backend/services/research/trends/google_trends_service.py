@@ -53,6 +53,7 @@ try:
     PYTrends_AVAILABLE = True
 except ImportError:
     PYTrends_AVAILABLE = False
+    _TrendReq = Any # Define as Any to prevent NameError in type hints
     _TooManyRequestsError = None
     logger.warning("pytrends not installed. Google Trends features will be unavailable.")
 

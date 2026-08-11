@@ -201,6 +201,12 @@ env/
 ENV/
 .venv/
 myenv312/
+.alwrity/
+.youtube/
+
+# Local workspace folders (not required for app functionality)
+.command/
+backups/
 
 # Jupyter Notebook
 .ipynb_checkpoints

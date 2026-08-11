@@ -9,7 +9,9 @@ import { DASHBOARD_WORKFLOW_CARDS } from "../components/dashboard/dashboardWorkf
 describe("engagementWedgeCopy", () => {
   it("exports thought-leader positioning strings", () => {
     expect(ENGAGEMENT_WEDGE_RING_DESCRIPTION).toMatch(/authority-building/i);
-    expect(ENGAGEMENT_WEDGE_MODAL_INTRO).toMatch(/thought-leader/i);
+    expect(ENGAGEMENT_WEDGE_MODAL_INTRO).toBe(
+      "Your 15-minute thought-leader routine on LinkedIn",
+    );
   });
 
   it("renames opportunities tile to Conversations to Join", () => {
