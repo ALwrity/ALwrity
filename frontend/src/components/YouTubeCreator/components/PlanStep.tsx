@@ -51,7 +51,7 @@ import { OperationButton } from '../../shared/OperationButton';
 import { AssetLibraryImageModal } from '../../shared/AssetLibraryImageModal';
 import { ContentAsset } from '../../../hooks/useContentAssets';
 import { buildVideoPlanningOperation, buildImageEditingOperation } from '../utils/operationHelpers';
-import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
 
 interface PlanStepProps {
@@ -122,89 +122,8 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
     [] // No dependencies - always returns same object
   );
 
-  // Load avatar as blob if it's an authenticated endpoint
-  const [avatarBlobUrl, setAvatarBlobUrl] = useState<string | null>(null);
-  const [avatarLoading, setAvatarLoading] = useState(false);
-
-  useEffect(() => {
-    if (!avatarPreview) {
-      setAvatarBlobUrl(null);
-      setAvatarLoading(false);
-      return;
-    }
-
-    // If it's a data URL (from FileReader), use it directly
-    if (avatarPreview.startsWith('data:')) {
-      setAvatarBlobUrl(null);
-      setAvatarLoading(false);
-      return;
-    }
-
-    // If it's an authenticated YouTube image endpoint, load as blob
-    const isYouTubeImage = avatarPreview.includes('/api/youtube/images/') || 
-                          avatarPreview.includes('/api/youtube/avatar/');
-    
-    if (!isYouTubeImage) {
-      setAvatarBlobUrl(null);
-      setAvatarLoading(false);
-      return;
-    }
-
-    // Fetch as blob for authenticated endpoints
-    let isMounted = true;
-    const currentAvatarPreview = avatarPreview;
-    setAvatarLoading(true);
-
-    const loadAvatarBlob = async () => {
-      try {
-        // Normalize path
-        let imagePath = currentAvatarPreview.startsWith('/') 
-          ? currentAvatarPreview 
-          : `/${currentAvatarPreview}`;
-        
-        // Remove query parameters if present
-        imagePath = imagePath.split('?')[0];
-
-        const blobUrl = await fetchMediaBlobUrl(imagePath);
-        
-        if (!isMounted || avatarPreview !== currentAvatarPreview) {
-          if (blobUrl) {
-            URL.revokeObjectURL(blobUrl);
-          }
-          return;
-        }
-        
-        setAvatarBlobUrl((prevBlobUrl) => {
-          // Clean up previous blob URL if exists
-          if (prevBlobUrl && prevBlobUrl !== blobUrl && prevBlobUrl.startsWith('blob:')) {
-            URL.revokeObjectURL(prevBlobUrl);
-          }
-          return blobUrl;
-        });
-        setAvatarLoading(false);
-      } catch (err) {
-        console.error('[PlanStep] Failed to load avatar blob:', err);
-        if (isMounted && avatarPreview === currentAvatarPreview) {
-          setAvatarBlobUrl(null);
-          setAvatarLoading(false);
-        }
-      }
-    };
-
-    loadAvatarBlob();
-
-    return () => {
-      isMounted = false;
-      // Cleanup blob URL when component unmounts or URL changes
-      setAvatarBlobUrl((prevBlobUrl) => {
-        if (prevBlobUrl && prevBlobUrl.startsWith('blob:')) {
-          URL.revokeObjectURL(prevBlobUrl);
-        }
-        return null;
-      });
-      setAvatarLoading(false);
-    };
-  }, [avatarPreview]);
+  // Load avatar with query-token authentication for YouTube API endpoints
+  const { avatarBlobUrl, avatarLoading } = useAvatarBlobUrl(avatarPreview);
 
   // State for custom values
   const [customTargetAudience, setCustomTargetAudience] = useState('');
@@ -562,15 +481,10 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                         ) : (
                           <Box
                             component="img"
-                            src={avatarBlobUrl || (avatarPreview.startsWith('data:') ? avatarPreview : undefined)}
+                            src={avatarBlobUrl || undefined}
                             alt="Avatar preview"
-                            onError={(e) => {
-                              // If blob URL fails, try to reload
-                              console.warn('[PlanStep] Avatar image failed to load, will retry');
-                              if (avatarPreview && !avatarPreview.startsWith('data:')) {
-                                // Trigger reload by updating state
-                                setAvatarBlobUrl(null);
-                              }
+                            onError={() => {
+                              console.warn('[PlanStep] Avatar image failed to load');
                             }}
                             sx={{
                               width: '100%',
@@ -578,7 +492,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
                               objectFit: 'cover',
                               borderRadius: 1.5,
                               border: '1px solid #e2e8f0',
-                              display: avatarBlobUrl || avatarPreview.startsWith('data:') ? 'block' : 'none',
+                              display: avatarBlobUrl ? 'block' : 'none',
                             }}
                           />
                         )}

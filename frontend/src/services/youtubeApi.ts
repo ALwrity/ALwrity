@@ -1,6 +1,6 @@
 // YouTube Creator Studio API Client
 
-import { apiClient, aiApiClient } from '../api/client';
+import { apiClient, aiApiClient, longRunningApiClient } from '../api/client';
 
 const API_BASE = '/api/youtube';
 
@@ -111,6 +111,8 @@ export interface TaskStatus {
   message?: string;
   result?: any;
   error?: string;
+  error_status?: number;
+  error_data?: any;
 }
 
 export interface CostEstimateRequest {
@@ -228,9 +230,13 @@ export const youtubeApi = {
    */
   async createPlan(request: VideoPlanRequest): Promise<{ success: boolean; plan?: VideoPlan; message: string }> {
     try {
-      const response = await apiClient.post(`${API_BASE}/plan`, request);
+      // Use longRunningApiClient with 180s-300s timeout for plan generation
+      const response = await longRunningApiClient.post(`${API_BASE}/plan`, request);
       return response.data;
     } catch (error: any) {
+      if (error.name === 'RequestTimeoutError' || error.message?.includes('timeout')) {
+        throw new Error('Plan generation is taking longer than expected. Please check your internet connection and try again.');
+      }
       const errorMessage = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to create video plan';
       throw new Error(errorMessage);
     }

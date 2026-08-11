@@ -1,6 +1,6 @@
 // Hook for managing scene media (images and audio)
 import { useState, useEffect } from 'react';
-import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { appendAuthTokenToUrl, fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
 
 interface UseSceneMediaProps {
   imageUrl?: string | null;
@@ -13,61 +13,60 @@ export const useSceneMedia = ({ imageUrl, audioUrl }: UseSceneMediaProps) => {
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
 
+  // Images: use ?token= query parameter so <img> tags load without blob lifecycle
   useEffect(() => {
-    console.log('[useSceneMedia] Image URL changed:', imageUrl);
-    let revokedUrl: string | null = null;
+    if (!imageUrl) {
+      setImageBlobUrl(null);
+      return;
+    }
 
-    const fetchImage = async () => {
-      if (!imageUrl) {
-        console.log('[useSceneMedia] No imageUrl, clearing blob');
-        setImageBlobUrl(null);
-        return;
-      }
+    let isMounted = true;
+    setImageLoading(true);
 
-      setImageLoading(true);
-      console.log('[useSceneMedia] Starting to fetch image blob for:', imageUrl);
-      try {
-        const blobUrl = await fetchMediaBlobUrl(imageUrl);
-        if (blobUrl) {
-          console.log('[useSceneMedia] Image blob loaded:', blobUrl);
-          setImageBlobUrl(blobUrl);
-          revokedUrl = blobUrl;
-          return;
+    appendAuthTokenToUrl(imageUrl.split('?')[0])
+      .then((authenticatedUrl) => {
+        if (isMounted) {
+          setImageBlobUrl(authenticatedUrl);
+          setImageLoading(false);
         }
-        // Fallback: use direct URL if blob could not be created (e.g., 404/401 handled upstream)
-        console.warn('[useSceneMedia] Blob URL unavailable, falling back to direct imageUrl');
-        setImageBlobUrl(imageUrl);
-      } catch (error) {
-        console.error('[useSceneMedia] Failed to load image:', error);
-        // Fallback to direct URL so UI still shows something while we investigate auth/serving
-        setImageBlobUrl(imageUrl);
-      } finally {
-        setImageLoading(false);
-      }
-    };
-
-    fetchImage();
+      })
+      .catch((err) => {
+        console.error('[useSceneMedia] Failed to build authenticated image URL:', err);
+        if (isMounted) {
+          setImageBlobUrl(imageUrl);
+          setImageLoading(false);
+        }
+      });
 
     return () => {
-      if (revokedUrl && revokedUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(revokedUrl);
-      }
+      isMounted = false;
     };
   }, [imageUrl]);
 
+  // Audio: keep blob approach — <audio> element holds the reference until unmount
   useEffect(() => {
-    if (audioUrl) {
-      setAudioLoading(true);
-      fetchMediaBlobUrl(audioUrl)
-        .then(setAudioBlobUrl)
-        .catch(console.error)
-        .finally(() => setAudioLoading(false));
-    } else {
+    if (!audioUrl) {
       setAudioBlobUrl(null);
+      return;
     }
 
+    let isMounted = true;
+    setAudioLoading(true);
+
+    fetchMediaBlobUrl(audioUrl)
+      .then((blobUrl) => {
+        if (isMounted) {
+          setAudioBlobUrl(blobUrl);
+          setAudioLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('[useSceneMedia] Failed to load audio blob:', err);
+        if (isMounted) setAudioLoading(false);
+      });
+
     return () => {
-      if (audioBlobUrl) URL.revokeObjectURL(audioBlobUrl);
+      isMounted = false;
     };
   }, [audioUrl]);
 

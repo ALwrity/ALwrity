@@ -1,6 +1,6 @@
-// Hook for managing scene media (images and audio)
+// Hook for managing scene media (images and audio) — SceneCard variant
 import { useState, useEffect } from 'react';
-import { fetchMediaBlobUrl } from '../../../../../utils/fetchMediaBlobUrl';
+import { appendAuthTokenToUrl, fetchMediaBlobUrl } from '../../../../../utils/fetchMediaBlobUrl';
 
 interface UseSceneMediaProps {
   imageUrl?: string | null;
@@ -13,35 +13,60 @@ export const useSceneMedia = ({ imageUrl, audioUrl }: UseSceneMediaProps) => {
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
 
+  // Images: use ?token= query parameter so <img> tags load without blob lifecycle
   useEffect(() => {
-    if (imageUrl) {
-      setImageLoading(true);
-      fetchMediaBlobUrl(imageUrl)
-        .then(setImageBlobUrl)
-        .catch(console.error)
-        .finally(() => setImageLoading(false));
-    } else {
+    if (!imageUrl) {
       setImageBlobUrl(null);
+      return;
     }
 
+    let isMounted = true;
+    setImageLoading(true);
+
+    appendAuthTokenToUrl(imageUrl.split('?')[0])
+      .then((authenticatedUrl) => {
+        if (isMounted) {
+          setImageBlobUrl(authenticatedUrl);
+          setImageLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('[useSceneMedia] Failed to build authenticated image URL:', err);
+        if (isMounted) {
+          setImageBlobUrl(imageUrl);
+          setImageLoading(false);
+        }
+      });
+
     return () => {
-      if (imageBlobUrl) URL.revokeObjectURL(imageBlobUrl);
+      isMounted = false;
     };
   }, [imageUrl]);
 
+  // Audio: keep blob approach — <audio> element holds the reference until unmount
   useEffect(() => {
-    if (audioUrl) {
-      setAudioLoading(true);
-      fetchMediaBlobUrl(audioUrl)
-        .then(setAudioBlobUrl)
-        .catch(console.error)
-        .finally(() => setAudioLoading(false));
-    } else {
+    if (!audioUrl) {
       setAudioBlobUrl(null);
+      return;
     }
 
+    let isMounted = true;
+    setAudioLoading(true);
+
+    fetchMediaBlobUrl(audioUrl)
+      .then((blobUrl) => {
+        if (isMounted) {
+          setAudioBlobUrl(blobUrl);
+          setAudioLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('[useSceneMedia] Failed to load audio blob:', err);
+        if (isMounted) setAudioLoading(false);
+      });
+
     return () => {
-      if (audioBlobUrl) URL.revokeObjectURL(audioBlobUrl);
+      isMounted = false;
     };
   }, [audioUrl]);
 

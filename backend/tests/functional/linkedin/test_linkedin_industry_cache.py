@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -50,8 +51,7 @@ class TestIndustryCacheHelpers:
         assert payload["item_count"] == 0
 
 
-@pytest.mark.asyncio
-async def test_sync_dedupes_by_id(monkeypatch, tmp_path):
+def test_sync_dedupes_by_id(monkeypatch, tmp_path):
     cache_path = tmp_path / "linkedin_industries_cache.json"
     monkeypatch.setenv("LINKEDIN_INDUSTRY_CACHE_PATH", str(cache_path))
 
@@ -96,7 +96,7 @@ async def test_sync_dedupes_by_id(monkeypatch, tmp_path):
         _fake_get_search_parameters,
     )
 
-    count = await cache_service.sync_industries_from_unipile("user_test")
+    count = asyncio.run(cache_service.sync_industries_from_unipile("user_test"))
     assert count == 3
 
     payload = cache_service.get_industries()

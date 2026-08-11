@@ -28,7 +28,7 @@ import {
   Collections,
 } from '@mui/icons-material';
 import { useContentAssets, ContentAsset } from '../../hooks/useContentAssets';
-import { fetchMediaBlobUrl } from '../../utils/fetchMediaBlobUrl';
+import { isAuthenticatedAssetUrl, useAssetAuthUrls } from '../../hooks/useAssetAuthUrls';
 import { getLatestBrandAvatar, AssetResponse as BrandAvatarResponse } from '../../api/brandAssets';
 
 export interface AssetLibraryImageModalProps {
@@ -58,8 +58,6 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
   const [selectedAsset, setSelectedAsset] = useState<ContentAsset | null>(null);
   const [page, setPage] = useState(0);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [imageBlobUrls, setImageBlobUrls] = useState<Map<number, string>>(new Map());
-  const [loadingImages, setLoadingImages] = useState<Set<number>>(new Set());
   const [brandAvatar, setBrandAvatar] = useState<BrandAvatarResponse | null>(null);
   const [brandAvatarLoading, setBrandAvatarLoading] = useState(false);
   const [brandAvatarError, setBrandAvatarError] = useState<string | null>(null);
@@ -76,6 +74,17 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
   };
 
   const { assets, loading, error, total, toggleFavorite, refetch } = useContentAssets(filters);
+
+  // Securely and efficiently resolve authenticated URLs for all assets and the brand avatar
+  const {
+    imageAuthUrls,
+    loadingImages,
+    brandAvatarAuthUrl,
+  } = useAssetAuthUrls(open, assets, brandAvatar?.image_url);
+
+  const isBrandAvatarAuthPending = !!brandAvatar?.image_url &&
+    isAuthenticatedAssetUrl(brandAvatar.image_url) &&
+    !brandAvatarAuthUrl;
 
   // Load latest brand avatar generated in onboarding (Step 4)
   useEffect(() => {
@@ -98,11 +107,14 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
         if (response.success && response.image_url) {
           setBrandAvatar(response);
         } else {
+          // No brand avatar yet — expected for new users, not an error
           setBrandAvatar(null);
+          setBrandAvatarError(null);
         }
       } catch (err: any) {
         if (cancelled) return;
-        console.error('[AssetLibraryImageModal] Failed to load brand avatar:', err);
+        // Only log genuinely unexpected errors (5xx, network failures)
+        console.error('[AssetLibraryImageModal] Unexpected error loading brand avatar:', err);
         setBrandAvatar(null);
         setBrandAvatarError('Failed to load brand avatar');
       } finally {
@@ -118,88 +130,6 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
       cancelled = true;
     };
   }, [open, showBrandAvatarShortcut]);
-
-  // Check if a URL requires authentication (internal API endpoints)
-  const isAuthenticatedUrl = useCallback((url: string): boolean => {
-    if (!url) return false;
-    return url.includes('/api/podcast/') || 
-           url.includes('/api/youtube/') || 
-           url.includes('/api/story/') ||
-           (url.startsWith('/') && !url.startsWith('//'));
-  }, []);
-
-  // Load blob URLs for authenticated images
-  useEffect(() => {
-    if (!open || assets.length === 0) {
-      // Clean up blob URLs when modal closes or no assets
-      setImageBlobUrls(prev => {
-        prev.forEach((url) => {
-          if (url.startsWith('blob:')) {
-            URL.revokeObjectURL(url);
-          }
-        });
-        return new Map();
-      });
-      setLoadingImages(new Set());
-      return;
-    }
-
-    const loadBlobUrls = async () => {
-      const newBlobUrls = new Map<number, string>();
-      const newLoadingImages = new Set<number>();
-
-      for (const asset of assets) {
-        if (!asset.file_url) continue;
-
-        // Check if this is an authenticated endpoint
-        if (isAuthenticatedUrl(asset.file_url)) {
-          newLoadingImages.add(asset.id);
-          try {
-            const blobUrl = await fetchMediaBlobUrl(asset.file_url);
-            if (blobUrl) {
-              newBlobUrls.set(asset.id, blobUrl);
-            }
-          } catch (err) {
-            console.error(`[AssetLibraryImageModal] Failed to load image for asset ${asset.id}:`, err);
-          } finally {
-            newLoadingImages.delete(asset.id);
-          }
-        } else {
-          // External URL, use directly
-          newBlobUrls.set(asset.id, asset.file_url);
-        }
-      }
-
-      setImageBlobUrls(prev => {
-        // Clean up old blob URLs that are no longer needed
-        prev.forEach((url, id) => {
-          if (!newBlobUrls.has(id) && url.startsWith('blob:')) {
-            URL.revokeObjectURL(url);
-          }
-        });
-        return newBlobUrls;
-      });
-      setLoadingImages(newLoadingImages);
-    };
-
-    loadBlobUrls();
-
-    // Cleanup function
-    return () => {
-      // Don't clean up here - let the next effect handle it
-    };
-  }, [assets, open, isAuthenticatedUrl]);
-
-  // Cleanup blob URLs on unmount
-  useEffect(() => {
-    return () => {
-      imageBlobUrls.forEach((url) => {
-        if (url.startsWith('blob:')) {
-          URL.revokeObjectURL(url);
-        }
-      });
-    };
-  }, []);
 
   const handleSelect = useCallback(() => {
     if (selectedAsset) {
@@ -345,20 +275,35 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
                     bgcolor: '#f3f4f6',
                   }}
                 >
-                  <CardMedia
-                    component="img"
-                    image={brandAvatar.image_url}
-                    alt="Brand Avatar"
-                    sx={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover',
-                    }}
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
-                  />
+                  {isBrandAvatarAuthPending ? (
+                    <Box
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        bgcolor: '#f3f4f6',
+                      }}
+                    >
+                      <CircularProgress size={16} />
+                    </Box>
+                  ) : (
+                    <CardMedia
+                      component="img"
+                      image={brandAvatarAuthUrl || brandAvatar.image_url}
+                      alt="Brand Avatar"
+                      sx={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                      }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                      }}
+                    />
+                  )}
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#111827' }}>
@@ -477,7 +422,13 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
             }}
           >
             <Grid container spacing={2}>
-              {assets.map((asset) => (
+              {assets.map((asset) => {
+                const requiresAuth = !!asset.file_url && isAuthenticatedAssetUrl(asset.file_url);
+                const resolvedImageUrl = imageAuthUrls.get(asset.id);
+                const displayImageUrl = requiresAuth ? resolvedImageUrl : asset.file_url;
+                const shouldShowImageLoader = loadingImages.has(asset.id) || (requiresAuth && !displayImageUrl);
+
+                return (
                 <Grid item xs={6} sm={4} md={3} key={asset.id}>
                   <Card
                     sx={{
@@ -497,7 +448,7 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
                   >
                     {/* Image */}
                     <Box sx={{ position: 'relative', paddingTop: '100%' }}>
-                      {loadingImages.has(asset.id) ? (
+                      {shouldShowImageLoader ? (
                         <Box
                           sx={{
                             position: 'absolute',
@@ -516,7 +467,7 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
                       ) : (
                         <CardMedia
                           component="img"
-                          image={imageBlobUrls.get(asset.id) || asset.file_url}
+                          image={displayImageUrl || ''}
                           alt={asset.title || 'Asset'}
                           sx={{
                             position: 'absolute',
@@ -609,7 +560,8 @@ export const AssetLibraryImageModal: React.FC<AssetLibraryImageModalProps> = ({
                     )}
                   </Card>
                 </Grid>
-              ))}
+                );
+              })}
             </Grid>
 
             {/* Load More (if needed) */}
