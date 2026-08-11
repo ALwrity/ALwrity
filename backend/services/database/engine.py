@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 from loguru import logger
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 
 from services.database.paths import get_user_db_path
 
@@ -34,6 +34,15 @@ def get_engine_for_user(user_id: str):
 
     engine = create_engine(database_url, **engine_kwargs)
     _user_engines[user_id] = engine
+
+    # Enable WAL mode for SQLite — allows concurrent reads with one writer
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            conn.execute(text("PRAGMA busy_timeout=5000"))
+            conn.commit()
+    except Exception:
+        pass
 
     try:
         from services.database.init_db import init_user_database

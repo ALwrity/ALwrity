@@ -241,13 +241,37 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   }, []);
 
   const startCompetitorDiscovery = useCallback(async (force = false) => {
-    // Check cache first unless forced
+    // Check localStorage cache first unless forced
     if (!force && loadCachedAnalysis()) {
       console.log('CompetitorAnalysisStep: Using cached competitor analysis');
       return;
     }
 
-      setIsAnalyzing(true);
+    // Check backend DB for existing competitor data (survives cache expiry)
+    if (!force) {
+      try {
+        const dbResult = await apiClient.get('/api/onboarding/competitor-analysis');
+        if (dbResult?.data?.competitors?.length > 0) {
+          console.log('CompetitorAnalysisStep: Using DB competitor data');
+          const comps = dbResult.data.competitors.map((c: any) => ({
+            url: c.url || '', domain: c.domain || '', title: c.url || '',
+            summary: '', relevance_score: 0.8,
+            highlights: [], favicon: null, image: null, published_date: null, author: null,
+            competitive_insights: { business_model: '', target_audience: '' },
+            content_insights: { content_focus: '', content_quality: '' },
+          }));
+          setCompetitors(comps);
+          setIsAnalyzing(false);
+          setShowProgressModal(false);
+          return;
+        }
+      } catch {
+        // DB check failed — proceed with fresh API call
+      }
+    }
+
+    // Fresh API call
+    setIsAnalyzing(true);
       setShowProgressModal(true);
       setIsLoadingPillars(true);
       setError(null);
@@ -537,28 +561,22 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount
 
-  // Auto-trigger sitemap analysis when competitors are loaded (only if not cached)
+  // Load cached sitemap analysis if available (no auto-trigger — user clicks Refresh Strategy)
   useEffect(() => {
-    if (competitors.length > 0 && !sitemapAnalysis && !isAnalyzingSitemap) {
-      // Check if sitemap analysis is already cached
+    if (competitors.length > 0 && !sitemapAnalysis) {
       const cachedData = localStorage.getItem('competitor_analysis_data');
       if (cachedData) {
         try {
           const parsedData = JSON.parse(cachedData);
           if (parsedData.sitemap_analysis) {
-            console.log('CompetitorAnalysisStep: Sitemap analysis already cached, skipping auto-trigger');
             setSitemapAnalysis(parsedData.sitemap_analysis);
-            return;
           }
         } catch (err) {
-          console.warn('Error checking cached sitemap analysis:', err);
+          console.warn('Error loading cached sitemap analysis:', err);
         }
       }
-      
-      console.log('Competitors loaded, starting sitemap analysis...');
-      startSitemapAnalysis();
     }
-  }, [competitors, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis]);
+  }, [competitors.length, sitemapAnalysis]);
 
   // Fetch sitemap benchmark results (runs in background after competitor discovery)
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
@@ -922,7 +940,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       )}
 
       {/* Strategic Content Opportunities Section */}
-      {(sitemapAnalysis || isAnalyzingSitemap) && (
+      {competitors.length > 0 && (
         <Box mt={6} mb={4}>
           {/* Header */}
           <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>

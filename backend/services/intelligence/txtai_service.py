@@ -284,9 +284,9 @@ class TxtaiIntelligenceService:
 
     @staticmethod
     def _is_nprobe_incompatibility(error: Exception) -> bool:
-        """Detect known FAISS IndexIDMap/nprobe incompatibility."""
+        """Detect known FAISS IndexIDMap/nprobe and IndexIVFFlat/nflip incompatibilities."""
         message = str(error)
-        return "nprobe" in message and "IndexIDMap" in message
+        return ("nprobe" in message and "IndexIDMap" in message) or ("nflip" in message and "IndexIVFFlat" in message)
 
     # Phase 5 / Issue #8: explicit guard for missing txtai. The
     # previous inline check on ``TXTAI_AVAILABLE`` was buried in

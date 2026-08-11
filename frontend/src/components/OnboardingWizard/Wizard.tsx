@@ -288,9 +288,22 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
     setActiveStep(computedStep);
-    // Keep localStorage in sync with the authoritative source for next load
     localStorage.setItem('onboarding_active_step', String(computedStep));
   }, [data, currentStep, steps.length]);
+
+  // Fallback: force-load /init if context hasn't populated data on mount
+  useEffect(() => {
+    if (!data && !loading) {
+      import('../../api/client').then(({ apiClient }) => {
+        apiClient.get('/api/onboarding/init').then(res => {
+          if (res.data?.onboarding) {
+            const step = res.data.onboarding.current_step || 1;
+            setActiveStep(Math.max(0, Math.min(steps.length - 1, step - 1)));
+          }
+        }).catch(() => {});
+      });
+    }
+  }, []); // eslint-disable-line
 
   const handleNext = useCallback(async (rawStepData?: any) => {
     const isLinkedIn = onboardingType === 'linkedin';

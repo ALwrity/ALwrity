@@ -131,13 +131,6 @@ def schedule_step2_tasks(
         db.commit()
         logger.info(f"[onboarding_step2] Scheduled SIF indexing for {website_url} ({get_task_label("sif_indexing")})")
         _record_task_in_session(db, user_id, "sif_indexing", step=2, details={"website_url": website_url})
-
-        # Trigger SIF executor immediately in background (non-blocking)
-        try:
-            import asyncio
-            asyncio.ensure_future(_run_sif_now(user_id, website_url))
-        except Exception as bg_err:
-            logger.warning(f"[onboarding_step2] Could not start SIF background task: {bg_err}")
     except Exception as e:
         db.rollback()
         logger.warning(f"[onboarding_step2] Non-blocking: failed to schedule SIF indexing: {e}")
