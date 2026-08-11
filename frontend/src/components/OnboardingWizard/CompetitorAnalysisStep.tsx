@@ -1050,7 +1050,12 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
                         return growthMoves.length > 0 ? (
                           <List dense disablePadding>
                             {growthMoves.map((move: any, i: number) => {
-                              const text = typeof move === 'string' ? move : (move?.action || move?.finding || move?.type || JSON.stringify(move));
+                              const text = typeof move === 'string' ? move
+                                : (typeof move?.action === 'string' ? move.action
+                                : typeof move?.finding === 'string' ? move.finding
+                                : typeof move?.type === 'string' ? move.type
+                                : typeof move?.title === 'string' ? move.title
+                                : JSON.stringify(move));
                               return (
                               <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
                                 <ListItemIcon sx={{ minWidth: 28 }}>
@@ -1139,12 +1144,14 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
                 <LightbulbIcon sx={{ fontSize: 16, color: '#f59e0b' }} /> Content Strategy
               </Typography>
               <List dense disablePadding>
-                {sitemapAnalysis.analysis_data.ai_insights.content_strategy.map((item: string, i: number) => (
+                {sitemapAnalysis.analysis_data.ai_insights.content_strategy.map((item: any, i: number) => {
+                  const text = typeof item === 'string' ? item : item?.finding || item?.action || item?.title || JSON.stringify(item);
+                  return (
                   <ListItem key={i} disableGutters sx={{ py: 0.25 }}>
                     <ListItemIcon sx={{ minWidth: 24 }}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#94a3b8' }} /></ListItemIcon>
-                    <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
+                    <ListItemText primary={text} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
                   </ListItem>
-                ))}
+                )})}
               </List>
             </Box>
           )}
@@ -1154,12 +1161,14 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
                 <SearchIcon sx={{ fontSize: 16, color: '#0284c7' }} /> SEO Opportunities
               </Typography>
               <List dense disablePadding>
-                {sitemapAnalysis.analysis_data.ai_insights.seo_opportunities.map((item: string, i: number) => (
+                {sitemapAnalysis.analysis_data.ai_insights.seo_opportunities.map((item: any, i: number) => {
+                  const text = typeof item === 'string' ? item : item?.finding || item?.action || item?.title || JSON.stringify(item);
+                  return (
                   <ListItem key={i} disableGutters sx={{ py: 0.25 }}>
                     <ListItemIcon sx={{ minWidth: 24 }}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#94a3b8' }} /></ListItemIcon>
-                    <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
+                    <ListItemText primary={text} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
                   </ListItem>
-                ))}
+                )})}
               </List>
             </Box>
           )}
