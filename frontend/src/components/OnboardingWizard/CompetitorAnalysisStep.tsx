@@ -111,6 +111,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
 
   // Ref to track if initialization has already started to prevent duplicate calls
   const initializationStarted = React.useRef(false);
+  const sitemapAutoTriggered = React.useRef(false);
   const crawlSocialMediaRef = React.useRef<Record<string, string>>({});
 
   const mergeCrawlSocialMedia = React.useCallback((exaData: Record<string, any>) => {
@@ -361,8 +362,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
           social_media_accounts: result.social_media_accounts || {},
           social_media_citations: result.social_media_citations || [],
           research_summary: result.research_summary || null,
-          // Use auto-triggered sitemap analysis if available, else preserve existing
-          sitemap_analysis: result.sitemap_analysis || sitemapAnalysis || null
+          sitemap_analysis: sitemapAnalysis || null
         };
 
         setCompetitors(analysisData.competitors);
@@ -372,9 +372,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         setResearchSummary(analysisData.research_summary);
         if (result.content_pillars) {
           setContentPillars(result.content_pillars);
-        }
-        if (result.sitemap_analysis) {
-          setSitemapAnalysis(result.sitemap_analysis);
         }
         
         // Cache the analysis results with merged data
@@ -581,6 +578,23 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
       }
     }
   }, [competitors.length, sitemapAnalysis]);
+
+  // Auto-trigger sitemap analysis when competitors load and no data exists
+  useEffect(() => {
+    if (
+      competitors.length > 0 &&
+      !sitemapAnalysis &&
+      !isAnalyzing &&
+      !isAnalyzingSitemap &&
+      !sitemapAutoTriggered.current
+    ) {
+      sitemapAutoTriggered.current = true;
+      console.log('CompetitorAnalysisStep: Auto-triggering sitemap analysis');
+      startSitemapAnalysis(false).finally(() => {
+        sitemapAutoTriggered.current = false;
+      });
+    }
+  }, [competitors.length, isAnalyzing, sitemapAnalysis, isAnalyzingSitemap, startSitemapAnalysis]);
 
   // Fetch sitemap benchmark results (runs in background after competitor discovery)
   const [benchmarkReport, setBenchmarkReport] = useState<any>(null);
