@@ -82,9 +82,11 @@ def llm_text_gen(
             import uuid
             trace_id = f"alwrity_{resolved_flow_type}_{user_id or 'anon'}_{uuid.uuid4().hex[:8]}"
 
-        def _estimate_tokens(text: str) -> int:
+        def _estimate_tokens(text: Any) -> int:
             if not text:
                 return 1
+            if not isinstance(text, str):
+                text = str(text)
             try:
                 import tiktoken
                 enc = tiktoken.get_encoding("o200k_base")
