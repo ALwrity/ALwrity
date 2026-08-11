@@ -109,6 +109,13 @@ def novaroute_structured_json_response(
         response_format={"type": "json_object"},
     )
     api_took = (_time.time() - t1) * 1000
+    usage = response.usage
+    if usage:
+        logger.warning(
+            f"[novaroute_telemetry] model={model} "
+            f"prompt_tokens={usage.prompt_tokens} completion_tokens={usage.completion_tokens} "
+            f"total_tokens={usage.total_tokens} api_ms={api_took:.0f}"
+        )
     logger.warning(f"[novaroute_structured_json_response] API call completed in {api_took:.0f}ms (model={model})")
 
     return response.choices[0].message.content or ""
