@@ -4,6 +4,8 @@ export type PublishWedgeLockedFeature = "publish_campaign";
 
 export const PUBLISH_WEDGE_SCHEDULE_LOCKED = true;
 
+export const PUBLISH_WEDGE_TIMING_LOCKED = true;
+
 export const PUBLISH_WEDGE_LOCKED_FEATURES = new Set<PublishWedgeLockedFeature>([
   "publish_campaign",
 ]);
@@ -18,6 +20,9 @@ export const PUBLISH_WEDGE_NOTIFY_KEYS: Record<
 export const PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT =
   "Scheduling launches soon — open in Studio and use Publish from the editor for now.";
 
+export const PUBLISH_WEDGE_TIMING_LOCKED_HINT =
+  "Best Time to Post launches soon — we'll recommend optimal windows based on your audience.";
+
 export function isPublishWedgeFeatureLocked(
   feature: string,
 ): feature is PublishWedgeLockedFeature {
@@ -26,4 +31,8 @@ export function isPublishWedgeFeatureLocked(
 
 export function isPublishWedgeScheduleLocked(): boolean {
   return PUBLISH_WEDGE_SCHEDULE_LOCKED;
+}
+
+export function isPublishWedgeTimingLocked(): boolean {
+  return PUBLISH_WEDGE_TIMING_LOCKED;
 }
