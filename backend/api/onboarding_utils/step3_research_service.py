@@ -39,6 +39,16 @@ class Step3ResearchService:
         self.service_name = "step3_research"
         logger.info(f"Initialized {self.service_name}")
     
+    async def _discover_content_pillars_with_fallback(self, user_url: str) -> Optional[Dict[str, Any]]:
+        """Discover content pillars via Answer API (fast, structured JSON)."""
+        logger.info(f"[research] Content pillar discovery starting for {user_url}")
+        result = await self.exa_service._discover_content_pillars_via_answer(user_url)
+        if result:
+            logger.info(f"[research] Content pillars from Answer API: {list(result.keys())}")
+        else:
+            logger.warning(f"[research] Content pillar discovery returned None — no pillars data")
+        return result
+
     async def discover_competitors_for_onboarding(
         self,
         user_url: str,
@@ -85,9 +95,13 @@ class Step3ResearchService:
                 user_url=user_url, num_results=num_results, exclude_domains=None,
                 industry_context=industry_context, website_analysis_data=website_analysis_data)
             social_media_task = self.exa_service.discover_social_media_accounts(user_url)
-            pillars_task = self.exa_service._discover_content_pillars_via_agent(user_url)
+            pillars_task = self._discover_content_pillars_with_fallback(user_url)
+            logger.info(f"[research] All 3 tasks created — awaiting asyncio.gather…")
             competitor_results, social_media_results, pillars_results = await asyncio.gather(
                 competitor_task, social_media_task, pillars_task, return_exceptions=True)
+            logger.info(f"[research] gather complete — competitor={type(competitor_results).__name__} "
+                        f"social={type(social_media_results).__name__} "
+                        f"pillars={type(pillars_results).__name__}")
             if isinstance(competitor_results, Exception):
                 return {"success": False, "error": str(competitor_results)}
             if not competitor_results.get("success"):
