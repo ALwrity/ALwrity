@@ -14,10 +14,8 @@ from sqlalchemy.orm import Session
 
 from middleware.auth_middleware import get_current_user
 from services.database import get_db
-from services.youtube.planner import YouTubePlannerService
 from services.youtube.scene_builder import YouTubeSceneBuilderService
 from services.youtube.renderer import YouTubeVideoRendererService
-from services.persona_data_service import PersonaDataService
 from services.subscription import PricingService
 from services.subscription.preflight_validator import validate_scene_animation_operation
 from services.content_asset_service import ContentAssetService
@@ -26,6 +24,7 @@ from utils.logger_utils import get_service_logger
 from utils.asset_tracker import save_asset_to_library
 from services.story_writer.video_generation_service import StoryVideoGenerationService
 from services.user_workspace_manager import UserWorkspaceManager
+from .planning_executor import execute_video_plan_task
 from .task_manager import task_manager
 from .handlers import avatar as avatar_handlers
 from .handlers import images as image_handlers
@@ -104,6 +103,13 @@ class VideoPlanResponse(BaseModel):
     """Response model for video plan."""
     success: bool
     plan: Optional[Dict[str, Any]] = None
+    message: str
+
+
+class VideoPlanTaskResponse(BaseModel):
+    """Response model for asynchronous video plan task creation."""
+    success: bool
+    task_id: Optional[str] = None
     message: str
 
 
@@ -217,128 +223,85 @@ def require_authenticated_user(current_user: Dict[str, Any]) -> str:
     return str(user_id)
 
 
-@router.post("/plan", response_model=VideoPlanResponse)
+@router.post("/plan", response_model=VideoPlanTaskResponse)
 async def create_video_plan(
     request: VideoPlanRequest,
+    background_tasks: BackgroundTasks,
     current_user: Dict[str, Any] = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> VideoPlanResponse:
+) -> VideoPlanTaskResponse:
     """
-    Generate a comprehensive video plan from user input.
-    
-    This endpoint uses AI to create a detailed plan including:
-    - Video summary and target audience
-    - Content outline with timing
-    - Hook strategy and CTA
-    - Visual style recommendations
-    - SEO keywords
+    Create an asynchronous video planning task from user input.
     """
     try:
         user_id = require_authenticated_user(current_user)
-        
+
         logger.info(
-            f"[YouTubeAPI] Planning video: idea={request.user_idea[:50]}..., "
+            f"[YouTubeAPI] Creating plan task: idea={request.user_idea[:50]}..., "
             f"duration={request.duration_type}, user={user_id}"
         )
-        
-        # Note: Research subscription checks are handled by ResearchService internally
-        # ResearchService validates limits before making API calls and raises HTTPException(429) if exceeded
-        
-        # Note: Subscription checks for LLM are handled by llm_text_gen internally
-        # It validates limits before making API calls and raises HTTPException(429) if exceeded
-        
-        # Get persona data if available
-        persona_data = None
-        try:
-            persona_service = PersonaDataService()
-            persona_data = persona_service.get_user_persona_data(user_id)
-        except Exception as e:
-            logger.warning(f"[YouTubeAPI] Could not load persona data: {e}")
-        
-        # Generate plan (optimized: for shorts, combine plan + scenes in one call)
-        planner = YouTubePlannerService()
-        plan = await planner.generate_video_plan(
-            user_idea=request.user_idea,
-            duration_type=request.duration_type,
-            video_type=request.video_type,
-            target_audience=request.target_audience,
-            video_goal=request.video_goal,
-            brand_style=request.brand_style,
-            persona_data=persona_data,
-            reference_image_description=request.reference_image_description,
-            source_content_id=request.source_content_id,
-            source_content_type=request.source_content_type,
+
+        task_id = task_manager.create_task(
+            "youtube_video_plan",
+            metadata={
+                "owner_user_id": user_id,
+                "duration_type": request.duration_type,
+                "has_avatar_input": bool(request.avatar_url),
+            },
             user_id=user_id,
-            include_scenes=(request.duration_type == "shorts"),  # Optimize shorts
-            enable_research=getattr(request, 'enable_research', True),  # Research enabled by default
         )
-        
-        # Auto-generate avatar if user didn't upload one
-        # Try to reuse existing avatar from asset library first to save on AI calls during testing
-        auto_avatar_url = None
-        if not request.avatar_url:
-            try:
-                from services.content_asset_service import ContentAssetService
-                from models.content_asset_models import AssetType, AssetSource
-                
-                # Check for existing YouTube creator avatar in asset library
-                asset_service = ContentAssetService(db)
-                existing_avatars, _ = asset_service.get_user_assets(
-                    user_id=user_id,
-                    asset_type=AssetType.IMAGE,
-                    source_module=AssetSource.YOUTUBE_CREATOR,
-                    limit=1,  # Get most recent one
-                )
-                
-                if existing_avatars and len(existing_avatars) > 0:
-                    # Reuse the most recent avatar
-                    existing_avatar = existing_avatars[0]
-                    auto_avatar_url = existing_avatar.file_url
-                    plan["auto_generated_avatar_url"] = auto_avatar_url
-                    plan["avatar_reused"] = True  # Flag to indicate avatar was reused
-                    logger.info(
-                        f"[YouTubeAPI] ♻️ Reusing existing avatar from asset library to save AI call: {auto_avatar_url} "
-                        f"(asset_id: {existing_avatar.id}, created: {existing_avatar.created_at})"
-                    )
-                else:
-                    # No existing avatar found, generate new one
-                    import uuid
-                    import json
-                    from .handlers.avatar import _generate_avatar_from_context
-                    # Pass both original user inputs AND plan data for better avatar generation
-                    logger.info(f"[YouTubeAPI] 🎨 No existing avatar found, generating new avatar...")
-                    avatar_response = await _generate_avatar_from_context(
-                        user_id=user_id,
-                        project_id=f"plan_{user_id}_{uuid.uuid4().hex[:8]}",
-                        audience=request.target_audience or plan.get("target_audience"),  # Prefer user input
-                        content_type=request.video_type,  # User's video type selection
-                        video_plan_json=json.dumps(plan),
-                        brand_style=request.brand_style,  # User's brand style preference
-                        db=db,
-                    )
-                    auto_avatar_url = avatar_response.get("avatar_url")
-                    avatar_prompt = avatar_response.get("avatar_prompt")
-                    plan["auto_generated_avatar_url"] = auto_avatar_url
-                    plan["avatar_prompt"] = avatar_prompt  # Store the AI prompt used for generation
-                    plan["avatar_reused"] = False  # Flag to indicate avatar was newly generated
-                    logger.info(f"[YouTubeAPI] ✅ Auto-generated new avatar based on user inputs and plan: {auto_avatar_url}")
-            except Exception as e:
-                logger.warning(f"[YouTubeAPI] Avatar generation/reuse failed (non-critical): {e}")
-                # Non-critical, continue without avatar
-        
-        return VideoPlanResponse(
+        initial_status = task_manager.get_task_status(task_id, requester_user_id=user_id)
+        if not initial_status:
+            logger.error(f"[YouTubeAPI] Failed to create plan task {task_id} for user {user_id}")
+            return VideoPlanTaskResponse(
+                success=False,
+                message="Failed to create planning task. Please try again.",
+            )
+
+        background_tasks.add_task(
+            execute_video_plan_task,
+            task_id=task_id,
+            request_data=request.model_dump(),
+            user_id=user_id,
+        )
+
+        return VideoPlanTaskResponse(
             success=True,
-            plan=plan,
-            message="Video plan generated successfully"
+            task_id=task_id,
+            message="Video plan generation started"
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"[YouTubeAPI] Error creating plan: {e}", exc_info=True)
-        return VideoPlanResponse(
+        logger.error(f"[YouTubeAPI] Error creating plan task: {e}", exc_info=True)
+        return VideoPlanTaskResponse(
             success=False,
-            message=f"Failed to create video plan: {str(e)}"
+            message=f"Failed to start video plan generation: {str(e)}"
+        )
+
+
+@router.get("/plan/{task_id}")
+async def get_video_plan_status(
+    task_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Optional[Dict[str, Any]]:
+    """
+    Get asynchronous YouTube plan task status.
+    """
+    try:
+        user_id = require_authenticated_user(current_user)
+        logger.debug(f"[YouTubeAPI] Getting plan status for task: {task_id}, user={user_id}")
+        task_status = task_manager.get_task_status(task_id, requester_user_id=user_id)
+        if not task_status:
+            return None
+        return task_status
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[YouTubeAPI] Error getting plan status: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get plan status: {str(e)}",
         )
 
 

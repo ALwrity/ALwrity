@@ -55,6 +55,7 @@ class YouTubeTaskManager:
     def _map_task_type(self, task_type_str: str) -> YouTubeTaskType:
         """Map a string task type to the enum."""
         mapping = {
+            "youtube_video_plan": YouTubeTaskType.RENDER,
             "youtube_video_render": YouTubeTaskType.RENDER,
             "youtube_scene_video_render": YouTubeTaskType.SCENE_RENDER,
             "youtube_video_combine": YouTubeTaskType.COMBINE,

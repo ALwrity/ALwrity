@@ -138,6 +138,7 @@ if "googleapiclient" not in sys.modules:
     _gap = types.ModuleType("googleapiclient")
     _gap.discovery = types.ModuleType("googleapiclient.discovery")
     _gap.errors = types.ModuleType("googleapiclient.errors")
+    _gap.http = types.ModuleType("googleapiclient.http")
 
     def _build(*args, **kwargs):
         return types.SimpleNamespace(
@@ -148,10 +149,13 @@ if "googleapiclient" not in sys.modules:
 
     _gap.errors.HttpError = type("HttpError", (Exception,), {})
     _gap.errors.UnknownApiServiceOrVersion = type("UnknownApiServiceOrVersion", (Exception,), {})
+    _gap.http.MediaFileUpload = type("MediaFileUpload", (), {})
+    _gap.http.MediaIoBaseUpload = type("MediaIoBaseUpload", (), {})
     _gap.discovery.build = _build
     sys.modules["googleapiclient"] = _gap
     sys.modules["googleapiclient.discovery"] = _gap.discovery
     sys.modules["googleapiclient.errors"] = _gap.errors
+    sys.modules["googleapiclient.http"] = _gap.http
 
 
 if "google_auth_oauthlib" not in sys.modules:
@@ -761,6 +765,16 @@ if "reportlab" not in sys.modules:
         _rl_units.inch = 72.0
         sys.modules["reportlab.lib.units"] = _rl_units
 
+        _rl_styles = types.ModuleType("reportlab.lib.styles")
+
+        class _ParagraphStyle:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        _rl_styles.ParagraphStyle = _ParagraphStyle
+        _rl_styles.getSampleStyleSheet = lambda *args, **kwargs: {}
+        sys.modules["reportlab.lib.styles"] = _rl_styles
+
         _rl_platypus = types.ModuleType("reportlab.platypus")
 
         class _SimpleDocTemplate:
@@ -774,11 +788,26 @@ if "reportlab" not in sys.modules:
             def __init__(self, *args, **kwargs):
                 pass
 
+        class _Paragraph:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        class _Spacer:
+            def __init__(self, *args, **kwargs):
+                pass
+
+        class _KeepTogether:
+            def __init__(self, *args, **kwargs):
+                pass
+
         class _PageBreak:
             pass
 
         _rl_platypus.SimpleDocTemplate = _SimpleDocTemplate
         _rl_platypus.Image = _RLImage
+        _rl_platypus.Paragraph = _Paragraph
+        _rl_platypus.Spacer = _Spacer
+        _rl_platypus.KeepTogether = _KeepTogether
         _rl_platypus.PageBreak = _PageBreak
         sys.modules["reportlab.platypus"] = _rl_platypus
 
@@ -786,6 +815,7 @@ if "reportlab" not in sys.modules:
         _rl.platypus = _rl_platypus
         _rl_lib.pagesizes = _rl_pagesizes
         _rl_lib.units = _rl_units
+        _rl_lib.styles = _rl_styles
 
 
 # ---------------------------------------------------------------------------

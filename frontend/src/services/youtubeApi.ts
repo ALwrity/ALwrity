@@ -45,6 +45,16 @@ export interface VideoPlan {
   avatar_prompt?: string; // AI prompt used to generate the avatar
 }
 
+export interface VideoPlanTaskCreateResponse {
+  success: boolean;
+  task_id?: string;
+  message: string;
+}
+
+export interface VideoPlanTaskResult {
+  plan?: VideoPlan;
+}
+
 export interface Scene {
   scene_number: number;
   title: string;
@@ -111,6 +121,8 @@ export interface TaskStatus {
   message?: string;
   result?: any;
   error?: string;
+  error_status?: number;
+  error_data?: any;
 }
 
 export interface CostEstimateRequest {
@@ -224,12 +236,52 @@ export interface SceneAudioResponse {
 
 export const youtubeApi = {
   /**
-   * Generate a video plan from user input.
+   * Start asynchronous video plan generation.
    */
-  async createPlan(request: VideoPlanRequest): Promise<{ success: boolean; plan?: VideoPlan; message: string }> {
+  async createPlanTask(request: VideoPlanRequest): Promise<VideoPlanTaskCreateResponse> {
     try {
       const response = await apiClient.post(`${API_BASE}/plan`, request);
       return response.data;
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to start video plan generation';
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Get asynchronous video plan task status.
+   * Returns null if task is missing.
+   */
+  async getPlanStatus(taskId: string): Promise<(TaskStatus & { result?: VideoPlanTaskResult }) | null> {
+    try {
+      const response = await apiClient.get(`${API_BASE}/plan/${taskId}`);
+      return response.data || null;
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        return null;
+      }
+      const errorMessage = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to get video plan status';
+      throw new Error(errorMessage);
+    }
+  },
+
+  /**
+   * Generate a video plan from user input.
+   * @deprecated Use createPlanTask() + getPlanStatus() for resilient flows.
+   */
+  async createPlan(request: VideoPlanRequest): Promise<{ success: boolean; plan?: VideoPlan; message: string }> {
+    try {
+      const startResponse = await apiClient.post(`${API_BASE}/plan`, request);
+      const data = startResponse.data as VideoPlanTaskCreateResponse;
+      if (!data.success) {
+        return { success: false, message: data.message || 'Failed to start video plan generation' };
+      }
+      return {
+        success: false,
+        message: data.task_id
+          ? 'Plan generation now runs asynchronously. Please use createPlanTask/getPlanStatus.'
+          : (data.message || 'Failed to create video plan'),
+      };
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || error.response?.data?.detail || error.message || 'Failed to create video plan';
       throw new Error(errorMessage);
