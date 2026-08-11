@@ -50,12 +50,14 @@ class TestOnboardingAssetQueryRoutes:
         assert response.json() == {"success": False, "message": "No avatar found"}
 
     def test_latest_avatar_returns_latest_brand_avatar(self):
+        from models.content_asset_models import AssetSource
+
         fake_asset = SimpleNamespace(
             id=42,
             file_url="/api/youtube/images/avatars/avatar.png",
             prompt="A smiling presenter avatar",
             provider="openai",
-            source_module="brand_avatar_generator",
+            source_module=AssetSource.BRAND_AVATAR_GENERATOR,
             asset_metadata={"category": "brand_avatar"},
         )
 
