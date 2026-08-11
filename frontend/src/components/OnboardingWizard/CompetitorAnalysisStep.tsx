@@ -250,7 +250,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     // Check backend DB for existing competitor data (survives cache expiry)
     if (!force) {
       try {
-        const dbResult = await apiClient.get('/api/onboarding/competitor-analysis');
+        const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
         if (dbResult?.data?.competitors?.length > 0) {
           console.log('CompetitorAnalysisStep: Using DB competitor data');
           const comps = dbResult.data.competitors.map((c: any) => ({

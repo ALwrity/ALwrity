@@ -40,7 +40,7 @@ from loguru import logger
 
 from exa_py import Exa
 
-DEFAULT_EFFORT = "medium"
+DEFAULT_EFFORT = "auto"
 DEFAULT_TIMEOUT = 300  # seconds
 DEFAULT_POLL_INTERVAL = 4000  # milliseconds
 

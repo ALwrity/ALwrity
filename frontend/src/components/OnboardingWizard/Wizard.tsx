@@ -8,7 +8,7 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { getCurrentStep, setCurrentStep } from '../../api/onboarding';
-import { apiClient } from '../../api/client';
+import { apiClient, longRunningApiClient } from '../../api/client';
 import { useOnboarding } from '../../contexts/OnboardingContext';
 import WebsiteStep from './WebsiteStep';
 import LinkedInConnectStep from './LinkedInConnectStep';
@@ -95,7 +95,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
     if (activeStep < 1) return;
     const fetchTasks = async () => {
       try {
-        const res = await apiClient.get('/api/onboarding/tasks/status');
+        const res = await longRunningApiClient.get('/api/onboarding/tasks/status');
         if (res.data.tasks) {
           setBackgroundTasks(res.data);
         }
@@ -288,22 +288,10 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
       }
     }
     setActiveStep(computedStep);
-    localStorage.setItem('onboarding_active_step', String(computedStep));
-  }, [data, currentStep, steps.length]);
-
-  // Fallback: force-load /init if context hasn't populated data on mount
-  useEffect(() => {
-    if (!data && !loading) {
-      import('../../api/client').then(({ apiClient }) => {
-        apiClient.get('/api/onboarding/init').then(res => {
-          if (res.data?.onboarding) {
-            const step = res.data.onboarding.current_step || 1;
-            setActiveStep(Math.max(0, Math.min(steps.length - 1, step - 1)));
-          }
-        }).catch(() => {});
-      });
+    if (onboarding.steps) {
+      localStorage.setItem('onboarding_active_step', String(computedStep));
     }
-  }, []); // eslint-disable-line
+  }, [data, currentStep, steps.length]);
 
   const handleNext = useCallback(async (rawStepData?: any) => {
     const isLinkedIn = onboardingType === 'linkedin';
