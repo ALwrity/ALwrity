@@ -114,6 +114,11 @@ class EnvironmentSetup:
 # Authentication
 # CLERK_SECRET_KEY=your_clerk_secret_key_here
 
+# Payment / Stripe
+# Set to true for local development to skip Stripe payment functionality.
+# Set to false for environments where Stripe payments are configured.
+SKIP_PAYMENT=true
+
 # OAuth Redirect URIs
 # GSC_REDIRECT_URI=https://your-frontend.vercel.app/gsc/callback
 # WORDPRESS_REDIRECT_URI=https://your-frontend.vercel.app/wp/callback
