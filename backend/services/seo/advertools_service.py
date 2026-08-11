@@ -34,7 +34,12 @@ _DOMAIN_SEMAPHORES: Dict[str, threading.Lock] = {}
 _DOMAIN_LAST_REQUEST: Dict[str, float] = {}
 _DOMAIN_LAST_429: Dict[str, float] = {}
 _DOMAIN_429_LOCK = threading.Lock()
-_DOMAIN_429_LOCK = threading.Lock()
+
+# Per-URL sitemap DataFrame cache — avoids refetching when multiple
+# background tasks hit the same domain. TTL ensures freshness.
+_SITEMAP_CACHE: Dict[str, Tuple[pd.DataFrame, float]] = {}
+_SITEMAP_CACHE_LOCK = threading.Lock()
+_SITEMAP_CACHE_TTL = 600  # 10 minutes
 
 
 def _extract_domain(url: str) -> str:
@@ -144,6 +149,18 @@ class AdvertoolsService:
         def _fetch_once(url: str, retries: int) -> pd.DataFrame:
             domain = _extract_domain(url)
             df = pd.DataFrame()
+
+            # Check cache first
+            with _SITEMAP_CACHE_LOCK:
+                cached = _SITEMAP_CACHE.get(url)
+                if cached is not None:
+                    cached_df, cached_at = cached
+                    if _time.monotonic() - cached_at < _SITEMAP_CACHE_TTL:
+                        logger.debug(f"advertools cache HIT for {url} (age={_time.monotonic() - cached_at:.0f}s)")
+                        return cached_df.copy()
+                    else:
+                        del _SITEMAP_CACHE[url]
+
             for attempt in range(retries + 1):
                 sleep_secs = 0.0
                 if _time.monotonic() >= _deadline:
@@ -176,6 +193,8 @@ class AdvertoolsService:
                     )
                     df = pd.DataFrame()
                 if df is not None and not df.empty:
+                    with _SITEMAP_CACHE_LOCK:
+                        _SITEMAP_CACHE[url] = (df.copy(), _time.monotonic())
                     return df
                 if attempt < retries:
                     if sleep_secs <= 0:
