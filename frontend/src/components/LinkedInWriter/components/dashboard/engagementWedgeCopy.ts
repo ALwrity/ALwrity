@@ -6,7 +6,7 @@ export const ENGAGEMENT_WEDGE_RING_DESCRIPTION =
   "Daily authority-building — reply, engage, and grow your network.";
 
 export const ENGAGEMENT_WEDGE_MODAL_INTRO =
-  "Your 15-minute thought-leader routine on LinkedIn.";
+  "Your 15-minute thought-leader routine on LinkedIn";
 
 export const CONVERSATIONS_TO_JOIN_TILE = {
   title: "Conversations to Join",
