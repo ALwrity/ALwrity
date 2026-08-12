@@ -102,6 +102,7 @@ class TestUploadAvatar:
 class TestGenerateAvatar:
     def test_generate_from_context_writes_avatar(self, tmp_path):
         from api.youtube.handlers import avatar as avatar_mod
+        from api.youtube.handlers import avatar_generation as gen_mod
 
         image_result = SimpleNamespace(
             image_bytes=b"generated-png",
@@ -111,9 +112,9 @@ class TestGenerateAvatar:
         # Force MagicMock (not AsyncMock): conftest may stub generate_image as async.
         mock_generate = MagicMock(return_value=image_result)
 
-        with patch.object(avatar_mod, "YOUTUBE_AVATARS_DIR", tmp_path), \
-             patch.object(avatar_mod, "generate_image", new=mock_generate), \
-             patch.object(avatar_mod, "save_asset_to_library"):
+        with patch.object(gen_mod, "YOUTUBE_AVATARS_DIR", tmp_path), \
+             patch.object(gen_mod, "generate_image", new=mock_generate), \
+             patch.object(gen_mod, "save_asset_to_library"):
             result = asyncio.run(
                 avatar_mod._generate_avatar_from_context(
                     user_id="user_avatar",
