@@ -1,18 +1,20 @@
 """
 Semantic Harvester Service
-Handles deep content acquisition using Exa AI.
-Prioritizes Exa for scale (hundreds of URLs) to avoid IP bans.
+
+Crawls web pages using BeautifulSoup-based WebCrawlerLogic.
+Prioritises the user's own sitemap URLs (from website analysis)
+to avoid external API costs and ban risk.
 """
 
+import os
 import traceback
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from loguru import logger
-from services.research.exa_service import ExaService
+
 
 class SemanticHarvesterService:
-    def __init__(self, api_key: Optional[str] = None):
-        self.exa_service = ExaService()
+    def __init__(self):
         self._harvest_stats = {
             "total_urls_processed": 0,
             "successful_extractions": 0,
@@ -22,172 +24,132 @@ class SemanticHarvesterService:
 
     async def harvest_website(self, website_url: str, limit: int = 100, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Deep crawl a website using Exa AI.
-        
+        Crawl a website using BeautifulSoup and the user's sitemap.
+
+        Priorities for URL selection:
+        1. Sitemap URLs from website analysis (top N by path depth)
+        2. Fallback to homepage-only if no sitemap data
+
         Args:
             website_url: The root URL to crawl.
-            limit: Maximum number of pages to retrieve.
-            user_id: Optional user ID for usage tracking and preflight checks.
-            
-        Returns:
-            List of pages with content and metadata.
+            limit: Maximum number of pages (capped by MAX_SIF_PAGES_PER_INDEX).
+            user_id: Optional user ID for sitemap lookup.
         """
         logger.info(f"[SemanticHarvester] Starting harvest for {website_url} (Limit: {limit})")
-        
+
+        results = []
+
         try:
-            # Validate input
             if not website_url or not website_url.strip():
-                logger.error(f"[SemanticHarvester] Invalid website URL provided: {website_url}")
                 return []
-            
-            # Normalize URL
+
             website_url = website_url.strip()
             if not website_url.startswith(('http://', 'https://')):
                 website_url = f"https://{website_url}"
-                logger.debug(f"[SemanticHarvester] Normalized URL to: {website_url}")
-            
-            logger.debug(f"[SemanticHarvester] Processing domain: {website_url}")
-            
-            # Use ExaService to find similar contents (which effectively crawls the site if we search by domain)
-            # OR better: Use Exa's search with 'site:' operator or include_domains
-            
-            # Since ExaService.discover_competitors finds *similar* sites, we need a method to crawl *specific* site.
-            # Exa SDK supports searching within a domain.
-            
-            if not self.exa_service.enabled:
-                self.exa_service._try_initialize()
-                if not self.exa_service.enabled:
-                    # Phase 5 / Issue #617 #4: fail fast instead of
-                    # returning fabricated "Sample Page 1" data.
-                    # Pre-#4 the harvester silently produced a fake
-                    # document, which got indexed into the SIF
-                    # index and then surfaced in production search
-                    # results. Now we return an empty list and
-                    # log a clear warning so operators see that
-                    # Exa is the missing piece. The user can
-                    # configure Exa (or a future provider) to
-                    # actually harvest content.
-                    logger.warning(
-                        "[SemanticHarvester] Exa service disabled. "
-                        "Returning empty harvest; configure Exa in the "
-                        "user's integrations to enable content harvesting. "
-                        "(Issue #617 #4: was returning placeholder data.)"
-                    )
-                    return []
 
-            # Preflight subscription check if user_id provided
-            if user_id:
+            # Determine page limit from env var (default 10)
+            max_pages = int(os.getenv("MAX_SIF_PAGES_PER_INDEX", "10"))
+            limit = min(limit, max_pages)
+            logger.info(f"[SemanticHarvester] Page limit: {limit}")
+
+            # Resolve URLs to crawl: sitemap first, homepage fallback
+            urls_to_crawl = await self._resolve_urls_from_sitemap(website_url, user_id, limit)
+
+            from services.component_logic.web_crawler_logic import WebCrawlerLogic
+            crawler = WebCrawlerLogic()
+
+            for i, url in enumerate(urls_to_crawl):
                 try:
-                    from services.database import get_session_for_user
-                    from services.subscription import PricingService
-                    from models.subscription_models import APIProvider
-                    db = get_session_for_user(user_id)
-                    if db:
-                        try:
-                            pricing_service = PricingService(db)
-                            can_proceed, message, usage_info = pricing_service.check_usage_limits(
-                                user_id=user_id,
-                                provider=APIProvider.EXA,
-                                tokens_requested=0,
-                                actual_provider_name="exa",
-                            )
-                            if not can_proceed:
-                                logger.warning(f"[SemanticHarvester] Exa blocked for user {user_id}: {message}")
-                                return []
-                        finally:
-                            db.close()
-                except Exception as e:
-                    logger.warning(f"[SemanticHarvester] Preflight check failed: {e}")
-
-            # Use Exa to search for all pages in this domain
-            search_response = self.exa_service.exa.search_and_contents(
-                query=f"site:{website_url}",
-                num_results=min(limit, 50), # Exa limit per request
-                text=True,
-                highlights=True
-            )
-            
-            results = []
-            if search_response and hasattr(search_response, 'results'):
-                for result in search_response.results:
-                    results.append({
-                        "url": getattr(result, 'url', ''),
-                        "title": getattr(result, 'title', ''),
-                        "content": getattr(result, 'text', '') or getattr(result, 'summary', ''),
-                        "metadata": {
-                            "published_date": getattr(result, 'published_date', None),
-                            "author": getattr(result, 'author', None),
-                            "highlights": getattr(result, 'highlights', [])
-                        }
-                    })
-            
-            logger.info(f"[SemanticHarvester] Successfully harvested {len(results)} pages from {website_url}")
-
-            # Track Exa usage if user_id provided
-            if user_id and results:
-                try:
-                    from services.database import get_session_for_user
-                    from services.subscription import PricingService
-                    from sqlalchemy import text
-                    db = get_session_for_user(user_id)
-                    if db:
-                        try:
-                            pricing_service = PricingService(db)
-                            current_period = pricing_service.get_current_billing_period(user_id)
-                            cost = 0.005  # Exa search cost estimate
-
-                            update_query = text("""
-                                UPDATE usage_summaries 
-                                SET exa_calls = COALESCE(exa_calls, 0) + 1,
-                                    exa_cost = COALESCE(exa_cost, 0) + :cost,
-                                    total_calls = COALESCE(total_calls, 0) + 1,
-                                    total_cost = COALESCE(total_cost, 0) + :cost
-                                WHERE user_id = :user_id AND billing_period = :period
-                            """)
-                            db.execute(update_query, {
-                                'cost': cost, 'user_id': user_id, 'period': current_period,
+                    logger.debug(f"[SemanticHarvester] Crawling {i+1}/{len(urls_to_crawl)}: {url}")
+                    crawl_result = await crawler.crawl_website(url)
+                    if crawl_result and crawl_result.get("success"):
+                        content = crawl_result.get("content", {})
+                        text = content.get("main_content", "") or ""
+                        if text:
+                            results.append({
+                                "url": url,
+                                "title": content.get("title", url),
+                                "content": text[:10_000],
+                                "metadata": {
+                                    "source": "beautifulsoup",
+                                    "word_count": len(text.split()),
+                                    "depth": url.count("/") - 2,
+                                }
                             })
-                            db.commit()
-                            from services.subscription.cache import clear_dashboard_cache
-                            clear_dashboard_cache(user_id)
-                            logger.info(f"[SemanticHarvester] Tracked Exa usage: user={user_id}, cost=${cost}")
-                        finally:
-                            db.close()
-                except Exception as track_err:
-                    logger.warning(f"[SemanticHarvester] Failed to track Exa usage: {track_err}")
-
-            return results
-            
-        except Exception as e:
-            logger.error(f"[SemanticHarvester] Failed to harvest {website_url} via Exa: {e}")
-            logger.error(f"[SemanticHarvester] Full traceback: {traceback.format_exc()}")
-            
-            # Fallback: use BeautifulSoup-based crawler for the user's own site
-            try:
-                logger.info(f"[SemanticHarvester] Attempting BeautifulSoup fallback for {website_url}")
-                from services.component_logic.web_crawler_logic import WebCrawlerLogic
-                crawler = WebCrawlerLogic()
-                crawl_result = await crawler.crawl_website(website_url)
-                if crawl_result and crawl_result.get("success"):
-                    content = crawl_result.get("content", {})
-                    text = content.get("main_content", "") or ""
-                    if text:
-                        results = [{
-                            "url": website_url,
-                            "title": content.get("title", website_url),
-                            "content": text[:10000],  # limit to 10K chars
-                            "metadata": {
-                                "source": "beautifulsoup_fallback",
-                                "word_count": len(text.split()),
-                            }
-                        }]
-                        logger.info(f"[SemanticHarvester] BeautifulSoup fallback: {len(text)} chars from {website_url}")
+                            self._harvest_stats["successful_extractions"] += 1
+                        else:
+                            self._harvest_stats["failed_extractions"] += 1
                     else:
-                        logger.warning(f"[SemanticHarvester] BeautifulSoup fallback returned no text for {website_url}")
-                return results
-            except Exception as bs_err:
-                logger.warning(f"[SemanticHarvester] BeautifulSoup fallback also failed: {bs_err}")
-                return []
+                        self._harvest_stats["failed_extractions"] += 1
+                except Exception as crawl_err:
+                    logger.warning(f"[SemanticHarvester] Crawl failed for {url}: {crawl_err}")
+                    self._harvest_stats["failed_extractions"] += 1
+
+            self._harvest_stats["total_urls_processed"] += len(urls_to_crawl)
+            self._harvest_stats["last_harvest_time"] = datetime.now().isoformat()
+            logger.info(f"[SemanticHarvester] Harvested {len(results)}/{len(urls_to_crawl)} pages from {website_url}")
+
+        except Exception as e:
+            logger.error(f"[SemanticHarvester] Harvest failed for {website_url}: {e}")
+            logger.error(f"[SemanticHarvester] Full traceback: {traceback.format_exc()}")
+
+        return results
+
+    async def _resolve_urls_from_sitemap(self, website_url: str, user_id: Optional[str], limit: int) -> List[str]:
+        """Extract prioritized URLs from the user's sitemap analysis."""
+        urls = []
+
+        # Try DB-based sitemap (from Step 1 website analysis)
+        if user_id:
+            try:
+                from services.database import get_session_for_user
+                from models.onboarding import WebsiteAnalysis, OnboardingSession
+
+                db = get_session_for_user(user_id)
+                if db:
+                    try:
+                        analyses = (
+                            db.query(WebsiteAnalysis)
+                            .join(OnboardingSession, WebsiteAnalysis.session_id == OnboardingSession.id)
+                            .filter(OnboardingSession.user_id == user_id)
+                            .order_by(WebsiteAnalysis.created_at.desc())
+                            .all()
+                        )
+                        for analysis in analyses:
+                            if not analysis.seo_audit:
+                                continue
+                            sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
+                            structure = sitemap_data.get("structure_analysis", {})
+                            sitemap_urls = structure.get("urls", [])
+                            if sitemap_urls:
+                                from urllib.parse import urlparse
+                                base_domain = urlparse(website_url).netloc
+                                for u in sitemap_urls:
+                                    url_str = u if isinstance(u, str) else u.get("url", "")
+                                    if not url_str or not url_str.startswith("http"):
+                                        continue
+                                    parsed = urlparse(url_str)
+                                    if parsed.netloc == base_domain or parsed.netloc.endswith("." + base_domain):
+                                        urls.append(url_str)
+                        db.close()
+                    finally:
+                        pass
+            except Exception as e:
+                logger.debug(f"[SemanticHarvester] Could not load sitemap from DB: {e}")
+
+        # Prioritise: homepage first, then shallow paths, then deep
+        if urls:
+            urls = sorted(urls, key=lambda u: u.count("/"))
+            # Ensure homepage is first
+            base = website_url.rstrip("/")
+            if base in urls:
+                urls.remove(base)
+            urls.insert(0, base)
+        else:
+            # Fallback: homepage only
+            urls = [website_url]
+
+        return urls[:limit]
 
     async def harvest_competitors(self, competitor_urls: List[str], pages_per_competitor: int = 10) -> List[Dict[str, Any]]:
         """Harvest content from multiple competitors with detailed logging."""
