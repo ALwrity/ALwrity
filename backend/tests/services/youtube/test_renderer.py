@@ -95,9 +95,7 @@ class TestRenderSceneVideo:
         from services.youtube.renderer import YouTubeVideoRendererService
 
         with patch("services.youtube.renderer.WaveSpeedClient"), \
-             patch("services.youtube.renderer.get_youtube_video_dir", return_value=Path("/tmp/yt")), \
-             patch("services.youtube.renderer.validate_scene_animation_operation"), \
-             patch("services.youtube.renderer.PricingService"):
+             patch("services.youtube.renderer.get_youtube_video_dir", return_value=Path("/tmp/yt")):
             svc = YouTubeVideoRendererService()
             with pytest.raises(HTTPException) as exc:
                 svc.render_scene_video(
@@ -131,8 +129,6 @@ class TestRenderSceneVideo:
 
         with patch("services.youtube.renderer.WaveSpeedClient") as mock_ws_cls, \
              patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
-             patch("services.youtube.renderer.validate_scene_animation_operation"), \
-             patch("services.youtube.renderer.PricingService"), \
              patch(
                  "services.youtube.renderer.save_youtube_scene_video",
                  return_value=save_result,
