@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ClerkProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   const { isLoaded, isSignedIn } = useAuth();
   
   // Use onboarding context instead of making API calls
@@ -135,6 +135,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   // All checks passed - render protected component
   return <>{children}</>;
+};
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const skipSignIn = process.env.REACT_APP_SKIP_SIGNIN === 'true';
+
+  if (skipSignIn) {
+    return <>{children}</>;
+  }
+
+  return <ClerkProtectedRoute>{children}</ClerkProtectedRoute>;
 };
 
 export default ProtectedRoute;

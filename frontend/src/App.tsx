@@ -92,12 +92,24 @@ const ProductAvatarStudio = React.lazy(() => import('./components/ProductMarketi
 const BacklinkOutreachDashboard = React.lazy(() => import('./components/BacklinkOutreach').then(m => ({ default: m.BacklinkOutreachDashboard })));
 
 // Root route that chooses Landing (signed out) or InitialRouteHandler (signed in)
-const RootRoute: React.FC = () => {
+const ClerkRootRoute: React.FC = () => {
   const { isSignedIn } = useAuth();
+
   if (isSignedIn) {
     return <InitialRouteHandler />;
   }
+
   return <Landing />;
+};
+
+const RootRoute: React.FC = () => {
+  const skipSignIn = process.env.REACT_APP_SKIP_SIGNIN === 'true';
+
+  if (skipSignIn) {
+    return <InitialRouteHandler />;
+  }
+
+  return <ClerkRootRoute />;
 };
 
 const App: React.FC = () => {
@@ -159,11 +171,16 @@ const App: React.FC = () => {
 
 
   // Get environment variables with fallbacks
-  const clerkPublishableKey = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY || '';
-  const clerkJSUrl = process.env.REACT_APP_CLERK_JS_URL;
+const skipSignIn = process.env.REACT_APP_SKIP_SIGNIN === 'true';
 
-  // Show error if required keys are missing
-  if (!clerkPublishableKey) {
+console.log('REACT_APP_SKIP_SIGNIN:', process.env.REACT_APP_SKIP_SIGNIN);
+console.log('skipSignIn:', skipSignIn);
+
+const clerkPublishableKey = process.env.REACT_APP_CLERK_PUBLISHABLE_KEY || '';
+const clerkJSUrl = process.env.REACT_APP_CLERK_JS_URL;
+
+// Show error if Clerk is required but the key is missing
+if (!skipSignIn && !clerkPublishableKey) {
     return (
       <Box sx={{ p: 3, textAlign: 'center' }}>
         <Typography color="error" variant="h6">
@@ -281,13 +298,16 @@ const App: React.FC = () => {
         // TODO: Send to error tracking service (Sentry, LogRocket, etc.)
       }}
     >
-      <ClerkProvider publishableKey={clerkPublishableKey} clerkJSUrl={clerkJSUrl}>
-        <SubscriptionProvider>
-          <OnboardingProvider>
-            {renderApp()}
-          </OnboardingProvider>
-        </SubscriptionProvider>
-      </ClerkProvider>
+      <ClerkProvider
+  publishableKey={clerkPublishableKey}
+  clerkJSUrl={clerkJSUrl}
+>
+  <SubscriptionProvider>
+    <OnboardingProvider>
+      {renderApp()}
+    </OnboardingProvider>
+  </SubscriptionProvider>
+</ClerkProvider>
     </ErrorBoundary>
   );
 };
