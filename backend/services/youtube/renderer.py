@@ -19,6 +19,7 @@ from services.subscription import PricingService
 from services.subscription.preflight_validator import validate_scene_animation_operation
 from services.llm_providers.main_video_generation import track_video_usage
 from services.user_workspace_manager import UserWorkspaceManager
+from services.youtube.video_storage import get_youtube_video_dir, save_youtube_scene_video
 from sqlalchemy.orm import Session
 from utils.logger_utils import get_service_logger
 from utils.asset_tracker import save_asset_to_library
@@ -33,10 +34,8 @@ class YouTubeVideoRendererService:
         """Initialize the renderer service."""
         self.wavespeed_client = WaveSpeedClient()
         
-        # Video output directory
-        # services/youtube/renderer.py -> youtube -> services -> backend -> root
-        base_dir = Path(__file__).resolve().parents[4]
-        self.output_dir = base_dir / "workspace" / "media" / "youtube_videos"
+        # Video output directory (global fallback; per-user dir resolved at save time)
+        self.output_dir = get_youtube_video_dir()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
         logger.info(f"[YouTubeRenderer] Initialized with output directory: {self.output_dir}")
@@ -46,19 +45,7 @@ class YouTubeVideoRendererService:
         Get the video directory for a specific user.
         Falls back to default output_dir if workspace not found.
         """
-        if db and user_id:
-            try:
-                workspace_manager = UserWorkspaceManager(db)
-                workspace = workspace_manager.get_user_workspace(user_id)
-                if workspace:
-                    # Use media/youtube_videos inside user workspace
-                    user_video_dir = Path(workspace['workspace_path']) / "media" / "youtube_videos"
-                    user_video_dir.mkdir(parents=True, exist_ok=True)
-                    return user_video_dir
-            except Exception as e:
-                logger.warning(f"[YouTubeRenderer] Failed to resolve user workspace path for {user_id}: {e}")
-        
-        return self.output_dir
+        return get_youtube_video_dir(user_id=user_id, db=db)
 
     def _get_user_audio_dir(self, user_id: str, db: Optional[Session] = None) -> Path:
         """
@@ -352,22 +339,13 @@ class YouTubeVideoRendererService:
                     },
                 ) from e
             
-            # Save scene video
-            # Resolve user-specific output directory for video service initialization
-            user_video_dir = self._get_user_video_dir(user_id, db)
-            video_service = StoryVideoGenerationService(output_dir=str(user_video_dir))
-            
-            save_result = video_service.save_scene_video(
+            # Save into canonical YouTube media dir (not Story writer media paths)
+            save_result = save_youtube_scene_video(
                 video_bytes=video_result["video_bytes"],
                 scene_number=scene_number,
                 user_id=user_id,
-                db=db
+                db=db,
             )
-            
-            # Update video URL to use YouTube API endpoint
-            filename = save_result["video_filename"]
-            save_result["video_url"] = f"/api/youtube/videos/{filename}"
-            
             # Track usage
             usage_info = track_video_usage(
                 user_id=user_id,
@@ -525,8 +503,8 @@ class YouTubeVideoRendererService:
                 )
                 
                 final_video_path = combined_result["video_path"]
-                final_video_url = combined_result["video_url"]
-            
+                final_filename = Path(combined_result.get("video_filename") or final_video_path).name
+                final_video_url = f"/api/youtube/videos/{final_filename}"            
             logger.info(
                 f"[YouTubeRenderer] ✅ Full video rendered: {len(scene_results)} scenes, "
                 f"total_cost=${total_cost:.2f}"
