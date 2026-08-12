@@ -427,6 +427,15 @@ class OnboardingManager:
                 logger.error(f"Error in sif_retrigger: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error")
 
+        @self.app.get("/api/onboarding/sif/search")
+        async def sif_search(query: str = "", limit: int = 5, current_user: dict = Depends(get_current_user)):
+            """Search the SIF index for test queries (white-box debugging)."""
+            try:
+                return await search_sif_index(query, limit, current_user)
+            except Exception as e:
+                logger.error(f"Error in sif_search: {e}")
+                return {"hits": [], "query": query, "error": str(e)}
+
         # Business Information endpoints
         @self.app.post("/api/onboarding/business-info")
         async def business_info_save(request: dict):

@@ -413,9 +413,15 @@ async def search_sif_index(query: str = "", limit: int = 5, current_user: Dict[s
         user_id = str(current_user.get("id"))
         from services.intelligence.sif_integration import SIFIntegrationService
         svc = SIFIntegrationService(user_id)
-        await svc._ensure_initialized()
-        results = svc.intelligence_service.search(query, limit=limit)
-        hits = [{"text": r.get("text", ""), "score": r.get("score", 0)} for r in (results or [])]
+        results = await svc.intelligence_service.search(query, limit=limit)
+        hits = []
+        for r in (results or []):
+            if isinstance(r, dict):
+                hits.append({"text": r.get("text", ""), "score": r.get("score", 0)})
+            elif isinstance(r, (list, tuple)):
+                hits.append({"text": str(r[0]) if len(r) > 0 else "", "score": r[1] if len(r) > 1 else 0})
+            else:
+                hits.append({"text": str(r), "score": 0})
         return {"hits": hits, "query": query}
     except Exception as e:
         from loguru import logger
