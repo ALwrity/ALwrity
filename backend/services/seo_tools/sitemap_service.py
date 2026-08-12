@@ -719,15 +719,36 @@ class SitemapService:
             }
 
             # Generate AI insights
+            import time as _time
+            t0 = _time.time()
+            trace_id = f"alwrity_onboarding_sitemap_{user_id}"
             ai_response = llm_text_gen(
                 prompt=prompt,
                 system_prompt=self._get_onboarding_system_prompt(),
                 json_struct=json_struct,
-                user_id=user_id
+                user_id=user_id,
+                trace_id=trace_id,
             )
-            
+            api_took = (_time.time() - t0) * 1000
+
             # Parse and structure insights
+            parse_t0 = _time.time()
             insights = self._parse_onboarding_insights(ai_response)
+            parse_took = (_time.time() - parse_t0) * 1000
+
+            pydantic_result = self._validate_with_pydantic(insights)
+            logger.warning(
+                f"[onboarding_insights_telemetry] trace={trace_id} "
+                f"api_latency_ms={api_took:.0f} parse_ms={parse_took:.0f} "
+                f"pydantic_valid={pydantic_result['valid']} "
+                f"fields_ok={pydantic_result['fields_ok']}/{pydantic_result['total_fields']} "
+                f"parse_source={'direct_dict' if isinstance(ai_response, dict) else 'json_string'}"
+            )
+            if not pydantic_result['valid']:
+                logger.warning(
+                    f"[onboarding_insights_telemetry] trace={trace_id} "
+                    f"Pydantic errors: {pydantic_result.get('errors', '')}"
+                )
             
             # Log AI analysis
             await seo_logger.log_ai_analysis(
@@ -1113,7 +1134,7 @@ Key focus areas:
 
 Provide practical, data-driven insights that help content creators make informed decisions about their content strategy and competitive positioning.
 
-Format your response as structured insights that can be easily parsed and displayed in a user interface."""
+IMPORTANT: Your response MUST be a single valid minified JSON object. No markdown, no code fences, no prose outside JSON."""
 
     def _parse_onboarding_insights(self, ai_response: Any) -> Dict[str, Any]:
         """Parse AI response for onboarding-specific insights"""
@@ -1173,6 +1194,42 @@ Format your response as structured insights that can be easily parsed and displa
                 "growth_opportunities": [],
                 "industry_benchmarks": [],
                 "strategic_recommendations": []
+            }
+
+    def _validate_with_pydantic(self, insights: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate onboarding insights against Pydantic model.
+
+        Returns dict with: valid, total_fields, fields_ok, errors (field paths only, no raw content).
+        """
+        try:
+            from pydantic import BaseModel, field_validator, ValidationError
+
+            class OnboardingInsights(BaseModel):
+                competitive_positioning: str = ""
+                content_gaps: list = []
+                growth_opportunities: list = []
+                industry_benchmarks: list = []
+                strategic_recommendations: list = []
+
+            OnboardingInsights(**insights)
+            return {
+                "valid": True,
+                "total_fields": 5,
+                "fields_ok": 5,
+                "errors": "",
+            }
+        except Exception as e:
+            error_fields = []
+            if hasattr(e, 'errors'):
+                for err in e.errors():
+                    loc = ".".join(str(x) for x in err.get("loc", []))
+                    typ = err.get("type", "unknown")
+                    error_fields.append(f"{loc}({typ})")
+            return {
+                "valid": False,
+                "total_fields": 5,
+                "fields_ok": 5 - len(error_fields),
+                "errors": "; ".join(error_fields) if error_fields else str(e)[:200],
             }
 
     async def discover_sitemap_url(self, website_url: str) -> Optional[str]:

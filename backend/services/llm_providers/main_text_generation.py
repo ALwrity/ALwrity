@@ -82,9 +82,11 @@ def llm_text_gen(
             import uuid
             trace_id = f"alwrity_{resolved_flow_type}_{user_id or 'anon'}_{uuid.uuid4().hex[:8]}"
 
-        def _estimate_tokens(text: str) -> int:
+        def _estimate_tokens(text: Any) -> int:
             if not text:
                 return 1
+            if not isinstance(text, str):
+                text = str(text)
             try:
                 import tiktoken
                 enc = tiktoken.get_encoding("o200k_base")
@@ -126,6 +128,9 @@ def llm_text_gen(
             elif primary_provider in ['openai', 'gpt']:
                 gpt_provider = "openai"
                 model = os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+            elif primary_provider in ['novarouteai', 'novaroute']:
+                gpt_provider = "novarouteai"
+                model = os.getenv('NOVAROUTE_MODEL', 'qwen3.5-plus')
             else:
                 logger.warning(f"[llm_text_gen] Unknown GPT_PROVIDER: {primary_provider}, using auto-select")
                 gpt_provider = None
@@ -143,6 +148,9 @@ def llm_text_gen(
             elif preferred_provider in ['hf_response_api', 'huggingface', 'hf']:
                 gpt_provider = "huggingface"
                 model = "openai/gpt-oss-120b:cerebras"
+            elif preferred_provider in ['novarouteai', 'novaroute']:
+                gpt_provider = "novarouteai"
+                model = os.getenv('NOVAROUTE_MODEL', 'qwen3.5-plus')
             else:
                 gpt_provider = None
                 model = None
@@ -187,6 +195,8 @@ def llm_text_gen(
             available_providers.append("huggingface")
         if api_key_manager.get_api_key("wavespeed"):
             available_providers.append("wavespeed")
+        if api_key_manager.get_api_key("novaroute"):
+            available_providers.append("novarouteai")
         
         logger.warning(
             f"[llm_text_gen][{flow_tag}] Provider preflight: env_provider='{env_provider or 'auto'}', "
@@ -244,6 +254,9 @@ def llm_text_gen(
         elif gpt_provider == "openai":
             provider_enum = APIProvider.OPENAI
             actual_provider_name = "openai"
+        elif gpt_provider == "novarouteai":
+            provider_enum = APIProvider.WAVESPEED  # NovaRouteAI uses same billing structure
+            actual_provider_name = "novarouteai"
         
         if not provider_enum:
             # For unknown providers, try to proceed without subscription tracking
@@ -429,9 +442,36 @@ def llm_text_gen(
                 api_took_ms = (time.time() - t1) * 1000
                 total_ms = (time.time() - t0) * 1000
                 logger.warning(f"[llm_text_gen][{flow_tag}] wavespeed: user={user_id} import_took={(t1-t0)*1000:.0f}ms api_took={api_took_ms:.0f}ms total={total_ms:.0f}ms")
+            elif gpt_provider == "novarouteai":
+                t0 = time.time()
+                logger.warning(f"[llm_text_gen][{flow_tag}] novarouteai: Starting provider init for user {user_id}")
+                if json_struct:
+                    from services.llm_providers.novarouteai_provider import novaroute_structured_json_response
+                    t1 = time.time()
+                    response_text = novaroute_structured_json_response(
+                        prompt=prompt,
+                        schema=json_struct,
+                        model=model or "qwen3.5-plus",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_instructions
+                    )
+                else:
+                    from services.llm_providers.novarouteai_provider import novaroute_text_response
+                    t1 = time.time()
+                    response_text = novaroute_text_response(
+                        prompt=prompt,
+                        model=model or "qwen3.5-plus",
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        system_prompt=system_instructions
+                    )
+                api_took_ms = (time.time() - t1) * 1000
+                total_ms = (time.time() - t0) * 1000
+                logger.warning(f"[llm_text_gen][{flow_tag}] novarouteai: user={user_id} import_took={(t1-t0)*1000:.0f}ms api_took={api_took_ms:.0f}ms total={total_ms:.0f}ms")
             else:
                 logger.error(f"[llm_text_gen] Unknown provider: {gpt_provider}")
-                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed")
+                raise RuntimeError(f"Unknown LLM provider: {gpt_provider}. Supported providers: google, huggingface, wavespeed, openai, novarouteai")
             
             # TRACK USAGE after successful API call
             if response_text:
@@ -459,10 +499,12 @@ def llm_text_gen(
                     logger.error(f"[llm_text_gen] ❌ Failed to track usage: {usage_error}", exc_info=True)
 
             # Telemetry log — provider-agnostic, for routing/cost analysis
-            logger.info(
+            input_estimated = _estimate_tokens(prompt) + _estimate_tokens(system_prompt or "") + _estimate_tokens(str(json_struct) if json_struct else "")
+            output_estimated = _estimate_tokens(response_text)
+            logger.warning(
                 f"[llm_telemetry] trace={trace_id} user={user_id} provider={gpt_provider} "
                 f"model={model} flow={resolved_flow_type} "
-                f"input_tokens_est={_estimate_tokens(prompt)} output_tokens_est={_estimate_tokens(response_text)} "
+                f"input_tokens_est={input_estimated} output_tokens_est={output_estimated} "
                 f"latency_ms={total_ms:.0f} retries={retry_count} success=1"
             )
             return response_text

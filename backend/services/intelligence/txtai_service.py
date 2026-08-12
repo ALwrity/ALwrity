@@ -199,6 +199,9 @@ class TxtaiIntelligenceService:
         if load_existing_index:
             from .sif_index_remediation import remediate_corrupt_index
             remediate_corrupt_index(self.index_path, user_id=self.user_id)
+        # Reset ANN flag after remediation — the recreated index uses
+        # the correct faiss config (IVF1,Flat) and should be compatible.
+        self._disable_ann_queries = False
         if not TXTAI_AVAILABLE:
             logger.error("txtai is not available. Please install with: pip install txtai[pipeline,similarity]")
             return
@@ -345,6 +348,8 @@ class TxtaiIntelligenceService:
         """Bypass the FAISS ANN index by recomputing embeddings from stored content."""
         try:
             if not self.embeddings:
+                return []
+            if not callable(getattr(self.embeddings, 'transform', None)):
                 return []
             ids = self.embeddings.ids()
             if not ids:

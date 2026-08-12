@@ -7,38 +7,34 @@ import {
   Alert,
   Button,
   Grid,
-  LinearProgress,
   Dialog,
   DialogTitle,
   DialogContent,
-  Card,
-  CardContent,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Chip,
   Tooltip,
   IconButton,
-  Collapse
+  Collapse,
+  Chip,
 } from '@mui/material';
 import {
   Assessment as AssessmentIcon,
   Refresh as RefreshIcon,
-  Info as InfoIcon,
-  Lightbulb as LightbulbIcon,
-  TrendingUp as TrendingUpIcon,
-  Search as SearchIcon,
-  AutoAwesome as AutoFixHighIcon,
-  ExpandLess as ExpandLessIcon,
   CheckCircle as CheckCircleIcon,
+  Info as InfoIcon,
+  ExpandLess as ExpandLessIcon,
+  Search as SearchIcon,
+  TrendingUp as TrendingUpIcon,
+  AutoAwesome as AutoFixHighIcon,
 } from '@mui/icons-material';
-import { aiApiClient, longRunningApiClient } from '../../api/client';  // Use aiApiClient for long-running operations
+import { aiApiClient, longRunningApiClient } from '../../api/client';
 import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';
 import type { Competitor } from './WebsiteStep/components';
 import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
 import { ContentPillarsSection, type ContentPillarData } from './CompetitorAnalysisStep/ContentPillarsSection';
+import { StrategicInsightsSection } from './CompetitorAnalysisStep/StrategicInsightsSection';
+import { InsightsModals } from './CompetitorAnalysisStep/InsightsModals';
+import { ProgressModal } from './CompetitorAnalysisStep/ProgressModal';
+import { useCompetitorDiscovery } from './CompetitorAnalysisStep/useCompetitorDiscovery';
 
 
 // Light theme constants matching requirements
@@ -82,26 +78,15 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   initialData
 }) => {
   const classes = useOnboardingStyles();
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStep, setAnalysisStep] = useState('');
-  const [competitors, setCompetitors] = useState<Competitor[]>([]);
-  const [socialMediaAccounts, setSocialMediaAccounts] = useState<any>({});
-  const [, setSocialMediaCitations] = useState<any[]>([]);
-  const [researchSummary, setResearchSummary] = useState<ResearchSummary | null>(null);
-  const [contentPillars, setContentPillars] = useState<ContentPillarData | null>(null);
-  const [isLoadingPillars, setIsLoadingPillars] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showProgressModal, setShowProgressModal] = useState(false);
+
+  // UI state (modals, header, sitemap, social discovery) — stays in parent
   const [showHighlightsModal, setShowHighlightsModal] = useState(false);
   const [selectedCompetitorHighlights, setSelectedCompetitorHighlights] = useState<string[]>([]);
   const [selectedCompetitorTitle, setSelectedCompetitorTitle] = useState<string>('');
-  const [usingCachedData, setUsingCachedData] = useState(false);
   const [sitemapAnalysis, setSitemapAnalysis] = useState<any>(null);
   const [isAnalyzingSitemap, setIsAnalyzingSitemap] = useState(false);
   const [isDiscoveringSocial, setIsDiscoveringSocial] = useState(false);
   const [showHeaderInfo, setShowHeaderInfo] = useState(false);
-  // const [showWhyImportant, setShowWhyImportant] = useState(false);
   const [missingData, setMissingData] = useState(false);
   const [showBenchmarksModal, setShowBenchmarksModal] = useState(false);
   const [showStrategyModal, setShowStrategyModal] = useState(false);
@@ -109,8 +94,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   const [showStructureModal, setShowStructureModal] = useState(false);
   const [backgroundSetupOpen, setBackgroundSetupOpen] = useState(false);
 
-  // Ref to track if initialization has already started to prevent duplicate calls
-  const initializationStarted = React.useRef(false);
   const sitemapAutoTriggered = React.useRef(false);
   const crawlSocialMediaRef = React.useRef<Record<string, string>>({});
 
@@ -124,6 +107,28 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     }
     return merged;
   }, []);
+
+  // Data-fetching hook — manages competitors, social media, pillars, analysis state
+  const {
+    competitors, setCompetitors,
+    socialMediaAccounts, setSocialMediaAccounts,
+    researchSummary,
+    contentPillars,
+    isLoadingPillars,
+    error, setError,
+    isAnalyzing,
+    analysisProgress, analysisStep,
+    showProgressModal,
+    usingCachedData,
+    startCompetitorDiscovery,
+    updateCacheWithSitemapAnalysis,
+  } = useCompetitorDiscovery({
+    userUrl,
+    industryContext,
+    initialData,
+    sitemapAnalysis,
+    mergeCrawlSocialMedia,
+  });
 
   // Check for missing data
   useEffect(() => {
@@ -153,251 +158,6 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     
     return () => clearTimeout(timer);
   }, [userUrl, initialData]);
-
-
-  // Check for cached competitor analysis data
-  const loadCachedAnalysis = useCallback(() => {
-    try {
-      const cachedData = localStorage.getItem('competitor_analysis_data');
-      const cachedUrl = localStorage.getItem('competitor_analysis_url') || '';
-      const cacheTimestamp = localStorage.getItem('competitor_analysis_timestamp');
-      
-      // Get current URL for comparison
-      const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
-      
-      // Helper to normalize URL for comparison (ignore trailing slashes and protocol differences)
-      const normalizeUrl = (url: string) => {
-        if (!url) return '';
-        return url.trim().toLowerCase().replace(/\/$/, '').replace(/^https?:\/\//, '').replace(/^www\./, '');
-      };
-
-      if (cachedData && normalizeUrl(cachedUrl) === normalizeUrl(finalUserUrl) && cacheTimestamp) {
-        const cacheAge = Date.now() - parseInt(cacheTimestamp);
-        const cacheValidDuration = 24 * 60 * 60 * 1000; // 24 hours
-        
-        // Check if cache is still valid (less than 24 hours old)
-        if (cacheAge < cacheValidDuration) {
-          const parsedData = JSON.parse(cachedData);
-          
-          console.log('CompetitorAnalysisStep: Loading cached competitor analysis:', {
-            url: cachedUrl,
-            currentUrl: finalUserUrl,
-            match: 'normalized',
-            cacheAge: Math.round(cacheAge / (60 * 1000)),
-            competitors: parsedData.competitors?.length || 0
-          });
-          
-          const hasCompetitors = (parsedData.competitors || []).length > 0;
-          const hasResearch = !!parsedData.research_summary;
-
-          // Only consider cache valid if it has actual data (avoid stale empty-competitor cache)
-          if (hasCompetitors || hasResearch) {
-            setCompetitors(parsedData.competitors || []);
-            setSocialMediaAccounts(parsedData.social_media_accounts || {});
-            setSocialMediaCitations(parsedData.social_media_citations || []);
-            setResearchSummary(parsedData.research_summary || null);
-            setSitemapAnalysis(parsedData.sitemap_analysis || null);
-            setUsingCachedData(true);
-            
-            return true; // Successfully loaded from cache
-          } else {
-            console.log('CompetitorAnalysisStep: Cache has no competitor data, treating as miss');
-            localStorage.removeItem('competitor_analysis_data');
-            localStorage.removeItem('competitor_analysis_url');
-            localStorage.removeItem('competitor_analysis_timestamp');
-          }
-        } else {
-          console.log('CompetitorAnalysisStep: Cache expired, will run fresh analysis');
-        }
-      } else {
-        console.log('CompetitorAnalysisStep: Cache miss or URL mismatch', {
-            cachedUrl,
-            finalUserUrl,
-            hasData: !!cachedData,
-            hasTimestamp: !!cacheTimestamp
-        });
-      }
-      
-      return false; // No valid cache found
-    } catch (err) {
-      console.error('Error loading cached analysis:', err);
-      return false;
-    }
-  }, [userUrl]);
-
-  // Update cache with sitemap analysis
-  const updateCacheWithSitemapAnalysis = useCallback((sitemapResult: any) => {
-    try {
-      const cachedData = localStorage.getItem('competitor_analysis_data');
-      if (cachedData) {
-        const parsedData = JSON.parse(cachedData);
-        parsedData.sitemap_analysis = sitemapResult;
-        
-        localStorage.setItem('competitor_analysis_data', JSON.stringify(parsedData));
-        console.log('CompetitorAnalysisStep: Updated cache with sitemap analysis');
-      }
-    } catch (err) {
-      console.warn('Failed to update cache with sitemap analysis:', err);
-    }
-  }, []);
-
-  const startCompetitorDiscovery = useCallback(async (force = false) => {
-    // Check localStorage cache first unless forced
-    if (!force && loadCachedAnalysis()) {
-      console.log('CompetitorAnalysisStep: Using cached competitor analysis');
-      return;
-    }
-
-    // Check backend DB for existing competitor data (survives cache expiry)
-    // Pre-populate competitors but continue to API for fresh social media + pillars
-    if (!force) {
-      try {
-        const dbResult = await longRunningApiClient.get('/api/onboarding/competitor-analysis');
-        if (dbResult?.data?.competitors?.length > 0) {
-          console.log('CompetitorAnalysisStep: Pre-populating competitors from DB');
-          const comps = dbResult.data.competitors.map((c: any) => ({
-            url: c.url || '', domain: c.domain || '', title: c.url || '',
-            summary: '', relevance_score: 0.8,
-            highlights: [], favicon: null, image: null, published_date: null, author: null,
-            competitive_insights: { business_model: '', target_audience: '' },
-            content_insights: { content_focus: '', content_quality: '' },
-          }));
-          setCompetitors(comps);
-          setUsingCachedData(true);
-          // Continue to API call below for fresh social media + pillars
-        }
-      } catch {
-        // DB check failed — proceed with fresh API call
-      }
-    }
-
-    // Fresh API call
-    setIsAnalyzing(true);
-      setShowProgressModal(true);
-      setIsLoadingPillars(true);
-      setError(null);
-    setAnalysisProgress(0);
-    setAnalysisStep('Initializing competitor discovery...');
-    setUsingCachedData(false);
-
-    try {
-      setAnalysisStep('Validating session...');
-      setAnalysisProgress(20);
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      setAnalysisStep('Discovering competitors using AI...');
-      setAnalysisProgress(40);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      setAnalysisStep('Analyzing competitor content and strategy...');
-      setAnalysisProgress(60);
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      setAnalysisStep('Generating competitive insights...');
-      setAnalysisProgress(80);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Get website URL from multiple sources with better fallbacks
-      const propUserUrl = userUrl || '';
-      const localStorageUrl = localStorage.getItem('website_url') || '';
-      
-      // Try to get from onboarding context or global state
-      const onboardingContextUrl = (window as any).onboardingContext?.websiteUrl || '';
-      
-      const finalUserUrl = propUserUrl || localStorageUrl || onboardingContextUrl || '';
-      
-      // Get website analysis data from multiple sources
-      const localStorageAnalysis = localStorage.getItem('website_analysis_data');
-      
-      let websiteAnalysisData = null;
-      if (localStorageAnalysis) {
-        try {
-          websiteAnalysisData = JSON.parse(localStorageAnalysis);
-        } catch (e) {
-          console.warn('Failed to parse localStorage website_analysis_data:', e);
-        }
-      }
-      if (!websiteAnalysisData) {
-        console.log('CompetitorAnalysisStep: No analysis data found from localStorage');
-      }
-      
-      console.log('CompetitorAnalysisStep: URL sources debug:', {
-        propUserUrl,
-        localStorageUrl,
-        onboardingContextUrl,
-        finalUserUrl,
-        hasLocalStorageAnalysis: !!localStorageAnalysis,
-        websiteAnalysisData: websiteAnalysisData ? 'present' : 'null'
-      });
-
-      console.log('CompetitorAnalysisStep: Making request with data:', {
-        user_url: finalUserUrl,
-        industry_context: industryContext,
-        num_results: 25,
-        website_analysis_data: websiteAnalysisData
-      });
-
-      // Validate that we have a URL before making the request
-      if (!finalUserUrl || finalUserUrl.trim() === '') {
-        throw new Error('No website URL available for competitor analysis. Please complete Step 2 (Website Analysis) first.');
-      }
-
-      const response = await aiApiClient.post('/api/onboarding/step3/discover-competitors', {
-        // session_id removed - backend gets user from auth token
-        user_url: finalUserUrl,
-        industry_context: industryContext,
-        num_results: 25,
-        website_analysis_data: websiteAnalysisData
-      });
-
-      const result = response.data;
-
-      if (result.success) {
-        setAnalysisStep('Finalizing analysis...');
-        setAnalysisProgress(100);
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        const analysisData = {
-          competitors: result.competitors || [],
-          social_media_accounts: result.social_media_accounts || {},
-          social_media_citations: result.social_media_citations || [],
-          research_summary: result.research_summary || null,
-          sitemap_analysis: sitemapAnalysis || null
-        };
-
-        setCompetitors(analysisData.competitors);
-        const mergedAccounts = mergeCrawlSocialMedia(analysisData.social_media_accounts);
-        setSocialMediaAccounts(mergedAccounts);
-        setSocialMediaCitations(analysisData.social_media_citations);
-        setResearchSummary(analysisData.research_summary);
-        if (result.content_pillars) {
-          setContentPillars(result.content_pillars);
-        }
-        
-        // Cache the analysis results with merged data
-        try {
-          localStorage.setItem('competitor_analysis_data', JSON.stringify({ ...analysisData, social_media_accounts: mergedAccounts }));
-          localStorage.setItem('competitor_analysis_url', finalUserUrl);
-          localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
-          console.log('CompetitorAnalysisStep: Cached competitor analysis for future use');
-        } catch (cacheErr) {
-          console.warn('Failed to cache competitor analysis:', cacheErr);
-        }
-        
-        setShowProgressModal(false);
-        setIsAnalyzing(false);
-        setIsLoadingPillars(false);
-      } else {
-        throw new Error(result.error || 'Competitor discovery failed');
-      }
-    } catch (err) {
-      console.error('Competitor discovery error:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
-      setIsAnalyzing(false);
-      setIsLoadingPillars(false);
-      setShowProgressModal(false);
-    }
-  }, [userUrl, industryContext, loadCachedAnalysis]);  // sessionId removed from dependencies
 
   // Social Media Discovery Function
   const discoverSocialMedia = useCallback(async () => {
@@ -497,70 +257,12 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userUrl, competitors, industryContext, isAnalyzingSitemap]);
 
-  // Initialize: Check cache first, then run analysis if needed
+  // Pick up sitemapAnalysis from initialData (competitors/cache handled by hook)
   useEffect(() => {
-    const initialize = async () => {
-      // Prevent double-initialization (React Strict Mode or rapid remounts)
-      if (initializationStarted.current) {
-        console.log('CompetitorAnalysisStep: Initialization already started, skipping duplicate run');
-        return;
-      }
-      initializationStarted.current = true;
-
-      // Extract crawl social media from step 2 for fallback
-      const crawlData = initialData?.crawl_social_media || initialData?.crawlResult?.content?.social_media || {};
-      if (Object.keys(crawlData).length > 0) {
-        console.log('CompetitorAnalysisStep: Loaded crawl social media for fallback:', crawlData);
-        crawlSocialMediaRef.current = crawlData;
-      }
-
-      // Apply crawl-merged social media accounts from backend (always available since init endpoint fix)
-      if (initialData?.social_media_accounts) {
-        console.log('CompetitorAnalysisStep: Applying backend social media accounts');
-        setSocialMediaAccounts(mergeCrawlSocialMedia(initialData.social_media_accounts));
-      }
-
-      // 1. Check for backend competitors data (SSOT)
-      if (initialData?.competitors?.length > 0) {
-        console.log('CompetitorAnalysisStep: Initializing competitors from backend data');
-        setCompetitors(initialData.competitors);
-        if (initialData.social_media_citations) setSocialMediaCitations(initialData.social_media_citations);
-        if (initialData.researchSummary) setResearchSummary(initialData.researchSummary);
-        if (initialData.sitemapAnalysis) setSitemapAnalysis(initialData.sitemapAnalysis);
-        setUsingCachedData(true);
-        
-        // Prime local cache for consistency
-        try {
-          const analysisData = {
-            competitors: initialData.competitors || [],
-            social_media_accounts: initialData.social_media_accounts || {},
-            social_media_citations: initialData.social_media_citations || [],
-            research_summary: initialData.researchSummary || null,
-            sitemap_analysis: initialData.sitemapAnalysis || null
-          };
-          const finalUserUrl = userUrl || localStorage.getItem('website_url') || '';
-          localStorage.setItem('competitor_analysis_data', JSON.stringify(analysisData));
-          localStorage.setItem('competitor_analysis_url', finalUserUrl);
-          localStorage.setItem('competitor_analysis_timestamp', Date.now().toString());
-          console.log('CompetitorAnalysisStep: Primed cache from backend data');
-        } catch (e) {
-          console.warn('Failed to prime cache from backend data', e);
-        }
-        return;
-      }
-
-      // 2. Try to load from cache
-      const cacheLoaded = loadCachedAnalysis();
-      
-      // 3. If no cache found, run fresh analysis
-      if (!cacheLoaded) {
-        await startCompetitorDiscovery(false);
-      }
-    };
-    
-    initialize();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount
+    if (initialData?.sitemapAnalysis) {
+      setSitemapAnalysis(initialData.sitemapAnalysis);
+    }
+  }, [initialData?.sitemapAnalysis]);
 
   // Load cached sitemap analysis if available (no auto-trigger — user clicks Refresh Strategy)
   useEffect(() => {
@@ -605,7 +307,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     if (!competitors.length || isAnalyzing) return;
     let cancelled = false;
     setBenchmarkLoading(true);
-    aiApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
+    longRunningApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
       .then((resp) => {
         if (!cancelled) setBenchmarkReport(resp.data || resp.data?.benchmark);
       })
@@ -959,412 +661,36 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
 
       {/* Strategic Content Opportunities Section */}
       {competitors.length > 0 && (
-        <Box mt={6} mb={4}>
-          {/* Header */}
-          <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-            <Tooltip title="Based on competitor analysis, these are specific recommendations to improve your SEO and content strategy.">
-              <Typography variant="h5" fontWeight={600} sx={{ color: '#1a202c !important', display: 'flex', alignItems: 'center', cursor: 'help' }}>
-                <LightbulbIcon sx={{ mr: 1, color: '#f59e0b' }} />
-                Strategic Content Opportunities
-                <InfoIcon sx={{ ml: 1, fontSize: 20, color: 'text.disabled' }} />
-              </Typography>
-            </Tooltip>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={isAnalyzingSitemap ? <CircularProgress size={16} color="inherit" /> : <RefreshIcon />}
-              onClick={() => startSitemapAnalysis(true)}
-              disabled={isAnalyzingSitemap}
-              sx={{ borderColor: '#667eea', color: '#667eea', textTransform: 'none', '&:hover': { borderColor: '#5a6fd8', bgcolor: 'rgba(102,126,234,0.04)' } }}
-            >
-              {isAnalyzingSitemap ? 'Refreshing...' : 'Refresh Strategy'}
-            </Button>
-          </Box>
-
-          {isAnalyzingSitemap ? (
-            <Paper sx={{ p: 4, textAlign: 'center', bgcolor: '#f8fafc', borderStyle: 'dashed', borderColor: '#cbd5e0' }}>
-              <CircularProgress size={24} sx={{ mb: 2 }} />
-              <Typography color="text.secondary">Analyzing competitive landscape for opportunities...</Typography>
-            </Paper>
-          ) : (
-            <Box>
-              {/* 1. Your Competitive Position */}
-              {sitemapAnalysis?.analysis_data?.onboarding_insights?.competitive_positioning && (
-                <Paper sx={{ p: 3, mb: 3, bgcolor: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 2 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-                    <Box sx={{ p: 1, bgcolor: 'white', borderRadius: '50%', color: '#0284c7', flexShrink: 0 }}>
-                      <AssessmentIcon />
-                    </Box>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight={600} color="#0c4a6e" gutterBottom>
-                        Your Competitive Position
-                      </Typography>
-                      <Typography variant="body2" color="#0c4a6e">
-                        {sitemapAnalysis.analysis_data.onboarding_insights.competitive_positioning}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Paper>
-              )}
-
-              <Grid container spacing={3}>
-                {/* 2. Topics to Create */}
-                <Grid item xs={12} md={6}>
-                  <Card sx={{ height: '100%', bgcolor: '#fffbeb', border: '1px solid #fde68a' }}>
-                    <CardContent>
-                      <Typography variant="h6" sx={{ color: '#92400e', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <AutoFixHighIcon fontSize="small" sx={{ color: '#f59e0b' }} /> Topics to Create
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 2, color: '#78716c' }}>
-                        Subjects your competitors cover that you don't yet — create content on these to capture new audience segments.
-                      </Typography>
-                      {sitemapAnalysis?.analysis_data?.onboarding_insights?.content_gaps?.length > 0 ? (
-                        <Box display="flex" flexWrap="wrap" gap={1}>
-                          {sitemapAnalysis.analysis_data.onboarding_insights.content_gaps.map((gap: string, i: number) => (
-                            <Chip key={i} label={gap} size="small" sx={{ bgcolor: 'white', border: '1px solid #fde68a', fontWeight: 500 }} />
-                          ))}
-                        </Box>
-                      ) : (
-                        <Typography variant="caption" fontStyle="italic" color="#78716c">No gaps detected yet.</Typography>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-
-                {/* 3. Growth Moves */}
-                <Grid item xs={12} md={6}>
-                  <Card sx={{ height: '100%', bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                    <CardContent>
-                      <Typography variant="h6" sx={{ color: '#166534', display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <TrendingUpIcon fontSize="small" sx={{ color: '#22c55e' }} /> Growth Moves
-                      </Typography>
-                      <Typography variant="body2" sx={{ mb: 2, color: '#6b7280' }}>
-                        Prioritized actions to improve your content strategy and organic reach.
-                      </Typography>
-                      {(() => {
-                        const ACTION_VERBS = ['Target', 'Expand', 'Create', 'Build', 'Optimize', 'Capture', 'Scale', 'Launch'];
-                        const growthMoves = [
-                          ...(sitemapAnalysis?.analysis_data?.onboarding_insights?.growth_opportunities || []),
-                          ...(sitemapAnalysis?.analysis_data?.onboarding_insights?.strategic_recommendations || []).slice(0, 2)
-                        ];
-                        return growthMoves.length > 0 ? (
-                          <List dense disablePadding>
-                            {growthMoves.map((move: any, i: number) => {
-                              const text = typeof move === 'string' ? move
-                                : (typeof move?.action === 'string' ? move.action
-                                : typeof move?.finding === 'string' ? move.finding
-                                : typeof move?.type === 'string' ? move.type
-                                : typeof move?.title === 'string' ? move.title
-                                : JSON.stringify(move));
-                              return (
-                              <ListItem key={i} disableGutters sx={{ py: 0.5 }}>
-                                <ListItemIcon sx={{ minWidth: 28 }}>
-                                  <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: '#22c55e', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
-                                    {i + 1}
-                                  </Box>
-                                </ListItemIcon>
-                                <ListItemText primary={`${ACTION_VERBS[i % ACTION_VERBS.length]} ${text}`} primaryTypographyProps={{ variant: 'body2', color: '#166534' }} />
-                              </ListItem>
-                            )})}
-                          </List>
-                        ) : (
-                          <Typography variant="caption" fontStyle="italic" color="#6b7280">Generating recommendations...</Typography>
-                        );
-                      })()}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              </Grid>
-
-              {/* 4. Deeper Insights — secondary buttons */}
-              <Box mt={3}>
-                <Typography variant="caption" color="text.disabled" sx={{ display: 'block', textAlign: 'center', mb: 1, fontSize: '0.7rem', letterSpacing: 1 }}>
-                  DEEPER INSIGHTS
-                </Typography>
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, justifyContent: 'center' }}>
-                  {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.length > 0 && (
-                    <Button size="small" variant="outlined" onClick={() => setShowBenchmarksModal(true)} startIcon={<AssessmentIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
-                      Industry Benchmarks
-                    </Button>
-                  )}
-                  {sitemapAnalysis?.analysis_data?.ai_insights?.content_strategy?.length > 0 && (
-                    <Button size="small" variant="outlined" onClick={() => setShowStrategyModal(true)} startIcon={<LightbulbIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
-                      Content Strategy & SEO
-                    </Button>
-                  )}
-                  {sitemapAnalysis?.analysis_data?.content_trends?.trends?.length > 0 && (
-                    <Button size="small" variant="outlined" onClick={() => setShowPublishingModal(true)} startIcon={<TrendingUpIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
-                      Publishing Patterns
-                    </Button>
-                  )}
-                  {sitemapAnalysis?.analysis_data?.structure_analysis?.keyword_clusters && Object.keys(sitemapAnalysis.analysis_data.structure_analysis.keyword_clusters).length > 0 && (
-                    <Button size="small" variant="outlined" onClick={() => setShowStructureModal(true)} startIcon={<SearchIcon />} sx={{ color: '#64748b', borderColor: '#cbd5e1', textTransform: 'none', fontSize: '0.75rem' }}>
-                      Topics Your Site Covers
-                    </Button>
-                  )}
-                </Box>
-              </Box>
-            </Box>
-          )}
-        </Box>
+        <StrategicInsightsSection
+          sitemapAnalysis={sitemapAnalysis}
+          isAnalyzingSitemap={isAnalyzingSitemap}
+          onRefreshStrategy={() => startSitemapAnalysis(true)}
+          onShowBenchmarks={() => setShowBenchmarksModal(true)}
+          onShowStrategy={() => setShowStrategyModal(true)}
+          onShowPublishing={() => setShowPublishingModal(true)}
+          onShowStructure={() => setShowStructureModal(true)}
+        />
       )}
 
-      {/* Industry Benchmarks Modal */}
-      <Dialog
-        open={showBenchmarksModal}
-        onClose={() => setShowBenchmarksModal(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle sx={{ pb: 2 }}>
-          <Typography variant="h6" fontWeight={600}>Industry Benchmarks</Typography>
-        </DialogTitle>
-        <DialogContent>
-          {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.map((benchmark: string, i: number) => (
-            <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#94a3b8', flexShrink: 0 }} />
-              <Typography variant="body2" color="#334155">{benchmark}</Typography>
-            </Paper>
-          ))}
-        </DialogContent>
-      </Dialog>
+      {/* Insight Modals */}
+      <InsightsModals
+        sitemapAnalysis={sitemapAnalysis}
+        showBenchmarks={showBenchmarksModal}
+        showStrategy={showStrategyModal}
+        showPublishing={showPublishingModal}
+        showStructure={showStructureModal}
+        onCloseBenchmarks={() => setShowBenchmarksModal(false)}
+        onCloseStrategy={() => setShowStrategyModal(false)}
+        onClosePublishing={() => setShowPublishingModal(false)}
+        onCloseStructure={() => setShowStructureModal(false)}
+      />
 
-      {/* Content Strategy & SEO Modal */}
-      <Dialog open={showStrategyModal} onClose={() => setShowStrategyModal(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ pb: 2 }}>
-          <Typography variant="h6" fontWeight={600}>Content Strategy & SEO Insights</Typography>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.85rem' }}>
-            Actionable recommendations from AI analysis of your site structure and competitor landscape.
-          </Typography>
-          {sitemapAnalysis?.analysis_data?.ai_insights?.content_strategy?.length > 0 && (
-            <Box mb={2}>
-              <Typography variant="subtitle2" fontWeight={600} color="#0c4a6e" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <LightbulbIcon sx={{ fontSize: 16, color: '#f59e0b' }} /> Content Strategy
-              </Typography>
-              <List dense disablePadding>
-                {sitemapAnalysis.analysis_data.ai_insights.content_strategy.map((item: any, i: number) => {
-                  const text = typeof item === 'string' ? item : item?.finding || item?.action || item?.title || JSON.stringify(item);
-                  return (
-                  <ListItem key={i} disableGutters sx={{ py: 0.25 }}>
-                    <ListItemIcon sx={{ minWidth: 24 }}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#94a3b8' }} /></ListItemIcon>
-                    <ListItemText primary={text} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
-                  </ListItem>
-                )})}
-              </List>
-            </Box>
-          )}
-          {sitemapAnalysis?.analysis_data?.ai_insights?.seo_opportunities?.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" fontWeight={600} color="#0c4a6e" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <SearchIcon sx={{ fontSize: 16, color: '#0284c7' }} /> SEO Opportunities
-              </Typography>
-              <List dense disablePadding>
-                {sitemapAnalysis.analysis_data.ai_insights.seo_opportunities.map((item: any, i: number) => {
-                  const text = typeof item === 'string' ? item : item?.finding || item?.action || item?.title || JSON.stringify(item);
-                  return (
-                  <ListItem key={i} disableGutters sx={{ py: 0.25 }}>
-                    <ListItemIcon sx={{ minWidth: 24 }}><Box sx={{ width: 5, height: 5, borderRadius: '50%', bgcolor: '#94a3b8' }} /></ListItemIcon>
-                    <ListItemText primary={text} primaryTypographyProps={{ variant: 'body2', color: '#334155' }} />
-                  </ListItem>
-                )})}
-              </List>
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Publishing Patterns Modal */}
-      <Dialog open={showPublishingModal} onClose={() => setShowPublishingModal(false)} maxWidth="md" fullWidth
-        PaperProps={{ sx: { borderRadius: 2 } }}>
-        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#0f172a' }}>Publishing Patterns &amp; Trends</Typography>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
-          <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>
-            How often you publish, when content was created, and optimization opportunities found in your sitemap.
-          </Typography>
-
-          {/* Velocity + Date range side by side */}
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 2.5 }}>
-            {sitemapAnalysis?.analysis_data?.content_trends?.publishing_velocity != null && (
-              <Paper variant="outlined" sx={{ flex: 1, minWidth: 140, p: 2, textAlign: 'center', bgcolor: '#f0f9ff', borderColor: '#bae6fd' }}>
-                <Typography variant="h4" sx={{ color: '#0369a1', fontWeight: 700 }}>
-                  {typeof sitemapAnalysis.analysis_data.content_trends.publishing_velocity === 'number'
-                    ? sitemapAnalysis.analysis_data.content_trends.publishing_velocity.toFixed(2)
-                    : sitemapAnalysis.analysis_data.content_trends.publishing_velocity}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#475569' }}>Posts per day</Typography>
-              </Paper>
-            )}
-            {sitemapAnalysis?.analysis_data?.content_trends?.date_range?.span_days != null && (
-              <Paper variant="outlined" sx={{ flex: 1, minWidth: 140, p: 2, textAlign: 'center', bgcolor: '#fef2f2', borderColor: '#fecaca' }}>
-                <Typography variant="h4" sx={{ color: '#b91c1c', fontWeight: 700 }}>
-                  {sitemapAnalysis.analysis_data.content_trends.date_range.span_days}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#475569' }}>Days of content history</Typography>
-              </Paper>
-            )}
-            {sitemapAnalysis?.analysis_data?.structure_analysis?.total_urls != null && (
-              <Paper variant="outlined" sx={{ flex: 1, minWidth: 140, p: 2, textAlign: 'center', bgcolor: '#f0fdf4', borderColor: '#bbf7d0' }}>
-                <Typography variant="h4" sx={{ color: '#15803d', fontWeight: 700 }}>
-                  {sitemapAnalysis.analysis_data.structure_analysis.total_urls}
-                </Typography>
-                <Typography variant="caption" sx={{ color: '#475569' }}>Total URLs in sitemap</Typography>
-              </Paper>
-            )}
-          </Box>
-
-          {/* Trends */}
-          {sitemapAnalysis?.analysis_data?.content_trends?.trends?.length > 0 && (
-            <Box mb={2.5}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Trends</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                {sitemapAnalysis.analysis_data.content_trends.trends.map((item: string, i: number) => (
-                  <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: '#ffffff', borderColor: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#3b82f6', flexShrink: 0 }} />
-                    <Typography variant="body2" sx={{ color: '#1e293b' }}>{item}</Typography>
-                  </Paper>
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {/* Optimization Opportunities */}
-          {sitemapAnalysis?.analysis_data?.publishing_patterns?.optimization_opportunities?.length > 0 && (
-            <Box mb={2.5}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Sitemap Optimization Tips</Typography>
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                {sitemapAnalysis.analysis_data.publishing_patterns.optimization_opportunities.map((item: string, i: number) => (
-                  <Paper key={i} variant="outlined" sx={{ p: 1.5, bgcolor: '#fffbeb', borderColor: '#fde68a', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#d97706', flexShrink: 0 }} />
-                    <Typography variant="body2" sx={{ color: '#92400e' }}>{item}</Typography>
-                  </Paper>
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {/* Competitors Analyzed */}
-          {sitemapAnalysis?.analysis_data?.competitors_analyzed?.length > 0 && (
-            <Box>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Competitors Compared</Typography>
-              <Box display="flex" flexWrap="wrap" gap={0.75}>
-                {sitemapAnalysis.analysis_data.competitors_analyzed.map((domain: string, i: number) => (
-                  <Chip key={i} label={domain} size="small" sx={{ bgcolor: '#f1f5f9', color: '#334155', fontWeight: 500 }} />
-                ))}
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Site Structure Modal */}
-      <Dialog open={showStructureModal} onClose={() => setShowStructureModal(false)} maxWidth="md" fullWidth
-        PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
-        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#0f172a' }}>Topics Your Site Covers</Typography>
-        </DialogTitle>
-        <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
-          <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>
-            A high-contrast snapshot of the main topics, content pillars, and structure quality found across your website.
-          </Typography>
-
-          {/* Top Topics — light high-contrast chips */}
-          {sitemapAnalysis?.analysis_data?.structure_analysis?.keyword_clusters && (
-            <Box mb={2.5}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1 }}>Top Topics</Typography>
-              <Box display="flex" flexWrap="wrap" gap={0.75}>
-                {Object.entries(sitemapAnalysis.analysis_data.structure_analysis.keyword_clusters).map(([topic, count]: [string, any], i: number) => (
-                  <Chip key={i} label={`${topic} (${count})`} size="small" sx={{ bgcolor: '#eef2ff', color: '#4338ca', border: '1px solid #c7d2fe', fontWeight: 600 }} />
-                ))}
-              </Box>
-            </Box>
-          )}
-
-          {/* Content Mix — high contrast progress bars */}
-          {sitemapAnalysis?.analysis_data?.structure_analysis?.strategic_pillars && (
-            <Box mb={2.5}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#0f172a', mb: 1.5 }}>Content Mix</Typography>
-              {(() => {
-                const entries = Object.entries(sitemapAnalysis.analysis_data.structure_analysis.strategic_pillars);
-                const maxCount = Math.max(...entries.map(([, c]) => c as number), 1);
-                return (
-                  <Box display="flex" flexDirection="column" gap={1.25}>
-                    {entries.map(([pillar, count]: [string, any], i: number) => (
-                      <Box key={i}>
-                        <Box display="flex" justifyContent="space-between" alignItems="center" mb={0.5}>
-                          <Typography variant="body2" fontWeight={600} sx={{ color: '#1e293b' }}>{pillar}</Typography>
-                          <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 500 }}>{count} URLs</Typography>
-                        </Box>
-                        <Box sx={{ width: '100%', height: 10, bgcolor: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
-                          <Box sx={{ width: `${((count as number) / maxCount) * 100}%`, height: '100%', bgcolor: '#6366f1', borderRadius: 5 }} />
-                        </Box>
-                      </Box>
-                    ))}
-                  </Box>
-                );
-              })()}
-            </Box>
-          )}
-
-          {/* Structure Quality — high contrast green */}
-          {sitemapAnalysis?.analysis_data?.structure_analysis?.structure_quality && (
-            <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f0fdf4', border: '1px solid #86efac', borderRadius: 2 }}>
-              <Typography variant="subtitle2" fontWeight={700} sx={{ color: '#166534', mb: 0.5 }}>Structure Quality</Typography>
-              <Typography variant="body2" sx={{ color: '#15803d' }}>{sitemapAnalysis.analysis_data.structure_analysis.structure_quality}</Typography>
-            </Paper>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
+      {/* Progress Modal */}
+      <ProgressModal
         open={showProgressModal}
-        onClose={() => {}}
-        maxWidth="sm"
-        fullWidth
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            p: 3
-          }
-        }}
-      >
-        <DialogTitle sx={{ textAlign: 'center', pb: 2 }}>
-          <Box display="flex" alignItems="center" justifyContent="center" gap={2}>
-            <CircularProgress size={32} color="primary" />
-            <Typography variant="h6" fontWeight={600}>
-              Analyzing Your Competition
-            </Typography>
-          </Box>
-        </DialogTitle>
-        
-        <DialogContent sx={{ textAlign: 'center', pt: 2 }}>
-          <Typography variant="body1" color="text.secondary" mb={3}>
-            We're discovering your competitors and analyzing their strategies using AI...
-          </Typography>
-          
-          <Box mb={3}>
-            <LinearProgress 
-              variant="determinate" 
-              value={analysisProgress} 
-              sx={{ 
-                height: 8, 
-                borderRadius: 4,
-                mb: 2
-              }} 
-            />
-            <Typography variant="body2" color="text.secondary">
-              {analysisProgress}% Complete
-            </Typography>
-          </Box>
-          
-          <Typography variant="body2" color="primary" fontWeight={500}>
-            {analysisStep}
-          </Typography>
-        </DialogContent>
-      </Dialog>
+        progress={analysisProgress}
+        step={analysisStep}
+      />
 
       {/* Highlights Modal */}
       <Dialog 

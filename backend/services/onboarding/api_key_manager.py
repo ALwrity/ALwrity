@@ -575,6 +575,7 @@ class APIKeyManager:
             'FIRECRAWL_API_KEY',
             'STABILITY_API_KEY',
             'WAVESPEED_API_KEY',
+            'NOVAROUTE_API_KEY',
         ]
         
         for provider in providers:
