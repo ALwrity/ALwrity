@@ -1,6 +1,7 @@
 """YouTube Creator avatar upload and AI optimization handlers."""
 
 import uuid
+from pathlib import Path
 from typing import Dict, Any, Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
