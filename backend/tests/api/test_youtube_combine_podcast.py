@@ -46,20 +46,20 @@ class TestYouTubeCombineUsesPodcastWorkflow:
 
         with patch("services.database.get_session_for_user", return_value=mock_db), \
              patch(
-                 "api.youtube.router.find_youtube_video_file",
+                 "api.youtube.combine_tasks.find_youtube_video_file",
                  side_effect=lambda name, user_id=None, db=None: {
                      "scene_1.mp4": scene1,
                      "scene_2.mp4": scene2,
                  }.get(name),
              ), \
              patch(
-                 "api.youtube.router.get_youtube_video_dir",
+                 "api.youtube.combine_tasks.get_youtube_video_dir",
                  return_value=tmp_path,
              ), \
              patch(
-                 "api.youtube.router.PodcastVideoCombinationService"
+                 "api.youtube.combine_tasks.PodcastVideoCombinationService"
              ) as mock_svc_cls, \
-             patch("api.youtube.router.save_asset_to_library"):
+             patch("api.youtube.combine_tasks.save_asset_to_library"):
             mock_svc_cls.return_value.combine_videos = mock_combine
 
             _execute_combine_video_task(
