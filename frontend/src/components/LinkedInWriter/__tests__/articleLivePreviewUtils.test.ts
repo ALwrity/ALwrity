@@ -28,9 +28,11 @@ describe("articleLivePreviewUtils", () => {
       ],
       images: [
         {
+          id: "block-1",
           url: "https://example.com/hero.png",
           imageId: "img-1",
           alt: "Hero",
+          markdown: "![Hero](https://example.com/hero.png)",
         },
       ],
       readingTime: 5,

@@ -1,4 +1,4 @@
-import type { LinkedInPost } from "../../../services/postAnalyticsApi";
+import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 import { openQuickCreateFromWedge } from "../../components/dashboard/engagementWedgeNavigation";
 import { REMARKET_RETURN } from "../../components/dashboard/remarketWedgeNavigation";
 import {

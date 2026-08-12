@@ -66,8 +66,10 @@ export const ContentPillarsSection: React.FC<ContentPillarsSectionProps> = ({ da
     );
   }
 
+  const { target_company, competitors } = data;
+
   const hasTarget = target_company?.content_pillars?.length;
-  const hasCompetitorPillars = competitors?.some(c => c.content_pillars?.length);
+  const hasCompetitorPillars = competitors?.some((c: { content_pillars?: string[] }) => c.content_pillars?.length);
   const hasPillars = hasTarget || hasCompetitorPillars;
   
   if (!hasPillars) {

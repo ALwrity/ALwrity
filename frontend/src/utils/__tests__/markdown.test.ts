@@ -15,7 +15,7 @@ jest.mock('marked', () => ({
 import { marked } from 'marked';
 import { renderMarkdown } from '../markdown';
 
-const mockParse = marked.parse as jest.Mock;
+const mockParse = marked.parse as unknown as jest.Mock;
 
 describe('renderMarkdown — regression', () => {
   beforeEach(() => {

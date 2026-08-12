@@ -28,7 +28,14 @@ describe("linkedInVideoService", () => {
     jest.clearAllMocks();
     jest
       .mocked(checkPreflight)
-      .mockResolvedValue({ can_proceed: true, operations: [] });
+      .mockResolvedValue({
+        can_proceed: true,
+        operations: [],
+        estimated_cost: 0,
+        total_cost: 0,
+        usage_summary: null,
+        cached: false,
+      });
   });
 
   describe("buildVideoPromptFromSelection", () => {

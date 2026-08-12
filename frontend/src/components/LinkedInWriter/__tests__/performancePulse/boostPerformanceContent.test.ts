@@ -1,6 +1,6 @@
 import { boostPerformanceContent } from "../../components/dashboard/performancePulse/boostPerformanceContent";
 import { optimizeForEngagement } from "../../components/dashboard/engagementBoosterApi";
-import type { LinkedInPost } from "../../../services/postAnalyticsApi";
+import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 
 jest.mock("../../components/dashboard/engagementBoosterApi", () => ({
   optimizeForEngagement: jest.fn(),

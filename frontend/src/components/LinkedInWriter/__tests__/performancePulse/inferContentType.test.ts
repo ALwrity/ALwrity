@@ -1,4 +1,4 @@
-import type { LinkedInPost } from "../../../services/postAnalyticsApi";
+import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 import { inferPerformanceContentType } from "../../components/dashboard/performancePulse/inferContentType";
 
 function makePost(

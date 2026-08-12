@@ -94,7 +94,7 @@ describe("useUndoRedo", () => {
     );
 
     const keydownHandlers = addSpy.mock.calls.filter(
-      ([eventName]) => eventName === "keydown",
+      ([eventName]: [string, ...unknown[]]) => eventName === "keydown",
     );
     expect(keydownHandlers).toHaveLength(0);
 

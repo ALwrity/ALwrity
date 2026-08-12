@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { Competitor } from '../../WebsiteStep/components';
+import type { Competitor } from '../WebsiteStep/components';
 import type { ContentPillarData } from './ContentPillarsSection';
 import { aiApiClient, longRunningApiClient } from '../../../api/client';
 
 interface UseCompetitorDiscoveryProps {
   userUrl: string;
-  industryContext: string;
+  industryContext?: string;
   initialData: any;
   sitemapAnalysis: any;
   mergeCrawlSocialMedia: (exaData: Record<string, any>) => Record<string, any>;
@@ -282,9 +282,7 @@ export function useCompetitorDiscovery({
     socialMediaAccounts,
     setSocialMediaAccounts,
     researchSummary,
-    setResearchSummary,
     contentPillars,
-    setContentPillars,
     isLoadingPillars,
     error,
     setError,
@@ -294,7 +292,6 @@ export function useCompetitorDiscovery({
     showProgressModal,
     usingCachedData,
     startCompetitorDiscovery,
-    loadCachedAnalysis,
     updateCacheWithSitemapAnalysis,
   };
 }

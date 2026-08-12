@@ -141,7 +141,7 @@ describe("linkedInPublishReadiness", () => {
 
   test("isArticleUnipilePublishBlocked", () => {
     expect(isArticleUnipilePublishBlocked("article")).toBe(true);
-    expect(isArticleUnipilePublishBlocked("linkedin_article")).toBe(true);
+    expect(isArticleUnipilePublishBlocked("linkedin_article" as never)).toBe(true);
     expect(isArticleUnipilePublishBlocked("post")).toBe(false);
     expect(isArticleUnipilePublishBlocked(undefined)).toBe(false);
   });
