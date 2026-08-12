@@ -18,6 +18,7 @@ from .onboarding_utils.endpoints_core import (
     get_competitor_analysis,
     get_onboarding_state,
     retrigger_sif_indexing,
+    search_sif_index,
 )
 from .onboarding_utils.endpoints_management import (
     complete_step as _complete_step_impl,

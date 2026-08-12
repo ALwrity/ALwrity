@@ -407,6 +407,22 @@ async def retrigger_sif_indexing(current_user: Dict[str, Any]):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+async def search_sif_index(query: str = "", limit: int = 5, current_user: Dict[str, Any] = None):
+    """Search the SIF index for test queries (white-box debugging)."""
+    try:
+        user_id = str(current_user.get("id"))
+        from services.intelligence.sif_integration import SIFIntegrationService
+        svc = SIFIntegrationService(user_id)
+        await svc._ensure_initialized()
+        results = svc.intelligence_service.search(query, limit=limit)
+        hits = [{"text": r.get("text", ""), "score": r.get("score", 0)} for r in (results or [])]
+        return {"hits": hits, "query": query}
+    except Exception as e:
+        from loguru import logger
+        logger.warning(f"Error searching SIF: {str(e)}")
+        return {"hits": [], "query": query, "error": str(e)}
+
+
 __all__ = [name for name in globals().keys() if not name.startswith('_')]
 
 

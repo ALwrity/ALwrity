@@ -35,6 +35,24 @@ export const SifIndexingPanel: React.FC = () => {
   const [sifRetriggering, setSifRetriggering] = useState(false);
   const [indexedPages, setIndexedPages] = useState<IndexedPage[]>([]);
   const [showPagesModal, setShowPagesModal] = useState(false);
+  const [harvestSource, setHarvestSource] = useState<string>('');
+  const [freshnessHours, setFreshnessHours] = useState<number | null>(null);
+  const [testQuery, setTestQuery] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<string>('');
+
+  const handleTestQuery = async (query: string) => {
+    setTestQuery(query);
+    setTestResult('');
+    try {
+      const res = await apiClient.get('/api/onboarding/sif/search', { params: { q: query, limit: 3 } });
+      const hits = res?.data?.hits || [];
+      setTestResult(hits.length > 0
+        ? hits.map((h: any) => h?.text?.slice(0, 200) || h?.title || '').join('\n---\n')
+        : 'No results found — content may not be indexed yet.');
+    } catch {
+      setTestResult('Search unavailable — try re-indexing.');
+    }
+  };
 
   useEffect(() => {
     const poll = async () => {
@@ -55,11 +73,14 @@ export const SifIndexingPanel: React.FC = () => {
           setSifPillarCount(hasPillars ? details.pillars_found : null);
           setSifLastIndexed(sifTask.started_at || null);
           if (details.indexed_pages?.length) setIndexedPages(details.indexed_pages);
+          if (details.harvest_source) setHarvestSource(details.harvest_source);
+          if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
         } else if (sifTask.status === 'running') {
           setSifStatus('indexing');
           setSifPhase(details.phase || '');
           setSifPageCount(details.pages_harvested ?? null);
           setSifPageTotal(details.pages_total ?? null);
+          if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
         } else if (sifTask.status === 'failed') {
           setSifStatus('error');
           setSifErrorReason(sifTask.failure_reason || null);
@@ -76,12 +97,13 @@ export const SifIndexingPanel: React.FC = () => {
   }, []);
 
   const handleRetrigger = async () => {
+    if (sifRetriggering) return;
     setSifRetriggering(true);
     setSifErrorReason(null);
     setSifStatus('idle');
     try { await apiClient.post('/api/onboarding/sif/retrigger'); }
     catch { /* Non-blocking — poll will pick up status */ }
-    setSifRetriggering(false);
+    finally { setSifRetriggering(false); }
   };
 
   const bgColor = sifStatus === 'done' ? 'linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)'
@@ -120,6 +142,12 @@ export const SifIndexingPanel: React.FC = () => {
           {sifStatus === 'indexing' && `ALwrity is analyzing your website in the background — you can continue.`}
           {sifStatus === 'idle' && 'Once you complete the Website step, SIF automatically indexes your content.'}
         </Typography>
+
+        {harvestSource && (sifStatus === 'done' || sifStatus === 'partial') && (
+          <Typography variant="caption" sx={{ color: '#64748B', display: 'block', mb: 1 }}>
+            Source: {harvestSource} · {freshnessHours != null ? `${freshnessHours}h ago` : ''}
+          </Typography>
+        )}
 
         {sifStatus === 'indexing' && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -203,7 +231,7 @@ export const SifIndexingPanel: React.FC = () => {
                   ].map((q) => (
                     <span
                       key={q}
-                      onClick={() => {/* Future: wire to SIF search API */}}
+                      onClick={() => handleTestQuery(q)}
                       style={{
                         padding: '4px 10px',
                         borderRadius: 8,
@@ -222,8 +250,13 @@ export const SifIndexingPanel: React.FC = () => {
                   ))}
                 </div>
                 <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: 6 }}>
-                  Content pillar analysis in progress — these will be searchable once analysis completes.
+                  {testQuery ? `Results for "${testQuery}":` : 'Content pillar analysis in progress — these will be searchable once analysis completes.'}
                 </div>
+                {testResult && (
+                  <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: '#fff', border: '1px solid #e8ecf1', fontSize: '0.75rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
+                    {testResult}
+                  </div>
+                )}
               </div>
               {/* Page list */}
               {indexedPages.map((page, i) => (

@@ -51,6 +51,9 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     details['phase'] = payload['phase']
                 if payload.get('pages_harvested'):
                     details['pages_harvested'] = payload['pages_harvested']
+                if payload.get('pages_total'):
+                    details['pages_total'] = payload['pages_total']
+                details['harvest_source'] = payload.get('harvest_source', 'beautifulsoup')
                 if payload.get('pages_indexed'):
                     details['pages_indexed'] = payload['pages_indexed']
                 if payload.get('pillars_found'):
@@ -89,6 +92,17 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     pass  # execution log may not exist yet
 
                 base['details'] = details
+
+                # Add freshness indicator (hours since last success)
+                if base.get('last_success'):
+                    try:
+                        from datetime import datetime, timezone
+                        last = datetime.fromisoformat(base['last_success'])
+                        hours = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+                        base['index_freshness_hours'] = round(hours, 1)
+                        base['index_stale'] = hours > 48
+                    except Exception:
+                        pass
 
             return base
 
