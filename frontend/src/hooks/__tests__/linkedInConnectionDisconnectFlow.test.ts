@@ -34,7 +34,7 @@ describe('linkedInConnectionDisconnectFlow', () => {
   it('captureConnectionSnapshot returns a shallow copy for rollback', () => {
     const snapshot = captureConnectionSnapshot({
       status: connectedStatus,
-      accounts: [{ account_id: 'AC_1', account_type: 'personal' }],
+      accounts: [{ account_id: 'AC_1', account_type: 'personal', platform: 'linkedin' }],
       organizations: [],
       cachedAvatarUrl: 'https://example.com/avatar.png',
       selectedAccountId: 'AC_1',
@@ -50,7 +50,7 @@ describe('linkedInConnectionDisconnectFlow', () => {
   it('applyConnectionSnapshot restores setter state', () => {
     const snapshot = captureConnectionSnapshot({
       status: connectedStatus,
-      accounts: [{ account_id: 'AC_1', account_type: 'personal' }],
+      accounts: [{ account_id: 'AC_1', account_type: 'personal', platform: 'linkedin' }],
       organizations: [],
       cachedAvatarUrl: 'https://example.com/avatar.png',
       selectedAccountId: 'AC_1',

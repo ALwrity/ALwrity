@@ -1,4 +1,4 @@
-import type { LinkedInPost } from "../../../services/postAnalyticsApi";
+import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 import { toPerformancePulseItem } from "../../components/dashboard/performancePulse/inferContentType";
 import {
   countPerformancePulseByFilter,
