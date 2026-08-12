@@ -24,6 +24,7 @@ class AnalyticsCacheService:
             'bing_analytics': 60 * 60,       # 1 hour for expensive Bing calls
             'gsc_analytics': 60 * 60,        # 1 hour for GSC calls
             'bing_sites': 120 * 60,         # 2 hours for Bing sites (rarely change)
+            'sitemap_df': 10 * 60,         # 10 minutes for sitemap DataFrame cache
         }
         
         # Cache statistics

@@ -831,9 +831,14 @@ async def _persist_sitemap_analysis(
         if analysis:
             seo_audit = analysis.seo_audit or {}
             seo_audit["sitemap_analysis"] = {
-                "structure_analysis": analysis_result.get("structure_analysis"),
-                "onboarding_insights": analysis_result.get("sitemap_onboarding_insights"),
+                "success": True,
+                "user_url": user_url,
                 "analyzed_at": analysis_result.get("timestamp"),
+                "analysis_data": {
+                    "total_urls": analysis_result.get("total_urls", 0),
+                    "structure_analysis": analysis_result.get("structure_analysis"),
+                    "onboarding_insights": analysis_result.get("onboarding_insights") or analysis_result.get("sitemap_onboarding_insights"),
+                },
             }
             analysis.seo_audit = seo_audit
             db.commit()
