@@ -3,6 +3,8 @@ Subscription API Module
 Main router that includes all subscription-related endpoints.
 """
 
+import os
+
 from fastapi import APIRouter
 
 from .routes import (
@@ -13,7 +15,6 @@ from .routes import (
     dashboard,
     logs,
     preflight,
-    payment,
     disputes,
     fraud_warnings,
 )
@@ -29,7 +30,12 @@ router.include_router(alerts.router, tags=["subscription"])
 router.include_router(dashboard.router, tags=["subscription"])
 router.include_router(logs.router, tags=["subscription"])
 router.include_router(preflight.router, tags=["subscription"])
-router.include_router(payment.router, tags=["subscription"])
+
+if os.getenv("SKIP_PAYMENT", "false").lower() != "true":
+    from .routes import payment
+
+    router.include_router(payment.router, tags=["subscription"])
+
 router.include_router(disputes.router, tags=["subscription"])
 router.include_router(fraud_warnings.router, tags=["subscription"])
 

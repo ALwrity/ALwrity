@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 from services.database import get_db
-from services.subscription.stripe_service import StripeService
+
 from middleware.auth_middleware import get_current_user
 from loguru import logger
 from models.subscription_models import SubscriptionTier, BillingCycle
@@ -53,6 +53,7 @@ async def create_checkout_session(
 
     user_email = current_user.get("email")
 
+    from services.subscription.stripe_service import StripeService
     stripe_service = StripeService(db)
     
     try:
@@ -84,6 +85,7 @@ async def create_portal_session(
     if not user_id:
         raise HTTPException(status_code=401, detail="User not authenticated")
 
+    from services.subscription.stripe_service import StripeService
     stripe_service = StripeService(db)
     
     try:
@@ -111,6 +113,8 @@ async def stripe_webhook(
         raise HTTPException(status_code=400, detail="Missing stripe-signature header")
 
     payload = await request.body()
+
+    from services.subscription.stripe_service import StripeService
     stripe_service = StripeService(db)
     
     try:
@@ -159,7 +163,8 @@ async def verify_checkout_status(
         client_ip = request.client.host if request and request.client else "unknown"
         logger.warning(f"Verify-checkout rate limit exceeded for user_id={user_id}, ip={client_ip}")
         raise HTTPException(status_code=429, detail="Too many verification requests. Please wait before trying again.")
-    
+
+    from services.subscription.stripe_service import StripeService
     stripe_service = StripeService(db)
     
     try:
