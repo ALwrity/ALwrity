@@ -125,4 +125,39 @@ describe('youtubeApi', () => {
       expect(result).toEqual(mockStatus);
     });
   });
+
+  describe('combineVideos and video URL helpers', () => {
+    it('posts combine request with scene_video_urls to /api/youtube/render/combine', async () => {
+      const mockResponse = {
+        data: { success: true, task_id: 'combine-1', message: 'Combining 2 videos...' },
+      };
+      jest.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
+
+      const params = {
+        scene_video_urls: [
+          '/api/youtube/videos/scene_1_user_abcd_11111111.mp4',
+          '/api/youtube/videos/scene_2_user_abcd_22222222.mp4',
+        ],
+        resolution: '720p' as const,
+        title: 'My YouTube Video',
+      };
+
+      const result = await youtubeApi.combineVideos(params);
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/youtube/render/combine',
+        expect.objectContaining({
+          scene_video_urls: params.scene_video_urls,
+          resolution: '720p',
+          title: 'My YouTube Video',
+        }),
+      );
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('builds video serve URLs under /api/youtube/videos', () => {
+      expect(youtubeApi.getVideoUrl('scene_1_user_abcd_11111111.mp4')).toBe(
+        '/api/youtube/videos/scene_1_user_abcd_11111111.mp4',
+      );
+    });
+  });
 });

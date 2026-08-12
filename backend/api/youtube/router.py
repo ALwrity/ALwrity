@@ -22,24 +22,21 @@ from services.content_asset_service import ContentAssetService
 from models.content_asset_models import AssetType, AssetSource
 from utils.logger_utils import get_service_logger
 from utils.asset_tracker import save_asset_to_library
-from services.story_writer.video_generation_service import StoryVideoGenerationService
-from services.user_workspace_manager import UserWorkspaceManager
+from services.podcast.video_combination_service import PodcastVideoCombinationService
 from .handlers import avatar as avatar_handlers
 from .handlers import images as image_handlers
 from .handlers import audio as audio_handlers
 from .oauth_router import router as youtube_oauth_router
 from .publish_router import router as youtube_publish_router
+from .task_manager import task_manager
 from services.youtube.planner import YouTubePlannerService
+from services.youtube.video_storage import (
+    find_youtube_video_file,
+    get_youtube_video_dir,
+)
 
 router = APIRouter(prefix="/youtube", tags=["youtube"])
 logger = get_service_logger("api.youtube")
-
-from .paths import (
-    YOUTUBE_VIDEO_DIR,
-    YOUTUBE_AVATARS_DIR,
-    YOUTUBE_IMAGES_DIR,
-    ensure_youtube_media_dirs,
-)
 
 # Include sub-routers for avatar, images, audio, and OAuth
 router.include_router(avatar_handlers.router)
@@ -1120,11 +1117,7 @@ async def combine_scene_videos(
                 message="At least two scene videos are required to combine."
             )
 
-        user_workspace = UserWorkspaceManager(db)
-        workspace_info = user_workspace.get_user_workspace(user_id)
-        youtube_video_dir = Path(workspace_info['workspace_path']) / "content" / "videos" if workspace_info and workspace_info.get('workspace_path') else YOUTUBE_VIDEO_DIR
-        base_dir = Path(__file__).parent.parent.parent.parent
-        legacy_video_dir = base_dir / "youtube_videos"
+        youtube_video_dir = get_youtube_video_dir(user_id=user_id, db=db)
         missing_files = []
         for url in request.scene_video_urls:
             filename = Path(url).name
@@ -1135,14 +1128,14 @@ async def combine_scene_videos(
                     task_id=None,
                     message=f"Invalid video filename: {filename}"
                 )
-            video_path = youtube_video_dir / filename
-            if not video_path.exists():
-                legacy_path = legacy_video_dir / filename
-                if legacy_path.exists():
-                    video_path = legacy_path
-                else:
-                    missing_files.append(filename)
+            video_path = find_youtube_video_file(filename, user_id=user_id, db=db)
+            if not video_path:
+                missing_files.append(filename)
         if missing_files:
+            logger.error(
+                f"[YouTubeAPI] Combine preflight missing files for user {user_id}: {missing_files} "
+                f"(canonical_dir={youtube_video_dir})"
+            )
             return CombineVideosResponse(
                 success=False,
                 task_id=None,
@@ -1267,8 +1260,7 @@ def _execute_combine_video_task(
 
     # Create DB session for workspace resolution
     from services.database import get_session_for_user
-    from services.user_workspace_manager import UserWorkspaceManager
-    
+
     db = get_session_for_user(user_id)
     if not db:
         logger.error(f"[YouTubeRenderer] Could not create database session for user {user_id}")
@@ -1282,40 +1274,20 @@ def _execute_combine_video_task(
             task_id, "processing", progress=5.0, message="Preparing to combine videos..."
         )
 
-        # Resolve user workspace directory
-        workspace_manager = UserWorkspaceManager(db)
-        workspace_info = workspace_manager.get_user_workspace(user_id)
-        
-        if workspace_info and workspace_info.get('workspace_path'):
-            user_video_dir = Path(workspace_info['workspace_path']) / "content" / "videos"
-            if not user_video_dir.exists():
-                user_video_dir.mkdir(parents=True, exist_ok=True)
-        else:
-            # Fallback to default directory
-            base_dir = Path(__file__).parent.parent.parent.parent
-            user_video_dir = base_dir / "youtube_videos"
-            logger.warning(f"Workspace not found for user {user_id}, using default directory: {user_video_dir}")
+        user_video_dir = get_youtube_video_dir(user_id=user_id, db=db)
+        logger.info(
+            f"[YouTubeRenderer] Combine using canonical video dir: {user_video_dir}"
+        )
 
-        # Fallback directory (legacy global directory) for backward compatibility
-        base_dir = Path(__file__).parent.parent.parent.parent
-        legacy_video_dir = base_dir / "youtube_videos"
-
-        # Resolve video paths from URLs
+        # Resolve video paths from URLs (canonical + legacy locations)
         video_paths: List[Path] = []
         for url in scene_video_urls:
             filename = Path(url).name
-            
-            # Check user directory first
-            video_path = user_video_dir / filename
-            
-            # If not found, check legacy directory
-            if not video_path.exists():
-                legacy_path = legacy_video_dir / filename
-                if legacy_path.exists():
-                    video_path = legacy_path
-                    
-            if not video_path.exists():
-                logger.error(f"[YouTubeRenderer] Video file not found for combine: {video_path}")
+            video_path = find_youtube_video_file(filename, user_id=user_id, db=db)
+            if not video_path:
+                logger.error(
+                    f"[YouTubeRenderer] Video file not found for combine: {filename}"
+                )
                 raise HTTPException(
                     status_code=404,
                     detail=f"Video file not found: {filename}",
@@ -1329,19 +1301,22 @@ def _execute_combine_video_task(
             task_id, "processing", progress=25.0, message="Combining scene videos..."
         )
 
-        # Use user video directory for output
-        video_service = StoryVideoGenerationService(output_dir=str(user_video_dir))
-        combined_result = video_service.generate_story_video(
-            scenes=[
-                {"scene_number": idx + 1, "title": f"Scene {idx + 1}"}
-                for idx in range(len(video_paths))
-            ],
-            image_paths=[None] * len(video_paths),
-            audio_paths=[],
+        # Reuse podcast video-only combiner (scene MP4s already include embedded audio).
+        # Story combine path expects separate narration tracks and is not used here.
+        video_service = PodcastVideoCombinationService(output_dir=str(user_video_dir))
+
+        def progress_callback(progress: float, message: str) -> None:
+            # Keep combine progress in the mid/high range reserved for encoding
+            mapped = min(95.0, max(25.0, progress))
+            task_manager.update_task_status(
+                task_id, "processing", progress=mapped, message=message
+            )
+
+        combined_result = video_service.combine_videos(
             video_paths=[str(p) for p in video_paths],
-            user_id=user_id,
-            story_title=title or "YouTube Video",
+            podcast_title=title or "YouTube Video",
             fps=24,
+            progress_callback=progress_callback,
         )
 
         task_manager.update_task_status(
@@ -1349,7 +1324,11 @@ def _execute_combine_video_task(
         )
 
         final_path = combined_result["video_path"]
-        final_url = combined_result["video_url"]
+        final_filename = Path(
+            combined_result.get("video_filename") or final_path
+        ).name
+        # Podcast service returns /api/podcast/... — rewrite to YouTube serve path
+        final_url = f"/api/youtube/videos/{final_filename}"
         file_size = combined_result.get("file_size", 0)
 
         # Save to asset library using existing db session
@@ -1478,28 +1457,40 @@ async def serve_youtube_video(
     Query parameter is required for <video> tags which cannot send custom headers.
     """
     try:
-        require_authenticated_user(current_user)
-        
+        user_id = require_authenticated_user(current_user)
+
         # Security: prevent directory traversal
         if ".." in video_filename or "/" in video_filename or "\\" in video_filename:
             raise HTTPException(status_code=400, detail="Invalid filename")
-        
-        video_path = YOUTUBE_VIDEO_DIR / video_filename
-        
-        if not video_path.exists():
+
+        # Resolve across canonical + legacy dirs (needs DB for per-user workspace)
+        from services.database import get_session_for_user
+
+        db = get_session_for_user(user_id)
+        try:
+            video_path = find_youtube_video_file(
+                video_filename,
+                user_id=user_id,
+                db=db,
+            )
+        finally:
+            if db is not None:
+                db.close()
+
+        if not video_path:
             raise HTTPException(status_code=404, detail="Video not found")
-        
+
         if not video_path.is_file():
             raise HTTPException(status_code=400, detail="Invalid video path")
-        
-        logger.debug(f"[YouTubeAPI] Serving video: {video_filename}")
-        
+
+        logger.debug(f"[YouTubeAPI] Serving video: {video_filename} from {video_path}")
+
         return FileResponse(
             path=str(video_path),
             media_type="video/mp4",
             filename=video_filename,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
