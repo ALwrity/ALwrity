@@ -377,12 +377,16 @@ class SitemapService:
                             nested_tasks.append(self._fetch_sitemap_data(nested_url, depth + 1, session))
                         
                         if nested_tasks:
+                            skipped_nested = 0
+                            fetched_nested = 0
                             nested_results = await asyncio.gather(*nested_tasks, return_exceptions=True)
                             for res in nested_results:
                                 if isinstance(res, Exception):
+                                    skipped_nested += 1
                                     logger.info(f"Skipping nested sitemap: {res}")
                                 elif isinstance(res, dict):
                                     urls.extend(res.get("urls", []))
+                                    fetched_nested += 1
                     
                     else:
                         # Regular sitemap with URLs
@@ -403,10 +407,20 @@ class SitemapService:
                                     urls.append(url_data)
                                     url_count += 1
                     
+                    logger.info(
+                        f"Sitemap fetch complete for {sitemap_url}: "
+                        f"{len(urls)} URLs found"
+                        + (f", {fetched_nested} nested sitemaps fetched, {skipped_nested} skipped" if nested_tasks else "")
+                    )
                     return {
                         "urls": urls,
                         "sitemaps": sitemaps,
-                        "total_urls": len(urls)
+                        "total_urls": len(urls),
+                        "fetch_stats": {
+                            "urls_found": len(urls),
+                            "nested_fetched": fetched_nested if nested_tasks else 0,
+                            "nested_skipped": skipped_nested if nested_tasks else 0,
+                        }
                     }
                 finally:
                     # Make sure the response is released even if the
