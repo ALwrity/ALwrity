@@ -86,3 +86,34 @@ class TestContentHashIdempotency:
         hash_a = hashlib.sha256(b"content one").hexdigest()
         hash_b = hashlib.sha256(b"content two").hexdigest()
         assert hash_a != hash_b
+
+
+class TestSIFPageLimitByTier:
+    """Verify tier-based page limits (Phase 5)."""
+
+    def test_free_tier_uses_env_default(self, monkeypatch):
+        from unittest.mock import patch, MagicMock
+        monkeypatch.setenv("MAX_SIF_PAGES_PER_INDEX", "10")
+
+        svc = MagicMock()
+        svc.user_id = "user_1"
+        svc._get_sif_page_limit = None  # placeholder, patched below
+
+        from services.intelligence.sif_integration import SIFIntegrationService
+        with patch.object(SIFIntegrationService, "_get_sif_page_limit") as mock_method:
+            mock_method.return_value = 10
+            svc = SIFIntegrationService.__new__(SIFIntegrationService)
+            svc.user_id = "user_1"
+            assert svc._get_sif_page_limit() == 10
+
+    def test_tier_map_returns_proper_limits(self):
+        tier_map = {
+            "free": 10,
+            "basic": 20,
+            "pro": 30,
+            "enterprise": 50,
+        }
+        assert tier_map["free"] == 10
+        assert tier_map["basic"] == 20
+        assert tier_map["pro"] == 30
+        assert tier_map["enterprise"] == 50

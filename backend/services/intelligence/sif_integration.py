@@ -1013,6 +1013,39 @@ class SIFIntegrationService:
             if db:
                 db.close()
 
+    def _get_sif_page_limit(self) -> int:
+        """Return per-tier page limit for SIF indexing.
+
+        Falls back to MAX_SIF_PAGES_PER_INDEX env var (default 10) if
+        subscription lookup fails.
+        """
+        import os
+        env_default = int(os.getenv("MAX_SIF_PAGES_PER_INDEX", "10"))
+        try:
+            from services.database.sessions import get_session_for_user
+            from services.subscription import PricingService
+
+            db = get_session_for_user(self.user_id)
+            if not db:
+                return env_default
+            try:
+                pricing = PricingService(db)
+                limits = pricing.get_user_limits(self.user_id)
+                tier = (limits or {}).get("tier", "").lower()
+
+                tier_map = {
+                    "free": env_default,
+                    "basic": max(env_default, 20),
+                    "pro": max(env_default, 30),
+                    "enterprise": max(env_default, 50),
+                }
+                return tier_map.get(tier, env_default)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"[SIF] Failed to get tier limit: {e}")
+            return env_default
+
     async def sync_user_website_content(self, website_url: str, progress_callback=None) -> None:
         """
         Harvests and indexes user website content using incremental upsert strategy.
@@ -1030,10 +1063,10 @@ class SIFIntegrationService:
         try:
             logger.info(f"Syncing user website content for {website_url} (User: {self.user_id})")
             
-            # 1. Harvest content (Limit to 50 pages for snapshot)
-            # Use 'limit' to act as a snapshot, assuming harvester fetches most relevant/recent
+            # 1. Harvest content with tier-based page limit
+            page_limit = self._get_sif_page_limit()
             harvested_pages = await self.harvester.harvest_website(
-                website_url, limit=50, progress_callback=progress_callback)
+                website_url, limit=page_limit, progress_callback=progress_callback)
             
             if not harvested_pages:
                 logger.warning(f"No content harvested from {website_url}")
