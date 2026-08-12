@@ -1,8 +1,8 @@
 """
-Behavioral coverage for YouTube router.py endpoints.
+Behavioral coverage for YouTube API endpoints (router + handlers).
 
-Pre-refactor safety net: each public endpoint/helper is exercised with
-mocked services so behavior is locked before modularizing router.py.
+Safety net: each public endpoint/helper is exercised with mocked services
+so behavior stays locked after modularizing the YouTube API package.
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ class TestCreateVideoPlan:
         request = VideoPlanRequest(user_idea="How to travel cheap", duration_type="shorts")
         plan = {"video_summary": "Travel tips"}
 
-        with patch("api.youtube.router.YouTubePlannerService") as mock_cls:
+        with patch("api.youtube.handlers.plan.YouTubePlannerService") as mock_cls:
             mock_cls.return_value.generate_plan = AsyncMock(return_value=plan)
             result = asyncio.run(create_video_plan(request=request, current_user=_user()))
 
@@ -84,7 +84,7 @@ class TestCreateVideoPlan:
         from api.youtube.router import VideoPlanRequest, create_video_plan
 
         request = VideoPlanRequest(user_idea="Broken plan", duration_type="shorts")
-        with patch("api.youtube.router.YouTubePlannerService") as mock_cls:
+        with patch("api.youtube.handlers.plan.YouTubePlannerService") as mock_cls:
             mock_cls.return_value.generate_plan = AsyncMock(side_effect=RuntimeError("boom"))
             result = asyncio.run(create_video_plan(request=request, current_user=_user()))
 
@@ -99,7 +99,7 @@ class TestBuildScenes:
         request = SceneBuildRequest(video_plan=_video_plan())
         scenes = [_sample_scene(1), _sample_scene(2)]
 
-        with patch("api.youtube.router.YouTubeSceneBuilderService") as mock_cls:
+        with patch("api.youtube.handlers.plan.YouTubeSceneBuilderService") as mock_cls:
             mock_cls.return_value.build_scenes_from_plan.return_value = scenes
             result = asyncio.run(build_scenes(request=request, current_user=_user()))
 
@@ -110,7 +110,7 @@ class TestBuildScenes:
         from api.youtube.router import SceneBuildRequest, build_scenes
 
         request = SceneBuildRequest(video_plan=_video_plan())
-        with patch("api.youtube.router.YouTubeSceneBuilderService") as mock_cls:
+        with patch("api.youtube.handlers.plan.YouTubeSceneBuilderService") as mock_cls:
             mock_cls.return_value.build_scenes_from_plan.side_effect = RuntimeError("fail")
             result = asyncio.run(build_scenes(request=request, current_user=_user()))
 
@@ -163,8 +163,8 @@ class TestStartVideoRender:
             scenes=[_sample_scene(1, imageUrl=None, audioUrl=None)],
             video_plan=_video_plan(),
         )
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"):
             result = asyncio.run(
                 start_video_render(
                     request=request,
@@ -185,8 +185,8 @@ class TestStartVideoRender:
             combine_scenes=True,
         )
         bg = BackgroundTasks()
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"):
             result = asyncio.run(
                 start_video_render(
                     request=request,
@@ -208,8 +208,8 @@ class TestRenderSingleSceneVideo:
             scene=_sample_scene(1, visual_prompt="", imageUrl=None),
             video_plan=_video_plan(),
         )
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"):
             result = asyncio.run(
                 render_single_scene_video(
                     request=request,
@@ -229,8 +229,8 @@ class TestRenderSingleSceneVideo:
             video_plan=_video_plan(),
         )
         bg = BackgroundTasks()
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"):
             result = asyncio.run(
                 render_single_scene_video(
                     request=request,
@@ -270,7 +270,7 @@ class TestEstimateRenderCost:
 
         request = CostEstimateRequest(scenes=[_sample_scene(1)], resolution="720p")
         estimate = {"total_cost": 1.25, "scene_count": 1}
-        with patch("api.youtube.router.YouTubeVideoRendererService") as mock_cls:
+        with patch("api.youtube.handlers.render.YouTubeVideoRendererService") as mock_cls:
             mock_cls.return_value.estimate_render_cost.return_value = estimate
             result = asyncio.run(estimate_render_cost(request=request, current_user=_user()))
 
@@ -281,7 +281,7 @@ class TestEstimateRenderCost:
         from api.youtube.router import CostEstimateRequest, estimate_render_cost
 
         request = CostEstimateRequest(scenes=[_sample_scene(1)], resolution="720p")
-        with patch("api.youtube.router.YouTubeVideoRendererService") as mock_cls:
+        with patch("api.youtube.handlers.render.YouTubeVideoRendererService") as mock_cls:
             mock_cls.return_value.estimate_render_cost.side_effect = RuntimeError("nope")
             result = asyncio.run(estimate_render_cost(request=request, current_user=_user()))
 
@@ -301,7 +301,7 @@ class TestListVideos:
             asset_metadata={"scene_number": 1, "resolution": "720p"},
         )
         mock_db = MagicMock()
-        with patch("api.youtube.router.ContentAssetService") as mock_cls:
+        with patch("api.youtube.handlers.videos.ContentAssetService") as mock_cls:
             mock_cls.return_value.get_user_assets.return_value = ([asset], 1)
             result = asyncio.run(list_videos(current_user=_user(), db=mock_db))
 
@@ -312,7 +312,7 @@ class TestListVideos:
     def test_returns_empty_on_error(self):
         from api.youtube.router import list_videos
 
-        with patch("api.youtube.router.ContentAssetService") as mock_cls:
+        with patch("api.youtube.handlers.videos.ContentAssetService") as mock_cls:
             mock_cls.return_value.get_user_assets.side_effect = RuntimeError("db down")
             result = asyncio.run(list_videos(current_user=_user(), db=MagicMock()))
 
@@ -325,8 +325,8 @@ class TestCombineSceneVideos:
         from api.youtube.router import CombineVideosRequest, combine_scene_videos
 
         request = CombineVideosRequest(scene_video_urls=["/api/youtube/videos/a.mp4"])
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"):
             result = asyncio.run(
                 combine_scene_videos(
                     request=request,
@@ -347,10 +347,10 @@ class TestCombineSceneVideos:
                 "/api/youtube/videos/missing_2.mp4",
             ]
         )
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"), \
-             patch("api.youtube.router.get_youtube_video_dir", return_value=Path("/tmp")), \
-             patch("api.youtube.router.find_youtube_video_file", return_value=None):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"), \
+             patch("api.youtube.handlers.render.get_youtube_video_dir", return_value=Path("/tmp")), \
+             patch("api.youtube.handlers.render.find_youtube_video_file", return_value=None):
             result = asyncio.run(
                 combine_scene_videos(
                     request=request,
@@ -377,10 +377,10 @@ class TestCombineSceneVideos:
         def _find(name, user_id=None, db=None):
             return {"a.mp4": f1, "b.mp4": f2}.get(name)
 
-        with patch("api.youtube.router.PricingService"), \
-             patch("api.youtube.router.validate_scene_animation_operation"), \
-             patch("api.youtube.router.get_youtube_video_dir", return_value=tmp_path), \
-             patch("api.youtube.router.find_youtube_video_file", side_effect=_find):
+        with patch("api.youtube.handlers.render.PricingService"), \
+             patch("api.youtube.handlers.render.validate_scene_animation_operation"), \
+             patch("api.youtube.handlers.render.get_youtube_video_dir", return_value=tmp_path), \
+             patch("api.youtube.handlers.render.find_youtube_video_file", side_effect=_find):
             result = asyncio.run(
                 combine_scene_videos(
                     request=request,
@@ -412,7 +412,7 @@ class TestServeYouTubeVideo:
         mock_db = MagicMock()
 
         with patch("services.database.get_session_for_user", return_value=mock_db), \
-             patch("api.youtube.router.find_youtube_video_file", return_value=video):
+             patch("api.youtube.handlers.videos.find_youtube_video_file", return_value=video):
             response = asyncio.run(
                 serve_youtube_video(video_filename="final.mp4", current_user=_user())
             )
@@ -424,7 +424,7 @@ class TestServeYouTubeVideo:
         from api.youtube.router import serve_youtube_video
 
         with patch("services.database.get_session_for_user", return_value=MagicMock()), \
-             patch("api.youtube.router.find_youtube_video_file", return_value=None):
+             patch("api.youtube.handlers.videos.find_youtube_video_file", return_value=None):
             with pytest.raises(HTTPException) as exc:
                 asyncio.run(
                     serve_youtube_video(video_filename="gone.mp4", current_user=_user())

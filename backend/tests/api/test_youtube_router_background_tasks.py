@@ -43,7 +43,7 @@ class TestExecuteSceneVideoRenderTask:
         }
 
         with patch("services.database.get_session_for_user", return_value=mock_db), \
-             patch("api.youtube.router.YouTubeVideoRendererService") as mock_renderer_cls:
+             patch("api.youtube.render_tasks.YouTubeVideoRendererService") as mock_renderer_cls:
             mock_renderer_cls.return_value.render_scene_video.return_value = scene_result
             _execute_scene_video_render_task(
                 task_id=task_id,
@@ -96,7 +96,7 @@ class TestExecuteVideoRenderTask:
         }
 
         with patch("services.database.get_session_for_user", return_value=mock_db), \
-             patch("api.youtube.router.YouTubeVideoRendererService"):
+             patch("api.youtube.render_tasks.YouTubeVideoRendererService"):
             _execute_video_render_task(
                 task_id=task_id,
                 scenes=[invalid_scene],
@@ -141,8 +141,8 @@ class TestExecuteVideoRenderTask:
         ]
 
         with patch("services.database.get_session_for_user", return_value=mock_db), \
-             patch("api.youtube.router.YouTubeVideoRendererService") as mock_renderer_cls, \
-             patch("api.youtube.router.save_asset_to_library"):
+             patch("api.youtube.render_tasks.YouTubeVideoRendererService") as mock_renderer_cls, \
+             patch("api.youtube.render_tasks.save_asset_to_library"):
             mock_renderer = mock_renderer_cls.return_value
             mock_renderer.render_scene_video.side_effect = scene_results
             _execute_video_render_task(
