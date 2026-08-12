@@ -1013,7 +1013,40 @@ class SIFIntegrationService:
             if db:
                 db.close()
 
-    async def sync_user_website_content(self, website_url: str) -> None:
+    def _get_sif_page_limit(self) -> int:
+        """Return per-tier page limit for SIF indexing.
+
+        Falls back to MAX_SIF_PAGES_PER_INDEX env var (default 10) if
+        subscription lookup fails.
+        """
+        import os
+        env_default = int(os.getenv("MAX_SIF_PAGES_PER_INDEX", "10"))
+        try:
+            from services.database.sessions import get_session_for_user
+            from services.subscription import PricingService
+
+            db = get_session_for_user(self.user_id)
+            if not db:
+                return env_default
+            try:
+                pricing = PricingService(db)
+                limits = pricing.get_user_limits(self.user_id)
+                tier = (limits or {}).get("tier", "").lower()
+
+                tier_map = {
+                    "free": env_default,
+                    "basic": max(env_default, 20),
+                    "pro": max(env_default, 30),
+                    "enterprise": max(env_default, 50),
+                }
+                return tier_map.get(tier, env_default)
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"[SIF] Failed to get tier limit: {e}")
+            return env_default
+
+    async def sync_user_website_content(self, website_url: str, progress_callback=None) -> None:
         """
         Harvests and indexes user website content using incremental upsert strategy.
         This ensures that:
@@ -1030,9 +1063,10 @@ class SIFIntegrationService:
         try:
             logger.info(f"Syncing user website content for {website_url} (User: {self.user_id})")
             
-            # 1. Harvest content (Limit to 50 pages for snapshot)
-            # Use 'limit' to act as a snapshot, assuming harvester fetches most relevant/recent
-            harvested_pages = await self.harvester.harvest_website(website_url, limit=50)
+            # 1. Harvest content with tier-based page limit
+            page_limit = self._get_sif_page_limit()
+            harvested_pages = await self.harvester.harvest_website(
+                website_url, limit=page_limit, progress_callback=progress_callback)
             
             if not harvested_pages:
                 logger.warning(f"No content harvested from {website_url}")
@@ -1040,19 +1074,33 @@ class SIFIntegrationService:
                 
             logger.info(f"Harvested {len(harvested_pages)} pages from {website_url}")
             
-            # 2. Prepare items for indexing (Upsert Strategy)
+            # 2. Prepare items for indexing (Upsert Strategy with watermark)
             # Using URL as the unique ID ensures updates overwrite existing entries
+            import hashlib
+            from services.database.sessions import get_session_for_user
+            from models.sif_indexing_watermark import SIFIndexingWatermark
+
+            wm_session = get_session_for_user(self.user_id)
             items_to_index = []
+            watermark_updates = []  # (source_id, source_hash, embedding_count)
+
             for page in harvested_pages:
                 url = page.get("url")
                 if not url:
                     continue
-                    
-                # Rich text content
+
                 text_content = page.get("content", "")
                 title = page.get("title", "")
-                
-                # Metadata
+
+                # Watermark: skip unchanged pages
+                content_hash = hashlib.sha256(text_content.encode("utf-8")).hexdigest()
+                source_id = f"user_content:{url}"
+                if wm_session and SIFIndexingWatermark.is_fresh(
+                    wm_session, self.user_id, source_id, content_hash
+                ):
+                    logger.debug(f"[SIF] Skipping unchanged page (watermark hit): {url}")
+                    continue
+
                 metadata = {
                     "type": "user_content",
                     "url": url,
@@ -1065,18 +1113,30 @@ class SIFIntegrationService:
                         "snippet": text_content[:200]
                     }
                 }
-                
-                # ID format: "user_content_{url_hash}" or just URL if safe?
-                # Txtai usually handles string IDs. Let's use a consistent prefix.
-                # But wait, existing logic in SIFOnboardingIntegration uses URL as ID?
-                # "user_items = [(page['url'], ...)]"
-                # Yes, it uses URL directly.
                 items_to_index.append((url, text_content, metadata))
-            
+                watermark_updates.append((source_id, content_hash, 1))
+
             # 3. Index (Upsert)
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
                 logger.info(f"Successfully synced {len(items_to_index)} pages to SIF index")
+
+            # 4. Persist watermarks
+            if wm_session and watermark_updates:
+                for source_id, content_hash, count in watermark_updates:
+                    SIFIndexingWatermark.upsert(
+                        wm_session, self.user_id, source_id, content_hash,
+                        embedding_count=count, notes="website_content",
+                    )
+                try:
+                    wm_session.commit()
+                except Exception:
+                    wm_session.rollback()
+            if wm_session:
+                try:
+                    wm_session.close()
+                except Exception:
+                    pass
             _sif_metrics_inc("sif_sync_total", "website_content_success")
             return {
                 "count": len(harvested_pages),

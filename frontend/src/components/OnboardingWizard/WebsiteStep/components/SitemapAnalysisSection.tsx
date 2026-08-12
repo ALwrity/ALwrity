@@ -88,6 +88,8 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
     seo_recommendations
   } = sitemapAnalysis;
 
+  const fetchStats = (sitemapAnalysis as any).fetch_stats;
+
   return (
     <Box>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -105,6 +107,13 @@ const SitemapAnalysisSection: React.FC<SitemapAnalysisSectionProps> = ({
           />
         </Tooltip>
       </Box>
+      {fetchStats && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: -1, mb: 2 }}>
+          {fetchStats.urls_found} URLs collected
+          {fetchStats.nested_fetched > 0 && ` · ${fetchStats.nested_fetched} sub-sitemaps fetched`}
+          {fetchStats.nested_skipped > 0 && ` · ${fetchStats.nested_skipped} sub-sitemaps skipped`}
+        </Typography>
+      )}
 
       {/* AI Insights — structured cards */}
       {ai_insights && (

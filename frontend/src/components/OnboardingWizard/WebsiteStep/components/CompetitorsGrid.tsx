@@ -147,15 +147,17 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
               height: '100%', 
               display: 'flex', 
               flexDirection: 'column',
-              background: 'linear-gradient(135deg, #e0f2fe 0%, #b3e5fc 100%)',
-              border: '1px solid #81d4fa',
-              boxShadow: '0 4px 12px rgba(3, 169, 244, 0.15)',
-              transition: 'all 0.3s ease',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2.5,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              transition: 'all 0.2s ease',
               '&:hover': {
-                transform: 'translateY(-4px)',
-                boxShadow: '0 8px 20px rgba(3, 169, 244, 0.25)'
+                boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                borderColor: '#6366f1'
               },
-              position: 'relative'
+              position: 'relative',
+              bgcolor: '#fff'
             }}>
               {onRemoveCompetitor && (
                   <IconButton
@@ -165,80 +167,90 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
                         position: 'absolute',
                         top: 8,
                         right: 8,
-                        bgcolor: 'rgba(255,255,255,0.7)',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.9)', color: 'error.main' }
+                        bgcolor: 'rgba(0,0,0,0.08)',
+                        color: '#64748b',
+                        '&:hover': { bgcolor: 'rgba(239,68,68,0.15)', color: '#ef4444' }
                     }}
+                    title="Remove competitor"
                   >
                       <DeleteIcon fontSize="small" />
                   </IconButton>
               )}
 
-              <CardContent sx={{ flexGrow: 1 }}>
-                <Box display="flex" alignItems="flex-start" gap={2} mb={2}>
-                  <Avatar sx={{ width: 40, height: 40, bgcolor: '#eef2ff', color: '#6366f1', fontSize: '1.1rem', fontWeight: 700, border: '1px solid #c7d2fe' }}>
-                    {(competitor.title || '?').charAt(0).toUpperCase()}
+              <CardContent sx={{ flexGrow: 1, pb: 0 }}>
+                <Box display="flex" alignItems="flex-start" gap={1.5} mb={1.5}>
+                  <Avatar sx={{ 
+                    width: 36, height: 36, 
+                    bgcolor: '#eef2ff', color: '#6366f1', 
+                    fontSize: '0.85rem', fontWeight: 700, 
+                    flexShrink: 0
+                  }}>
+                    {(competitor.title || competitor.domain || '?').charAt(0).toUpperCase()}
                   </Avatar>
-                  <Box flex={1} pr={onRemoveCompetitor ? 3 : 0}>
+                  <Box flex={1} minWidth={0} pr={onRemoveCompetitor ? 4 : 0}>
                     <Typography 
-                      variant="h6" 
+                      variant="subtitle2" 
                       fontWeight={600} 
-                      gutterBottom
-                      sx={{ color: '#1a202c !important', wordBreak: 'break-word' }} // Force dark text for readability
+                      noWrap
+                      sx={{ color: '#1e293b', lineHeight: 1.3 }}
                     >
-                      {competitor.title}
+                      {competitor.title || competitor.domain}
                     </Typography>
                     <Typography 
-                      variant="body2" 
-                      gutterBottom
-                      sx={{ color: '#4a5568 !important', wordBreak: 'break-all' }} // Force dark text for readability
+                      variant="caption" 
+                      sx={{ color: '#94a3b8', wordBreak: 'break-all' }}
                     >
                       {competitor.domain}
                     </Typography>
-                    <Box display="flex" gap={1} flexWrap="wrap">
-                      <Chip 
-                        label={`${Math.round(competitor.relevance_score * 100)}% Match`}
-                        color="primary"
-                        size="small"
-                      />
-                      {competitor.published_date && (
-                        <Chip 
-                          label={new Date(competitor.published_date).toLocaleDateString()}
-                          variant="outlined"
-                          size="small"
-                          sx={{ 
-                            fontSize: '0.7rem',
-                            height: 20,
-                            '& .MuiChip-label': { px: 1 }
-                          }}
-                        />
-                      )}
-                    </Box>
                   </Box>
                 </Box>
-
-                <Typography 
-                  variant="body2" 
-                  mb={2}
-                  sx={{ color: '#2d3748 !important' }} // Force dark text for readability
-                >
-                  {competitor.summary.length > 150 
-                    ? `${competitor.summary.substring(0, 150)}...` 
-                    : competitor.summary
-                  }
-                </Typography>
+                <Box display="flex" gap={0.75} flexWrap="wrap" mb={1.5}>
+                  <Chip 
+                    label={`${Math.round(competitor.relevance_score * 100)}% match`}
+                    size="small"
+                    sx={{ 
+                      bgcolor: '#f0fdf4', color: '#15803d', 
+                      fontWeight: 600, fontSize: '0.7rem', height: 22,
+                      border: '1px solid #bbf7d0'
+                    }}
+                  />
+                  {competitor.published_date && (
+                    <Chip 
+                      label={new Date(competitor.published_date).toLocaleDateString()}
+                      variant="outlined"
+                      size="small"
+                      sx={{ fontSize: '0.7rem', height: 22, borderColor: '#e2e8f0', color: '#64748b' }}
+                    />
+                  )}
+                </Box>
+                {competitor.summary?.length > 0 && (
+                  <Typography 
+                    variant="caption" 
+                    sx={{ color: '#64748b', lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                  >
+                    {competitor.summary}
+                  </Typography>
+                )}
               </CardContent>
 
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button size="small" startIcon={<OpenInNewIcon />}
+              <CardActions sx={{ p: 1.5, pt: 0, mt: 'auto', gap: 0.5 }}>
+                <Button 
+                  size="small" 
+                  startIcon={<OpenInNewIcon />}
                   onClick={() => competitor.url && window.open(competitor.url, '_blank')}
-                  disabled={!competitor.url}>Visit Website</Button>
+                  disabled={!competitor.url}
+                  sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#6366f1' }}
+                >
+                  Visit
+                </Button>
                 {competitor.highlights && competitor.highlights.length > 0 && (
                   <Button
                     size="small"
-                    variant="outlined"
+                    variant="text"
                     onClick={() => onShowHighlights(competitor)}
+                    sx={{ textTransform: 'none', fontSize: '0.75rem', color: '#64748b' }}
                   >
-                    Highlights
+                    Insights
                   </Button>
                 )}
               </CardActions>
@@ -247,40 +259,39 @@ const CompetitorsGrid: React.FC<CompetitorsGridProps> = ({
           ))}
         </Grid>
       ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, overflow: 'hidden' }}>
+        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: 'divider' }}>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f1f5f9' }}>
-                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Company</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Domain</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Match</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem' }}>Highlights</TableCell>
-                <TableCell sx={{ fontWeight: 700, color: '#334155', fontSize: '0.8rem', width: 120 }}>Actions</TableCell>
+              <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5 }}>Company</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5 }}>Domain</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5 }}>Match</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: '#475569', fontSize: '0.75rem', py: 1.5, width: 100 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {competitors.map((competitor, index) => (
-                <TableRow key={index} sx={{ '&:nth-of-type(even)': { bgcolor: '#f8fafc' } }}>
-                  <TableCell>
+                  <TableRow key={index} hover sx={{ '&:last-child td': { border: 0 } }}>
+                  <TableCell sx={{ py: 1 }}>
                     <Box display="flex" alignItems="center" gap={1}>
-                      <Avatar sx={{ width: 24, height: 24, bgcolor: '#eef2ff', color: '#6366f1', fontSize: '0.7rem', fontWeight: 700 }}>
-                        {(competitor.title || '?').charAt(0).toUpperCase()}
+                      <Avatar sx={{ width: 28, height: 28, bgcolor: '#eef2ff', color: '#6366f1', fontSize: '0.7rem', fontWeight: 700 }}>
+                        {(competitor.title || competitor.domain || '?').charAt(0).toUpperCase()}
                       </Avatar>
-                      <Typography variant="body2" fontWeight={600} sx={{ color: '#1e293b' }}>{competitor.title}</Typography>
+                      <Typography variant="body2" fontWeight={600} sx={{ color: '#1e293b' }}>{competitor.title || competitor.domain}</Typography>
                     </Box>
                   </TableCell>
-                  <TableCell><Typography variant="body2" sx={{ color: '#64748b', wordBreak: 'break-all', fontSize: '0.8rem' }}>{competitor.domain}</Typography></TableCell>
-                  <TableCell><Chip label={`${Math.round(competitor.relevance_score * 100)}%`} color="primary" size="small" variant="outlined" /></TableCell>
-                  <TableCell>
-                    {competitor.highlights?.length ? competitor.highlights.slice(0, 2).map((h, i) => (
-                      <Typography key={i} variant="caption" sx={{ color: '#475569', lineHeight: 1.3, display: 'block' }}>{h}</Typography>
-                    )) : <Typography variant="caption" sx={{ color: '#94a3b8' }}>—</Typography>}
+                  <TableCell sx={{ py: 1 }}><Typography variant="body2" sx={{ color: '#94a3b8', fontSize: '0.8rem' }}>{competitor.domain}</Typography></TableCell>
+                  <TableCell sx={{ py: 1 }}>
+                    <Chip 
+                      label={`${Math.round(competitor.relevance_score * 100)}%`} 
+                      size="small" 
+                      sx={{ bgcolor: '#f0fdf4', color: '#15803d', fontWeight: 600, fontSize: '0.7rem', border: '1px solid #bbf7d0' }}
+                    />
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ py: 1 }}>
                     <Box display="flex" gap={0.5}>
-                      <IconButton size="small" onClick={() => competitor.url && window.open(competitor.url, '_blank')} disabled={!competitor.url} title={competitor.url ? 'Visit' : 'No website'}><OpenInNewIcon fontSize="small" /></IconButton>
-                      {competitor.highlights && competitor.highlights.length > 0 && <IconButton size="small" onClick={() => onShowHighlights(competitor)} title="Highlights"><BusinessIcon fontSize="small" /></IconButton>}
-                      {onRemoveCompetitor && <IconButton size="small" onClick={() => onRemoveCompetitor(index)} title="Remove" sx={{ color: '#ef4444' }}><DeleteIcon fontSize="small" /></IconButton>}
+                      <IconButton size="small" onClick={() => competitor.url && window.open(competitor.url, '_blank')} disabled={!competitor.url} title="Visit"><OpenInNewIcon fontSize="small" /></IconButton>
+                      {onRemoveCompetitor && <IconButton size="small" onClick={() => onRemoveCompetitor(index)} title="Remove" sx={{ color: '#94a3b8', '&:hover': { color: '#ef4444' } }}><DeleteIcon fontSize="small" /></IconButton>}
                     </Box>
                   </TableCell>
                 </TableRow>

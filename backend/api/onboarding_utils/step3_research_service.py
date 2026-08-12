@@ -102,6 +102,18 @@ class Step3ResearchService:
             logger.info(f"[research] gather complete — competitor={type(competitor_results).__name__} "
                         f"social={type(social_media_results).__name__} "
                         f"pillars={type(pillars_results).__name__}")
+
+            # Trigger SIF indexing regardless of Exa success/failure (background thread)
+            try:
+                from api.onboarding_utils.onboarding_task_scheduler import _run_sif_now
+                import asyncio as _asyncio
+                _asyncio.get_event_loop().run_in_executor(
+                    None, lambda: _asyncio.run(_run_sif_now(user_id, user_url))
+                )
+                logger.info(f"Triggered SIF indexing in background thread for {user_id}")
+            except Exception as sif_err:
+                logger.warning(f"Could not trigger SIF after discovery: {sif_err}")
+
             if isinstance(competitor_results, Exception):
                 return {"success": False, "error": str(competitor_results)}
             if not competitor_results.get("success"):
@@ -138,15 +150,6 @@ class Step3ResearchService:
             )
             
             logger.info(f"Successfully discovered {len(enhanced_competitors)} competitors for user {user_id}")
-
-            # Trigger SIF indexing now that Exa Agent calls are complete (non-blocking)
-            try:
-                from api.onboarding_utils.onboarding_task_scheduler import _run_sif_now
-                website_url = user_url
-                asyncio.ensure_future(_run_sif_now(user_id, website_url))
-                logger.info(f"Triggered SIF indexing after Exa discovery for {user_id}")
-            except Exception as sif_err:
-                logger.warning(f"Could not trigger SIF after discovery: {sif_err}")
 
             return {
                 "success": True,

@@ -355,6 +355,42 @@ class StepManagementService:
             db.rollback()
             raise e
 
+    def _delete_competitor_by_url(self, user_id: str, competitor_url: str, db: Session) -> bool:
+        """Delete a single competitor by URL from the database."""
+        try:
+            session = self._get_or_create_session(user_id, db)
+            deleted = db.query(CompetitorAnalysis).filter(
+                CompetitorAnalysis.session_id == session.id,
+                CompetitorAnalysis.competitor_url == competitor_url
+            ).delete(synchronize_session=False)
+            if deleted:
+                db.commit()
+                logger.info(f"Deleted competitor {competitor_url} for user {user_id}")
+                # Clear step_data cache so get_research_data won't return stale competitors
+                try:
+                    from services.intelligence.agents.specialized.agent_flat_context import AgentFlatContextStore
+                    flat_store = AgentFlatContextStore(user_id)
+                    existing = flat_store.load_step3_context_document() or {}
+                    if isinstance(existing, dict):
+                        existing_data = existing.get("data") if isinstance(existing.get("data"), dict) else {}
+                        competitors = existing_data.get("competitors", [])
+                        if isinstance(competitors, list):
+                            existing_data["competitors"] = [
+                                c for c in competitors
+                                if c.get("url", "").strip().strip('`').strip() != competitor_url
+                            ]
+                            flat_store.save_step3_research_preferences(existing_data, source="competitor_deletion")
+                            logger.info(f"Updated flat context after deletion: {len(existing_data['competitors'])} competitors remain")
+                except Exception as cache_err:
+                    logger.warning(f"Could not update flat context after deletion: {cache_err}")
+            else:
+                logger.warning(f"No competitor found with URL {competitor_url} for user {user_id}")
+            return deleted > 0
+        except Exception as e:
+            logger.error(f"Failed to delete competitor {competitor_url}: {e}")
+            db.rollback()
+            return False
+
 
 
     def _save_step5_integrations_context(self, user_id: str, step5_data: Dict[str, Any], db: Session) -> bool:
