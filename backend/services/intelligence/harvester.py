@@ -159,9 +159,35 @@ class SemanticHarvesterService:
             return results
             
         except Exception as e:
-            logger.error(f"[SemanticHarvester] Failed to harvest {website_url}: {e}")
+            logger.error(f"[SemanticHarvester] Failed to harvest {website_url} via Exa: {e}")
             logger.error(f"[SemanticHarvester] Full traceback: {traceback.format_exc()}")
-            return []
+            
+            # Fallback: use BeautifulSoup-based crawler for the user's own site
+            try:
+                logger.info(f"[SemanticHarvester] Attempting BeautifulSoup fallback for {website_url}")
+                from services.component_logic.web_crawler_logic import WebCrawlerLogic
+                crawler = WebCrawlerLogic()
+                crawl_result = await crawler.crawl_website(website_url)
+                if crawl_result and crawl_result.get("success"):
+                    content = crawl_result.get("content", {})
+                    text = content.get("main_content", "") or ""
+                    if text:
+                        results = [{
+                            "url": website_url,
+                            "title": content.get("title", website_url),
+                            "content": text[:10000],  # limit to 10K chars
+                            "metadata": {
+                                "source": "beautifulsoup_fallback",
+                                "word_count": len(text.split()),
+                            }
+                        }]
+                        logger.info(f"[SemanticHarvester] BeautifulSoup fallback: {len(text)} chars from {website_url}")
+                    else:
+                        logger.warning(f"[SemanticHarvester] BeautifulSoup fallback returned no text for {website_url}")
+                return results
+            except Exception as bs_err:
+                logger.warning(f"[SemanticHarvester] BeautifulSoup fallback also failed: {bs_err}")
+                return []
 
     async def harvest_competitors(self, competitor_urls: List[str], pages_per_competitor: int = 10) -> List[Dict[str, Any]]:
         """Harvest content from multiple competitors with detailed logging."""
