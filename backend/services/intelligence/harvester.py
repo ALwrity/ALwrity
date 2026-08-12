@@ -127,14 +127,17 @@ class SemanticHarvesterService:
                             if not analysis.seo_audit:
                                 continue
                             sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
-                            structure = sitemap_data.get("structure_analysis", {})
-                            sitemap_urls = structure.get("urls", [])
+                            analysis_data = sitemap_data.get("analysis_data", {}) or sitemap_data
+                            sitemap_urls = analysis_data.get("url_list", [])
                             if sitemap_urls:
                                 from urllib.parse import urlparse
                                 base_domain = urlparse(website_url).netloc
-                                for u in sitemap_urls:
-                                    url_str = u if isinstance(u, str) else u.get("url", "")
-                                    if not url_str or not url_str.startswith("http"):
+                                for url_str in sitemap_urls:
+                                    if not url_str:
+                                        continue
+                                    if isinstance(url_str, dict):
+                                        url_str = url_str.get("loc", "")
+                                    if not isinstance(url_str, str) or not url_str.startswith("http"):
                                         continue
                                     parsed = urlparse(url_str)
                                     if parsed.netloc == base_domain or parsed.netloc.endswith("." + base_domain):

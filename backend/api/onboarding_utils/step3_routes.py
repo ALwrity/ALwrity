@@ -836,6 +836,7 @@ async def _persist_sitemap_analysis(
                 "analyzed_at": analysis_result.get("timestamp"),
                 "analysis_data": {
                     "total_urls": analysis_result.get("total_urls", 0),
+                    "url_list": analysis_result.get("url_list", []),
                     "structure_analysis": analysis_result.get("structure_analysis"),
                     "onboarding_insights": analysis_result.get("onboarding_insights") or analysis_result.get("sitemap_onboarding_insights"),
                 },

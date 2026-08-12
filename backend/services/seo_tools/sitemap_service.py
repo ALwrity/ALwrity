@@ -139,6 +139,7 @@ class SitemapService:
                 "sitemap_url": sitemap_url,
                 "analysis_date": datetime.utcnow().isoformat(),
                 "total_urls": len(sitemap_data.get("urls", [])),
+                "url_list": [u.get("loc", "") for u in sitemap_data.get("urls", []) if u.get("loc")],
                 "structure_analysis": structure_analysis,
                 "content_trends": content_trends,
                 "publishing_patterns": publishing_patterns,
