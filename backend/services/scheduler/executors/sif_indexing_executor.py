@@ -143,13 +143,26 @@ class SIFIndexingExecutor(TaskExecutor):
 
             _update_phase("harvesting")
 
+            # Progress callback: update task.payload incrementally
+            async def _harvest_progress(current: int, total: int):
+                payload = dict(task.payload) if task.payload else {}
+                payload['pages_harvested'] = current
+                payload['pages_total'] = total
+                payload['phase'] = f"harvesting {current}/{total}"
+                task.payload = payload
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
             # 1. Sync Step 2 Metadata (WebsiteAnalysis, CompetitorAnalysis)
             metadata_synced = await sif_service.sync_onboarding_data_to_sif()
             
             _update_phase("indexing_metadata", items_indexed=metadata_synced or 0)
 
             # 2. Sync User Website Content (Deep Crawl / Snapshot)
-            content_result = await sif_service.sync_user_website_content(website_url)
+            content_result = await sif_service.sync_user_website_content(
+                website_url, progress_callback=_harvest_progress)
             
             pages_harvested = content_result.get("count", 0) if isinstance(content_result, dict) else (content_result if isinstance(content_result, int) else 0)
             indexed_pages = content_result.get("pages", []) if isinstance(content_result, dict) else []

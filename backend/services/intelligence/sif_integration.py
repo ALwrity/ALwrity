@@ -1013,7 +1013,7 @@ class SIFIntegrationService:
             if db:
                 db.close()
 
-    async def sync_user_website_content(self, website_url: str) -> None:
+    async def sync_user_website_content(self, website_url: str, progress_callback=None) -> None:
         """
         Harvests and indexes user website content using incremental upsert strategy.
         This ensures that:
@@ -1032,7 +1032,8 @@ class SIFIntegrationService:
             
             # 1. Harvest content (Limit to 50 pages for snapshot)
             # Use 'limit' to act as a snapshot, assuming harvester fetches most relevant/recent
-            harvested_pages = await self.harvester.harvest_website(website_url, limit=50)
+            harvested_pages = await self.harvester.harvest_website(
+                website_url, limit=50, progress_callback=progress_callback)
             
             if not harvested_pages:
                 logger.warning(f"No content harvested from {website_url}")

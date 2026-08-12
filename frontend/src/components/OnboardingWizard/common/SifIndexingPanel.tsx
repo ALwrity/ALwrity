@@ -28,6 +28,7 @@ export const SifIndexingPanel: React.FC = () => {
   const [sifStatus, setSifStatus] = useState<'idle' | 'indexing' | 'partial' | 'done' | 'error'>('idle');
   const [sifPhase, setSifPhase] = useState('');
   const [sifPageCount, setSifPageCount] = useState<number | null>(null);
+  const [sifPageTotal, setSifPageTotal] = useState<number | null>(null);
   const [sifPillarCount, setSifPillarCount] = useState<number | null>(null);
   const [sifLastIndexed, setSifLastIndexed] = useState<string | null>(null);
   const [sifErrorReason, setSifErrorReason] = useState<string | null>(null);
@@ -50,13 +51,15 @@ export const SifIndexingPanel: React.FC = () => {
           setSifStatus(hasPillars ? 'done' : hasPages ? 'partial' : 'done');
           setSifPhase(hasPillars ? 'complete' : '');
           setSifPageCount(details.pages_harvested ?? null);
+          setSifPageTotal(details.pages_total ?? null);
           setSifPillarCount(hasPillars ? details.pillars_found : null);
           setSifLastIndexed(sifTask.started_at || null);
           if (details.indexed_pages?.length) setIndexedPages(details.indexed_pages);
         } else if (sifTask.status === 'running') {
           setSifStatus('indexing');
           setSifPhase(details.phase || '');
-          if (details.pages_harvested) setSifPageCount(details.pages_harvested);
+          setSifPageCount(details.pages_harvested ?? null);
+          setSifPageTotal(details.pages_total ?? null);
         } else if (sifTask.status === 'failed') {
           setSifStatus('error');
           setSifErrorReason(sifTask.failure_reason || null);
@@ -121,7 +124,11 @@ export const SifIndexingPanel: React.FC = () => {
         {sifStatus === 'indexing' && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <CircularProgress size={14} sx={{ color: PHASE_COLORS[sifPhase] || '#2563eb' }} />
-            <Typography variant="caption" sx={{ color: '#64748b' }}>{sifPageCount ? `${sifPageCount} pages found so far...` : 'Starting...'}</Typography>
+            <Typography variant="caption" sx={{ color: '#64748b' }}>
+              {sifPageCount != null && sifPageTotal != null
+                ? `Harvesting ${sifPageCount}/${sifPageTotal} pages...`
+                : sifPageCount ? `${sifPageCount} pages found so far...` : 'Starting...'}
+            </Typography>
           </Box>
         )}
 

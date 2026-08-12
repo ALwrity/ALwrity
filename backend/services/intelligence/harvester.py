@@ -22,7 +22,8 @@ class SemanticHarvesterService:
             "last_harvest_time": None
         }
 
-    async def harvest_website(self, website_url: str, limit: int = 100, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    async def harvest_website(self, website_url: str, limit: int = 100, user_id: Optional[str] = None,
+                               progress_callback=None) -> List[Dict[str, Any]]:
         """
         Crawl a website using BeautifulSoup and the user's sitemap.
 
@@ -34,6 +35,7 @@ class SemanticHarvesterService:
             website_url: The root URL to crawl.
             limit: Maximum number of pages (capped by MAX_SIF_PAGES_PER_INDEX).
             user_id: Optional user ID for sitemap lookup.
+            progress_callback: Optional async callable(current, total) for progress.
         """
         logger.info(f"[SemanticHarvester] Starting harvest for {website_url} (Limit: {limit})")
 
@@ -84,6 +86,12 @@ class SemanticHarvesterService:
                 except Exception as crawl_err:
                     logger.warning(f"[SemanticHarvester] Crawl failed for {url}: {crawl_err}")
                     self._harvest_stats["failed_extractions"] += 1
+                finally:
+                    if progress_callback:
+                        try:
+                            await progress_callback(len(results), len(urls_to_crawl))
+                        except Exception:
+                            pass
 
             self._harvest_stats["total_urls_processed"] += len(urls_to_crawl)
             self._harvest_stats["last_harvest_time"] = datetime.now().isoformat()
