@@ -1041,19 +1041,33 @@ class SIFIntegrationService:
                 
             logger.info(f"Harvested {len(harvested_pages)} pages from {website_url}")
             
-            # 2. Prepare items for indexing (Upsert Strategy)
+            # 2. Prepare items for indexing (Upsert Strategy with watermark)
             # Using URL as the unique ID ensures updates overwrite existing entries
+            import hashlib
+            from services.database.sessions import get_session_for_user
+            from models.sif_indexing_watermark import SIFIndexingWatermark
+
+            wm_session = get_session_for_user(self.user_id)
             items_to_index = []
+            watermark_updates = []  # (source_id, source_hash, embedding_count)
+
             for page in harvested_pages:
                 url = page.get("url")
                 if not url:
                     continue
-                    
-                # Rich text content
+
                 text_content = page.get("content", "")
                 title = page.get("title", "")
-                
-                # Metadata
+
+                # Watermark: skip unchanged pages
+                content_hash = hashlib.sha256(text_content.encode("utf-8")).hexdigest()
+                source_id = f"user_content:{url}"
+                if wm_session and SIFIndexingWatermark.is_fresh(
+                    wm_session, self.user_id, source_id, content_hash
+                ):
+                    logger.debug(f"[SIF] Skipping unchanged page (watermark hit): {url}")
+                    continue
+
                 metadata = {
                     "type": "user_content",
                     "url": url,
@@ -1066,18 +1080,30 @@ class SIFIntegrationService:
                         "snippet": text_content[:200]
                     }
                 }
-                
-                # ID format: "user_content_{url_hash}" or just URL if safe?
-                # Txtai usually handles string IDs. Let's use a consistent prefix.
-                # But wait, existing logic in SIFOnboardingIntegration uses URL as ID?
-                # "user_items = [(page['url'], ...)]"
-                # Yes, it uses URL directly.
                 items_to_index.append((url, text_content, metadata))
-            
+                watermark_updates.append((source_id, content_hash, 1))
+
             # 3. Index (Upsert)
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
                 logger.info(f"Successfully synced {len(items_to_index)} pages to SIF index")
+
+            # 4. Persist watermarks
+            if wm_session and watermark_updates:
+                for source_id, content_hash, count in watermark_updates:
+                    SIFIndexingWatermark.upsert(
+                        wm_session, self.user_id, source_id, content_hash,
+                        embedding_count=count, notes="website_content",
+                    )
+                try:
+                    wm_session.commit()
+                except Exception:
+                    wm_session.rollback()
+            if wm_session:
+                try:
+                    wm_session.close()
+                except Exception:
+                    pass
             _sif_metrics_inc("sif_sync_total", "website_content_success")
             return {
                 "count": len(harvested_pages),
