@@ -399,11 +399,12 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
   };
 
   const handleRemoveCompetitor = (index: number) => {
+    const removed = competitors[index];
     const newCompetitors = [...competitors];
     newCompetitors.splice(index, 1);
     setCompetitors(newCompetitors);
-     // Update cache
-     try {
+    // Update cache
+    try {
         const cachedData = localStorage.getItem('competitor_analysis_data');
         if (cachedData) {
             const parsedData = JSON.parse(cachedData);
@@ -412,6 +413,11 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         }
     } catch (e) {
         console.warn('Failed to update cache for competitors', e);
+    }
+    // Delete from DB
+    if (removed?.url) {
+      longRunningApiClient.delete('/api/onboarding/competitor-analysis', { params: { competitor_url: removed.url } })
+        .catch((e: any) => console.warn('Failed to delete competitor from DB:', e));
     }
   };
 

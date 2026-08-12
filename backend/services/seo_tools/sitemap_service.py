@@ -380,7 +380,7 @@ class SitemapService:
                             nested_results = await asyncio.gather(*nested_tasks, return_exceptions=True)
                             for res in nested_results:
                                 if isinstance(res, Exception):
-                                    logger.warning(f"Failed to fetch nested sitemap: {res}")
+                                    logger.info(f"Skipping nested sitemap: {res}")
                                 elif isinstance(res, dict):
                                     urls.extend(res.get("urls", []))
                     
@@ -421,27 +421,28 @@ class SitemapService:
                  raise e
 
         except ET.ParseError as e:
-            # Check if content is empty
-            if not content or not content.strip():
-                logger.warning(f"Sitemap is empty: {sitemap_url}")
+            err_msg = str(e).lower()
+            if any(kw in err_msg for kw in ("no element found", "not a valid xml", "syntax error", "mismatched tag")):
+                logger.info(f"Sitemap unavailable for {sitemap_url}: not valid XML — skipping")
                 return {"urls": [], "sitemaps": [], "total_urls": 0}
-
-            # Check if content looks like HTML to give a better error message
+            if not content or not content.strip():
+                logger.info(f"Sitemap is empty: {sitemap_url}")
+                return {"urls": [], "sitemaps": [], "total_urls": 0}
             try:
-                if "content" in locals() and ("<html" in content.lower() or "<body" in content.lower() or "<div" in content.lower()):
-                    raise Exception("URL returned a webpage (HTML), not a valid XML sitemap")
+                if "<html" in content.lower() or "<body" in content.lower():
+                    logger.info(f"Sitemap unavailable for {sitemap_url}: URL returned HTML, not XML")
+                    return {"urls": [], "sitemaps": [], "total_urls": 0}
             except Exception:
                 pass
-            
             logger.warning(f"Failed to parse sitemap XML: {e}")
-            raise Exception(f"Failed to parse sitemap XML: {e}")
+            return {"urls": [], "sitemaps": [], "total_urls": 0}
         except Exception as e:
             err_msg = str(e).lower()
-            if any(kw in err_msg for kw in ("no element found", "not a valid xml", "not an xml", "webpage", "html")):
+            if any(kw in err_msg for kw in ("no element found", "not a valid xml", "webpage", "html")):
                 logger.info(f"Sitemap unavailable for {sitemap_url}: not a sitemap")
             else:
                 logger.error(f"Error fetching sitemap data for {sitemap_url}: {e}")
-            raise
+            return {"urls": [], "sitemaps": [], "total_urls": 0}
         finally:
             # Only close the session if we created it
             if local_session and session:

@@ -806,6 +806,24 @@ async def refresh_competitor_analysis(
         )
 
 
+@router.delete("/competitor-analysis")
+async def delete_competitor(
+    competitor_url: str = Query(..., description="URL of the competitor to delete"),
+    current_user: Dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete a single competitor from the database by URL."""
+    try:
+        user_id = str(current_user.get('id'))
+        from api.onboarding_utils.step_management_service import StepManagementService
+        svc = StepManagementService()
+        deleted = svc._delete_competitor_by_url(user_id, competitor_url, db)
+        return {"success": deleted, "deleted_url": competitor_url}
+    except Exception as e:
+        logger.error(f"Failed to delete competitor {competitor_url}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Helper functions from RESEARCH_AI_HYPERPERSONALIZATION.md
 
 def _get_domain_suggestions(industry: str) -> list[str]:

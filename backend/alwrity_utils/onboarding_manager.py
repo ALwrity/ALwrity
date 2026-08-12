@@ -369,6 +369,42 @@ class OnboardingManager:
                 logger.error(f"Error in competitor_analysis_data: {e}")
                 raise HTTPException(status_code=500, detail="Internal server error")
 
+        @self.app.delete("/api/onboarding/competitor-analysis")
+        async def competitor_analysis_delete(competitor_url: str = Query(...)):
+            """Delete a single competitor by URL."""
+            try:
+                from services.database import get_db
+                from api.onboarding_utils.step_management_service import StepManagementService
+                from models.onboarding import CompetitorAnalysis, OnboardingSession
+                db_gen = get_db()
+                db = next(db_gen)
+                try:
+                    svc = StepManagementService()
+                    records = db.query(CompetitorAnalysis).filter(
+                        CompetitorAnalysis.competitor_url == competitor_url
+                    ).all()
+                    if not records:
+                        db.close()
+                        return {"success": False, "deleted_url": competitor_url, "message": "Competitor not found in any session"}
+                    user_id = None
+                    for record in records:
+                        session_obj = db.query(OnboardingSession).filter(
+                            OnboardingSession.id == record.session_id
+                        ).first()
+                        if session_obj and session_obj.user_id:
+                            user_id = session_obj.user_id
+                            break
+                    if not user_id:
+                        db.close()
+                        return {"success": False, "deleted_url": competitor_url, "message": "Could not determine user for competitor"}
+                    svc._delete_competitor_by_url(user_id, competitor_url, db)
+                    return {"success": True, "deleted_url": competitor_url}
+                finally:
+                    db.close()
+            except Exception as e:
+                logger.error(f"Error deleting competitor {competitor_url}: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
         @self.app.post("/api/onboarding/state")
         async def onboarding_state(current_user: dict = Depends(get_current_user)):
             """Unified endpoint: current step + all step data in one call."""
