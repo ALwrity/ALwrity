@@ -231,10 +231,14 @@ class YouTubeVideoRendererService:
                         
                         try:
                             from services.content_asset_service import ContentAssetService
-                            from services.database import get_db
+                            from services.database import get_session_for_user
                             from models.content_asset_models import AssetType, AssetSource
-                            
-                            db = next(get_db())
+
+                            db = get_session_for_user(user_id)
+                            if not db:
+                                raise FileNotFoundError(
+                                    f"Database session unavailable for user {user_id}"
+                                )
                             try:
                                 asset_service = ContentAssetService(db)
                                 # Try to find the asset by filename and source
@@ -244,14 +248,14 @@ class YouTubeVideoRendererService:
                                     source_module=AssetSource.YOUTUBE_CREATOR,
                                     limit=100,
                                 )
-                                
+
                                 # Find matching asset by filename
                                 matching_asset = None
                                 for asset in assets:
                                     if asset.filename == audio_filename:
                                         matching_asset = asset
                                         break
-                                
+
                                 if matching_asset and matching_asset.file_path:
                                     asset_path = Path(matching_asset.file_path)
                                     if asset_path.exists() and asset_path.is_file():
