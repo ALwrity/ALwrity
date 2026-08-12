@@ -1,5 +1,5 @@
 import { youtubeApi } from '../../../services/youtubeApi';
-import { longRunningApiClient } from '../../../api/client';
+import { apiClient, longRunningApiClient } from '../../../api/client';
 
 jest.mock('../../../api/client', () => ({
   apiClient: {
@@ -91,6 +91,38 @@ describe('youtubeApi', () => {
       await expect(youtubeApi.buildScenes(videoPlan)).rejects.toThrow(
         'Scene generation is taking longer than expected. Please check your internet connection and try again.'
       );
+    });
+  });
+
+  describe('generateSceneImage and status polling', () => {
+    it('posts image generation task request to /api/youtube/image', async () => {
+      const mockResponse = { data: { success: true, task_id: 'task-123', message: 'Task started' } };
+      jest.mocked(apiClient.post).mockResolvedValueOnce(mockResponse);
+
+      const params = {
+        sceneId: '1',
+        sceneTitle: 'Scene Title',
+        sceneContent: 'Scene Content',
+        width: 1024,
+        height: 576,
+      };
+
+      const result = await youtubeApi.generateSceneImage(params);
+      expect(apiClient.post).toHaveBeenCalledWith('/api/youtube/image', expect.objectContaining({
+        scene_id: '1',
+        scene_title: 'Scene Title',
+        scene_content: 'Scene Content',
+      }));
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('fetches image generation status from /api/youtube/image/status/:taskId', async () => {
+      const mockStatus = { status: 'completed', progress: 100, result: { image_url: '/api/youtube/images/scenes/1.png' } };
+      jest.mocked(apiClient.get).mockResolvedValueOnce({ data: mockStatus });
+
+      const result = await youtubeApi.getImageGenerationStatus('task-123');
+      expect(apiClient.get).toHaveBeenCalledWith('/api/youtube/image/status/task-123');
+      expect(result).toEqual(mockStatus);
     });
   });
 });

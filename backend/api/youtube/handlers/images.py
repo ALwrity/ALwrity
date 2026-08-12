@@ -185,10 +185,13 @@ def _execute_image_generation_task(task_id: str, request_data: dict, user_id: st
             task_id, "processing", progress=10.0, message="Preparing image generation..."
         )
 
-        # Get database session for this background task
-        from services.database import get_db
-        db = next(get_db())
-        logger.info(f"[YouTubeImageGen] Database session acquired for task {task_id}")
+        # Get database session for this background task using user-scoped helper
+        from services.database import get_session_for_user
+        db = get_session_for_user(user_id)
+        if not db:
+            logger.error(f"[YouTubeImageGen] Could not create database session for user {user_id}")
+            raise RuntimeError(f"Database session unavailable for user {user_id}")
+        logger.info(f"[YouTubeImageGen] Database session acquired for user {user_id} and task {task_id}")
 
         # Load avatar if provided
         base_avatar_bytes = None

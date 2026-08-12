@@ -658,9 +658,14 @@ def _execute_video_render_task(
         return
     
     # Create DB session for workspace resolution
-    from services.database import get_db
-    db_gen = get_db()
-    db = next(db_gen)
+    from services.database import get_session_for_user
+    db = get_session_for_user(user_id)
+    if not db:
+        logger.error(f"[YouTubeRenderer] Could not create database session for user {user_id}")
+        task_manager.update_task_status(
+            task_id, "failed", error="Database session unavailable", message="Failed to initialize render"
+        )
+        return
     
     try:
         task_manager.update_task_status(
@@ -999,9 +1004,14 @@ def _execute_scene_video_render_task(
         return
 
     # Create DB session for workspace resolution
-    from services.database import get_db
-    db_gen = get_db()
-    db = next(db_gen)
+    from services.database import get_session_for_user
+    db = get_session_for_user(user_id)
+    if not db:
+        logger.error(f"[YouTubeRenderer] Could not create database session for user {user_id}")
+        task_manager.update_task_status(
+            task_id, "failed", error="Database session unavailable", message="Failed to initialize scene render"
+        )
+        return
 
     try:
         task_manager.update_task_status(
@@ -1256,11 +1266,16 @@ def _execute_combine_video_task(
         return
 
     # Create DB session for workspace resolution
-    from services.database import get_db
+    from services.database import get_session_for_user
     from services.user_workspace_manager import UserWorkspaceManager
     
-    db_gen = get_db()
-    db = next(db_gen)
+    db = get_session_for_user(user_id)
+    if not db:
+        logger.error(f"[YouTubeRenderer] Could not create database session for user {user_id}")
+        task_manager.update_task_status(
+            task_id, "failed", error="Database session unavailable", message="Failed to initialize video combine"
+        )
+        return
 
     try:
         task_manager.update_task_status(

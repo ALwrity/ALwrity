@@ -907,55 +907,59 @@ def edit(
             # Continue without failing the request
         
         # TRACK USAGE after successful image editing
-        if result:
+        if result and user_id:
             logger.info(f"[images.edit] ✅ Image editing successful, tracking usage for user {user_id}")
             try:
-                db_track = next(get_db())
-                try:
-                    # Get or create usage summary
-                    pricing = PricingService(db_track)
-                    current_period = pricing.get_current_billing_period(user_id) or datetime.now().strftime("%Y-%m")
-                    
-                    logger.debug(f"[images.edit] Looking for usage summary: user_id={user_id}, period={current_period}")
-                    
-                    summary = db_track.query(UsageSummary).filter(
-                        UsageSummary.user_id == user_id,
-                        UsageSummary.billing_period == current_period
-                    ).first()
-                    
-                    if not summary:
-                        logger.info(f"[images.edit] Creating new usage summary for user {user_id}, period {current_period}")
-                        summary = UsageSummary(
-                            user_id=user_id,
-                            billing_period=current_period
-                        )
-                        db_track.add(summary)
-                        db_track.flush()
-                    
-                    current_calls_before = getattr(summary, "image_edit_calls", 0) or 0
-                    new_calls = current_calls_before + 1
-                    
-                    limits = pricing.get_user_limits(user_id)
-                    plan_name = limits.get('plan_name', 'unknown') if limits else 'unknown'
-                    tier = limits.get('tier', 'unknown') if limits else 'unknown'
-                    call_limit = limits['limits'].get("image_edit_calls", 0) if limits else 0
-                    
-                    current_image_gen_calls = getattr(summary, "stability_calls", 0) or 0
-                    image_gen_limit = limits['limits'].get("stability_calls", 0) if limits else 0
-                    
-                    current_video_calls = getattr(summary, "video_calls", 0) or 0
-                    video_limit = limits['limits'].get("video_calls", 0) if limits else 0
-                    
-                    # Get audio stats for unified log
-                    current_audio_calls = getattr(summary, "audio_calls", 0) or 0
-                    audio_limit = limits['limits'].get("audio_calls", 0) if limits else 0
-                    # Only show ∞ for Enterprise tier when limit is 0 (unlimited)
-                    audio_limit_display = audio_limit if (audio_limit > 0 or tier != 'enterprise') else '∞'
-                    
-                    logger.debug(f"[images.edit] Usage snapshot for logging: image_edit_calls={current_calls_before}, total_calls={summary.total_calls or 0}")
-                    
-                    # UNIFIED SUBSCRIPTION LOG - Shows before/after state in one message
-                    print(f"""
+                from services.database import get_session_for_user
+                db_track = get_session_for_user(user_id)
+                if not db_track:
+                    logger.warning(f"[images.edit] Skipping usage tracking - no DB session for user {user_id}")
+                else:
+                    try:
+                        # Get or create usage summary
+                        pricing = PricingService(db_track)
+                        current_period = pricing.get_current_billing_period(user_id) or datetime.now().strftime("%Y-%m")
+
+                        logger.debug(f"[images.edit] Looking for usage summary: user_id={user_id}, period={current_period}")
+
+                        summary = db_track.query(UsageSummary).filter(
+                            UsageSummary.user_id == user_id,
+                            UsageSummary.billing_period == current_period
+                        ).first()
+
+                        if not summary:
+                            logger.info(f"[images.edit] Creating new usage summary for user {user_id}, period {current_period}")
+                            summary = UsageSummary(
+                                user_id=user_id,
+                                billing_period=current_period
+                            )
+                            db_track.add(summary)
+                            db_track.flush()
+
+                        current_calls_before = getattr(summary, "image_edit_calls", 0) or 0
+                        new_calls = current_calls_before + 1
+
+                        limits = pricing.get_user_limits(user_id)
+                        plan_name = limits.get('plan_name', 'unknown') if limits else 'unknown'
+                        tier = limits.get('tier', 'unknown') if limits else 'unknown'
+                        call_limit = limits['limits'].get("image_edit_calls", 0) if limits else 0
+
+                        current_image_gen_calls = getattr(summary, "stability_calls", 0) or 0
+                        image_gen_limit = limits['limits'].get("stability_calls", 0) if limits else 0
+
+                        current_video_calls = getattr(summary, "video_calls", 0) or 0
+                        video_limit = limits['limits'].get("video_calls", 0) if limits else 0
+
+                        # Get audio stats for unified log
+                        current_audio_calls = getattr(summary, "audio_calls", 0) or 0
+                        audio_limit = limits['limits'].get("audio_calls", 0) if limits else 0
+                        # Only show ∞ for Enterprise tier when limit is 0 (unlimited)
+                        audio_limit_display = audio_limit if (audio_limit > 0 or tier != 'enterprise') else '∞'
+
+                        logger.debug(f"[images.edit] Usage snapshot for logging: image_edit_calls={current_calls_before}, total_calls={summary.total_calls or 0}")
+
+                        # UNIFIED SUBSCRIPTION LOG - Shows before/after state in one message
+                        print(f"""
 [SUBSCRIPTION] Image Editing
 ├─ User: {user_id}
 ├─ Plan: {plan_name} ({tier})
@@ -968,11 +972,11 @@ def edit(
 ├─ Audio: {current_audio_calls} / {audio_limit_display}
 └─ Status: ✅ Allowed & Tracked
 """)
-                except Exception as track_error:
-                    logger.error(f"[images.edit] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
-                    db_track.rollback()
-                finally:
-                    db_track.close()
+                    except Exception as track_error:
+                        logger.error(f"[images.edit] ❌ Error tracking usage (non-blocking): {track_error}", exc_info=True)
+                        db_track.rollback()
+                    finally:
+                        db_track.close()
             except Exception as usage_error:
                 # Non-blocking: log error but don't fail the request
                 logger.error(f"[images.edit] ❌ Failed to track usage: {usage_error}", exc_info=True)
