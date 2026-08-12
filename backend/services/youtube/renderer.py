@@ -14,7 +14,7 @@ from fastapi import HTTPException
 
 from services.wavespeed.client import WaveSpeedClient
 from services.llm_providers.main_audio_generation import generate_audio
-from services.story_writer.video_generation_service import StoryVideoGenerationService
+from services.podcast.video_combination_service import PodcastVideoCombinationService
 from services.subscription import PricingService
 from services.subscription.preflight_validator import validate_scene_animation_operation
 from services.llm_providers.main_video_generation import track_video_usage
@@ -473,38 +473,21 @@ class YouTubeVideoRendererService:
             final_video_url = None
             if combine_scenes and len(scene_results) > 1:
                 logger.info("[YouTubeRenderer] Combining scenes into final video...")
-                
-                # Prepare data for video concatenation
+
                 scene_video_paths = [r["video_path"] for r in scene_results]
-                scene_audio_paths = [r.get("audio_path") for r in scene_results if r.get("audio_path")]
-                
-                # Use StoryVideoGenerationService to combine
-                # Resolve user-specific output directory
                 user_video_dir = self._get_user_video_dir(user_id, db)
-                video_service = StoryVideoGenerationService(output_dir=str(user_video_dir))
-                
-                # Create scene dicts for concatenation
-                scene_dicts = [
-                    {
-                        "scene_number": r["scene_number"],
-                        "title": f"Scene {r['scene_number']}",
-                    }
-                    for r in scene_results
-                ]
-                
-                combined_result = video_service.generate_story_video(
-                    scenes=scene_dicts,
-                    image_paths=[None] * len(scene_results),  # No static images
-                    audio_paths=scene_audio_paths if scene_audio_paths else [],
-                    video_paths=scene_video_paths,  # Use rendered videos
-                    user_id=user_id,
-                    story_title=video_plan.get("video_summary", "YouTube Video")[:50],
+
+                # Reuse podcast combiner — scene videos already include embedded audio
+                video_service = PodcastVideoCombinationService(output_dir=str(user_video_dir))
+                combined_result = video_service.combine_videos(
+                    video_paths=scene_video_paths,
+                    podcast_title=(video_plan.get("video_summary", "YouTube Video") or "YouTube Video")[:50],
                     fps=24,
                 )
-                
+
                 final_video_path = combined_result["video_path"]
                 final_filename = Path(combined_result.get("video_filename") or final_video_path).name
-                final_video_url = f"/api/youtube/videos/{final_filename}"            
+                final_video_url = f"/api/youtube/videos/{final_filename}"
             logger.info(
                 f"[YouTubeRenderer] ✅ Full video rendered: {len(scene_results)} scenes, "
                 f"total_cost=${total_cost:.2f}"

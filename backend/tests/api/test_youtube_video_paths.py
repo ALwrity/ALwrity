@@ -28,7 +28,10 @@ class TestYouTubeCombineServePathWiring:
         source = inspect.getsource(_execute_combine_video_task)
         assert "find_youtube_video_file" in source
         assert "get_youtube_video_dir" in source
+        assert "PodcastVideoCombinationService" in source
+        assert "combine_videos" in source
         assert "/api/youtube/videos/" in source
+        assert "generate_story_video" not in source
         assert 'content" / "videos' not in source
 
     def test_serve_youtube_video_uses_find_helper(self):
@@ -37,3 +40,11 @@ class TestYouTubeCombineServePathWiring:
         source = inspect.getsource(serve_youtube_video)
         assert "find_youtube_video_file" in source
         assert "YOUTUBE_VIDEO_DIR / video_filename" not in source
+
+    def test_renderer_full_video_uses_podcast_combiner(self):
+        from services.youtube.renderer import YouTubeVideoRendererService
+
+        source = inspect.getsource(YouTubeVideoRendererService.render_full_video)
+        assert "PodcastVideoCombinationService" in source
+        assert "combine_videos" in source
+        assert "generate_story_video" not in source

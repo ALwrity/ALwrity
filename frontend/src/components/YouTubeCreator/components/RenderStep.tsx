@@ -32,6 +32,7 @@ import { CostEstimateCard } from './CostEstimateCard';
 import { RenderSettings } from './RenderSettings';
 import { RenderStatusDisplay } from './RenderStatusDisplay';
 import { ScenePreviewModal } from './ScenePreviewModal';
+import { YouTubeFinalVideoPanel } from './YouTubeFinalVideoPanel';
 import { useYouTubeRenderQueue } from '../hooks/useYouTubeRenderQueue';
 import { YouTubePublishPanel } from './YouTubePublishPanel';
 import Snackbar from '@mui/material/Snackbar';
@@ -353,38 +354,13 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
 
             {/* Combine Scene Videos (Optional) */}
             {combineScenes && scenes.filter(s => s.enabled !== false && s.videoUrl).length >= 2 && (
-              <Box sx={{ mb: 3, p: 2.5, bgcolor: '#f0fdf4', borderRadius: 2, border: '2px solid #10b981' }}>
-                <Typography variant="h6" sx={{ mb: 1, fontWeight: 600, color: '#065f46' }}>
-                  🎞️ Combine Scene Videos
-                </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  All scene videos are ready! Combine them into one final video.
-                </Typography>
-                <Stack direction="row" spacing={2} alignItems="center">
-                  <Button
-                    variant="contained"
-                    color="success"
-                    onClick={combineVideos}
-                    disabled={combining}
-                    startIcon={combining ? <CircularProgress size={20} sx={{ color: 'white' }} /> : undefined}
-                    sx={{ textTransform: 'none', fontWeight: 700 }}
-                  >
-                    {combining ? 'Combining Videos...' : 'Combine Into Final Video'}
-                  </Button>
-                  {combining && (
-                    <Typography variant="body2" color="text.secondary">
-                      {combiningMessage} ({combiningProgress.toFixed(0)}%)
-                    </Typography>
-                  )}
-                  {finalVideoUrl && (
-                    <Chip 
-                      label="✅ Final video ready" 
-                      color="success"
-                      sx={{ fontWeight: 600 }}
-                    />
-                  )}
-                </Stack>
-              </Box>
+              <YouTubeFinalVideoPanel
+                finalVideoUrl={finalVideoUrl}
+                combining={combining}
+                combiningProgress={combiningProgress}
+                combiningMessage={combiningMessage}
+                onCombine={combineVideos}
+              />
             )}
 
             {/* Render Settings */}

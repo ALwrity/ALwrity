@@ -138,7 +138,7 @@ describe('youtubeApi', () => {
           '/api/youtube/videos/scene_1_user_abcd_11111111.mp4',
           '/api/youtube/videos/scene_2_user_abcd_22222222.mp4',
         ],
-        resolution: '720p',
+        resolution: '720p' as const,
         title: 'My YouTube Video',
       };
 

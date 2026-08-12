@@ -22,7 +22,7 @@ from services.content_asset_service import ContentAssetService
 from models.content_asset_models import AssetType, AssetSource
 from utils.logger_utils import get_service_logger
 from utils.asset_tracker import save_asset_to_library
-from services.story_writer.video_generation_service import StoryVideoGenerationService
+from services.podcast.video_combination_service import PodcastVideoCombinationService
 from .handlers import avatar as avatar_handlers
 from .handlers import images as image_handlers
 from .handlers import audio as audio_handlers
@@ -1301,19 +1301,22 @@ def _execute_combine_video_task(
             task_id, "processing", progress=25.0, message="Combining scene videos..."
         )
 
-        # Use canonical YouTube video directory for output
-        video_service = StoryVideoGenerationService(output_dir=str(user_video_dir))
-        combined_result = video_service.generate_story_video(
-            scenes=[
-                {"scene_number": idx + 1, "title": f"Scene {idx + 1}"}
-                for idx in range(len(video_paths))
-            ],
-            image_paths=[None] * len(video_paths),
-            audio_paths=[],
+        # Reuse podcast video-only combiner (scene MP4s already include embedded audio).
+        # Story combine path expects separate narration tracks and is not used here.
+        video_service = PodcastVideoCombinationService(output_dir=str(user_video_dir))
+
+        def progress_callback(progress: float, message: str) -> None:
+            # Keep combine progress in the mid/high range reserved for encoding
+            mapped = min(95.0, max(25.0, progress))
+            task_manager.update_task_status(
+                task_id, "processing", progress=mapped, message=message
+            )
+
+        combined_result = video_service.combine_videos(
             video_paths=[str(p) for p in video_paths],
-            user_id=user_id,
-            story_title=title or "YouTube Video",
+            podcast_title=title or "YouTube Video",
             fps=24,
+            progress_callback=progress_callback,
         )
 
         task_manager.update_task_status(
@@ -1321,8 +1324,10 @@ def _execute_combine_video_task(
         )
 
         final_path = combined_result["video_path"]
-        final_filename = Path(final_path).name
-        # Story service returns /api/story/videos/... — rewrite to YouTube serve path
+        final_filename = Path(
+            combined_result.get("video_filename") or final_path
+        ).name
+        # Podcast service returns /api/podcast/... — rewrite to YouTube serve path
         final_url = f"/api/youtube/videos/{final_filename}"
         file_size = combined_result.get("file_size", 0)
 
