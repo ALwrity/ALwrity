@@ -234,7 +234,7 @@ class TxtaiIntelligenceService:
                 "gpu": False,  # Force CPU usage for compatibility
                 "limit": 1000,  # Maximum number of results for queries
                 "faiss": {
-                    "components": "IVF1,Flat",  # Force IVF to avoid IndexIDMap nprobe incompatibility
+                    "components": "Flat",  # Flat avoids IndexIDMap nprobe incompatibility for small indexes
                 },
             })
             
@@ -264,7 +264,7 @@ class TxtaiIntelligenceService:
                         "gpu": False,
                         "limit": 1000,
                         "faiss": {
-                            "components": "IVF1,Flat",
+                            "components": "Flat",
                         },
                     })
             elif load_existing_index:
