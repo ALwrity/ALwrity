@@ -19,6 +19,14 @@ const PHASE_COLORS: Record<string, string> = {
   'complete': '#16a34a',
 };
 
+const TEST_QUERIES = [
+  'What is the main product?',
+  'Summarize key features',
+  'List the pricing plans',
+  'What industries are targeted?',
+  'How does the platform work?',
+];
+
 interface IndexedPage {
   url: string;
   title: string;
@@ -40,6 +48,7 @@ export const SifIndexingPanel: React.FC = () => {
   const [sitemapTotal, setSitemapTotal] = useState<number | null>(null);
   const [testQuery, setTestQuery] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string>('');
+  const [logMessages, setLogMessages] = useState<string[]>([]);
 
   const handleTestQuery = async (query: string) => {
     setTestQuery(query);
@@ -76,12 +85,14 @@ export const SifIndexingPanel: React.FC = () => {
           if (details.indexed_pages?.length) setIndexedPages(details.indexed_pages);
           if (details.harvest_source) setHarvestSource(details.harvest_source);
           if (details.sitemap_total != null) setSitemapTotal(details.sitemap_total);
+          if (details.log_messages?.length) setLogMessages(details.log_messages);
           if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
         } else if (sifTask.status === 'running') {
           setSifStatus('indexing');
           setSifPhase(details.phase || '');
           setSifPageCount(details.pages_harvested ?? null);
           setSifPageTotal(details.pages_total ?? null);
+          if (details.log_messages?.length) setLogMessages(details.log_messages);
           if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
         } else if (sifTask.status === 'failed') {
           setSifStatus('error');
@@ -190,8 +201,63 @@ export const SifIndexingPanel: React.FC = () => {
             {sifLastIndexed && (
               <Paper elevation={0} sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${borderColor}`, bgcolor: '#ffffff', minWidth: 140, textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Last indexed</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: sifStatus === 'partial' ? '#d97706' : '#16a34a' }}>{new Date(sifLastIndexed).toLocaleDateString()}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: sifStatus === 'partial' ? '#d97706' : '#16a34a' }}>{new Date(sifLastIndexed).toLocaleString()}</Typography>
               </Paper>
+            )}
+          </Box>
+        )}
+
+        {logMessages.length > 0 && (
+          <Box sx={{ mt: 1.5, mb: sifStatus === 'partial' || sifStatus === 'error' ? 1.5 : 0, p: 1.5, borderRadius: 2, bgcolor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mb: 0.5, fontWeight: 600 }}>
+              Activity log
+            </Typography>
+            <Box component="ul" sx={{ m: 0, pl: 2, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+              {logMessages.slice(-8).map((msg, i) => (
+                <Typography key={i} component="li" variant="caption" sx={{ color: '#475569' }}>
+                  {msg}
+                </Typography>
+              ))}
+            </Box>
+          </Box>
+        )}
+
+        {(sifStatus === 'done' || sifStatus === 'partial') && (
+          <Box sx={{ mt: 1.5, p: 1.5, borderRadius: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+            <Typography variant="caption" sx={{ color: '#16a34a', display: 'block', mb: 1, fontWeight: 600 }}>
+              Test your indexing — click a question to see results:
+            </Typography>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+              {TEST_QUERIES.map((q) => (
+                <Typography
+                  key={q}
+                  component="span"
+                  onClick={() => handleTestQuery(q)}
+                  sx={{
+                    padding: '4px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #bbf7d0',
+                    background: '#fff',
+                    fontSize: '0.75rem',
+                    color: '#166534',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    '&:hover': { background: '#dcfce7' },
+                  }}
+                >
+                  {q}
+                </Typography>
+              ))}
+            </Box>
+            {testQuery && (
+              <Typography variant="caption" sx={{ color: '#94a3b8', display: 'block', mt: 1 }}>
+                Results for "{testQuery}":
+              </Typography>
+            )}
+            {testResult && (
+              <Box sx={{ mt: 1, p: 1.25, borderRadius: 8, bgcolor: '#fff', border: '1px solid #e8ecf1', fontSize: '0.75rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
+                {testResult}
+              </Box>
             )}
           </Box>
         )}
@@ -225,48 +291,6 @@ export const SifIndexingPanel: React.FC = () => {
                 style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: '#94a3b8' }}>×</button>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px' }}>
-              {/* Test queries */}
-              <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 10, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#16a34a', marginBottom: 8 }}>
-                  Test your indexing — click a question to see results:
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {[
-                    'What is the main product?',
-                    'Summarize key features',
-                    'List the pricing plans',
-                    'What industries are targeted?',
-                    'How does the platform work?',
-                  ].map((q) => (
-                    <span
-                      key={q}
-                      onClick={() => handleTestQuery(q)}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 8,
-                        border: '1px solid #bbf7d0',
-                        background: '#fff',
-                        fontSize: '0.75rem',
-                        color: '#166534',
-                        cursor: 'pointer',
-                        userSelect: 'none',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = '#dcfce7'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; }}
-                    >
-                      {q}
-                    </span>
-                  ))}
-                </div>
-                <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: 6 }}>
-                  {testQuery ? `Results for "${testQuery}":` : 'Content pillar analysis in progress — these will be searchable once analysis completes.'}
-                </div>
-                {testResult && (
-                  <div style={{ marginTop: 8, padding: 10, borderRadius: 8, background: '#fff', border: '1px solid #e8ecf1', fontSize: '0.75rem', color: '#334155', whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
-                    {testResult}
-                  </div>
-                )}
-              </div>
               {/* Page list */}
               {indexedPages.map((page, i) => (
                 <div key={i} style={{ padding: '10px 12px', marginBottom: 6, borderRadius: 8, border: '1px solid #e8ecf1', background: '#fafbfc' }}>
