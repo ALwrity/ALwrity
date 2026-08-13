@@ -54,12 +54,13 @@ class TestResolveSceneAudioBase64:
         mock_generate.assert_called_once()
 
     def test_loads_existing_local_audio_file(self, tmp_path):
+        from services.youtube import audio_storage as storage
         from services.youtube import scene_audio as scene_audio_mod
 
         audio_file = tmp_path / "scene_1_title_abcd1234.mp3"
         audio_file.write_bytes(b"local-audio")
 
-        with patch.object(scene_audio_mod, "_LEGACY_YOUTUBE_AUDIO_DIR", tmp_path):
+        with patch.object(storage, "_LEGACY_YOUTUBE_AUDIO_DIR", tmp_path):
             result = scene_audio_mod.resolve_scene_audio_base64(
                 scene_number=1,
                 scene_audio_url="/api/youtube/audio/scene_1_title_abcd1234.mp3",
@@ -70,3 +71,54 @@ class TestResolveSceneAudioBase64:
             )
 
         assert result == base64.b64encode(b"local-audio").decode("utf-8")
+
+    def test_loads_from_canonical_workspace_dir(self, tmp_path):
+        from services.youtube import scene_audio as scene_audio_mod
+
+        workspace_path = tmp_path / "ws"
+        audio_dir = workspace_path / "media" / "youtube_audio"
+        audio_dir.mkdir(parents=True)
+        filename = "scene_3_title_workspace.mp3"
+        (audio_dir / filename).write_bytes(b"workspace-audio")
+        mock_db = MagicMock()
+
+        with patch("services.user_workspace_manager.UserWorkspaceManager") as mock_mgr_cls:
+            mock_mgr_cls.return_value.get_user_workspace.return_value = {
+                "workspace_path": str(workspace_path),
+            }
+            result = scene_audio_mod.resolve_scene_audio_base64(
+                scene_number=3,
+                scene_audio_url=f"/api/youtube/audio/{filename}",
+                narration="",
+                generate_audio_enabled=False,
+                voice_id="Wise_Woman",
+                user_id="user_workspace",
+                db=mock_db,
+            )
+
+        assert result == base64.b64encode(b"workspace-audio").decode("utf-8")
+
+    def test_fuzzy_matches_audio_in_workspace_dir(self, tmp_path):
+        from services.youtube import scene_audio as scene_audio_mod
+
+        workspace_path = tmp_path / "ws"
+        audio_dir = workspace_path / "media" / "youtube_audio"
+        audio_dir.mkdir(parents=True)
+        (audio_dir / "scene_4_title_actualhash.mp3").write_bytes(b"fuzzy-audio")
+        mock_db = MagicMock()
+
+        with patch("services.user_workspace_manager.UserWorkspaceManager") as mock_mgr_cls:
+            mock_mgr_cls.return_value.get_user_workspace.return_value = {
+                "workspace_path": str(workspace_path),
+            }
+            result = scene_audio_mod.resolve_scene_audio_base64(
+                scene_number=4,
+                scene_audio_url="/api/youtube/audio/scene_4_title_missinghash.mp3",
+                narration="",
+                generate_audio_enabled=False,
+                voice_id="Wise_Woman",
+                user_id="user_fuzzy",
+                db=mock_db,
+            )
+
+        assert result == base64.b64encode(b"fuzzy-audio").decode("utf-8")

@@ -46,18 +46,68 @@ export const clearMediaCache = (url?: string) => {
   }
 };
 
+function sanitizeMediaUrl(url: string): string {
+  return url.split('?')[0];
+}
+
 export async function downloadMediaBlob(mediaUrl: string, filename?: string): Promise<void> {
-  const blobUrl = await fetchMediaBlobUrl(mediaUrl);
-  if (!blobUrl) {
+  const safeUrl = sanitizeMediaUrl(mediaUrl);
+  const downloadName = filename || `media-${Date.now()}.mp4`;
+
+  console.info('[downloadMediaBlob] Starting download', {
+    url: safeUrl,
+    filename: downloadName,
+  });
+
+  const cachedBlobUrl = await fetchMediaBlobUrl(mediaUrl);
+  if (!cachedBlobUrl) {
+    console.warn('[downloadMediaBlob] No blob URL available for download', {
+      url: safeUrl,
+    });
     return;
   }
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = filename || `media-${Date.now()}.mp4`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(blobUrl);
+
+  // Clone the blob into a separate object URL so preview cache stays valid.
+  try {
+    const response = await fetch(cachedBlobUrl);
+    if (!response.ok) {
+      console.error('[downloadMediaBlob] Failed to read cached blob for download', {
+        url: safeUrl,
+        status: response.status,
+      });
+      throw new Error(`Failed to read cached blob for download (${response.status})`);
+    }
+
+    const blob = await response.blob();
+    if (!blob.size) {
+      console.error('[downloadMediaBlob] Cached blob is empty', { url: safeUrl });
+      throw new Error('Cached media blob is empty');
+    }
+
+    const downloadUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = downloadUrl;
+    anchor.download = downloadName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    setTimeout(() => {
+      URL.revokeObjectURL(downloadUrl);
+      console.debug('[downloadMediaBlob] Revoked download clone URL', { url: safeUrl });
+    }, 1000);
+
+    console.info('[downloadMediaBlob] Download triggered', {
+      url: safeUrl,
+      filename: downloadName,
+      bytes: blob.size,
+    });
+  } catch (err) {
+    console.error('[downloadMediaBlob] Failed to create download from cached blob', {
+      url: safeUrl,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    throw err;
+  }
 }
 
 export async function fetchMediaBlobUrl(pathOrUrl: string): Promise<string | null> {
@@ -115,10 +165,18 @@ export async function fetchMediaBlobUrl(pathOrUrl: string): Promise<string | nul
     
     // Gracefully handle 404s and other errors - file might not exist or was regenerated
     if (err?.response?.status === 404) {
-      console.warn(`Media file not found (404): ${pathOrUrl}`);
+      console.warn(`[fetchMediaBlobUrl] Media file not found (404): ${sanitizeMediaUrl(pathOrUrl)}`);
       return null;
     }
-    // Re-throw other errors
+    if (err?.response?.status === 401) {
+      console.warn('[fetchMediaBlobUrl] Media request unauthorized (401), caller may use token fallback', {
+        url: sanitizeMediaUrl(pathOrUrl),
+      });
+    }
+    console.warn('[fetchMediaBlobUrl] Blob load failed', {
+      url: sanitizeMediaUrl(pathOrUrl),
+      status: err?.response?.status,
+    });
     throw err;
   }
 }

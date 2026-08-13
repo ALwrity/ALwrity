@@ -1,7 +1,7 @@
 /**
  * Scene Preview Modal
- * 
- * Shows a preview of scene image and audio with playback controls.
+ *
+ * Shows a preview of scene video, image, and audio with playback controls.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -22,6 +22,7 @@ import {
   VolumeUp,
 } from '@mui/icons-material';
 import { fetchMediaBlobUrl } from '../../../utils/fetchMediaBlobUrl';
+import { useAuthenticatedMediaSrc } from '../hooks/useAuthenticatedMediaSrc';
 
 interface ScenePreviewModalProps {
   open: boolean;
@@ -30,6 +31,7 @@ interface ScenePreviewModalProps {
   sceneNumber: number;
   imageUrl?: string | null;
   audioUrl?: string | null;
+  videoUrl?: string | null;
 }
 
 export const ScenePreviewModal: React.FC<ScenePreviewModalProps> = ({
@@ -39,7 +41,13 @@ export const ScenePreviewModal: React.FC<ScenePreviewModalProps> = ({
   sceneNumber,
   imageUrl,
   audioUrl,
+  videoUrl,
 }) => {
+  const {
+    src: videoSrc,
+    loading: videoLoading,
+    error: videoError,
+  } = useAuthenticatedMediaSrc(videoUrl, open);
   const [imageBlobUrl, setImageBlobUrl] = useState<string | null>(null);
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [imageLoading, setImageLoading] = useState(false);
@@ -49,43 +57,113 @@ export const ScenePreviewModal: React.FC<ScenePreviewModalProps> = ({
 
   // Load image blob
   useEffect(() => {
-    if (!imageUrl || !open) {
-      setImageBlobUrl(null);
-      return;
+    let cancelled = false;
+
+    async function loadImage(): Promise<void> {
+      if (!imageUrl || !open) {
+        setImageBlobUrl(null);
+        return;
+      }
+
+      setImageLoading(true);
+      console.info('[ScenePreviewModal] Loading scene image', {
+        sceneNumber,
+        url: imageUrl.split('?')[0],
+      });
+      try {
+        const blobUrl = await fetchMediaBlobUrl(imageUrl);
+        if (cancelled) {
+          return;
+        }
+        setImageBlobUrl(blobUrl);
+        if (!blobUrl) {
+          console.warn('[ScenePreviewModal] Scene image blob was empty', {
+            sceneNumber,
+            url: imageUrl.split('?')[0],
+          });
+        }
+      } catch (error) {
+        console.error('[ScenePreviewModal] Failed to load scene image', {
+          sceneNumber,
+          url: imageUrl.split('?')[0],
+          error: error instanceof Error ? error.message : String(error),
+        });
+        if (!cancelled) {
+          setImageBlobUrl(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setImageLoading(false);
+        }
+      }
     }
 
-    setImageLoading(true);
-    fetchMediaBlobUrl(imageUrl)
-      .then(setImageBlobUrl)
-      .catch(console.error)
-      .finally(() => setImageLoading(false));
+    loadImage().catch((error) => {
+      console.error('[ScenePreviewModal] Unhandled image load error', {
+        sceneNumber,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 
     return () => {
-      if (imageBlobUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(imageBlobUrl);
-      }
+      cancelled = true;
     };
-  }, [imageUrl, open]);
+  }, [imageUrl, open, sceneNumber]);
 
   // Load audio blob
   useEffect(() => {
-    if (!audioUrl || !open) {
-      setAudioBlobUrl(null);
-      return;
+    let cancelled = false;
+
+    async function loadAudio(): Promise<void> {
+      if (!audioUrl || !open) {
+        setAudioBlobUrl(null);
+        return;
+      }
+
+      setAudioLoading(true);
+      console.info('[ScenePreviewModal] Loading scene audio', {
+        sceneNumber,
+        url: audioUrl.split('?')[0],
+      });
+      try {
+        const blobUrl = await fetchMediaBlobUrl(audioUrl);
+        if (cancelled) {
+          return;
+        }
+        setAudioBlobUrl(blobUrl);
+        if (!blobUrl) {
+          console.warn('[ScenePreviewModal] Scene audio blob was empty', {
+            sceneNumber,
+            url: audioUrl.split('?')[0],
+          });
+        }
+      } catch (error) {
+        console.error('[ScenePreviewModal] Failed to load scene audio', {
+          sceneNumber,
+          url: audioUrl.split('?')[0],
+          error: error instanceof Error ? error.message : String(error),
+        });
+        if (!cancelled) {
+          setAudioBlobUrl(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setAudioLoading(false);
+        }
+      }
     }
 
-    setAudioLoading(true);
-    fetchMediaBlobUrl(audioUrl)
-      .then(setAudioBlobUrl)
-      .catch(console.error)
-      .finally(() => setAudioLoading(false));
+    loadAudio().catch((error) => {
+      console.error('[ScenePreviewModal] Unhandled audio load error', {
+        sceneNumber,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    });
 
     return () => {
-      if (audioBlobUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(audioBlobUrl);
-      }
+      cancelled = true;
     };
-  }, [audioUrl, open]);
+  }, [audioUrl, open, sceneNumber]);
 
   // Create audio element
   useEffect(() => {
@@ -101,14 +179,27 @@ export const ScenePreviewModal: React.FC<ScenePreviewModalProps> = ({
   }, [audioBlobUrl]);
 
   const togglePlayPause = () => {
-    if (!audioElement) return;
+    if (!audioElement) {
+      console.warn('[ScenePreviewModal] Play skipped: audio element is not ready', { sceneNumber });
+      return;
+    }
 
     if (isPlaying) {
       audioElement.pause();
-    } else {
-      audioElement.play();
+      setIsPlaying(false);
+      return;
     }
-    setIsPlaying(!isPlaying);
+
+    audioElement
+      .play()
+      .then(() => setIsPlaying(true))
+      .catch((error) => {
+        console.error('[ScenePreviewModal] Failed to play scene audio', {
+          sceneNumber,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        setIsPlaying(false);
+      });
   };
 
   const handleClose = () => {
@@ -150,6 +241,41 @@ export const ScenePreviewModal: React.FC<ScenePreviewModalProps> = ({
 
       <DialogContent>
         <Stack spacing={3}>
+          {videoUrl && (
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600, color: '#475569' }}>
+                Scene Video
+              </Typography>
+              {videoLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                  <CircularProgress />
+                </Box>
+              ) : videoSrc ? (
+                <Box
+                  sx={{
+                    width: '100%',
+                    borderRadius: 2,
+                    overflow: 'hidden',
+                    backgroundColor: '#000',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                  }}
+                >
+                  <video
+                    controls
+                    src={videoSrc}
+                    style={{ width: '100%', display: 'block', maxHeight: 420 }}
+                  >
+                    Your browser does not support video playback.
+                  </video>
+                </Box>
+              ) : (
+                <Typography variant="body2" color="text.secondary">
+                  {videoError || 'Failed to load video'}
+                </Typography>
+              )}
+            </Box>
+          )}
+
           {/* Image Preview */}
           {imageUrl && (
             <Box>
@@ -236,7 +362,7 @@ export const ScenePreviewModal: React.FC<ScenePreviewModalProps> = ({
             </Box>
           )}
 
-          {!imageUrl && !audioUrl && (
+          {!imageUrl && !audioUrl && !videoUrl && (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', p: 3 }}>
               No assets available for preview
             </Typography>

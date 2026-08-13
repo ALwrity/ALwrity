@@ -1,19 +1,22 @@
 import React from "react";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { YouTubeFinalVideoPanel } from "./YouTubeFinalVideoPanel";
-import { downloadMediaBlob, fetchMediaBlobUrl } from "../../../utils/fetchMediaBlobUrl";
+import { downloadMediaBlob, fetchMediaBlobUrl, appendAuthTokenToUrl } from "../../../utils/fetchMediaBlobUrl";
 
 jest.mock("../../../utils/fetchMediaBlobUrl", () => ({
   fetchMediaBlobUrl: jest.fn(),
   downloadMediaBlob: jest.fn(),
+  appendAuthTokenToUrl: jest.fn(),
 }));
 
 const mockedFetchMediaBlobUrl = fetchMediaBlobUrl as jest.MockedFunction<typeof fetchMediaBlobUrl>;
 const mockedDownloadMediaBlob = downloadMediaBlob as jest.MockedFunction<typeof downloadMediaBlob>;
+const mockedAppendAuthTokenToUrl = appendAuthTokenToUrl as jest.MockedFunction<typeof appendAuthTokenToUrl>;
 
 describe("YouTubeFinalVideoPanel", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockedAppendAuthTokenToUrl.mockImplementation(async (url) => `${url}?token=test`);
   });
 
   it("shows combine action when final video is not ready", () => {
@@ -54,6 +57,27 @@ describe("YouTubeFinalVideoPanel", () => {
       const video = document.querySelector("video");
       expect(video).not.toBeNull();
       expect(video?.getAttribute("src")).toBe("blob:youtube-final-video");
+    });
+  });
+
+  it("falls back to authenticated URL instead of the raw video path", async () => {
+    mockedFetchMediaBlobUrl.mockResolvedValueOnce(null);
+
+    render(
+      <YouTubeFinalVideoPanel
+        finalVideoUrl="/api/youtube/videos/final.mp4"
+        combining={false}
+        combiningProgress={100}
+        combiningMessage="Done"
+        onCombine={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      const video = document.querySelector("video");
+      expect(video).not.toBeNull();
+      expect(video?.getAttribute("src")).toBe("/api/youtube/videos/final.mp4?token=test");
+      expect(video?.getAttribute("src")).not.toBe("/api/youtube/videos/final.mp4");
     });
   });
 

@@ -6,15 +6,13 @@ Handles video rendering using WAN 2.5 text-to-video and audio generation.
 
 from typing import Dict, Any, List, Optional
 from pathlib import Path
-import requests
 from fastapi import HTTPException
 
 from services.wavespeed.client import WaveSpeedClient
 from services.podcast.video_combination_service import PodcastVideoCombinationService
-from services.llm_providers.main_video_generation import track_video_usage
 from services.user_workspace_manager import UserWorkspaceManager
-from services.youtube.video_storage import get_youtube_video_dir, save_youtube_scene_video
-from services.youtube.scene_audio import resolve_scene_audio_base64
+from services.youtube.video_storage import get_youtube_video_dir
+from services.youtube.scene_render import execute_scene_video_render
 from sqlalchemy.orm import Session
 from utils.logger_utils import get_service_logger
 
@@ -91,149 +89,38 @@ class YouTubeVideoRendererService:
             Dictionary with video metadata, bytes, and cost
         """
         scene_number = scene.get("scene_number", 1)
+        generation_mode = "t2v"
         try:
-            narration = scene.get("narration", "").strip()
-            visual_prompt = (
-                scene.get("enhanced_visual_prompt") or scene.get("visual_prompt", "")
-            ).strip()
-            duration_estimate = scene.get("duration_estimate", 5)
-
-            # VALIDATION: Check inputs before making expensive API calls
-            if not visual_prompt:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": f"Scene {scene_number} has no visual prompt",
-                        "scene_number": scene_number,
-                        "message": "Visual prompt is required for video generation",
-                        "user_action": "Please add a visual description for this scene before rendering.",
-                    },
-                )
-
-            if len(visual_prompt) < 10:
-                logger.warning(
-                    f"[YouTubeRenderer] Scene {scene_number} has very short visual prompt "
-                    f"({len(visual_prompt)} chars), may result in poor quality"
-                )
-
-            # Clamp duration to valid WAN 2.5 values (5 or 10 seconds)
-            duration = 5 if duration_estimate <= 7 else 10
-
-            has_existing_image = bool(scene.get("imageUrl"))
-            has_existing_audio = bool(scene.get("audioUrl"))
-
-            logger.info(
-                f"[YouTubeRenderer] Rendering scene {scene_number}: "
-                f"resolution={resolution}, duration={duration}s, prompt_length={len(visual_prompt)}, "
-                f"has_existing_image={has_existing_image}, has_existing_audio={has_existing_audio}"
-            )
-
-            audio_base64 = resolve_scene_audio_base64(
-                scene_number=scene_number,
-                scene_audio_url=scene.get("audioUrl"),
-                narration=narration,
+            result = execute_scene_video_render(
+                scene=scene,
+                user_id=user_id,
+                resolution=resolution,
                 generate_audio_enabled=generate_audio_enabled,
                 voice_id=voice_id,
-                user_id=user_id,
-            )
-
-            # VALIDATION: Final check before expensive video API call
-            if not visual_prompt or len(visual_prompt.strip()) < 5:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": f"Scene {scene_number} has invalid visual prompt",
-                        "scene_number": scene_number,
-                        "message": "Visual prompt must be at least 5 characters",
-                        "user_action": "Please provide a valid visual description for this scene.",
-                    },
-                )
-
-            # Generate video using WAN 2.5 text-to-video
-            try:
-                video_result = self.wavespeed_client.generate_text_video(
-                    prompt=visual_prompt,
-                    resolution=resolution,
-                    duration=duration,
-                    audio_base64=audio_base64,
-                    enable_prompt_expansion=True,
-                    enable_sync_mode=True,
-                    timeout=600,
-                )
-            except requests.exceptions.Timeout as e:
-                logger.error(
-                    f"[YouTubeRenderer] WaveSpeed API timed out for scene {scene_number}: {e}"
-                )
-                raise HTTPException(
-                    status_code=504,
-                    detail={
-                        "error": "WaveSpeed request timed out",
-                        "scene_number": scene_number,
-                        "message": "The video generation request timed out.",
-                        "user_action": "Please retry. If it persists, try fewer scenes, lower resolution, or shorter durations.",
-                    },
-                ) from e
-            except requests.exceptions.RequestException as e:
-                logger.error(
-                    f"[YouTubeRenderer] WaveSpeed API request failed for scene {scene_number}: {e}"
-                )
-                raise HTTPException(
-                    status_code=502,
-                    detail={
-                        "error": "WaveSpeed request failed",
-                        "scene_number": scene_number,
-                        "message": str(e),
-                        "user_action": "Please retry. If it persists, check network connectivity or try again later.",
-                    },
-                ) from e
-
-            # Save into canonical YouTube media dir (not Story writer media paths)
-            save_result = save_youtube_scene_video(
-                video_bytes=video_result["video_bytes"],
-                scene_number=scene_number,
-                user_id=user_id,
                 db=db,
+                wavespeed_client=self.wavespeed_client,
             )
-            usage_info = track_video_usage(
-                user_id=user_id,
-                provider=video_result["provider"],
-                model_name=video_result["model_name"],
-                prompt=visual_prompt,
-                video_bytes=video_result["video_bytes"],
-                cost_override=video_result["cost"],
-            )
-
-            logger.info(
-                f"[YouTubeRenderer] ✅ Scene {scene_number} rendered: "
-                f"cost=${video_result['cost']:.2f}, size={len(video_result['video_bytes'])} bytes"
-            )
-
-            return {
-                "scene_number": scene_number,
-                "video_filename": save_result["video_filename"],
-                "video_url": save_result["video_url"],
-                "video_path": save_result["video_path"],
-                "duration": video_result["duration"],
-                "cost": video_result["cost"],
-                "resolution": resolution,
-                "width": video_result["width"],
-                "height": video_result["height"],
-                "file_size": save_result["file_size"],
-                "prediction_id": video_result.get("prediction_id"),
-                "usage_info": usage_info,
-            }
+            generation_mode = result.pop("generation_mode", generation_mode)
+            return result
 
         except HTTPException as e:
             error_detail = e.detail
             if isinstance(error_detail, dict):
                 error_msg = error_detail.get("error", str(error_detail))
+                generation_mode = error_detail.get("generation_mode", generation_mode)
             else:
                 error_msg = str(error_detail)
 
             logger.error(
-                f"[YouTubeRenderer] Scene {scene_number} failed: {error_msg}",
+                f"[YouTubeRenderer] Scene {scene_number} failed ({generation_mode}): {error_msg}",
                 exc_info=True,
             )
+
+            if isinstance(error_detail, dict):
+                preserved_detail = dict(error_detail)
+                preserved_detail.setdefault("scene_number", scene_number)
+                raise HTTPException(status_code=e.status_code, detail=preserved_detail)
+
             raise HTTPException(
                 status_code=e.status_code,
                 detail={
@@ -245,7 +132,7 @@ class YouTubeVideoRendererService:
             )
         except Exception as e:
             logger.error(
-                f"[YouTubeRenderer] Error rendering scene {scene_number}: {e}",
+                f"[YouTubeRenderer] Scene {scene_number} unexpected error ({generation_mode}): {e}",
                 exc_info=True,
             )
             raise HTTPException(
