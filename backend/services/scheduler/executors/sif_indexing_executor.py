@@ -141,7 +141,24 @@ class SIFIndexingExecutor(TaskExecutor):
                 except Exception:
                     db.rollback()
 
+            def _log(message: str):
+                payload = dict(task.payload) if task.payload else {}
+                logs = list(payload.get('log_messages') or [])
+                logs.append(message)
+                if len(logs) > 20:
+                    logs = logs[-20:]
+                payload['log_messages'] = logs
+                task.payload = payload
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
+
+            async def _log_callback(message: str):
+                _log(message)
+
             _update_phase("harvesting")
+            _log(f"Starting SIF indexing for {website_url}")
 
             # Progress callback: update task.payload incrementally
             async def _harvest_progress(current: int, total: int):
@@ -156,13 +173,16 @@ class SIFIndexingExecutor(TaskExecutor):
                     db.rollback()
 
             # 1. Sync Step 2 Metadata (WebsiteAnalysis, CompetitorAnalysis)
+            _log("Indexing site metadata...")
             metadata_synced = await sif_service.sync_onboarding_data_to_sif()
             
             _update_phase("indexing_metadata", items_indexed=metadata_synced or 0)
+            _log(f"Indexed {metadata_synced or 0} metadata item(s)")
 
             # 2. Sync User Website Content (Deep Crawl / Snapshot)
+            _log("Harvesting website pages...")
             content_result = await sif_service.sync_user_website_content(
-                website_url, progress_callback=_harvest_progress)
+                website_url, progress_callback=_harvest_progress, log_callback=_log_callback)
             
             pages_harvested = content_result.get("count", 0) if isinstance(content_result, dict) else (content_result if isinstance(content_result, int) else 0)
             indexed_pages = content_result.get("pages", []) if isinstance(content_result, dict) else []
@@ -183,6 +203,7 @@ class SIFIndexingExecutor(TaskExecutor):
 
             _update_phase("indexing_content", pages_harvested=pages_harvested, indexed_pages=indexed_pages, sitemap_total=sitemap_total)
             content_synced = pages_harvested > 0
+            _log(f"Harvested {pages_harvested} page(s) from {website_url}")
 
             # 3. Trigger Content Guardian Audit (Background Analysis)
             # This ensures the agent runs immediately after new data is indexed
@@ -216,16 +237,35 @@ class SIFIndexingExecutor(TaskExecutor):
                         # Persist the audit report in the task log result data
                     except Exception as e:
                         logger.error(f"Failed to run Content Guardian audit: {e}")
-            
-            # Phase tracking: mark complete with results
+                        _log(f"Site audit failed: {e}")
+
+            # 4. Identify content pillars from the freshly indexed content
             pillar_count = 0
-            if guardian_report and isinstance(guardian_report, dict):
-                pillar_count = (
-                    guardian_report.get('pillars_found')
-                    or guardian_report.get('pillar_count')
-                    or len(guardian_report.get('pillars', []))
-                )
+            pillars = []
+            if content_synced:
+                _update_phase("analyzing")
+                _log("Analyzing content pillars...")
+                try:
+                    pillar_result = await sif_service.analyze_content_pillars()
+                    pillars = pillar_result.get("pillars", []) if isinstance(pillar_result, dict) else []
+                    pillar_count = len(pillars)
+                    if pillar_result.get("error"):
+                        _log(f"Pillar analysis warning: {pillar_result.get('error')}")
+                except Exception as e:
+                    logger.error(f"Failed to analyze content pillars: {e}")
+                    _log(f"Pillar analysis failed: {e}")
+
+            # Merge pillar results into the guardian report so downstream
+            # consumers (tasks/status, dashboard_service) can read them.
+            if guardian_report is None:
+                guardian_report = {}
+            if isinstance(guardian_report, dict):
+                guardian_report["pillars"] = pillars
+                guardian_report["pillars_found"] = pillar_count
+
+            # Phase tracking: mark complete with results
             _update_phase("complete", pillars_found=pillar_count, pages_harvested=pages_harvested)
+            _log(f"Indexing complete: {pages_harvested} page(s), {pillar_count} pillar(s) found")
             
             # Determine overall success
             success = metadata_synced or content_synced

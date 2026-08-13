@@ -837,12 +837,17 @@ async def _persist_sitemap_analysis(
             seo_audit["sitemap_analysis"] = {
                 "success": True,
                 "user_url": user_url,
+                "sitemap_url": analysis_result.get("sitemap_url"),
                 "analyzed_at": analysis_result.get("timestamp"),
                 "analysis_data": {
                     "total_urls": analysis_result.get("total_urls", 0),
                     "url_list": analysis_result.get("url_list", []),
                     "structure_analysis": analysis_result.get("structure_analysis"),
+                    "content_trends": analysis_result.get("content_trends"),
+                    "publishing_patterns": analysis_result.get("publishing_patterns"),
+                    "ai_insights": analysis_result.get("ai_insights"),
                     "onboarding_insights": analysis_result.get("onboarding_insights") or analysis_result.get("sitemap_onboarding_insights"),
+                    "competitors_analyzed": analysis_result.get("competitors_analyzed", []),
                 },
             }
             analysis.seo_audit = seo_audit

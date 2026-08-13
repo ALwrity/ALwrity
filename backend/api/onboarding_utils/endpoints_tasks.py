@@ -62,6 +62,8 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     details['pillars_found'] = payload['pillars_found']
                 if payload.get('indexed_pages'):
                     details['indexed_pages'] = payload['indexed_pages']
+                if payload.get('log_messages'):
+                    details['log_messages'] = payload['log_messages']
 
                 # Override progress_pct with actual phase-based progress
                 phase_progress = {
