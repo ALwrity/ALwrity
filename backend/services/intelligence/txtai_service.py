@@ -262,7 +262,10 @@ class TxtaiIntelligenceService:
                         "backend": self._backend,
                         "batch": 32,
                         "gpu": False,
-                        "limit": 1000
+                        "limit": 1000,
+                        "faiss": {
+                            "components": "IVF1,Flat",
+                        },
                     })
             elif load_existing_index:
                 logger.info(f"No existing index found. Creating new txtai index for user {self.user_id}")
