@@ -46,9 +46,11 @@ async def _generate_image_to_video(
             duration=duration,
             enable_prompt_expansion=enable_prompt_expansion,
         )
-    except HTTPException:
+    except HTTPException as exc:
+        prediction_id = exc.detail.get("prediction_id") if isinstance(exc.detail, dict) else None
         logger.warning(
-            "[YouTubeSceneVideo] WAN 2.5 I2V request rejected by upstream API",
+            "[YouTubeSceneVideo] WAN 2.5 I2V request rejected by upstream API "
+            f"(prediction_id={prediction_id})",
             exc_info=True,
         )
         raise
@@ -156,9 +158,11 @@ def generate_youtube_scene_video(
                 enable_sync_mode=True,
                 timeout=timeout,
             )
-    except HTTPException:
+    except HTTPException as exc:
+        prediction_id = exc.detail.get("prediction_id") if isinstance(exc.detail, dict) else None
         logger.warning(
-            f"[YouTubeSceneVideo] Video generation failed via {mode} (HTTP error)",
+            f"[YouTubeSceneVideo] Video generation failed via {mode} "
+            f"(HTTP error, prediction_id={prediction_id})",
             exc_info=True,
         )
         raise

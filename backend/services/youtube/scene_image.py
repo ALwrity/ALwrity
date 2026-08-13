@@ -115,8 +115,8 @@ def _load_image_from_asset_library(filename: str, user_id: str) -> Optional[byte
             limit=100,
         )
         logger.debug(
-            f"[YouTubeSceneImage] Asset library returned {len(assets)} image asset(s) "
-            f"(total={total}) for user {user_id}"
+            f"[YouTubeSceneImage] Asset library get_user_assets returned "
+            f"{len(assets)} image asset(s) (total={total}) for user {user_id}"
         )
 
         for asset in assets:
@@ -141,7 +141,7 @@ def _load_image_from_asset_library(filename: str, user_id: str) -> Optional[byte
                 return None
 
         logger.warning(
-            f"[YouTubeSceneImage] Image asset not found in library: {filename}"
+            f"[YouTubeSceneImage] Asset library miss via get_user_assets for {filename}"
         )
         return None
     except Exception as exc:

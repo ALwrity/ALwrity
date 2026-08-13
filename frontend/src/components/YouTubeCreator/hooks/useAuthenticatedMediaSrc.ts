@@ -50,9 +50,15 @@ export function useAuthenticatedMediaSrc(
       try {
         const [blob, authenticated] = await Promise.all([
           fetchMediaBlobUrl(mediaUrl).catch((err) => {
+            const status = (err as { response?: { status?: number } })?.response?.status;
             console.warn(
               '[useAuthenticatedMediaSrc] Blob load failed, using authenticated URL fallback',
-              { url: safeUrl, error: err instanceof Error ? err.message : String(err) },
+              {
+                url: safeUrl,
+                status,
+                fallback: 'token-url',
+                error: err instanceof Error ? err.message : String(err),
+              },
             );
             return null;
           }),

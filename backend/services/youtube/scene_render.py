@@ -90,6 +90,26 @@ def execute_scene_video_render(
         db=db,
     )
 
+    if has_existing_audio and not audio_base64 and not generate_audio_enabled:
+        logger.error(
+            f"[YouTubeSceneRender] Scene {scene_number} audioUrl present but audio load failed "
+            "and new audio generation is disabled. Skipping video generation to avoid mute credits."
+        )
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": f"Scene {scene_number} audio could not be loaded",
+                "scene_number": scene_number,
+                "message": (
+                    "The pre-generated scene audio could not be found. "
+                    "Video generation was stopped so credits are not spent on a silent scene."
+                ),
+                "user_action": (
+                    "Re-generate scene audio, or enable audio generation, then retry render."
+                ),
+            },
+        )
+
     if len(visual_prompt.strip()) < 5:
         raise HTTPException(
             status_code=400,
@@ -156,9 +176,10 @@ def execute_scene_video_render(
             if isinstance(error_detail, dict)
             else str(error_detail)
         )
+        prediction_id = error_detail.get("prediction_id") if isinstance(error_detail, dict) else None
         logger.warning(
             f"[YouTubeSceneRender] Scene {scene_number} {generation_mode} generation rejected: "
-            f"{error_msg}",
+            f"{error_msg} prediction_id={prediction_id}",
             exc_info=True,
         )
         raise

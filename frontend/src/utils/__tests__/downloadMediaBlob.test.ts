@@ -72,6 +72,7 @@ describe('downloadMediaBlob', () => {
     expect(cachedPreviewUrl).toBe('blob:cached-preview');
 
     const clickSpy = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const debugSpy = jest.spyOn(console, 'debug').mockImplementation(() => {});
 
     await downloadMediaBlob(mediaUrl, 'scene-1.mp4');
 
@@ -83,8 +84,13 @@ describe('downloadMediaBlob', () => {
     expect(revokeObjectURLMock).toHaveBeenCalledTimes(1);
     expect(revokeObjectURLMock).toHaveBeenCalledWith('blob:download-clone');
     expect(revokeObjectURLMock).not.toHaveBeenCalledWith('blob:cached-preview');
+    expect(debugSpy).toHaveBeenCalledWith(
+      '[downloadMediaBlob] Revoked download clone URL',
+      expect.objectContaining({ url: mediaUrl }),
+    );
 
     clickSpy.mockRestore();
+    debugSpy.mockRestore();
   });
 
   it('leaves cached preview blob URL intact after download', async () => {
@@ -164,5 +170,36 @@ describe('downloadMediaBlob', () => {
       expect.objectContaining({ url: mediaUrl }),
     );
     errorSpy.mockRestore();
+  });
+});
+
+describe('fetchMediaBlobUrl 401', () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+
+  beforeEach(() => {
+    clearMediaCache();
+    setMediaAuthTokenGetter(null);
+    URL.createObjectURL = jest.fn().mockReturnValue('blob:preview');
+  });
+
+  afterEach(() => {
+    clearMediaCache();
+    URL.createObjectURL = originalCreateObjectURL;
+    jest.clearAllMocks();
+  });
+
+  it('logs unauthorized status and rethrows so callers can use token fallback', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockedGet.mockRejectedValueOnce({ response: { status: 401 } });
+
+    await expect(fetchMediaBlobUrl('/api/youtube/videos/scene.mp4')).rejects.toEqual({
+      response: { status: 401 },
+    });
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      '[fetchMediaBlobUrl] Media request unauthorized (401), caller may use token fallback',
+      expect.objectContaining({ url: '/api/youtube/videos/scene.mp4' }),
+    );
+    warnSpy.mockRestore();
   });
 });

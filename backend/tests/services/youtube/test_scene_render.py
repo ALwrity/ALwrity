@@ -75,3 +75,51 @@ class TestExecuteSceneVideoRender:
         mock_execute.assert_called_once()
         assert "generation_mode" not in result
         assert result["video_url"] == expected["video_url"]
+
+    def test_raises_when_audio_url_fails_and_generation_disabled(self):
+        from services.youtube.scene_render import execute_scene_video_render
+
+        with patch("services.youtube.scene_render.resolve_scene_audio_base64", return_value=None), \
+             patch("services.youtube.scene_render.generate_youtube_scene_video") as mock_generate:
+            with pytest.raises(HTTPException) as exc:
+                execute_scene_video_render(
+                    scene=_scene(),
+                    user_id="user_render",
+                    resolution="720p",
+                    generate_audio_enabled=False,
+                    voice_id="Wise_Woman",
+                    db=None,
+                    wavespeed_client=MagicMock(),
+                )
+
+        assert exc.value.status_code == 400
+        assert "audio could not be loaded" in str(exc.value.detail)
+        mock_generate.assert_not_called()
+
+    def test_logs_prediction_id_when_wavespeed_rejects(self):
+        from services.youtube.scene_render import execute_scene_video_render
+
+        rejected = HTTPException(
+            status_code=502,
+            detail={"error": "WaveSpeed failed", "prediction_id": "pred-abc"},
+        )
+
+        with patch("services.youtube.scene_render.resolve_scene_audio_base64", return_value="audio-b64"), \
+             patch("services.youtube.scene_render.resolve_scene_image_base64", return_value=None), \
+             patch(
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 side_effect=rejected,
+             ):
+            with pytest.raises(HTTPException) as exc:
+                execute_scene_video_render(
+                    scene=_scene(imageUrl=None),
+                    user_id="user_render",
+                    resolution="720p",
+                    generate_audio_enabled=False,
+                    voice_id="Wise_Woman",
+                    db=None,
+                    wavespeed_client=MagicMock(),
+                )
+
+        assert exc.value.status_code == 502
+        assert exc.value.detail.get("prediction_id") == "pred-abc"

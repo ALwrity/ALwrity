@@ -74,3 +74,25 @@ class TestGenerateYouTubeSceneVideo:
             return "ok"
 
         assert _run_async_coro(_sample()) == "ok"
+
+    def test_reraises_http_exception_with_prediction_id(self):
+        from fastapi import HTTPException
+        from services.youtube.scene_video_generate import generate_youtube_scene_video
+
+        mock_client = MagicMock()
+        mock_client.generate_text_video.side_effect = HTTPException(
+            status_code=502,
+            detail={"error": "WaveSpeed failed", "prediction_id": "pred-xyz"},
+        )
+
+        try:
+            generate_youtube_scene_video(
+                visual_prompt="A cinematic sunset over mountains",
+                resolution="720p",
+                duration=5,
+                wavespeed_client=mock_client,
+            )
+            raise AssertionError("Expected HTTPException")
+        except HTTPException as exc:
+            assert exc.status_code == 502
+            assert exc.detail["prediction_id"] == "pred-xyz"

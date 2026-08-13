@@ -4,7 +4,7 @@ YouTube image storage helpers.
 Canonical on-disk location for YouTube Creator scene/avatar images:
   {user_workspace}/media/youtube_images/
 
-Falls back to the global YouTube media dir (YOUTUBE_IMAGES_DIR).
+Falls back to the global YouTube media dir and legacy repo-root youtube_images.
 Scene images are served at /api/youtube/images/scenes/{filename}.
 """
 
@@ -19,6 +19,9 @@ from api.youtube.paths import YOUTUBE_IMAGES_DIR
 from utils.logger_utils import get_service_logger
 
 logger = get_service_logger("youtube.image_storage")
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+_LEGACY_YOUTUBE_IMAGES_DIR = _REPO_ROOT / "youtube_images"
 
 
 def get_youtube_image_dir(user_id: Optional[str] = None, db: Optional[Session] = None) -> Path:
@@ -85,6 +88,7 @@ def list_youtube_image_search_dirs(
 
     _add(get_youtube_image_dir(user_id=user_id, db=db))
     _add(YOUTUBE_IMAGES_DIR)
+    _add(_LEGACY_YOUTUBE_IMAGES_DIR)
 
     logger.debug(
         f"[YouTubeImageStorage] Image search dirs for user_id={user_id or 'none'}: "

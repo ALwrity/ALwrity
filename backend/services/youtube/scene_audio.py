@@ -17,8 +17,8 @@ from sqlalchemy.orm import Session
 
 from models.content_asset_models import AssetSource, AssetType
 from services.youtube.audio_storage import (
-    _LEGACY_YOUTUBE_AUDIO_DIR,
     find_youtube_audio_file,
+    list_youtube_audio_search_dirs,
 )
 from utils.logger_utils import get_service_logger
 
@@ -170,12 +170,14 @@ def _load_existing_audio_base64(
 
     logger.debug(
         f"[YouTubeSceneAudio] Scene {scene_number} audio not in canonical dirs; "
-        f"trying legacy fuzzy match for {audio_filename}"
+        f"trying fuzzy filename match for {audio_filename}"
     )
-    audio_path = _find_legacy_fuzzy_audio_match(scene_number, audio_filename)
+    audio_path = _find_fuzzy_audio_match(
+        scene_number, audio_filename, user_id=user_id, db=db
+    )
     if audio_path and audio_path.is_file():
         return _read_audio_file(
-            audio_path, scene_number=scene_number, source="legacy fuzzy match"
+            audio_path, scene_number=scene_number, source="fuzzy filename match"
         )
 
     logger.warning(
@@ -196,18 +198,13 @@ def _load_existing_audio_base64(
     )
 
 
-def _find_legacy_fuzzy_audio_match(scene_number: int, audio_filename: str) -> Optional[Path]:
-    """
-    Last-resort local fuzzy match against legacy repo-root youtube_audio directory.
-    """
-    youtube_audio_dir = _LEGACY_YOUTUBE_AUDIO_DIR
-    if not youtube_audio_dir.exists():
-        logger.debug(
-            f"[YouTubeSceneAudio] Legacy audio dir missing for fuzzy match: {youtube_audio_dir}"
-        )
-        return None
-
-    all_files = list(youtube_audio_dir.glob("*.mp3"))
+def _find_fuzzy_audio_match(
+    scene_number: int,
+    audio_filename: str,
+    user_id: str,
+    db: Optional[Session] = None,
+) -> Optional[Path]:
+    """Last-resort local fuzzy match across canonical + legacy audio search dirs."""
     expected_parts = audio_filename.replace(".mp3", "").split("_")
     if len(expected_parts) < 3:
         logger.debug(
@@ -218,49 +215,48 @@ def _find_legacy_fuzzy_audio_match(scene_number: int, audio_filename: str) -> Op
 
     scene_num_str = expected_parts[1] if expected_parts[0] == "scene" else None
     title_part = expected_parts[2] if len(expected_parts) > 2 else None
-    matching_files = []
 
-    for file_path in all_files:
-        file_parts = file_path.stem.split("_")
-        if len(file_parts) < 3 or file_parts[0] != "scene":
+    for youtube_audio_dir in list_youtube_audio_search_dirs(user_id=user_id, db=db):
+        if not youtube_audio_dir.exists():
             continue
 
-        file_scene_num = file_parts[1]
-        file_title = file_parts[2] if len(file_parts) > 2 else ""
+        matching_files: list[str] = []
+        for file_path in youtube_audio_dir.glob("*.mp3"):
+            file_parts = file_path.stem.split("_")
+            if len(file_parts) < 3 or file_parts[0] != "scene":
+                continue
 
-        if scene_num_str:
-            try:
-                scene_num_int = int(scene_num_str)
-            except ValueError:
-                logger.debug(
-                    f"[YouTubeSceneAudio] Invalid scene number in filename: {audio_filename}"
-                )
-                return None
+            file_scene_num = file_parts[1]
+            file_title = file_parts[2] if len(file_parts) > 2 else ""
 
-            file_scene_int = int(file_scene_num) if file_scene_num.isdigit() else None
-            if file_scene_int in {scene_num_int, scene_num_int - 1, scene_num_int + 1}:
+            if scene_num_str:
+                try:
+                    scene_num_int = int(scene_num_str)
+                except ValueError:
+                    logger.debug(
+                        f"[YouTubeSceneAudio] Invalid scene number in filename: {audio_filename}"
+                    )
+                    return None
+
+                file_scene_int = int(file_scene_num) if file_scene_num.isdigit() else None
+                if file_scene_int in {scene_num_int, scene_num_int - 1, scene_num_int + 1}:
+                    matching_files.append(file_path.name)
+            elif title_part and title_part.lower() in file_title.lower():
                 matching_files.append(file_path.name)
-        elif title_part and title_part.lower() in file_title.lower():
-            matching_files.append(file_path.name)
 
-    if not matching_files:
-        logger.debug(
-            f"[YouTubeSceneAudio] No fuzzy legacy audio matches for scene {scene_number}: "
-            f"{audio_filename}"
-        )
-        return None
+        if not matching_files:
+            continue
 
-    alternative_path = youtube_audio_dir / matching_files[0]
-    if alternative_path.exists() and alternative_path.is_file():
-        logger.info(
-            f"[YouTubeSceneAudio] Found fuzzy legacy audio match for scene {scene_number}: "
-            f"{matching_files[0]}"
-        )
-        return alternative_path
+        alternative_path = youtube_audio_dir / matching_files[0]
+        if alternative_path.exists() and alternative_path.is_file():
+            logger.info(
+                f"[YouTubeSceneAudio] Found fuzzy audio match for scene {scene_number}: "
+                f"{matching_files[0]} in {youtube_audio_dir}"
+            )
+            return alternative_path
 
-    logger.warning(
-        f"[YouTubeSceneAudio] Fuzzy match candidate missing on disk for scene {scene_number}: "
-        f"{alternative_path}"
+    logger.debug(
+        f"[YouTubeSceneAudio] No fuzzy audio matches for scene {scene_number}: {audio_filename}"
     )
     return None
 
@@ -291,8 +287,8 @@ def _load_audio_from_asset_library(filename: str, user_id: str) -> Optional[byte
             limit=100,
         )
         logger.debug(
-            f"[YouTubeSceneAudio] Asset library returned {len(assets)} audio asset(s) "
-            f"(total={total}) for user {user_id}"
+            f"[YouTubeSceneAudio] Asset library get_user_assets returned "
+            f"{len(assets)} audio asset(s) (total={total}) for user {user_id}"
         )
 
         for asset in assets:
@@ -316,8 +312,8 @@ def _load_audio_from_asset_library(filename: str, user_id: str) -> Optional[byte
                 )
                 return None
 
-        logger.debug(
-            f"[YouTubeSceneAudio] No matching audio asset in library for {filename}"
+        logger.warning(
+            f"[YouTubeSceneAudio] Asset library miss via get_user_assets for {filename}"
         )
         return None
     except Exception as exc:

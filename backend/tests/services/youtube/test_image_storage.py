@@ -59,6 +59,20 @@ class TestFindYouTubeImageFile:
         assert found is not None
         assert found.name == filename
 
+    def test_finds_legacy_repo_root_location(self, tmp_path):
+        from services.youtube import image_storage as storage
+
+        legacy_dir = tmp_path / "legacy_images"
+        legacy_dir.mkdir()
+        filename = "yt_scene_legacy_deadbeef.png"
+        (legacy_dir / filename).write_bytes(b"legacy-png")
+
+        with patch.object(storage, "_LEGACY_YOUTUBE_IMAGES_DIR", legacy_dir):
+            found = storage.find_youtube_image_file(filename, user_id=None, db=None)
+
+        assert found is not None
+        assert found == legacy_dir / filename
+
     def test_rejects_path_traversal_filename(self):
         from services.youtube.image_storage import find_youtube_image_file
 

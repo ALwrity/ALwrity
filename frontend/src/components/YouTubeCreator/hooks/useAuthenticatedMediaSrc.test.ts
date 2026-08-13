@@ -31,9 +31,13 @@ describe("useAuthenticatedMediaSrc", () => {
     expect(result.current.error).toBeNull();
   });
 
-  it("falls back to the authenticated URL when blob load fails", async () => {
-    mockedFetchMediaBlobUrl.mockRejectedValueOnce(new Error("401"));
+  it("falls back to the authenticated URL when blob load fails with 401", async () => {
+    const unauthorized = Object.assign(new Error("unauthorized"), {
+      response: { status: 401 },
+    });
+    mockedFetchMediaBlobUrl.mockRejectedValueOnce(unauthorized);
     mockedAppendAuthTokenToUrl.mockResolvedValueOnce("/api/youtube/videos/scene.mp4?token=abc");
+    const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
 
     const { result } = renderHook(() =>
       useAuthenticatedMediaSrc("/api/youtube/videos/scene.mp4"),
@@ -45,6 +49,15 @@ describe("useAuthenticatedMediaSrc", () => {
 
     expect(result.current.src).toBe("/api/youtube/videos/scene.mp4?token=abc");
     expect(result.current.error).toBe("Preview stream is temporarily unavailable.");
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[useAuthenticatedMediaSrc] Blob load failed, using authenticated URL fallback",
+      expect.objectContaining({
+        url: "/api/youtube/videos/scene.mp4",
+        status: 401,
+        fallback: "token-url",
+      }),
+    );
+    warnSpy.mockRestore();
   });
 
   it("does not load when disabled or url is missing", async () => {

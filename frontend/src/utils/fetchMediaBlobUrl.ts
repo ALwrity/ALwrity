@@ -91,7 +91,10 @@ export async function downloadMediaBlob(mediaUrl: string, filename?: string): Pr
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
-    setTimeout(() => URL.revokeObjectURL(downloadUrl), 1000);
+    setTimeout(() => {
+      URL.revokeObjectURL(downloadUrl);
+      console.debug('[downloadMediaBlob] Revoked download clone URL', { url: safeUrl });
+    }, 1000);
 
     console.info('[downloadMediaBlob] Download triggered', {
       url: safeUrl,
@@ -162,10 +165,18 @@ export async function fetchMediaBlobUrl(pathOrUrl: string): Promise<string | nul
     
     // Gracefully handle 404s and other errors - file might not exist or was regenerated
     if (err?.response?.status === 404) {
-      console.warn(`Media file not found (404): ${pathOrUrl}`);
+      console.warn(`[fetchMediaBlobUrl] Media file not found (404): ${sanitizeMediaUrl(pathOrUrl)}`);
       return null;
     }
-    // Re-throw other errors
+    if (err?.response?.status === 401) {
+      console.warn('[fetchMediaBlobUrl] Media request unauthorized (401), caller may use token fallback', {
+        url: sanitizeMediaUrl(pathOrUrl),
+      });
+    }
+    console.warn('[fetchMediaBlobUrl] Blob load failed', {
+      url: sanitizeMediaUrl(pathOrUrl),
+      status: err?.response?.status,
+    });
     throw err;
   }
 }
