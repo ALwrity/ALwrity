@@ -110,7 +110,7 @@ class TestRenderSceneVideo:
         from services.youtube.renderer import YouTubeVideoRendererService
 
         video_bytes = b"\x00\x00\x00\x18ftypmp42" + (b"x" * 32)
-        wavespeed_result = {
+        video_result = {
             "video_bytes": video_bytes,
             "provider": "wavespeed",
             "model_name": "alibaba/wan-2.5/text-to-video",
@@ -130,17 +130,24 @@ class TestRenderSceneVideo:
         with patch("services.youtube.renderer.WaveSpeedClient") as mock_ws_cls, \
              patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
              patch(
-                 "services.youtube.renderer.save_youtube_scene_video",
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 return_value=video_result,
+             ) as mock_generate, \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_image_base64",
+                 return_value=None,
+             ), \
+             patch(
+                 "services.youtube.scene_render.save_youtube_scene_video",
                  return_value=save_result,
              ) as mock_save, \
              patch(
-                 "services.youtube.renderer.track_video_usage",
+                 "services.youtube.scene_render.track_video_usage",
                  return_value={"tracked": True},
              ):
-            mock_ws_cls.return_value.generate_text_video.return_value = wavespeed_result
             svc = YouTubeVideoRendererService()
             result = svc.render_scene_video(
-                scene=_scene(audioUrl=None),
+                scene=_scene(audioUrl=None, imageUrl=None),
                 video_plan={"video_summary": "Plan"},
                 user_id="user_render",
                 generate_audio_enabled=False,
@@ -149,7 +156,257 @@ class TestRenderSceneVideo:
 
         assert result["video_url"] == save_result["video_url"]
         assert result["cost"] == 0.5
+        mock_generate.assert_called_once()
         mock_save.assert_called_once()
+        call_kwargs = mock_generate.call_args.kwargs
+        assert call_kwargs["image_base64"] is None
+        assert call_kwargs["wavespeed_client"] is mock_ws_cls.return_value
+
+    def test_uses_i2v_when_scene_image_resolves(self, tmp_path):
+        from services.youtube.renderer import YouTubeVideoRendererService
+
+        video_bytes = b"\x00\x00\x00\x18ftypmp42" + (b"x" * 32)
+        video_result = {
+            "video_bytes": video_bytes,
+            "provider": "wavespeed",
+            "model_name": "alibaba/wan-2.5/image-to-video",
+            "cost": 0.5,
+            "duration": 5,
+            "width": 1280,
+            "height": 720,
+            "prediction_id": "pred-i2v",
+        }
+        save_result = {
+            "video_filename": "scene_1_user_abc.mp4",
+            "video_url": "/api/youtube/videos/scene_1_user_abc.mp4",
+            "video_path": str(tmp_path / "scene_1_user_abc.mp4"),
+            "file_size": len(video_bytes),
+        }
+
+        with patch("services.youtube.renderer.WaveSpeedClient"), \
+             patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_image_base64",
+                 return_value="image-b64",
+             ) as mock_image, \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_audio_base64",
+                 return_value="audio-b64",
+             ), \
+             patch(
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 return_value=video_result,
+             ) as mock_generate, \
+             patch(
+                 "services.youtube.scene_render.save_youtube_scene_video",
+                 return_value=save_result,
+             ), \
+             patch(
+                 "services.youtube.scene_render.track_video_usage",
+                 return_value={"tracked": True},
+             ):
+            svc = YouTubeVideoRendererService()
+            svc.render_scene_video(
+                scene=_scene(),
+                video_plan={"video_summary": "Plan"},
+                user_id="user_render",
+                generate_audio_enabled=False,
+                db=MagicMock(),
+            )
+
+        mock_image.assert_called_once()
+        call_kwargs = mock_generate.call_args.kwargs
+        assert call_kwargs["image_base64"] == "image-b64"
+        assert call_kwargs["audio_base64"] == "audio-b64"
+
+    def test_falls_back_to_t2v_when_image_load_fails_but_keeps_audio(self, tmp_path):
+        from services.youtube.renderer import YouTubeVideoRendererService
+
+        video_bytes = b"\x00\x00\x00\x18ftypmp42" + (b"x" * 32)
+        video_result = {
+            "video_bytes": video_bytes,
+            "provider": "wavespeed",
+            "model_name": "alibaba/wan-2.5/text-to-video",
+            "cost": 0.5,
+            "duration": 5,
+            "width": 1280,
+            "height": 720,
+            "prediction_id": "pred-t2v",
+        }
+        save_result = {
+            "video_filename": "scene_1_user_abc.mp4",
+            "video_url": "/api/youtube/videos/scene_1_user_abc.mp4",
+            "video_path": str(tmp_path / "scene_1_user_abc.mp4"),
+            "file_size": len(video_bytes),
+        }
+
+        with patch("services.youtube.renderer.WaveSpeedClient"), \
+             patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_image_base64",
+                 return_value=None,
+             ), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_audio_base64",
+                 return_value="audio-b64",
+             ), \
+             patch(
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 return_value=video_result,
+             ) as mock_generate, \
+             patch(
+                 "services.youtube.scene_render.save_youtube_scene_video",
+                 return_value=save_result,
+             ), \
+             patch(
+                 "services.youtube.scene_render.track_video_usage",
+                 return_value={"tracked": True},
+             ):
+            svc = YouTubeVideoRendererService()
+            svc.render_scene_video(
+                scene=_scene(),
+                video_plan={"video_summary": "Plan"},
+                user_id="user_render",
+                generate_audio_enabled=False,
+                db=MagicMock(),
+            )
+
+        call_kwargs = mock_generate.call_args.kwargs
+        assert call_kwargs["image_base64"] is None
+        assert call_kwargs["audio_base64"] == "audio-b64"
+
+    def test_image_resolution_error_falls_back_to_t2v_with_audio(self, tmp_path):
+        from services.youtube.renderer import YouTubeVideoRendererService
+
+        video_bytes = b"\x00\x00\x00\x18ftypmp42" + (b"x" * 32)
+        video_result = {
+            "video_bytes": video_bytes,
+            "provider": "wavespeed",
+            "model_name": "alibaba/wan-2.5/text-to-video",
+            "cost": 0.5,
+            "duration": 5,
+            "width": 1280,
+            "height": 720,
+            "prediction_id": "pred-t2v",
+        }
+        save_result = {
+            "video_filename": "scene_1_user_abc.mp4",
+            "video_url": "/api/youtube/videos/scene_1_user_abc.mp4",
+            "video_path": str(tmp_path / "scene_1_user_abc.mp4"),
+            "file_size": len(video_bytes),
+        }
+
+        with patch("services.youtube.renderer.WaveSpeedClient"), \
+             patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_image_base64",
+                 side_effect=RuntimeError("image resolver crashed"),
+             ), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_audio_base64",
+                 return_value="audio-b64",
+             ), \
+             patch(
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 return_value=video_result,
+             ) as mock_generate, \
+             patch(
+                 "services.youtube.scene_render.save_youtube_scene_video",
+                 return_value=save_result,
+             ), \
+             patch(
+                 "services.youtube.scene_render.track_video_usage",
+                 return_value={"tracked": True},
+             ):
+            svc = YouTubeVideoRendererService()
+            svc.render_scene_video(
+                scene=_scene(),
+                video_plan={"video_summary": "Plan"},
+                user_id="user_render",
+                generate_audio_enabled=False,
+                db=MagicMock(),
+            )
+
+        call_kwargs = mock_generate.call_args.kwargs
+        assert call_kwargs["image_base64"] is None
+        assert call_kwargs["audio_base64"] == "audio-b64"
+
+    def test_raises_when_generation_returns_empty_video_bytes(self, tmp_path):
+        from services.youtube.renderer import YouTubeVideoRendererService
+
+        with patch("services.youtube.renderer.WaveSpeedClient"), \
+             patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_image_base64",
+                 return_value=None,
+             ), \
+             patch(
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 return_value={
+                     "video_bytes": b"",
+                     "provider": "wavespeed",
+                     "model_name": "alibaba/wan-2.5/text-to-video",
+                     "cost": 0.0,
+                     "duration": 5,
+                     "width": 1280,
+                     "height": 720,
+                 },
+             ), \
+             patch("services.youtube.scene_render.save_youtube_scene_video") as mock_save:
+            svc = YouTubeVideoRendererService()
+            with pytest.raises(HTTPException) as exc:
+                svc.render_scene_video(
+                    scene=_scene(audioUrl=None, imageUrl=None),
+                    video_plan={"video_summary": "Plan"},
+                    user_id="user_render",
+                    generate_audio_enabled=False,
+                    db=MagicMock(),
+                )
+
+        assert exc.value.status_code == 502
+        mock_save.assert_not_called()
+
+    def test_raises_when_save_fails_after_generation(self, tmp_path):
+        from services.youtube.renderer import YouTubeVideoRendererService
+
+        video_bytes = b"\x00\x00\x00\x18ftypmp42" + (b"x" * 32)
+        with patch("services.youtube.renderer.WaveSpeedClient"), \
+             patch("services.youtube.renderer.get_youtube_video_dir", return_value=tmp_path), \
+             patch(
+                 "services.youtube.scene_render.resolve_scene_image_base64",
+                 return_value=None,
+             ), \
+             patch(
+                 "services.youtube.scene_render.generate_youtube_scene_video",
+                 return_value={
+                     "video_bytes": video_bytes,
+                     "provider": "wavespeed",
+                     "model_name": "alibaba/wan-2.5/text-to-video",
+                     "cost": 0.5,
+                     "duration": 5,
+                     "width": 1280,
+                     "height": 720,
+                 },
+             ), \
+             patch(
+                 "services.youtube.scene_render.save_youtube_scene_video",
+                 side_effect=OSError("disk full"),
+             ), \
+             patch("services.youtube.scene_render.track_video_usage"):
+            svc = YouTubeVideoRendererService()
+            with pytest.raises(HTTPException) as exc:
+                svc.render_scene_video(
+                    scene=_scene(audioUrl=None, imageUrl=None),
+                    video_plan={"video_summary": "Plan"},
+                    user_id="user_render",
+                    generate_audio_enabled=False,
+                    db=MagicMock(),
+                )
+
+        assert exc.value.status_code == 500
+        detail = exc.value.detail
+        assert isinstance(detail, dict)
+        assert detail.get("error") == "Failed to save rendered scene video"
 
 
 class TestRenderFullVideo:

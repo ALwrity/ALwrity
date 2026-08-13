@@ -162,14 +162,13 @@ class TestFindYouTubeVideoFile:
 
 
 class TestRendererUsesYouTubeStorage:
-    def test_renderer_imports_save_youtube_scene_video(self):
-        """Regression: scene save must not route through Story story_videos path."""
+    def test_scene_render_uses_save_youtube_scene_video(self):
+        """Regression: scene save must route through YouTube video storage helper."""
         import inspect
 
-        from services.youtube import renderer as renderer_module
+        from services.youtube import scene_render as scene_render_module
 
-        source = inspect.getsource(renderer_module.YouTubeVideoRendererService.render_scene_video)
+        source = inspect.getsource(scene_render_module.execute_scene_video_render)
         assert "save_youtube_scene_video" in source
-        # Must not call StoryVideoGenerationService scene-save helper
         assert "video_service.save_scene_video" not in source
         assert ".save_scene_video(" not in source
