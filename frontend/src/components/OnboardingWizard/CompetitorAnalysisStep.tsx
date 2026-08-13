@@ -30,6 +30,7 @@ import { useOnboardingStyles } from './common/useOnboardingStyles';
 import { SocialMediaPresenceSection, CompetitorsGrid } from './WebsiteStep/components';
 import type { Competitor } from './WebsiteStep/components';
 import ResearchStepBackgroundSetupModal from './CompetitorAnalysisStep/ResearchStepBackgroundSetupModal';
+import { SifIndexingPanel } from './common/SifIndexingPanel';
 import { ContentPillarsSection, type ContentPillarData } from './CompetitorAnalysisStep/ContentPillarsSection';
 import { StrategicInsightsSection } from './CompetitorAnalysisStep/StrategicInsightsSection';
 import { InsightsModals } from './CompetitorAnalysisStep/InsightsModals';
@@ -743,6 +744,8 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
         open={backgroundSetupOpen}
         onClose={() => setBackgroundSetupOpen(false)}
       />
+
+      <SifIndexingPanel />
 
     </Box>
   );
