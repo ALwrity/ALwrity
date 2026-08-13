@@ -37,6 +37,7 @@ export const SifIndexingPanel: React.FC = () => {
   const [showPagesModal, setShowPagesModal] = useState(false);
   const [harvestSource, setHarvestSource] = useState<string>('');
   const [freshnessHours, setFreshnessHours] = useState<number | null>(null);
+  const [sitemapTotal, setSitemapTotal] = useState<number | null>(null);
   const [testQuery, setTestQuery] = useState<string | null>(null);
   const [testResult, setTestResult] = useState<string>('');
 
@@ -74,6 +75,7 @@ export const SifIndexingPanel: React.FC = () => {
           setSifLastIndexed(sifTask.started_at || null);
           if (details.indexed_pages?.length) setIndexedPages(details.indexed_pages);
           if (details.harvest_source) setHarvestSource(details.harvest_source);
+          if (details.sitemap_total != null) setSitemapTotal(details.sitemap_total);
           if (sifTask.index_freshness_hours != null) setFreshnessHours(sifTask.index_freshness_hours);
         } else if (sifTask.status === 'running') {
           setSifStatus('indexing');
@@ -171,6 +173,13 @@ export const SifIndexingPanel: React.FC = () => {
               <Typography variant="h6" sx={{ fontWeight: 700, color: sifStatus === 'partial' ? '#d97706' : '#16a34a' }}>{sifPageCount}</Typography>
               <Typography variant="caption" sx={{ color: '#64748b' }}>indexed</Typography>
             </Paper>
+            {sitemapTotal != null && sitemapTotal > 0 && (
+              <Paper elevation={0} sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${borderColor}`, bgcolor: '#ffffff', minWidth: 140, textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Sitemap</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b' }}>{sitemapTotal}</Typography>
+                <Typography variant="caption" sx={{ color: '#64748b' }}>URLs found</Typography>
+              </Paper>
+            )}
             {sifPillarCount !== null && (
               <Paper elevation={0} sx={{ p: 1.5, borderRadius: 2, border: `1px solid ${borderColor}`, bgcolor: '#ffffff', minWidth: 140, textAlign: 'center' }}>
                 <Typography variant="caption" sx={{ color: '#64748b', display: 'block' }}>Pillars</Typography>

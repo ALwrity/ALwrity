@@ -166,7 +166,22 @@ class SIFIndexingExecutor(TaskExecutor):
             
             pages_harvested = content_result.get("count", 0) if isinstance(content_result, dict) else (content_result if isinstance(content_result, int) else 0)
             indexed_pages = content_result.get("pages", []) if isinstance(content_result, dict) else []
-            _update_phase("indexing_content", pages_harvested=pages_harvested, indexed_pages=indexed_pages)
+            
+            # Fetch sitemap total for visibility
+            sitemap_total = 0
+            try:
+                from models.onboarding import WebsiteAnalysis
+                wa = db.query(WebsiteAnalysis).filter(
+                    WebsiteAnalysis.session_id == onboarding_session.id
+                ).order_by(WebsiteAnalysis.created_at.desc()).first()
+                if wa and wa.seo_audit:
+                    sitemap_data = wa.seo_audit.get("sitemap_analysis", {})
+                    ad = sitemap_data.get("analysis_data", {}) or sitemap_data
+                    sitemap_total = ad.get("total_urls", 0) or 0
+            except Exception:
+                pass
+
+            _update_phase("indexing_content", pages_harvested=pages_harvested, indexed_pages=indexed_pages, sitemap_total=sitemap_total)
             content_synced = pages_harvested > 0
 
             # 3. Trigger Content Guardian Audit (Background Analysis)
