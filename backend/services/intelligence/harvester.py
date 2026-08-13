@@ -125,15 +125,28 @@ class SemanticHarvesterService:
                         )
                         for analysis in analyses:
                             sitemap_urls = []
+                            sitemap_url = None
                             # Path 1: Step 2 stores in seo_audit.sitemap_analysis.analysis_data.url_list
                             if analysis.seo_audit:
                                 sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
                                 analysis_data = sitemap_data.get("analysis_data", {}) or sitemap_data
                                 sitemap_urls = analysis_data.get("url_list", []) or []
-                            # Path 2: Step 1 stores in crawl_result.sitemap_analysis.url_list
+                            # Path 2: Step 1 stores in crawl_result.sitemap_analysis
                             if not sitemap_urls and analysis.crawl_result:
                                 crawl_sitemap = (analysis.crawl_result or {}).get("sitemap_analysis", {})
                                 sitemap_urls = crawl_sitemap.get("url_list", []) or []
+                                sitemap_url = crawl_sitemap.get("sitemap_url")
+                            # Fallback: fetch sitemap directly when url_list missing but sitemap_url exists
+                            if not sitemap_urls and sitemap_url:
+                                try:
+                                    from services.seo_tools.sitemap_service import SitemapService
+                                    svc = SitemapService()
+                                    fetched = await svc._fetch_sitemap_data(sitemap_url)
+                                    raw_urls = fetched.get("urls", []) if isinstance(fetched, dict) else []
+                                    sitemap_urls = [u.get("loc", "") for u in raw_urls if isinstance(u, dict) and u.get("loc")]
+                                    logger.info(f"[SemanticHarvester] Fetched {len(sitemap_urls)} URLs from sitemap {sitemap_url}")
+                                except Exception as fetch_err:
+                                    logger.warning(f"[SemanticHarvester] Sitemap fetch fallback failed: {fetch_err}")
                             if sitemap_urls:
                                 from urllib.parse import urlparse
                                 base_domain = urlparse(website_url).netloc
