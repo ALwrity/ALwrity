@@ -15,13 +15,11 @@ import {
   Alert,
   CircularProgress,
   Chip,
-  IconButton,
   Tooltip,
 } from '@mui/material';
 import PlayArrow from '@mui/icons-material/PlayArrow';
 import CheckCircle from '@mui/icons-material/CheckCircle';
 import ArrowBack from '@mui/icons-material/ArrowBack';
-import Visibility from '@mui/icons-material/Visibility';
 import ImageIcon from '@mui/icons-material/Image';
 import VolumeUp from '@mui/icons-material/VolumeUp';
 import { motion } from 'framer-motion';
@@ -32,6 +30,7 @@ import { CostEstimateCard } from './CostEstimateCard';
 import { RenderSettings } from './RenderSettings';
 import { RenderStatusDisplay } from './RenderStatusDisplay';
 import { ScenePreviewModal } from './ScenePreviewModal';
+import { SceneVideoActions } from './SceneVideoActions';
 import { YouTubeFinalVideoPanel } from './YouTubeFinalVideoPanel';
 import { useYouTubeRenderQueue } from '../hooks/useYouTubeRenderQueue';
 import { YouTubePublishPanel } from './YouTubePublishPanel';
@@ -268,53 +267,17 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
                               </Stack>
                             </Box>
 
-                            {/* Action Buttons */}
-                            <Stack direction="row" spacing={1} alignItems="center">
-                              {running && st.progress > 0 && st.progress < 100 && (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                  <CircularProgress 
-                                    size={32} 
-                                    variant="determinate" 
-                                    value={Math.min(100, st.progress)} 
-                                    sx={{ color: '#667eea' }}
-                                  />
-                                  <Typography variant="caption" sx={{ color: '#64748b', fontWeight: 600 }}>
-                                    {Math.round(st.progress)}%
-                                  </Typography>
-                                </Box>
-                              )}
-                              {hasAssets && (
-                                <Tooltip title="Preview scene assets" arrow>
-                                  <IconButton
-                                    size="small"
-                                    onClick={() => handlePreviewScene(scene)}
-                                    sx={{
-                                      color: '#667eea',
-                                      '&:hover': {
-                                        bgcolor: '#eff6ff',
-                                      },
-                                    }}
-                                  >
-                                    <Visibility />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                              <Button
-                                variant={completed ? "outlined" : "contained"}
-                                color={completed ? "success" : "primary"}
-                                onClick={() => runSceneVideo(scene)}
-                                disabled={!hasAssets || running}
-                                startIcon={running ? <CircularProgress size={16} sx={{ color: 'white' }} /> : undefined}
-                                sx={{ 
-                                  textTransform: 'none', 
-                                  fontWeight: 700,
-                                  minWidth: 120,
-                                  px: 2.5,
-                                }}
-                              >
-                                {running ? 'Generating' : failed ? 'Retry Video' : completed ? 'Regenerate' : 'Generate Video'}
-                              </Button>
-                            </Stack>
+                            <SceneVideoActions
+                              scene={scene}
+                              running={running}
+                              failed={failed}
+                              completed={completed}
+                              hasAssets={hasAssets}
+                              progress={st.progress}
+                              onPreview={() => handlePreviewScene(scene)}
+                              onGenerate={() => runSceneVideo(scene)}
+                              onError={(msg) => showSnackbar(msg, 'error')}
+                            />
                           </Box>
 
                           {/* Progress/Error Message */}
@@ -467,6 +430,7 @@ export const RenderStep: React.FC<RenderStepProps> = React.memo(({
           sceneNumber={previewScene.scene_number}
           imageUrl={previewScene.imageUrl}
           audioUrl={previewScene.audioUrl}
+          videoUrl={previewScene.videoUrl}
         />
       )}
 

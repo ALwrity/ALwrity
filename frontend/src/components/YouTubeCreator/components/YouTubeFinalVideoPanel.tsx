@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Alert,
   Box,
@@ -10,7 +10,8 @@ import {
   alpha,
 } from "@mui/material";
 import Download from "@mui/icons-material/Download";
-import { downloadMediaBlob, fetchMediaBlobUrl } from "../../../utils/fetchMediaBlobUrl";
+import { downloadMediaBlob } from "../../../utils/fetchMediaBlobUrl";
+import { useAuthenticatedMediaSrc } from "../hooks/useAuthenticatedMediaSrc";
 
 interface YouTubeFinalVideoPanelProps {
   finalVideoUrl: string | null;
@@ -27,64 +28,35 @@ export const YouTubeFinalVideoPanel: React.FC<YouTubeFinalVideoPanelProps> = ({
   combiningMessage,
   onCombine,
 }) => {
-  const [finalVideoBlobUrl, setFinalVideoBlobUrl] = useState<string | null>(null);
-  const [blobLoading, setBlobLoading] = useState(false);
-  const [blobError, setBlobError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadBlobPreview(): Promise<void> {
-      if (!finalVideoUrl) {
-        setFinalVideoBlobUrl(null);
-        setBlobError(null);
-        setBlobLoading(false);
-        return;
-      }
-
-      setBlobLoading(true);
-      setBlobError(null);
-
-      try {
-        const blobUrl = await fetchMediaBlobUrl(finalVideoUrl);
-        if (!cancelled) {
-          setFinalVideoBlobUrl(blobUrl);
-          if (!blobUrl) {
-            setBlobError("Preview stream is temporarily unavailable. You can still publish or retry download.");
-          }
-        }
-      } catch (error) {
-        console.error("[YouTubeFinalVideoPanel] Failed to load final video blob preview:", error);
-        if (!cancelled) {
-          setFinalVideoBlobUrl(null);
-          setBlobError("Unable to load secure preview. You can still publish or retry download.");
-        }
-      } finally {
-        if (!cancelled) {
-          setBlobLoading(false);
-        }
-      }
-    }
-
-    loadBlobPreview();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [finalVideoUrl]);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const {
+    src: videoSrc,
+    loading: blobLoading,
+    error: blobError,
+  } = useAuthenticatedMediaSrc(finalVideoUrl);
 
   const handleDownload = async (): Promise<void> => {
     if (!finalVideoUrl) {
+      console.warn("[YouTubeFinalVideoPanel] Download skipped: final video URL is missing");
+      setDownloadError("Final video is not ready to download yet.");
       return;
     }
 
     setDownloading(true);
+    setDownloadError(null);
+    console.info("[YouTubeFinalVideoPanel] Starting final video download", {
+      url: finalVideoUrl.split("?")[0],
+    });
     try {
       await downloadMediaBlob(finalVideoUrl, `youtube-final-${Date.now()}.mp4`);
+      console.info("[YouTubeFinalVideoPanel] Final video download started");
     } catch (error) {
-      console.error("[YouTubeFinalVideoPanel] Download failed:", error);
-      setBlobError("Download failed. Please retry in a moment.");
+      console.error("[YouTubeFinalVideoPanel] Download failed", {
+        url: finalVideoUrl.split("?")[0],
+        error: error instanceof Error ? error.message : String(error),
+      });
+      setDownloadError("Download failed. Please retry in a moment.");
     } finally {
       setDownloading(false);
     }
@@ -122,9 +94,9 @@ export const YouTubeFinalVideoPanel: React.FC<YouTubeFinalVideoPanelProps> = ({
 
       {finalVideoUrl && (
         <Stack spacing={2}>
-          {blobError && (
+          {(downloadError || (blobError && !videoSrc)) && (
             <Alert severity="warning" sx={{ background: alpha("#f59e0b", 0.1), border: `1px solid ${alpha("#f59e0b", 0.35)}` }}>
-              {blobError}
+              {downloadError || blobError}
             </Alert>
           )}
 
@@ -145,7 +117,7 @@ export const YouTubeFinalVideoPanel: React.FC<YouTubeFinalVideoPanelProps> = ({
             ) : (
               <video
                 controls
-                src={finalVideoBlobUrl || finalVideoUrl}
+                src={videoSrc || undefined}
                 style={{ width: "100%", display: "block", maxHeight: 520 }}
               >
                 Your browser does not support video playback.
