@@ -285,7 +285,9 @@ export function useCompetitorDiscovery({
     socialMediaAccounts,
     setSocialMediaAccounts,
     researchSummary,
+    setResearchSummary,
     contentPillars,
+    setContentPillars,
     isLoadingPillars,
     error,
     setError,
@@ -295,6 +297,7 @@ export function useCompetitorDiscovery({
     showProgressModal,
     usingCachedData,
     startCompetitorDiscovery,
+    loadCachedAnalysis,
     updateCacheWithSitemapAnalysis,
   };
 }
