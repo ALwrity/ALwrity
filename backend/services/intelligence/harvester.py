@@ -63,7 +63,7 @@ class SemanticHarvesterService:
             for i, url in enumerate(urls_to_crawl):
                 try:
                     logger.debug(f"[SemanticHarvester] Crawling {i+1}/{len(urls_to_crawl)}: {url}")
-                    crawl_result = await crawler.crawl_website(url)
+                    crawl_result = await crawler.crawl_website(url, use_exa=False)
                     if crawl_result and crawl_result.get("success"):
                         content = crawl_result.get("content", {})
                         text = content.get("main_content", "") or ""

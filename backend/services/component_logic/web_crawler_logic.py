@@ -89,12 +89,13 @@ class WebCrawlerLogic:
         logger.debug(f"[WebCrawlerLogic._fix_url_format] Fixed URL: {url}")
         return url
     
-    async def crawl_website(self, url: str) -> Dict[str, Any]:
+    async def crawl_website(self, url: str, use_exa: bool = True) -> Dict[str, Any]:
         """
         Crawl a website and extract its content asynchronously with enhanced data extraction.
         
         Args:
             url (str): The URL to crawl
+            use_exa (bool): Whether to attempt Exa API first (False = BeautifulSoup only)
             
         Returns:
             Dict: Extracted website content and metadata
@@ -131,7 +132,7 @@ class WebCrawlerLogic:
                     return None
 
             exa_result, html_content = await asyncio.gather(
-                self._extract_content_via_exa(fixed_url),
+                self._extract_content_via_exa(fixed_url) if use_exa else self._empty_exa_result(),
                 _fetch_html(),
             )
 
@@ -283,6 +284,10 @@ class WebCrawlerLogic:
         except Exception as e:
             logger.error(f"[WebCrawlerLogic._extract_enhanced_content] Error: {str(e)}")
             return ''
+
+    async def _empty_exa_result(self) -> Dict[str, Any]:
+        """Return an empty Exa result to skip Exa calls (BeautifulSoup-only path)."""
+        return {"success": False, "text": "", "title": "", "summary": "", "highlights": []}
 
     async def _extract_content_via_exa(self, url: str) -> Dict[str, Any]:
         """Extract clean content from a URL using Exa's get_contents API.
