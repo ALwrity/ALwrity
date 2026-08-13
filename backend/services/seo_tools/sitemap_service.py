@@ -361,6 +361,9 @@ class SitemapService:
                     # Handle different sitemap formats
                     urls = []
                     sitemaps = []
+                    nested_tasks = []
+                    fetched_nested = 0
+                    skipped_nested = 0
                     
                     # Check if it's a sitemap index
                     if root.tag.endswith('sitemapindex'):

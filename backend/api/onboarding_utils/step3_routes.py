@@ -814,6 +814,10 @@ async def _persist_sitemap_analysis(
 ) -> None:
     """Background task to persist sitemap analysis results to DB."""
     try:
+        if not analysis_result or not isinstance(analysis_result, dict):
+            logger.warning(f"_persist_sitemap_analysis: invalid analysis_result for user {user_id}")
+            return
+
         from services.database import get_session_for_user
         from api.onboarding_utils.step_management_service import StepManagementService
         db = get_session_for_user(user_id)
