@@ -124,11 +124,16 @@ class SemanticHarvesterService:
                             .all()
                         )
                         for analysis in analyses:
-                            if not analysis.seo_audit:
-                                continue
-                            sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
-                            analysis_data = sitemap_data.get("analysis_data", {}) or sitemap_data
-                            sitemap_urls = analysis_data.get("url_list", [])
+                            sitemap_urls = []
+                            # Path 1: Step 2 stores in seo_audit.sitemap_analysis.analysis_data.url_list
+                            if analysis.seo_audit:
+                                sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
+                                analysis_data = sitemap_data.get("analysis_data", {}) or sitemap_data
+                                sitemap_urls = analysis_data.get("url_list", []) or []
+                            # Path 2: Step 1 stores in crawl_result.sitemap_analysis.url_list
+                            if not sitemap_urls and analysis.crawl_result:
+                                crawl_sitemap = (analysis.crawl_result or {}).get("sitemap_analysis", {})
+                                sitemap_urls = crawl_sitemap.get("url_list", []) or []
                             if sitemap_urls:
                                 from urllib.parse import urlparse
                                 base_domain = urlparse(website_url).netloc
