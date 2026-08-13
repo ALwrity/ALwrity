@@ -366,7 +366,7 @@ class TxtaiIntelligenceService:
             if len(items) < 2:
                 return []
             # Transform all items to get fresh embedding vectors
-            vectors = self.embeddings.transform(items)
+            vectors = self.embeddings.batchtransform(items)
             if not vectors or len(vectors) < 2:
                 return []
             query_vec = vectors[0]
