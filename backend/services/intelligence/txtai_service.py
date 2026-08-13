@@ -74,7 +74,7 @@ class TxtaiIntelligenceService:
         self._initialization_in_progress = False
         self.enable_caching = enable_caching
         self.cache_manager = semantic_cache_manager if enable_caching else None
-        self._backend = "faiss"  # Default backend
+        self._backend = "numpy"  # NumPy backend avoids faiss IndexIDMap/nprobe incompatibility
         self._disable_ann_queries = False  # Set when FAISS nprobe incompatibility is detected
         self.fail_fast = str(os.getenv("SIF_FAIL_FAST", "true")).lower() in {"1", "true", "yes", "on"}
         
