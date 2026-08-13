@@ -28,6 +28,7 @@ import {
 } from './dashboard/engagementWedgeNavigation';
 import type { PostPulseCreateMode } from './dashboard/postPulseCreateUtils';
 import { ReferencePostContextBanner } from './dashboard/ReferencePostContextBanner';
+import { QuickCreatePostArticleHeader } from './QuickCreate/QuickCreatePostArticleHeader';
 import { DashboardModalBackButton } from './dashboard/DashboardModalBackButton';
 
 
@@ -1143,7 +1144,15 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
 
             {/* Modal header — back above title when opened from a wedge */}
             <div className="linkedin-quick-create-header">
-              {returnTo ? (
+              {(selectedType === "post" || selectedType === "article") &&
+              variationsPhase === "idle" ? (
+                <QuickCreatePostArticleHeader
+                  type={selectedType}
+                  returnTo={returnTo}
+                  onBack={handleBackNavigation}
+                  onClose={closeModal}
+                />
+              ) : returnTo ? (
                 <>
                   <nav
                     aria-label="Modal navigation"
@@ -1167,113 +1176,37 @@ export const QuickCreate: React.FC<QuickCreateProps> = ({
                   </nav>
                   <div
                     id="linkedin-quick-create-title"
-                    className={
-                      selectedType === "post"
-                        ? "linkedin-quick-create-title linkedin-quick-create-title--xl"
-                        : selectedType === "article"
-                          ? "linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
-                          : "linkedin-quick-create-title"
-                    }
+                    className="linkedin-quick-create-title"
                   >
-                    {selectedType === "post" ? (
-                      <>
-                        <span
-                          className="linkedin-quick-create-title__icon"
-                          aria-hidden
-                        >
-                          📝
-                        </span>
-                        <span className="linkedin-quick-create-title__text">
-                          Post
-                        </span>
-                      </>
-                    ) : selectedType === "article" ? (
-                      <>
-                        <span
-                          className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
-                          aria-hidden
-                        >
-                          📄
-                        </span>
-                        <span className="linkedin-quick-create-title__text">
-                          Article
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        {CONTENT_TYPES.find((c) => c.type === selectedType)?.icon}{" "}
-                        {variationsPhase !== "idle"
-                          ? "3 Tone Variations"
-                          : CONTENT_TYPES.find((c) => c.type === selectedType)?.label}
-                      </>
-                    )}
+                    {CONTENT_TYPES.find((c) => c.type === selectedType)?.icon}{" "}
+                    {variationsPhase !== "idle"
+                      ? "3 Tone Variations"
+                      : CONTENT_TYPES.find((c) => c.type === selectedType)?.label}
                   </div>
                 </>
               ) : (
                 <div
                   style={{
-                    flex: 1,
-                    minWidth: 0,
                     display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    width: "100%",
                   }}
                 >
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 12,
-                      width: "100%",
-                    }}
+                    id="linkedin-quick-create-title"
+                    className="linkedin-quick-create-title"
                   >
-                    {selectedType === "post" && variationsPhase === "idle" ? (
-                      <div
-                        id="linkedin-quick-create-title"
-                        className="linkedin-quick-create-title linkedin-quick-create-title--xl"
-                      >
-                        <span
-                          className="linkedin-quick-create-title__icon"
-                          aria-hidden
-                        >
-                          📝
-                        </span>
-                        <span className="linkedin-quick-create-title__text">
-                          Post
-                        </span>
-                      </div>
-                    ) : selectedType === "article" && variationsPhase === "idle" ? (
-                      <div
-                        id="linkedin-quick-create-title"
-                        className="linkedin-quick-create-title linkedin-quick-create-title--xl linkedin-quick-create-title--article"
-                      >
-                        <span
-                          className="linkedin-quick-create-title__icon linkedin-quick-create-title__icon--article"
-                          aria-hidden
-                        >
-                          📄
-                        </span>
-                        <span className="linkedin-quick-create-title__text">
-                          Article
-                        </span>
-                      </div>
-                    ) : (
-                      <div
-                        id="linkedin-quick-create-title"
-                        className="linkedin-quick-create-title"
-                      >
-                        {CONTENT_TYPES.find((c) => c.type === selectedType)?.icon}{" "}
-                        {variationsPhase !== "idle"
-                          ? "3 Tone Variations"
-                          : CONTENT_TYPES.find((c) => c.type === selectedType)?.label}
-                      </div>
-                    )}
-                    <StudioModalCloseButton
-                      onClick={closeModal}
-                      ariaLabel="Close quick create"
-                    />
+                    {CONTENT_TYPES.find((c) => c.type === selectedType)?.icon}{" "}
+                    {variationsPhase !== "idle"
+                      ? "3 Tone Variations"
+                      : CONTENT_TYPES.find((c) => c.type === selectedType)?.label}
                   </div>
+                  <StudioModalCloseButton
+                    onClick={closeModal}
+                    ariaLabel="Close quick create"
+                  />
                 </div>
               )}
             </div>

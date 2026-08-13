@@ -29,8 +29,8 @@ describe("wedgeModalUi", () => {
   it("wedgeSubModalShellProps returns shared drill-down header config", () => {
     expect(wedgeSubModalShellProps("Publish")).toEqual({
       backLabel: "Publish",
-      backPlacement: "aboveTitle",
       titleSize: "xl",
+      headerLayout: "centeredRow",
     });
   });
 
@@ -53,8 +53,8 @@ describe("wedgeModalUi", () => {
   it("wedgePostSizeSubModalProps merges shell props with post-modal size", () => {
     expect(wedgePostSizeSubModalProps("Quick Create")).toEqual({
       backLabel: "Quick Create",
-      backPlacement: "aboveTitle",
       titleSize: "xl",
+      headerLayout: "centeredRow",
       width: "min(77.6vw, 960px)",
       maxWidth: "min(77.6vw, 960px)",
       maxHeight: "min(98dvh, calc(100dvh - 8px))",

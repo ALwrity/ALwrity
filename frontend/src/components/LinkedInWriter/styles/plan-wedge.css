@@ -665,6 +665,47 @@
   padding: 2px 0 4px !important;
 }
 
+/* Shared modal header — back (left), title (center), close (right) in one row */
+.linkedin-dashboard-action-modal-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.linkedin-dashboard-action-modal-header-side {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.linkedin-dashboard-action-modal-header-side--start {
+  justify-self: start;
+}
+
+.linkedin-dashboard-action-modal-header-side--end {
+  justify-self: end;
+}
+
+.linkedin-dashboard-action-modal-title--centered {
+  grid-column: 2;
+  justify-self: center;
+  max-width: min(100%, 420px);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .linkedin-dashboard-action-modal-title--centered {
+    max-width: min(100%, 240px);
+    font-size: 20px !important;
+  }
+}
+
 .linkedin-engagement-wedge-modal .linkedin-dashboard-action-modal-header,
 .linkedin-create-wedge-modal .linkedin-dashboard-action-modal-header,
 .linkedin-plan-wedge-modal .linkedin-dashboard-action-modal-header,
@@ -675,7 +716,7 @@
   padding: 10px 20px 6px !important;
 }
 
-/* Wedge drill-down modals — back above title, 24px titles, comfortable back hit area */
+/* Wedge drill-down modals — back left, title center, close right, 24px titles */
 .linkedin-wedge-sub-modal .linkedin-dashboard-action-modal-header {
   border-bottom: none !important;
   padding: 12px 20px 10px !important;

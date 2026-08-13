@@ -34,7 +34,6 @@ import { CONVERSATIONS_TO_JOIN_MODAL } from "./engagementWedgeCopy";
 
 export { CommentAssistantModal } from "./CommentAssistantInboxModal";
 export { EngagementBoosterModal } from "./EngagementBoosterModal";
-export { NetworkAdvisorModal } from "./NetworkAdvisorModal";
 export { GrowNetworkModal } from "./GrowNetworkModal";
 
 const ConnectPrompt: React.FC<{ message: string }> = ({ message }) => (

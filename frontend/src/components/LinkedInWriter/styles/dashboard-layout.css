@@ -4612,6 +4612,78 @@ body.linkedin-quick-create-open {
   padding: 12px 16px 4px;
 }
 
+/* Post / Article modal header — 3-column row: back | title | close */
+.linkedin-quick-create-header:has(.linkedin-quick-create-modal-header-row) {
+  display: block;
+  width: 100%;
+  padding: 12px 16px 4px;
+}
+
+.linkedin-quick-create-modal-header-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  width: 100%;
+}
+
+.linkedin-quick-create-modal-header-side {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.linkedin-quick-create-modal-header-side--start {
+  grid-column: 1;
+  justify-self: start;
+}
+
+.linkedin-quick-create-modal-header-side--end {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.linkedin-quick-create-modal-header-title {
+  grid-column: 2;
+  justify-self: center;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  max-width: min(100%, 320px);
+  min-width: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.linkedin-quick-create-modal-header-title.linkedin-quick-create-title--article {
+  color: #057642;
+}
+
+.linkedin-quick-create-modal-header-title:not(.linkedin-quick-create-title--article) {
+  color: #0a66c2;
+}
+
+.linkedin-quick-create-header .linkedin-dashboard-action-modal-header-row {
+  min-height: 44px;
+  gap: 8px;
+}
+
+.linkedin-quick-create-header .linkedin-dashboard-action-modal-title--centered {
+  max-width: min(100%, 280px);
+}
+
+.linkedin-quick-create-header .linkedin-dashboard-action-modal-title--centered.linkedin-quick-create-title--xl {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .linkedin-quick-create-header .linkedin-dashboard-modal-back-btn {
   min-height: 44px;
   padding: 10px 4px 10px 0 !important;

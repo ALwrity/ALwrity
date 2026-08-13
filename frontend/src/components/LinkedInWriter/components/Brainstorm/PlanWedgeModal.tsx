@@ -173,6 +173,7 @@ export const PlanWedgeModal: React.FC<PlanWedgeModalProps> = ({
       maxWidth="min(97vw, 1200px)"
       maxHeight="min(98dvh, calc(100dvh - 8px))"
       titleSize="xl"
+      headerLayout="default"
     >
       <div className="plan-wedge">
         <div className="plan-wedge-main">

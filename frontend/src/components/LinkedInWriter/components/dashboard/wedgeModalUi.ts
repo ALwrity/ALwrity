@@ -1,5 +1,5 @@
 /**
- * LinkedIn dashboard wedge sub-modal UX — back above title, 24px titles, one-level-up nav.
+ * LinkedIn dashboard wedge sub-modal UX — back left, title center, close right (one row).
  */
 import type { WorkflowModalId } from "./workflowWedgeNavigation";
 import { POST_WEDGE_MODAL_SIZE, POST_WEDGE_MODAL_SIZE_CLASS } from "./wedgeModalLayout";
@@ -26,8 +26,8 @@ export const WEDGE_SUB_MODAL_CLASS = "linkedin-wedge-sub-modal";
 export function wedgeSubModalShellProps(backLabel: string) {
   return {
     backLabel,
-    backPlacement: "aboveTitle" as const,
     titleSize: "xl" as const,
+    headerLayout: "centeredRow" as const,
   };
 }
 
