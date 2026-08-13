@@ -772,7 +772,7 @@ async def analyze_sitemap_for_onboarding(
         # Background task to persist analysis results to DB
         background_tasks.add_task(
             _persist_sitemap_analysis,
-            current_user.get('user_id'),
+            str(current_user.get('id')),
             request.user_url,
             analysis_result
         )
@@ -853,7 +853,9 @@ async def _persist_sitemap_analysis(
         
         db.close()
     except Exception as e:
+        import traceback
         logger.error(f"Error persisting sitemap analysis: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
 
 async def _log_sitemap_analysis_result(
