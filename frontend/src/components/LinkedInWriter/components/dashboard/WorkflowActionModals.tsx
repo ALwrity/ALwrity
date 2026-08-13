@@ -37,13 +37,13 @@ import {
   GROWTH_ENGINE_ENGAGEMENT_TILE,
 } from "./engagementWedgeCopy";
 import { PUBLISH_WEDGE_MODAL_INTRO } from "./publishWedgeCopy";
+import { CREATE_WEDGE_MODAL_INTRO } from "./createWedgeCopy";
+import { ANALYSIS_WEDGE_MODAL_INTRO } from "./analysisWedgeCopy";
+import { REMARKET_WEDGE_MODAL_INTRO } from "./remarketWedgeCopy";
 import { RepurposeLabModal } from "./repurposeLab";
 import { FormatTransformerModal } from "./formatTransformer";
-import {
-  ContentRefreshModal,
-  StaleReviverModal,
-  PerfToPlanModal,
-} from "./RemarkWedgeModals";
+import { PerfToPlanModal, PERF_TO_PLAN_TILE } from "./perfToPlan";
+import { ContentRefreshModal, StaleReviverModal } from "./RemarkWedgeModals";
 import { DraftLibraryModal } from "./PublishWedgeModals";
 import { CreateWedgeComingSoonTile } from "./CreateWedgeComingSoonTile";
 import { PublishWedgeComingSoonTile } from "./PublishWedgeComingSoonTile";
@@ -297,7 +297,18 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         {...POST_WEDGE_MODAL_SIZE}
         modalClassName={`linkedin-create-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
         titleSize="xl"
+        headerLayout="default"
       >
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: "#64748b",
+            lineHeight: 1.5,
+          }}
+        >
+          {CREATE_WEDGE_MODAL_INTRO}
+        </p>
         <div
           className={`linkedin-create-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
           style={WEDGE_TILE_GRID_STYLE}
@@ -346,6 +357,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={onClose}
         {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
+        headerLayout="default"
         modalClassName={`linkedin-publish-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <p
@@ -412,8 +424,19 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={onClose}
         {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
+        headerLayout="default"
         modalClassName={`linkedin-analysis-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: "#64748b",
+            lineHeight: 1.5,
+          }}
+        >
+          {ANALYSIS_WEDGE_MODAL_INTRO}
+        </p>
         <div
           className={`linkedin-analysis-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
           style={WEDGE_TILE_GRID_STYLE}
@@ -479,6 +502,7 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={onClose}
         {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
+        headerLayout="default"
         modalClassName={`linkedin-engagement-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
         <p
@@ -562,8 +586,19 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
         onClose={onClose}
         {...POST_WEDGE_MODAL_SIZE}
         titleSize="xl"
+        headerLayout="default"
         modalClassName={`linkedin-remarket-wedge-modal ${POST_WEDGE_MODAL_SIZE_CLASS}`}
       >
+        <p
+          style={{
+            margin: "0 0 14px",
+            fontSize: 13,
+            color: "#64748b",
+            lineHeight: 1.5,
+          }}
+        >
+          {REMARKET_WEDGE_MODAL_INTRO}
+        </p>
         <div
           className={`linkedin-remarket-wedge-tiles ${WEDGE_TILE_GRID_CLASS}`}
           style={WEDGE_TILE_GRID_STYLE}
@@ -621,10 +656,10 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
             }}
           />
           <DashboardToolTile
-            title="Perf → Plan"
-            description="Extract winning topics from top posts, generate 5 remix ideas"
-            icon="📈"
-            accent="#0a66c2"
+            title={PERF_TO_PLAN_TILE.title}
+            description={PERF_TO_PLAN_TILE.description}
+            icon={PERF_TO_PLAN_TILE.icon}
+            accent={PERF_TO_PLAN_TILE.accent}
             onClick={() => {
               onClose();
               setRemarkSub("perf_plan");

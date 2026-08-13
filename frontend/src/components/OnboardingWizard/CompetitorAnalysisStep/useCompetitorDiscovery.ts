@@ -17,7 +17,9 @@ interface UseCompetitorDiscoveryReturn {
   socialMediaAccounts: any;
   setSocialMediaAccounts: React.Dispatch<React.SetStateAction<any>>;
   researchSummary: any;
+  setResearchSummary: React.Dispatch<React.SetStateAction<any>>;
   contentPillars: ContentPillarData | null;
+  setContentPillars: React.Dispatch<React.SetStateAction<ContentPillarData | null>>;
   isLoadingPillars: boolean;
   error: string | null;
   setError: React.Dispatch<React.SetStateAction<string | null>>;
@@ -27,6 +29,7 @@ interface UseCompetitorDiscoveryReturn {
   showProgressModal: boolean;
   usingCachedData: boolean;
   startCompetitorDiscovery: (force?: boolean) => Promise<void>;
+  loadCachedAnalysis: () => boolean;
   updateCacheWithSitemapAnalysis: (sitemapResult: any) => void;
 }
 
@@ -173,7 +176,7 @@ export function useCompetitorDiscovery({
 
       const response = await aiApiClient.post('/api/onboarding/step3/discover-competitors', {
         user_url: finalUserUrl,
-        industry_context: industryContext,
+        industry_context: industryContext ?? '',
         num_results: 25,
         website_analysis_data: websiteAnalysisData
       });
@@ -282,7 +285,9 @@ export function useCompetitorDiscovery({
     socialMediaAccounts,
     setSocialMediaAccounts,
     researchSummary,
+    setResearchSummary,
     contentPillars,
+    setContentPillars,
     isLoadingPillars,
     error,
     setError,
@@ -292,6 +297,7 @@ export function useCompetitorDiscovery({
     showProgressModal,
     usingCachedData,
     startCompetitorDiscovery,
+    loadCachedAnalysis,
     updateCacheWithSitemapAnalysis,
   };
 }
