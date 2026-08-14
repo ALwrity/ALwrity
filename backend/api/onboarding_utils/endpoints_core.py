@@ -385,7 +385,7 @@ async def retrigger_sif_indexing(current_user: Dict[str, Any]):
             task.status = "active"
             session.commit()
 
-            website_url = (task.payload or {}).get('website_url', '')
+            website_url = task.website_url or (task.payload or {}).get('website_url', '')
             try:
                 import asyncio
                 from api.onboarding_utils.onboarding_task_scheduler import _run_sif_now

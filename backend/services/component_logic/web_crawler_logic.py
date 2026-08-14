@@ -89,12 +89,13 @@ class WebCrawlerLogic:
         logger.debug(f"[WebCrawlerLogic._fix_url_format] Fixed URL: {url}")
         return url
     
-    async def crawl_website(self, url: str) -> Dict[str, Any]:
+    async def crawl_website(self, url: str, use_exa: bool = True) -> Dict[str, Any]:
         """
         Crawl a website and extract its content asynchronously with enhanced data extraction.
         
         Args:
             url (str): The URL to crawl
+            use_exa (bool): Whether to attempt Exa API first (False = BeautifulSoup only)
             
         Returns:
             Dict: Extracted website content and metadata
@@ -123,17 +124,19 @@ class WebCrawlerLogic:
                             if response.status == 200:
                                 html = await response.text()
                                 logger.debug("[WebCrawlerLogic.crawl_website] Successfully fetched HTML content")
-                                return html
+                                return {"html": html, "status": response.status}
                             logger.error(f"[WebCrawlerLogic.crawl_website] Fetch HTTP status {response.status}")
-                            return None
+                            return {"html": None, "status": response.status}
                 except Exception as fetch_err:
                     logger.error(f"[WebCrawlerLogic.crawl_website] Fetch failed: {str(fetch_err)}")
-                    return None
+                    return {"html": None, "status": None}
 
-            exa_result, html_content = await asyncio.gather(
-                self._extract_content_via_exa(fixed_url),
+            exa_result, html_result = await asyncio.gather(
+                self._extract_content_via_exa(fixed_url) if use_exa else self._empty_exa_result(),
                 _fetch_html(),
             )
+            html_content = html_result.get("html") if isinstance(html_result, dict) else html_result
+            fetch_status = html_result.get("status") if isinstance(html_result, dict) else None
 
             exa_text = ""
             exa_title = ""
@@ -150,7 +153,7 @@ class WebCrawlerLogic:
             if not soup and not exa_text:
                 error_msg = f"Failed to fetch content from {fixed_url}: no content available via Exa or direct fetch"
                 logger.error(f"[WebCrawlerLogic.crawl_website] {error_msg}")
-                return {'success': False, 'error': error_msg}
+                return {'success': False, 'error': error_msg, 'http_status': fetch_status}
 
             # Build content dict — prefer Exa text/title when available, soup for metadata
             if soup:
@@ -208,7 +211,8 @@ class WebCrawlerLogic:
                 'success': True,
                 'content': content,
                 'url': fixed_url,
-                'timestamp': datetime.now().isoformat()
+                'timestamp': datetime.now().isoformat(),
+                'http_status': fetch_status,
             }
                 
         except Exception as e:
@@ -283,6 +287,10 @@ class WebCrawlerLogic:
         except Exception as e:
             logger.error(f"[WebCrawlerLogic._extract_enhanced_content] Error: {str(e)}")
             return ''
+
+    async def _empty_exa_result(self) -> Dict[str, Any]:
+        """Return an empty Exa result to skip Exa calls (BeautifulSoup-only path)."""
+        return {"success": False, "text": "", "title": "", "summary": "", "highlights": []}
 
     async def _extract_content_via_exa(self, url: str) -> Dict[str, Any]:
         """Extract clean content from a URL using Exa's get_contents API.

@@ -27,7 +27,7 @@ export const ProgressModal: React.FC<ProgressModalProps> = ({ open, progress, st
       <DialogTitle sx={{ textAlign: 'center', pb: 2 }}>
         <Box display="flex" alignItems="center" justifyContent="center" gap={2}>
           <CircularProgress size={32} color="primary" />
-          <Typography variant="h6" fontWeight={600}>
+          <Typography variant="h6" component="span" fontWeight={600}>
             Analyzing Your Competition
           </Typography>
         </Box>

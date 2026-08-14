@@ -7,6 +7,7 @@ to avoid external API costs and ban risk.
 """
 
 import os
+import asyncio
 import traceback
 from datetime import datetime
 from typing import List, Dict, Any, Optional
@@ -23,7 +24,7 @@ class SemanticHarvesterService:
         }
 
     async def harvest_website(self, website_url: str, limit: int = 100, user_id: Optional[str] = None,
-                               progress_callback=None) -> List[Dict[str, Any]]:
+                               progress_callback=None, log_callback=None) -> List[Dict[str, Any]]:
         """
         Crawl a website using BeautifulSoup and the user's sitemap.
 
@@ -36,8 +37,16 @@ class SemanticHarvesterService:
             limit: Maximum number of pages (capped by MAX_SIF_PAGES_PER_INDEX).
             user_id: Optional user ID for sitemap lookup.
             progress_callback: Optional async callable(current, total) for progress.
+            log_callback: Optional async callable(message) for progress messages.
         """
         logger.info(f"[SemanticHarvester] Starting harvest for {website_url} (Limit: {limit})")
+
+        async def _emit(message: str):
+            if log_callback:
+                try:
+                    await log_callback(message)
+                except Exception:
+                    pass
 
         results = []
 
@@ -53,49 +62,83 @@ class SemanticHarvesterService:
             max_pages = int(os.getenv("MAX_SIF_PAGES_PER_INDEX", "10"))
             limit = min(limit, max_pages)
             logger.info(f"[SemanticHarvester] Page limit: {limit}")
+            await _emit(f"Starting harvest (page limit: {limit})")
 
             # Resolve URLs to crawl: sitemap first, homepage fallback
-            urls_to_crawl = await self._resolve_urls_from_sitemap(website_url, user_id, limit)
+            urls_to_crawl = await self._resolve_urls_from_sitemap(website_url, user_id, limit, log_callback=log_callback)
+            await _emit(f"Resolved {len(urls_to_crawl)} URL(s) to crawl")
 
             from services.component_logic.web_crawler_logic import WebCrawlerLogic
             crawler = WebCrawlerLogic()
 
+            # Rate-limit-friendly crawling: a small pause between requests,
+            # plus a single retry when the site returns HTTP 429.
+            try:
+                crawl_delay = float(os.getenv("SIF_CRAWL_DELAY_MS", "1500")) / 1000.0
+            except (TypeError, ValueError):
+                crawl_delay = 1.5
+            try:
+                max_retries = int(os.getenv("SIF_CRAWL_MAX_RETRIES", "1"))
+            except (TypeError, ValueError):
+                max_retries = 1
+            if max_retries < 0:
+                max_retries = 0
+
             for i, url in enumerate(urls_to_crawl):
-                try:
-                    logger.debug(f"[SemanticHarvester] Crawling {i+1}/{len(urls_to_crawl)}: {url}")
-                    crawl_result = await crawler.crawl_website(url)
+                if i > 0 and crawl_delay > 0:
+                    await asyncio.sleep(crawl_delay)
+
+                crawl_result = None
+                for attempt in range(max_retries + 1):
+                    try:
+                        logger.debug(f"[SemanticHarvester] Crawling {i+1}/{len(urls_to_crawl)}: {url} (attempt {attempt+1})")
+                        crawl_result = await crawler.crawl_website(url, use_exa=False)
+                    except Exception as crawl_err:
+                        logger.warning(f"[SemanticHarvester] Crawl failed for {url}: {crawl_err}")
+                        crawl_result = {"success": False, "error": str(crawl_err), "http_status": None}
+
                     if crawl_result and crawl_result.get("success"):
-                        content = crawl_result.get("content", {})
-                        text = content.get("main_content", "") or ""
-                        if text:
-                            results.append({
-                                "url": url,
-                                "title": content.get("title", url),
-                                "content": text[:10_000],
-                                "metadata": {
-                                    "source": "beautifulsoup",
-                                    "word_count": len(text.split()),
-                                    "depth": url.count("/") - 2,
-                                }
-                            })
-                            self._harvest_stats["successful_extractions"] += 1
-                        else:
-                            self._harvest_stats["failed_extractions"] += 1
+                        break
+
+                    # Retry only on rate limiting (HTTP 429)
+                    if crawl_result and crawl_result.get("http_status") == 429 and attempt < max_retries:
+                        backoff = 2.0 * (attempt + 1)
+                        logger.warning(f"[SemanticHarvester] Rate limited (429) for {url}; retrying in {backoff}s")
+                        await _emit(f"Rate limited (429) — retrying {url} in {backoff}s")
+                        await asyncio.sleep(backoff)
+                        continue
+                    break
+
+                if crawl_result and crawl_result.get("success"):
+                    content = crawl_result.get("content", {})
+                    text = content.get("main_content", "") or ""
+                    if text:
+                        results.append({
+                            "url": url,
+                            "title": content.get("title", url),
+                            "content": text[:10_000],
+                            "metadata": {
+                                "source": "beautifulsoup",
+                                "word_count": len(text.split()),
+                                "depth": url.count("/") - 2,
+                            }
+                        })
+                        self._harvest_stats["successful_extractions"] += 1
                     else:
                         self._harvest_stats["failed_extractions"] += 1
-                except Exception as crawl_err:
-                    logger.warning(f"[SemanticHarvester] Crawl failed for {url}: {crawl_err}")
+                else:
                     self._harvest_stats["failed_extractions"] += 1
-                finally:
-                    if progress_callback:
-                        try:
-                            await progress_callback(len(results), len(urls_to_crawl))
-                        except Exception:
-                            pass
+
+                if progress_callback:
+                    try:
+                        await progress_callback(len(results), len(urls_to_crawl))
+                    except Exception:
+                        pass
 
             self._harvest_stats["total_urls_processed"] += len(urls_to_crawl)
             self._harvest_stats["last_harvest_time"] = datetime.now().isoformat()
             logger.info(f"[SemanticHarvester] Harvested {len(results)}/{len(urls_to_crawl)} pages from {website_url}")
+            await _emit(f"Harvested {len(results)} of {len(urls_to_crawl)} page(s)")
 
         except Exception as e:
             logger.error(f"[SemanticHarvester] Harvest failed for {website_url}: {e}")
@@ -103,9 +146,16 @@ class SemanticHarvesterService:
 
         return results
 
-    async def _resolve_urls_from_sitemap(self, website_url: str, user_id: Optional[str], limit: int) -> List[str]:
+    async def _resolve_urls_from_sitemap(self, website_url: str, user_id: Optional[str], limit: int, log_callback=None) -> List[str]:
         """Extract prioritized URLs from the user's sitemap analysis."""
         urls = []
+
+        async def _emit(message: str):
+            if log_callback:
+                try:
+                    await log_callback(message)
+                except Exception:
+                    pass
 
         # Try DB-based sitemap (from Step 1 website analysis)
         if user_id:
@@ -124,11 +174,34 @@ class SemanticHarvesterService:
                             .all()
                         )
                         for analysis in analyses:
-                            if not analysis.seo_audit:
-                                continue
-                            sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
-                            analysis_data = sitemap_data.get("analysis_data", {}) or sitemap_data
-                            sitemap_urls = analysis_data.get("url_list", [])
+                            sitemap_urls = []
+                            sitemap_url = None
+                            # Path 1: Step 2 stores in seo_audit.sitemap_analysis.analysis_data.url_list
+                            if analysis.seo_audit:
+                                sitemap_data = analysis.seo_audit.get("sitemap_analysis", {})
+                                analysis_data = sitemap_data.get("analysis_data", {}) or sitemap_data
+                                sitemap_urls = analysis_data.get("url_list", []) or []
+                                sitemap_url = sitemap_data.get("sitemap_url") or analysis_data.get("sitemap_url")
+                            # Path 2: Step 1 stores in crawl_result.sitemap_analysis
+                            if not sitemap_urls and analysis.crawl_result:
+                                crawl_sitemap = (analysis.crawl_result or {}).get("sitemap_analysis", {})
+                                sitemap_urls = crawl_sitemap.get("url_list", []) or []
+                                if not sitemap_url:
+                                    sitemap_url = crawl_sitemap.get("sitemap_url")
+                            # Fallback: fetch sitemap directly when url_list missing but sitemap_url exists
+                            if not sitemap_urls and sitemap_url:
+                                try:
+                                    from services.seo_tools.sitemap_service import SitemapService
+                                    svc = SitemapService()
+                                    await _emit(f"Fetching sitemap directly from {sitemap_url}")
+                                    fetched = await svc._fetch_sitemap_data(sitemap_url)
+                                    raw_urls = fetched.get("urls", []) if isinstance(fetched, dict) else []
+                                    sitemap_urls = [u.get("loc", "") for u in raw_urls if isinstance(u, dict) and u.get("loc")]
+                                    logger.info(f"[SemanticHarvester] Fetched {len(sitemap_urls)} URLs from sitemap {sitemap_url}")
+                                    await _emit(f"Fetched {len(sitemap_urls)} URL(s) from sitemap")
+                                except Exception as fetch_err:
+                                    logger.warning(f"[SemanticHarvester] Sitemap fetch fallback failed: {fetch_err}")
+                                    await _emit(f"Sitemap fetch failed: {fetch_err}")
                             if sitemap_urls:
                                 from urllib.parse import urlparse
                                 base_domain = urlparse(website_url).netloc
@@ -159,6 +232,7 @@ class SemanticHarvesterService:
         else:
             # Fallback: homepage only
             urls = [website_url]
+            await _emit("No sitemap URLs found — falling back to homepage only")
 
         return urls[:limit]
 
