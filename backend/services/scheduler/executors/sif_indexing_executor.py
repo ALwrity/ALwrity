@@ -186,6 +186,11 @@ class SIFIndexingExecutor(TaskExecutor):
             
             pages_harvested = content_result.get("count", 0) if isinstance(content_result, dict) else (content_result if isinstance(content_result, int) else 0)
             indexed_pages = content_result.get("pages", []) if isinstance(content_result, dict) else []
+
+            # If nothing new was harvested, retain the previously indexed
+            # page list so the SIF panel keeps showing the full index.
+            if not indexed_pages and isinstance(task.payload, dict) and task.payload.get("indexed_pages"):
+                indexed_pages = task.payload.get("indexed_pages")
             
             # Fetch sitemap total for visibility
             sitemap_total = 0

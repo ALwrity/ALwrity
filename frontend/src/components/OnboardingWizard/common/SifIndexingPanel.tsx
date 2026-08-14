@@ -54,10 +54,15 @@ export const SifIndexingPanel: React.FC = () => {
     setTestQuery(query);
     setTestResult('');
     try {
-      const res = await apiClient.get('/api/onboarding/sif/search', { params: { q: query, limit: 3 } });
+      const res = await apiClient.get('/api/onboarding/sif/search', { params: { query, limit: 3 } });
       const hits = res?.data?.hits || [];
       setTestResult(hits.length > 0
-        ? hits.map((h: any) => h?.text?.slice(0, 200) || h?.title || '').join('\n---\n')
+        ? hits.map((h: any, i: number) => {
+            const score = typeof h?.score === 'number' ? h.score.toFixed(3) : '';
+            const url = h?.id || '';
+            const text = h?.text?.slice(0, 250) || h?.title || '';
+            return `#${i + 1}${score ? ` · score ${score}` : ''}\n${url}\n${text}`;
+          }).join('\n\n')
         : 'No results found — content may not be indexed yet.');
     } catch {
       setTestResult('Search unavailable — try re-indexing.');

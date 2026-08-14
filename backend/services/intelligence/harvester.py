@@ -24,7 +24,8 @@ class SemanticHarvesterService:
         }
 
     async def harvest_website(self, website_url: str, limit: int = 100, user_id: Optional[str] = None,
-                               progress_callback=None, log_callback=None) -> List[Dict[str, Any]]:
+                               progress_callback=None, log_callback=None,
+                               urls: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         """
         Crawl a website using BeautifulSoup and the user's sitemap.
 
@@ -38,6 +39,8 @@ class SemanticHarvesterService:
             user_id: Optional user ID for sitemap lookup.
             progress_callback: Optional async callable(current, total) for progress.
             log_callback: Optional async callable(message) for progress messages.
+            urls: Optional pre-resolved list of URLs to crawl. When provided,
+                sitemap resolution is skipped and only these URLs are crawled.
         """
         logger.info(f"[SemanticHarvester] Starting harvest for {website_url} (Limit: {limit})")
 
@@ -65,8 +68,12 @@ class SemanticHarvesterService:
             await _emit(f"Starting harvest (page limit: {limit})")
 
             # Resolve URLs to crawl: sitemap first, homepage fallback
-            urls_to_crawl = await self._resolve_urls_from_sitemap(website_url, user_id, limit, log_callback=log_callback)
-            await _emit(f"Resolved {len(urls_to_crawl)} URL(s) to crawl")
+            if urls is not None:
+                urls_to_crawl = [u for u in urls if u][:limit]
+                await _emit(f"Crawling {len(urls_to_crawl)} URL(s)")
+            else:
+                urls_to_crawl = await self._resolve_urls_from_sitemap(website_url, user_id, limit, log_callback=log_callback)
+                await _emit(f"Resolved {len(urls_to_crawl)} URL(s) to crawl")
 
             from services.component_logic.web_crawler_logic import WebCrawlerLogic
             crawler = WebCrawlerLogic()
@@ -145,6 +152,15 @@ class SemanticHarvesterService:
             logger.error(f"[SemanticHarvester] Full traceback: {traceback.format_exc()}")
 
         return results
+
+    async def resolve_urls(self, website_url: str, limit: int = 100,
+                           user_id: Optional[str] = None, log_callback=None) -> List[str]:
+        """Resolve the sitemap URLs to crawl without crawling them.
+
+        Exposes the sitemap -> URL-list resolution so callers can pre-filter
+        (e.g. against an indexing watermark) before crawling.
+        """
+        return await self._resolve_urls_from_sitemap(website_url, user_id, limit, log_callback=log_callback)
 
     async def _resolve_urls_from_sitemap(self, website_url: str, user_id: Optional[str], limit: int, log_callback=None) -> List[str]:
         """Extract prioritized URLs from the user's sitemap analysis."""
