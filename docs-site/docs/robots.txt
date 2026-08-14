@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://alwrity.github.io/ALwrity/sitemap.xml
