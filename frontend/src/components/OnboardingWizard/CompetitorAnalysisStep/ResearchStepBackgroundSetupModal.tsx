@@ -484,6 +484,9 @@ const ResearchStepBackgroundSetupModal: React.FC<Props> = ({ open, onClose }) =>
             <Typography variant="caption" sx={{ color: '#94a3b8' }}>
               Last updated: {new Date(taskHealth.last_updated).toLocaleString()}
             </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', display: 'block', mt: 0.5 }}>
+              Full results for these tasks appear in the SEO Dashboard once you finish onboarding.
+            </Typography>
           </Box>
         )}
       </DialogContent>
