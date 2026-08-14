@@ -229,6 +229,8 @@ nav:
       - API Reference: features/todays-workflow/api-reference.md
     - SIF & AI Agents:
       - Overview: features/sif-agents/overview.md
+      - Semantic Indexing: features/sif-agents/semantic-indexing.md
+      - Test Your Indexing: features/sif-agents/test-your-indexing.md
       - Agent Directory: features/sif-agents/agent-directory.md
       - Committee System: features/sif-agents/committee-system.md
       - ContentGuardianAgent: features/sif-agents/content-guardian.md
