@@ -417,11 +417,26 @@ async def search_sif_index(query: str = "", limit: int = 5, current_user: Dict[s
         hits = []
         for r in (results or []):
             if isinstance(r, dict):
-                hits.append({"text": r.get("text", ""), "score": r.get("score", 0)})
+                doc_id = r.get("id")
+                text = r.get("text") or ""
+                score = r.get("score", 0)
             elif isinstance(r, (list, tuple)):
-                hits.append({"text": str(r[0]) if len(r) > 0 else "", "score": r[1] if len(r) > 1 else 0})
+                doc_id = r[0] if len(r) > 0 else None
+                text = str(doc_id) if len(r) > 0 else ""
+                score = r[1] if len(r) > 1 else 0
             else:
-                hits.append({"text": str(r), "score": 0})
+                doc_id = None
+                text = str(r)
+                score = 0
+
+            # txtai search returns id + score only; enrich with the stored
+            # document text so the caller can render a meaningful answer.
+            if not text or text == str(doc_id):
+                try:
+                    text = svc.intelligence_service.get_document_text(doc_id)
+                except Exception:
+                    text = ""
+            hits.append({"text": text, "score": score, "id": doc_id})
         return {"hits": hits, "query": query}
     except Exception as e:
         from loguru import logger

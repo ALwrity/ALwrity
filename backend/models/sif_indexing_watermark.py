@@ -86,6 +86,35 @@ class SIFIndexingWatermark(Base):
             return False
 
     @classmethod
+    def get_indexed_source_ids(cls, session, user_id: str, source_ids) -> set:
+        """Return the subset of ``source_ids`` that already have a watermark row.
+
+        Used to pre-filter URLs before crawling so already-indexed pages are
+        not re-harvested. Existence (not hash match) is the signal here — a
+        row means the source has been indexed at least once.
+        """
+        ids = list(source_ids or [])
+        if not ids:
+            return set()
+        try:
+            rows = (
+                session.query(cls.source_id)
+                .filter(cls.user_id == user_id, cls.source_id.in_(ids))
+                .all()
+            )
+            return {r[0] for r in rows}
+        except SQLAlchemyError as exc:
+            logger.warning(
+                f"SIFIndexingWatermark.get_indexed_source_ids DB error for "
+                f"user={user_id}: {exc}"
+            )
+            try:
+                session.rollback()
+            except Exception:
+                pass
+            return set()
+
+    @classmethod
     def upsert(
         cls,
         session,
