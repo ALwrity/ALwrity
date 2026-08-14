@@ -310,7 +310,7 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     setBenchmarkLoading(true);
     longRunningApiClient.get('/api/onboarding/step3/sitemap-benchmark-report')
       .then((resp) => {
-        if (!cancelled) setBenchmarkReport(resp.data || resp.data?.benchmark);
+        if (!cancelled) setBenchmarkReport(resp.data || null);
       })
       .catch(() => {
         if (!cancelled) setBenchmarkReport(null);
@@ -415,9 +415,11 @@ const CompetitorAnalysisStep: React.FC<CompetitorAnalysisStepProps> = ({
     } catch (e) {
         console.warn('Failed to update cache for competitors', e);
     }
-    // Delete from DB
-    if (removed?.url) {
-      longRunningApiClient.delete('/api/onboarding/competitor-analysis', { params: { competitor_url: removed.url } })
+    // Delete from DB — resolve URL across possible field names
+    const removedUrl = removed?.url || removed?.domain || '';
+    if (removedUrl) {
+      longRunningApiClient.delete('/api/onboarding/competitor-analysis', { params: { competitor_url: removedUrl } })
+        .then(() => console.log('Deleted competitor from DB:', removedUrl))
         .catch((e: any) => console.warn('Failed to delete competitor from DB:', e));
     }
   };

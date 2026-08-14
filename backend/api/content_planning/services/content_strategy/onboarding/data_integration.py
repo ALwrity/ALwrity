@@ -1041,6 +1041,14 @@ class OnboardingDataIntegrationService:
                     competitor_dict['analysis_data'] = record.analysis_data
                 competitor_dict['data_freshness'] = self._calculate_freshness(record.updated_at)
                 competitor_dict['confidence_level'] = 0.9 if record.status == 'completed' else 0.5
+                # Add frontend-friendly aliases (url/domain/title/summary/relevance_score)
+                competitor_dict['url'] = competitor_dict.get('competitor_url', '')
+                competitor_dict['domain'] = competitor_dict.get('competitor_domain', '')
+                ad = competitor_dict.get('analysis_data') or {}
+                if isinstance(ad, dict):
+                    competitor_dict['title'] = ad.get('title', '') or competitor_dict.get('competitor_domain', '')
+                    competitor_dict['summary'] = ad.get('summary', '')
+                    competitor_dict['relevance_score'] = ad.get('relevance_score', 0.5)
                 competitors.append(competitor_dict)
             
             logger.info(f"[CompetitorAnalysis] retrieved={len(competitors)} user={user_id}")
