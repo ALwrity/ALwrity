@@ -15,6 +15,8 @@ Usage:
 """
 
 import os
+import json
+import re
 import time as _time
 from typing import List, Dict, Optional
 
@@ -83,7 +85,7 @@ def novaroute_structured_json_response(
     temperature: float = 0.2,
     max_tokens: int = 8192,
     system_prompt: Optional[str] = None
-) -> str:
+) -> Dict[str, Any]:
     if not OPENAI_AVAILABLE:
         raise ImportError("OpenAI library not available")
 
@@ -98,7 +100,18 @@ def novaroute_structured_json_response(
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
-    messages.append({"role": "user", "content": prompt})
+
+    # Embed the JSON schema + an explicit JSON instruction so the model knows
+    # the exact expected structure (mirrors WaveSpeed/HF providers). This also
+    # satisfies the OpenAI "json" keyword requirement for response_format.
+    json_instruction = "Please respond with valid JSON that matches the provided schema."
+    user_content = f"{prompt}\n\n{json_instruction}"
+    if schema:
+        try:
+            user_content += f"\n\nJSON Schema:\n{json.dumps(schema, indent=2)}"
+        except Exception:
+            pass
+    messages.append({"role": "user", "content": user_content})
 
     t1 = _time.time()
     response = client.chat.completions.create(
@@ -118,4 +131,34 @@ def novaroute_structured_json_response(
         )
     logger.warning(f"[novaroute_structured_json_response] API call completed in {api_took:.0f}ms (model={model})")
 
-    return response.choices[0].message.content or ""
+    content = response.choices[0].message.content
+    content = content.strip() if content else ""
+
+    # Parse the JSON string into a dict, mirroring WaveSpeed/HF, so
+    # llm_text_gen returns a consistent dict across all OpenAI-compatible
+    # providers (NovaRouteAI returns a JSON string per the OpenAI standard).
+    if content.startswith("```json"):
+        content = content[7:]
+    if content.startswith("```"):
+        content = content[3:]
+    if content.endswith("```"):
+        content = content[:-3]
+    content = content.strip()
+
+    try:
+        parsed = json.loads(content) if content else None
+        if parsed is not None:
+            return parsed
+    except json.JSONDecodeError as parse_err:
+        logger.warning(f"[novaroute_structured_json_response] JSON parse failed: {parse_err}")
+
+    # Regex fallback: extract the first {...} JSON object.
+    if content:
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+        if json_match:
+            try:
+                return json.loads(json_match.group())
+            except json.JSONDecodeError:
+                pass
+
+    return {"error": "Failed to parse JSON response", "raw_response": content}
