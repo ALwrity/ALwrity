@@ -194,7 +194,6 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
               persona={corePersona}
               onChange={(updatedPersona) => {
                 setCorePersona(updatedPersona);
-                // TODO: Add debounced auto-save
               }}
               completeness={completeness}
               data_sufficiency={data_sufficiency}
@@ -291,7 +290,6 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
                           ...platformPersonas,
                           [platformId]: updatedPersona
                         });
-                        // TODO: Add debounced auto-save
                       }}
                     />
                   </Box>

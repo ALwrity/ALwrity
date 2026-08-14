@@ -121,11 +121,9 @@ if _is_full_mode():
     from api.onboarding_utils.step2_task_routes import router as step2_task_routes
     from api.onboarding_utils.content_audit_routes import router as content_audit_routes
 
-# Persona generation routes — full mode only (requires nltk/spacy; tied to onboarding)
-step4_persona_routes = None
+# Persona routes — full mode only (requires nltk/spacy; tied to onboarding)
 persona_routes = None
 if _is_full_mode():
-    from api.onboarding_utils.step4_persona_routes_optimized import router as step4_persona_routes
     from api.persona_routes import router as persona_routes
 
 # Import SEO tools router (skip in feature-only modes - uses seo_analyzer)
@@ -762,8 +760,6 @@ if _is_full_mode():
         app.include_router(step2_task_routes)
     if content_audit_routes:
         app.include_router(content_audit_routes)
-    if step4_persona_routes:
-        app.include_router(step4_persona_routes)
     if persona_routes:
         app.include_router(persona_routes)
 
