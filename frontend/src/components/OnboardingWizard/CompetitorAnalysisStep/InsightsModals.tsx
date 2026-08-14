@@ -11,10 +11,12 @@ import {
   ListItemIcon,
   ListItemText,
   Chip,
+  IconButton,
 } from '@mui/material';
 import {
   Lightbulb as LightbulbIcon,
   Search as SearchIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 
 function safeText(item: any): string {
@@ -52,15 +54,17 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
   return (
     <>
       {/* Industry Benchmarks Modal */}
-      <Dialog open={showBenchmarks} onClose={onCloseBenchmarks} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ pb: 2 }}>
-          <Typography variant="h6" fontWeight={600}>Industry Benchmarks</Typography>
+      <Dialog open={showBenchmarks} onClose={onCloseBenchmarks} maxWidth="md" fullWidth
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
+        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Industry Benchmarks</Typography>
+          <IconButton size="small" onClick={onCloseBenchmarks} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           {sitemapAnalysis?.analysis_data?.onboarding_insights?.industry_benchmarks?.map((benchmark: any, i: number) => {
             const text = typeof benchmark === 'string' ? benchmark : benchmark?.finding || benchmark?.title || JSON.stringify(benchmark);
             return (
-            <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#f8fafc', display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Paper key={i} variant="outlined" sx={{ p: 1.5, mb: 1.5, bgcolor: '#f8fafc', borderColor: '#e2e8f0', display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: '#94a3b8', flexShrink: 0 }} />
               <Typography variant="body2" color="#334155">{text}</Typography>
             </Paper>
@@ -69,11 +73,13 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
       </Dialog>
 
       {/* Content Strategy & SEO Modal */}
-      <Dialog open={showStrategy} onClose={onCloseStrategy} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ pb: 2 }}>
-          <Typography variant="h6" fontWeight={600}>Content Strategy & SEO Insights</Typography>
+      <Dialog open={showStrategy} onClose={onCloseStrategy} maxWidth="md" fullWidth
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
+        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Content Strategy & SEO Insights</Typography>
+          <IconButton size="small" onClick={onCloseStrategy} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2, fontSize: '0.85rem' }}>
             Actionable recommendations from AI analysis of your site structure and competitor landscape.
           </Typography>
@@ -116,9 +122,10 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
 
       {/* Publishing Patterns Modal */}
       <Dialog open={showPublishing} onClose={onClosePublishing} maxWidth="md" fullWidth
-        PaperProps={{ sx: { borderRadius: 2 } }}>
-        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#0f172a' }}>Publishing Patterns &amp; Trends</Typography>
+        PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
+        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Publishing Patterns &amp; Trends</Typography>
+          <IconButton size="small" onClick={onClosePublishing} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>
@@ -198,8 +205,9 @@ export const InsightsModals: React.FC<InsightsModalsProps> = ({
       {/* Site Structure Modal */}
       <Dialog open={showStructure} onClose={onCloseStructure} maxWidth="md" fullWidth
         PaperProps={{ sx: { borderRadius: 2, bgcolor: '#ffffff' } }}>
-        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-          <Typography variant="h6" fontWeight={700} sx={{ color: '#0f172a' }}>Topics Your Site Covers</Typography>
+        <DialogTitle sx={{ pb: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography variant="h6" component="span" fontWeight={700} sx={{ color: '#0f172a' }}>Topics Your Site Covers</Typography>
+          <IconButton size="small" onClick={onCloseStructure} aria-label="close" sx={{ color: '#64748b' }}><CloseIcon fontSize="small" /></IconButton>
         </DialogTitle>
         <DialogContent sx={{ pt: 2.5, bgcolor: '#ffffff' }}>
           <Typography variant="body2" sx={{ mb: 2.5, color: '#475569', fontSize: '0.85rem' }}>

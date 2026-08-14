@@ -38,6 +38,7 @@ from api.onboarding import (
     get_competitor_analysis,
     get_onboarding_state,
     retrigger_sif_indexing,
+    search_sif_index,
     save_business_info,
     get_business_info,
     get_business_info_by_user,

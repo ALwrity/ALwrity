@@ -53,6 +53,8 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     details['pages_harvested'] = payload['pages_harvested']
                 if payload.get('pages_total'):
                     details['pages_total'] = payload['pages_total']
+                if payload.get('sitemap_total'):
+                    details['sitemap_total'] = payload['sitemap_total']
                 details['harvest_source'] = payload.get('harvest_source', 'beautifulsoup')
                 if payload.get('pages_indexed'):
                     details['pages_indexed'] = payload['pages_indexed']
@@ -60,6 +62,8 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     details['pillars_found'] = payload['pillars_found']
                 if payload.get('indexed_pages'):
                     details['indexed_pages'] = payload['indexed_pages']
+                if payload.get('log_messages'):
+                    details['log_messages'] = payload['log_messages']
 
                 # Override progress_pct with actual phase-based progress
                 phase_progress = {

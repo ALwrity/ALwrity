@@ -772,7 +772,7 @@ async def analyze_sitemap_for_onboarding(
         # Background task to persist analysis results to DB
         background_tasks.add_task(
             _persist_sitemap_analysis,
-            current_user.get('user_id'),
+            str(current_user.get('id')),
             request.user_url,
             analysis_result
         )
@@ -814,6 +814,10 @@ async def _persist_sitemap_analysis(
 ) -> None:
     """Background task to persist sitemap analysis results to DB."""
     try:
+        if not analysis_result or not isinstance(analysis_result, dict):
+            logger.warning(f"_persist_sitemap_analysis: invalid analysis_result for user {user_id}")
+            return
+
         from services.database import get_session_for_user
         from api.onboarding_utils.step_management_service import StepManagementService
         db = get_session_for_user(user_id)
@@ -833,12 +837,17 @@ async def _persist_sitemap_analysis(
             seo_audit["sitemap_analysis"] = {
                 "success": True,
                 "user_url": user_url,
+                "sitemap_url": analysis_result.get("sitemap_url"),
                 "analyzed_at": analysis_result.get("timestamp"),
                 "analysis_data": {
                     "total_urls": analysis_result.get("total_urls", 0),
                     "url_list": analysis_result.get("url_list", []),
                     "structure_analysis": analysis_result.get("structure_analysis"),
+                    "content_trends": analysis_result.get("content_trends"),
+                    "publishing_patterns": analysis_result.get("publishing_patterns"),
+                    "ai_insights": analysis_result.get("ai_insights"),
                     "onboarding_insights": analysis_result.get("onboarding_insights") or analysis_result.get("sitemap_onboarding_insights"),
+                    "competitors_analyzed": analysis_result.get("competitors_analyzed", []),
                 },
             }
             analysis.seo_audit = seo_audit
@@ -849,7 +858,9 @@ async def _persist_sitemap_analysis(
         
         db.close()
     except Exception as e:
+        import traceback
         logger.error(f"Error persisting sitemap analysis: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
 
 async def _log_sitemap_analysis_result(

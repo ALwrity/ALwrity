@@ -74,7 +74,7 @@ class TxtaiIntelligenceService:
         self._initialization_in_progress = False
         self.enable_caching = enable_caching
         self.cache_manager = semantic_cache_manager if enable_caching else None
-        self._backend = "faiss"  # Default backend
+        self._backend = "numpy"  # NumPy backend avoids faiss IndexIDMap/nprobe incompatibility
         self._disable_ann_queries = False  # Set when FAISS nprobe incompatibility is detected
         self.fail_fast = str(os.getenv("SIF_FAIL_FAST", "true")).lower() in {"1", "true", "yes", "on"}
         
@@ -234,7 +234,7 @@ class TxtaiIntelligenceService:
                 "gpu": False,  # Force CPU usage for compatibility
                 "limit": 1000,  # Maximum number of results for queries
                 "faiss": {
-                    "components": "IVF1,Flat",  # Force IVF to avoid IndexIDMap nprobe incompatibility
+                    "components": "IDMap,Flat",  # IDMap supports add_with_ids; Flat has no nprobe (no incompatibility)
                 },
             })
             
@@ -262,7 +262,10 @@ class TxtaiIntelligenceService:
                         "backend": self._backend,
                         "batch": 32,
                         "gpu": False,
-                        "limit": 1000
+                        "limit": 1000,
+                        "faiss": {
+                            "components": "IDMap,Flat",
+                        },
                     })
             elif load_existing_index:
                 logger.info(f"No existing index found. Creating new txtai index for user {self.user_id}")
@@ -363,7 +366,7 @@ class TxtaiIntelligenceService:
             if len(items) < 2:
                 return []
             # Transform all items to get fresh embedding vectors
-            vectors = self.embeddings.transform(items)
+            vectors = self.embeddings.batchtransform(items)
             if not vectors or len(vectors) < 2:
                 return []
             query_vec = vectors[0]
