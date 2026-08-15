@@ -1,6 +1,7 @@
 """YouTube plan and scene-building API handlers."""
 
 from typing import Any, Dict
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -31,9 +32,13 @@ async def create_video_plan(
     try:
         user_id = require_authenticated_user(current_user)
 
+        article_url = (request.source_article_url or "").strip()
+        article_host = urlparse(article_url).hostname if article_url else None
+        has_source_article = bool(article_url or (request.source_article_summary or "").strip())
         logger.info(
             f"[YouTubeAPI] Creating plan: idea={request.user_idea[:50]}..., "
-            f"duration={request.duration_type}, user={user_id}"
+            f"duration={request.duration_type}, user={user_id}, "
+            f"has_source_article={has_source_article}, article_host={article_host}"
         )
 
         planner = YouTubePlannerService()
@@ -48,6 +53,9 @@ async def create_video_plan(
             user_id=user_id,
             avatar_url=request.avatar_url,
             enable_research=request.enable_research,
+            source_article_url=request.source_article_url,
+            source_article_title=request.source_article_title,
+            source_article_summary=request.source_article_summary,
         )
 
         return VideoPlanResponse(

@@ -43,6 +43,18 @@ class VideoPlanRequest(BaseModel):
         pattern="^(blog|story)$",
         description="Type of source content: blog or story"
     )
+    source_article_url: Optional[str] = Field(
+        None,
+        description="Optional extracted article URL used as video source"
+    )
+    source_article_title: Optional[str] = Field(
+        None,
+        description="Optional extracted article title"
+    )
+    source_article_summary: Optional[str] = Field(
+        None,
+        description="Optional extracted article summary (or truncated text)"
+    )
     avatar_url: Optional[str] = Field(
         None,
         description="Optional avatar URL if user uploaded one before plan generation"

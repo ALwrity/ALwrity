@@ -54,6 +54,9 @@ def build_planning_prompt(
     reference_image_description: Optional[str],
     research_context: str,
     include_scenes: bool,
+    source_article_url: Optional[str] = None,
+    source_article_title: Optional[str] = None,
+    source_article_summary: Optional[str] = None,
 ) -> str:
     """Build the LLM planning prompt (optionally including shorts scenes)."""
     source_context = ""
@@ -63,6 +66,21 @@ def build_planning_prompt(
 - Type: {source_content_type}
 - ID: {source_content_id}
 - Note: This video should be based on the existing {source_content_type} content.
+"""
+
+    article_url = (source_article_url or "").strip()
+    article_title = (source_article_title or "").strip()
+    article_summary = (source_article_summary or "").strip()[:4000]
+    source_article_context = ""
+    if article_url or article_summary:
+        source_article_context = f"""
+**Source Article:**
+- URL: {article_url or "N/A"}
+- Title: {article_title or "N/A"}
+- Summary:
+{article_summary or "N/A"}
+
+Plan the video from this article. Keep facts consistent with the summary. Do not invent claims that are not in the article.
 """
 
     image_context = ""
@@ -100,6 +118,7 @@ Follow these guidelines:
 
 {persona_context if persona_data else ""}
 {source_context if source_content_id else ""}
+{source_article_context}
 {image_context if reference_image_description else ""}
 {research_context if research_context else ""}
 

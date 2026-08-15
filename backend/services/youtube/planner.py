@@ -50,6 +50,9 @@ class YouTubePlannerService:
         avatar_url: Optional[str] = None,
         include_scenes: bool = False,  # For shorts: combine plan + scenes in one call
         enable_research: bool = True,  # Always enable research by default for enhanced plans
+        source_article_url: Optional[str] = None,
+        source_article_title: Optional[str] = None,
+        source_article_summary: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Generate a comprehensive video plan from user input.
@@ -143,6 +146,9 @@ class YouTubePlannerService:
                 persona_data=persona_data,
                 source_content_id=source_content_id,
                 source_content_type=source_content_type,
+                source_article_url=source_article_url,
+                source_article_title=source_article_title,
+                source_article_summary=source_article_summary,
                 reference_image_description=reference_image_description,
                 research_context=research_context,
                 include_scenes=include_scenes,
@@ -197,6 +203,9 @@ class YouTubePlannerService:
 
             if include_scenes and duration_type == "shorts":
                 plan_data = self._finalize_shorts_scenes(plan_data, duration_context)
+
+            if source_article_url:
+                plan_data["source_article_url"] = source_article_url
 
             logger.info("[YouTubePlanner] ✅ Plan generated successfully")
             return plan_data

@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom';
 import { youtubeApi, type VideoPlan, type Scene } from '../../services/youtubeApi';
 import { STEPS, YT_RED, YT_BG, YT_BORDER, YT_TEXT, YOUTUBE_CONTENT_LANGUAGE_OPTIONS, type Resolution, type DurationType, type VideoType, type YouTubeContentLanguage } from './constants';
 import { PlanStep } from './components/PlanStep';
+import type { YouTubeSourceArticle } from './components/PlanUrlImportBar';
 import { ScenesStep } from './components/ScenesStep';
 import { SceneGenerationStep } from './components/SceneGenerationStep';
 import { RenderStep } from './components/RenderStep';
@@ -73,6 +74,7 @@ const YouTubeCreator: React.FC = () => {
   const [regeneratingAvatar, setRegeneratingAvatar] = useState(false);
   const [generatingImageSceneId, setGeneratingImageSceneId] = useState<number | null>(null);
   const [generatingAudioSceneId, setGeneratingAudioSceneId] = useState<number | null>(null);
+  const [sourceArticle, setSourceArticle] = useState<YouTubeSourceArticle | null>(null);
   
   // Robust polling hook for image generation
   const { startPolling: startImagePolling, stopPolling: stopImagePolling } = useImageGenerationPolling();
@@ -146,6 +148,9 @@ const YouTubeCreator: React.FC = () => {
         brand_style: brandStyle || undefined,
         reference_image_description: referenceImage || undefined,
         avatar_url: avatarUrl || undefined,
+        source_article_url: sourceArticle?.url,
+        source_article_title: sourceArticle?.title,
+        source_article_summary: sourceArticle?.summary,
       });
 
       if (response.success && response.plan) {
@@ -169,7 +174,7 @@ const YouTubeCreator: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [userIdea, durationType, videoType, targetAudience, videoGoal, brandStyle, referenceImage, avatarUrl, updateState]);
+  }, [userIdea, durationType, videoType, targetAudience, videoGoal, brandStyle, referenceImage, avatarUrl, sourceArticle, updateState]);
 
   const handleAvatarUpload = useCallback(async (file: File) => {
     setUploadingAvatar(true);
@@ -899,6 +904,7 @@ const YouTubeCreator: React.FC = () => {
           makingPresentable={makingPresentable}
           language={language}
           onIdeaChange={(value) => updateState({ userIdea: value })}
+          onSourceArticleChange={setSourceArticle}
           onDurationChange={(value) => updateState({ durationType: value })}
           onVideoTypeChange={(value) => updateState({ videoType: value })}
           onTargetAudienceChange={(value) => updateState({ targetAudience: value })}

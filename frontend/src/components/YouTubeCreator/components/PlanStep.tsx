@@ -54,6 +54,7 @@ import { buildVideoPlanningOperation, buildImageEditingOperation } from '../util
 import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
 import { PlanTopicDiscoveryBar } from './PlanTopicDiscoveryBar';
+import { PlanUrlImportBar, type YouTubeSourceArticle } from './PlanUrlImportBar';
 
 interface PlanStepProps {
   userIdea: string;
@@ -70,6 +71,7 @@ interface PlanStepProps {
   makingPresentable?: boolean;
   language: YouTubeContentLanguage;
   onIdeaChange: (idea: string) => void;
+  onSourceArticleChange: (article: YouTubeSourceArticle | null) => void;
   onDurationChange: (duration: DurationType) => void;
   onVideoTypeChange: (type: VideoType | '') => void;
   onTargetAudienceChange: (audience: string) => void;
@@ -99,6 +101,7 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
   makingPresentable = false,
   language,
   onIdeaChange,
+  onSourceArticleChange,
   onDurationChange,
   onVideoTypeChange,
   onTargetAudienceChange,
@@ -208,6 +211,12 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
             <PlanTopicDiscoveryBar
               userIdea={userIdea}
               onIdeaChange={onIdeaChange}
+              disabled={loading}
+            />
+            <PlanUrlImportBar
+              userIdea={userIdea}
+              onIdeaChange={onIdeaChange}
+              onSourceArticleChange={onSourceArticleChange}
               disabled={loading}
             />
           </Box>

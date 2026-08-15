@@ -57,8 +57,10 @@ class TestTopicDiscoveryRouterPaths:
 
         assert "/api/podcast/trends" in paths
         assert "/api/podcast/research/tavily-category" in paths
+        assert "/api/podcast/extract-url" in paths
         assert "post" in paths["/api/podcast/trends"]
         assert "post" in paths["/api/podcast/research/tavily-category"]
+        assert "post" in paths["/api/podcast/extract-url"]
 
 
 class TestTopicDiscoveryTrendsEndpoint:

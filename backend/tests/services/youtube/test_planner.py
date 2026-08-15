@@ -92,6 +92,28 @@ class TestGeneratePlan:
         assert result["video_summary"]
         assert result["duration_type"] == "shorts" or "video_summary" in result
 
+    def test_copies_source_article_url_onto_plan(self):
+        from services.youtube.planner import YouTubePlannerService
+
+        svc = YouTubePlannerService()
+        llm_payload = _minimal_plan()
+
+        with patch("services.youtube.planner.llm_text_gen", return_value=llm_payload), \
+             patch.object(svc, "_perform_exa_research", new=AsyncMock(return_value=None)):
+            result = asyncio.run(
+                svc.generate_plan(
+                    user_idea="Cheap travel tips",
+                    duration_type="shorts",
+                    user_id="user_planner",
+                    enable_research=False,
+                    source_article_url="https://example.com/bali-guide",
+                    source_article_title="Bali Guide",
+                    source_article_summary="Pack light.",
+                )
+            )
+
+        assert result["source_article_url"] == "https://example.com/bali-guide"
+
     def test_http_exception_propagates(self):
         from services.youtube.planner import YouTubePlannerService
 

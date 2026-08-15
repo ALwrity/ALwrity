@@ -14,6 +14,9 @@ export interface VideoPlanRequest {
   reference_image_description?: string;
   source_content_id?: string;
   source_content_type?: 'blog' | 'story';
+  source_article_url?: string;
+  source_article_title?: string;
+  source_article_summary?: string;
   avatar_url?: string;
 }
 
