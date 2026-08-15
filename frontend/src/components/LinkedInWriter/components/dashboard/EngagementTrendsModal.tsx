@@ -172,7 +172,10 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   const showNoChanges = Boolean(
     data && !loading && !insufficient && hasNoComparableChanges(data),
   );
-  const risingList = data ? postsForTab("rising", data) : [];
+  const risingList = useMemo(
+    () => (data ? postsForTab("rising", data) : []),
+    [data],
+  );
   const hasTrendData = Boolean(
     data &&
     !loading &&
