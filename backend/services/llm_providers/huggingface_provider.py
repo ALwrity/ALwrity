@@ -51,7 +51,9 @@ import sys
 from pathlib import Path
 import json
 import re
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
+
+from .json_parsing import robust_json_loads
 
 from dotenv import load_dotenv
 
@@ -296,7 +298,8 @@ def huggingface_structured_json_response(
     model: str = "openai/gpt-oss-120b:groq",
     temperature: float = 0.7,
     max_tokens: int = 8192,
-    system_prompt: Optional[str] = None
+    system_prompt: Optional[str] = None,
+    fallback_models: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Generate structured JSON response using Hugging Face Inference Providers API.
@@ -374,7 +377,7 @@ def huggingface_structured_json_response(
         
         # Add user prompt with JSON instruction
         # For HF models, explicit JSON instruction in prompt is often better than response_format
-        json_instruction = "Please respond with valid JSON that matches the provided schema."
+        json_instruction = "Please respond with valid JSON that matches the provided schema. Use only standard JSON escape sequences."
         messages.append({
             "role": "user", 
             "content": f"{prompt}\n\n{json_instruction}"
@@ -433,7 +436,7 @@ def huggingface_structured_json_response(
             response_text = response_text.strip()
             
             try:
-                parsed_json = json.loads(response_text)
+                parsed_json = robust_json_loads(response_text)
                 logger.info("✅ Hugging Face structured JSON response parsed successfully")
                 return parsed_json
             except json.JSONDecodeError as json_err:
@@ -444,7 +447,7 @@ def huggingface_structured_json_response(
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
                     try:
-                        extracted_json = json.loads(json_match.group())
+                        extracted_json = robust_json_loads(json_match.group())
                         logger.info("✅ JSON extracted using regex fallback")
                         return extracted_json
                     except json.JSONDecodeError:
@@ -478,11 +481,11 @@ def huggingface_structured_json_response(
                     raise last_error or e
                 response_text = response.choices[0].message.content
                 try:
-                    return json.loads(response_text)
+                    return robust_json_loads(response_text)
                 except:
                     json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                     if json_match:
-                        return json.loads(json_match.group())
+                        return robust_json_loads(json_match.group())
                     return {"error": "Failed to parse JSON response", "raw_response": response_text}
             raise e
         

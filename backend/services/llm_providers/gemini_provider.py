@@ -93,6 +93,8 @@ import re
 
 from typing import Optional, Dict, Any
 
+from .json_parsing import robust_json_loads
+
 
 def get_gemini_api_key() -> str:
     """Get Gemini API key with proper error handling."""
@@ -597,7 +599,7 @@ def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, 
                 if json_match:
                     cleaned_text = json_match.group(0)
                 
-                parsed_text = json.loads(cleaned_text)
+                parsed_text = robust_json_loads(cleaned_text)
                 logger.info("Successfully parsed text as JSON")
                 
                 # Track usage if user_id is provided
@@ -635,7 +637,7 @@ def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, 
                         fixed_json = re.sub(r',\s*}', '}', fixed_json)
                         fixed_json = re.sub(r',\s*]', ']', fixed_json)
                         
-                        parsed_text = json.loads(fixed_json)
+                        parsed_text = robust_json_loads(fixed_json)
                         
                         # Track usage if user_id is provided
                         if user_id:
@@ -670,7 +672,7 @@ def gemini_structured_json_response(prompt, schema, temperature=0.7, top_p=0.9, 
                         if hasattr(part, 'text') and part.text:
                             try:
                                 import json
-                                parsed_text = json.loads(part.text)
+                                parsed_text = robust_json_loads(part.text)
                                 logger.info("Successfully parsed candidate text as JSON")
                                 
                                 # Track usage if user_id is provided
@@ -844,7 +846,7 @@ def _removed_extract_partial_json(text: str) -> Optional[Dict[str, Any]]:
         
         # Try to parse the repaired JSON
         try:
-            result = json.loads(json_text)
+            result = robust_json_loads(json_text)
             logger.info(f"Successfully extracted partial JSON with {len(str(result))} characters")
             return result
         except json.JSONDecodeError as e:
