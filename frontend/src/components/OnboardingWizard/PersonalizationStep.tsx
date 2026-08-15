@@ -19,6 +19,7 @@ import {
 import { getLatestBrandAvatar, getLatestVoiceClone } from '../../api/brandAssets';
 import { usePersonaPolling } from '../../hooks/usePersonaPolling';
 import { aiApiClient } from '../../api/client';
+import { savePersonaUpdate } from '../../api/personaApi';
 import { type GenerationStep } from './PersonaStep/PersonaGenerationProgress';
 import { usePersonaInitialization } from './PersonaStep/personaInitialization';
 import { usePersonaGeneration } from './PersonaStep/personaGeneration';
@@ -245,6 +246,38 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     onDataChange
   ]);
 
+  // Debounced auto-save of persona edits to the server. Edits are also
+  // persisted on "Continue" (complete_step), but this makes them durable
+  // even if the user navigates away or refreshes without clicking through.
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!corePersona || isGenerating) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    saveTimerRef.current = setTimeout(() => {
+      savePersonaUpdate({
+        core_persona: corePersona,
+        platform_personas: platformPersonas,
+        quality_metrics: qualityMetrics ?? {},
+        selected_platforms: selectedPlatforms,
+      }).catch((err) => {
+        // Non-blocking: a failed auto-save is surfaced only in the console.
+        // The authoritative write still happens on Continue.
+        console.warn('Persona auto-save failed:', err);
+      });
+    }, 800);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [corePersona, platformPersonas, qualityMetrics, selectedPlatforms, isGenerating]);
+
   // Generation steps (Ported from PersonaStep)
   const generationSteps: GenerationStep[] = [
     {
@@ -457,7 +490,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     setCorePersona(null);
     setPlatformPersonas({});
     setQualityMetrics(null);
-    generatePersonas();
+    generatePersonas(true);
   };
 
   useEffect(() => {

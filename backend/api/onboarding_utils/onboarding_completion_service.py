@@ -390,7 +390,15 @@ class OnboardingCompletionService:
             )
     
 async def _generate_persona_from_onboarding(user_id: str) -> bool:
-        """Generate writing persona from onboarding data (fire-and-forget with timeout)."""
+        """Generate writing persona from onboarding data (fire-and-forget with timeout).
+
+        NOTE: this populates the legacy ``WritingPersona`` table (via the
+        deprecated ``PersonaAnalysisService``), which is a DIFFERENT store
+        from the onboarding ``PersonaData`` persona generated in Step 3.
+        ``WritingPersona`` is still consumed by content generators (LinkedIn,
+        Facebook, persona replication), so this must not be "deduplicated"
+        against ``PersonaData`` without migrating those consumers first.
+        """
         try:
             import asyncio
             persona_service = PersonaAnalysisService()

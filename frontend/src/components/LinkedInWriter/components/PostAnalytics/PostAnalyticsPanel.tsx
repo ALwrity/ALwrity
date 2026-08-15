@@ -7,10 +7,11 @@ import { ErrorState } from "./ErrorState";
 import { LoadingState } from "./LoadingState";
 import { PostCard } from "./PostCard";
 import { EngagementSummary } from "./EngagementSummary";
+import { ContentAnalyticsOverview } from "./ContentAnalyticsOverview";
+import { EngagementHighlights } from "./EngagementHighlights";
 import { PostTimelineChart } from "./PostTimelineChart";
-import { BrandScoreSummaryCard } from "./BrandScoreSummaryCard";
-import { colors, panelContainer, primaryBtn, secondaryBtn } from "./styles";
-import { PerformancePulseCrossLink } from "../dashboard/PerformancePulseCrossLink";
+import { useEngagementStats } from "./useEngagementStats";
+import { colors, panelContainer, secondaryBtn } from "./styles";
 
 export interface PostAnalyticsPanelProps {
   /** When true, fetches and renders post analytics content. */
@@ -39,6 +40,7 @@ export const PostAnalyticsPanel: React.FC<PostAnalyticsPanelProps> = ({
   } = usePostAnalytics();
   const isLoading = panelState === "loading";
   const showSkeleton = isLoading && !data;
+  const engagementStats = useEngagementStats(data?.posts ?? []);
 
   useEffect(() => {
     if (open && panelState === "idle" && connected) {
@@ -82,91 +84,23 @@ Create a new post that captures the same essence but with different examples, up
   }
 
   return (
-    <div style={embedded ? undefined : panelContainer}>
-      {!embedded ? (
-        <header
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            justifyContent: "space-between",
-            gap: 16,
-            marginBottom: 20,
-          }}
-        >
-          <div>
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 22,
-                fontWeight: 700,
-                color: colors.textDark,
-              }}
-            >
-              Post Analytics
-            </h2>
-            <p
-              style={{
-                margin: "6px 0 0",
-                fontSize: 13,
-                color: colors.textSecondary,
-                lineHeight: 1.5,
-              }}
-            >
-              Review engagement on your personal LinkedIn posts — reactions,
-              comments, impressions, and more.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={handleFetch}
-            disabled={isLoading}
-            style={{
-              ...primaryBtn,
-              flexShrink: 0,
-              background: isLoading ? "#93c5fd" : colors.primary,
-              cursor: isLoading ? "not-allowed" : "pointer",
-            }}
-            aria-label="Get post list"
-          >
-            {isLoading ? "Loading…" : "Get Post List"}
-          </button>
-        </header>
-      ) : (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
-          <p
+    <div
+      className={embedded ? "linkedin-content-analytics-panel" : undefined}
+      style={embedded ? undefined : panelContainer}
+    >
+      {!embedded && (
+        <header style={{ marginBottom: 20 }}>
+          <h2
             style={{
               margin: 0,
-              fontSize: 13,
-              color: colors.textSecondary,
-              lineHeight: 1.5,
+              fontSize: 22,
+              fontWeight: 700,
+              color: colors.textDark,
             }}
           >
-            Review engagement on your personal LinkedIn posts — reactions,
-            comments, impressions, and more.
-          </p>
-          <button
-            type="button"
-            onClick={handleFetch}
-            disabled={isLoading}
-            style={{
-              ...primaryBtn,
-              flexShrink: 0,
-              background: isLoading ? "#93c5fd" : colors.primary,
-              cursor: isLoading ? "not-allowed" : "pointer",
-            }}
-            aria-label="Get post list"
-          >
-            {isLoading ? "Loading…" : "Get Post List"}
-          </button>
-        </div>
+            Post Analytics
+          </h2>
+        </header>
       )}
 
       {panelState === "idle" && <IdleState onFetch={handleFetch} />}
@@ -182,18 +116,27 @@ Create a new post that captures the same essence but with different examples, up
       )}
 
       {data && panelState !== "idle" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {onOpenPerformancePulse && data.posts.length > 0 && (
-            <PerformancePulseCrossLink
-              onBeforeNavigate={onOpenPerformancePulse}
-            />
+        <div className="linkedin-content-analytics-panel__body">
+          {embedded ? (
+            data.posts.length > 0 && (
+              <>
+                <ContentAnalyticsOverview posts={data.posts} />
+                <EngagementHighlights
+                  stats={engagementStats}
+                  onOpenPerformancePulse={onOpenPerformancePulse}
+                />
+              </>
+            )
+          ) : (
+            <>
+              {data.posts.length >= 3 && (
+                <PostTimelineChart posts={data.posts} />
+              )}
+              {data.posts.length > 0 && (
+                <EngagementSummary posts={data.posts} />
+              )}
+            </>
           )}
-
-          <BrandScoreSummaryCard />
-
-          {data.posts.length >= 3 && <PostTimelineChart posts={data.posts} />}
-
-          {data.posts.length > 0 && <EngagementSummary posts={data.posts} />}
 
           <RefreshBar
             postCount={data.posts.length}
@@ -213,7 +156,7 @@ Create a new post that captures the same essence but with different examples, up
           )}
 
           {data.posts.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="linkedin-content-analytics-panel__posts">
               {data.posts.map((post) => (
                 <PostCard
                   key={post.id}

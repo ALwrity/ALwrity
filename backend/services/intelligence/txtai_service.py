@@ -395,6 +395,17 @@ class TxtaiIntelligenceService:
         except Exception:
             return ""
 
+    def get_document_text(self, doc_id) -> str:
+        """Return the stored text for a document ID, or '' if unavailable.
+
+        Public wrapper over ``_get_document_text`` for callers (e.g. the
+        SIF search endpoint) that receive a document ID from search hits
+        and need to surface the matching text.
+        """
+        if not self._initialized or not self.embeddings:
+            return ""
+        return self._get_document_text(doc_id)
+
     @staticmethod
     def _cosine_similarity_from_vectors(v1, v2) -> float:
         """Compute cosine similarity for two embedding vectors."""

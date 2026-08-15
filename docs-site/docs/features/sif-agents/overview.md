@@ -79,6 +79,8 @@ Every agent action — proposals, audits, errors, initialisations — is logged 
 
 ## Related Features
 
+- **[Semantic Indexing](semantic-indexing.md)** — How ALwrity indexes your website content
+- **[Test Your Indexing](test-your-indexing.md)** — Verify ALwrity understands your website
 - **[Team Activity](../team-activity/overview.md)** — Real-time agent activity dashboard
 - **[Content Guardian](content-guardian.md)** — AI quality audits for your content
 - **[Today's Workflow](../todays-workflow/overview.md)** — Agent-driven daily task management

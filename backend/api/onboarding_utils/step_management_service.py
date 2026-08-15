@@ -356,12 +356,24 @@ class StepManagementService:
             raise e
 
     def _delete_competitor_by_url(self, user_id: str, competitor_url: str, db: Session) -> bool:
-        """Delete a single competitor by URL from the database."""
+        """Delete a single competitor by URL (or domain) across all user sessions."""
         try:
-            session = self._get_or_create_session(user_id, db)
+            from sqlalchemy import or_
+            # Get all session IDs for this user to avoid first-vs-latest session mismatch
+            session_ids = [
+                s.id for s in db.query(OnboardingSession).filter(
+                    OnboardingSession.user_id == user_id
+                ).all()
+            ]
+            if not session_ids:
+                logger.warning(f"No sessions found for user {user_id}")
+                return False
             deleted = db.query(CompetitorAnalysis).filter(
-                CompetitorAnalysis.session_id == session.id,
-                CompetitorAnalysis.competitor_url == competitor_url
+                CompetitorAnalysis.session_id.in_(session_ids),
+                or_(
+                    CompetitorAnalysis.competitor_url == competitor_url,
+                    CompetitorAnalysis.competitor_domain == competitor_url,
+                )
             ).delete(synchronize_session=False)
             if deleted:
                 db.commit()

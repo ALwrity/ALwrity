@@ -18,7 +18,7 @@ CORE_ROUTER_REGISTRY = [
     {"name": "step3_research", "module": "api.onboarding_utils.step3_routes", "attr": "router", "features": {"all", "core"}},
     {"name": "onboarding_asset_queries", "module": "api.onboarding_utils.asset_query_routes", "attr": "router", "features": {"all", "core", "podcast", "youtube"}},
     {"name": "step4_assets", "module": "api.onboarding_utils.step4_asset_routes", "attr": "router", "features": {"all", "core", "podcast"}},
-    {"name": "step4_persona", "module": "api.onboarding_utils.step4_persona_routes_optimized", "attr": "router", "features": {"all", "core"}},
+    {"name": "step4_test_drive", "module": "api.onboarding_utils.step4_test_drive_routes", "attr": "router", "features": {"all", "core"}},
     {"name": "gsc_auth", "module": "routers.gsc_auth", "attr": "router", "features": {"all", "core", "seo", "blog_writer"}},
     {"name": "ai_visibility", "module": "routers.ai_visibility", "attr": "router", "features": {"all", "core", "seo", "blog_writer"}},
     {"name": "wordpress", "module": "routers.wordpress", "attr": "router", "features": {"all", "core", "blog_writer"}},

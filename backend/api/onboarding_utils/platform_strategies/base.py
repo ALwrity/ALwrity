@@ -7,8 +7,9 @@ instagram, ...) must implement.  The onboarding plumbing calls only these
 methods, never platform-specific services directly, so new platforms can
 be added without touching shared code.
 
-Step numbers follow the **backend** convention (1-indexed, steps 1-5,
-step 6 = completion) established by the existing website onboarding flow.
+Step numbers follow the **backend** convention (1-indexed):
+1 = website/connect, 2 = research, 3 = persona generation. Final
+completion is handled by OnboardingCompletionService, not a strategy.
 """
 
 from __future__ import annotations
@@ -77,11 +78,10 @@ class PlatformOnboardingStrategy(Protocol):
         ``async def`` and run their sync code without any awaits.
 
         Backend step numbers:
-            1 -- API keys / initial integrations
-            2 -- Website analysis / profile baseline
-            3 -- Research / competitor discovery
-            4 -- Persona generation
-            5 -- Integrations / content preferences
+            1 -- Website analysis / connect platforms
+            2 -- Research / competitor discovery
+            3 -- Persona generation
+            (final completion is handled by OnboardingCompletionService)
         """
         ...
 

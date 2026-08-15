@@ -4,6 +4,10 @@ Core Persona Service
 Handles the core persona generation logic using the provider-agnostic llm_text_gen gateway.
 """
 
+import json
+import re
+import time
+
 from typing import Dict, Any, List
 from loguru import logger
 from datetime import datetime
@@ -110,6 +114,8 @@ class CorePersonaService:
         try:
             # Generate structured response using the provider-agnostic gateway
             # (handles GPT_PROVIDER routing, subscription/usage checks, fallbacks)
+            t0 = time.time()
+            trace_id = f"alwrity_onboarding_persona_{user_id}"
             response = llm_text_gen(
                 prompt=prompt,
                 json_struct=persona_schema,
@@ -117,20 +123,105 @@ class CorePersonaService:
                 max_tokens=8192,
                 system_prompt=system_prompt,
                 user_id=user_id,
-                flow_type="core_persona_generation"
+                flow_type="core_persona_generation",
+                trace_id=trace_id,
             )
-            
-            if "error" in response:
-                logger.error(f"LLM gateway error: {response['error']}")
-                return {"error": f"AI analysis failed: {response['error']}"}
+            api_took = (time.time() - t0) * 1000
+
+            # Provider shape differs: WaveSpeed/Gemini return a pre-parsed dict,
+            # NovaRouteAI/HF return a JSON string (OpenAI-standard). Normalize both.
+            parse_t0 = time.time()
+            parsed = self._parse_persona_response(response)
+            parse_took = (time.time() - parse_t0) * 1000
+
+            validation = self._validate_persona_with_pydantic(parsed)
+            logger.warning(
+                f"[persona_telemetry] trace={trace_id} "
+                f"api_latency_ms={api_took:.0f} parse_ms={parse_took:.0f} "
+                f"pydantic_valid={validation['valid']} "
+                f"fields_ok={validation['fields_ok']}/{validation['total_fields']} "
+                f"parse_source={'direct_dict' if isinstance(response, dict) else 'json_string'}"
+            )
+            if not validation['valid']:
+                logger.warning(
+                    f"[persona_telemetry] trace={trace_id} "
+                    f"Pydantic errors: {validation.get('errors', '')}"
+                )
+
+            if parsed.get("error"):
+                logger.error(f"LLM gateway error: {parsed['error']}")
+                return {"error": f"AI analysis failed: {parsed['error']}"}
             
             logger.info("✅ Core persona generated successfully")
-            return response
+            return parsed
             
         except Exception as e:
             logger.error(f"Error generating core persona: {str(e)}")
             return {"error": f"Failed to generate core persona: {str(e)}"}
     
+    def _parse_persona_response(self, ai_response: Any) -> Dict[str, Any]:
+        """Normalize the LLM response to a dict.
+
+        WaveSpeed/Gemini native JSON mode return a pre-parsed dict; NovaRouteAI
+        and HF follow the OpenAI standard and return a JSON string. Handle both,
+        plus markdown-fenced JSON.
+        """
+        if isinstance(ai_response, dict):
+            return ai_response
+        if isinstance(ai_response, str):
+            try:
+                return json.loads(ai_response)
+            except json.JSONDecodeError:
+                m = re.search(r'```json\s*(.*?)\s*```', ai_response, re.DOTALL)
+                if m:
+                    try:
+                        return json.loads(m.group(1))
+                    except json.JSONDecodeError:
+                        pass
+        return {"error": f"Unparseable persona response: {str(ai_response)[:200]}"}
+
+    def _validate_persona_with_pydantic(self, persona: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate the persona against its required top-level contract.
+
+        Returns dict with: valid, total_fields, fields_ok, errors (field paths
+        only, no raw content).
+        """
+        required_fields = [
+            "identity",
+            "linguistic_fingerprint",
+            "tonal_range",
+            "evidence",
+            "what_was_missing",
+            "confidence",
+        ]
+        total = len(required_fields)
+        try:
+            from pydantic import BaseModel, ValidationError
+
+            class CorePersona(BaseModel):
+                identity: dict
+                linguistic_fingerprint: dict
+                tonal_range: dict
+                evidence: dict
+                what_was_missing: list
+                confidence: float
+
+            CorePersona(**persona)
+            return {"valid": True, "total_fields": total, "fields_ok": total, "errors": ""}
+        except Exception as e:
+            error_fields = []
+            if hasattr(e, 'errors'):
+                for err in e.errors():
+                    loc = ".".join(str(x) for x in err.get("loc", []))
+                    typ = err.get("type", "unknown")
+                    error_fields.append(f"{loc}({typ})")
+            return {
+                "valid": False,
+                "total_fields": total,
+                "fields_ok": max(0, total - len(error_fields)),
+                "errors": "; ".join(error_fields) if error_fields else str(e)[:200],
+            }
+
     def generate_platform_adaptations(self, core_persona: Dict[str, Any], onboarding_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate platform-specific persona adaptations."""
         

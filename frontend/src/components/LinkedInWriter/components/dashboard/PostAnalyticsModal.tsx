@@ -7,6 +7,10 @@ import {
   wedgeSubModalClassName,
   wedgeSubModalShellProps,
 } from "./wedgeModalUi";
+import {
+  CONTENT_ANALYTICS_MODAL_CLASS,
+  CONTENT_ANALYTICS_MODAL_SIZE,
+} from "./contentAnalyticsModalLayout";
 
 interface PostAnalyticsModalProps {
   open: boolean;
@@ -45,14 +49,18 @@ export const PostAnalyticsModal: React.FC<PostAnalyticsModalProps> = ({
       title="Content Analytics"
       onClose={onClose}
       onBack={onBack}
+      {...CONTENT_ANALYTICS_MODAL_SIZE}
       {...(wedgeNav
         ? {
             ...wedgeSubModalShellProps(WEDGE_BACK_LABELS.analysis),
-            modalClassName: wedgeSubModalClassName(),
+            modalClassName: wedgeSubModalClassName(
+              CONTENT_ANALYTICS_MODAL_CLASS,
+            ),
           }
-        : { titleSize: "xl" as const })}
-      maxWidth={960}
-      maxHeight="min(92vh, 900px)"
+        : {
+            titleSize: "xl" as const,
+            modalClassName: CONTENT_ANALYTICS_MODAL_CLASS,
+          })}
     >
       <PostAnalyticsPanel
         open={open}

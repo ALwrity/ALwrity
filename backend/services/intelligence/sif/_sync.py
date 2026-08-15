@@ -526,41 +526,69 @@ class SIFSyncMixin:
         try:
             logger.info(f"Syncing user website content for {website_url} (User: {self.user_id})")
 
-            # 1. Harvest content with tier-based page limit
+            import hashlib
+            from services.database.sessions import get_session_for_user
+            from models.sif_indexing_watermark import SIFIndexingWatermark
+
+            # 1. Resolve URLs (cheap) without crawling
             page_limit = self._get_sif_page_limit()
             if log_callback:
                 try:
                     await log_callback(f"Resolving URLs (page limit: {page_limit})...")
                 except Exception:
                     pass
-            harvested_pages = await self.harvester.harvest_website(
-                website_url, limit=page_limit, user_id=self.user_id,
-                progress_callback=progress_callback,
-                log_callback=log_callback)
+            urls = await self.harvester.resolve_urls(
+                website_url, limit=page_limit, user_id=self.user_id, log_callback=log_callback)
 
-            if not harvested_pages:
-                logger.warning(f"No content harvested from {website_url}")
+            # 2. Pre-filter: skip already-indexed URLs (watermark existence)
+            wm_session = get_session_for_user(self.user_id)
+            source_ids = [f"user_content:{u}" for u in urls]
+            already_indexed = set()
+            if wm_session:
+                already_indexed = SIFIndexingWatermark.get_indexed_source_ids(
+                    wm_session, self.user_id, source_ids)
+            new_urls = [u for u, sid in zip(urls, source_ids) if sid not in already_indexed]
+            unchanged_count = len(urls) - len(new_urls)
+
+            if not new_urls:
                 if log_callback:
                     try:
-                        await log_callback("No pages could be harvested from the website")
+                        await log_callback(f"All {len(urls)} page(s) already indexed — nothing new")
                     except Exception:
                         pass
-                return
+                if wm_session:
+                    try:
+                        wm_session.close()
+                    except Exception:
+                        pass
+                _sif_metrics_inc("sif_sync_total", "website_content_success")
+                return {"count": len(urls), "pages": [], "new": 0, "unchanged": unchanged_count}
 
-            logger.info(f"Harvested {len(harvested_pages)} pages from {website_url}")
             if log_callback:
                 try:
-                    await log_callback(f"Indexing {len(harvested_pages)} harvested page(s)...")
+                    await log_callback(f"Indexing {len(new_urls)} new page(s) ({unchanged_count} already indexed)")
                 except Exception:
                     pass
 
-            # 2. Prepare items for indexing (Upsert Strategy with watermark)
-            # Using URL as the unique ID ensures updates overwrite existing entries
-            import hashlib
-            from services.database.sessions import get_session_for_user
-            from models.sif_indexing_watermark import SIFIndexingWatermark
+            # 3. Harvest only new URLs
+            harvested_pages = await self.harvester.harvest_website(
+                website_url, limit=page_limit, user_id=self.user_id,
+                progress_callback=progress_callback,
+                log_callback=log_callback, urls=new_urls)
 
-            wm_session = get_session_for_user(self.user_id)
+            if not harvested_pages:
+                logger.warning(f"No content harvested from {website_url}")
+                if wm_session:
+                    try:
+                        wm_session.close()
+                    except Exception:
+                        pass
+                return {"count": unchanged_count, "pages": [], "new": 0, "unchanged": unchanged_count}
+
+            logger.info(f"Harvested {len(harvested_pages)} new pages from {website_url}")
+
+            # 4. Prepare items for indexing (Upsert Strategy with watermark)
+            # Using URL as the unique ID ensures updates overwrite existing entries
             items_to_index = []
             watermark_updates = []  # (source_id, source_hash, embedding_count)
 
@@ -596,12 +624,12 @@ class SIFSyncMixin:
                 items_to_index.append((url, text_content, metadata))
                 watermark_updates.append((source_id, content_hash, 1))
 
-            # 3. Index (Upsert)
+            # 5. Index (Upsert)
             if items_to_index:
                 await self.intelligence_service.index_content(items_to_index)
-                logger.info(f"Successfully synced {len(items_to_index)} pages to SIF index")
+                logger.info(f"Successfully synced {len(items_to_index)} new pages to SIF index")
 
-            # 4. Persist watermarks
+            # 6. Persist watermarks
             if wm_session and watermark_updates:
                 for source_id, content_hash, count in watermark_updates:
                     SIFIndexingWatermark.upsert(
@@ -619,8 +647,10 @@ class SIFSyncMixin:
                     pass
             _sif_metrics_inc("sif_sync_total", "website_content_success")
             return {
-                "count": len(harvested_pages),
+                "count": unchanged_count + len(harvested_pages),
                 "pages": [{"url": p.get("url", ""), "title": p.get("title", "")} for p in harvested_pages if p.get("url")],
+                "new": len(harvested_pages),
+                "unchanged": unchanged_count,
             }
 
         except Exception as e:

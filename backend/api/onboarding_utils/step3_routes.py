@@ -381,9 +381,10 @@ async def get_research_data(
         )
 
 @router.get("/sitemap-benchmark-report")
-async def get_sitemap_benchmark_report(current_user: dict = Depends(get_current_user)) -> Dict[str, Any]:
+async def get_sitemap_benchmark_report(current_user: dict = Depends(get_current_user)) -> Optional[Dict[str, Any]]:
     """
     Retrieve the full sitemap benchmark report for the current user.
+    Returns None (200) when no report exists yet — the frontend treats this as "not available".
     """
     user_id = str(current_user.get("id"))
     db = get_session_for_user(user_id)
@@ -398,9 +399,6 @@ async def get_sitemap_benchmark_report(current_user: dict = Depends(get_current_
         seo_audit = website_analysis.get("seo_audit") if isinstance(website_analysis, dict) else {}
         sitemap_benchmark_report = seo_audit.get("competitive_sitemap_benchmarking") if isinstance(seo_audit, dict) else None
         
-        if not sitemap_benchmark_report:
-            raise HTTPException(status_code=404, detail="No sitemap benchmark report found")
-            
         return sitemap_benchmark_report
         
     finally:

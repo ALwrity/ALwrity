@@ -371,37 +371,26 @@ class OnboardingManager:
                 raise HTTPException(status_code=500, detail="Internal server error")
 
         @self.app.delete("/api/onboarding/competitor-analysis")
-        async def competitor_analysis_delete(competitor_url: str = Query(...)):
-            """Delete a single competitor by URL."""
+        async def competitor_analysis_delete(
+            current_user: dict = Depends(get_current_user),
+            competitor_url: str = "",
+        ):
+            """Delete a single competitor by URL (or domain)."""
             try:
-                from services.database import get_db
+                from services.database import get_session_for_user
                 from api.onboarding_utils.step_management_service import StepManagementService
-                from models.onboarding import CompetitorAnalysis, OnboardingSession
-                db_gen = get_db()
-                db = next(db_gen)
+                user_id = str(current_user.get("id") or current_user.get("clerk_user_id"))
+                db = get_session_for_user(user_id)
+                if not db:
+                    raise HTTPException(status_code=503, detail="Database temporarily unavailable")
                 try:
                     svc = StepManagementService()
-                    records = db.query(CompetitorAnalysis).filter(
-                        CompetitorAnalysis.competitor_url == competitor_url
-                    ).all()
-                    if not records:
-                        db.close()
-                        return {"success": False, "deleted_url": competitor_url, "message": "Competitor not found in any session"}
-                    user_id = None
-                    for record in records:
-                        session_obj = db.query(OnboardingSession).filter(
-                            OnboardingSession.id == record.session_id
-                        ).first()
-                        if session_obj and session_obj.user_id:
-                            user_id = session_obj.user_id
-                            break
-                    if not user_id:
-                        db.close()
-                        return {"success": False, "deleted_url": competitor_url, "message": "Could not determine user for competitor"}
-                    svc._delete_competitor_by_url(user_id, competitor_url, db)
-                    return {"success": True, "deleted_url": competitor_url}
+                    deleted = svc._delete_competitor_by_url(user_id, competitor_url, db)
+                    return {"success": deleted, "deleted_url": competitor_url}
                 finally:
                     db.close()
+            except HTTPException:
+                raise
             except Exception as e:
                 logger.error(f"Error deleting competitor {competitor_url}: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
@@ -496,10 +485,12 @@ class OnboardingManager:
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.get("/api/onboarding/step4/persona-task/{task_id}")
-        async def get_persona_task(task_id: str):
+        async def get_persona_task(task_id: str, current_user: dict = Depends(get_current_user)):
             """Get persona generation task status."""
             try:
-                return await get_persona_task_status(task_id)
+                return await get_persona_task_status(task_id, current_user)
+            except HTTPException as he:
+                raise he
             except Exception as e:
                 logger.error(f"Error in get_persona_task: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
