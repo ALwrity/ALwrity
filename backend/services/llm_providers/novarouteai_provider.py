@@ -16,12 +16,13 @@ Usage:
 
 import os
 import json
-import re
 import time as _time
-from typing import List, Dict, Optional
+from typing import Dict, Any, Optional
 
 from loguru import logger
 from utils.logger_utils import get_service_logger
+
+from .json_parsing import robust_json_parse
 
 logger = get_service_logger("novaroute_provider")
 
@@ -104,7 +105,7 @@ def novaroute_structured_json_response(
     # Embed the JSON schema + an explicit JSON instruction so the model knows
     # the exact expected structure (mirrors WaveSpeed/HF providers). This also
     # satisfies the OpenAI "json" keyword requirement for response_format.
-    json_instruction = "Please respond with valid JSON that matches the provided schema."
+    json_instruction = "Please respond with valid JSON that matches the provided schema. Use only standard JSON escape sequences."
     user_content = f"{prompt}\n\n{json_instruction}"
     if schema:
         try:
@@ -137,28 +138,8 @@ def novaroute_structured_json_response(
     # Parse the JSON string into a dict, mirroring WaveSpeed/HF, so
     # llm_text_gen returns a consistent dict across all OpenAI-compatible
     # providers (NovaRouteAI returns a JSON string per the OpenAI standard).
-    if content.startswith("```json"):
-        content = content[7:]
-    if content.startswith("```"):
-        content = content[3:]
-    if content.endswith("```"):
-        content = content[:-3]
-    content = content.strip()
-
-    try:
-        parsed = json.loads(content) if content else None
-        if parsed is not None:
-            return parsed
-    except json.JSONDecodeError as parse_err:
-        logger.warning(f"[novaroute_structured_json_response] JSON parse failed: {parse_err}")
-
-    # Regex fallback: extract the first {...} JSON object.
-    if content:
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
-                pass
+    parsed = robust_json_parse(content)
+    if parsed is not None:
+        return parsed
 
     return {"error": "Failed to parse JSON response", "raw_response": content}
