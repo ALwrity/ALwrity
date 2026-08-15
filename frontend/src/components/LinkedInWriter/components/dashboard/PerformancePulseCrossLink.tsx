@@ -7,11 +7,13 @@ import { openPerformancePulse } from "./workflowWedgeNavigation";
 export interface PerformancePulseCrossLinkProps {
   /** Called before navigation (e.g. close parent modal). */
   onBeforeNavigate?: () => void;
+  /** When true, fits beside the best-post highlight in one row. */
+  inline?: boolean;
 }
 
 export const PerformancePulseCrossLink: React.FC<
   PerformancePulseCrossLinkProps
-> = ({ onBeforeNavigate }) => {
+> = ({ onBeforeNavigate, inline = false }) => {
   const handleClick = () => {
     if (onBeforeNavigate) {
       onBeforeNavigate();
@@ -22,43 +24,19 @@ export const PerformancePulseCrossLink: React.FC<
 
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 10,
-        padding: "10px 12px",
-        marginBottom: 16,
-        background: "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)",
-        border: "1px solid #ddd6fe",
-        borderRadius: 10,
-      }}
+      className={
+        inline
+          ? "linkedin-content-analytics-pulse-crosslink linkedin-content-analytics-pulse-crosslink--inline"
+          : "linkedin-content-analytics-pulse-crosslink"
+      }
     >
-      <span
-        style={{
-          fontSize: 12,
-          color: "#5b21b6",
-          lineHeight: 1.45,
-          fontWeight: 500,
-        }}
-      >
+      <span className="linkedin-content-analytics-pulse-crosslink__text">
         Ready to act on your best (and weakest) posts?
       </span>
       <button
         type="button"
         onClick={handleClick}
-        style={{
-          flexShrink: 0,
-          padding: "6px 12px",
-          borderRadius: 8,
-          border: "none",
-          background: "#7c3aed",
-          color: "#fff",
-          fontSize: 12,
-          fontWeight: 700,
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-        }}
+        className="linkedin-content-analytics-pulse-crosslink__btn"
       >
         Act on top posts →
       </button>

@@ -5,3 +5,4 @@ export { LoadingState } from './LoadingState';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { EngagementSummary } from './EngagementSummary';
+export { ContentAnalyticsOverview } from './ContentAnalyticsOverview';
