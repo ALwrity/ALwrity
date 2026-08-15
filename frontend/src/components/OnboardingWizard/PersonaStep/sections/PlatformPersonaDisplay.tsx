@@ -51,6 +51,7 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
   };
 
   const isLinkedIn = platformName.toLowerCase() === 'linkedin';
+  const isFacebook = platformName.toLowerCase() === 'facebook';
 
   return (
     <Box>
@@ -77,6 +78,11 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
         />
       </Box>
 
+      {/* Generic sections — only for generic-schema platforms (blog, twitter,
+          instagram, youtube, podcast). LinkedIn/Facebook have dedicated
+          structures and render their own sections below. */}
+      {!isLinkedIn && !isFacebook && (
+        <>
       {/* 1. Content Format Rules Section */}
       <SectionAccordion
         title="Content Format Rules"
@@ -301,6 +307,8 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
           </Grid>
         </Box>
       </SectionAccordion>
+        </>
+      )}
 
       {/* LinkedIn-specific sections */}
       {isLinkedIn && (
@@ -579,6 +587,377 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
                     multiline
                     placeholder="Conversion strategy..."
                     helperText="How to optimize for conversions"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+        </>
+      )}
+
+      {/* Facebook-specific sections */}
+      {isFacebook && (
+        <>
+          {/* Facebook Identity */}
+          <SectionAccordion
+            title="Facebook Persona Identity"
+            subtitle="Name, archetype and core belief"
+            icon={<StrategyIcon />}
+            defaultExpanded={true}
+            color="info.main"
+          >
+            <Box sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              mb: 3
+            }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Persona Name"
+                    value={getNestedValue(platformPersona, ['persona_name'])}
+                    onChange={(val) => updateField(['persona_name'], val)}
+                    placeholder="e.g., The Community Builder"
+                    helperText="Name of the Facebook-optimized persona"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Archetype"
+                    value={getNestedValue(platformPersona, ['archetype'])}
+                    onChange={(val) => updateField(['archetype'], val)}
+                    placeholder="e.g., The Community Catalyst"
+                    helperText="Persona archetype"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableTextField
+                    label="Core Belief"
+                    value={getNestedValue(platformPersona, ['core_belief'])}
+                    onChange={(val) => updateField(['core_belief'], val)}
+                    multiline
+                    placeholder="Core belief driving the Facebook persona..."
+                    helperText="The belief that drives the Facebook voice"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Facebook Algorithm Optimization */}
+          <SectionAccordion
+            title="Facebook Algorithm Optimization"
+            subtitle="Engagement, quality, timing and targeting"
+            icon={<AlgorithmIcon />}
+            color="secondary.main"
+          >
+            <Box sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              mb: 3
+            }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Engagement Optimization"
+                    values={getNestedValue(platformPersona, ['facebook_algorithm_optimization', 'engagement_optimization'], [])}
+                    onChange={(vals) => updateField(['facebook_algorithm_optimization', 'engagement_optimization'], vals)}
+                    placeholder="Add engagement strategies..."
+                    color="primary"
+                    helperText="Strategies to boost engagement"
+                  />
+                  <EditableChipArray
+                    label="Content Quality Optimization"
+                    values={getNestedValue(platformPersona, ['facebook_algorithm_optimization', 'content_quality_optimization'], [])}
+                    onChange={(vals) => updateField(['facebook_algorithm_optimization', 'content_quality_optimization'], vals)}
+                    placeholder="Add content quality strategies..."
+                    color="secondary"
+                    helperText="Strategies to improve content quality"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Timing Optimization"
+                    values={getNestedValue(platformPersona, ['facebook_algorithm_optimization', 'timing_optimization'], [])}
+                    onChange={(vals) => updateField(['facebook_algorithm_optimization', 'timing_optimization'], vals)}
+                    placeholder="Add timing strategies..."
+                    color="success"
+                    helperText="Optimal posting timing"
+                  />
+                  <EditableChipArray
+                    label="Audience Targeting Optimization"
+                    values={getNestedValue(platformPersona, ['facebook_algorithm_optimization', 'audience_targeting_optimization'], [])}
+                    onChange={(vals) => updateField(['facebook_algorithm_optimization', 'audience_targeting_optimization'], vals)}
+                    placeholder="Add targeting strategies..."
+                    color="warning"
+                    helperText="Audience targeting optimization"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Facebook Engagement Strategies */}
+          <SectionAccordion
+            title="Facebook Engagement Strategies"
+            subtitle="Community, content and conversion"
+            icon={<TrendingIcon />}
+            color="info.main"
+          >
+            <Box sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              mb: 3
+            }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Community Building"
+                    values={getNestedValue(platformPersona, ['facebook_engagement_strategies', 'community_building'], [])}
+                    onChange={(vals) => updateField(['facebook_engagement_strategies', 'community_building'], vals)}
+                    placeholder="Add community strategies..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Content Engagement"
+                    values={getNestedValue(platformPersona, ['facebook_engagement_strategies', 'content_engagement'], [])}
+                    onChange={(vals) => updateField(['facebook_engagement_strategies', 'content_engagement'], vals)}
+                    placeholder="Add content engagement..."
+                    color="secondary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Conversion Optimization"
+                    values={getNestedValue(platformPersona, ['facebook_engagement_strategies', 'conversion_optimization'], [])}
+                    onChange={(vals) => updateField(['facebook_engagement_strategies', 'conversion_optimization'], vals)}
+                    placeholder="Add conversion strategies..."
+                    color="success"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Facebook Audience Targeting */}
+          <SectionAccordion
+            title="Facebook Audience Targeting"
+            subtitle="Demographic, interest and behavioral"
+            icon={<ProfessionalIcon />}
+            color="warning.main"
+          >
+            <Box sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              mb: 3
+            }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Demographic Targeting"
+                    values={getNestedValue(platformPersona, ['facebook_audience_targeting', 'demographic_targeting'], [])}
+                    onChange={(vals) => updateField(['facebook_audience_targeting', 'demographic_targeting'], vals)}
+                    placeholder="Add demographics..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Interest Targeting"
+                    values={getNestedValue(platformPersona, ['facebook_audience_targeting', 'interest_targeting'], [])}
+                    onChange={(vals) => updateField(['facebook_audience_targeting', 'interest_targeting'], vals)}
+                    placeholder="Add interests..."
+                    color="secondary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Behavioral Targeting"
+                    values={getNestedValue(platformPersona, ['facebook_audience_targeting', 'behavioral_targeting'], [])}
+                    onChange={(vals) => updateField(['facebook_audience_targeting', 'behavioral_targeting'], vals)}
+                    placeholder="Add behaviors..."
+                    color="success"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Facebook Community Building */}
+          <SectionAccordion
+            title="Facebook Community Building"
+            subtitle="Groups, events and live streaming"
+            icon={<FeaturesIcon />}
+            color="success.main"
+          >
+            <Box sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              mb: 3
+            }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Group Management"
+                    values={getNestedValue(platformPersona, ['facebook_community_building', 'group_management'], [])}
+                    onChange={(vals) => updateField(['facebook_community_building', 'group_management'], vals)}
+                    placeholder="Add group strategies..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Event Management"
+                    values={getNestedValue(platformPersona, ['facebook_community_building', 'event_management'], [])}
+                    onChange={(vals) => updateField(['facebook_community_building', 'event_management'], vals)}
+                    placeholder="Add event strategies..."
+                    color="secondary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Live Streaming"
+                    values={getNestedValue(platformPersona, ['facebook_community_building', 'live_streaming'], [])}
+                    onChange={(vals) => updateField(['facebook_community_building', 'live_streaming'], vals)}
+                    placeholder="Add live strategies..."
+                    color="success"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Facebook Content Formats */}
+          <SectionAccordion
+            title="Facebook Content Formats"
+            subtitle="Text, image, video and carousel post optimizations"
+            icon={<ContentIcon />}
+            color="info.main"
+          >
+            <Box sx={{
+              p: 3,
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1px solid #e2e8f0',
+              borderRadius: 3,
+              mb: 3
+            }}>
+              {/* Text Posts */}
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 1.5 }}>
+                Text Posts
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={4}>
+                  <EditableTextField
+                    label="Optimal Length"
+                    value={getNestedValue(platformPersona, ['facebook_content_formats', 'text_posts', 'optimal_length'])}
+                    onChange={(val) => updateField(['facebook_content_formats', 'text_posts', 'optimal_length'], val)}
+                    placeholder="e.g., 40-80 words"
+                    helperText="Optimal text post length"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Structure Guidelines"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'text_posts', 'structure_guidelines'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'text_posts', 'structure_guidelines'], vals)}
+                    placeholder="Add structure guidelines..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableChipArray
+                    label="Hook Strategies"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'text_posts', 'hook_strategies'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'text_posts', 'hook_strategies'], vals)}
+                    placeholder="Add hook strategies..."
+                    color="secondary"
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Image Posts */}
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 1.5 }}>
+                Image Posts
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Image Guidelines"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'image_posts', 'image_guidelines'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'image_posts', 'image_guidelines'], vals)}
+                    placeholder="Add image guidelines..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Caption Strategies"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'image_posts', 'caption_strategies'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'image_posts', 'caption_strategies'], vals)}
+                    placeholder="Add caption strategies..."
+                    color="secondary"
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Video Posts */}
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 1.5 }}>
+                Video Posts
+              </Typography>
+              <Grid container spacing={3} sx={{ mb: 3 }}>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Video Length Guidelines"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'video_posts', 'video_length_guidelines'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'video_posts', 'video_length_guidelines'], vals)}
+                    placeholder="Add video length guidelines..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Engagement Hooks"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'video_posts', 'engagement_hooks'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'video_posts', 'engagement_hooks'], vals)}
+                    placeholder="Add engagement hooks..."
+                    color="secondary"
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Carousel Posts */}
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#0f172a', mb: 1.5 }}>
+                Carousel Posts
+              </Typography>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Slide Structure"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'carousel_posts', 'slide_structure'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'carousel_posts', 'slide_structure'], vals)}
+                    placeholder="Add slide structure..."
+                    color="primary"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray
+                    label="Storytelling Flow"
+                    values={getNestedValue(platformPersona, ['facebook_content_formats', 'carousel_posts', 'storytelling_flow'], [])}
+                    onChange={(vals) => updateField(['facebook_content_formats', 'carousel_posts', 'storytelling_flow'], vals)}
+                    placeholder="Add storytelling flow..."
+                    color="secondary"
                   />
                 </Grid>
               </Grid>

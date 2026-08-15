@@ -16,6 +16,103 @@ if TYPE_CHECKING:
 logger = get_service_logger("job_restoration")
 
 
+async def _restore_platform_persona_job(scheduler: 'TaskScheduler', db, user_id: str, platform: str):
+    """Restore a single platform persona job for a user; returns (restored, skipped)."""
+    from services.persona.platform_persona_scheduler import (
+        schedule_platform_persona_generation,
+        generate_platform_persona_task,
+    )
+    from services.persona_data_service import PersonaDataService
+
+    persona_data_service = PersonaDataService(db_session=db)
+    persona_data = persona_data_service.get_user_persona_data(user_id)
+    platform_personas = persona_data.get('platform_personas', {}) if persona_data else {}
+    persona_exists = bool(platform_personas.get(platform) if platform_personas else None)
+    has_core_persona = bool(persona_data.get('core_persona') if persona_data else False)
+
+    if persona_exists or not has_core_persona:
+        return 0, 0
+
+    job_id = f"persona_{platform}_{user_id}"
+    existing_jobs = [j for j in scheduler.scheduler.get_jobs() if j.id == job_id]
+    if existing_jobs:
+        return 0, 1
+
+    now = datetime.utcnow().replace(tzinfo=timezone.utc)
+    try:
+        original_scheduled_event = db.query(SchedulerEventLog).filter(
+            SchedulerEventLog.event_type == 'job_scheduled',
+            SchedulerEventLog.job_id == job_id,
+            SchedulerEventLog.user_id == user_id,
+        ).order_by(SchedulerEventLog.event_date.desc()).first()
+        completed_event = db.query(SchedulerEventLog).filter(
+            SchedulerEventLog.event_type.in_(['job_completed', 'job_failed']),
+            SchedulerEventLog.job_id == job_id,
+            SchedulerEventLog.user_id == user_id,
+        ).order_by(SchedulerEventLog.event_date.desc()).first()
+    except Exception:
+        original_scheduled_event = None
+        completed_event = None
+        logger.warning(f"SchedulerEventLog query failed for {job_id}, scheduling new job")
+
+    if completed_event:
+        logger.debug(f"{platform} persona job {job_id} already completed/failed, skipping restoration")
+        return 0, 1
+
+    if original_scheduled_event and original_scheduled_event.event_data:
+        scheduled_for_str = original_scheduled_event.event_data.get('scheduled_for')
+        if scheduled_for_str:
+            try:
+                original_time = datetime.fromisoformat(scheduled_for_str.replace('Z', '+00:00'))
+                if original_time.tzinfo is None:
+                    original_time = original_time.replace(tzinfo=timezone.utc)
+                time_since_scheduled = (now - original_time).total_seconds()
+                if 0 < time_since_scheduled <= 3600:
+                    logger.warning(
+                        f"Restoring {platform} persona job {job_id} - original time was {original_time}, executing now (missed)"
+                    )
+                    try:
+                        await generate_platform_persona_task(user_id, platform)
+                    except Exception as exec_error:
+                        logger.error(f"Error executing missed {platform} persona job {job_id}: {exec_error}")
+                    return 0, 0
+                elif original_time > now:
+                    time_until_run = (original_time - now).total_seconds() / 60
+                    logger.warning(
+                        f"[Restoration] Restoring {platform} persona job {job_id} with ORIGINAL scheduled time: "
+                        f"{original_time} (UTC), will run in {time_until_run:.1f} minutes"
+                    )
+                    scheduler.schedule_one_time_task(
+                        func=generate_platform_persona_task,
+                        run_date=original_time,
+                        job_id=job_id,
+                        kwargs={'user_id': user_id, 'platform': platform},
+                        replace_existing=True,
+                    )
+                    return 1, 0
+                else:
+                    logger.debug(f"{platform} persona job {job_id} scheduled time {original_time} is too old, skipping")
+                    return 0, 1
+            except Exception as time_error:
+                logger.warning(f"Error parsing original scheduled time for {job_id}: {time_error}, scheduling new job")
+                schedule_platform_persona_generation(user_id, platform, delay_minutes=20)
+                return 1, 0
+        else:
+            logger.warning(
+                f"[Restoration] No original scheduled time found for {platform} persona job {job_id}, "
+                "scheduling NEW job with current time + 20 minutes"
+            )
+            schedule_platform_persona_generation(user_id, platform, delay_minutes=20)
+            return 1, 0
+    else:
+        logger.warning(
+            f"[Restoration] No previous scheduled event found for {platform} persona job {job_id}, "
+            "scheduling NEW job with current time + 20 minutes"
+        )
+        schedule_platform_persona_generation(user_id, platform, delay_minutes=20)
+        return 1, 0
+
+
 async def restore_persona_jobs(scheduler: 'TaskScheduler'):
     """
     Restore one-time persona generation jobs for users who completed onboarding
@@ -43,12 +140,7 @@ async def restore_persona_jobs(scheduler: 'TaskScheduler'):
                     schedule_research_persona_generation,
                     generate_research_persona_task
                 )
-                from services.persona.facebook.facebook_persona_scheduler import (
-                    schedule_facebook_persona_generation,
-                    generate_facebook_persona_task
-                )
                 from services.research.research_persona_service import ResearchPersonaService
-                from services.persona_data_service import PersonaDataService
                 
                 # Check if user completed onboarding
                 session = db.query(OnboardingSession).filter(
@@ -167,104 +259,18 @@ async def restore_persona_jobs(scheduler: 'TaskScheduler'):
                 except Exception as e:
                     logger.debug(f"Could not restore research persona for user {user_id}: {e}")
                 
-                # Restore Facebook persona job
+                # Restore platform persona jobs (facebook, twitter, instagram, youtube, podcast)
                 try:
-                    persona_data_service = PersonaDataService(db_session=db)
-                    persona_data = persona_data_service.get_user_persona_data(user_id)
-                    platform_personas = persona_data.get('platform_personas', {}) if persona_data else {}
-                    facebook_persona_exists = bool(platform_personas.get('facebook') if platform_personas else None)
-                    has_core_persona = bool(persona_data.get('core_persona') if persona_data else False)
-                    
-                    if not facebook_persona_exists and has_core_persona:
-                        # Note: Clerk user_id already includes "user_" prefix
-                        job_id = f"facebook_persona_{user_id}"
-                        
-                        # Check if job already exists in scheduler
-                        existing_jobs = [j for j in scheduler.scheduler.get_jobs() 
-                                        if j.id == job_id]
-                        
-                        if not existing_jobs:
-                            try:
-                                original_scheduled_event = db.query(SchedulerEventLog).filter(
-                                    SchedulerEventLog.event_type == 'job_scheduled',
-                                    SchedulerEventLog.job_id == job_id,
-                                    SchedulerEventLog.user_id == user_id
-                                ).order_by(SchedulerEventLog.event_date.desc()).first()
-                                
-                                completed_event = db.query(SchedulerEventLog).filter(
-                                    SchedulerEventLog.event_type.in_(['job_completed', 'job_failed']),
-                                    SchedulerEventLog.job_id == job_id,
-                                    SchedulerEventLog.user_id == user_id
-                                ).order_by(SchedulerEventLog.event_date.desc()).first()
-                            except Exception:
-                                original_scheduled_event = None
-                                completed_event = None
-                                logger.warning(f"SchedulerEventLog query failed for {job_id}, scheduling new job")
-                            
-                            if completed_event:
-                                skipped_count += 1
-                                logger.debug(f"Facebook persona job {job_id} already completed/failed, skipping restoration")
-                            elif original_scheduled_event and original_scheduled_event.event_data:
-                                # Restore with original scheduled time
-                                scheduled_for_str = original_scheduled_event.event_data.get('scheduled_for')
-                                if scheduled_for_str:
-                                    try:
-                                        original_time = datetime.fromisoformat(scheduled_for_str.replace('Z', '+00:00'))
-                                        if original_time.tzinfo is None:
-                                            original_time = original_time.replace(tzinfo=timezone.utc)
-                                        
-                                        # Check if original time is in the past (within grace period)
-                                        time_since_scheduled = (now - original_time).total_seconds()
-                                        if time_since_scheduled > 0 and time_since_scheduled <= 3600:  # Within 1 hour grace period
-                                            # Execute immediately (missed job)
-                                            logger.warning(f"Restoring Facebook persona job {job_id} - original time was {original_time}, executing now (missed)")
-                                            try:
-                                                await generate_facebook_persona_task(user_id)
-                                            except Exception as exec_error:
-                                                logger.error(f"Error executing missed Facebook persona job {job_id}: {exec_error}")
-                                        elif original_time > now:
-                                            # Restore with original future time
-                                            time_until_run = (original_time - now).total_seconds() / 60  # minutes
-                                            logger.warning(
-                                                f"[Restoration] Restoring Facebook persona job {job_id} with ORIGINAL scheduled time: "
-                                                f"{original_time} (UTC) = {original_time.astimezone().strftime('%H:%M:%S %Z')} (local), "
-                                                f"will run in {time_until_run:.1f} minutes"
-                                            )
-                                            scheduler.schedule_one_time_task(
-                                                func=generate_facebook_persona_task,
-                                                run_date=original_time,
-                                                job_id=job_id,
-                                                kwargs={'user_id': user_id},
-                                                replace_existing=True
-                                            )
-                                            restored_count += 1
-                                        else:
-                                            skipped_count += 1
-                                            logger.debug(f"Facebook persona job {job_id} scheduled time {original_time} is too old, skipping")
-                                    except Exception as time_error:
-                                        logger.warning(f"Error parsing original scheduled time for {job_id}: {time_error}, scheduling new job")
-                                        schedule_facebook_persona_generation(user_id, delay_minutes=20)
-                                        restored_count += 1
-                                else:
-                                    logger.warning(
-                                        f"[Restoration] No original scheduled time found for Facebook persona job {job_id}, "
-                                        f"scheduling NEW job with current time + 20 minutes"
-                                    )
-                                    schedule_facebook_persona_generation(user_id, delay_minutes=20)
-                                    restored_count += 1
-                            else:
-                                # No previous scheduled event, schedule new job
-                                logger.warning(
-                                    f"[Restoration] No previous scheduled event found for Facebook persona job {job_id}, "
-                                    f"scheduling NEW job with current time + 20 minutes"
-                                )
-                                schedule_facebook_persona_generation(user_id, delay_minutes=20)
-                                restored_count += 1
-                        else:
-                            skipped_count += 1
-                            logger.debug(f"Facebook persona job {job_id} already exists in scheduler, skipping restoration")
+                    from services.persona.platform_registry import get_scheduled_platforms
+                    for platform in get_scheduled_platforms():
+                        try:
+                            r, s = await _restore_platform_persona_job(scheduler, db, user_id, platform["id"])
+                            restored_count += r
+                            skipped_count += s
+                        except Exception as e:
+                            logger.debug(f"Could not restore {platform['id']} persona for user {user_id}: {e}")
                 except Exception as e:
-                    logger.debug(f"Could not restore Facebook persona for user {user_id}: {e}")
+                    logger.debug(f"Could not restore platform personas for user {user_id}: {e}")
             
                 if restored_count > 0:
                     logger.warning(f"[Scheduler] ✅ Restored {restored_count} persona generation job(s) for user {user_id}")

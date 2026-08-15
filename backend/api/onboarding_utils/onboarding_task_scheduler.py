@@ -300,15 +300,17 @@ def schedule_step4_tasks(user_id: str, db: Optional[Session] = None):
     except Exception as e:
         logger.warning(f"[onboarding_step4] Non-blocking: failed to schedule research persona: {e}")
 
-    # 2. Facebook persona
+    # 2. Platform personas (facebook, twitter, instagram, youtube, podcast)
     try:
-        from services.persona.facebook.facebook_persona_scheduler import schedule_facebook_persona_generation
-        schedule_facebook_persona_generation(user_id, delay_minutes=10)
-        logger.info(f"[onboarding_step4] Scheduled Facebook persona generation for {user_id}")
-        if db:
-            _record_task_in_session(db, user_id, "facebook_persona", step=4)
+        from services.persona.platform_persona_scheduler import schedule_platform_persona_generation
+        from services.persona.platform_registry import get_scheduled_platforms
+        for platform in get_scheduled_platforms():
+            schedule_platform_persona_generation(user_id, platform["id"], delay_minutes=10)
+            logger.info(f"[onboarding_step4] Scheduled {platform['id']} persona generation for {user_id}")
+            if db:
+                _record_task_in_session(db, user_id, f"persona_{platform['id']}", step=4)
     except Exception as e:
-        logger.warning(f"[onboarding_step4] Non-blocking: failed to schedule Facebook persona: {e}")
+        logger.warning(f"[onboarding_step4] Non-blocking: failed to schedule platform personas: {e}")
 
 
 async def _run_sif_now(user_id: str, website_url: str):

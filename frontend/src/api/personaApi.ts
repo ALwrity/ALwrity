@@ -3,7 +3,7 @@
  * Handles communication with the persona generation backend services.
  */
 
-import { apiClient } from './client';
+import { apiClient, aiApiClient } from './client';
 
 export interface PersonaGenerationRequest {
   onboarding_data: {
@@ -49,6 +49,58 @@ export const savePersonaUpdate = async (
         error?.response?.data?.detail ||
         error.message ||
         'Failed to save persona',
+    };
+  }
+};
+
+export interface PersonaPlatform {
+  id: string;
+  name: string;
+  description: string;
+  enabled: boolean;
+  scheduled: boolean;
+}
+
+/**
+ * Fetch the canonical persona platform list (single source of truth, backend).
+ */
+export const getPersonaPlatforms = async (): Promise<PersonaPlatform[]> => {
+  try {
+    const response = await apiClient.get('/api/onboarding/step4/persona-platforms');
+    return response.data?.platforms ?? [];
+  } catch (error: any) {
+    console.error('Error getting persona platforms:', error);
+    return [];
+  }
+};
+
+export interface GeneratePlatformPersonaResponse {
+  success: boolean;
+  platform?: string;
+  persona?: any;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Generate a single platform persona on demand (blocking; used by "Generate Now").
+ */
+export const generatePlatformPersona = async (
+  platform: string
+): Promise<GeneratePlatformPersonaResponse> => {
+  try {
+    const response = await aiApiClient.post('/api/onboarding/step4/generate-platform-persona', { platform });
+    return response.data;
+  } catch (error: any) {
+    console.error('Error generating platform persona:', error);
+    return {
+      success: false,
+      message:
+        error?.response?.data?.message ||
+        error?.response?.data?.detail ||
+        error.message ||
+        'Failed to generate platform persona',
+      error: 'network_error',
     };
   }
 };

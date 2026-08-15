@@ -49,6 +49,8 @@ from api.onboarding import (
     assess_persona_quality,
     regenerate_persona,
     get_persona_generation_options,
+    get_persona_platforms,
+    generate_platform_persona,
     get_latest_persona,
     save_persona_update,
     StepCompletionRequest,
@@ -542,6 +544,25 @@ class OnboardingManager:
                 return await get_persona_generation_options(current_user)
             except Exception as e:
                 logger.error(f"Error in get_persona_options: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.get("/api/onboarding/step4/persona-platforms")
+        async def get_persona_platforms_endpoint(current_user: dict = Depends(get_current_user)):
+            """Get the canonical persona platform list."""
+            try:
+                return await get_persona_platforms(current_user)
+            except Exception as e:
+                logger.error(f"Error in get_persona_platforms: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @self.app.post("/api/onboarding/step4/generate-platform-persona")
+        async def generate_platform_persona_endpoint(request: dict, current_user: dict = Depends(get_current_user)):
+            """Generate a single platform persona on demand."""
+            try:
+                from api.onboarding_utils.step4_persona_routes import PlatformPersonaRequest
+                return await generate_platform_persona(PlatformPersonaRequest(**request), current_user)
+            except Exception as e:
+                logger.error(f"Error in generate_platform_persona: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
     
     def get_onboarding_status(self) -> Dict[str, Any]:

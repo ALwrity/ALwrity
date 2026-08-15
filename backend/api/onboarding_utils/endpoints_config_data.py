@@ -11,7 +11,9 @@ from .step4_persona_routes import (
     get_persona_task_status,
     assess_persona_quality,
     regenerate_persona,
-    get_persona_generation_options
+    get_persona_generation_options,
+    get_persona_platforms,
+    generate_platform_persona
 )
 
 
