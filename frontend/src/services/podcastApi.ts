@@ -444,12 +444,16 @@ export const podcastApi = {
     };
     error?: string;
   }> {
-    const response = await aiApiClient.post("/api/podcast/trends", {
-      keywords: params.keywords,
-      timeframe: params.timeframe || "today 12-m",
-      geo: params.geo || "US",
-      source: params.source || "web",  // 'web' = Google, 'podcast' = YouTube
-    });
+    const response = await aiApiClient.post(
+      "/api/podcast/trends",
+      {
+        keywords: params.keywords,
+        timeframe: params.timeframe || "today 12-m",
+        geo: params.geo || "US",
+        source: params.source || "web", // 'web' = Google, 'podcast' = YouTube
+      },
+      { timeout: 120000 },
+    );
     return response.data;
   },
 

@@ -53,6 +53,7 @@ import { ContentAsset } from '../../../hooks/useContentAssets';
 import { buildVideoPlanningOperation, buildImageEditingOperation } from '../utils/operationHelpers';
 import { useAvatarBlobUrl } from '../hooks/useAvatarBlobUrl';
 import { SelectWithCustom } from './SelectWithCustom';
+import { PlanTopicDiscoveryBar } from './PlanTopicDiscoveryBar';
 
 interface PlanStepProps {
   userIdea: string;
@@ -203,6 +204,11 @@ export const PlanStep: React.FC<PlanStepProps> = React.memo(({
               helperText="Describe your video idea in 1-2 sentences. Include who it's for, what they'll learn, and your goal (views, subscribers, sales, etc.)."
               sx={inputSx}
               FormHelperTextProps={{ sx: helperSx }}
+            />
+            <PlanTopicDiscoveryBar
+              userIdea={userIdea}
+              onIdeaChange={onIdeaChange}
+              disabled={loading}
             />
           </Box>
 

@@ -11,6 +11,8 @@ from pydantic import BaseModel, Field
 from loguru import logger
 
 from middleware.auth_middleware import get_current_user
+from services.research.trends.trends_config import get_trends_total_timeout
+from services.research.trends.trends_keyword_utils import normalize_trends_keywords
 
 router = APIRouter(prefix="/trends", tags=["Podcast Trends"])
 
@@ -71,13 +73,48 @@ async def get_podcast_trends(
         gprop_map = {"": "", "web": "", "podcast": "youtube", "news": "news", "images": "images", "shopping": "froogle"}
         gprop = gprop_map.get(request.source, "")
 
-        result = await service.analyze_trends(
-            keywords=request.keywords,
-            timeframe=request.timeframe,
-            geo=request.geo,
-            gprop=gprop,
-            user_id=user_id,
+        keywords = normalize_trends_keywords(request.keywords)
+        if keywords != request.keywords:
+            logger.info(
+                "[Podcast Trends] Normalized keywords for Google Trends: {} -> {}",
+                request.keywords,
+                keywords,
+            )
+
+        total_timeout = get_trends_total_timeout()
+        logger.info(
+            "[Podcast Trends] Fetch started user={} source={} keywords={} timeout={}s",
+            user_id,
+            request.source,
+            keywords,
+            int(total_timeout),
         )
+
+        try:
+            result = await asyncio.wait_for(
+                service.analyze_trends(
+                    keywords=keywords,
+                    timeframe=request.timeframe,
+                    geo=request.geo,
+                    gprop=gprop,
+                    user_id=user_id,
+                ),
+                timeout=total_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "[Podcast Trends] Timed out after {}s source={} keywords={}",
+                int(total_timeout),
+                request.source,
+                keywords,
+            )
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f"Google Trends took too long ({int(total_timeout)}s). "
+                    "Try a shorter idea with 2-4 words (e.g. 'Bali travel')."
+                ),
+            )
 
         has_error = result.get("error")
         has_data = (

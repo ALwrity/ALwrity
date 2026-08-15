@@ -734,6 +734,23 @@ else:
         "reason": "Podcast feature not enabled",
     }
 
+from api.shared.topic_discovery_router import (
+    mount_topic_discovery_routes,
+    should_mount_topic_discovery_for_youtube,
+)
+
+if should_mount_topic_discovery_for_youtube(get_enabled_features()):
+    mount_topic_discovery_routes(app)
+    router_group_status["topic_discovery"] = {
+        "mounted": True,
+        "reason": "YouTube feature enabled without full Podcast API",
+    }
+else:
+    router_group_status["topic_discovery"] = {
+        "mounted": False,
+        "reason": "Provided by Podcast router or YouTube not enabled",
+    }
+
 if _is_full_mode():
     # Include YouTube Creator Studio router
     from api.youtube.router import router as youtube_router

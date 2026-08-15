@@ -133,6 +133,7 @@ if PYTrends_AVAILABLE:
     logger.debug("[Trends] Patched TrendReq.related_topics/related_queries for IndexError")
 
 from .rate_limiter import RateLimiter
+from .trends_config import get_pytrends_timeout, get_trends_retry_delays
 
 
 class GoogleTrendsService:
@@ -235,9 +236,9 @@ class GoogleTrendsService:
             logger.info(f"Returning cached trends data for: {keywords}")
             return {**cached_data, "cached": True}
 
-        # Retry logic for 429 errors
-        max_retries = 3
-        retry_delays = [30, 60, 120]  # Longer delays: 30s, 60s, 120s
+        # Retry logic for 429 errors (short delays to stay within client timeout)
+        retry_delays = list(get_trends_retry_delays())
+        max_retries = len(retry_delays)
 
         for attempt in range(max_retries + 1):
             try:
@@ -317,13 +318,18 @@ class GoogleTrendsService:
         )
 
         # Initialize TrendReq with gprop (youtube for video/podcast relevance)
+        connect_timeout, read_timeout = get_pytrends_timeout()
+        call_timeout = float(connect_timeout + read_timeout + 10)
         init_start = time.monotonic()
-        pytrends = await asyncio.to_thread(
-            self._create_pytrends,
-            keywords,
-            timeframe,
-            geo,
-            gprop,
+        pytrends = await asyncio.wait_for(
+            asyncio.to_thread(
+                self._create_pytrends,
+                keywords,
+                timeframe,
+                geo,
+                gprop,
+            ),
+            timeout=call_timeout,
         )
         init_ms = int((time.monotonic() - init_start) * 1000)
         logger.info(f"[Trends] TrendReq init + build_payload took {init_ms}ms")
@@ -331,8 +337,9 @@ class GoogleTrendsService:
         # --- Interest Over Time ONLY (skip others to avoid 429) ---
         await self.rate_limiter.acquire()  # Rate limit check BEFORE each request
         iot_start = time.monotonic()
-        interest_over_time = await asyncio.to_thread(
-            lambda: self._fetch_interest_over_time(pytrends)
+        interest_over_time = await asyncio.wait_for(
+            asyncio.to_thread(lambda: self._fetch_interest_over_time(pytrends)),
+            timeout=call_timeout,
         )
         iot_ms = int((time.monotonic() - iot_start) * 1000)
         logger.info(f"[Trends] interest_over_time took {iot_ms}ms, returned {len(interest_over_time)} points")
@@ -383,11 +390,15 @@ class GoogleTrendsService:
         """Create TrendReq with optional gprop (e.g., 'youtube' for video trends)."""
         start = time.monotonic()
         ua = random.choice(self.USER_AGENTS)
-        logger.info(f"[Trends] Creating TrendReq (fail-fast, gprop='{gprop}', UA={ua[:40]}...)")
+        connect_timeout, read_timeout = get_pytrends_timeout()
+        logger.info(
+            f"[Trends] Creating TrendReq (fail-fast, gprop='{gprop}', "
+            f"timeout=({connect_timeout}, {read_timeout}), UA={ua[:40]}...)"
+        )
         pytrends = _TrendReq(
             hl='en-US',
             tz=360,
-            timeout=(10, 30),
+            timeout=(connect_timeout, read_timeout),
             retries=0,
             backoff_factor=0,
             requests_args={'headers': {'User-Agent': ua}},
@@ -664,10 +675,11 @@ class GoogleTrendsService:
 
         try:
             ua = random.choice(self.USER_AGENTS)
+            connect_timeout, read_timeout = get_pytrends_timeout()
             pytrends = _TrendReq(
                 hl='en-US',
                 tz=360,
-                timeout=(10, 30),
+                timeout=(connect_timeout, read_timeout),
                 retries=0,
                 backoff_factor=0,
                 requests_args={'headers': {'User-Agent': ua}},
