@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 from services.persona.core_persona.core_persona_service import CorePersonaService
 from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
 from services.persona.persona_quality_improver import PersonaQualityImprover
+from services.persona.platform_registry import get_enabled_platforms, get_platforms_payload
+from services.persona_data_service import PersonaDataService
 from middleware.auth_middleware import get_current_user
 from services.user_api_key_context import user_api_keys
 from services.database import get_session_for_user
@@ -648,13 +650,8 @@ async def get_persona_generation_options(
         return {
             "success": True,
             "available_platforms": [
-                {"id": "linkedin", "name": "LinkedIn", "description": "Professional networking and thought leadership"},
-                {"id": "facebook", "name": "Facebook", "description": "Social media and community building"},
-                {"id": "twitter", "name": "Twitter", "description": "Micro-blogging and real-time updates"},
-                {"id": "blog", "name": "Blog", "description": "Long-form content and SEO optimization"},
-                {"id": "instagram", "name": "Instagram", "description": "Visual storytelling and engagement"},
-                {"id": "medium", "name": "Medium", "description": "Publishing platform and audience building"},
-                {"id": "substack", "name": "Substack", "description": "Newsletter and subscription content"}
+                {"id": p["id"], "name": p["name"], "description": p["description"]}
+                for p in get_enabled_platforms()
             ],
             "persona_types": [
                 "Thought Leader",
@@ -675,6 +672,98 @@ async def get_persona_generation_options(
     except Exception as e:
         logger.error(f"Error getting persona options: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get persona options: {str(e)}")
+
+@router.get("/step4/persona-platforms", response_model=Dict[str, Any])
+async def get_persona_platforms(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Return the canonical persona platform list (single source of truth)."""
+    return {"success": True, "platforms": get_platforms_payload()}
+
+class PlatformPersonaRequest(BaseModel):
+    """Request body for /step4/generate-platform-persona."""
+    platform: str
+
+
+@router.post("/step4/generate-platform-persona", response_model=Dict[str, Any])
+async def generate_platform_persona(
+    request: PlatformPersonaRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """
+    Generate a single platform persona on demand (blocking, synchronous).
+
+    Used by the "Generate Now" button on platform tabs that haven't been
+    generated yet. Reuses the same generation path as the async flow, then
+    persists via PersonaDataService (the same path the Facebook scheduler uses).
+    """
+    user_id = _extract_user_id(current_user)
+    platform = (request.platform or "").strip().lower()
+
+    # Validate against the registry (enabled platforms only).
+    enabled_ids = {p["id"] for p in get_enabled_platforms()}
+    if platform not in enabled_ids:
+        return {
+            "success": False,
+            "message": f"Unsupported or disabled platform: {platform}",
+            "error": "invalid_platform",
+        }
+
+    # Core-first gate: a platform persona depends on the core persona.
+    persona_data_service = PersonaDataService()
+    core = persona_data_service.get_core_persona(user_id)
+    if not core or not core.get("core_persona"):
+        return {
+            "success": False,
+            "message": "Generate your core persona first, then generate platform personas.",
+            "error": "missing_core_persona",
+        }
+    core_persona = core["core_persona"]
+
+    # Build onboarding context from SSOT (mirrors the Facebook scheduler).
+    db = get_session_for_user(user_id)
+    if not db:
+        return {"success": False, "message": "Could not connect to database.", "error": "db_unavailable"}
+    try:
+        from api.content_planning.services.content_strategy.onboarding import OnboardingDataIntegrationService
+        integration_service = OnboardingDataIntegrationService()
+        integrated_data = integration_service.get_integrated_data_sync(user_id, db)
+        website_analysis = integrated_data.get("website_analysis", {}) if isinstance(integrated_data, dict) else {}
+        research_prefs = integrated_data.get("research_preferences", {}) if isinstance(integrated_data, dict) else {}
+    except Exception as e:
+        logger.warning(f"Could not load integrated onboarding data for {user_id}: {e}")
+        website_analysis, research_prefs = {}, {}
+    finally:
+        db.close()
+
+    onboarding_data = {
+        "session_info": {"user_id": user_id},
+        "website_url": website_analysis.get("website_url", "") if website_analysis else "",
+        "writing_style": website_analysis.get("writing_style", {}) if website_analysis else {},
+        "content_characteristics": website_analysis.get("content_characteristics", {}) if website_analysis else {},
+        "target_audience": website_analysis.get("target_audience", "") if website_analysis else "",
+        "research_preferences": research_prefs or {},
+    }
+
+    # Generate the platform persona (blocking; runs the sync service in an executor).
+    try:
+        generated = await generate_single_platform_persona_async(core_persona, platform, onboarding_data)
+    except Exception as e:
+        logger.error(f"Failed to generate {platform} persona for {user_id}: {e}")
+        return {"success": False, "message": f"Failed to generate {platform} persona: {e}", "error": "generation_failed"}
+
+    if not generated or (isinstance(generated, dict) and generated.get("error")):
+        err = generated.get("error") if isinstance(generated, dict) else "Unknown error"
+        logger.error(f"{platform} persona generation returned error for {user_id}: {err}")
+        return {"success": False, "message": f"Failed to generate {platform} persona: {err}", "error": "generation_failed"}
+
+    # Persist via the same path the Facebook scheduler uses.
+    saved = persona_data_service.save_platform_persona(user_id, platform, generated)
+    if not saved:
+        logger.warning(f"Could not persist {platform} persona for {user_id}")
+
+    logger.info(f"Generated + saved {platform} persona for {user_id}")
+    return {"success": True, "platform": platform, "persona": generated}
 
 async def execute_persona_generation_task(task_id: str, persona_request: PersonaGenerationRequest, current_user: Dict[str, Any]):
     """
@@ -735,7 +824,7 @@ async def execute_persona_generation_task(task_id: str, persona_request: Persona
                 await asyncio.sleep(0.3)
 
                 # Step 1: Generate core persona (1 API call)
-                update_task_status(user_id, task_id, "running", 20, "Calling AI to analyze your brand voice (this may take up to 30s)...")
+                update_task_status(user_id, task_id, "running", 20, "Calling AI to analyze your brand voice (this may take a couple of minutes)...")
                 logger.info(f"Task {task_id}: Step 1 - Generating core persona...")
                 
                 core_persona = await asyncio.get_event_loop().run_in_executor(

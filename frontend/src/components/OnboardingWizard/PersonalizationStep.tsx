@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Box,
   Button,
@@ -6,6 +6,7 @@ import {
   Alert,
   Stack,
   CircularProgress,
+  Backdrop,
 } from '@mui/material';
 import {
   InfoOutlined,
@@ -19,7 +20,7 @@ import {
 import { getLatestBrandAvatar, getLatestVoiceClone } from '../../api/brandAssets';
 import { usePersonaPolling } from '../../hooks/usePersonaPolling';
 import { aiApiClient } from '../../api/client';
-import { savePersonaUpdate } from '../../api/personaApi';
+import { savePersonaUpdate, getPersonaPlatforms, generatePlatformPersona, type PersonaPlatform } from '../../api/personaApi';
 import { type GenerationStep } from './PersonaStep/PersonaGenerationProgress';
 import { usePersonaInitialization } from './PersonaStep/personaInitialization';
 import { usePersonaGeneration } from './PersonaStep/personaGeneration';
@@ -100,12 +101,10 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
 
   // UI state
   const [showPreview, setShowPreview] = useState(false);
-  // Phase 4: now an array of open accordion ids (or empty = all closed),
-  // so the "Expand all / Collapse all" button can drive multiple
-  // accordions together. Default: only "core" open on first render.
-  const [expandedAccordion, setExpandedAccordion] = useState<string[]>(['core']);
   const [, setHasCheckedCache] = useState(false);
   const [configurationOptions, setConfigurationOptions] = useState<any>(null);
+  const [platforms, setPlatforms] = useState<PersonaPlatform[]>([]);
+  const [generatingPlatform, setGeneratingPlatform] = useState<string | null>(null);
 
   // Asset Status State
   const [brandAvatarSet, setBrandAvatarSet] = useState(false);
@@ -478,6 +477,14 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         console.error('Failed to load configuration options:', e);
       }
 
+      // Load the canonical persona platform list (backend registry)
+      try {
+        const platformList = await getPersonaPlatforms();
+        setPlatforms(platformList);
+      } catch (e) {
+        console.error('Failed to load persona platforms:', e);
+      }
+
       // Then initialize persona generation (potentially heavy)
       await initialize();
     };
@@ -492,6 +499,66 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
     setQualityMetrics(null);
     generatePersonas(true);
   };
+
+  // On-demand generation for a single platform ("Generate Now").
+  // Blocking: the Backdrop overlay prevents interaction while the LLM call runs.
+  const handleGenerateNow = useCallback(async (platformId: string) => {
+    setError(null);
+    setGeneratingPlatform(platformId);
+
+    try {
+      const resp = await generatePlatformPersona(platformId);
+      if (resp.success && resp.persona) {
+        setPlatformPersonas((prev) => ({ ...prev, [platformId]: resp.persona }));
+        setSelectedPlatforms((prev) => (prev.includes(platformId) ? prev : [...prev, platformId]));
+      } else {
+        setError(resp.message || `Failed to generate ${platformId} persona.`);
+      }
+    } catch (err: any) {
+      setError(err?.message || `Failed to generate ${platformId} persona.`);
+    } finally {
+      setGeneratingPlatform(null);
+    }
+  }, []);
+
+  const generatingPlatformName = useMemo(
+    () => platforms.find((p) => p.id === generatingPlatform)?.name || generatingPlatform || '',
+    [platforms, generatingPlatform],
+  );
+
+  // Re-fetch the latest persisted persona to pick up platform personas that were
+  // generated in the background after onboarding (e.g. Facebook/Twitter/YouTube).
+  // Only fills in *missing* platforms so it never clobbers in-progress local edits.
+  const refreshPersonaData = useCallback(async () => {
+    try {
+      const resp = await aiApiClient.get('/api/onboarding/step4/persona-latest');
+      if (resp.data?.success && resp.data?.persona) {
+        const p = resp.data.persona;
+        const serverPlatforms = p.platform_personas || {};
+        setPlatformPersonas((prev) => {
+          const next = { ...prev };
+          for (const [pid, pp] of Object.entries(serverPlatforms)) {
+            if (!next[pid]) {
+              next[pid] = pp;
+            }
+          }
+          return next;
+        });
+        if (Array.isArray(p.selected_platforms)) {
+          setSelectedPlatforms((prev) => Array.from(new Set([...prev, ...p.selected_platforms])));
+        }
+      }
+    } catch (e) {
+      // Non-critical: background generation status refresh is best-effort.
+    }
+  }, []);
+
+  const handleTabChange = useCallback((tab: PersonalizationTab) => {
+    setActiveTab(tab);
+    if (tab === 'text') {
+      refreshPersonaData();
+    }
+  }, [refreshPersonaData]);
 
   useEffect(() => {
     const hasValidData = !!(corePersona && platformPersonas && Object.keys(platformPersonas).length > 0 && qualityMetrics);
@@ -550,7 +617,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
           Regenerate + All-set buttons. The standalone tab row is gone. */}
       <Step4Hero
         activeTab={activeTab}
-        onTabChange={(t) => setActiveTab(t)}
+        onTabChange={handleTabChange}
         voiceDone={!!(corePersona && Object.keys(platformPersonas).length > 0 && qualityMetrics)}
         visualDone={brandAvatarSet}
         cloneDone={voiceCloneSet}
@@ -584,12 +651,10 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
               corePersona={corePersona}
               platformPersonas={platformPersonas}
               qualityMetrics={qualityMetrics}
-              selectedPlatforms={selectedPlatforms}
-              expandedAccordion={expandedAccordion}
-              setExpandedAccordion={setExpandedAccordion}
+              platforms={platforms}
               setCorePersona={setCorePersona}
               setPlatformPersonas={setPlatformPersonas}
-              handleRegenerate={handleRegenerate}
+              onGenerateNow={handleGenerateNow}
               completeness={completeness}
               data_sufficiency={dataSufficiency}
             />
@@ -661,6 +726,20 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
         hasBrandAvatar={brandAvatarSet}
         onVideoGenerated={(url) => setIntroVideoUrl(url || '')}
       />
+
+      {/* Blocking overlay while generating a platform persona on demand */}
+      <Backdrop
+        open={!!generatingPlatform}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 1, color: '#fff', flexDirection: 'column', gap: 2 }}
+      >
+        <CircularProgress color="inherit" />
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          Generating {generatingPlatformName} persona…
+        </Typography>
+        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.85)' }}>
+          This takes a few seconds. Please don't close the window.
+        </Typography>
+      </Backdrop>
     </Box>
   );
 };

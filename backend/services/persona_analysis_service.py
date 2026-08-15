@@ -18,6 +18,7 @@ import json
 from services.database import get_db_session
 from models.onboarding import OnboardingSession, WebsiteAnalysis, ResearchPreferences
 from models.persona_models import WritingPersona, PlatformPersona, PersonaAnalysisResult
+from services.persona.platform_registry import get_platform_constraints
 
 def _is_feature_limited_mode():
     """Check if running in feature-limited mode to skip heavy initialization."""
@@ -245,7 +246,7 @@ Generate a comprehensive, data-driven persona profile that can be used to replic
     def _build_platform_adaptation_prompt(self, core_persona: Dict[str, Any], platform: str, onboarding_data: Dict[str, Any]) -> str:
         """Build prompt for platform-specific persona adaptation."""
         
-        platform_constraints = self._get_platform_constraints(platform)
+        platform_constraints = get_platform_constraints(platform)
         
         prompt = f"""
 PLATFORM ADAPTATION TASK: Adapt the core writing persona for {platform.upper()}.
@@ -299,64 +300,6 @@ Generate a platform-optimized persona adaptation that maintains brand consistenc
         
         return prompt
     
-    
-    def _get_platform_constraints(self, platform: str) -> Dict[str, Any]:
-        """Get platform-specific constraints and best practices."""
-        
-        constraints = {
-            "twitter": {
-                "character_limit": 280,
-                "optimal_length": "120-150 characters",
-                "hashtag_limit": 3,
-                "image_support": True,
-                "thread_support": True,
-                "link_shortening": True
-            },
-            "linkedin": self.linkedin_service.get_linkedin_constraints(),
-            "facebook": self.facebook_service.get_facebook_constraints(),
-            "instagram": {
-                "caption_limit": 2200,
-                "optimal_length": "125-150 words",
-                "hashtag_limit": 30,
-                "visual_first": True,
-                "story_support": True,
-                "emoji_friendly": True
-            },
-            "facebook": {
-                "character_limit": 63206,
-                "optimal_length": "40-80 words",
-                "algorithm_favors": "engagement",
-                "link_preview": True,
-                "event_support": True,
-                "group_sharing": True
-            },
-            "blog": {
-                "word_count": "800-2000 words",
-                "seo_important": True,
-                "header_structure": True,
-                "internal_linking": True,
-                "meta_descriptions": True,
-                "readability_score": True
-            },
-            "medium": {
-                "word_count": "1000-3000 words",
-                "storytelling_focus": True,
-                "subtitle_support": True,
-                "publication_support": True,
-                "clap_optimization": True,
-                "follower_building": True
-            },
-            "substack": {
-                "newsletter_format": True,
-                "email_optimization": True,
-                "subscription_focus": True,
-                "long_form": True,
-                "personal_connection": True,
-                "monetization_support": True
-            }
-        }
-        
-        return constraints.get(platform, {})
     
     def _save_persona_to_db(self, user_id: int, core_persona: Dict[str, Any], platform_personas: Dict[str, Any], onboarding_data: Dict[str, Any]) -> WritingPersona:
         """Save generated persona to database."""
