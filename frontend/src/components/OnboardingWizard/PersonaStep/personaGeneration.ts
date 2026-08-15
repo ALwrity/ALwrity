@@ -1,11 +1,8 @@
 import { useCallback } from 'react';
 import { aiApiClient } from '../../../api/client';
-import { 
-  generateWritingPersonas, 
-  assessPersonaQuality, 
+import {
   prepareOnboardingData,
-  validatePersonaRequest,
-  PersonaGenerationRequest 
+  PersonaGenerationRequest
 } from '../../../api/personaApi';
 
 interface PersonaGenerationProps {
@@ -38,7 +35,7 @@ export const usePersonaGeneration = ({
   startPolling
 }: PersonaGenerationProps) => {
 
-  const generatePersonas = useCallback(async () => {
+  const generatePersonas = useCallback(async (force = false) => {
     setIsGenerating(true);
     setError(null);
     setProgress(0);
@@ -52,7 +49,8 @@ export const usePersonaGeneration = ({
       const request: PersonaGenerationRequest = {
         onboarding_data: prepareOnboardingData(onboardingData),
         selected_platforms: selectedPlatforms,
-        user_preferences: null
+        user_preferences: null,
+        force
       };
 
       console.log('Starting async persona generation...');
@@ -94,56 +92,6 @@ export const usePersonaGeneration = ({
     }
   }, [onboardingData, selectedPlatforms, startPolling, setIsGenerating, setError, setProgress, setShowPreview, setCorePersona, setPlatformPersonas, setQualityMetrics, setGenerationStep, savePersonaDataToCache]);
 
-  const generateCorePersona = async (data: any) => {
-    const request: PersonaGenerationRequest = {
-      onboarding_data: prepareOnboardingData(data),
-      selected_platforms: selectedPlatforms,
-      user_preferences: null
-    };
-
-    // Validate request
-    const validationErrors = validatePersonaRequest(request);
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-
-    const response = await generateWritingPersonas(request);
-    if (!response.success) {
-      throw new Error(response.error || 'Failed to generate core persona');
-    }
-
-    return response.core_persona;
-  };
-
-  const generatePlatformPersonas = async (corePersona: any, platforms: string[]) => {
-    const request: PersonaGenerationRequest = {
-      onboarding_data: prepareOnboardingData(onboardingData),
-      selected_platforms: platforms,
-      user_preferences: null
-    };
-
-    const response = await generateWritingPersonas(request);
-    if (!response.success) {
-      throw new Error(response.error || 'Failed to generate platform personas');
-    }
-
-    return response.platform_personas || {};
-  };
-
-  const assessPersonaQualityInternal = async (corePersona: any, platformPersonas: any) => {
-    const response = await assessPersonaQuality({
-      core_persona: corePersona,
-      platform_personas: platformPersonas,
-      user_feedback: null
-    });
-
-    if (!response.success) {
-      throw new Error(response.error || 'Failed to assess persona quality');
-    }
-
-    return response.quality_metrics;
-  };
-
   const getStepFromMessage = (message: string): string => {
     if (message.includes('Initializing')) return 'analyzing';
     if (message.includes('core persona')) return 'generating';
@@ -155,9 +103,6 @@ export const usePersonaGeneration = ({
 
   return {
     generatePersonas,
-    generateCorePersona,
-    generatePlatformPersonas,
-    assessPersonaQualityInternal,
     getStepFromMessage
   };
 };

@@ -485,10 +485,12 @@ class OnboardingManager:
                 raise HTTPException(status_code=500, detail=str(e))
 
         @self.app.get("/api/onboarding/step4/persona-task/{task_id}")
-        async def get_persona_task(task_id: str):
+        async def get_persona_task(task_id: str, current_user: dict = Depends(get_current_user)):
             """Get persona generation task status."""
             try:
-                return await get_persona_task_status(task_id)
+                return await get_persona_task_status(task_id, current_user)
+            except HTTPException as he:
+                raise he
             except Exception as e:
                 logger.error(f"Error in get_persona_task: {e}")
                 raise HTTPException(status_code=500, detail=str(e))

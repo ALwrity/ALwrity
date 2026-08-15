@@ -186,13 +186,33 @@ export function usePersonaPolling(options: UsePersonaPollingOptions = {}): UsePe
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
         console.error('Persona polling error:', errorMessage);
-        
-        // Only stop polling for actual task failures (404, task not found)
-        // For network errors, timeouts, etc., continue polling
+
+        // A 404 means the task is gone (expired, or lost on a server restart).
+        // Recover by falling back to the latest persisted persona instead of
+        // surfacing a terminal error to the user.
         if (errorMessage.includes('404') || errorMessage.includes('Task not found')) {
-          setError('Task not found - it may have expired or been cleaned up');
-          onError?.('Task not found - it may have expired or been cleaned up');
           stopPolling();
+          try {
+            const resp = await aiApiClient.get('/api/onboarding/step4/persona-latest');
+            const persona = resp.data?.persona;
+            if (resp.data?.success && persona) {
+              onComplete?.({
+                success: true,
+                core_persona: persona.core_persona,
+                platform_personas: persona.platform_personas || {},
+                quality_metrics: persona.quality_metrics || null,
+                completeness: null,
+                data_sufficiency: null,
+              });
+            } else {
+              setError('Persona generation was lost. Please regenerate your persona.');
+              onError?.('Persona generation was lost. Please regenerate your persona.');
+            }
+          } catch {
+            setError('Persona generation was lost. Please regenerate your persona.');
+            onError?.('Persona generation was lost. Please regenerate your persona.');
+          }
+          return;
         }
         // For other errors (timeouts, network issues), continue polling
         // The backend will eventually complete or fail, and we'll catch it

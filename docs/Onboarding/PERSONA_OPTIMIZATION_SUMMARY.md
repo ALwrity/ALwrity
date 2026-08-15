@@ -155,30 +155,28 @@ Total: 1 + N API calls (but parallel execution)
 
 ## 📋 **Implementation Options**
 
-### **Option 1: Ultra-Optimized (Recommended)**
-- **File**: `step4_persona_routes_optimized.py`
-- **API Calls**: 1 total
-- **Best for**: Production environments, cost optimization
-- **Trade-off**: Single large prompt vs multiple focused prompts
+> **Note (consolidation):** The experimental parallel variants were retired.
+> `step4_persona_routes_optimized.py` and `step4_persona_routes_quality_first.py`
+> have been removed. Production uses a single flow: `step4_persona_routes.py`
+> (core persona + sequential platform adaptations + rule-based/linguistic
+> quality assessment via `PersonaQualityImprover`), plus
+> `step4_test_drive_routes.py` for the "test with your data" modal.
 
-### **Option 2: Parallel Optimized**
-- **File**: `step4_persona_routes.py` (updated)
-- **API Calls**: 1 + N (parallel)
-- **Best for**: When platform-specific optimization is critical
-- **Trade-off**: More API calls but better platform specialization
+### **Production flow (active)**
+- **File**: `step4_persona_routes.py`
+- **API Calls**: 1 (core) + N (platforms, sequential with rate-limit delay)
+- **Quality assessment**: deterministic linguistic analyzer + `PersonaQualityImprover`
+- **Best for**: Production — grounded, evidence-based personas with subscription/usage checks
 
-### **Option 3: Hybrid Approach**
-- **Core persona**: Single API call
-- **Platform adaptations**: Parallel API calls
-- **Quality assessment**: Rule-based
-- **Best for**: Balanced approach
+### **Retired**
+- ~~`step4_persona_routes_optimized.py`~~ — single-call Gemini variant (bypassed subscription checks; inferior schema). Removed.
+- ~~`step4_persona_routes_quality_first.py`~~ — quality-threshold + auto-improve variant. Removed.
 
-## 🎯 **Recommendation**
+## 🎯 **Follow-up enhancement (tracked)**
 
-**Use Option 1 (Ultra-Optimized)** for the best performance and cost efficiency:
-- 1 API call total
-- 70% cost reduction
-- 60% faster execution
-- Reliable and scalable
-
-The optimized approach maintains quality while dramatically improving performance and reducing costs.
+The retired "quality-first" file had one idea worth preserving: a
+`quality_threshold` gate plus an automatic `improve_persona_quality` loop
+when the generated persona scores below the threshold. The underlying
+`PersonaQualityImprover.improve_persona_quality` remains available and this
+loop should be folded into the main `step4_persona_routes.py` flow in a
+later phase.
