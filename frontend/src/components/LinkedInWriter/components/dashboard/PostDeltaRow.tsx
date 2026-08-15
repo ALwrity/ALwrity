@@ -53,6 +53,7 @@ export const PostDeltaRow: React.FC<PostDeltaRowProps> = ({
     <div
       style={{
         ...rowBase,
+        background: colors.white,
         marginBottom: 8,
         borderLeft: `3px solid ${gain ? "#16a34a" : "#dc2626"}`,
       }}

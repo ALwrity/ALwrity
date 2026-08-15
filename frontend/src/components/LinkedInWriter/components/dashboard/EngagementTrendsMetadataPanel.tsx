@@ -7,7 +7,7 @@ import {
 } from "./engagementTrendsLocaleFormat";
 import { EMPTY_COPY } from "./engagementTrendsCopy";
 
-export interface EngagementTrendsMetadataFooterProps {
+export interface EngagementTrendsMetadataPanelProps {
   lastSyncedAt?: string | null;
   period?: { from: string; to: string } | null;
   showComparison: boolean;
@@ -17,9 +17,9 @@ export interface EngagementTrendsMetadataFooterProps {
   syncCooldownHint?: string | null;
 }
 
-/** Lower-priority sync metadata — shown below actionable trend insights. */
-export const EngagementTrendsMetadataFooter: React.FC<
-  EngagementTrendsMetadataFooterProps
+/** Right insight box — last updated, comparison window, and Sync Latest. */
+export const EngagementTrendsMetadataPanel: React.FC<
+  EngagementTrendsMetadataPanelProps
 > = ({
   lastSyncedAt,
   period,
@@ -46,7 +46,8 @@ export const EngagementTrendsMetadataFooter: React.FC<
   return (
     <div
       style={{
-        marginTop: 10,
+        flex: "1 1 0",
+        minWidth: 0,
         padding: "8px 10px",
         background: colors.rowBg,
         border: `1px solid ${colors.border}`,
@@ -66,19 +67,6 @@ export const EngagementTrendsMetadataFooter: React.FC<
           </span>
         </div>
       )}
-      {comparison && (
-        <div
-          style={{ marginBottom: syncCooldownHint ? 6 : 0 }}
-          title={`${comparison.previous.display} → ${comparison.latest.display}`}
-        >
-          <span style={{ fontWeight: 700, color: colors.textTertiary }}>
-            Comparing:{" "}
-          </span>
-          <span style={{ color: colors.textDark, fontWeight: 600 }}>
-            {comparison.previous.relative} → {comparison.latest.relative}
-          </span>
-        </div>
-      )}
       {syncCooldownHint && (
         <div style={{ marginBottom: 6, fontSize: 10, color: "#b45309" }}>
           {EMPTY_COPY.syncCooldownPrefix} ({syncCooldownHint}).
@@ -88,10 +76,26 @@ export const EngagementTrendsMetadataFooter: React.FC<
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "flex-end",
+          justifyContent: "space-between",
           gap: 8,
+          flexWrap: "nowrap",
         }}
       >
+        {comparison ? (
+          <div
+            style={{ minWidth: 0, flex: "1 1 auto" }}
+            title={`${comparison.previous.display} → ${comparison.latest.display}`}
+          >
+            <span style={{ fontWeight: 700, color: colors.textTertiary }}>
+              Comparing:{" "}
+            </span>
+            <span style={{ color: colors.textDark, fontWeight: 600 }}>
+              {comparison.previous.relative} → {comparison.latest.relative}
+            </span>
+          </div>
+        ) : (
+          <span style={{ flex: "1 1 auto" }} />
+        )}
         <button
           type="button"
           onClick={onRefresh}
@@ -99,7 +103,7 @@ export const EngagementTrendsMetadataFooter: React.FC<
           title={
             syncCooldownHint
               ? `${EMPTY_COPY.syncCooldownPrefix} (${syncCooldownHint})`
-              : undefined
+              : EMPTY_COPY.syncButton
           }
           style={{
             padding: "4px 10px",
@@ -112,6 +116,7 @@ export const EngagementTrendsMetadataFooter: React.FC<
             cursor: refreshDisabled ? "not-allowed" : "pointer",
             opacity: refreshDisabled ? 0.6 : 1,
             flexShrink: 0,
+            whiteSpace: "nowrap",
           }}
         >
           Sync Latest

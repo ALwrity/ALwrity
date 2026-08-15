@@ -39,7 +39,7 @@ export const EngagementTrendsPeriodChips: React.FC<
             padding: "5px 10px",
             borderRadius: 999,
             border: `1px solid ${selected ? colors.primary : colors.border}`,
-            background: selected ? "#eff6ff" : colors.rowBg,
+            background: selected ? "#eff6ff" : colors.white,
             color: selected ? colors.primary : colors.textSecondary,
             fontSize: 11,
             fontWeight: selected ? 700 : 600,

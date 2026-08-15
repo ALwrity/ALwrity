@@ -21,6 +21,14 @@ export {
   openQuickCreateFromWedge,
   openPerformancePulse,
   resolveWorkflowWedgeDetail,
+  isContentAnalyticsReturnTarget,
+  buildContentAnalyticsReturnTarget,
+  CONTENT_ANALYTICS_MODAL_LABEL,
+} from "./workflowWedgeNavigation";
+
+export type {
+  OpenPerformancePulseOptions,
+  ContentAnalyticsReturnTarget,
 } from "./workflowWedgeNavigation";
 
 export const ENGAGEMENT_RETURN = {

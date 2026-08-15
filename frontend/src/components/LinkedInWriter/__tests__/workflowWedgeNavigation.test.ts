@@ -3,6 +3,7 @@ import {
   openWorkflowWedge,
   openPerformancePulse,
   OPEN_WORKFLOW_WEDGE_EVENT,
+  buildContentAnalyticsReturnTarget,
 } from "../components/dashboard/workflowWedgeNavigation";
 
 describe("workflowWedgeNavigation", () => {
@@ -11,6 +12,17 @@ describe("workflowWedgeNavigation", () => {
       expect(
         resolveWorkflowWedgeDetail({ wedge: "engagement", sub: "pulse" }),
       ).toEqual({ wedge: "remarket", sub: "pulse" });
+    });
+
+    it("preserves returnTo when remapping legacy engagement pulse", () => {
+      const returnTo = buildContentAnalyticsReturnTarget(true);
+      expect(
+        resolveWorkflowWedgeDetail({
+          wedge: "engagement",
+          sub: "pulse",
+          returnTo,
+        }),
+      ).toEqual({ wedge: "remarket", sub: "pulse", returnTo });
     });
 
     it("passes through remarket+pulse unchanged", () => {
@@ -42,7 +54,7 @@ describe("workflowWedgeNavigation", () => {
   });
 
   describe("openPerformancePulse", () => {
-    it("opens remarket pulse sub-modal", () => {
+    it("opens remarket pulse with Content Analytics return target", () => {
       const handler = jest.fn();
       window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
 
@@ -50,7 +62,26 @@ describe("workflowWedgeNavigation", () => {
 
       expect(handler).toHaveBeenCalledTimes(1);
       const event = handler.mock.calls[0][0] as CustomEvent;
-      expect(event.detail).toEqual({ wedge: "remarket", sub: "pulse" });
+      expect(event.detail).toEqual({
+        wedge: "remarket",
+        sub: "pulse",
+        returnTo: buildContentAnalyticsReturnTarget(undefined),
+      });
+
+      window.removeEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
+    });
+
+    it("preserves Analysis wedge context in return target", () => {
+      const handler = jest.fn();
+      window.addEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
+
+      openPerformancePulse({ fromAnalysisWedge: true });
+
+      expect(handler).toHaveBeenCalledTimes(1);
+      const event = handler.mock.calls[0][0] as CustomEvent;
+      expect(event.detail.returnTo).toEqual(
+        buildContentAnalyticsReturnTarget(true),
+      );
 
       window.removeEventListener(OPEN_WORKFLOW_WEDGE_EVENT, handler);
     });

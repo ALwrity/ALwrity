@@ -1,6 +1,7 @@
 import React, { useMemo } from "react";
 import type { LinkedInPost } from "../../../../services/postAnalyticsApi";
 import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from "../../utils/personalPostAnalyticsLimits";
+import { POST_ANALYTICS_METRIC_THEMES } from "../dashboard/postAnalyticsMetricThemes";
 
 interface EngagementSummaryProps {
   posts: LinkedInPost[];
@@ -129,92 +130,93 @@ export const EngagementSummary: React.FC<EngagementSummaryProps> = React.memo(
       return null;
     }
 
+    const t = POST_ANALYTICS_METRIC_THEMES;
     const cards = [
       {
-        label: "Posts",
+        label: t.posts.label,
         value: formatNumber(stats.totalPosts),
-        color: "#0a66c2",
-        bg: "#e8f4fc",
+        color: t.posts.color,
+        bg: t.posts.bg,
       },
       {
-        label: "Reactions",
+        label: t.reactions.label,
         value: formatNumber(stats.totalReactions),
-        color: "#059669",
-        bg: "#d1fae5",
+        color: t.reactions.color,
+        bg: t.reactions.bg,
       },
       {
-        label: "Comments",
+        label: t.comments.label,
         value: formatNumber(stats.totalComments),
-        color: "#7c3aed",
-        bg: "#ede9fe",
+        color: t.comments.color,
+        bg: t.comments.bg,
       },
       {
-        label: "Reposts",
+        label: t.reposts.label,
         value: formatNumber(stats.totalReposts),
-        color: "#ea580c",
-        bg: "#ffedd5",
+        color: t.reposts.color,
+        bg: t.reposts.bg,
       },
       {
-        label: "Impressions",
+        label: t.impressions.label,
         value: formatNumber(stats.totalImpressions),
-        color: "#0369a1",
-        bg: "#e0f2fe",
+        color: t.impressions.color,
+        bg: t.impressions.bg,
       },
       {
-        label: "Avg. Engagement",
+        label: t.avgEngagement.label,
         value: `${(stats.avgEngagementRate * 100).toFixed(1)}%`,
-        color: "#0891b2",
-        bg: "#cffafe",
+        color: t.avgEngagement.color,
+        bg: t.avgEngagement.bg,
       },
       {
-        label: "Engagements",
+        label: t.engagements.label,
         value:
           stats.totalEngagements != null
             ? formatNumber(stats.totalEngagements)
             : "—",
-        color: "#4f46e5",
-        bg: "#eef2ff",
+        color: t.engagements.color,
+        bg: t.engagements.bg,
       },
       ...(PERSONAL_POST_CLICKS_CTR_AVAILABLE
         ? [
             {
-              label: "Clicks",
+              label: t.clicks.label,
               value: formatNumber(stats.totalClicks),
-              color: "#7c3aed",
-              bg: "#f5f3ff",
+              color: t.clicks.color,
+              bg: t.clicks.bg,
             },
             {
-              label: "Avg. CTR",
+              label: t.avgCtr.label,
               value:
                 stats.avgCtr != null
                   ? `${(stats.avgCtr * 100).toFixed(1)}%`
                   : "—",
-              color: "#0284c7",
-              bg: "#e0f2fe",
+              color: t.avgCtr.color,
+              bg: t.avgCtr.bg,
             },
           ]
         : []),
       {
-        label: "Page viewers",
+        label: t.pageViewers.label,
         value:
           stats.totalPageViewers != null
             ? formatNumber(stats.totalPageViewers)
             : "—",
-        color: "#db2777",
-        bg: "#fdf2f8",
+        color: t.pageViewers.color,
+        bg: t.pageViewers.bg,
       },
       {
-        label: "Followers Gained",
+        label: t.followersGained.label,
         value: `+${formatNumber(stats.totalFollowersGained)}`,
-        color: "#10b981",
-        bg: "#f0fdf4",
+        color: t.followersGained.color,
+        bg: t.followersGained.bg,
       },
       {
-        label: "Reached",
+        label: t.reached.label,
         value:
           stats.totalReach != null ? formatNumber(stats.totalReach) : "—",
-        color: "#0d9488",
-        bg: "#f0fdfa",
+        color: t.reached.color,
+        bg: t.reached.bg,
       },
     ];
 

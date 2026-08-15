@@ -13,7 +13,9 @@ import {
 } from "../../utils/linkedInDashboardEvents";
 import {
   OPEN_WORKFLOW_WEDGE_EVENT,
+  isContentAnalyticsReturnTarget,
   resolveWorkflowWedgeDetail,
+  type ContentAnalyticsReturnTarget,
   type OpenWorkflowWedgeDetailInput,
   type WorkflowModalId,
 } from "./engagementWedgeNavigation";
@@ -141,6 +143,8 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
     GrowNetworkScrollTarget | undefined
   >();
   const [remarkSub, setRemarkSub] = useState<RemarkSub>(null);
+  const [pulseReturnTo, setPulseReturnTo] =
+    useState<ContentAnalyticsReturnTarget | null>(null);
   const [publishSub, setPublishSub] = useState<PublishSub>(null);
 
   const { connected } = useLinkedInSocialConnection();
@@ -228,6 +232,13 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
       onOpenWedge?.(detail.wedge);
       if (detail.wedge === "remarket" && detail.sub) {
         setRemarkSub(detail.sub as RemarkSub);
+        if (detail.sub === "pulse") {
+          setPulseReturnTo(
+            isContentAnalyticsReturnTarget(detail.returnTo)
+              ? detail.returnTo
+              : null,
+          );
+        }
       }
       if (detail.wedge === "engagement" && detail.sub) {
         setEngagementSub(detail.sub as EngagementSub);
@@ -258,7 +269,27 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
   const backToRemarketGrid = () => {
     setRemarkSub(null);
+    setPulseReturnTo(null);
     onOpenWedge?.("remarket");
+  };
+
+  const backFromPerformancePulse = () => {
+    if (pulseReturnTo?.modal === "contentAnalytics") {
+      const fromAnalysisWedge = Boolean(pulseReturnTo.fromAnalysisWedge);
+      setRemarkSub(null);
+      setPulseReturnTo(null);
+      onClose();
+      openPostAnalyticsModal(
+        fromAnalysisWedge ? { fromAnalysisWedge: true } : undefined,
+      );
+      return;
+    }
+    backToRemarketGrid();
+  };
+
+  const closePerformancePulse = () => {
+    setRemarkSub(null);
+    setPulseReturnTo(null);
   };
 
   const growNetworkOpen =
@@ -670,8 +701,12 @@ export const WorkflowActionModals: React.FC<WorkflowActionModalsProps> = ({
 
       <PostPulseModal
         open={remarkSub === "pulse"}
-        onClose={() => setRemarkSub(null)}
-        onBack={backToRemarketGrid}
+        onClose={closePerformancePulse}
+        onBack={backFromPerformancePulse}
+        backLabel={
+          pulseReturnTo?.label ??
+          undefined
+        }
         connected={connected}
       />
       <RepurposeLabModal

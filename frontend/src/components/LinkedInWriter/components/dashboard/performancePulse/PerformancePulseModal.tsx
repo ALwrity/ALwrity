@@ -30,6 +30,8 @@ export interface PerformancePulseModalProps {
   open: boolean;
   onClose: () => void;
   onBack?: () => void;
+  /** Overrides default Remarket wedge back label when opened from another parent modal. */
+  backLabel?: string;
   connected?: boolean;
 }
 
@@ -37,6 +39,7 @@ export const PerformancePulseModal: React.FC<PerformancePulseModalProps> = ({
   open,
   onClose,
   onBack,
+  backLabel,
   connected = true,
 }) => {
   const [activeFilter, setActiveFilter] = useState<PerformancePulseFilter>("all");
@@ -76,7 +79,9 @@ export const PerformancePulseModal: React.FC<PerformancePulseModalProps> = ({
       title="Performance Pulse"
       onClose={onClose}
       onBack={onBack}
-      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.remarket)}
+      {...wedgePostSizeSubModalProps(
+        backLabel ?? WEDGE_BACK_LABELS.remarket,
+      )}
       modalClassName={wedgePostSizeModalClassName()}
     >
       <p
