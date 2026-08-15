@@ -100,15 +100,7 @@ export const PostTimelineChart: React.FC<PostTimelineChartProps> = ({
   if (sorted.length < 3) return null;
 
   return (
-    <div
-      style={{
-        background: "#fff",
-        border: "1px solid #e2e8f0",
-        borderRadius: 12,
-        padding: "14px 16px",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-      }}
-    >
+    <div className="linkedin-content-analytics-chart">
       {/* Header */}
       <div
         style={{
