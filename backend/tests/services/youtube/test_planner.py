@@ -67,7 +67,27 @@ class TestValidateAndEnhancePlan:
         assert enhanced["video_summary"] == "Only summary"
         assert isinstance(enhanced["seo_keywords"], list)
         assert isinstance(enhanced["content_outline"], list)
+        assert enhanced["title_suggestions"] == []
+        assert enhanced["selected_title"] == "Only summary"
         assert "duration_metadata" in enhanced or enhanced.get("tone")
+
+    def test_normalizes_title_suggestions_and_default_selected(self):
+        from services.youtube.planner import YouTubePlannerService
+
+        svc = YouTubePlannerService()
+        duration = svc._get_duration_context("shorts")
+        enhanced = svc._validate_and_enhance_plan(
+            plan_data=_minimal_plan(
+                title_suggestions=["  First Title  ", "", "First Title", "Second Title"],
+                selected_title="   ",
+            ),
+            duration_context=duration,
+            video_type="tutorial",
+            video_type_config={},
+        )
+
+        assert enhanced["title_suggestions"] == ["First Title", "Second Title"]
+        assert enhanced["selected_title"] == "First Title"
 
 
 class TestGeneratePlan:

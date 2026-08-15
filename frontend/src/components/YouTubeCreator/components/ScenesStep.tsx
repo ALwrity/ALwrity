@@ -35,6 +35,7 @@ interface ScenesStepProps {
   onNext: () => void;
   onAvatarRegenerate?: () => void;
   regeneratingAvatar?: boolean;
+  onPlanChange?: (plan: VideoPlan) => void;
 }
 
 export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
@@ -53,6 +54,7 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
   onNext,
   onAvatarRegenerate,
   regeneratingAvatar = false,
+  onPlanChange,
 }) => {
   const enabledScenesCount = useMemo(
     () => scenes.filter(s => s.enabled !== false).length,
@@ -90,7 +92,7 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
               color="error"
               startIcon={<PlayArrow />}
               onClick={onBuildScenes}
-              disabled={loading}
+              disabled={loading || !videoPlan.content_outline?.length}
               loading={loading}
               checkOnHover={true}
               checkOnMount={false}
@@ -103,6 +105,7 @@ export const ScenesStep: React.FC<ScenesStepProps> = React.memo(({
           plan={videoPlan}
           onAvatarRegenerate={onAvatarRegenerate}
           regeneratingAvatar={regeneratingAvatar}
+          onPlanChange={onPlanChange}
         />
 
         {scenes.length === 0 && (

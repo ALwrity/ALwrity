@@ -134,6 +134,7 @@ Follow these guidelines:
 9. **Tone**: {default_tone}
 10. **SEO Keywords**: 5-7 relevant terms based on video idea
 11. **Avatar Recommendations**: {f"{video_type_config.get('avatar_style', '')} " if video_type_config else ""}matching audience and style
+12. **Title Suggestions**: 3-5 YouTube titles under 70 characters. Pick the strongest as selected_title.
 
 **Response Format (JSON):**
 {{
@@ -150,6 +151,8 @@ Follow these guidelines:
   "visual_style": "...",
   "tone": "...",
   "seo_keywords": ["keyword1", "keyword2", ...],
+  "title_suggestions": ["...", "..."],
+  "selected_title": "...",
   "avatar_recommendations": {{
     "description": "...",
     "style": "...",
@@ -212,6 +215,11 @@ def build_plan_json_struct(*, include_scenes: bool, duration_type: str) -> Dict[
                     "type": "array",
                     "items": {"type": "string"}
                 },
+                "title_suggestions": {
+                    "type": "array",
+                    "items": {"type": "string"}
+                },
+                "selected_title": {"type": "string"},
                 "scenes": {
                     "type": "array",
                     "items": {
@@ -276,6 +284,11 @@ def build_plan_json_struct(*, include_scenes: bool, duration_type: str) -> Dict[
                 "type": "array",
                 "items": {"type": "string"}
             },
+            "title_suggestions": {
+                "type": "array",
+                "items": {"type": "string"}
+            },
+            "selected_title": {"type": "string"},
             "avatar_recommendations": {
                 "type": "object",
                 "properties": {

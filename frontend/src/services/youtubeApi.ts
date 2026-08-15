@@ -36,6 +36,12 @@ export interface VideoPlan {
   visual_style: string;
   tone?: string;
   seo_keywords: string[];
+  title_suggestions?: string[];
+  selected_title?: string;
+  duration_metadata?: {
+    target_seconds?: number;
+    max_scenes?: number;
+  };
   duration_type: string;
   estimated_duration?: string;
   auto_generated_avatar_url?: string;

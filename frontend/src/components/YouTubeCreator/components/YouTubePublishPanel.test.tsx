@@ -135,4 +135,50 @@ describe("YouTubePublishPanel", () => {
       }),
     );
   });
+
+  it("publishes with selected_title when present", () => {
+    const publishToYouTube = jest.fn();
+    mockedUseYouTubePublish.mockReturnValue(
+      buildHookState({
+        connected: true,
+        activeChannel: {
+          token_id: 99,
+          channel_id: "abc123",
+          channel_name: "ALwrity Channel",
+          expires_at: "2027-01-01T00:00:00Z",
+          connected_at: "2026-01-01T00:00:00Z",
+          is_active: true,
+        },
+        publishToYouTube,
+      }),
+    );
+
+    render(
+      <YouTubePublishPanel
+        videoUrl="https://example.com/video.mp4"
+        scenes={baseScenes}
+        videoPlan={{
+          video_summary: "How to rank YouTube videos fast",
+          target_audience: "Creators",
+          key_message: "Use searchable titles and retention hooks.",
+          content_outline: [],
+          hook_strategy: "Open with a bold promise",
+          visual_style: "Modern",
+          seo_keywords: ["youtube seo"],
+          duration_type: "medium",
+          selected_title: "Rank Videos in 7 Days",
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Publish to YouTube" }));
+
+    expect(publishToYouTube).toHaveBeenCalledWith(
+      "https://example.com/video.mp4",
+      "Rank Videos in 7 Days",
+      expect.objectContaining({
+        description: "Use searchable titles and retention hooks.",
+      }),
+    );
+  });
 });

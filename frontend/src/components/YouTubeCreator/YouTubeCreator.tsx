@@ -937,6 +937,13 @@ const YouTubeCreator: React.FC = () => {
           onNext={() => setActiveStep(2)}
           onAvatarRegenerate={handleAvatarRegenerate}
           regeneratingAvatar={regeneratingAvatar}
+          onPlanChange={(plan) => {
+            console.info('[YouTubeCreator] Plan updated before scene build', {
+              outlineCount: plan.content_outline?.length ?? 0,
+              hasSelectedTitle: Boolean(plan.selected_title?.trim()),
+            });
+            updateState({ videoPlan: plan });
+          }}
         />
       )}
 

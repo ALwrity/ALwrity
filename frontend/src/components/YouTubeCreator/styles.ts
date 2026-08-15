@@ -158,6 +158,19 @@ export const helperSx = {
   fontWeight: 400,
 };
 
+export const readableChipSx = {
+  backgroundColor: BACKGROUND,
+  color: TEXT_PRIMARY,
+  border: `1.5px solid ${BORDER_COLOR}`,
+  fontWeight: 500,
+  '& .MuiChip-label': {
+    color: TEXT_PRIMARY,
+  },
+  '& .MuiChip-deleteIcon': {
+    color: TEXT_SECONDARY,
+  },
+};
+
 // Additional styles for better UI
 export const paperSx = {
   backgroundColor: BACKGROUND,

@@ -331,6 +331,39 @@ class YouTubePlannerService:
                 f"Plan may need enhancement."
             )
 
+        raw_titles = plan_data.get("title_suggestions")
+        suggestions: List[str] = []
+        if isinstance(raw_titles, list):
+            seen_titles: set[str] = set()
+            for item in raw_titles:
+                if not isinstance(item, str):
+                    continue
+                title = item.strip()[:70]
+                key = title.lower()
+                if not title or key in seen_titles:
+                    continue
+                seen_titles.add(key)
+                suggestions.append(title)
+                if len(suggestions) >= 5:
+                    break
+        plan_data["title_suggestions"] = suggestions
+
+        selected = plan_data.get("selected_title")
+        selected_title = selected.strip()[:70] if isinstance(selected, str) else ""
+        if not selected_title:
+            if suggestions:
+                selected_title = suggestions[0]
+            else:
+                summary = plan_data.get("video_summary")
+                selected_title = (
+                    summary.strip()[:80] if isinstance(summary, str) and summary.strip() else ""
+                )
+        plan_data["selected_title"] = selected_title
+        logger.info(
+            f"[YouTubePlanner] Title fields normalized: "
+            f"suggestion_count={len(suggestions)}, has_selected={bool(selected_title)}"
+        )
+
         if not plan_data.get("avatar_recommendations"):
             logger.warning(
                 "[YouTubePlanner] Avatar recommendations missing. Generating defaults..."

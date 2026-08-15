@@ -72,3 +72,22 @@ class TestSourceArticlePrompt:
         )
         assert "A" * 4000 in prompt
         assert "A" * 4001 not in prompt
+
+
+class TestTitleSuggestionsPrompt:
+    def test_prompt_asks_for_title_suggestions(self):
+        from services.youtube.planner_prompts import build_planning_prompt
+
+        prompt = build_planning_prompt(**_base_kwargs())
+        assert "Title Suggestions" in prompt
+        assert "title_suggestions" in prompt
+        assert "selected_title" in prompt
+
+    def test_json_struct_includes_optional_title_fields(self):
+        from services.youtube.planner_prompts import build_plan_json_struct
+
+        schema = build_plan_json_struct(include_scenes=False, duration_type="medium")
+        assert "title_suggestions" in schema["properties"]
+        assert "selected_title" in schema["properties"]
+        assert "title_suggestions" not in schema["required"]
+        assert "selected_title" not in schema["required"]
