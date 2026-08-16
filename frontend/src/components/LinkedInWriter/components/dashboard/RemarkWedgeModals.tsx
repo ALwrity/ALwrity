@@ -139,6 +139,7 @@ export const ContentRefreshModal: React.FC<ContentRefreshModalProps> = ({
       await saveLinkedInToAssetLibrary({
         title: `Refreshed LinkedIn Post`,
         content: after,
+        contentType: "post",
         tags: ["refreshed"],
       });
       setSaved((prev) => ({ ...prev, [key]: true }));

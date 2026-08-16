@@ -31,6 +31,35 @@ describe("linkedInDraftLibraryUtils", () => {
     expect(getDraftContentType(completePost())).toBe("post");
   });
 
+  test("getDraftContentType maps linkedin_article metadata to article", () => {
+    expect(
+      getDraftContentType(
+        completePost({
+          asset_metadata: {
+            content_type: "linkedin_article",
+            content: completePost().asset_metadata?.content,
+            word_count: 22,
+          },
+        }),
+      ),
+    ).toBe("article");
+  });
+
+  test("getDraftContentType prefers linkedin_article tag over wrong post metadata", () => {
+    expect(
+      getDraftContentType(
+        completePost({
+          tags: ["linkedin", "social_media", "linkedin_article"],
+          asset_metadata: {
+            content_type: "linkedin_post",
+            content: completePost().asset_metadata?.content,
+            word_count: 800,
+          },
+        }),
+      ),
+    ).toBe("article");
+  });
+
   test("isCompleteLinkedInDraft accepts post with topic and body", () => {
     expect(isCompleteLinkedInDraft(completePost())).toBe(true);
   });
