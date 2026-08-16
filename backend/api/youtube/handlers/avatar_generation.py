@@ -54,6 +54,9 @@ async def _generate_avatar_from_context(
     )
 
     # Build optimized prompt using plan data
+    # PHASE-3B (deferred): APPEND the YouTube persona's prompt_defaults here —
+    # image_base_prompt (brand visual identity) + negative_prompt — so the avatar
+    # reflects the channel's stable look. An explicit brand_style always wins.
     prompt_parts = []
     
     # Base avatar description - use recommendations if available

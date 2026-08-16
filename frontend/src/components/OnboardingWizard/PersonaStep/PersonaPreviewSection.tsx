@@ -7,7 +7,7 @@ import {
   Tab,
   Fade
 } from '@mui/material';
-import { CheckCircle, Cancel } from '@mui/icons-material';
+import { CheckCircle, Cancel, Refresh } from '@mui/icons-material';
 import { CorePersonaDisplay } from './sections/CorePersonaDisplay';
 import { PlatformPersonaDisplay } from './sections/PlatformPersonaDisplay';
 import { HowWeBuiltThisPersona } from './sections/HowWeBuiltThisPersona';
@@ -131,6 +131,16 @@ export const PersonaPreviewSection: React.FC<PersonaPreviewSectionProps> = ({
           if (isGenerated(p.id)) {
             return (
               <Box key={p.id}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+                  <Button
+                    variant="outlined"
+                    startIcon={<Refresh />}
+                    onClick={() => onGenerateNow?.(p.id)}
+                    sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                  >
+                    Regenerate
+                  </Button>
+                </Box>
                 <PlatformPersonaDisplay
                   platformPersona={platformPersonas[p.id]}
                   platformName={p.id}

@@ -52,6 +52,8 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
 
   const isLinkedIn = platformName.toLowerCase() === 'linkedin';
   const isFacebook = platformName.toLowerCase() === 'facebook';
+  const isYoutube = platformName.toLowerCase() === 'youtube';
+  const isPodcast = platformName.toLowerCase() === 'podcast';
 
   return (
     <Box>
@@ -81,7 +83,7 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
       {/* Generic sections — only for generic-schema platforms (blog, twitter,
           instagram, youtube, podcast). LinkedIn/Facebook have dedicated
           structures and render their own sections below. */}
-      {!isLinkedIn && !isFacebook && (
+      {!isLinkedIn && !isFacebook && !isYoutube && !isPodcast && (
         <>
       {/* 1. Content Format Rules Section */}
       <SectionAccordion
@@ -961,6 +963,410 @@ export const PlatformPersonaDisplay: React.FC<PlatformPersonaDisplayProps> = ({
                   />
                 </Grid>
               </Grid>
+            </Box>
+          </SectionAccordion>
+        </>
+      )}
+
+      {/* YouTube-specific sections */}
+      {isYoutube && (
+        <>
+          {/* YouTube Identity */}
+          <SectionAccordion
+            title="YouTube Persona Identity"
+            subtitle="Name, archetype and core belief"
+            icon={<StrategyIcon />}
+            defaultExpanded={true}
+            color="info.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Persona Name"
+                    value={getNestedValue(platformPersona, ['persona_name'])}
+                    onChange={(val) => updateField(['persona_name'], val)}
+                    placeholder="e.g., The Fast-Paced Explainer"
+                    helperText="Name of the YouTube persona"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Archetype"
+                    value={getNestedValue(platformPersona, ['archetype'])}
+                    onChange={(val) => updateField(['archetype'], val)}
+                    placeholder="e.g., The Hands-On Educator"
+                    helperText="Persona archetype"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableTextField
+                    label="Core Belief"
+                    value={getNestedValue(platformPersona, ['core_belief'])}
+                    onChange={(val) => updateField(['core_belief'], val)}
+                    multiline
+                    placeholder="Core belief driving the channel..."
+                    helperText="The belief that drives the channel"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Tone & Pacing */}
+          <SectionAccordion
+            title="Tone & Pacing"
+            subtitle="Delivery energy, pace and style"
+            icon={<AlgorithmIcon />}
+            color="secondary.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Default Tone"
+                    value={getNestedValue(platformPersona, ['tone_and_pacing', 'default_tone'])}
+                    onChange={(val) => updateField(['tone_and_pacing', 'default_tone'], val)}
+                    placeholder="e.g., energetic, encouraging"
+                  />
+                  <EditableTextField
+                    label="Pace"
+                    value={getNestedValue(platformPersona, ['tone_and_pacing', 'pace'])}
+                    onChange={(val) => updateField(['tone_and_pacing', 'pace'], val)}
+                    placeholder="e.g., fast — cut every 2-3s"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Energy Level"
+                    value={getNestedValue(platformPersona, ['tone_and_pacing', 'energy_level'])}
+                    onChange={(val) => updateField(['tone_and_pacing', 'energy_level'], val)}
+                    placeholder="e.g., high, medium, low"
+                  />
+                  <EditableTextField
+                    label="Delivery Style"
+                    value={getNestedValue(platformPersona, ['tone_and_pacing', 'delivery_style'])}
+                    onChange={(val) => updateField(['tone_and_pacing', 'delivery_style'], val)}
+                    placeholder="e.g., direct-to-camera, voiceover"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Script Structure */}
+          <SectionAccordion
+            title="Script Structure"
+            subtitle="Hook, intro, body and CTA"
+            icon={<ContentIcon />}
+            color="info.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Hook Style" value={getNestedValue(platformPersona, ['script_structure', 'hook_style'])} onChange={(val) => updateField(['script_structure', 'hook_style'], val)} multiline placeholder="e.g., bold claim or question in first 5s" />
+                  <EditableTextField label="Intro Format" value={getNestedValue(platformPersona, ['script_structure', 'intro_format'])} onChange={(val) => updateField(['script_structure', 'intro_format'], val)} multiline placeholder="e.g., promise + why it matters" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Body Structure" value={getNestedValue(platformPersona, ['script_structure', 'body_structure'])} onChange={(val) => updateField(['script_structure', 'body_structure'], val)} multiline placeholder="e.g., 3 steps, each with an example" />
+                  <EditableTextField label="CTA Style" value={getNestedValue(platformPersona, ['script_structure', 'cta_style'])} onChange={(val) => updateField(['script_structure', 'cta_style'], val)} multiline placeholder="e.g., subscribe + comment" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Visual Style */}
+          <SectionAccordion
+            title="Visual Style"
+            subtitle="Brand colors, thumbnails, text and framing"
+            icon={<FeaturesIcon />}
+            color="warning.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <EditableChipArray label="Color Palette" values={getNestedValue(platformPersona, ['visual_style', 'color_palette'], [])} onChange={(vals) => updateField(['visual_style', 'color_palette'], vals)} placeholder="Add brand colors..." color="primary" helperText="Brand color palette" />
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Thumbnail Style" value={getNestedValue(platformPersona, ['visual_style', 'thumbnail_style'])} onChange={(val) => updateField(['visual_style', 'thumbnail_style'], val)} multiline placeholder="e.g., bold 3-word headline + face + contrast" />
+                  <EditableTextField label="On-Screen Text" value={getNestedValue(platformPersona, ['visual_style', 'on_screen_text'])} onChange={(val) => updateField(['visual_style', 'on_screen_text'], val)} multiline placeholder="e.g., minimal, large key terms" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="B-Roll" value={getNestedValue(platformPersona, ['visual_style', 'b_roll'])} onChange={(val) => updateField(['visual_style', 'b_roll'], val)} multiline placeholder="e.g., screen recordings + stock clips" />
+                  <EditableTextField label="Camera Framing" value={getNestedValue(platformPersona, ['visual_style', 'camera_framing'])} onChange={(val) => updateField(['visual_style', 'camera_framing'], val)} placeholder="e.g., centered medium shot" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Title & Description */}
+          <SectionAccordion
+            title="Title & Description"
+            subtitle="SEO strategy for titles and descriptions"
+            icon={<TrendingIcon />}
+            color="success.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Title Strategy" value={getNestedValue(platformPersona, ['title_description', 'title_strategy'])} onChange={(val) => updateField(['title_description', 'title_strategy'], val)} multiline placeholder="e.g., curiosity/benefit-driven titles" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Description Strategy" value={getNestedValue(platformPersona, ['title_description', 'description_strategy'])} onChange={(val) => updateField(['title_description', 'description_strategy'], val)} multiline placeholder="e.g., summary + keywords + chapters" />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableChipArray label="SEO Keywords" values={getNestedValue(platformPersona, ['title_description', 'seo_keywords'], [])} onChange={(vals) => updateField(['title_description', 'seo_keywords'], vals)} placeholder="Add SEO keywords..." color="primary" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Target Audience */}
+          <SectionAccordion
+            title="Target Audience"
+            subtitle="Who this channel serves"
+            icon={<ProfessionalIcon />}
+            color="info.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <EditableTextField label="Expertise Level" value={getNestedValue(platformPersona, ['target_audience', 'expertise_level'])} onChange={(val) => updateField(['target_audience', 'expertise_level'], val)} placeholder="e.g., beginner, intermediate, expert" />
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Interests" values={getNestedValue(platformPersona, ['target_audience', 'interests'], [])} onChange={(vals) => updateField(['target_audience', 'interests'], vals)} placeholder="Add interests..." color="primary" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Pain Points" values={getNestedValue(platformPersona, ['target_audience', 'pain_points'], [])} onChange={(vals) => updateField(['target_audience', 'pain_points'], vals)} placeholder="Add pain points..." color="error" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Engagement */}
+          <SectionAccordion
+            title="Engagement"
+            subtitle="Call-to-action and prompts"
+            icon={<BestPracticeIcon />}
+            color="success.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <EditableTextField label="Call to Action" value={getNestedValue(platformPersona, ['engagement', 'call_to_action'])} onChange={(val) => updateField(['engagement', 'call_to_action'], val)} multiline placeholder="e.g., subscribe + comment your blocker" />
+              <EditableChipArray label="Engagement Prompts" values={getNestedValue(platformPersona, ['engagement', 'engagement_prompts'], [])} onChange={(vals) => updateField(['engagement', 'engagement_prompts'], vals)} placeholder="Add engagement prompts..." color="secondary" />
+            </Box>
+          </SectionAccordion>
+
+          {/* Prompt Defaults */}
+          <SectionAccordion
+            title="Prompt Defaults"
+            subtitle="Ready-to-inject fragments for image/video models"
+            icon={<ContentIcon />}
+            color="warning.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <EditableTextField label="Image Base Prompt" value={getNestedValue(platformPersona, ['prompt_defaults', 'image_base_prompt'])} onChange={(val) => updateField(['prompt_defaults', 'image_base_prompt'], val)} multiline helperText="Stable visual identity for thumbnails/b-roll/scenes" />
+              <EditableTextField label="Video Base Prompt" value={getNestedValue(platformPersona, ['prompt_defaults', 'video_base_prompt'])} onChange={(val) => updateField(['prompt_defaults', 'video_base_prompt'], val)} multiline helperText="Stable framing + pacing cues for video generation" />
+              <EditableTextField label="Negative Prompt" value={getNestedValue(platformPersona, ['prompt_defaults', 'negative_prompt'])} onChange={(val) => updateField(['prompt_defaults', 'negative_prompt'], val)} multiline helperText="What to avoid" />
+            </Box>
+          </SectionAccordion>
+        </>
+      )}
+
+      {/* Podcast-specific sections */}
+      {isPodcast && (
+        <>
+          {/* Podcast Identity */}
+          <SectionAccordion
+            title="Podcast Persona Identity"
+            subtitle="Name, archetype and core belief"
+            icon={<StrategyIcon />}
+            defaultExpanded={true}
+            color="info.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Persona Name"
+                    value={getNestedValue(platformPersona, ['persona_name'])}
+                    onChange={(val) => updateField(['persona_name'], val)}
+                    placeholder="e.g., The Curious Host"
+                    helperText="Name of the podcast persona"
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField
+                    label="Archetype"
+                    value={getNestedValue(platformPersona, ['archetype'])}
+                    onChange={(val) => updateField(['archetype'], val)}
+                    placeholder="e.g., The Storyteller"
+                    helperText="Persona archetype"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableTextField
+                    label="Core Belief"
+                    value={getNestedValue(platformPersona, ['core_belief'])}
+                    onChange={(val) => updateField(['core_belief'], val)}
+                    multiline
+                    placeholder="Core belief driving the show..."
+                    helperText="The belief that drives the show"
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Host */}
+          <SectionAccordion
+            title="Host"
+            subtitle="Voice, personality and visual look"
+            icon={<ProfessionalIcon />}
+            color="secondary.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Name" value={getNestedValue(platformPersona, ['host', 'name'])} onChange={(val) => updateField(['host', 'name'], val)} placeholder="e.g., Alex" />
+                  <EditableTextField label="Background" value={getNestedValue(platformPersona, ['host', 'background'])} onChange={(val) => updateField(['host', 'background'], val)} multiline placeholder="Professional background..." />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Expertise Level" value={getNestedValue(platformPersona, ['host', 'expertise_level'])} onChange={(val) => updateField(['host', 'expertise_level'], val)} placeholder="e.g., expert, practitioner" />
+                  <EditableTextField label="Vocal Style" value={getNestedValue(platformPersona, ['host', 'vocal_style'])} onChange={(val) => updateField(['host', 'vocal_style'], val)} multiline placeholder="e.g., warm, conversational" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Personality Traits" values={getNestedValue(platformPersona, ['host', 'personality_traits'], [])} onChange={(vals) => updateField(['host', 'personality_traits'], vals)} placeholder="Add traits..." color="primary" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Catchphrases" values={getNestedValue(platformPersona, ['host', 'catchphrases'], [])} onChange={(vals) => updateField(['host', 'catchphrases'], vals)} placeholder="Add catchphrases..." color="secondary" />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableTextField label="Look" value={getNestedValue(platformPersona, ['host', 'look'])} onChange={(val) => updateField(['host', 'look'], val)} multiline placeholder="Visual description for avatar..." helperText="Market-fit and style only (no sensitive traits)" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Visual Style */}
+          <SectionAccordion
+            title="Visual Style"
+            subtitle="Studio, lighting and palette"
+            icon={<FeaturesIcon />}
+            color="warning.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Style Preset" value={getNestedValue(platformPersona, ['visual_style', 'style_preset'])} onChange={(val) => updateField(['visual_style', 'style_preset'], val)} placeholder="e.g., Professional Studio" />
+                  <EditableTextField label="Environment" value={getNestedValue(platformPersona, ['visual_style', 'environment'])} onChange={(val) => updateField(['visual_style', 'environment'], val)} placeholder="e.g., warm office with bookshelf" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Lighting" value={getNestedValue(platformPersona, ['visual_style', 'lighting'])} onChange={(val) => updateField(['visual_style', 'lighting'], val)} placeholder="e.g., soft studio lighting" />
+                  <EditableTextField label="Camera Style" value={getNestedValue(platformPersona, ['visual_style', 'camera_style'])} onChange={(val) => updateField(['visual_style', 'camera_style'], val)} placeholder="e.g., static mid-shot" />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableChipArray label="Color Palette" values={getNestedValue(platformPersona, ['visual_style', 'color_palette'], [])} onChange={(vals) => updateField(['visual_style', 'color_palette'], vals)} placeholder="Add brand colors..." color="primary" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Audio Environment */}
+          <SectionAccordion
+            title="Audio Environment"
+            subtitle="Soundscape, music and sound effects"
+            icon={<TrendingIcon />}
+            color="info.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={4}>
+                  <EditableTextField label="Soundscape" value={getNestedValue(platformPersona, ['audio_environment', 'soundscape'])} onChange={(val) => updateField(['audio_environment', 'soundscape'], val)} placeholder="e.g., quiet studio" />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableTextField label="Music Mood" value={getNestedValue(platformPersona, ['audio_environment', 'music_mood'])} onChange={(val) => updateField(['audio_environment', 'music_mood'], val)} placeholder="e.g., subtle, professional" />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <EditableTextField label="SFX Style" value={getNestedValue(platformPersona, ['audio_environment', 'sfx_style'])} onChange={(val) => updateField(['audio_environment', 'sfx_style'], val)} placeholder="e.g., minimal, tech-inspired" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Show Rules */}
+          <SectionAccordion
+            title="Show Rules"
+            subtitle="Intro, outro and interaction tone"
+            icon={<ContentIcon />}
+            color="success.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Intro Format" value={getNestedValue(platformPersona, ['show_rules', 'intro_format'])} onChange={(val) => updateField(['show_rules', 'intro_format'], val)} multiline placeholder="e.g., welcome + episode promise" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Outro Format" value={getNestedValue(platformPersona, ['show_rules', 'outro_format'])} onChange={(val) => updateField(['show_rules', 'outro_format'], val)} multiline placeholder="e.g., recap + subscribe" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Interaction Tone" value={getNestedValue(platformPersona, ['show_rules', 'interaction_tone'])} onChange={(val) => updateField(['show_rules', 'interaction_tone'], val)} placeholder="e.g., conversational" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Constraints" values={getNestedValue(platformPersona, ['show_rules', 'constraints'], [])} onChange={(vals) => updateField(['show_rules', 'constraints'], vals)} placeholder="Add constraints..." color="warning" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Audience */}
+          <SectionAccordion
+            title="Audience"
+            subtitle="Who this show serves"
+            icon={<ProfessionalIcon />}
+            color="info.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <EditableTextField label="Expertise Level" value={getNestedValue(platformPersona, ['audience', 'expertise_level'])} onChange={(val) => updateField(['audience', 'expertise_level'], val)} placeholder="e.g., beginner, intermediate, expert" />
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Interests" values={getNestedValue(platformPersona, ['audience', 'interests'], [])} onChange={(vals) => updateField(['audience', 'interests'], vals)} placeholder="Add interests..." color="primary" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableChipArray label="Pain Points" values={getNestedValue(platformPersona, ['audience', 'pain_points'], [])} onChange={(vals) => updateField(['audience', 'pain_points'], vals)} placeholder="Add pain points..." color="error" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Brand */}
+          <SectionAccordion
+            title="Brand"
+            subtitle="Tone, communication style and key messages"
+            icon={<BestPracticeIcon />}
+            color="success.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Tone" value={getNestedValue(platformPersona, ['brand', 'tone'])} onChange={(val) => updateField(['brand', 'tone'], val)} placeholder="e.g., professional, inspirational" />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <EditableTextField label="Communication Style" value={getNestedValue(platformPersona, ['brand', 'communication_style'])} onChange={(val) => updateField(['brand', 'communication_style'], val)} placeholder="e.g., storytelling, socratic" />
+                </Grid>
+                <Grid item xs={12}>
+                  <EditableChipArray label="Key Messages" values={getNestedValue(platformPersona, ['brand', 'key_messages'], [])} onChange={(vals) => updateField(['brand', 'key_messages'], vals)} placeholder="Add key messages..." color="primary" />
+                </Grid>
+              </Grid>
+            </Box>
+          </SectionAccordion>
+
+          {/* Prompt Defaults */}
+          <SectionAccordion
+            title="Prompt Defaults"
+            subtitle="Ready-to-inject fragments for image/video models"
+            icon={<ContentIcon />}
+            color="warning.main"
+          >
+            <Box sx={{ p: 3, background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', border: '1px solid #e2e8f0', borderRadius: 3, mb: 3 }}>
+              <EditableTextField label="Host Image Prompt" value={getNestedValue(platformPersona, ['prompt_defaults', 'host_image_prompt'])} onChange={(val) => updateField(['prompt_defaults', 'host_image_prompt'], val)} multiline helperText="Host/avatar visual fragment" />
+              <EditableTextField label="Studio Prompt" value={getNestedValue(platformPersona, ['prompt_defaults', 'studio_prompt'])} onChange={(val) => updateField(['prompt_defaults', 'studio_prompt'], val)} multiline helperText="Studio/setting visual fragment" />
+              <EditableTextField label="Negative Prompt" value={getNestedValue(platformPersona, ['prompt_defaults', 'negative_prompt'])} onChange={(val) => updateField(['prompt_defaults', 'negative_prompt'], val)} multiline helperText="What to avoid" />
             </Box>
           </SectionAccordion>
         </>

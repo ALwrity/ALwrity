@@ -203,6 +203,9 @@ def _execute_image_generation_task(task_id: str, request_data: dict, user_id: st
                 logger.warning(f"[YouTubeImageGen] Could not load base avatar for task {task_id}")
 
         # Build prompt (same logic as before)
+        # PHASE-3B (deferred): APPEND the YouTube persona's prompt_defaults here —
+        # image_base_prompt (brand visual identity) + negative_prompt — to the
+        # scene-specific content below. An explicit request.custom_prompt always wins.
         if base_avatar_bytes:
             prompt_parts = []
             if request.scene_title:

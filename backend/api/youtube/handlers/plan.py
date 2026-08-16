@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from middleware.auth_middleware import get_current_user
 from services.youtube.planner import YouTubePlannerService
 from services.youtube.scene_builder import YouTubeSceneBuilderService
+from services.persona_data_service import PersonaDataService
 from utils.logger_utils import get_service_logger
 from ..deps import require_authenticated_user
 from ..schemas import (
@@ -37,6 +38,18 @@ async def create_video_plan(
         )
 
         planner = YouTubePlannerService()
+
+        # Load the user's YouTube persona (if generated) to personalize the plan.
+        # Best-effort: if no persona exists yet, the planner falls back to its
+        # default persona-free behavior.
+        persona_data = None
+        try:
+            platform_persona = PersonaDataService().get_platform_persona(user_id, "youtube")
+            if platform_persona and platform_persona.get("platform_persona"):
+                persona_data = platform_persona["platform_persona"]
+        except Exception as exc:
+            logger.warning(f"[YouTubeAPI] Could not load YouTube persona for {user_id}: {exc}")
+
         plan = await planner.generate_plan(
             user_idea=request.user_idea,
             duration_type=request.duration_type,
@@ -44,6 +57,7 @@ async def create_video_plan(
             target_audience=request.target_audience,
             video_goal=request.video_goal,
             brand_style=request.brand_style,
+            persona_data=persona_data,
             reference_image_description=request.reference_image_description,
             user_id=user_id,
             avatar_url=request.avatar_url,
@@ -94,6 +108,9 @@ async def build_scenes(
         )
 
         # Build scenes (optimized to reuse existing scenes if available)
+        # PHASE-3B (deferred): load the YouTube persona (PersonaDataService, as in
+        # the /plan endpoint above) and pass it into build_scenes_from_plan so
+        # scene narration + visual_prompt inherit visual_style + prompt_defaults.
         scene_builder = YouTubeSceneBuilderService()
         scenes = scene_builder.build_scenes_from_plan(
             video_plan=request.video_plan,

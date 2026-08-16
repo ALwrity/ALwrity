@@ -15,11 +15,11 @@ from utils.logger_utils import get_service_logger
 from services.youtube.planner_config import VIDEO_TYPE_CONFIGS, get_duration_context
 from services.youtube.planner_prompts import (
     PLANNER_SYSTEM_PROMPT,
-    build_persona_context,
     build_planning_prompt,
     build_plan_json_struct,
 )
 from services.youtube.planner_research import perform_exa_research
+from services.persona.youtube.youtube_persona_service import YouTubePersonaService
 
 logger = get_service_logger("youtube.planner")
 
@@ -42,6 +42,11 @@ class YouTubePlannerService:
         target_audience: Optional[str] = None,
         video_goal: Optional[str] = None,
         brand_style: Optional[str] = None,
+        # Two-tier personalization: this is the user's YouTube BASE persona (the
+        # platform_personas['youtube'] dict — stable form: tone/pacing, visual
+        # style, script structure, audience, prompt_defaults). It supplies DEFAULTS
+        # only; episode inputs (target_audience/video_goal/brand_style above) always
+        # win. Rendered into the prompt by _build_persona_context.
         persona_data: Optional[Dict[str, Any]] = None,
         reference_image_description: Optional[str] = None,
         source_content_id: Optional[str] = None,  # For blog/story conversion
@@ -253,8 +258,14 @@ class YouTubePlannerService:
         return plan_data
 
     def _build_persona_context(self, persona_data: Optional[Dict[str, Any]]) -> str:
-        """Build persona context string for prompts."""
-        return build_persona_context(persona_data)
+        """Build persona context string for prompts (YouTube persona schema).
+
+        Delegates to ``YouTubePersonaService.build_prompt_context`` so the renderer
+        lives next to the schema it consumes. Returns "" when no persona is present,
+        in which case ``build_planning_prompt`` omits the persona block entirely and
+        the planner falls back to its generic, persona-free behavior.
+        """
+        return YouTubePersonaService.build_prompt_context(persona_data)
 
     def _get_duration_context(self, duration_type: str) -> Dict[str, Any]:
         """Get duration-specific context and constraints."""
