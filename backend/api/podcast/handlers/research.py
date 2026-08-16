@@ -169,13 +169,11 @@ async def podcast_research_exa(
     # --- Context Building ---
     bible_service = PodcastBibleService()
     bible_context = ""
-    if request.bible:
-        try:
-            from models.podcast_bible_models import PodcastBible
-            bible_data = PodcastBible(**request.bible)
-            bible_context = bible_service.serialize_bible(bible_data)
-        except Exception as exc:
-            logger.warning(f"[Podcast Research] Failed to serialize bible: {exc}")
+    bible_obj = None
+    try:
+        bible_obj, bible_context = bible_service.get_or_build_bible(user_id, request.bible, "temp_research")
+    except Exception as exc:
+        logger.warning(f"[Podcast Research] Failed to build bible: {exc}")
 
     analysis_context = ""
     if request.analysis:
@@ -193,14 +191,12 @@ Guest Talking Points: {', '.join(request.analysis.get('guest_talking_points', []
 Listener CTA: {request.analysis.get('listener_cta', 'N/A')}
 """
 
-    # Exa search params
-    industry = request.bible.get("brand", {}).get("industry", "") if request.bible else ""
+    # Exa search params (from the resolved bible — persona-seeded or explicit).
+    industry = bible_obj.brand.industry if bible_obj else ""
     target_audience = ""
-    if request.bible:
-        audience_dna = request.bible.get("audience", {})
-        if audience_dna:
-            interests = ", ".join(audience_dna.get("interests", []))
-            target_audience = f"Expertise: {audience_dna.get('expertise_level', '')}. Interests: {interests}."
+    if bible_obj:
+        interests = ", ".join(bible_obj.audience.interests or [])
+        target_audience = f"Expertise: {bible_obj.audience.expertise_level}. Interests: {interests}."
 
     # Preflight subscription check for Exa
     try:

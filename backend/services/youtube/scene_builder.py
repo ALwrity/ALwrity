@@ -34,6 +34,11 @@ class YouTubeSceneBuilderService:
         user_id: str,
         custom_script: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
+        # PHASE-3B (deferred): this builds scene narration + visual_prompt WITHOUT
+        # the YouTube persona. Flow the persona in (visual_style, script_structure,
+        # prompt_defaults.video_base_prompt) from plan.py /scenes so medium/long
+        # scenes stay on-brand. APPEND persona fragment, never replace the
+        # scene-specific content; an explicit custom_script always wins.
         """
         Build structured scenes from a video plan.
 

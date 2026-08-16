@@ -17,6 +17,8 @@ from .data_collector import OnboardingDataCollector
 from .prompt_builder import PersonaPromptBuilder
 from services.persona.linkedin.linkedin_persona_service import LinkedInPersonaService
 from services.persona.facebook.facebook_persona_service import FacebookPersonaService
+from services.persona.youtube.youtube_persona_service import YouTubePersonaService
+from services.persona.podcast.podcast_persona_service import PodcastPersonaService
 from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
 from services.persona.platform_registry import PERSONA_PLATFORMS, get_platform_constraints
 
@@ -40,6 +42,8 @@ class CorePersonaService:
             self.prompt_builder = PersonaPromptBuilder()
             self.linkedin_service = LinkedInPersonaService()
             self.facebook_service = FacebookPersonaService()
+            self.youtube_service = YouTubePersonaService()
+            self.podcast_service = PodcastPersonaService()
             logger.debug("CorePersonaService initialized")
             self._initialized = True
     
@@ -252,6 +256,19 @@ class CorePersonaService:
         # Use Facebook service for Facebook platform
         if platform.lower() == "facebook":
             return self.facebook_service.generate_facebook_persona(core_persona, onboarding_data)
+        
+        # Use YouTube service for YouTube platform (video-aware)
+        # Unlike the generic text adaptation below, YouTube/Podcast get dedicated
+        # audio/video-aware services so their personas capture MEDIA form
+        # (tone/pacing, visual style, script structure, prompt_defaults) instead of
+        # just writing style. Those services produce the stable BASE persona that
+        # Phase 3/4 later inject into episode generation.
+        if platform.lower() == "youtube":
+            return self.youtube_service.generate_youtube_persona(core_persona, onboarding_data)
+        
+        # Use Podcast service for Podcast platform (audio/video-aware)
+        if platform.lower() == "podcast":
+            return self.podcast_service.generate_podcast_persona(core_persona, onboarding_data)
         
         # Use generic platform adaptation for other platforms
         platform_constraints = self._get_platform_constraints(platform)

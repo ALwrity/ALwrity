@@ -63,6 +63,27 @@ interface QualityMetrics {
 
 type PersonalizationTab = 'text' | 'image' | 'audio';
 
+// Merge a freshly generated platform persona into the local (localStorage) cache so
+// on-demand "Generate Now" results survive a page reload even if the server-cache
+// check is skipped for the current session.
+function persistPlatformPersonaToCache(platformId: string, persona: any) {
+  try {
+    const raw = localStorage.getItem('persona_generation_data');
+    if (!raw) return;
+    const cached = JSON.parse(raw);
+    if (cached && typeof cached === 'object') {
+      cached.platform_personas = {
+        ...(cached.platform_personas || {}),
+        [platformId]: persona,
+      };
+      cached.timestamp = new Date().toISOString();
+      localStorage.setItem('persona_generation_data', JSON.stringify(cached));
+    }
+  } catch (err) {
+    console.warn('Failed to cache platform persona:', err);
+  }
+}
+
 const PersonalizationStep: React.FC<PersonalizationStepProps> = ({ 
   onContinue: _onContinue, 
   updateHeaderContent, 
@@ -510,6 +531,7 @@ const PersonalizationStep: React.FC<PersonalizationStepProps> = ({
       const resp = await generatePlatformPersona(platformId);
       if (resp.success && resp.persona) {
         setPlatformPersonas((prev) => ({ ...prev, [platformId]: resp.persona }));
+        persistPlatformPersonaToCache(platformId, resp.persona);
         setSelectedPlatforms((prev) => (prev.includes(platformId) ? prev : [...prev, platformId]));
       } else {
         setError(resp.message || `Failed to generate ${platformId} persona.`);

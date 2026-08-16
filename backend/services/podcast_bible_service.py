@@ -172,6 +172,66 @@ class PodcastBibleService:
             # Return a default bible if something goes wrong to ensure project creation doesn't fail
             return self._get_default_bible(project_id)
 
+    def get_or_build_bible(
+        self,
+        user_id: str,
+        request_bible: Optional[Dict[str, Any]] = None,
+        project_id: str = "temp",
+    ) -> tuple[PodcastBible, str]:
+        """Resolve a Podcast Bible and its serialized prompt context.
+
+        Priority:
+        1. Explicit ``request_bible`` (user/project-provided) — parsed and
+           serialized as-is.
+        2. Podcast platform persona (richer, brand-grounded) — mapped to a
+           ``PodcastBible`` via ``PodcastPersonaService.to_podcast_bible``.
+        3. Existing preferences-based ``generate_bible`` fallback.
+
+        Returns a ``(bible, bible_context)`` tuple. The fallback paths use a
+        user-scoped ``project_id`` so ``serialize_bible``'s process-global
+        cache (keyed by ``project_id``) never leaks one user's persona into
+        another user's session.
+
+        This is the podcast side of the two-tier personalization model:
+        - A user-configured ``request_bible`` (per project) is the episode-level
+          OVERRIDE and always wins.
+        - The podcast persona is the stable base FORM (host, visual/audio
+          environment, show rules, brand) and only SEEDS the bible when the user
+          hasn't provided one — it never replaces an explicit bible.
+        - ``generate_bible`` (onboarding preferences) is the last-resort fallback
+          for users with no persona and no manual bible.
+        """
+        if request_bible:
+            try:
+                bible = PodcastBible(**request_bible)
+                return bible, self.serialize_bible(bible)
+            except Exception as exc:
+                logger.warning(f"Could not parse provided Podcast Bible: {exc}")
+
+        scoped_project_id = f"{project_id}:{user_id}"
+
+        # Seed the bible from the podcast persona (brand-grounded FORM). This is the
+        # mechanism that keeps every episode on-brand without asking the user to
+        # restate their show's voice/visuals each time.
+        try:
+            from services.persona_data_service import PersonaDataService
+            from services.persona.podcast.podcast_persona_service import PodcastPersonaService
+
+            platform = PersonaDataService().get_platform_persona(user_id, "podcast")
+            if platform and platform.get("platform_persona"):
+                bible = PodcastPersonaService.to_podcast_bible(
+                    platform["platform_persona"],
+                    project_id=scoped_project_id,
+                    core_persona=platform.get("core_persona"),
+                )
+                if bible:
+                    return bible, self.serialize_bible(bible)
+        except Exception as exc:
+            logger.warning(f"Could not build Podcast Bible from podcast persona: {exc}")
+
+        bible = self.generate_bible(user_id, scoped_project_id)
+        return bible, self.serialize_bible(bible)
+
     def _get_default_bible(self, project_id: str) -> PodcastBible:
         """Return a sensible default Bible."""
         return PodcastBible(

@@ -86,22 +86,23 @@ async def generate_podcast_scene_image(
             logger.info(f"[Podcast] No base avatar URL provided, will generate from scratch")
             base_avatar_bytes = None
         
-        # Extract Podcast Bible context for hyper-personalization
+        # Extract Podcast Bible context for hyper-personalization. Seeded from the
+        # user's podcast persona when no explicit bible is provided.
         bible_context = ""
         bible_obj = None
-        if request.bible:
-            try:
-                from services.podcast_bible_service import PodcastBibleService
-                from models.podcast_bible_models import PodcastBible
-                bible_service = PodcastBibleService()
-                bible_obj = PodcastBible(**request.bible)
-                bible_context = bible_service.serialize_bible(bible_obj)
-            except Exception as exc:
-                logger.warning(f"[Podcast Image] Failed to serialize podcast bible: {exc}")
+        try:
+            from services.podcast_bible_service import PodcastBibleService
+            bible_service = PodcastBibleService()
+            bible_obj, bible_context = bible_service.get_or_build_bible(user_id, request.bible, "temp_image")
+        except Exception as exc:
+            logger.warning(f"[Podcast Image] Failed to build podcast bible: {exc}")
 
         # Build optimized prompt for scene image generation
         # When base avatar is provided, use Ideogram Character to maintain consistency
         # Otherwise, generate from scratch with podcast-optimized prompt
+        # PHASE-4B (deferred): APPEND the podcast persona's prompt_defaults here —
+        # studio_prompt (setting) + negative_prompt — on top of the scene-specific
+        # content below. An explicit request.custom_prompt always wins.
         image_prompt = ""  # Initialize prompt variable
         
         # Emotion to lighting mapping for visual tone
