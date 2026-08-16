@@ -2,6 +2,7 @@ import React from "react";
 import { Tooltip } from "@mui/material";
 
 import type { LinkedInTopicRecommendation } from "../../../../api/linkedinSocial";
+import { IdeaFormatCreateButtons } from "../shared/IdeaFormatCreateButtons";
 import {
   formatGrowthImpact,
   formatRecommendationFormat,
@@ -186,53 +187,6 @@ export const TopicRecommendationCard: React.FC<
               alignItems: "center",
             }}
           >
-            <button
-              type="button"
-              onClick={() => {
-                const contentType =
-                  recommendation.recommended_format === "LinkedIn Article"
-                    ? "article"
-                    : "post";
-                window.dispatchEvent(
-                  new CustomEvent("linkedinwriter:openQuickCreate", {
-                    detail: {
-                      type: contentType,
-                      topic: recommendation.title,
-                      key_points: recommendation.why_this_fits,
-                      target_audience:
-                        recommendation.target_audience.join(", "),
-                    },
-                  }),
-                );
-              }}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "7px 14px",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 700,
-                background: "linear-gradient(135deg, #0A66C2 0%, #004182 100%)",
-                color: "#ffffff",
-                border: "none",
-                cursor: "pointer",
-                boxShadow: "0 2px 8px rgba(10, 102, 194, 0.3)",
-                transition: "opacity 150ms ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "0.88";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "1";
-              }}
-              title={`Create a ${recommendation.recommended_format} about this topic`}
-            >
-              ✍️ Create{" "}
-              {recommendation.recommended_format === "LinkedIn Article"
-                ? "Article"
-                : "Post"}
-            </button>
             {onSave && (
               <button
                 type="button"
@@ -261,6 +215,11 @@ export const TopicRecommendationCard: React.FC<
                 {isSaved ? "✓ Saved" : isSaving ? "Saving…" : "💾 Save to My Ideas"}
               </button>
             )}
+            <IdeaFormatCreateButtons
+              topic={recommendation.title}
+              key_points={recommendation.why_this_fits}
+              target_audience={recommendation.target_audience.join(", ")}
+            />
           </div>
         </div>
       </div>

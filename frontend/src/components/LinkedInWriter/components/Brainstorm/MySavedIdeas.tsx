@@ -8,8 +8,8 @@ import { DashboardActionModal } from "../dashboard/DashboardActionModal";
 import { StudioModalCloseButton } from "../dashboard/StudioModalCloseButton";
 import {
   WEDGE_BACK_LABELS,
-  wedgeSubModalClassName,
-  wedgeSubModalShellProps,
+  wedgePostSizeModalClassName,
+  wedgePostSizeSubModalProps,
 } from "../dashboard/wedgeModalUi";
 import type { QuickCreateReturnTarget } from "../dashboard/workflowWedgeNavigation";
 import {
@@ -239,10 +239,11 @@ export const MySavedIdeas: React.FC<MySavedIdeasProps> = ({
         title="My Saved Ideas"
         onClose={onClose}
         onBack={onBack}
-        {...wedgeSubModalShellProps(backLabel)}
-        modalClassName={wedgeSubModalClassName("linkedin-plan-saved-ideas-modal")}
-        maxWidth={720}
-        maxHeight="min(90vh, 720px)"
+        {...wedgePostSizeSubModalProps(backLabel)}
+        height={CREATE_WEDGE_NESTED_MODAL_SIZE.height}
+        modalClassName={wedgePostSizeModalClassName(
+          "linkedin-plan-saved-ideas-modal",
+        )}
       >
         <p
           style={{
