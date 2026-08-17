@@ -286,6 +286,15 @@ class SIFContextMixin:
             if db:
                 db.close()
 
+        # ==========================================================================
+        # PHASE D FOLLOW-UP — natural-language semantic query (NOT YET TUNED)
+        # This tier is only reached when flat-file and DB both miss. The query
+        # below uses onboarding-internal wording ("step 4"); once persona is
+        # indexed into SIF (Phase A), retune it to natural domain terms the
+        # content-gen agents actually use, e.g.
+        #   "brand persona tone voice audience go-to phrases"
+        # so semantic retrieval returns the indexed persona docs (type: "persona").
+        # ==========================================================================
         try:
             results = await self.intelligence_service.search("persona platform personas onboarding step 4", limit=1)
         except SIFError as se:

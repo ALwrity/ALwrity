@@ -46,6 +46,13 @@ class OutlineService:
         
         # Extract cache parameters - use original user keywords for consistent caching
         keywords = request.research.original_keywords or request.research.keyword_analysis.get('primary', [])
+        # NOTE (Phase C, lower priority): `industry` / `target_audience` here are
+        # used for SEO targeting + outline CACHING, not brand voice. The curated
+        # brand-voice injection already lives in medium_blog_generator (content
+        # generation). If on-brand OUTLINE generation is desired later, resolve
+        # resolve_persona_context(user_id, 'blog') here and thread it into the
+        # outline generator — optional, since outline/research are SEO-driven.
+        # (Same pattern repeats in generate_outline_with_progress below.)
         industry = getattr(request.persona, 'industry', 'general') if request.persona else 'general'
         target_audience = getattr(request.persona, 'target_audience', 'general') if request.persona else 'general'
         word_count = request.word_count or 1500

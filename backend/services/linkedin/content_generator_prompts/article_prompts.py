@@ -11,6 +11,17 @@ from models.linkedin_models import LinkedInOutlineSection
 class ArticlePromptBuilder:
     """Builder class for LinkedIn article generation prompts."""
     
+    # ==========================================================================
+    # PHASE C FOLLOW-UP — persona context injection (NOT YET WIRED)
+    # This builder uses the legacy `persona` dict only. To complete the curated
+    # brand-voice injection: (1) add a `persona_context: Optional[str] = None`
+    # param, (2) prefer it over the legacy `persona` dict (mirror
+    # PostPromptBuilder.build_post_prompt), (3) resolve it in
+    # content_generator.generate_grounded_article_content via
+    # resolve_persona_context(user_id, 'linkedin') when there is no
+    # persona_override. Keep the persona in the STYLE layer only — topic/outline
+    # stay user-driven (brand voice constrains HOW, never WHAT).
+    # ==========================================================================
     @staticmethod
     def build_article_prompt(request: Any, persona: Optional[Dict[str, Any]] = None) -> str:
         """

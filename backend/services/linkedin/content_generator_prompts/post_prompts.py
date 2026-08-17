@@ -11,18 +11,28 @@ class PostPromptBuilder:
     """Builder class for LinkedIn post generation prompts."""
     
     @staticmethod
-    def build_post_prompt(request: Any, persona: Optional[Dict[str, Any]] = None) -> str:
+    def build_post_prompt(request: Any, persona: Optional[Dict[str, Any]] = None, persona_context: Optional[str] = None) -> str:
         """
         Build prompt for post generation.
         
         Args:
             request: LinkedInPostRequest object containing generation parameters
+            persona: Legacy persona dict (fallback when no curated context).
+            persona_context: Curated brand-voice block (preferred when present).
             
         Returns:
             Formatted prompt string for post generation
         """
         persona_block = ""
-        if persona:
+        if persona_context and persona_context.strip():
+            # Phase C.2: curated brand-voice block (resolved from onboarding
+            # PersonaData via resolve_persona_context) takes precedence over the
+            # legacy persona dict below — so the brand voice is enforced from
+            # onboarding, while the TOPIC / KEY POINTS below stay user-driven.
+            # This keeps the model on-brand (HOW the brand writes) without
+            # constraining WHAT it writes about (the user's topic).
+            persona_block = persona_context.strip()
+        elif persona:
             try:
                 # Expecting structure similar to persona_service.get_persona_for_platform output
                 core = persona.get('core_persona', persona)

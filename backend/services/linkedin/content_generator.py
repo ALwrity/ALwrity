@@ -450,6 +450,12 @@ class ContentGenerator:
             persona_data = None
             if user_id:
                 persona_data = self._get_cached_persona_data(user_id, 'linkedin')
+            # Phase C.2 — curated brand-voice injection. Resolve the rich
+            # onboarding persona (PersonaData) into a compact, platform-scoped
+            # "Brand Voice" block and prefer it over the legacy WritingPersona
+            # path. Resolved only when there is no session persona_override,
+            # so an explicit user override always wins.
+            persona_context = None
             if getattr(request, 'persona_override', None):
                 try:
                     override = request.persona_override
@@ -466,7 +472,10 @@ class ContentGenerator:
                         persona_data = override
                 except Exception:
                     pass
-            prompt = PostPromptBuilder.build_post_prompt(request, persona=persona_data)
+            elif user_id:
+                from services.persona.persona_resolver import resolve_persona_context
+                persona_context = resolve_persona_context(user_id, 'linkedin')
+            prompt = PostPromptBuilder.build_post_prompt(request, persona=persona_data, persona_context=persona_context)
             
             # Inject research context into prompt
             research_context = self._build_research_context(research_sources)
@@ -538,6 +547,13 @@ class ContentGenerator:
     async def generate_grounded_article_content(self, request, research_sources: List, user_id: str = None) -> Dict[str, Any]:
         """Generate article content using provider-agnostic llm_text_gen with structured JSON output."""
         try:
+            # NOTE (Phase C follow-up): this article path is NOT yet wired to the
+            # curated persona_context — it still uses the legacy persona via
+            # ArticlePromptBuilder.build_article_prompt. To complete it, mirror
+            # generate_grounded_post_content above: resolve persona_context when
+            # there is no persona_override, then add a persona_context= param to
+            # ArticlePromptBuilder.build_article_prompt and pass it through.
+            # The carousel / video-script builders are the same follow-up pattern.
             # Build the prompt using persona if available
             persona_data = None
             if user_id:

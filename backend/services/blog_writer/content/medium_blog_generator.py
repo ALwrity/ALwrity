@@ -22,6 +22,38 @@ from services.llm_providers.main_text_generation import llm_text_gen
 from services.cache.persistent_content_cache import persistent_content_cache
 
 
+def _resolve_persona_block(req, user_id: str) -> str:
+    """Return the brand-voice block for the system prompt.
+
+    Phase C.3 — curated brand-voice injection: prefer the rich onboarding
+    persona (PersonaData) block over the simple ``req.persona``, so the blog is
+    written in the brand's actual voice (tone, phrases, sentence style). The
+    TOPIC / sections / keywords are separate and remain user-driven — the
+    persona constrains HOW the brand writes, never WHAT it writes about.
+    Falls back to the legacy ``req.persona`` (or "") when no curated persona.
+    """
+    try:
+        from services.persona.persona_resolver import resolve_persona_context
+        curated = resolve_persona_context(user_id, 'blog')
+        if curated:
+            return curated
+    except Exception as e:
+        logger.warning(f"Curated persona resolve failed (falling back to req.persona): {e}")
+
+    if req.persona:
+        return f"""
+            PERSONA GUIDELINES:
+            - Industry: {req.persona.industry or 'General'}
+            - Tone: {req.persona.tone or 'Professional'}
+            - Audience: {req.persona.audience or 'General readers'}
+            
+            Write content that reflects this persona's expertise and communication style.
+            Use industry-specific terminology and examples where appropriate.
+            Maintain consistent voice and authority throughout all sections.
+            """
+    return ""
+
+
 class MediumBlogGenerator:
     """Service for generating medium-length blog content using structured AI calls."""
     
@@ -126,19 +158,8 @@ class MediumBlogGenerator:
             "sections": [section_block(s) for s in req.sections],
         }
 
-        # Build persona-aware system prompt
-        persona_context = ""
-        if req.persona:
-            persona_context = f"""
-            PERSONA GUIDELINES:
-            - Industry: {req.persona.industry or 'General'}
-            - Tone: {req.persona.tone or 'Professional'}
-            - Audience: {req.persona.audience or 'General readers'}
-            
-            Write content that reflects this persona's expertise and communication style.
-            Use industry-specific terminology and examples where appropriate.
-            Maintain consistent voice and authority throughout all sections.
-            """
+        # Build persona-aware system prompt.
+        persona_context = _resolve_persona_block(req, user_id)
         
         system = (
             f"You are a professional blog writer in {datetime.now().year}. "
