@@ -361,9 +361,8 @@ const LinkedInWriterContent: React.FC<LinkedInWriterProps> = ({
         title,
         content: draftToSave,
         topic,
-        tags: isArticle
-          ? ["linkedin_article", "social_media"]
-          : ["linkedin_post", "social_media"],
+        contentType: draftContentType,
+        tags: ["social_media"],
         assetMetadata: {
           word_count: wordCount,
           source: locationState?.calendarTopic ? "calendar" : "manual",

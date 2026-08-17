@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from services.persona_analysis_service import PersonaAnalysisService
 from services.database import get_db
+from services.persona.platform_registry import get_enabled_platforms
 
 class PersonaGenerationRequest(BaseModel):
     """Request model for persona generation."""
@@ -502,60 +503,13 @@ async def generate_persona_preview(user_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to generate preview: {str(e)}")
 
 async def get_supported_platforms():
-    """Get list of supported platforms for persona generation."""
+    """Get list of supported platforms for persona generation (from the registry)."""
     return {
         "platforms": [
-            {
-                "id": "twitter",
-                "name": "Twitter/X",
-                "description": "Microblogging platform optimized for short, engaging content",
-                "character_limit": 280,
-                "optimal_length": "120-150 characters"
-            },
-            {
-                "id": "linkedin",
-                "name": "LinkedIn",
-                "description": "Professional networking platform for thought leadership content",
-                "character_limit": 3000,
-                "optimal_length": "150-300 words"
-            },
-            {
-                "id": "instagram",
-                "name": "Instagram",
-                "description": "Visual-first platform with engaging captions",
-                "character_limit": 2200,
-                "optimal_length": "125-150 words"
-            },
-            {
-                "id": "facebook",
-                "name": "Facebook",
-                "description": "Social networking platform for community engagement",
-                "character_limit": 63206,
-                "optimal_length": "40-80 words"
-            },
-            {
-                "id": "blog",
-                "name": "Blog Posts",
-                "description": "Long-form content optimized for SEO and engagement",
-                "word_count": "800-2000 words",
-                "seo_optimized": True
-            },
-            {
-                "id": "medium",
-                "name": "Medium",
-                "description": "Publishing platform for storytelling and thought leadership",
-                "word_count": "1000-3000 words",
-                "storytelling_focus": True
-            },
-            {
-                "id": "substack",
-                "name": "Substack",
-                "description": "Newsletter platform for building subscriber relationships",
-                "format": "email newsletter",
-                "subscription_focus": True
-                    }
-    ]
-}
+            {"id": p["id"], "name": p["name"], "description": p["description"]}
+            for p in get_enabled_platforms()
+        ]
+    }
 
 class LinkedInOptimizationRequest(BaseModel):
     """Request model for LinkedIn algorithm optimization."""

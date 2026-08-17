@@ -19,16 +19,20 @@ import { LinkedInPublishChecklist } from "../LinkedInPublishChecklist";
 import {
   filterCompleteLinkedInDrafts,
   getDraftAssetContent,
+  getDraftContentType,
   type LinkedInDraftAsset,
 } from "../../utils/linkedInDraftLibraryUtils";
+import type { LinkedInDraftContentType } from "../../utils/linkedInDraftContentTypeStorage";
+import {
+  openDraftAssetInStudio,
+  openDraftContentInStudio,
+} from "../../utils/openDraftInStudio";
 import {
   isPublishWedgeScheduleLocked,
   isPublishWedgeTimingLocked,
   PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT,
-  PUBLISH_WEDGE_TIMING_LOCKED_HINT,
 } from "../../utils/linkedInPublishWedgeLockedUi";
 import { ConnectLockIcon } from "./ConnectLockIcon";
-import { EngagementBoosterLaunchButton } from "./EngagementBoosterLaunchButton";
 import { QualityCheckEngagementActions } from "./QualityCheckEngagementActions";
 import {
   WEDGE_BACK_LABELS,
@@ -36,6 +40,8 @@ import {
   wedgePostSizeModalClassName,
   wedgePostSizeSubModalProps,
 } from "./wedgeModalUi";
+import { DraftLibraryCard } from "./publishWedge/DraftLibraryCard";
+import { publishWedgePanelBtn as panelBtn } from "./publishWedge/publishWedgePanelUi";
 
 export { PublishNowModal } from "./PublishNowModal";
 
@@ -53,36 +59,9 @@ function readDraftFromStorage(): string {
   }
 }
 
-function openInStudio(content: string, onDone: () => void) {
-  window.dispatchEvent(
-    new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
-  );
-  onDone();
-}
-
 // ---------------------------------------------------------------------------
 // Shared UI primitives
 // ---------------------------------------------------------------------------
-
-const panelBtn = (
-  primary?: boolean,
-  danger?: boolean,
-  locked?: boolean,
-): React.CSSProperties => ({
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "9px 18px",
-  borderRadius: 8,
-  border: primary ? "none" : "1.5px solid #d1d5db",
-  background: danger ? "#ef4444" : primary ? "#0a66c2" : "#ffffff",
-  color: danger ? "#fff" : primary ? "#fff" : "#374151",
-  fontSize: 13,
-  fontWeight: 600,
-  cursor: locked ? "not-allowed" : "pointer",
-  opacity: locked ? 0.72 : 1,
-  transition: "opacity 140ms",
-});
 
 const sectionLabel: React.CSSProperties = {
   fontSize: 11,
@@ -183,7 +162,7 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
     getDraftAssetContent(asset);
 
   const handleOpenInStudio = (asset: LinkedInDraftAsset) => {
-    openInStudio(getAssetContent(asset), onClose);
+    openDraftAssetInStudio(asset, onClose);
   };
 
   const handleViewAll = () => {
@@ -289,194 +268,21 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
         )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {drafts.map((asset) => {
-            const assetContent = getAssetContent(asset);
-            return (
-              <div
-                key={asset.id}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "#cbd5e1";
-                  e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.06)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "#e2e8f0";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-                style={{
-                  background: "#ffffff",
-                  borderRadius: 12,
-                  border: "1.5px solid #e2e8f0",
-                  padding: "14px 16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  transition: "border-color 0.15s, box-shadow 0.15s",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-              {/* Left accent bar */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  top: 0,
-                  bottom: 0,
-                  width: 3,
-                  background: "linear-gradient(180deg, #0a66c2, #8b5cf6)",
-                  borderRadius: "3px 0 0 3px",
-                }}
-              />
-
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 12,
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: "#111827",
-                      marginBottom: 2,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {asset.title || "Untitled Draft"}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#9ca3af",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                    }}
-                  >
-                    {asset.created_at
-                      ? new Date(asset.created_at).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        })
-                      : ""}
-                    {asset.description && (
-                      <>
-                        <span style={{ color: "#d1d5db" }}>·</span>
-                        <span>
-                          {asset.description.split(/\s+/).length} words
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              {(() => {
-                const content = assetContent;
-                const isShort = content.length < 60 && content === asset.title;
-                return (
-                  <div
-                    style={{
-                      fontSize: 12.5,
-                      color: "#6b7280",
-                      lineHeight: 1.6,
-                      background: "#f8fafc",
-                      borderRadius: 8,
-                      padding: "10px 12px",
-                      border: "1px solid #f1f5f9",
-                    }}
-                  >
-                    {isShort ? (
-                      <span style={{ fontStyle: "italic", color: "#9ca3af" }}>
-                        Full content not available. Open in Studio to view.
-                      </span>
-                    ) : (
-                      `"${content.slice(0, 150)}${content.length > 150 ? "…" : ""}"`
-                    )}
-                  </div>
-                );
-              })()}
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button
-                  style={panelBtn(true)}
-                  onClick={() => handleOpenInStudio(asset)}
-                >
-                  ✍️ Open in Studio
-                </button>
-                <button
-                  style={{
-                    ...panelBtn(),
-                    borderColor: "#8b5cf6",
-                    color: "#8b5cf6",
-                  }}
-                  onClick={() => setQualityCheckAsset(asset)}
-                >
-                  📊 Quality Check
-                </button>
-                <EngagementBoosterLaunchButton
-                  variant="inline"
-                  content={assetContent}
-                  disabled={!assetContent.trim()}
-                />
-                <button
-                  type="button"
-                  style={{
-                    ...panelBtn(false, false, scheduleLocked),
-                    borderColor: scheduleLocked ? "#d1d5db" : "#10b981",
-                    color: scheduleLocked ? "#9ca3af" : "#10b981",
-                  }}
-                  disabled={scheduleLocked}
-                  title={
-                    scheduleLocked ? PUBLISH_WEDGE_SCHEDULE_LOCKED_HINT : undefined
-                  }
-                  aria-label={
-                    scheduleLocked
-                      ? "Schedule — coming soon"
-                      : "Schedule this draft"
-                  }
-                  onClick={() => {
-                    if (!scheduleLocked) setScheduleAsset(asset);
-                  }}
-                >
-                  📅 Schedule
-                  {scheduleLocked && <ConnectLockIcon size={12} />}
-                </button>
-                <button
-                  type="button"
-                  style={{
-                    ...panelBtn(false, false, timingLocked),
-                    borderColor: timingLocked ? "#d1d5db" : "#0ea5e9",
-                    color: timingLocked ? "#9ca3af" : "#0ea5e9",
-                  }}
-                  disabled={timingLocked}
-                  title={
-                    timingLocked ? PUBLISH_WEDGE_TIMING_LOCKED_HINT : undefined
-                  }
-                  aria-label={
-                    timingLocked
-                      ? "Best Time — coming soon"
-                      : "Find the best time to post this draft"
-                  }
-                  onClick={() => {
-                    if (!timingLocked) {
-                      setTimingForAsset(asset);
-                      setShowTiming(true);
-                    }
-                  }}
-                >
-                  ⏰ Best Time
-                  {timingLocked && <ConnectLockIcon size={12} />}
-                </button>
-              </div>
-              </div>
-            );
-          })}
+          {drafts.map((asset) => (
+            <DraftLibraryCard
+              key={asset.id}
+              asset={asset}
+              scheduleLocked={scheduleLocked}
+              timingLocked={timingLocked}
+              onOpenInStudio={handleOpenInStudio}
+              onQualityCheck={setQualityCheckAsset}
+              onSchedule={setScheduleAsset}
+              onBestTime={(draftAsset) => {
+                setTimingForAsset(draftAsset);
+                setShowTiming(true);
+              }}
+            />
+          ))}
         </div>
 
         <div
@@ -526,6 +332,11 @@ export const DraftLibraryModal: React.FC<DraftLibraryModalProps> = ({
         onBack={handleCloseQualityCheck}
         initialContent={
           qualityCheckAsset ? getAssetContent(qualityCheckAsset) : undefined
+        }
+        initialContentType={
+          qualityCheckAsset
+            ? getDraftContentType(qualityCheckAsset) ?? undefined
+            : undefined
         }
         contextHint={qualityCheckAsset?.title ?? undefined}
       />
@@ -591,6 +402,8 @@ interface QualityCheckModalProps {
   onBack?: () => void;
   /** When provided, scores this content instead of the localStorage draft */
   initialContent?: string;
+  /** Editor format when opening from a saved asset draft */
+  initialContentType?: LinkedInDraftContentType;
   /** Optional topic/context hint passed to the scoring API */
   contextHint?: string;
   qualityMetrics?: { overall_score?: number; factual_accuracy?: number; source_verification?: number; citation_coverage?: number } | null;
@@ -601,6 +414,7 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
   onClose,
   onBack,
   initialContent,
+  initialContentType,
   contextHint,
   qualityMetrics,
 }) => {
@@ -646,7 +460,7 @@ export const QualityCheckModal: React.FC<QualityCheckModalProps> = ({
   };
 
   const handleImproveInStudio = () => {
-    openInStudio(content, onClose);
+    openDraftContentInStudio(content, initialContentType, onClose);
   };
 
   return (

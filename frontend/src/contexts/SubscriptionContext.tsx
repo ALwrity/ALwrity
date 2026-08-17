@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import {
   apiClient,
+  ConnectionError,
+  NetworkError,
   isBackendCooldownActive,
   logBackendCooldownSkipOnce,
   setGlobalSubscriptionErrorHandler,
@@ -313,10 +315,11 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     } catch (err: any) {
       console.error('Error checking subscription:', err);
 
-      // Check if it's a connection error that should be handled at the app level
-      if (err instanceof Error && (err.name === 'NetworkError' || err.name === 'ConnectionError')) {
-        // Re-throw connection errors to be handled by the app-level error boundary
-        throw err;
+      // Surface connection issues in context state instead of uncaught async throws
+      if (err instanceof NetworkError || err instanceof ConnectionError) {
+        setError(err.message);
+        setLoading(false);
+        return;
       }
 
       // Handle 401 errors gracefully during initialization - don't block routing

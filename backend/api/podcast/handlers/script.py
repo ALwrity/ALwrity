@@ -15,7 +15,6 @@ from middleware.auth_middleware import get_current_user
 from api.story_writer.utils.auth import require_authenticated_user
 from services.llm_providers.main_text_generation import llm_text_gen
 from services.podcast_bible_service import PodcastBibleService
-from models.podcast_bible_models import PodcastBible
 from loguru import logger
 from ..models import (
     PodcastScriptRequest,
@@ -158,15 +157,14 @@ async def generate_podcast_script(
             "takeaway": "Narration summary for this scene.",
         }
 
-    # Extract Podcast Bible context for hyper-personalization
+    # Extract Podcast Bible context for hyper-personalization. Seeded from the
+    # user's podcast persona when no explicit bible is provided.
     bible_context = ""
-    if request.bible:
-        try:
-            bible_service = PodcastBibleService()
-            bible_obj = PodcastBible(**request.bible)
-            bible_context = bible_service.serialize_bible(bible_obj)
-        except Exception as exc:
-            logger.warning(f"Failed to serialize podcast bible: {exc}")
+    try:
+        bible_service = PodcastBibleService()
+        _, bible_context = bible_service.get_or_build_bible(user_id, request.bible, "temp_script")
+    except Exception as exc:
+        logger.warning(f"Failed to build podcast bible: {exc}")
 
     # Extract Analysis and Outline context for grounding
     analysis_context = ""

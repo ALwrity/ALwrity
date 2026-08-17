@@ -1,6 +1,10 @@
 import React from "react";
 import type { SavedBrainstormIdea } from "./MySavedIdeas";
 import type { QuickCreateReturnTarget } from "../dashboard/workflowWedgeNavigation";
+import { FormatActionButton } from "../dashboard/performancePulse/FormatActionButton";
+import { FORMAT_ACTION_LOCKED_HINT } from "../dashboard/performancePulse/formatTonalPalette";
+import { IdeaFormatCreateButtons } from "../shared/IdeaFormatCreateButtons";
+import { SAVED_IDEAS_FORMAT_ORDER } from "../../utils/ideaFormatCreateActions";
 
 const ITEM_STYLE: React.CSSProperties = {
   padding: "14px 16px",
@@ -27,12 +31,11 @@ const PRIMARY_BTN_STYLE: React.CSSProperties = {
   border: "none",
 };
 
-const SECONDARY_BTN_STYLE: React.CSSProperties = {
-  ...ACTION_BTN_STYLE,
-  background: "#ffffff",
-  color: "#475569",
-  border: "1px solid #cbd5e1",
-};
+const COPILOT_BTN_COLORS = {
+  bg: "#f8fafc",
+  border: "#cbd5e1",
+  text: "#475569",
+} as const;
 
 const DANGER_BTN_STYLE: React.CSSProperties = {
   ...ACTION_BTN_STYLE,
@@ -157,44 +160,21 @@ export const MySavedIdeasBody: React.FC<MySavedIdeasBodyProps> = ({
                 Saved {formatRelative(idea.created_at)}
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {onUseInCopilot && (
-                  <button
-                    type="button"
-                    onClick={() => onUseInCopilot(idea.prompt)}
-                    style={SECONDARY_BTN_STYLE}
-                  >
-                    Use in Copilot
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.dispatchEvent(
-                      new CustomEvent("linkedinwriter:openQuickCreate", {
-                        detail: {
-                          type: "post",
-                          topic: idea.prompt,
-                          ...(idea.rationale
-                            ? { key_points: idea.rationale }
-                            : {}),
-                          ...(quickCreateReturnTo
-                            ? { returnTo: quickCreateReturnTo }
-                            : {}),
-                        },
-                      }),
-                    );
-                    onClose();
-                  }}
-                  style={{
-                    ...ACTION_BTN_STYLE,
-                    background: "#ec4899",
-                    color: "#ffffff",
-                    border: "none",
-                  }}
-                  title="Open this idea in the Post creator"
-                >
-                  ✍️ Create Post
-                </button>
+                <FormatActionButton
+                  icon="🤖"
+                  label="Use in Copilot"
+                  colors={COPILOT_BTN_COLORS}
+                  locked
+                  lockedHint={FORMAT_ACTION_LOCKED_HINT}
+                  onClick={() => onUseInCopilot?.(idea.prompt)}
+                />
+                <IdeaFormatCreateButtons
+                  topic={idea.prompt}
+                  key_points={idea.rationale ?? undefined}
+                  returnTo={quickCreateReturnTo}
+                  onBeforeOpen={onClose}
+                  order={SAVED_IDEAS_FORMAT_ORDER}
+                />
                 <button
                   type="button"
                   onClick={() => void onCopy(idea)}

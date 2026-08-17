@@ -2,11 +2,14 @@
  * Helpers for Publish wedge — My Drafts library filtering.
  */
 
-export type LinkedInDraftContentType =
-  | "post"
-  | "article"
-  | "carousel"
-  | "video_script";
+import {
+  LINKEDIN_DRAFT_CONTENT_TYPES,
+  normalizeDraftContentType,
+  resolveDraftContentTypeFromAsset,
+  type LinkedInDraftContentType,
+} from "./linkedInDraftContentTypeCatalog";
+
+export type { LinkedInDraftContentType };
 
 export interface LinkedInDraftAsset {
   id: string;
@@ -25,56 +28,17 @@ export interface LinkedInDraftAsset {
   };
 }
 
-const ALLOWED_CONTENT_TYPES: LinkedInDraftContentType[] = [
-  "post",
-  "article",
-  "carousel",
-  "video_script",
-];
-
-const CONTENT_TYPE_ALIASES: Record<string, LinkedInDraftContentType> = {
-  post: "post",
-  linkedin_post: "post",
-  article: "article",
-  linkedin_article: "article",
-  carousel: "carousel",
-  linkedin_carousel: "carousel",
-  video_script: "video_script",
-  video: "video_script",
-  linkedin_video_script: "video_script",
-};
-
 const MIN_CONTENT_CHARS = 60;
 
 export function getDraftAssetContent(asset: LinkedInDraftAsset): string {
   return (asset.asset_metadata?.content || asset.description || "").trim();
 }
 
-function normalizeContentType(raw: string | undefined): LinkedInDraftContentType | null {
-  if (!raw) return null;
-  const key = raw.toLowerCase().replace(/\s+/g, "_");
-  return CONTENT_TYPE_ALIASES[key] ?? null;
-}
-
+/** Resolve format from creation metadata/tags — not from word count. */
 export function getDraftContentType(
   asset: LinkedInDraftAsset,
 ): LinkedInDraftContentType | null {
-  const fromMeta = normalizeContentType(asset.asset_metadata?.content_type);
-  if (fromMeta) return fromMeta;
-
-  for (const tag of asset.tags ?? []) {
-    const fromTag = normalizeContentType(tag);
-    if (fromTag) return fromTag;
-  }
-
-  if (
-    asset.source_module === "linkedin_writer" &&
-    asset.asset_type === "text"
-  ) {
-    return "post";
-  }
-
-  return null;
+  return resolveDraftContentTypeFromAsset(asset);
 }
 
 export function hasDraftTopic(asset: LinkedInDraftAsset): boolean {
@@ -103,7 +67,7 @@ export function hasDraftGeneratedContent(asset: LinkedInDraftAsset): boolean {
 /** Drafts with a topic and generated body for supported LinkedIn formats. */
 export function isCompleteLinkedInDraft(asset: LinkedInDraftAsset): boolean {
   const contentType = getDraftContentType(asset);
-  if (!contentType || !ALLOWED_CONTENT_TYPES.includes(contentType)) {
+  if (!contentType || !LINKEDIN_DRAFT_CONTENT_TYPES.includes(contentType)) {
     return false;
   }
   return hasDraftTopic(asset) && hasDraftGeneratedContent(asset);

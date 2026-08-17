@@ -18,6 +18,11 @@ import {
   type LinkedInVideoGenerationParams,
   type LinkedInVideoGenerationStartResult,
 } from './linkedInVideoService';
+import type { LinkedInDraftContentType } from '../components/LinkedInWriter/utils/linkedInDraftContentTypeCatalog';
+import {
+  buildLinkedInAssetFilename,
+  buildLinkedInAssetSavePayload,
+} from '../components/LinkedInWriter/utils/linkedInAssetSavePayload';
 
 // LinkedIn-specific enums
 export enum LinkedInPostType {
@@ -398,6 +403,8 @@ export interface SaveLinkedInAssetParams {
   title: string;
   content: string;
   topic?: string;
+  /** Creation format — persisted as asset_metadata.content_type (not inferred). */
+  contentType?: LinkedInDraftContentType;
   tags?: string[];
   assetMetadata?: Record<string, any>;
 }
@@ -407,47 +414,24 @@ export interface SaveLinkedInAssetResult {
 }
 
 /**
- * Save a LinkedIn post to the Asset Library.
+ * Save LinkedIn content to the Asset Library.
  * Uses the generic Content Asset API (POST /api/content-assets/).
  */
 export const saveLinkedInToAssetLibrary = async (
   params: SaveLinkedInAssetParams
 ): Promise<SaveLinkedInAssetResult> => {
-  // Build a filename from the title
-  const safeTitle = (params.title || 'linkedin-post')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '')
-    .substring(0, 80);
-  const filename = `${safeTitle}-${Date.now()}.txt`;
+  const filename = buildLinkedInAssetFilename(params.title);
+  const payload = buildLinkedInAssetSavePayload(params, filename);
 
-  const tags = [
-    'linkedin',
-    'social',
-    'ai_generated',
-    ...(params.tags || []),
-  ];
+  const response = await aiApiClient.post('/api/content-assets/', payload);
 
-  const response = await aiApiClient.post('/api/content-assets/', {
-    asset_type: 'text',
-    source_module: 'linkedin_writer',
-    filename,
-    file_url: `linkedin://posts/${filename}`,
-    title: params.title,
-    description: params.content,
-    prompt: params.topic || '',
-    tags,
-    asset_metadata: {
-      platform: 'linkedin',
-      content_type: 'linkedin_post',
-      content: params.content,
-      word_count: params.content ? params.content.split(/\s+/).length : 0,
-      ...(params.assetMetadata || {}),
-    },
-  });
+  console.log(
+    '[linkedInWriterApi] LinkedIn content saved to Asset Library:',
+    response.data.id,
+    'contentType:',
+    payload.asset_metadata.content_type,
+  );
 
-  console.log('[linkedInWriterApi] LinkedIn post saved to Asset Library:', response.data.id);
-  
   return { assetId: response.data.id };
 };
 

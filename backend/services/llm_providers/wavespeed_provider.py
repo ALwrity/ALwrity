@@ -44,6 +44,8 @@ import json
 import re
 from typing import Optional, Dict, Any, List
 
+from .json_parsing import robust_json_loads
+
 from dotenv import load_dotenv
 
 # Fix the environment loading path - load from backend directory
@@ -451,7 +453,7 @@ def wavespeed_structured_json_response(
             })
         
         # Add user prompt with JSON instruction
-        json_instruction = "Please respond with valid JSON that matches the provided schema."
+        json_instruction = "Please respond with valid JSON that matches the provided schema. Use only standard JSON escape sequences."
         messages.append({
             "role": "user", 
             "content": f"{prompt}\n\n{json_instruction}"
@@ -534,7 +536,7 @@ def wavespeed_structured_json_response(
             response_text = response_text.strip()
             
             try:
-                parsed_json = json.loads(response_text) if response_text else None
+                parsed_json = robust_json_loads(response_text) if response_text else None
                 if parsed_json is not None:
                     logger.info("✅ WaveSpeed structured JSON response parsed successfully")
                     return parsed_json
@@ -555,7 +557,7 @@ def wavespeed_structured_json_response(
                     )
                     if response_text:
                         try:
-                            parsed_json = json.loads(response_text)
+                            parsed_json = robust_json_loads(response_text)
                             if parsed_json is not None:
                                 logger.info("✅ WaveSpeed structured JSON parsed successfully after max_tokens increase")
                                 return parsed_json
@@ -569,7 +571,7 @@ def wavespeed_structured_json_response(
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
                     try:
-                        extracted_json = json.loads(json_match.group())
+                        extracted_json = robust_json_loads(json_match.group())
                         logger.info("✅ JSON extracted using regex fallback")
                         return extracted_json
                     except json.JSONDecodeError:
@@ -613,12 +615,12 @@ def wavespeed_structured_json_response(
                     response_text = response_text[:-3]
                 response_text = response_text.strip()
                 try:
-                    return json.loads(response_text) if response_text else {"error": "Empty response"}
+                    return robust_json_loads(response_text) if response_text else {"error": "Empty response"}
                 except json.JSONDecodeError:
                     json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                     if json_match:
                         try:
-                            return json.loads(json_match.group())
+                            return robust_json_loads(json_match.group())
                         except json.JSONDecodeError:
                             pass
                     return {"error": "Failed to parse JSON response", "raw_response": response_text}

@@ -19,6 +19,8 @@ import {
 } from "../../utils/publishCampaignUtils";
 import { QualityCheckModal, ScheduleQuickModal } from "./PublishWedgeModals";
 import { apiClient } from "../../../../api/client";
+import { openDraftContentInStudio } from "../../utils/openDraftInStudio";
+import type { LinkedInDraftContentType } from "../../utils/linkedInDraftContentTypeStorage";
 
 const DISMISS_STORAGE_KEY = "alwrity-publish-campaign-dismissed-insights";
 
@@ -97,11 +99,8 @@ export const PublishCampaignModal: React.FC<PublishCampaignModalProps> = ({
   }, []);
 
   const openInStudio = useCallback(
-    (content: string) => {
-      window.dispatchEvent(
-        new CustomEvent("linkedinwriter:updateDraft", { detail: content }),
-      );
-      onClose();
+    (content: string, contentType?: LinkedInDraftContentType) => {
+      openDraftContentInStudio(content, contentType, onClose);
     },
     [onClose],
   );
@@ -176,7 +175,7 @@ export const PublishCampaignModal: React.FC<PublishCampaignModalProps> = ({
         case "open_studio":
           if (item) {
             const content = await resolveItemContent(item);
-            openInStudio(content);
+            openInStudio(content, item.contentType);
           }
           break;
         default:
@@ -403,7 +402,9 @@ export const PublishCampaignModal: React.FC<PublishCampaignModalProps> = ({
                   item={item}
                   disabled={loadingContent}
                   onOpenStudio={() =>
-                    void resolveItemContent(item).then(openInStudio)
+                    void resolveItemContent(item).then((content) =>
+                      openInStudio(content, item.contentType),
+                    )
                   }
                   onQualityCheck={() => void handleQualityCheck(item)}
                   onSchedule={() => void handleSchedule(item)}
@@ -448,6 +449,7 @@ export const PublishCampaignModal: React.FC<PublishCampaignModalProps> = ({
         open={!!qualityItem}
         onClose={() => setQualityItem(null)}
         initialContent={qualityItem?.contentPreview}
+        initialContentType={qualityItem?.contentType}
         contextHint={qualityItem?.title}
       />
 

@@ -793,7 +793,7 @@ const Wizard: React.FC<WizardProps> = ({ onComplete }) => {
         )}
 
         {/* Background tasks status chip (visible after Step 2) */}
-        {backgroundTasks && !backgroundTasks.all_done && (
+        {backgroundTasks && (!backgroundTasks.all_done || backgroundTasks.failed_count > 0) && (
           <SystemStatusChip
             activeTasks={backgroundTasks.total - backgroundTasks.completed_count - backgroundTasks.failed_count}
             totalTasks={backgroundTasks.total}

@@ -15,6 +15,8 @@ interface GrowthEngineModalProps {
   onBack?: () => void;
   /** When set with onBack, uses Engagement wedge drill-down header (back above title). */
   engagementWedgeNav?: boolean;
+  /** @deprecated No longer used — safe to omit (kept for stale call sites). */
+  contentAnalyticsNav?: boolean;
   generatePost: (
     params?: Record<string, unknown>,
   ) => Promise<{ success: boolean; data?: unknown; error?: string }>;

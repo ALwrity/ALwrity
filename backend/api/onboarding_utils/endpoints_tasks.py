@@ -11,6 +11,7 @@ from models.website_analysis_monitoring_models import (
     MarketTrendsTask,
 )
 from models.advertools_monitoring_models import AdvertoolsTask
+from .task_status import derive_ui_status
 
 
 async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
@@ -32,13 +33,24 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     "details": None,
                 }
 
+            raw_status = task.status or ""
+            last_success = getattr(task, 'last_success', None)
+            next_execution = getattr(task, 'next_execution', None)
+
+            # Recurring tasks (SIF, market trends, etc.) keep status='active'
+            # so the scheduler re-runs them; a successful run (last_success) is
+            # the user-facing "done" signal.
+            ui_status, progress_pct = derive_ui_status(raw_status, task.last_executed, last_success)
+
             base = {
-                "status": task.status if task.status != "active" else "running",
+                "status": ui_status,
                 "started_at": task.last_executed.isoformat() if task.last_executed else None,
-                "progress_pct": 100 if task.status == "completed" else (50 if task.last_executed else 0),
+                "progress_pct": progress_pct,
                 "details": None,
-                "last_success": task.last_success.isoformat() if getattr(task, 'last_success', None) else None,
+                "last_success": last_success.isoformat() if last_success else None,
                 "failure_reason": getattr(task, 'failure_reason', None),
+                "recurring": bool(next_execution),
+                "next_execution": next_execution.isoformat() if next_execution else None,
             }
 
             # For SIF, attach rich progress details from execution log + payload
@@ -66,6 +78,7 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     details['log_messages'] = payload['log_messages']
 
                 # Override progress_pct with actual phase-based progress
+                # (only while running; completed tasks already report 100)
                 phase_progress = {
                     'harvesting': 10,
                     'indexing_metadata': 30,
@@ -74,7 +87,7 @@ async def get_tasks_status(current_user: dict) -> Dict[str, Any]:
                     'complete': 100,
                 }
                 current_phase = payload.get('phase', '')
-                if current_phase in phase_progress:
+                if ui_status == "running" and current_phase in phase_progress:
                     base['progress_pct'] = phase_progress[current_phase]
 
                 # Latest execution log result_data

@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from loguru import logger
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 
 from services.database import get_db_session
 from models.onboarding import PersonaData, OnboardingSession
@@ -182,10 +183,14 @@ class PersonaDataService:
                 return False
             
             # Update platform-specific data
-            platform_personas = persona_data.platform_personas or {}
+            # NOTE: dict() + flag_modified are REQUIRED (see save_platform_persona
+            # below for the full explanation) so SQLAlchemy actually persists the
+            # JSON mutation instead of silently dropping it.
+            platform_personas = dict(persona_data.platform_personas or {})
             if platform in platform_personas:
                 platform_personas[platform].update(updates)
                 persona_data.platform_personas = platform_personas
+                flag_modified(persona_data, "platform_personas")
                 persona_data.updated_at = datetime.utcnow()
                 
                 db.commit()
@@ -237,9 +242,24 @@ class PersonaDataService:
                 return False
             
             # Update or create platform persona
-            platform_personas = persona_data.platform_personas or {}
+            #
+            # IMPORTANT — SQLAlchemy JSON mutation-detection bug:
+            # `persona_data.platform_personas` is a plain `Column(JSON)`. If we mutate
+            # the loaded dict IN PLACE and reassign the *same* object, the ORM's
+            # history check compares old vs new with `==` (operator.eq), sees the
+            # identical object, and skips the UPDATE entirely. This caused on-demand
+            # "Generate Now" personas (YouTube/podcast/etc.) to silently vanish after
+            # a page reload because the write never hit the DB.
+            # Two defenses, both REQUIRED:
+            #   1. `dict(...)` copies the old dict FIRST, so the reassigned object
+            #      differs from the committed one and the change is detected.
+            #   2. `flag_modified(...)` force-marks the JSON column dirty regardless
+            #      of the `==` comparison.
+            # Do NOT "simplify" this back to in-place mutation — that reopens the bug.
+            platform_personas = dict(persona_data.platform_personas or {})
             platform_personas[platform] = platform_data  # Create or overwrite
             persona_data.platform_personas = platform_personas
+            flag_modified(persona_data, "platform_personas")
             persona_data.updated_at = datetime.utcnow()
             
             db.commit()

@@ -18,6 +18,16 @@ from typing import Optional
 IS_WINDOWS = platform.system() == "Windows"
 IS_LINUX = platform.system() == "Linux"
 
+
+def configure_console_utf8() -> None:
+    """Avoid UnicodeEncodeError on Windows cp1252 consoles when printing status icons."""
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 import uvicorn
 
 
@@ -430,6 +440,7 @@ def start_backend(enable_reload=False, production_mode=False):
 
 def main():
     """Main function to set up and start the backend."""
+    configure_console_utf8()
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="ALwrity Backend Server")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, Component } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import { apiClient } from '../api/client';
+import { apiClient, ConnectionError, NetworkError } from '../api/client';
 import { shouldSkipOnboarding } from '../utils/demoMode';
 
 /**
@@ -187,10 +187,11 @@ export const OnboardingProvider: React.FC<OnboardingProviderProps> = ({ children
     } catch (err) {
       console.error('OnboardingContext: Error fetching data:', err);
 
-      // Check if it's a connection error that should be handled at the app level
-      if (err instanceof Error && (err.name === 'NetworkError' || err.name === 'ConnectionError')) {
-        // Re-throw connection errors to be handled by the app-level error boundary
-        throw err;
+      // Surface connection issues in context state instead of uncaught async throws
+      if (err instanceof NetworkError || err instanceof ConnectionError) {
+        setError(err.message);
+        setLoading(false);
+        return;
       }
 
       setError(err instanceof Error ? err.message : 'Failed to load onboarding data');

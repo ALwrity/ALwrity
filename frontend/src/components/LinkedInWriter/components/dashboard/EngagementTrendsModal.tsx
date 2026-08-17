@@ -21,9 +21,8 @@ import { colors } from "../GrowthEngine/styles";
 import { ENGAGEMENT_TRENDS_BODY_STYLE } from "./engagementTrendsModalLayout";
 import { shouldShowContributionBadges } from "./engagementTrendsGrowthUtils";
 import { PostCommentsModal } from "./PostCommentsModal";
-import { EngagementGrowthDriversSection } from "./EngagementGrowthDriversSection";
 import { EngagementTrendsSummaryGrid } from "./EngagementTrendsSummaryGrid";
-import { EngagementTrendsMetadataFooter } from "./EngagementTrendsMetadataFooter";
+import { EngagementTrendsInsightsRow } from "./EngagementTrendsInsightsRow";
 import { EngagementTrendsPeriodChips } from "./engagementTrendsPeriodChips";
 import { EngagementTrendsPostTabs } from "./engagementTrendsPostTabs";
 import { EngagementTrendsPostList } from "./engagementTrendsPostList";
@@ -34,11 +33,17 @@ import {
 } from "./engagementTrendsCopy";
 import {
   WEDGE_BACK_LABELS,
-  WEDGE_NESTED_BACK_LABELS,
   wedgePostSizeModalClassName,
   wedgePostSizeSubModalProps,
 } from "./wedgeModalUi";
 import { extractEngagementTrendsErrorMessage } from "./engagementTrendsErrors";
+import {
+  CacheEmptyPrompt,
+  InsufficientHistoryState,
+  LoadErrorState,
+  LoadingRow,
+  NoChangesEmptyState,
+} from "./engagementTrendsModalStates";
 import {
   insufficientHistoryMessage,
   isInsufficientHistory,
@@ -64,115 +69,6 @@ function hasNoComparableChanges(data: PostAnalyticsHistoryResponse): boolean {
     falling.length === 0
   );
 }
-
-const primaryLoadBtn: React.CSSProperties = {
-  padding: "8px 18px",
-  background: colors.primary,
-  color: "#fff",
-  border: "none",
-  borderRadius: 8,
-  fontSize: 13,
-  fontWeight: 700,
-  cursor: "pointer",
-};
-
-const CacheEmptyPrompt: React.FC<{
-  icon: string;
-  title: string;
-  description: string;
-  buttonLabel: string;
-  onLoad: () => void;
-  disabled?: boolean;
-}> = ({ icon, title, description, buttonLabel, onLoad, disabled }) => (
-  <div style={{ textAlign: "center", padding: "16px 0" }}>
-    <div style={{ fontSize: 28, marginBottom: 8 }}>{icon}</div>
-    <div
-      style={{
-        fontWeight: 600,
-        fontSize: 13,
-        color: colors.textDark,
-        marginBottom: 4,
-      }}
-    >
-      {title}
-    </div>
-    <div
-      style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 14 }}
-    >
-      {description}
-    </div>
-    <button
-      type="button"
-      onClick={onLoad}
-      disabled={disabled}
-      style={{
-        ...primaryLoadBtn,
-        opacity: disabled ? 0.6 : 1,
-        cursor: disabled ? "not-allowed" : "pointer",
-      }}
-    >
-      {buttonLabel}
-    </button>
-  </div>
-);
-
-const LoadingRow: React.FC<{ message: string }> = ({ message }) => (
-  <div
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "16px 0",
-      justifyContent: "center",
-      color: colors.textSecondary,
-      fontSize: 12,
-    }}
-  >
-    <span
-      style={{
-        display: "inline-block",
-        width: 14,
-        height: 14,
-        border: "2px solid #d1d5db",
-        borderTopColor: colors.primary,
-        borderRadius: "50%",
-        animation: "aw-spin 0.7s linear infinite",
-        flexShrink: 0,
-      }}
-    />
-    {message}
-  </div>
-);
-
-const NoChangesEmptyState: React.FC = () => (
-  <div
-    style={{
-      textAlign: "center",
-      padding: "16px 12px",
-      marginBottom: 8,
-      background: colors.rowBg,
-      border: `1px solid ${colors.border}`,
-      borderRadius: 8,
-    }}
-  >
-    <div style={{ fontSize: 24, marginBottom: 8 }}>📊</div>
-    <div
-      style={{
-        fontWeight: 600,
-        fontSize: 13,
-        color: colors.textDark,
-        marginBottom: 4,
-      }}
-    >
-      {EMPTY_COPY.noChangesTitle}
-    </div>
-    <div
-      style={{ fontSize: 12, color: colors.textSecondary, lineHeight: 1.45 }}
-    >
-      {EMPTY_COPY.noChangesDescription}
-    </div>
-  </div>
-);
 
 export interface EngagementTrendsModalProps {
   open: boolean;
@@ -276,7 +172,10 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   const showNoChanges = Boolean(
     data && !loading && !insufficient && hasNoComparableChanges(data),
   );
-  const risingList = data ? postsForTab("rising", data) : [];
+  const risingList = useMemo(
+    () => (data ? postsForTab("rising", data) : []),
+    [data],
+  );
   const hasTrendData = Boolean(
     data &&
     !loading &&
@@ -306,229 +205,144 @@ export const EngagementTrendsModal: React.FC<EngagementTrendsModalProps> = ({
   }, [data]);
 
   const commentsOpen = !!commentsPost;
+  const showGrowthDrivers = activeTab === "rising" && risingList.length > 0;
 
   return (
     <>
-    <DashboardActionModal
-      open={open && !commentsOpen}
-      title={ENGAGEMENT_SINCE_TITLE}
-      onClose={onClose}
-      onBack={onBack}
-      {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.analysis)}
-      modalClassName={wedgePostSizeModalClassName()}
-    >
-      <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
-        <p
-          style={{
-            margin: "0 0 10px",
-            fontSize: 12,
-            color: colors.textSecondary,
-            lineHeight: 1.45,
-          }}
-        >
-          {ENGAGEMENT_SINCE_SUBTITLE}
-        </p>
+      <DashboardActionModal
+        open={open && !commentsOpen}
+        title={ENGAGEMENT_SINCE_TITLE}
+        onClose={onClose}
+        onBack={onBack}
+        {...wedgePostSizeSubModalProps(WEDGE_BACK_LABELS.analysis)}
+        modalClassName={wedgePostSizeModalClassName()}
+      >
+        <div style={ENGAGEMENT_TRENDS_BODY_STYLE}>
+          <p
+            style={{
+              margin: "0 0 10px",
+              fontSize: 12,
+              color: colors.textSecondary,
+              lineHeight: 1.45,
+            }}
+          >
+            {ENGAGEMENT_SINCE_SUBTITLE}
+          </p>
 
-        <EngagementTrendsPeriodChips
-          value={period}
-          onChange={handlePeriodChange}
-          disabled={loading}
-        />
-
-        {!connected && !data && !loading && (
-          <CacheEmptyPrompt
-            icon="🔗"
-            title={EMPTY_COPY.notConnectedTitle}
-            description={EMPTY_COPY.notConnectedDescription}
-            buttonLabel={EMPTY_COPY.syncButton}
-            onLoad={handleSync}
-            disabled
+          <EngagementTrendsPeriodChips
+            value={period}
+            onChange={handlePeriodChange}
+            disabled={loading}
           />
-        )}
 
-        {connected && !data && !loading && !error && (
-          <CacheEmptyPrompt
-            icon="📈"
-            title={EMPTY_COPY.noDataTitle}
-            description={EMPTY_COPY.noDataDescription}
-            buttonLabel={EMPTY_COPY.syncButton}
-            onLoad={handleSync}
-            disabled={loading || syncOnCooldown}
-          />
-        )}
+          {!connected && !data && !loading && (
+            <CacheEmptyPrompt
+              icon="🔗"
+              title={EMPTY_COPY.notConnectedTitle}
+              description={EMPTY_COPY.notConnectedDescription}
+              buttonLabel={EMPTY_COPY.syncButton}
+              onLoad={handleSync}
+              disabled
+            />
+          )}
 
-        {connected && !data && !loading && error && (
-          <div style={{ textAlign: "center", padding: "16px 0" }}>
-            <div style={{ fontSize: 28, marginBottom: 8 }}>⚠️</div>
-            <div
-              style={{
-                fontWeight: 600,
-                fontSize: 13,
-                color: colors.textDark,
-                marginBottom: 4,
-              }}
-            >
-              {EMPTY_COPY.loadErrorTitle}
-            </div>
-            <div style={{ fontSize: 12, color: "#dc2626", marginBottom: 14 }}>
-              {error}
-            </div>
-            <button
-              type="button"
-              onClick={handleLoad}
-              disabled={loading}
-              style={{
-                ...primaryLoadBtn,
-                opacity: loading ? 0.6 : 1,
-                cursor: loading ? "not-allowed" : "pointer",
-              }}
-            >
-              {EMPTY_COPY.retry}
-            </button>
-          </div>
-        )}
+          {connected && !data && !loading && !error && (
+            <CacheEmptyPrompt
+              icon="📈"
+              title={EMPTY_COPY.noDataTitle}
+              description={EMPTY_COPY.noDataDescription}
+              buttonLabel={EMPTY_COPY.syncButton}
+              onLoad={handleSync}
+              disabled={loading || syncOnCooldown}
+            />
+          )}
 
-        {loading && <LoadingRow message={EMPTY_COPY.loading} />}
+          {connected && !data && !loading && error && (
+            <LoadErrorState
+              error={error}
+              onRetry={handleLoad}
+              loading={loading}
+            />
+          )}
 
-        {data && !loading && (
-          <>
-            {insufficient && !data.last_synced_at && (
-              <CacheEmptyPrompt
-                icon="📈"
-                title={EMPTY_COPY.noDataTitle}
-                description={insufficientHistoryMessage(data)}
-                buttonLabel={EMPTY_COPY.syncButton}
-                onLoad={handleSync}
-                disabled={loading || syncOnCooldown}
-              />
-            )}
+          {loading && <LoadingRow message={EMPTY_COPY.loading} />}
 
-            {insufficient && data.last_synced_at && (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "14px 12px",
-                  marginBottom: 8,
-                  background: colors.rowBg,
-                  border: `1px solid ${colors.border}`,
-                  borderRadius: 8,
-                }}
-              >
-                <div style={{ fontSize: 24, marginBottom: 8 }}>📈</div>
-                <div
-                  style={{
-                    fontWeight: 600,
-                    fontSize: 13,
-                    color: colors.textDark,
-                    marginBottom: 4,
-                  }}
-                >
-                  {EMPTY_COPY.insufficientTitle}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: colors.textSecondary,
-                    lineHeight: 1.45,
-                  }}
-                >
-                  {insufficientHistoryMessage(data)}
-                </div>
-              </div>
-            )}
-
-            {showNoChanges && <NoChangesEmptyState />}
-
-            {hasTrendData && data.summary.total_posts > 0 && (
-              <EngagementTrendsSummaryGrid summary={data.summary} />
-            )}
-
-            {hasTrendData && (
-              <>
-                <EngagementTrendsPostTabs
-                  value={activeTab}
-                  onChange={setActiveTab}
-                  counts={tabCounts}
-                  disabled={loading}
+          {data && !loading && (
+            <>
+              {insufficient && !data.last_synced_at && (
+                <CacheEmptyPrompt
+                  icon="📈"
+                  title={EMPTY_COPY.noDataTitle}
+                  description={insufficientHistoryMessage(data)}
+                  buttonLabel={EMPTY_COPY.syncButton}
+                  onLoad={handleSync}
+                  disabled={loading || syncOnCooldown}
                 />
+              )}
 
-                {activeTab === "rising" && risingList.length > 0 && (
-                  <EngagementGrowthDriversSection
+              {insufficient && data.last_synced_at && (
+                <InsufficientHistoryState
+                  message={insufficientHistoryMessage(data)}
+                />
+              )}
+
+              {showNoChanges && <NoChangesEmptyState />}
+
+              {hasTrendData && data.summary.total_posts > 0 && (
+                <EngagementTrendsSummaryGrid summary={data.summary} />
+              )}
+
+              {hasTrendData && (
+                <>
+                  <EngagementTrendsPostTabs
+                    value={activeTab}
+                    onChange={setActiveTab}
+                    counts={tabCounts}
+                    disabled={loading}
+                  />
+
+                  <EngagementTrendsInsightsRow
                     summary={data.summary}
+                    showGrowthDrivers={showGrowthDrivers}
                     showContributionBadges={showContributionBadges}
-                  >
-                    <EngagementTrendsPostList
-                      tab="rising"
-                      posts={tabPosts}
-                      showContribution={showContributionBadges}
-                      onViewComments={setCommentsPost}
-                    />
-                  </EngagementGrowthDriversSection>
-                )}
+                    lastSyncedAt={data.last_synced_at}
+                    period={data.period}
+                    showComparison={!insufficient}
+                    onRefresh={handleSync}
+                    loading={loading}
+                    syncDisabled={syncOnCooldown}
+                    syncCooldownHint={cooldownHint}
+                  />
 
-                {(activeTab !== "rising" || risingList.length === 0) && (
                   <EngagementTrendsPostList
                     tab={activeTab}
                     posts={tabPosts}
-                    showContribution={showContributionBadges}
+                    showContribution={
+                      showContributionBadges && activeTab === "rising"
+                    }
                     onViewComments={setCommentsPost}
                   />
-                )}
-              </>
-            )}
+                </>
+              )}
 
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={loading || syncOnCooldown}
-              title={
-                syncOnCooldown && cooldownHint
-                  ? `${EMPTY_COPY.syncCooldownPrefix} (${cooldownHint})`
-                  : undefined
-              }
-              style={{
-                width: "100%",
-                padding: "7px",
-                background: "none",
-                border: `1px solid ${colors.border}`,
-                borderRadius: 6,
-                fontSize: 11,
-                color: colors.textSecondary,
-                cursor: loading || syncOnCooldown ? "not-allowed" : "pointer",
-                fontWeight: 600,
-                marginTop: 4,
-                opacity: loading || syncOnCooldown ? 0.6 : 1,
-              }}
-            >
-              {EMPTY_COPY.syncButton}
-            </button>
-            {syncOnCooldown && cooldownHint && (
-              <div
-                style={{
-                  marginTop: 6,
-                  fontSize: 10,
-                  color: "#b45309",
-                  textAlign: "center",
-                  lineHeight: 1.4,
-                }}
-              >
-                {EMPTY_COPY.syncCooldownPrefix} ({cooldownHint}).
-              </div>
-            )}
-
-            <EngagementTrendsMetadataFooter
-              lastSyncedAt={data.last_synced_at}
-              period={data.period}
-              showComparison={!insufficient}
-              onRefresh={handleSync}
-              loading={loading}
-              syncDisabled={syncOnCooldown}
-              syncCooldownHint={cooldownHint}
-            />
-          </>
-        )}
-      </div>
-    </DashboardActionModal>
+              {!hasTrendData && (
+                <EngagementTrendsInsightsRow
+                  summary={data.summary}
+                  showGrowthDrivers={false}
+                  showContributionBadges={false}
+                  lastSyncedAt={data.last_synced_at}
+                  period={data.period}
+                  showComparison={!insufficient}
+                  onRefresh={handleSync}
+                  loading={loading}
+                  syncDisabled={syncOnCooldown}
+                  syncCooldownHint={cooldownHint}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </DashboardActionModal>
       <PostCommentsModal
         open={commentsOpen}
         post={commentsPost}

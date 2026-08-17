@@ -83,6 +83,29 @@ class TestOnboardingManagerRegression:
         paths = {getattr(r, "path", None) for r in app.routes}
         assert "/api/onboarding/step4/generate-personas-async" in paths
         assert "/api/onboarding/step4/persona-latest" in paths
+        assert "/api/onboarding/step4/persona-platforms" in paths
+
+
+class TestPersonaPlatformsEndpoint:
+    def test_persona_platforms_returns_registry(self):
+        from alwrity_utils.onboarding_manager import OnboardingManager
+        from middleware.auth_middleware import get_current_user
+
+        app = FastAPI()
+        OnboardingManager(app)
+        app.dependency_overrides[get_current_user] = lambda: _fake_user()
+
+        client = TestClient(app, raise_server_exceptions=False)
+        resp = client.get("/api/onboarding/step4/persona-platforms")
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["success"] is True
+        assert len(body["platforms"]) == 9
+        enabled = {p["id"] for p in body["platforms"] if p["enabled"]}
+        assert enabled == {"linkedin", "blog", "facebook", "twitter", "instagram", "youtube", "podcast"}
+        for p in body["platforms"]:
+            assert set(p.keys()) == {"id", "name", "description", "enabled", "scheduled"}
 
 
 # --- /test-voice --------------------------------------------------------

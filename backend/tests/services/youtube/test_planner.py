@@ -90,6 +90,55 @@ class TestValidateAndEnhancePlan:
         assert enhanced["selected_title"] == "First Title"
 
 
+class TestBuildPlanningPrompt:
+    def _build(self, **overrides) -> str:
+        from services.youtube.planner_prompts import build_planning_prompt
+
+        args = dict(
+            user_idea="AI videos",
+            duration_type="shorts",
+            video_type="tutorial",
+            video_type_config={},
+            duration_context={
+                "target_seconds": 60,
+                "hook_seconds": 5,
+                "main_seconds": 50,
+                "cta_seconds": 5,
+                "max_scenes": 4,
+            },
+            default_audience="General",
+            default_goal="Engage",
+            default_tone="Professional",
+            default_visual_style="Clean",
+            brand_style=None,
+            target_audience=None,
+            video_goal=None,
+            persona_context="",
+            persona_data=None,
+            source_content_id=None,
+            source_content_type=None,
+            reference_image_description=None,
+            research_context="",
+            include_scenes=False,
+        )
+        args.update(overrides)
+        return build_planning_prompt(**args)
+
+    def test_no_adaptation_without_persona(self):
+        prompt = self._build()
+        assert "Persona Adaptation" not in prompt
+        assert "Persona Context" not in prompt
+
+    def test_adaptation_included_with_persona(self):
+        prompt = self._build(
+            persona_data={"persona_name": "X"},
+            persona_context="**Persona Context:**\n- Test",
+        )
+        assert "Persona Adaptation" in prompt
+        assert "Persona Context" in prompt
+        assert "AI videos" in prompt
+
+
 class TestGeneratePlan:
     def test_success_with_mocked_llm(self):
         from services.youtube.planner import YouTubePlannerService

@@ -2,54 +2,22 @@
  * Session persistence and event helpers for LinkedIn Studio draft content type.
  */
 
-import type { LinkedInDraftContentType } from "./linkedInDraftLibraryUtils";
+import {
+  DEFAULT_DRAFT_CONTENT_TYPE,
+  normalizeDraftContentType,
+  type LinkedInDraftContentType,
+} from "./linkedInDraftContentTypeCatalog";
 
 export type { LinkedInDraftContentType };
+export { DEFAULT_DRAFT_CONTENT_TYPE, normalizeDraftContentType };
 
 export const DRAFT_CONTENT_TYPE_SESSION_KEY = "li_draft_content_type";
-
-export const DEFAULT_DRAFT_CONTENT_TYPE: LinkedInDraftContentType = "post";
-
-const ALLOWED_CONTENT_TYPES = new Set<LinkedInDraftContentType>([
-  "post",
-  "article",
-  "carousel",
-  "video_script",
-]);
-
-const CONTENT_TYPE_ALIASES: Record<string, LinkedInDraftContentType> = {
-  post: "post",
-  linkedin_post: "post",
-  article: "article",
-  linkedin_article: "article",
-  carousel: "carousel",
-  linkedin_carousel: "carousel",
-  video_script: "video_script",
-  video: "video_script",
-  linkedin_video_script: "video_script",
-};
 
 const LOG_PREFIX = "[LinkedInDraftContentType]";
 
 export interface ParsedUpdateDraftDetail {
   content: string;
   contentType?: LinkedInDraftContentType;
-}
-
-/** Normalize raw content type strings (aliases, casing, underscores). */
-export function normalizeDraftContentType(
-  raw: unknown,
-): LinkedInDraftContentType | null {
-  if (typeof raw !== "string" || !raw.trim()) return null;
-  const key = raw.trim().toLowerCase().replace(/\s+/g, "_");
-  const normalized = CONTENT_TYPE_ALIASES[key];
-  if (normalized && ALLOWED_CONTENT_TYPES.has(normalized)) {
-    return normalized;
-  }
-  if (ALLOWED_CONTENT_TYPES.has(key as LinkedInDraftContentType)) {
-    return key as LinkedInDraftContentType;
-  }
-  return null;
 }
 
 /** Map LinkedIn Writer action names to draft content types. */

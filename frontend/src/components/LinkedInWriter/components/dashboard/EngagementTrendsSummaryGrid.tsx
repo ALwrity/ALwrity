@@ -7,6 +7,13 @@ import type {
 } from "../../../../services/postAnalyticsApi";
 import { METRIC_LABELS, METRIC_TOOLTIPS } from "./engagementTrendsCopy";
 import { PERSONAL_POST_CLICKS_CTR_AVAILABLE } from "../../utils/personalPostAnalyticsLimits";
+import {
+  ENGAGEMENT_TRENDS_METRIC_THEMES,
+  METRIC_CARD_LABEL_STYLE,
+  METRIC_CARD_SURFACE_STYLE,
+  METRIC_CARD_VALUE_STYLE,
+  type PostAnalyticsMetricTheme,
+} from "./postAnalyticsMetricThemes";
 
 interface EngagementTrendsSummaryGridProps {
   summary: EngagementSummary;
@@ -25,13 +32,14 @@ function formatDeltaLabel(
 const SummaryDeltaCard: React.FC<{
   icon: string;
   label: string;
+  theme: PostAnalyticsMetricTheme;
   before: number;
   now: number;
   delta: number;
   pct: number;
   isRate?: boolean;
   tooltip?: string;
-}> = ({ icon, label, before, now, delta, pct, isRate, tooltip }) => {
+}> = ({ icon, label, theme, before, now, delta, pct, isRate, tooltip }) => {
   const up = delta > 0;
   const flat = delta === 0;
   const tone = flat ? colors.textSecondary : up ? "#16a34a" : "#dc2626";
@@ -40,31 +48,20 @@ const SummaryDeltaCard: React.FC<{
     <div
       title={tooltip}
       style={{
-        flex: "1 1 calc(50% - 4px)",
-        minWidth: 100,
-        padding: "8px 10px",
-        background: colors.rowBg,
-        border: `1px solid ${colors.border}`,
-        borderRadius: 8,
+        ...METRIC_CARD_SURFACE_STYLE,
+        minWidth: 0,
+        background: theme.bg,
         cursor: tooltip ? "help" : "default",
       }}
     >
-      <div
-        style={{
-          fontSize: 10,
-          color: colors.textTertiary,
-          marginBottom: 2,
-          fontWeight: 600,
-        }}
-      >
+      <div style={{ ...METRIC_CARD_LABEL_STYLE, color: theme.color }}>
         {icon} {label}
       </div>
       <div
         style={{
-          fontSize: 16,
-          fontWeight: 800,
-          color: flat ? colors.textDark : tone,
-          marginBottom: 1,
+          ...METRIC_CARD_VALUE_STYLE,
+          color: flat ? colors.textDark : "#0f172a",
+          marginBottom: 2,
         }}
       >
         {isRate ? `${now}%` : now.toLocaleString()}
@@ -94,36 +91,27 @@ const SummaryDeltaCard: React.FC<{
 const PlaceholderMetricCard: React.FC<{
   icon: string;
   label: string;
+  theme: PostAnalyticsMetricTheme;
   tooltip: string;
-}> = ({ icon, label, tooltip }) => (
+}> = ({ icon, label, theme, tooltip }) => (
   <div
     title={tooltip}
     style={{
-      flex: "1 1 calc(50% - 4px)",
-      minWidth: 100,
-      padding: "8px 10px",
-      background: colors.rowBg,
-      border: `1px dashed ${colors.border}`,
-      borderRadius: 8,
+      ...METRIC_CARD_SURFACE_STYLE,
+      minWidth: 0,
+      background: theme.bg,
+      opacity: 0.72,
       cursor: "help",
     }}
   >
-    <div
-      style={{
-        fontSize: 10,
-        color: colors.textTertiary,
-        marginBottom: 2,
-        fontWeight: 600,
-      }}
-    >
+    <div style={{ ...METRIC_CARD_LABEL_STYLE, color: theme.color }}>
       {icon} {label}
     </div>
     <div
       style={{
-        fontSize: 16,
-        fontWeight: 800,
+        ...METRIC_CARD_VALUE_STYLE,
         color: colors.textTertiary,
-        marginBottom: 1,
+        marginBottom: 2,
       }}
     >
       —
@@ -139,23 +127,31 @@ const PlaceholderMetricCard: React.FC<{
 function OptionalMetricCard({
   icon,
   label,
+  theme,
   metric,
   tooltip,
 }: {
   icon: string;
   label: string;
+  theme: PostAnalyticsMetricTheme;
   metric?: MetricDelta | null;
   tooltip: string;
 }) {
   if (!metric) {
     return (
-      <PlaceholderMetricCard icon={icon} label={label} tooltip={tooltip} />
+      <PlaceholderMetricCard
+        icon={icon}
+        label={label}
+        theme={theme}
+        tooltip={tooltip}
+      />
     );
   }
   return (
     <SummaryDeltaCard
       icon={icon}
       label={label}
+      theme={theme}
       before={metric.before}
       now={metric.now}
       delta={metric.delta}
@@ -170,14 +166,23 @@ export const EngagementTrendsSummaryGrid: React.FC<
 > = ({ summary }) => {
   const erBefore = Math.round(summary.avg_engagement_rate_before * 100);
   const erNow = Math.round(summary.avg_engagement_rate_now * 100);
+  const columnCount =
+    6 + (PERSONAL_POST_CLICKS_CTR_AVAILABLE && summary.clicks ? 1 : 0);
+  const themes = ENGAGEMENT_TRENDS_METRIC_THEMES;
 
   return (
     <div
-      style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}
+      style={{
+        display: "grid",
+        gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+        gap: 8,
+        marginBottom: 10,
+      }}
     >
       <SummaryDeltaCard
         icon="❤️"
         label={METRIC_LABELS.reactions}
+        theme={themes.reactions}
         before={summary.reactions.before}
         now={summary.reactions.now}
         delta={summary.reactions.delta}
@@ -186,6 +191,7 @@ export const EngagementTrendsSummaryGrid: React.FC<
       <SummaryDeltaCard
         icon="💬"
         label={METRIC_LABELS.comments}
+        theme={themes.comments}
         before={summary.comments.before}
         now={summary.comments.now}
         delta={summary.comments.delta}
@@ -194,6 +200,7 @@ export const EngagementTrendsSummaryGrid: React.FC<
       <SummaryDeltaCard
         icon="👁️"
         label={METRIC_LABELS.impressions}
+        theme={themes.impressions}
         before={summary.impressions.before}
         now={summary.impressions.now}
         delta={summary.impressions.delta}
@@ -202,6 +209,7 @@ export const EngagementTrendsSummaryGrid: React.FC<
       <SummaryDeltaCard
         icon="📊"
         label={METRIC_LABELS.engagementRate}
+        theme={themes.engagementRate}
         before={erBefore}
         now={erNow}
         delta={erNow - erBefore}
@@ -212,6 +220,7 @@ export const EngagementTrendsSummaryGrid: React.FC<
       <OptionalMetricCard
         icon="👥"
         label={METRIC_LABELS.followersFromPosts}
+        theme={themes.followersFromPosts}
         metric={summary.followers}
         tooltip={METRIC_TOOLTIPS.followersFromPosts}
       />
@@ -219,6 +228,7 @@ export const EngagementTrendsSummaryGrid: React.FC<
         <OptionalMetricCard
           icon="🔗"
           label={METRIC_LABELS.clicks}
+          theme={themes.clicks}
           metric={summary.clicks}
           tooltip={METRIC_TOOLTIPS.clicks}
         />
@@ -226,6 +236,7 @@ export const EngagementTrendsSummaryGrid: React.FC<
       <OptionalMetricCard
         icon="🔁"
         label={METRIC_LABELS.reposts}
+        theme={themes.reposts}
         metric={summary.reposts}
         tooltip={METRIC_TOOLTIPS.reposts}
       />

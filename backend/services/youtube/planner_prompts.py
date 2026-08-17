@@ -10,29 +10,6 @@ PLANNER_SYSTEM_PROMPT = (
 )
 
 
-def build_persona_context(persona_data: Optional[Dict[str, Any]]) -> str:
-    """Build persona context string for prompts."""
-    if not persona_data:
-        return """
-**Persona Context:**
-- Using default professional tone
-- No specific persona constraints
-"""
-
-    core_persona = persona_data.get("core_persona", {})
-    tone = core_persona.get("tone", "professional")
-    voice = core_persona.get("voice_characteristics", {})
-
-    return f"""
-**Persona Context:**
-- Tone: {tone}
-- Voice Style: {voice.get('style', 'professional')}
-- Communication Style: {voice.get('communication_style', 'clear and direct')}
-- Brand Values: {core_persona.get('core_belief', 'value-driven content')}
-- Use this persona to guide the video's tone, style, and messaging approach.
-"""
-
-
 def build_planning_prompt(
     *,
     user_idea: str,
@@ -104,6 +81,21 @@ Follow these guidelines:
 - CTA: {video_type_config.get('cta_focus', '')}
 """
 
+    # Two-tier personalization (the "vice-versa" model):
+    #   - The BASE persona block (above, injected only when persona_data is present)
+    #     supplies the stable FORM: tone/pacing, visual style, script structure,
+    #     audience. It is DEFAULTS — it never overrides an explicit episode input.
+    #   - This ADAPTATION instruction tells the LLM to keep that form but tailor the
+    #     CONTENT to this specific topic — so the plan is brand-consistent AND
+    #     topic-specific. The episode fields (Target Audience / Video Goal / Style
+    #     below) are the overrides and always win.
+    persona_adaptation = ""
+    if persona_data:
+        persona_adaptation = f"""
+**Persona Adaptation:**
+Adapt the base persona above to this specific topic: "{user_idea}". Keep the persona's tone, pacing, visual style, and branding, but tailor examples, angles, hooks, and specifics to this topic.
+"""
+
     planning_prompt = f"""Create a YouTube video plan for: "{user_idea}"
 
 **Video Format:** {video_type or 'General'} | **Duration:** {duration_type} ({duration_context['target_seconds']}s target)
@@ -119,6 +111,7 @@ Follow these guidelines:
 
 {persona_context if persona_data else ""}
 {channel_bible_context if channel_bible_context else ""}
+{persona_adaptation}
 {source_context if source_content_id else ""}
 {source_article_context}
 {image_context if reference_image_description else ""}

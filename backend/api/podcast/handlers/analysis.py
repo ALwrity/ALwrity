@@ -131,14 +131,7 @@ async def enhance_podcast_idea(
         logger.warning(f"[Podcast Enhance] Podcast mode=full — attempting Bible generation for user {user_id}")
         try:
             bible_service = PodcastBibleService()
-            if request.bible:
-                from models.podcast_bible_models import PodcastBible
-                bible_data = PodcastBible(**request.bible)
-                bible_context = bible_service.serialize_bible(bible_data)
-            else:
-                # Generate from onboarding data directly
-                bible_obj = bible_service.generate_bible(user_id, "temp_enhance")
-                bible_context = bible_service.serialize_bible(bible_obj)
+            _, bible_context = bible_service.get_or_build_bible(user_id, request.bible, "temp_enhance")
         except Exception as exc:
             logger.warning(f"[Podcast Enhance] Failed to parse or generate bible context: {exc}")
     else:
@@ -254,21 +247,13 @@ async def analyze_podcast_idea(
     """
     user_id = require_authenticated_user(current_user)
 
-    # Serialize Bible context if provided or generate from onboarding
+    # Serialize Bible context if provided, or seed from the user's podcast persona
+    # (falling back to onboarding preferences).
     bible_context = ""
     bible_obj = None
     try:
         bible_service = PodcastBibleService()
-        if request.bible:
-            from models.podcast_bible_models import PodcastBible
-            bible_data = PodcastBible(**request.bible)
-            bible_context = bible_service.serialize_bible(bible_data)
-            bible_obj = bible_data
-        else:
-            # Generate from onboarding data directly
-            bible_obj = bible_service.generate_bible(user_id, "temp_analyze")
-            bible_context = bible_service.serialize_bible(bible_obj)
-            bible_obj = bible_obj
+        bible_obj, bible_context = bible_service.get_or_build_bible(user_id, request.bible, "temp_analyze")
     except Exception as exc:
         logger.warning(f"[Podcast Analyze] Failed to parse or generate bible context: {exc}")
 
@@ -294,6 +279,9 @@ async def analyze_podcast_idea(
             )
             
             # 2. Build avatar prompt from Bible host look or fallback
+            # PHASE-4B (deferred): prefer the podcast persona's prompt_defaults —
+            # host_image_prompt + negative_prompt (brand-grounded, image-model-ready)
+            # — falling back to the seeded bible host.look/style_preset below.
             host_look = bible_obj.host.look if bible_obj and bible_obj.host.look else "A professional podcast host"
             visual_style = bible_obj.visual_style.style_preset if bible_obj else "Realistic Photography"
             
@@ -499,16 +487,13 @@ async def regenerate_research_queries(
         keywords = ", ".join(request.existing_analysis.get("top_keywords", [])[:5])
         audience = request.existing_analysis.get("audience", "")
     
-    # Serialize Bible context if provided
+    # Serialize Bible context if provided, or seed from the podcast persona.
     bible_context = ""
-    if request.bible:
-        try:
-            bible_service = PodcastBibleService()
-            from models.podcast_bible_models import PodcastBible
-            bible_data = PodcastBible(**request.bible)
-            bible_context = bible_service.serialize_bible(bible_data)
-        except Exception as e:
-            logger.warning(f"Failed to serialize bible for query regeneration: {e}")
+    try:
+        bible_service = PodcastBibleService()
+        _, bible_context = bible_service.get_or_build_bible(user_id, request.bible, "temp_regenerate_queries")
+    except Exception as e:
+        logger.warning(f"Failed to build bible for query regeneration: {e}")
     
     prompt = f"""
 You are a research strategist for podcast content. Given a podcast idea, existing analysis, and user feedback,

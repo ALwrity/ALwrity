@@ -155,7 +155,7 @@ export const FormatTransformerModal: React.FC<FormatTransformerModalProps> = ({
         title: result.title || "Transformed Content",
         content: result.content,
         topic: result.title,
-        tags: [result.type],
+        contentType: result.type,
       });
       setSaved(true);
     } catch {

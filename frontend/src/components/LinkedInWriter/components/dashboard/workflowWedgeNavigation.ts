@@ -2,6 +2,18 @@
  * Shared workflow wedge navigation — Quick Create return targets and deep links.
  */
 
+import {
+  buildContentAnalyticsReturnTarget,
+  type ContentAnalyticsReturnTarget,
+} from "./dashboardModalReturnNavigation";
+
+export type { ContentAnalyticsReturnTarget } from "./dashboardModalReturnNavigation";
+export {
+  CONTENT_ANALYTICS_MODAL_LABEL,
+  buildContentAnalyticsReturnTarget,
+  isContentAnalyticsReturnTarget,
+} from "./dashboardModalReturnNavigation";
+
 export type WorkflowModalId =
   | "plan"
   | "create"
@@ -33,17 +45,25 @@ export interface QuickCreateReturnTarget {
 export interface OpenWorkflowWedgeDetail {
   wedge: WorkflowModalId;
   sub?: WorkflowSubModal;
+  /** When set, Performance Pulse back returns to this parent instead of the Remarket grid. */
+  returnTo?: ContentAnalyticsReturnTarget;
 }
 
 /** Legacy deep link: engagement wedge + pulse sub (Performance Pulse moved to Remarket). */
 export type LegacyEngagementPulseDetail = {
   wedge: "engagement";
   sub: "pulse";
+  returnTo?: ContentAnalyticsReturnTarget;
 };
 
 export type OpenWorkflowWedgeDetailInput =
   | OpenWorkflowWedgeDetail
   | LegacyEngagementPulseDetail;
+
+export interface OpenPerformancePulseOptions {
+  /** Preserve Analysis wedge back nav when returning to Content Analytics. */
+  fromAnalysisWedge?: boolean;
+}
 
 export interface OpenQuickCreateFromWedgeDetail {
   type?: string;
@@ -66,7 +86,11 @@ export function resolveWorkflowWedgeDetail(
   detail: OpenWorkflowWedgeDetailInput,
 ): OpenWorkflowWedgeDetail {
   if (detail.wedge === "engagement" && detail.sub === "pulse") {
-    return { wedge: "remarket", sub: "pulse" };
+    return {
+      wedge: "remarket",
+      sub: "pulse",
+      returnTo: detail.returnTo,
+    };
   }
   return detail;
 }
@@ -80,8 +104,14 @@ export function openWorkflowWedge(detail: OpenWorkflowWedgeDetailInput): void {
 }
 
 /** Open Performance Pulse (Remarket wedge) from analytics panels or sidebar. */
-export function openPerformancePulse(): void {
-  openWorkflowWedge({ wedge: "remarket", sub: "pulse" });
+export function openPerformancePulse(
+  options?: OpenPerformancePulseOptions,
+): void {
+  openWorkflowWedge({
+    wedge: "remarket",
+    sub: "pulse",
+    returnTo: buildContentAnalyticsReturnTarget(options?.fromAnalysisWedge),
+  });
 }
 
 export function openQuickCreateFromWedge(

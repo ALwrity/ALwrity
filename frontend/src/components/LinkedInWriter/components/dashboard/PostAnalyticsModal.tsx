@@ -37,9 +37,9 @@ export const PostAnalyticsModal: React.FC<PostAnalyticsModalProps> = ({
   );
 
   const handleOpenPerformancePulse = useCallback(() => {
+    openPerformancePulse({ fromAnalysisWedge: analysisWedgeNav });
     onClose();
-    openPerformancePulse();
-  }, [onClose]);
+  }, [onClose, analysisWedgeNav]);
 
   const wedgeNav = analysisWedgeNav && Boolean(onBack);
 

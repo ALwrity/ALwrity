@@ -17,7 +17,10 @@ from .data_collector import OnboardingDataCollector
 from .prompt_builder import PersonaPromptBuilder
 from services.persona.linkedin.linkedin_persona_service import LinkedInPersonaService
 from services.persona.facebook.facebook_persona_service import FacebookPersonaService
+from services.persona.youtube.youtube_persona_service import YouTubePersonaService
+from services.persona.podcast.podcast_persona_service import PodcastPersonaService
 from services.persona.enhanced_linguistic_analyzer import get_linguistic_analyzer
+from services.persona.platform_registry import PERSONA_PLATFORMS, get_platform_constraints
 
 
 class CorePersonaService:
@@ -39,6 +42,8 @@ class CorePersonaService:
             self.prompt_builder = PersonaPromptBuilder()
             self.linkedin_service = LinkedInPersonaService()
             self.facebook_service = FacebookPersonaService()
+            self.youtube_service = YouTubePersonaService()
+            self.podcast_service = PodcastPersonaService()
             logger.debug("CorePersonaService initialized")
             self._initialized = True
     
@@ -225,7 +230,8 @@ class CorePersonaService:
     def generate_platform_adaptations(self, core_persona: Dict[str, Any], onboarding_data: Dict[str, Any]) -> Dict[str, Any]:
         """Generate platform-specific persona adaptations."""
         
-        platforms = ["twitter", "linkedin", "instagram", "facebook", "blog", "medium", "substack", "youtube"]
+        # Preserve the legacy 8-platform set (all registry platforms except the new podcast).
+        platforms = [p["id"] for p in PERSONA_PLATFORMS if p["id"] != "podcast"]
         platform_personas = {}
         
         for platform in platforms:
@@ -250,6 +256,19 @@ class CorePersonaService:
         # Use Facebook service for Facebook platform
         if platform.lower() == "facebook":
             return self.facebook_service.generate_facebook_persona(core_persona, onboarding_data)
+        
+        # Use YouTube service for YouTube platform (video-aware)
+        # Unlike the generic text adaptation below, YouTube/Podcast get dedicated
+        # audio/video-aware services so their personas capture MEDIA form
+        # (tone/pacing, visual style, script structure, prompt_defaults) instead of
+        # just writing style. Those services produce the stable BASE persona that
+        # Phase 3/4 later inject into episode generation.
+        if platform.lower() == "youtube":
+            return self.youtube_service.generate_youtube_persona(core_persona, onboarding_data)
+        
+        # Use Podcast service for Podcast platform (audio/video-aware)
+        if platform.lower() == "podcast":
+            return self.podcast_service.generate_podcast_persona(core_persona, onboarding_data)
         
         # Use generic platform adaptation for other platforms
         platform_constraints = self._get_platform_constraints(platform)
@@ -279,66 +298,5 @@ class CorePersonaService:
             return {"error": f"Failed to generate {platform} persona: {str(e)}"}
     
     def _get_platform_constraints(self, platform: str) -> Dict[str, Any]:
-        """Get platform-specific constraints and best practices."""
-        
-        constraints = {
-            "twitter": {
-                "character_limit": 280,
-                "optimal_length": "120-150 characters",
-                "hashtag_limit": 3,
-                "image_support": True,
-                "thread_support": True,
-                "link_shortening": True
-            },
-            "linkedin": self.linkedin_service.get_linkedin_constraints(),
-            "instagram": {
-                "caption_limit": 2200,
-                "optimal_length": "125-150 words",
-                "hashtag_limit": 30,
-                "visual_first": True,
-                "story_support": True,
-                "emoji_friendly": True
-            },
-            "facebook": {
-                "character_limit": 63206,
-                "optimal_length": "40-80 words",
-                "algorithm_favors": "engagement",
-                "link_preview": True,
-                "event_support": True,
-                "group_sharing": True
-            },
-            "blog": {
-                "word_count": "800-2000 words",
-                "seo_important": True,
-                "header_structure": True,
-                "internal_linking": True,
-                "meta_descriptions": True,
-                "readability_score": True
-            },
-            "medium": {
-                "word_count": "1000-3000 words",
-                "storytelling_focus": True,
-                "subtitle_support": True,
-                "publication_support": True,
-                "clap_optimization": True,
-                "follower_building": True
-            },
-            "substack": {
-                "newsletter_format": True,
-                "email_optimization": True,
-                "subscription_focus": True,
-                "long_form": True,
-                "personal_connection": True,
-                "monetization_support": True
-            },
-            "youtube": {
-                "hook_optimization": True,
-                "script_structure": "Hook-Intro-Body-CTA",
-                "video_description_limit": 5000,
-                "title_optimization": True,
-                "engagement_prompts": True,
-                "visual_cues": True
-            }
-        }
-        
-        return constraints.get(platform, {})
+        """Get platform-specific constraints (delegates to the platform registry)."""
+        return get_platform_constraints(platform)
