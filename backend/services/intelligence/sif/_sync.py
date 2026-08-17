@@ -6,18 +6,181 @@ the tier page-limit helper. These are split out of ``sif_integration.py``
 to keep the facade light.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List, Tuple
 from loguru import logger
 from datetime import datetime
 from sqlalchemy import select, desc
 
 from services.database import get_session_for_user
-from models.onboarding import WebsiteAnalysis, OnboardingSession, CompetitorAnalysis
+from models.onboarding import WebsiteAnalysis, OnboardingSession, CompetitorAnalysis, PersonaData
 from services.intelligence.sif_metrics import inc_counter as _sif_metrics_inc
+
+
+def _safe_str(value: Any, fallback: str = "") -> str:
+    """Coerce a persona field to a compact string (None -> '', lists joined)."""
+    if value is None:
+        return fallback
+    if isinstance(value, str):
+        return value
+    if isinstance(value, (list, tuple)):
+        return ", ".join(str(v) for v in value)
+    return str(value)
+
+
+def _build_persona_index_items(persona: Dict[str, Any], user_id: str) -> List[Tuple[str, str, Dict[str, Any]]]:
+    """Build (id, text, metadata) SIF index items for a PersonaData dict.
+
+    Writes natural-language text so content-generation agents can retrieve the
+    brand voice semantically (e.g. "brand tone audience phrases"), plus one
+    document per platform persona for per-platform retrieval.
+    """
+    items: List[Tuple[str, str, Dict[str, Any]]] = []
+
+    # Core persona
+    core = persona.get("core_persona")
+    if isinstance(core, dict) and core:
+        identity = core.get("identity") or {}
+        linguistic = core.get("linguistic_fingerprint") or {}
+        lexical = linguistic.get("lexical_features") or {}
+        sentence = linguistic.get("sentence_metrics") or {}
+        rhetorical = linguistic.get("rhetorical_devices") or {}
+        tonal = core.get("tonal_range") or {}
+
+        parts = [f"Brand persona {_safe_str(identity.get('persona_name'))}"]
+        if identity.get("archetype"):
+            parts.append(f"Archetype: {_safe_str(identity['archetype'])}")
+        if identity.get("core_belief"):
+            parts.append(f"Core belief: {_safe_str(identity['core_belief'])}")
+        if identity.get("brand_voice_description"):
+            parts.append(f"Brand voice: {_safe_str(identity['brand_voice_description'])}")
+        if tonal.get("default_tone"):
+            parts.append(f"Default tone: {_safe_str(tonal['default_tone'])}")
+        if tonal.get("permissible_tones"):
+            parts.append(f"Permissible tones: {_safe_str(tonal['permissible_tones'])}")
+        if tonal.get("forbidden_tones"):
+            parts.append(f"Avoid tones: {_safe_str(tonal['forbidden_tones'])}")
+        if lexical.get("go_to_phrases"):
+            parts.append(f"Go-to phrases: {_safe_str(lexical['go_to_phrases'])}")
+        if lexical.get("go_to_words"):
+            parts.append(f"Go-to words: {_safe_str(lexical['go_to_words'])}")
+        if lexical.get("avoid_words"):
+            parts.append(f"Avoid words: {_safe_str(lexical['avoid_words'])}")
+        if sentence.get("average_sentence_length_words") is not None:
+            parts.append(
+                f"Sentence style: {_safe_str(sentence.get('average_sentence_length_words'))} words, "
+                f"{_safe_str(sentence.get('preferred_sentence_type'))}, "
+                f"{_safe_str(sentence.get('complexity_level'))}"
+            )
+        if rhetorical.get("storytelling_style"):
+            parts.append(f"Storytelling: {_safe_str(rhetorical['storytelling_style'])}")
+        text = ". ".join(parts) + "."
+        meta = {
+            "type": "persona",
+            "persona_kind": "core",
+            "user_id": user_id,
+            "full_report": core,
+        }
+        items.append((f"persona_core:{user_id}", text, meta))
+
+    # Platform personas (one document each, for per-platform retrieval)
+    platforms = persona.get("platform_personas")
+    if isinstance(platforms, dict) and platforms:
+        for platform, p in platforms.items():
+            if not isinstance(p, dict):
+                continue
+            name = _safe_str(p.get("persona_name") or p.get("name") or p.get("platform_type"))
+            archetype = _safe_str(p.get("archetype"))
+            core_belief = _safe_str(p.get("core_belief"))
+            tone = _safe_str(p.get("default_tone") or p.get("tone"))
+            parts = [f"{platform} content persona {name}"]
+            if archetype:
+                parts.append(f"Archetype: {archetype}")
+            if core_belief:
+                parts.append(f"Core belief: {core_belief}")
+            if tone:
+                parts.append(f"Tone: {tone}")
+            text = ". ".join(parts) + "."
+            meta = {
+                "type": "persona",
+                "persona_kind": "platform",
+                "platform": platform,
+                "user_id": user_id,
+                "full_report": p,
+            }
+            items.append((f"persona_{platform}:{user_id}", text, meta))
+
+    # Quality metrics
+    quality = persona.get("quality_metrics") or {}
+    if isinstance(quality, dict) and quality:
+        text = (
+            f"Persona quality metrics. Overall score {_safe_str(quality.get('overall_score'))}. "
+            f"Core completeness {_safe_str(quality.get('core_completeness'))}, "
+            f"platform consistency {_safe_str(quality.get('platform_consistency'))}, "
+            f"platform optimization {_safe_str(quality.get('platform_optimization'))}, "
+            f"linguistic quality {_safe_str(quality.get('linguistic_quality'))}."
+        )
+        meta = {
+            "type": "persona",
+            "persona_kind": "quality",
+            "user_id": user_id,
+            "full_report": quality,
+        }
+        items.append((f"persona_quality:{user_id}", text, meta))
+
+    return items
 
 
 class SIFSyncMixin:
     """Indexing/sync operations for the SIF index."""
+
+    async def sync_persona_data_to_sif(self, db=None) -> None:
+        """Embed PersonaData (core + platform personas + quality) into the SIF index.
+
+        Raises:
+            SIFEmbeddingFailed: If the underlying intelligence_service
+                raised during the index call.
+        """
+        close_db = False
+        try:
+            if db is None:
+                db = get_session_for_user(self.user_id)
+                close_db = True
+            if not db:
+                return
+
+            stmt = (
+                select(PersonaData)
+                .join(OnboardingSession, PersonaData.session_id == OnboardingSession.id)
+                .where(OnboardingSession.user_id == self.user_id)
+                .order_by(desc(PersonaData.updated_at))
+            )
+            persona = db.execute(stmt).scalars().first()
+            if not persona:
+                logger.info(f"No persona data found for user {self.user_id}")
+                _sif_metrics_inc("sif_sync_total", "persona_success")
+                return
+
+            items = _build_persona_index_items(
+                persona.to_dict() if hasattr(persona, "to_dict") else {},
+                self.user_id,
+            )
+            if items:
+                await self.intelligence_service.index_content(items)
+                logger.info(f"Successfully synced {len(items)} persona items to SIF")
+            _sif_metrics_inc("sif_sync_total", "persona_success")
+        except Exception as e:
+            logger.error(f"Failed to sync persona data to SIF: {e}", exc_info=True)
+            from services.intelligence.sif_errors import SIFEmbeddingFailed
+            _sif_metrics_inc("sif_sync_total", "persona_error")
+            raise SIFEmbeddingFailed(
+                f"Failed to sync persona data to SIF: {e}",
+                user_id=self.user_id,
+                operation="sync_persona_data_to_sif",
+                cause=e,
+            ) from e
+        finally:
+            if close_db and db:
+                db.close()
 
     async def index_market_trends_run(self, trends_result: Dict[str, Any], run_id: str) -> None:
         """
@@ -312,6 +475,12 @@ class SIFSyncMixin:
                 }
 
                 items_to_index.append((f"ca_{comp.id}", text_content, metadata))
+
+            # 3. Sync persona data (best-effort; independent of website/competitor)
+            try:
+                await self.sync_persona_data_to_sif(db=db)
+            except Exception as e:
+                logger.warning(f"Persona sync failed (continuing): {e}")
 
             # Index content
             if items_to_index:

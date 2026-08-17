@@ -10,6 +10,15 @@ from typing import Any
 class VideoScriptPromptBuilder:
     """Builder class for LinkedIn video script generation prompts."""
     
+    # ==========================================================================
+    # PHASE C FOLLOW-UP — persona context injection (NOT YET WIRED)
+    # This builder takes NO persona today. Add a `persona_context: Optional[str]
+    # = None` param and inject the curated brand-voice block into the STYLE layer
+    # (voice/tone guidance), keeping the topic/structure user-driven. Resolve via
+    # resolve_persona_context(user_id, 'linkedin') in the video-script generate
+    # method (mirror generate_grounded_post_content). Same pattern as the
+    # carousel builder below.
+    # ==========================================================================
     @staticmethod
     def build_video_script_prompt(request: Any) -> str:
         """
